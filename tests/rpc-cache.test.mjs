@@ -126,3 +126,62 @@ test('newer World Energy API snapshot replaces older balance and refill clock', 
   assert.equal(merged.data.amount, 20);
   assert.equal(merged.data.lastRefillAt, 2000000);
 });
+
+test('research actions update and clear the live countdown', () => {
+  const summary = record([{ name: 'getSummary', feature: 'personalResearch', ident: 1 }],
+    [{ ident: 1, result: { response: { queues: [] } } }], '2026-11-01T12:33:00.000Z');
+  const start = record([{ name: 'startResearch', feature: 'personalResearch', ident: 2,
+    args: { researchId: 119, nextLevel: 2, startDate: 1793536406988,
+      durationMs: 7810560, queueNumber: 0 } }],
+    [{ ident: 2, result: { response: {} } }], '2026-11-01T12:33:29.055Z');
+  const complete = record([{ name: 'completeResearch', feature: 'personalResearch', ident: 3,
+    args: { researchId: 119 } }], [{ ident: 3, result: { response: {} } }],
+    '2026-11-01T14:43:40.000Z');
+  const started = cache.merge({}, [summary, start]).cache;
+  assert.equal(started.researchStatus.data.queues[0].durationMs, 7810560);
+  assert.equal(started.researchStatus.data.queues[0].researchId, 119);
+  assert.equal(cache.merge(started, [start]).changed, false);
+  assert.equal(cache.merge(started, [complete]).cache.researchStatus.data.queues.length, 0);
+  const failed = record([{ name: 'startResearch', feature: 'personalResearch', ident: 4,
+    args: { startDate: 1, durationMs: 100 } }],
+    [{ ident: 4, result: { error: 'rejected' } }]);
+  assert.equal(cache.extract(failed).length, 0);
+});
+
+test('raid start spends 25 World Energy and cancellation refunds once', () => {
+  const baseline = record([{ name: 'refillableGetAll', feature: 'refillable', ident: 1 }],
+    [{ ident: 1, result: { response: { refillables: [
+      { refillableId: 2, amount: 44, lastRefillAt: 1793532222787 }
+    ] } } }], '2026-11-01T11:28:27.082Z');
+  const create = record([{ name: 'createRally', feature: 'mob', ident: 2 }],
+    [{ ident: 2, result: { response: { rally: { rallyId: 'rally-a' } } } }],
+    '2026-11-01T12:35:51.074Z');
+  const cancel = record([{ name: 'cancelRally', feature: 'rally', ident: 3,
+    args: { rallyId: 'rally-a' } }], [{ ident: 3, result: { response: {} } }],
+    '2026-11-01T12:36:05.983Z');
+  const started = cache.merge({}, [baseline, create]).cache;
+  assert.equal(started['resource:world-energy'].data.amount, 33);
+  assert.equal(started.worldEnergyStatus.data.energy, 33);
+  assert.equal(cache.merge(started, [create]).changed, false);
+  const canceled = cache.merge(started, [cancel]).cache;
+  assert.equal(canceled['resource:world-energy'].data.amount, 58);
+  assert.equal(cache.merge(canceled, [cancel]).changed, false);
+  const fresh = record([{ name: 'refillableGetAll', feature: 'refillable', ident: 4 }],
+    [{ ident: 4, result: { response: { refillables: [
+      { refillableId: 2, amount: 60, lastRefillAt: 1793536500000 }
+    ] } } }], '2026-11-01T12:37:00.000Z');
+  assert.equal(cache.merge(canceled, [fresh]).cache['resource:world-energy'].data.amount, 60);
+});
+
+test('raid from a full World Energy bar restarts the refill clock', () => {
+  const at = '2026-11-01T12:35:51.074Z';
+  const snapshot = record([{ name: 'refillableGetAll', feature: 'refillable', ident: 1 }],
+    [{ ident: 1, result: { response: { refillables: [
+      { refillableId: 2, amount: 200, lastRefillAt: 1793530000000 }
+    ] } } }], '2026-11-01T12:30:00.000Z');
+  const create = record([{ name: 'createRally', feature: 'mob', ident: 2 }],
+    [{ ident: 2, result: { response: { rally: { rallyId: 'rally-b' } } } }], at);
+  const result = cache.merge({}, [snapshot, create]).cache['resource:world-energy'];
+  assert.equal(result.data.amount, 175);
+  assert.equal(result.data.lastRefillAt, Date.parse(at));
+});

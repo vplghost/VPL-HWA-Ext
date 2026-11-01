@@ -133,9 +133,34 @@
             Array.isArray(result?.response?.queues)) {
           const queues = result.response.queues.filter((queue) =>
             Number.isFinite(queue.startDate) && Number.isFinite(queue.durationMs) && queue.durationMs >= 0)
-            .map((queue) => ({ startDate: queue.startDate, durationMs: queue.durationMs }));
+            .map((queue, index) => ({ startDate: queue.startDate, durationMs: queue.durationMs,
+              researchId: queue.researchId, queueNumber: queue.queueNumber ?? index }));
           return [{ key: call.feature === 'building' ? 'buildingStatus' : 'researchStatus',
             method: call.name, feature: call.feature, group: 'header', data: { queues },
+            updatedAt: record.timestamp }];
+        }
+        if (key === 'startResearch:personalResearch' && result?.response &&
+            Number.isFinite(call.args?.startDate) && Number.isFinite(call.args?.durationMs) &&
+            call.args.durationMs >= 0) {
+          return [{ key: 'researchStatus', method: call.name, feature: call.feature,
+            group: 'header', data: { action: 'start', queue: {
+              researchId: call.args.researchId, queueNumber: call.args.queueNumber,
+              startDate: call.args.startDate, durationMs: call.args.durationMs
+            } }, updatedAt: record.timestamp }];
+        }
+        if (key === 'completeResearch:personalResearch' && result?.response) {
+          return [{ key: 'researchStatus', method: call.name, feature: call.feature,
+            group: 'header', data: { action: 'complete', researchId: call.args?.researchId },
+            updatedAt: record.timestamp }];
+        }
+        if (key === 'createRally:mob' && result?.response?.rally?.rallyId) {
+          return [{ key: 'worldEnergyAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { action: 'create', rallyId: result.response.rally.rallyId },
+            updatedAt: record.timestamp }];
+        }
+        if (key === 'cancelRally:rally' && result?.response && call.args?.rallyId) {
+          return [{ key: 'worldEnergyAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { action: 'cancel', rallyId: call.args.rallyId },
             updatedAt: record.timestamp }];
         }
         if (!group || !result || !Object.hasOwn(result, 'response') || result.response == null) return [];
@@ -152,7 +177,67 @@
     let changed = false;
     for (const record of records) {
       for (const entry of extract(record)) {
+        if (entry.key === 'worldEnergyAction') {
+          const state = next.worldEnergyRallies?.data || {};
+          const previous = state[entry.data.rallyId];
+          if (previous && previous.updatedAt >= entry.updatedAt) continue;
+          if (entry.data.action === 'cancel' && previous?.active !== true) continue;
+          if (entry.data.action === 'create' && previous) continue;
+          const actionAt = Date.parse(entry.updatedAt);
+          const energy = next['resource:world-energy'];
+          const snapshotAt = energy ? Date.parse(energy.updatedAt) : Infinity;
+          const applies = energy && actionAt >= snapshotAt;
+          // All current globalMapMobRally attackCost entries charge 25 refillableResource #2.
+          const delta = entry.data.action === 'create' ? -25 : 25;
+          if (applies && Number.isFinite(energy.data.amount)) {
+            const data = { ...energy.data };
+            if (Number.isFinite(data.lastRefillAt) && Number.isFinite(data.refillEveryMs) &&
+                Number.isFinite(data.cap) && data.refillEveryMs > 0 && data.amount < data.cap) {
+              data.amount = Math.min(data.cap, data.amount +
+                Math.floor(Math.max(0, actionAt - data.lastRefillAt) / data.refillEveryMs));
+              data.lastRefillAt += Math.floor(Math.max(0, actionAt - data.lastRefillAt) /
+                data.refillEveryMs) * data.refillEveryMs;
+            }
+            const full = Number.isFinite(data.cap) && data.amount >= data.cap;
+            data.amount = Math.max(0, Math.min(Number.isFinite(data.cap) ? data.cap : Infinity,
+              data.amount + delta));
+            if (full && delta < 0) data.lastRefillAt = actionAt;
+            next['resource:world-energy'] = { ...energy, method: entry.method, data,
+              updatedAt: entry.updatedAt };
+            next.worldEnergyStatus = { key: 'worldEnergyStatus', method: entry.method,
+              feature: entry.feature, group: 'header', data: { energy: data.amount },
+              updatedAt: entry.updatedAt };
+          }
+          const states = { ...state, [entry.data.rallyId]: {
+            active: entry.data.action === 'create', updatedAt: entry.updatedAt
+          } };
+          const ids = Object.keys(states).sort((a, b) =>
+            states[b].updatedAt.localeCompare(states[a].updatedAt));
+          for (const id of ids.slice(40)) delete states[id];
+          next.worldEnergyRallies = { key: 'worldEnergyRallies', method: entry.method,
+            feature: entry.feature, group: 'internal', data: states, updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
+        if (entry.key === 'researchStatus' && entry.data.action &&
+            next[entry.key]?.updatedAt === entry.updatedAt) continue;
+        if (entry.key === 'researchStatus' && entry.data.action) {
+          const queues = [...(next.researchStatus?.data?.queues || [])];
+          if (entry.data.action === 'start') {
+            const queue = entry.data.queue;
+            const index = queues.findIndex((item) =>
+              Number.isInteger(queue.queueNumber) ? item.queueNumber === queue.queueNumber :
+                item.researchId === queue.researchId);
+            if (index >= 0) queues[index] = queue;
+            else queues.push(queue);
+          } else {
+            const index = queues.findIndex((item) => item.researchId === entry.data.researchId);
+            if (index >= 0) queues.splice(index, 1);
+            else if (queues.length === 1) queues.length = 0;
+          }
+          entry.data = { queues };
+        }
         if (entry.key === 'resource:energy' && !Number.isFinite(entry.data.cap) &&
             Number.isFinite(next[entry.key]?.data?.cap)) {
           entry.data.cap = next[entry.key].data.cap;

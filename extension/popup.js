@@ -391,7 +391,8 @@ async function render() {
   } else if (activeTab === 'other') {
     const entries = Object.values(cache).filter((entry) =>
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'energyStatus',
-        'worldEnergyStatus', 'accountStatus', 'buildingStatus', 'researchStatus'].includes(entry.key)
+        'worldEnergyStatus', 'worldEnergyRallies', 'accountStatus', 'buildingStatus',
+        'researchStatus'].includes(entry.key)
       && !entry.key.startsWith('resource:')
       && matches([entry.method, entry.feature || entry.group]));
     const rows = entries.map((entry) => [entry.method, entry.feature || entry.group,
