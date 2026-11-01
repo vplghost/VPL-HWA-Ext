@@ -24,9 +24,9 @@ test('hero soul progress uses inventory fragments and next-star cost', () => {
 test('teams retain every nested squad and resolve hero/titan names', () => {
   const rows = teamRows({ arena: [1, 4000], grand: [[1, 999999], [4000]] }, context.hwaHelperNameMap);
   assert.deepEqual(Array.from(rows, (row) => Array.from(row)), [
-    ['arena', '—', 2, '1, 4000', 'Aurora, Sigurd'],
-    ['grand', 1, 2, '1, 999999', 'Aurora, #999999'],
-    ['grand', 2, 1, '4000', 'Sigurd']
+    ['arena', '—', 2, 'Aurora, Sigurd', [1, 4000]],
+    ['grand', 1, 2, 'Aurora, #999999', [1, 999999]],
+    ['grand', 2, 1, 'Sigurd', [4000]]
   ]);
 });
 

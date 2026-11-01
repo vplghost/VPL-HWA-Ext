@@ -14,8 +14,17 @@ let currentProductionRates = {};
 const sortState = {};
 
 document.querySelector('#version').textContent = chrome.runtime.getManifest().version;
-document.querySelector('#open-tab').addEventListener('click', () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+const openTabButton = document.querySelector('#open-tab');
+if (new URLSearchParams(location.search).get('view') === 'tab') {
+  openTabButton.hidden = true;
+}
+if (chrome.tabs?.getCurrent) {
+  chrome.tabs.getCurrent((tab) => {
+    if (tab) openTabButton.hidden = true;
+  });
+}
+openTabButton.addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?view=tab') });
 });
 
 const formatNumber = (value) => typeof value === 'number' ? value.toLocaleString('en-US') : '—';
@@ -234,6 +243,348 @@ function starIcons(count) {
   return wrap;
 }
 
+const factionColors = {
+  'Way of Eternity': {
+    dot: 'bg-purple-400',
+    gradient: 'from-purple-600 to-indigo-800'
+  },
+  'Way of Nature': {
+    dot: 'bg-emerald-400',
+    gradient: 'from-emerald-600 to-teal-800'
+  },
+  'Way of Honor': {
+    dot: 'bg-amber-400',
+    gradient: 'from-amber-500 to-yellow-700'
+  },
+  'Way of Chaos': {
+    dot: 'bg-red-400',
+    gradient: 'from-red-600 to-rose-800'
+  },
+  'Way of Progress': {
+    dot: 'bg-sky-400',
+    gradient: 'from-sky-500 to-blue-700'
+  },
+  'Way of Mystery': {
+    dot: 'bg-violet-400',
+    gradient: 'from-violet-600 to-purple-800'
+  }
+};
+
+const titanElementColors = {
+  Water: { dot: 'bg-sky-400', gradient: 'from-sky-500 to-blue-700' },
+  Fire: { dot: 'bg-red-500', gradient: 'from-amber-600 to-red-700' },
+  Earth: { dot: 'bg-emerald-500', gradient: 'from-emerald-600 to-green-800' },
+  Darkness: { dot: 'bg-purple-400', gradient: 'from-purple-800 to-slate-900' },
+  Light: { dot: 'bg-amber-300', gradient: 'from-amber-400 to-yellow-600' },
+  Spirit: { dot: 'bg-indigo-400', gradient: 'from-indigo-500 to-violet-700' }
+};
+
+function starGlowClass(starCount, isLarge = false) {
+  const prefix = isLarge ? 'avatar-star-lg-' : 'avatar-star-';
+  const count = Number(starCount);
+  if (Number.isInteger(count) && count >= 1 && count <= 6) {
+    return `${prefix}${count}`;
+  }
+  return `${prefix}default`;
+}
+
+function createInitialsBadge(name, theme, isLarge = false, glowClass = '') {
+  const badge = document.createElement('span');
+  const gradient = factionColors[theme]?.gradient ||
+    titanElementColors[theme]?.gradient ||
+    'from-slate-600 to-slate-800';
+  const glow = glowClass || (isLarge ? 'avatar-star-lg-default' : 'avatar-star-default');
+  if (isLarge) {
+    badge.className = `inline-flex size-14 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} text-xl font-bold text-white ${glow}`;
+  } else {
+    badge.className = `inline-flex size-4 -my-0.5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${gradient} text-[9px] font-bold text-white ${glow}`;
+  }
+  badge.textContent = (name || '?').charAt(0).toUpperCase();
+  return badge;
+}
+
+function createHeroInline(heroId, displayName, heroSnapshot) {
+  const meta = globalThis.hwaHelperHeroMetadata?.[heroId];
+  if (!meta) {
+    const textNode = document.createElement('span');
+    textNode.textContent = displayName;
+    return textNode;
+  }
+
+  const starCount = heroSnapshot?.star;
+  const smallGlow = starGlowClass(starCount, false);
+  const largeGlow = starGlowClass(starCount, true);
+  const avatarPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${heroId}.webp` : null);
+
+  const container = document.createElement('span');
+  container.className = 'hero-hover-trigger group/hero inline-flex items-center gap-1.5 align-middle cursor-pointer';
+  container.tabIndex = 0;
+  container.setAttribute('aria-label', `${displayName} info`);
+
+  if (avatarPath) {
+    const img = document.createElement('img');
+    img.src = avatarPath;
+    img.alt = displayName;
+    img.className = `size-4 rounded-full object-cover -my-0.5 shrink-0 ${smallGlow} group-hover/hero:brightness-110`;
+    img.loading = 'lazy';
+    img.addEventListener('error', () => {
+      img.replaceWith(createInitialsBadge(displayName, meta.faction, false, smallGlow));
+    }, { once: true });
+    container.append(img);
+  } else {
+    container.append(createInitialsBadge(displayName, meta.faction, false, smallGlow));
+  }
+
+  const nameLabel = document.createElement('span');
+  nameLabel.className = 'group-hover/hero:text-blue-600 transition-colors';
+  nameLabel.textContent = displayName;
+  container.append(nameLabel);
+
+  const card = document.createElement('div');
+  card.className = 'hero-hover-card';
+
+  const header = document.createElement('div');
+  header.className = 'flex items-center gap-3';
+
+  if (avatarPath) {
+    const bigImg = document.createElement('img');
+    bigImg.src = avatarPath;
+    bigImg.alt = displayName;
+    bigImg.className = `size-14 rounded-lg object-cover shrink-0 ${largeGlow}`;
+    bigImg.addEventListener('error', () => {
+      bigImg.replaceWith(createInitialsBadge(displayName, meta.faction, true, largeGlow));
+    }, { once: true });
+    header.append(bigImg);
+  } else {
+    header.append(createInitialsBadge(displayName, meta.faction, true, largeGlow));
+  }
+
+  const infoCol = document.createElement('div');
+  infoCol.className = 'min-w-0 flex-1 space-y-0.5';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'font-bold text-sm text-white truncate';
+  nameEl.textContent = displayName;
+  infoCol.append(nameEl);
+
+  const starsEl = document.createElement('div');
+  starsEl.className = 'flex items-center gap-1 text-xs';
+  if (Number.isInteger(starCount) && starCount >= 1) {
+    starsEl.append(starIcons(starCount));
+  } else {
+    starsEl.className += ' text-slate-400';
+    starsEl.textContent = 'Stars: —';
+  }
+  infoCol.append(starsEl);
+
+  const powerEl = document.createElement('div');
+  powerEl.className = 'text-xs text-amber-300 font-medium tabular-nums';
+  powerEl.textContent = Number.isFinite(heroSnapshot?.power) ?
+    `⚡ Power: ${formatNumber(heroSnapshot.power)}` : 'Power: —';
+  infoCol.append(powerEl);
+
+  header.append(infoCol);
+  card.append(header);
+
+  const divider = document.createElement('div');
+  divider.className = 'border-t border-slate-700/80 my-2';
+  card.append(divider);
+
+  const details = document.createElement('div');
+  details.className = 'grid grid-cols-2 gap-2 text-[11px]';
+
+  const roleBox = document.createElement('div');
+  roleBox.className = 'rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60';
+  const roleLabel = document.createElement('span');
+  roleLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+  roleLabel.textContent = 'Role';
+  const roleVal = document.createElement('span');
+  roleVal.className = 'font-medium text-slate-200 block truncate';
+  roleVal.textContent = `${meta.class} (${meta.role})`;
+  roleBox.append(roleLabel, roleVal);
+
+  const factionBox = document.createElement('div');
+  const factionTheme = factionColors[meta.faction];
+  factionBox.className = 'rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60';
+  const facLabel = document.createElement('span');
+  facLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+  facLabel.textContent = 'Faction';
+  const facVal = document.createElement('span');
+  facVal.className = 'font-medium text-slate-200 flex items-center gap-1 truncate';
+  if (factionTheme) {
+    const dot = document.createElement('span');
+    dot.className = `size-1.5 rounded-full ${factionTheme.dot} shrink-0`;
+    facVal.append(dot);
+  }
+  const facText = document.createElement('span');
+  facText.className = 'truncate';
+  facText.textContent = meta.faction.replace('Way of ', '');
+  facVal.append(facText);
+  factionBox.append(facLabel, facVal);
+
+  details.append(roleBox, factionBox);
+  card.append(details);
+
+  container.append(card);
+
+  return container;
+}
+
+function createTitanInline(titanId, displayName, titanSnapshot) {
+  const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
+  if (!meta) {
+    const textNode = document.createElement('span');
+    textNode.textContent = displayName;
+    return textNode;
+  }
+
+  const starCount = titanSnapshot?.star;
+  const smallGlow = starGlowClass(starCount, false);
+  const largeGlow = starGlowClass(starCount, true);
+  const avatarPath = meta.avatarFile || (meta.hasAvatar ? `assets/titans/${titanId}.png` : null);
+
+  const container = document.createElement('span');
+  container.className = 'hero-hover-trigger group/hero inline-flex items-center gap-1.5 align-middle cursor-pointer';
+  container.tabIndex = 0;
+  container.setAttribute('aria-label', `${displayName} info`);
+
+  if (avatarPath) {
+    const img = document.createElement('img');
+    img.src = avatarPath;
+    img.alt = displayName;
+    img.className = `size-4 rounded-full object-cover -my-0.5 shrink-0 ${smallGlow} group-hover/hero:brightness-110`;
+    img.loading = 'lazy';
+    img.addEventListener('error', () => {
+      img.replaceWith(createInitialsBadge(displayName, meta.element, false, smallGlow));
+    }, { once: true });
+    container.append(img);
+  } else {
+    container.append(createInitialsBadge(displayName, meta.element, false, smallGlow));
+  }
+
+  const nameLabel = document.createElement('span');
+  nameLabel.className = 'group-hover/hero:text-blue-600 transition-colors';
+  nameLabel.textContent = displayName;
+  container.append(nameLabel);
+
+  const card = document.createElement('div');
+  card.className = 'hero-hover-card';
+
+  const header = document.createElement('div');
+  header.className = 'flex items-center gap-3';
+
+  if (avatarPath) {
+    const bigImg = document.createElement('img');
+    bigImg.src = avatarPath;
+    bigImg.alt = displayName;
+    bigImg.className = `size-14 rounded-lg object-cover shrink-0 ${largeGlow}`;
+    bigImg.addEventListener('error', () => {
+      bigImg.replaceWith(createInitialsBadge(displayName, meta.element, true, largeGlow));
+    }, { once: true });
+    header.append(bigImg);
+  } else {
+    header.append(createInitialsBadge(displayName, meta.element, true, largeGlow));
+  }
+
+  const infoCol = document.createElement('div');
+  infoCol.className = 'min-w-0 flex-1 space-y-0.5';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'font-bold text-sm text-white truncate';
+  nameEl.textContent = displayName;
+  infoCol.append(nameEl);
+
+  const starsEl = document.createElement('div');
+  starsEl.className = 'flex items-center gap-1 text-xs';
+  if (Number.isInteger(starCount) && starCount >= 1) {
+    starsEl.append(starIcons(starCount));
+  } else {
+    starsEl.className += ' text-slate-400';
+    starsEl.textContent = 'Stars: —';
+  }
+  infoCol.append(starsEl);
+
+  const powerEl = document.createElement('div');
+  powerEl.className = 'text-xs text-amber-300 font-medium tabular-nums';
+  powerEl.textContent = Number.isFinite(titanSnapshot?.power) ?
+    `⚡ Power: ${formatNumber(titanSnapshot.power)}` : 'Power: —';
+  infoCol.append(powerEl);
+
+  header.append(infoCol);
+  card.append(header);
+
+  const divider = document.createElement('div');
+  divider.className = 'border-t border-slate-700/80 my-2';
+  card.append(divider);
+
+  const details = document.createElement('div');
+  details.className = 'grid grid-cols-2 gap-2 text-[11px]';
+
+  const roleBox = document.createElement('div');
+  roleBox.className = 'rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60';
+  const roleLabel = document.createElement('span');
+  roleLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+  roleLabel.textContent = 'Role';
+  const roleVal = document.createElement('span');
+  roleVal.className = 'font-medium text-slate-200 block truncate';
+  roleVal.textContent = meta.role;
+  roleBox.append(roleLabel, roleVal);
+
+  const elemBox = document.createElement('div');
+  const elemTheme = titanElementColors[meta.element];
+  elemBox.className = 'rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60';
+  const elemLabel = document.createElement('span');
+  elemLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+  elemLabel.textContent = 'Element';
+  const elemVal = document.createElement('span');
+  elemVal.className = 'font-medium text-slate-200 flex items-center gap-1 truncate';
+  if (elemTheme) {
+    const dot = document.createElement('span');
+    dot.className = `size-1.5 rounded-full ${elemTheme.dot} shrink-0`;
+    elemVal.append(dot);
+  }
+  const elemText = document.createElement('span');
+  elemText.className = 'truncate';
+  elemText.textContent = meta.element;
+  elemVal.append(elemText);
+  elemBox.append(elemLabel, elemVal);
+
+  details.append(roleBox, elemBox);
+  card.append(details);
+
+  container.append(card);
+
+  return container;
+}
+
+function createTeamSquadCell(ids, fallbackText) {
+  if (!Array.isArray(ids) || !ids.length) {
+    const span = document.createElement('span');
+    span.textContent = fallbackText || '—';
+    return span;
+  }
+  const wrap = document.createElement('span');
+  wrap.className = 'inline-flex flex-wrap items-center gap-x-2 gap-y-1 align-middle';
+  for (const [index, id] of ids.entries()) {
+    const isHero = Number(id) < 4000;
+    const name = globalThis.hwaHelperNameMap.hero(id) || `#${id}`;
+    if (isHero) {
+      const heroSnapshot = currentCache.heroGetAll?.data?.[id];
+      wrap.append(createHeroInline(id, name, heroSnapshot));
+    } else {
+      const titanSnapshot = currentCache.titanGetAll?.data?.[id];
+      wrap.append(createTitanInline(id, name, titanSnapshot));
+    }
+    if (index < ids.length - 1) {
+      const sep = document.createElement('span');
+      sep.className = 'text-slate-400 select-none';
+      sep.textContent = '·';
+      wrap.append(sep);
+    }
+  }
+  return wrap;
+}
+
 function table(headings, rows) {
   const isNumericColumn = globalThis.hwaHelperPopupData.isNumericColumn;
   const element = document.createElement('table');
@@ -265,12 +616,27 @@ function table(headings, rows) {
   for (const values of sortedRows) {
     const line = document.createElement('tr');
     line.className = 'border-b border-slate-100 hover:bg-blue-50/50';
-    for (const [column, value] of values.entries()) {
+    for (const [column, heading] of headings.entries()) {
+      const value = values[column];
       const cell = document.createElement('td');
       cell.className = 'px-3 py-2 align-top text-slate-700';
-      if (headings[column] === 'Star') cell.append(starIcons(value));
-      else cell.textContent = String(value ?? '—');
-      if (isNumericColumn(headings[column])) cell.className += ' text-right tabular-nums';
+      if (heading === 'Star') {
+        cell.append(starIcons(value));
+      } else if (heading === 'Name' && activeTab === 'heroes') {
+        const heroId = values[0];
+        const heroSnapshot = currentCache.heroGetAll?.data?.[heroId];
+        cell.append(createHeroInline(heroId, String(value ?? '—'), heroSnapshot));
+      } else if (heading === 'Name' && activeTab === 'titans') {
+        const titanId = values[0];
+        const titanSnapshot = currentCache.titanGetAll?.data?.[titanId];
+        cell.append(createTitanInline(titanId, String(value ?? '—'), titanSnapshot));
+      } else if (heading === 'Hero/Titan names' && activeTab === 'teams') {
+        const ids = values[4];
+        cell.append(createTeamSquadCell(ids, String(value ?? '—')));
+      } else {
+        cell.textContent = String(value ?? '—');
+      }
+      if (isNumericColumn(heading)) cell.className += ' text-right tabular-nums';
       line.append(cell);
     }
     element.append(line);
@@ -445,12 +811,12 @@ async function render() {
   if (activeTab === 'config') {
     status.textContent = 'Settings and data stored in this browser.';
   } else if (activeTab === 'heroes') {
-    showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones / needed', 'Power', 'Skin ID'], (data) =>
+    showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones / needed', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, hero]) => {
         const { owned, needed } = globalThis.hwaHelperPopupData.heroSoulProgress(id, hero, cache.inventoryGet?.data);
         const soulStones = `${formatNumber(owned)} / ${typeof needed === 'number' ? formatNumber(needed) : needed ?? '—'}`;
         return [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(hero?.level),
-          hero?.star, soulStones, formatNumber(hero?.power), formatNumber(hero?.currentSkin)];
+          hero?.star, soulStones, formatNumber(hero?.power)];
       }));
   } else if (activeTab === 'items') {
     updateItemGroups(cache.inventoryGet?.data);
@@ -466,7 +832,7 @@ async function render() {
         [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(titan?.level),
           titan?.star, formatNumber(titan?.power)]));
   } else if (activeTab === 'teams') {
-    showSnapshot(cache.teamGetAll, ['Mode', 'Team', 'Members', 'Hero/Titan ID', 'Hero/Titan names'], (data) =>
+    showSnapshot(cache.teamGetAll, ['Mode', 'Team', 'Members', 'Hero/Titan names'], (data) =>
       globalThis.hwaHelperPopupData.teamRows(data, globalThis.hwaHelperNameMap));
   } else if (activeTab === 'other') {
     const entries = Object.values(cache).filter((entry) =>

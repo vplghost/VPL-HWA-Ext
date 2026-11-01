@@ -103,70 +103,70 @@ RPC: `inventoryGet`; cập nhật lúc `2026-11-01T09:18:28.248Z`. Response gồ
 
 | Item ID | Tên | Số lượng |
 | ---: | --- | ---: |
-| 1 | Mảnh Aurora | 73 |
-| 2 | Mảnh Galahad | 219 |
-| 3 | Mảnh Keira | 71 |
-| 4 | Mảnh Astaroth | 45 |
-| 5 | Mảnh Kai | 41 |
-| 6 | Mảnh Phobos | 40 |
-| 7 | Mảnh Thea | 13 |
-| 8 | Mảnh Daredevil | 16 |
-| 9 | Mảnh Heidi | 34 |
-| 10 | Mảnh Faceless | 5 |
-| 11 | Mảnh Chabba | 12 |
-| 12 | Mảnh Arachne | 4 |
-| 14 | Mảnh Fox | 23 |
-| 15 | Mảnh Ginger | 14 |
-| 16 | Mảnh Dante | 30 |
-| 17 | Mảnh Mojo | 30 |
-| 19 | Mảnh Dark Star | 17 |
-| 20 | Mảnh Artemis | 46 |
-| 21 | Mảnh Markus | 6 |
-| 22 | Mảnh Peppy | 9 |
-| 23 | Mảnh Lian | 1 |
-| 25 | Mảnh Ishmael | 7 |
-| 26 | Mảnh Lilith | 7 |
-| 27 | Mảnh Luther | 41 |
-| 28 | Mảnh Qing Mao | 48 |
-| 29 | Mảnh Dorian | 3 |
-| 30 | Mảnh Cornelius | 48 |
-| 32 | Mảnh Helios | 2 |
-| 33 | Mảnh Lars | 12 |
-| 34 | Mảnh Krista | 6 |
-| 35 | Mảnh Jorgen | 8 |
-| 36 | Mảnh Maya | 33 |
-| 37 | Mảnh Jhu | 4 |
-| 38 | Mảnh Elmir | 1 |
-| 39 | Mảnh Ziri | 37 |
-| 40 | Mảnh Nebula | 5 |
-| 41 | Mảnh K'arkh | 7 |
-| 42 | Mảnh Rufus | 3 |
-| 43 | Mảnh Celeste | 7 |
-| 44 | Mảnh Astrid and Lucas | 1 |
-| 45 | Mảnh Satori | 8 |
-| 46 | Mảnh Martha | 4 |
-| 47 | Mảnh Andvari | 3 |
-| 49 | Mảnh Yasmine | 13 |
-| 50 | Mảnh Isaac | 5 |
-| 51 | Mảnh Xe'Sha | 148 |
-| 53 | Mảnh Fafnir | 23 |
-| 55 | Mảnh Mushy and Shroom | 10 |
-| 60 | Mảnh Octavia | 45 |
-| 62 | Mảnh Soleil | 20 |
-| 64 | Mảnh Folio | 35 |
-| 67 | Mảnh Polaris | 70 |
-| 70 | Mảnh Somna | 123 |
-| 71 | Mảnh Electra von Grave | 135 |
-| 72 | Mảnh Byrna | 3 |
-| 76 | Mảnh Crow | 98 |
-| 77 | Mảnh Eva | 62 |
-| 78 | Mảnh Wodryn | 40 |
-| 79 | Mảnh Leonel | 101 |
-| 500 | Mảnh Sebastian | 2 |
-| 501 | Mảnh Corvus | 29 |
-| 502 | Mảnh Morrigan | 15 |
-| 503 | Mảnh Alvanor | 18 |
-| 504 | Mảnh Tristan | 5 |
+| 1 | Aurora fragment | 73 |
+| 2 | Galahad fragment | 219 |
+| 3 | Keira fragment | 71 |
+| 4 | Astaroth fragment | 45 |
+| 5 | Kai fragment | 41 |
+| 6 | Phobos fragment | 40 |
+| 7 | Thea fragment | 13 |
+| 8 | Daredevil fragment | 16 |
+| 9 | Heidi fragment | 34 |
+| 10 | Faceless fragment | 5 |
+| 11 | Chabba fragment | 12 |
+| 12 | Arachne fragment | 4 |
+| 14 | Fox fragment | 23 |
+| 15 | Ginger fragment | 14 |
+| 16 | Dante fragment | 30 |
+| 17 | Mojo fragment | 30 |
+| 19 | Dark Star fragment | 17 |
+| 20 | Artemis fragment | 46 |
+| 21 | Markus fragment | 6 |
+| 22 | Peppy fragment | 9 |
+| 23 | Lian fragment | 1 |
+| 25 | Ishmael fragment | 7 |
+| 26 | Lilith fragment | 7 |
+| 27 | Luther fragment | 41 |
+| 28 | Qing Mao fragment | 48 |
+| 29 | Dorian fragment | 3 |
+| 30 | Cornelius fragment | 48 |
+| 32 | Helios fragment | 2 |
+| 33 | Lars fragment | 12 |
+| 34 | Krista fragment | 6 |
+| 35 | Jorgen fragment | 8 |
+| 36 | Maya fragment | 33 |
+| 37 | Jhu fragment | 4 |
+| 38 | Elmir fragment | 1 |
+| 39 | Ziri fragment | 37 |
+| 40 | Nebula fragment | 5 |
+| 41 | K'arkh fragment | 7 |
+| 42 | Rufus fragment | 3 |
+| 43 | Celeste fragment | 7 |
+| 44 | Astrid and Lucas fragment | 1 |
+| 45 | Satori fragment | 8 |
+| 46 | Martha fragment | 4 |
+| 47 | Andvari fragment | 3 |
+| 49 | Yasmine fragment | 13 |
+| 50 | Isaac fragment | 5 |
+| 51 | Xe'Sha fragment | 148 |
+| 53 | Fafnir fragment | 23 |
+| 55 | Mushy and Shroom fragment | 10 |
+| 60 | Octavia fragment | 45 |
+| 62 | Soleil fragment | 20 |
+| 64 | Folio fragment | 35 |
+| 67 | Polaris fragment | 70 |
+| 70 | Somna fragment | 123 |
+| 71 | Electra von Grave fragment | 135 |
+| 72 | Byrna fragment | 3 |
+| 76 | Crow fragment | 98 |
+| 77 | Eva fragment | 62 |
+| 78 | Wodryn fragment | 40 |
+| 79 | Leonel fragment | 101 |
+| 500 | Sebastian fragment | 2 |
+| 501 | Corvus fragment | 29 |
+| 502 | Morrigan fragment | 15 |
+| 503 | Alvanor fragment | 18 |
+| 504 | Tristan fragment | 5 |
 
 ## coin (25 ID)
 
@@ -215,196 +215,196 @@ RPC: `inventoryGet`; cập nhật lúc `2026-11-01T09:18:28.248Z`. Response gồ
 
 | Item ID | Tên | Số lượng |
 | ---: | --- | ---: |
-| 4000 | Mảnh Sigurd | 472 |
-| 4001 | Mảnh Nova | 50 |
-| 4002 | Mảnh Mairi | 29 |
-| 4004 | Mảnh Tydus | 137 |
-| 4010 | Mảnh Moloch | 124 |
-| 4011 | Mảnh Vulcan | 127 |
-| 4012 | Mảnh Ignis | 90 |
-| 4020 | Mảnh Angus | 160 |
-| 4021 | Mảnh Sylva | 147 |
-| 4022 | Mảnh Avalon | 27 |
-| 4023 | Mảnh Eden | 250 |
-| 4030 | Mảnh Brustar | 50 |
-| 4031 | Mảnh Keros | 83 |
-| 4040 | Mảnh Rigel | 134 |
-| 4041 | Mảnh Amon | 118 |
-| 4042 | Mảnh Iyari | 93 |
-| 4050 | Mảnh Pallant | 43 |
-| 4052 | Mảnh Orm | 120 |
-| 4053 | Mảnh Metida | 280 |
+| 4000 | Sigurd fragment | 472 |
+| 4001 | Nova fragment | 50 |
+| 4002 | Mairi fragment | 29 |
+| 4004 | Tydus fragment | 137 |
+| 4010 | Moloch fragment | 124 |
+| 4011 | Vulcan fragment | 127 |
+| 4012 | Ignis fragment | 90 |
+| 4020 | Angus fragment | 160 |
+| 4021 | Sylva fragment | 147 |
+| 4022 | Avalon fragment | 27 |
+| 4023 | Eden fragment | 250 |
+| 4030 | Brustar fragment | 50 |
+| 4031 | Keros fragment | 83 |
+| 4040 | Rigel fragment | 134 |
+| 4041 | Amon fragment | 118 |
+| 4042 | Iyari fragment | 93 |
+| 4050 | Pallant fragment | 43 |
+| 4052 | Orm fragment | 120 |
+| 4053 | Metida fragment | 280 |
 
 ## fragmentScroll (39 ID)
 
 | Item ID | Tên | Số lượng |
 | ---: | --- | ---: |
-| 146 | Mảnh Hand of Midas - Recipe | 8 |
-| 147 | Mảnh Wiseman´s Crown - Recipe | 9 |
-| 148 | Mảnh Spear of a Dragon fighter - Recipe | 3 |
-| 149 | Mảnh Lion´s armor - Recipe | 16 |
-| 150 | Mảnh Fold arbalest - Recipe | 18 |
-| 151 | Mảnh Armor of Thieves´ Prince - Recipe | 19 |
-| 152 | Mảnh Tome of Fate - Recipe | 19 |
-| 153 | Mảnh Archangel's Wrath - Recipe | 21 |
-| 154 | Mảnh Morana's Glaive - Recipe | 32 |
-| 155 | Mảnh Panoptic Orb - Recipe | 16 |
-| 156 | Mảnh Cosmic Tremor - Recipe | 69 |
-| 157 | Mảnh Book of Prophecies - Recipe | 52 |
-| 158 | Mảnh Angel of Vengeance - Recipe | 109 |
-| 159 | Mảnh Selena's Sickle - Recipe | 64 |
-| 160 | Mảnh Diviner's Orb - Recipe | 61 |
-| 161 | Mảnh World Tremor - Recipe | 12 |
-| 162 | Mảnh Dragon Shield - Recipe | 5 |
-| 163 | Mảnh Siren´s Song - Recipe | 11 |
-| 164 | Mảnh Dragon´s Tooth - Recipe | 90 |
-| 165 | Mảnh Original Word - Recipe | 14 |
-| 166 | Mảnh Wasp - Recipe | 29 |
-| 190 | Mảnh Alucard´s Amulet - Recipe | 33 |
-| 191 | Mảnh Sphere of Power - Recipe | 2 |
-| 192 | Mảnh Staff of Neutralization - Recipe | 2 |
-| 193 | Mảnh Blade of the Immortals - Recipe | 3 |
-| 194 | Mảnh Blued Plate Armor - Recipe | 12 |
-| 195 | Mảnh Asklepius´ Staff - Recipe | 7 |
-| 199 | Mảnh Aquant´s Trident - Recipe | 1 |
-| 200 | Mảnh Trickster's Cane - Recipe | 2 |
-| 204 | Mảnh Ruler's Globus - Recipe | 1 |
-| 205 | Mảnh Dwarven Hardbane - Recipe | 1 |
-| 221 | Mảnh Tiara of Wisdom - Recipe | 5 |
-| 229 | Mảnh Titan's Strength Helmet - Recipe | 13 |
-| 231 | Mảnh Cuirass of Spell Protection - Recipe | 10 |
-| 233 | Mảnh Platemail of Vitality - Recipe | 30 |
-| 247 | Mảnh Mind Ring—Recipe | 25 |
-| 248 | Mảnh Whisper Ring—Recipe | 52 |
-| 251 | Mảnh Viper Kiss—Recipe | 50 |
-| 256 | Mảnh Runic Mantle—Recipe | 25 |
+| 146 | Hand of Midas - Recipe fragment | 8 |
+| 147 | Wiseman´s Crown - Recipe fragment | 9 |
+| 148 | Spear of a Dragon fighter - Recipe fragment | 3 |
+| 149 | Lion´s armor - Recipe fragment | 16 |
+| 150 | Fold arbalest - Recipe fragment | 18 |
+| 151 | Armor of Thieves´ Prince - Recipe fragment | 19 |
+| 152 | Tome of Fate - Recipe fragment | 19 |
+| 153 | Archangel's Wrath - Recipe fragment | 21 |
+| 154 | Morana's Glaive - Recipe fragment | 32 |
+| 155 | Panoptic Orb - Recipe fragment | 16 |
+| 156 | Cosmic Tremor - Recipe fragment | 69 |
+| 157 | Book of Prophecies - Recipe fragment | 52 |
+| 158 | Angel of Vengeance - Recipe fragment | 109 |
+| 159 | Selena's Sickle - Recipe fragment | 64 |
+| 160 | Diviner's Orb - Recipe fragment | 61 |
+| 161 | World Tremor - Recipe fragment | 12 |
+| 162 | Dragon Shield - Recipe fragment | 5 |
+| 163 | Siren´s Song - Recipe fragment | 11 |
+| 164 | Dragon´s Tooth - Recipe fragment | 90 |
+| 165 | Original Word - Recipe fragment | 14 |
+| 166 | Wasp - Recipe fragment | 29 |
+| 190 | Alucard´s Amulet - Recipe fragment | 33 |
+| 191 | Sphere of Power - Recipe fragment | 2 |
+| 192 | Staff of Neutralization - Recipe fragment | 2 |
+| 193 | Blade of the Immortals - Recipe fragment | 3 |
+| 194 | Blued Plate Armor - Recipe fragment | 12 |
+| 195 | Asklepius´ Staff - Recipe fragment | 7 |
+| 199 | Aquant´s Trident - Recipe fragment | 1 |
+| 200 | Trickster's Cane - Recipe fragment | 2 |
+| 204 | Ruler's Globus - Recipe fragment | 1 |
+| 205 | Dwarven Hardbane - Recipe fragment | 1 |
+| 221 | Tiara of Wisdom - Recipe fragment | 5 |
+| 229 | Titan's Strength Helmet - Recipe fragment | 13 |
+| 231 | Cuirass of Spell Protection - Recipe fragment | 10 |
+| 233 | Platemail of Vitality - Recipe fragment | 30 |
+| 247 | Mind Ring—Recipe fragment | 25 |
+| 248 | Whisper Ring—Recipe fragment | 52 |
+| 251 | Viper Kiss—Recipe fragment | 50 |
+| 256 | Runic Mantle—Recipe fragment | 25 |
 
 ## fragmentGear (35 ID)
 
 | Item ID | Tên | Số lượng |
 | ---: | --- | ---: |
-| 47 | Mảnh Brothers | 65 |
-| 48 | Mảnh Skull Crusher | 108 |
-| 49 | Mảnh Dawnguard | 30 |
-| 50 | Mảnh Sword of Storms | 7 |
-| 56 | Mảnh Dragon´s Heart | 4 |
-| 57 | Mảnh Needle | 3 |
-| 58 | Mảnh Sacred Rosary | 1 |
-| 59 | Mảnh Serenity Stone | 3 |
-| 60 | Mảnh Enchanted Lute | 2 |
-| 61 | Mảnh Splitter | 109 |
-| 62 | Mảnh Portal Gem | 37 |
-| 74 | Mảnh Storm Hammer | 5 |
-| 75 | Mảnh Magic Hat | 7 |
-| 76 | Mảnh Scorching Quiver | 1 |
-| 77 | Mảnh Sacrificial Dagger | 41 |
-| 91 | Mảnh Flaming Heart | 15 |
-| 92 | Mảnh Giant-Slayer | 15 |
-| 93 | Mảnh Pastor´s Seal | 80 |
-| 94 | Mảnh Minotaur´s Head | 21 |
-| 95 | Mảnh Hand of Glory | 39 |
-| 96 | Mảnh Desert Blade | 17 |
-| 97 | Mảnh Advisor | 67 |
-| 98 | Mảnh Funeral Totem | 91 |
-| 167 | Mảnh Alchemist´s Set | 35 |
-| 168 | Mảnh Lycanthrope´s Fang | 47 |
-| 169 | Mảnh La Mort´s Map | 47 |
-| 170 | Mảnh Harunian Helm | 1 |
-| 171 | Mảnh Enigma´s Chronicles | 1 |
-| 172 | Mảnh Throwing Knives | 1 |
-| 173 | Mảnh Gro Bulgor´s Poleaxe | 5 |
-| 174 | Mảnh Enchanted Chain | 6 |
-| 175 | Mảnh Citadel Guardian | 7 |
-| 176 | Mảnh Riversar´s Tiara | 5 |
-| 177 | Mảnh Hellion Harpoon | 4 |
-| 178 | Mảnh Thieves Guild Sign | 4 |
+| 47 | Brothers fragment | 65 |
+| 48 | Skull Crusher fragment | 108 |
+| 49 | Dawnguard fragment | 30 |
+| 50 | Sword of Storms fragment | 7 |
+| 56 | Dragon´s Heart fragment | 4 |
+| 57 | Needle fragment | 3 |
+| 58 | Sacred Rosary fragment | 1 |
+| 59 | Serenity Stone fragment | 3 |
+| 60 | Enchanted Lute fragment | 2 |
+| 61 | Splitter fragment | 109 |
+| 62 | Portal Gem fragment | 37 |
+| 74 | Storm Hammer fragment | 5 |
+| 75 | Magic Hat fragment | 7 |
+| 76 | Scorching Quiver fragment | 1 |
+| 77 | Sacrificial Dagger fragment | 41 |
+| 91 | Flaming Heart fragment | 15 |
+| 92 | Giant-Slayer fragment | 15 |
+| 93 | Pastor´s Seal fragment | 80 |
+| 94 | Minotaur´s Head fragment | 21 |
+| 95 | Hand of Glory fragment | 39 |
+| 96 | Desert Blade fragment | 17 |
+| 97 | Advisor fragment | 67 |
+| 98 | Funeral Totem fragment | 91 |
+| 167 | Alchemist´s Set fragment | 35 |
+| 168 | Lycanthrope´s Fang fragment | 47 |
+| 169 | La Mort´s Map fragment | 47 |
+| 170 | Harunian Helm fragment | 1 |
+| 171 | Enigma´s Chronicles fragment | 1 |
+| 172 | Throwing Knives fragment | 1 |
+| 173 | Gro Bulgor´s Poleaxe fragment | 5 |
+| 174 | Enchanted Chain fragment | 6 |
+| 175 | Citadel Guardian fragment | 7 |
+| 176 | Riversar´s Tiara fragment | 5 |
+| 177 | Hellion Harpoon fragment | 4 |
+| 178 | Thieves Guild Sign fragment | 4 |
 
 ## fragmentArtifact (82 ID)
 
 | Item ID | Tên | Số lượng |
 | ---: | --- | ---: |
-| 1001 | Mảnh Selias' Legacy | 1 |
-| 1002 | Mảnh Harunian Sword | 2 |
-| 1003 | Mảnh Octavia's Blades | 2 |
-| 1004 | Mảnh Scythe of Redemption | 4 |
-| 1006 | Mảnh Raven's Amulet | 1 |
-| 1007 | Mảnh Staff of Rebirth | 1 |
-| 1008 | Mảnh On and Off | 1 |
-| 1009 | Mảnh Mean Koba | 1 |
-| 1012 | Mảnh Hermit Drone | 1 |
-| 1013 | Mảnh DD-901 Arsenal | 2 |
-| 1015 | Mảnh Noble Mk.2 | 1 |
-| 1016 | Mảnh Spear of Fate | 3 |
-| 1018 | Mảnh Chart of Endless Stars | 1 |
-| 1020 | Mảnh Evil's Bane | 6 |
-| 1022 | Mảnh Ms. Whirligig | 3 |
-| 1023 | Mảnh Idol of Charm | 1 |
-| 1026 | Mảnh Devil's Contract | 3 |
-| 1027 | Mảnh Hammer of Righteous Judgment | 69 |
-| 1028 | Mảnh Spear of the Crimson Dawn | 2 |
-| 1030 | Mảnh Archivist's Staff | 1 |
-| 1032 | Mảnh Wand of the Thousand Suns | 1 |
-| 1033 | Mảnh Stormy Talisman | 1 |
-| 1039 | Mảnh Akhreb Ummi's Sting | 2 |
-| 1042 | Mảnh Rakashi's Shield | 2 |
-| 1043 | Mảnh Celeste's Crown | 4 |
-| 1047 | Mảnh Hand of the Great Master | 1 |
-| 1049 | Mảnh Concubine's Khanjars | 1 |
-| 1055 | Mảnh Wand of Growth | 1 |
-| 1058 | Mảnh Phoenix Seal | 3 |
-| 1061 | Mảnh Ancestor's Sword | 1 |
-| 1062 | Mảnh Prison of the Ancient God | 4 |
-| 1064 | Mảnh Archmage's feather | 3 |
-| 1067 | Mảnh Guiding Star | 1 |
-| 1070 | Mảnh Sir Dumpling | 1 |
-| 1076 | Mảnh Holy Grenade | 76 |
-| 1078 | Mảnh Rootbreaker | 6 |
-| 1079 | Mảnh Crest of Goldmane | 17 |
-| 1501 | Mảnh Undead King's Glaive | 1 |
-| 1502 | Mảnh Raven's Skull | 3 |
-| 1504 | Mảnh Demonic Reliquary | 6 |
-| 2001 | Mảnh Warrior's Code | 1 |
-| 2004 | Mảnh Alchemist's Folio | 1 |
-| 2009 | Mảnh Twin Blades Codex | 84 |
-| 2015 | Mảnh Grimoire of Thorns | 9 |
-| 3002 | Mảnh Ring of Strength | 1 |
-| 3003 | Mảnh Ring of Agility | 1 |
-| 11001 | Mảnh Siungur's Aegis | 35 |
-| 11002 | Mảnh Siungur's Maelstrom | 50 |
-| 11003 | Mảnh Siungur's Bands | 95 |
-| 11004 | Mảnh Siungur's Staff | 105 |
-| 11005 | Mảnh Ragni's Hammer | 40 |
-| 11006 | Mảnh Ragni's Horn | 120 |
-| 11007 | Mảnh Ragni's Spark | 140 |
-| 11008 | Mảnh Ragni's Beast | 25 |
-| 11009 | Mảnh Andvari's Fists | 40 |
-| 11010 | Mảnh Andvari's Arrowslinger | 110 |
-| 11011 | Mảnh Andvari's Bulwark | 105 |
-| 11012 | Mảnh Andvari's Soul | 65 |
-| 11013 | Mảnh The Dark Star of Nephtis | 150 |
-| 11014 | Mảnh Nephtis's Destroyers | 95 |
-| 11015 | Mảnh Nephtis's Vambraces | 70 |
-| 11016 | Mảnh Nephtis's Reaper | 155 |
-| 11017 | Mảnh Belav's Elytra | 40 |
-| 11018 | Mảnh Belav's Crown | 260 |
-| 11019 | Mảnh Belav's Face | 40 |
-| 11020 | Mảnh Belav's Greatness | 100 |
-| 11021 | Mảnh Andvari's Root | 80 |
-| 11022 | Mảnh Ragni’s Eye | 110 |
-| 11023 | Mảnh Siungur's Mace | 55 |
-| 11024 | Mảnh Belav's Manuscript | 90 |
-| 11025 | Mảnh Nephtis's Horn | 60 |
-| 11029 | Mảnh Zorval's Amulet | 250 |
-| 12001 | Mảnh Fire Crown | 335 |
-| 12002 | Mảnh Earth Crown | 265 |
-| 12003 | Mảnh Water Crown | 270 |
-| 12004 | Mảnh Crown of Darkness | 340 |
-| 12005 | Mảnh Crown of Light | 240 |
-| 12006 | Mảnh Elarite Crown | 70 |
-| 13001 | Mảnh Attack Seal | 45 |
-| 13002 | Mảnh Balance Seal | 320 |
-| 13003 | Mảnh Defense Seal | 55 |
-| 13004 | Mảnh Summon Seal | 65 |
+| 1001 | Selias' Legacy fragment | 1 |
+| 1002 | Harunian Sword fragment | 2 |
+| 1003 | Octavia's Blades fragment | 2 |
+| 1004 | Scythe of Redemption fragment | 4 |
+| 1006 | Raven's Amulet fragment | 1 |
+| 1007 | Staff of Rebirth fragment | 1 |
+| 1008 | On and Off fragment | 1 |
+| 1009 | Mean Koba fragment | 1 |
+| 1012 | Hermit Drone fragment | 1 |
+| 1013 | DD-901 Arsenal fragment | 2 |
+| 1015 | Noble Mk.2 fragment | 1 |
+| 1016 | Spear of Fate fragment | 3 |
+| 1018 | Chart of Endless Stars fragment | 1 |
+| 1020 | Evil's Bane fragment | 6 |
+| 1022 | Ms. Whirligig fragment | 3 |
+| 1023 | Idol of Charm fragment | 1 |
+| 1026 | Devil's Contract fragment | 3 |
+| 1027 | Hammer of Righteous Judgment fragment | 69 |
+| 1028 | Spear of the Crimson Dawn fragment | 2 |
+| 1030 | Archivist's Staff fragment | 1 |
+| 1032 | Wand of the Thousand Suns fragment | 1 |
+| 1033 | Stormy Talisman fragment | 1 |
+| 1039 | Akhreb Ummi's Sting fragment | 2 |
+| 1042 | Rakashi's Shield fragment | 2 |
+| 1043 | Celeste's Crown fragment | 4 |
+| 1047 | Hand of the Great Master fragment | 1 |
+| 1049 | Concubine's Khanjars fragment | 1 |
+| 1055 | Wand of Growth fragment | 1 |
+| 1058 | Phoenix Seal fragment | 3 |
+| 1061 | Ancestor's Sword fragment | 1 |
+| 1062 | Prison of the Ancient God fragment | 4 |
+| 1064 | Archmage's feather fragment | 3 |
+| 1067 | Guiding Star fragment | 1 |
+| 1070 | Sir Dumpling fragment | 1 |
+| 1076 | Holy Grenade fragment | 76 |
+| 1078 | Rootbreaker fragment | 6 |
+| 1079 | Crest of Goldmane fragment | 17 |
+| 1501 | Undead King's Glaive fragment | 1 |
+| 1502 | Raven's Skull fragment | 3 |
+| 1504 | Demonic Reliquary fragment | 6 |
+| 2001 | Warrior's Code fragment | 1 |
+| 2004 | Alchemist's Folio fragment | 1 |
+| 2009 | Twin Blades Codex fragment | 84 |
+| 2015 | Grimoire of Thorns fragment | 9 |
+| 3002 | Ring of Strength fragment | 1 |
+| 3003 | Ring of Agility fragment | 1 |
+| 11001 | Siungur's Aegis fragment | 35 |
+| 11002 | Siungur's Maelstrom fragment | 50 |
+| 11003 | Siungur's Bands fragment | 95 |
+| 11004 | Siungur's Staff fragment | 105 |
+| 11005 | Ragni's Hammer fragment | 40 |
+| 11006 | Ragni's Horn fragment | 120 |
+| 11007 | Ragni's Spark fragment | 140 |
+| 11008 | Ragni's Beast fragment | 25 |
+| 11009 | Andvari's Fists fragment | 40 |
+| 11010 | Andvari's Arrowslinger fragment | 110 |
+| 11011 | Andvari's Bulwark fragment | 105 |
+| 11012 | Andvari's Soul fragment | 65 |
+| 11013 | The Dark Star of Nephtis fragment | 150 |
+| 11014 | Nephtis's Destroyers fragment | 95 |
+| 11015 | Nephtis's Vambraces fragment | 70 |
+| 11016 | Nephtis's Reaper fragment | 155 |
+| 11017 | Belav's Elytra fragment | 40 |
+| 11018 | Belav's Crown fragment | 260 |
+| 11019 | Belav's Face fragment | 40 |
+| 11020 | Belav's Greatness fragment | 100 |
+| 11021 | Andvari's Root fragment | 80 |
+| 11022 | Ragni’s Eye fragment | 110 |
+| 11023 | Siungur's Mace fragment | 55 |
+| 11024 | Belav's Manuscript fragment | 90 |
+| 11025 | Nephtis's Horn fragment | 60 |
+| 11029 | Zorval's Amulet fragment | 250 |
+| 12001 | Fire Crown fragment | 335 |
+| 12002 | Earth Crown fragment | 265 |
+| 12003 | Water Crown fragment | 270 |
+| 12004 | Crown of Darkness fragment | 340 |
+| 12005 | Crown of Light fragment | 240 |
+| 12006 | Elarite Crown fragment | 70 |
+| 13001 | Attack Seal fragment | 45 |
+| 13002 | Balance Seal fragment | 320 |
+| 13003 | Defense Seal fragment | 55 |
+| 13004 | Summon Seal fragment | 65 |
 
 ## border (1 ID)
 

@@ -14,13 +14,13 @@
 
   function teamRows(data, nameMap) {
     return Object.entries(data).flatMap(([mode, members]) => {
-      if (!Array.isArray(members)) return [[mode, '—', 0, '—', '—']];
+      if (!Array.isArray(members)) return [[mode, '—', 0, '—', []]];
       const groups = members.some(Array.isArray) ? members : [members];
       return groups.map((group, index) => {
         const ids = Array.isArray(group) ? group.filter(Number.isInteger) : [];
         return [mode, groups.length > 1 ? index + 1 : '—', ids.length,
-          ids.length ? ids.join(', ') : '—',
-          ids.length ? ids.map((id) => nameMap.hero(id) || `#${id}`).join(', ') : '—'];
+          ids.length ? ids.map((id) => nameMap.hero(id) || `#${id}`).join(', ') : '—',
+          ids];
       });
     });
   }

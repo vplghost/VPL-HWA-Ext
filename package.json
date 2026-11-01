@@ -1,17 +1,21 @@
 {
   "name": "hwa-helper",
-  "version": "0.8.9",
+  "version": "0.9.0",
   "private": true,
   "description": "Personal Chrome extension for Hero Wars: Alliance",
   "scripts": {
+    "assets:convert": "node scripts/convert-img-asset.mjs",
     "build": "node scripts/build.mjs",
     "check": "node --test tests/*.test.mjs && npm run build",
     "docs:data": "node scripts/generate-data-docs.mjs",
+    "heroes:metadata": "node scripts/generate-hero-metadata.mjs",
     "names:update": "node scripts/generate-name-map.mjs",
-    "rules:production": "node scripts/generate-production-rules.mjs"
+    "rules:production": "node scripts/generate-production-rules.mjs",
+    "titans:metadata": "node scripts/generate-titan-metadata.mjs"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "tex-decoder": "^2.0.0"
   }
 }
