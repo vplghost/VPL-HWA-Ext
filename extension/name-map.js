@@ -11,10 +11,12 @@
     return entries && Object.hasOwn(entries, id) ? entries[id] : null;
   }
   function hero(id) { return lookup('hero', id); }
+  function building(id) { return lookup('building', id) || (id ? `Building #${id}` : null); }
+  function research(id) { return lookup('research', id) || (id ? `Research #${id}` : null); }
   function item(category, id) {
     const group = itemGroups[category];
     const name = group && lookup(group, id);
     return name ? (category.startsWith('fragment') ? `${name} fragment` : name) : null;
   }
-  globalThis.hwaHelperNameMap = { hero, item };
+  globalThis.hwaHelperNameMap = { hero, item, building, research };
 })();

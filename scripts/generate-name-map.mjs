@@ -49,7 +49,8 @@ const prefixes = {
   scroll: 'LIB_SCROLL_NAME_',
   coin: 'LIB_COIN_NAME_',
   artifact: 'LIB_ARTIFACT_NAME_',
-  skin: 'LIB_SKIN_NAME_'
+  skin: 'LIB_SKIN_NAME_',
+  research: 'STRATEGIC_BASE_INTERFACE_RESEARCH_'
 };
 const names = {};
 for (const [group, prefix] of Object.entries(prefixes)) {
@@ -61,11 +62,36 @@ for (const [group, prefix] of Object.entries(prefixes)) {
         !/^LIB_[A-Z0-9_]+$/.test(value.trim())) names[group][id] = value.trim();
   }
 }
-// The upstream English locale currently contains these non-English entries.
+names.building = {};
+for (const [key, value] of Object.entries(locale)) {
+  if (key.startsWith('STRATEGIC_BASE_INTERFACE_BUILDING_ID_') && key.endsWith('_NAME')) {
+    const id = key.slice('STRATEGIC_BASE_INTERFACE_BUILDING_ID_'.length, -'_NAME'.length);
+    if (/^\d+$/.test(id) && typeof value === 'string' && value.trim()) {
+      names.building[id] = value.trim();
+    }
+  }
+}
+// The upstream English locale currently contains these non-English entries or omissions.
 const englishCorrections = {
   hero: { 5016: 'Golem' },
   consumable: { 2001: "Captain's Coin" },
-  coin: { 40094: 'Ancient Coin' }
+  coin: { 40094: 'Ancient Coin' },
+  building: {
+    166: 'Zeppelin',
+    167: 'Hero Chest',
+    168: 'Events Area',
+    169: 'Adventure',
+    170: 'Food Warehouse',
+    171: 'Stone Warehouse',
+    172: 'Iron Warehouse',
+    173: 'Wood Warehouse',
+    174: 'Infirmary 2',
+    175: 'Infirmary 3',
+    177: 'Lighthouse',
+    182: 'Headquarters 1',
+    183: 'Headquarters 2',
+    184: 'Headquarters 3'
+  }
 };
 for (const [group, corrections] of Object.entries(englishCorrections)) {
   Object.assign(names[group], corrections);

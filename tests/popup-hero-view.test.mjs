@@ -51,6 +51,7 @@ const mockDoc = {
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const heroMetaJs = await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8');
 const titanMetaJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
+const heroStatJs = await readFile(new URL('../extension/hero-stat-data.js', import.meta.url), 'utf8');
 
 // Extract helper functions and run in context
 const context = {
@@ -60,6 +61,7 @@ const context = {
 };
 vm.runInNewContext(heroMetaJs, context);
 vm.runInNewContext(titanMetaJs, context);
+vm.runInNewContext(heroStatJs, context);
 
 // Extract the required functions: starIcons, starGlowClass, createInitialsBadge, createHeroInline, factionColors
 const codeToRun = popupJs.slice(
@@ -108,6 +110,44 @@ test('createHeroInline wraps both avatar and text inside .hero-hover-trigger', (
 
   // Verify no parentheses star text like (5★)
   assert.ok(!card.textContent.includes('(5★)'), 'Card should not contain (5★) text');
+});
+
+test('createHeroInline renders skills, skins, glyphs, artifacts, and spark of power', () => {
+  const { createHeroInline } = context;
+  const heroSnapshot = {
+    star: 5,
+    power: 27826,
+    titanGiftLevel: 22,
+    skills: { '270': 40, '271': 40, '272': 50, '273': 60 },
+    currentSkin: 307,
+    skins: { '2': 54, '307': 20 },
+    hero_runes: [40, 20, 20, 20, 0],
+    artifacts: [
+      { artifactType: 'weapon', star: 3, level: 40 },
+      { artifactType: 'book', star: 2, level: 24 },
+      { artifactType: 'ring', star: 2, level: 23 }
+    ]
+  };
+
+  const container = createHeroInline('2', 'Galahad', heroSnapshot);
+  const card = container.querySelector('.hero-hover-card');
+  assert.ok(card, 'Card should exist');
+
+  const text = card.textContent;
+  // Spark of Power
+  assert.ok(text.includes('Spark of Power') && text.includes('Lv. 22 / 30'), 'Should render Spark of Power');
+
+  // Skills
+  assert.ok(text.includes('S1: 40') && text.includes('S2: 40') && text.includes('S3: 50') && text.includes('S4: 60'), 'Should render Skills levels');
+
+  // Skins (skin 2 is default PA, skin 307 is PA)
+  assert.ok(text.includes('PA: 54') && text.includes('PA: 20'), 'Should render Skins with stat name and level');
+
+  // Glyphs (Hero 2 Galahad glyphs: PA, HP, Arm, Crit, Str)
+  assert.ok(text.includes('PA: 40') && text.includes('HP: 20') && text.includes('Arm: 20') && text.includes('Crit: 20') && text.includes('Str: 0'), 'Should render Glyphs with stat name and level');
+
+  // Artifacts
+  assert.ok(text.includes('Wpn: 3★ Lv.40') && text.includes('Book: 2★ Lv.24') && text.includes('Ring: 2★ Lv.23'), 'Should render Artifacts with stars and level');
 });
 
 test('createHeroInline supports converted PNG avatars (e.g. Hero 65 Tempus)', () => {

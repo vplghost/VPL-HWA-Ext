@@ -27,6 +27,17 @@ openTabButton.addEventListener('click', () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?view=tab') });
 });
 
+const draftBannerBtn = document.querySelector('#draft-banner-btn');
+if (draftBannerBtn) {
+  draftBannerBtn.addEventListener('click', () => {
+    activeTab = 'draft';
+    const tabButtons = [...document.querySelectorAll('[data-tab]')];
+    tabButtons.forEach((tab) => { tab.setAttribute('aria-selected', String(tab.dataset.tab === 'draft')); });
+    search.value = '';
+    render();
+  });
+}
+
 const formatNumber = (value) => typeof value === 'number' ? value.toLocaleString('en-US') : '—';
 const formatTime = (value) => value ? new Date(value).toLocaleString('en-US') : 'not available';
 const byId = ([a], [b]) => Number(a) - Number(b);
@@ -165,14 +176,26 @@ function refreshTimed() {
   if (worldEnergy) setResourceTooltip(document.querySelector('#world-energy-badge'),
     resourceTooltip(worldEnergy));
   document.querySelector('#building-time').textContent = resourceData.hoursMinutes(
-    resourceData.remainingMinutes(currentCache.buildingStatus));
+    resourceData.remainingMinutes(currentCache.buildingStatus, now));
   document.querySelector('#research-time').textContent = resourceData.hoursMinutes(
-    resourceData.remainingMinutes(currentCache.researchStatus));
+    resourceData.remainingMinutes(currentCache.researchStatus, now));
+  setResourceTooltip(document.querySelector('#building-badge'),
+    globalThis.hwaHelperPopupData.buildingTooltip(currentCache.buildingStatus, now, globalThis.hwaHelperNameMap.building));
+  setResourceTooltip(document.querySelector('#research-badge'),
+    globalThis.hwaHelperPopupData.researchTooltip(currentCache.researchStatus, now, globalThis.hwaHelperNameMap.research));
   for (const node of document.querySelectorAll('[data-resource-amount]')) {
     const entry = currentCache[node.dataset.resourceAmount];
     if (!entry) continue;
     node.textContent = resourceData.formatAmount(resourceData.amountAt(entry));
     setResourceTooltip(node.parentElement, resourceTooltip(entry));
+  }
+  const draftStatus = currentCache.legendDraftStatus?.data;
+  if (draftStatus?.stageFinishTs) {
+    const formatted = globalThis.hwaHelperPopupData.formatCountdown(draftStatus.stageFinishTs);
+    const bannerTimer = document.querySelector('#draft-banner-timer');
+    if (bannerTimer) bannerTimer.textContent = formatted;
+    const pageTimer = document.querySelector('#draft-countdown');
+    if (pageTimer) pageTimer.textContent = formatted;
   }
 }
 
@@ -423,6 +446,112 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
   factionBox.append(facLabel, facVal);
 
   details.append(roleBox, factionBox);
+
+  if (Number.isInteger(heroSnapshot?.titanGiftLevel) && heroSnapshot.titanGiftLevel > 0) {
+    const sparkBox = document.createElement('div');
+    sparkBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between';
+    const sparkLabel = document.createElement('span');
+    sparkLabel.className = 'text-slate-400 text-[10px] uppercase tracking-wider font-semibold';
+    sparkLabel.textContent = 'Spark of Power';
+    const sparkVal = document.createElement('span');
+    sparkVal.className = 'font-semibold text-purple-300 text-xs tabular-nums';
+    sparkVal.textContent = `Lv. ${heroSnapshot.titanGiftLevel} / 30`;
+    sparkBox.append(sparkLabel, sparkVal);
+    details.append(sparkBox);
+  }
+
+  if (heroSnapshot?.skills && Object.keys(heroSnapshot.skills).length) {
+    const skillsBox = document.createElement('div');
+    skillsBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5';
+    const skillsLabel = document.createElement('span');
+    skillsLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+    skillsLabel.textContent = 'Skills';
+    const skillsList = document.createElement('div');
+    skillsList.className = 'flex items-center gap-1.5 mt-0.5 flex-wrap';
+    const sortedKeys = Object.keys(heroSnapshot.skills).sort((a, b) => Number(a) - Number(b));
+    sortedKeys.forEach((key, idx) => {
+      const badge = document.createElement('span');
+      badge.className = 'rounded bg-slate-700/80 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300 tabular-nums';
+      badge.textContent = `S${idx + 1}: ${heroSnapshot.skills[key]}`;
+      skillsList.append(badge);
+    });
+    skillsBox.append(skillsLabel, skillsList);
+    details.append(skillsBox);
+  }
+
+  if (heroSnapshot?.skins && Object.keys(heroSnapshot.skins).length) {
+    const skinsBox = document.createElement('div');
+    skinsBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5';
+    const skinsLabel = document.createElement('span');
+    skinsLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+    skinsLabel.textContent = 'Skins';
+    const skinsList = document.createElement('div');
+    skinsList.className = 'flex items-center gap-1.5 mt-0.5 flex-wrap';
+    const skinEntries = Object.entries(heroSnapshot.skins).sort(([a], [b]) => Number(a) - Number(b));
+    for (const [skinId, level] of skinEntries) {
+      const isCurrent = Number(skinId) === Number(heroSnapshot.currentSkin);
+      const badge = document.createElement('span');
+      badge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+        isCurrent ? 'bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/50' : 'bg-slate-700/80 text-amber-300'
+      }`;
+      let stat = globalThis.hwaHelperSkinStats?.[skinId];
+      if (!stat || stat === 'MAIN' || Number(skinId) === Number(heroSnapshot.baseSkinId) || (Number(skinId) <= 100 && !globalThis.hwaHelperSkinStats?.[skinId])) {
+        const mainStat = meta.mainStat || (meta.role === 'Tank' || meta.class === 'Warrior' ? 'strength' : meta.class === 'Marksman' ? 'agility' : 'intelligence');
+        stat = mainStat === 'strength' ? 'Str' : mainStat === 'agility' ? 'Agi' : 'Int';
+      }
+      badge.textContent = `${stat}: ${level}`;
+      skinsList.append(badge);
+    }
+    skinsBox.append(skinsLabel, skinsList);
+    details.append(skinsBox);
+  }
+
+  const rawRunes = heroSnapshot?.hero_runes || heroSnapshot?.runes;
+  const heroRunes = Array.isArray(rawRunes)
+    ? rawRunes
+    : (rawRunes && typeof rawRunes === 'object' ? Object.values(rawRunes) : null);
+  if (Array.isArray(heroRunes) && heroRunes.length && heroRunes.some(r => r > 0)) {
+    const glyphsBox = document.createElement('div');
+    glyphsBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5';
+    const glyphsLabel = document.createElement('span');
+    glyphsLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+    glyphsLabel.textContent = 'Glyphs';
+    const glyphsList = document.createElement('div');
+    glyphsList.className = 'flex items-center gap-1.5 mt-0.5 flex-wrap';
+    const glyphStats = globalThis.hwaHelperHeroGlyphs?.[heroId] || ['PA', 'HP', 'Arm', 'Crit', 'Str'];
+    heroRunes.forEach((lvl, idx) => {
+      const stat = glyphStats[idx] || `G${idx + 1}`;
+      const badge = document.createElement('span');
+      badge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+        lvl > 0 ? 'bg-slate-700/80 text-emerald-300' : 'bg-slate-800 text-slate-500'
+      }`;
+      badge.textContent = `${stat}: ${lvl}`;
+      glyphsList.append(badge);
+    });
+    glyphsBox.append(glyphsLabel, glyphsList);
+    details.append(glyphsBox);
+  }
+
+  if (Array.isArray(heroSnapshot?.artifacts) && heroSnapshot.artifacts.length) {
+    const artBox = document.createElement('div');
+    artBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5';
+    const artLabel = document.createElement('span');
+    artLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+    artLabel.textContent = 'Artifacts';
+    const artList = document.createElement('div');
+    artList.className = 'flex items-center gap-1.5 mt-0.5 flex-wrap';
+    const typeAbbr = { weapon: 'Wpn', book: 'Book', ring: 'Ring' };
+    for (const art of heroSnapshot.artifacts) {
+      const badge = document.createElement('span');
+      badge.className = 'rounded bg-slate-700/80 px-1.5 py-0.5 text-[10px] font-semibold text-violet-300 tabular-nums';
+      const name = typeAbbr[art.artifactType] || art.artifactType || 'Art';
+      badge.textContent = `${name}: ${art.star || 0}★ Lv.${art.level || 0}`;
+      artList.append(badge);
+    }
+    artBox.append(artLabel, artList);
+    details.append(artBox);
+  }
+
   card.append(details);
 
   container.append(card);
@@ -746,6 +875,544 @@ function updateItemGroups(data) {
   itemGroup.value = [...itemGroup.options].some((option) => option.value === selected) ? selected : '';
 }
 
+let localDraftDefencePicks = [null, null, null, null, null];
+let localDraftAttackPicks = [null, null, null, null, null];
+let activeDraftStep = 0;
+let draftStepCandidates = globalThis.hwaHelperPopupData?.defaultDraftCandidates?.() || [
+  [24, 4, 38],
+  [12, 16, 49],
+  [51, 55, 10],
+  [502, 39, 503],
+  [68, 56, 36]
+];
+let activeHeroSwapCandidateIndex = null;
+let selectedRoleFilter = 'all';
+
+function renderDraft(cache) {
+  const draft = cache.legendDraftStatus?.data || {};
+  const stageId = draft.stageId || 0;
+  const isDefense = stageId === 2 || stageId === 3;
+  const isAttack = stageId === 4;
+  const isReady = stageId === 5;
+  const isSearching = stageId === 1;
+
+  if (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5) {
+    localDraftDefencePicks = [...draft.defenceHeroes];
+  }
+  if (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5) {
+    localDraftAttackPicks = [...draft.attackHeroes];
+  }
+
+  const currentPicks = isAttack ? localDraftAttackPicks : localDraftDefencePicks;
+  while (currentPicks.length < 5) currentPicks.push(null);
+
+  const val = globalThis.hwaHelperPopupData.validateDraftPicks(currentPicks);
+  const isLocked = isDefense ? (draft.defenceHeroes?.length === 5) :
+                   isAttack ? (draft.attackHeroes?.length === 5) : false;
+
+  if (activeDraftStep < 0 || activeDraftStep > 4) {
+    activeDraftStep = globalThis.hwaHelperPopupData.getDraftActiveStep(currentPicks);
+  }
+
+  const container = document.createElement('div');
+  container.className = 'p-4 space-y-4';
+
+  // 1. Status & Header Card
+  const headerCard = document.createElement('div');
+  headerCard.className = 'rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm';
+  
+  const headerGrid = document.createElement('div');
+  headerGrid.className = 'grid grid-cols-1 md:grid-cols-2 gap-4 items-center';
+
+  // Left: Match Stage & Countdown
+  const stageCol = document.createElement('div');
+  stageCol.className = 'space-y-1.5';
+  
+  const matchInfo = document.createElement('div');
+  matchInfo.className = 'text-xs text-slate-500 font-medium';
+  matchInfo.textContent = draft.matchId ? `Match #${draft.matchId}` : 'Chế độ Legend Draft';
+  stageCol.append(matchInfo);
+
+  const stageTitle = document.createElement('div');
+  stageTitle.className = 'text-base font-bold text-slate-900 flex items-center gap-2';
+  const stageBadgeColor = isDefense ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                          isAttack ? 'bg-red-100 text-red-800 border-red-300' :
+                          isReady ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                          isSearching ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                          'bg-slate-100 text-slate-700 border-slate-300';
+  stageTitle.innerHTML = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${stageBadgeColor}">${globalThis.hwaHelperPopupData.draftStageDescription(stageId)}</span>`;
+  stageCol.append(stageTitle);
+
+  if (draft.stageFinishTs) {
+    const timerRow = document.createElement('div');
+    timerRow.className = 'flex items-center gap-2 pt-1';
+    timerRow.innerHTML = `<span class="text-xs text-slate-500">Thời gian còn lại:</span>
+      <span id="draft-countdown" class="text-xl font-bold font-mono text-red-600">${globalThis.hwaHelperPopupData.formatCountdown(draft.stageFinishTs)}</span>`;
+    stageCol.append(timerRow);
+  }
+  headerGrid.append(stageCol);
+
+  // Right: Opponent Profile Card
+  const enemyUser = draft.enemyUser;
+  if (enemyUser) {
+    const enemyCol = document.createElement('div');
+    enemyCol.className = 'rounded-lg border border-slate-200 bg-white p-3 flex items-center gap-3';
+    
+    // Opponent Avatar
+    const avatarImg = document.createElement('img');
+    avatarImg.src = `assets/heroes/hero_00${String(enemyUser.avatarId || 1).padStart(2, '0')}.png`;
+    avatarImg.alt = enemyUser.name || 'Opponent';
+    avatarImg.className = 'size-12 rounded-full object-cover border-2 border-slate-200 shrink-0';
+    avatarImg.addEventListener('error', () => {
+      avatarImg.replaceWith(createInitialsBadge(enemyUser.name || 'Opponent', 'Way of Mystery', true));
+    }, { once: true });
+    enemyCol.append(avatarImg);
+
+    const enemyInfo = document.createElement('div');
+    enemyInfo.className = 'min-w-0 flex-1 space-y-0.5';
+    const enemyName = document.createElement('div');
+    enemyName.className = 'font-bold text-sm text-slate-900 truncate';
+    enemyName.textContent = enemyUser.name || 'Đối thủ';
+    enemyInfo.append(enemyName);
+
+    const enemySub = document.createElement('div');
+    enemySub.className = 'text-xs text-slate-500 flex items-center gap-2';
+    enemySub.innerHTML = `<span>Lv.${enemyUser.level || '—'}</span>${enemyUser.clanTitle ? `<span>• Bang: ${enemyUser.clanTitle}</span>` : ''}`;
+    enemyInfo.append(enemySub);
+
+    if (draft.rating) {
+      const ratingRow = document.createElement('div');
+      ratingRow.className = 'text-xs text-slate-600 font-medium pt-0.5';
+      ratingRow.textContent = `Rating: Bạn ${draft.rating.userRating ?? '—'} vs Đối thủ ${draft.rating.enemyRating ?? '—'}`;
+      enemyInfo.append(ratingRow);
+    }
+    enemyCol.append(enemyInfo);
+    headerGrid.append(enemyCol);
+  }
+  headerCard.append(headerGrid);
+  container.append(headerCard);
+
+  // 2. Enemy Defense Lineup (Shown in Attack Draft Stage 4)
+  if (isAttack && draft.enemyDefenceHeroes?.length) {
+    const enemyLineupCard = document.createElement('div');
+    enemyLineupCard.className = 'rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2';
+    
+    const enemyTitle = document.createElement('div');
+    enemyTitle.className = 'text-xs font-bold text-amber-900 flex items-center gap-1.5';
+    enemyTitle.innerHTML = `<span>🛡️ Đội hình Thủ của Đối thủ (5 tướng):</span>`;
+    enemyLineupCard.append(enemyTitle);
+
+    const enemySlotRow = document.createElement('div');
+    enemySlotRow.className = 'flex flex-wrap gap-2';
+    for (const heroId of draft.enemyDefenceHeroes) {
+      const heroMeta = globalThis.hwaHelperHeroMetadata?.[heroId] || {};
+      const heroSnap = cache.heroGetAll?.data?.[heroId];
+      const slot = document.createElement('div');
+      slot.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white shadow-xs';
+      slot.append(createHeroInline(heroId, heroMeta.name || globalThis.hwaHelperNameMap.hero(heroId) || `#${heroId}`, heroSnap));
+      enemySlotRow.append(slot);
+    }
+    enemyLineupCard.append(enemySlotRow);
+    container.append(enemyLineupCard);
+  }
+
+  // 3. Current Selected Team (5 Steps)
+  const teamSection = document.createElement('div');
+  teamSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3';
+  
+  const teamHeader = document.createElement('div');
+  teamHeader.className = 'flex items-center justify-between flex-wrap gap-2';
+  
+  const teamTitleCol = document.createElement('div');
+  teamTitleCol.className = 'space-y-0.5';
+  const teamTitle = document.createElement('h3');
+  teamTitle.className = 'text-sm font-bold text-slate-800 flex items-center gap-1.5';
+  teamTitle.textContent = isAttack ? '⚔️ Đội hình Tấn công của bạn (5 bước chọn):' : '🛡️ Đội hình Phòng thủ của bạn (5 bước chọn):';
+  teamTitleCol.append(teamTitle);
+
+  const teamSub = document.createElement('div');
+  teamSub.className = 'text-xs text-slate-500';
+  teamSub.textContent = val.valid ? '✓ Đã chọn đủ 5/5 tướng (5 bước hoàn tất)' :
+    `Đã chọn: ${val.count}/5 bước • Nhấp vào từng bước để xem hoặc đổi lựa chọn`;
+  teamTitleCol.append(teamSub);
+  teamHeader.append(teamTitleCol);
+
+  // Lock action button
+  const lockBtn = document.createElement('button');
+  lockBtn.type = 'button';
+  if (isLocked) {
+    lockBtn.className = 'px-3.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800 flex items-center gap-1';
+    lockBtn.disabled = true;
+    lockBtn.textContent = isDefense ? '✓ Đã khóa đội hình Thủ' : '✓ Đã khóa đội hình Công';
+  } else {
+    lockBtn.className = val.valid ?
+      'cursor-pointer px-4 py-1.5 rounded-lg bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all' :
+      'px-4 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-400 cursor-not-allowed border border-slate-200';
+    lockBtn.disabled = !val.valid;
+    lockBtn.textContent = isDefense ? 'Khóa Đội Hình Thủ (5 Tướng)' : isAttack ? 'Khóa Đội Hình Công (5 Tướng)' : 'Khóa Đội Hình (5 Tướng)';
+    if (val.valid) {
+      lockBtn.addEventListener('click', () => {
+        lockBtn.disabled = true;
+        lockBtn.textContent = 'Đang gửi...';
+        const action = isDefense ? 'saveDefence' : 'saveAttack';
+        chrome.runtime?.sendMessage?.({ kind: 'draft-action', action, heroes: val.heroes }, () => {
+          setTimeout(render, 500);
+        });
+      });
+    }
+  }
+  teamHeader.append(lockBtn);
+  teamSection.append(teamHeader);
+
+  // 5 Step Slots Row
+  const slotsGrid = document.createElement('div');
+  slotsGrid.className = 'grid grid-cols-2 sm:grid-cols-5 gap-2.5';
+  for (let i = 0; i < 5; i++) {
+    const heroId = currentPicks[i];
+    const isActiveStep = !isLocked && activeDraftStep === i;
+    const slotCard = document.createElement('div');
+
+    if (heroId) {
+      const heroMeta = globalThis.hwaHelperHeroMetadata?.[heroId] || {};
+      const heroSnap = cache.heroGetAll?.data?.[heroId];
+      slotCard.className = `flex flex-col items-center justify-between p-2.5 rounded-xl border transition-all text-center min-h-[110px] relative ${
+        isActiveStep ? 'border-blue-500 bg-blue-50/70 shadow-sm ring-2 ring-blue-400 cursor-pointer' :
+        !isLocked ? 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50/60 cursor-pointer' :
+        'border-slate-200 bg-slate-50/40'
+      }`;
+      
+      const topRow = document.createElement('div');
+      topRow.className = 'w-full flex items-center justify-between gap-1';
+      const stepBadge = document.createElement('span');
+      stepBadge.className = `text-[10px] px-1.5 py-0.2 rounded font-bold ${isActiveStep ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`;
+      stepBadge.textContent = `Bước ${i + 1}`;
+      topRow.append(stepBadge);
+
+      if (isActiveStep) {
+        const activeTag = document.createElement('span');
+        activeTag.className = 'text-[9px] font-bold text-blue-600 animate-pulse';
+        activeTag.textContent = 'Đang chọn';
+        topRow.append(activeTag);
+      } else if (!isLocked) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.title = 'Bỏ chọn bước này';
+        removeBtn.className = 'size-4 rounded-full bg-slate-200 hover:bg-red-100 hover:text-red-700 text-slate-600 flex items-center justify-center text-[10px] font-bold cursor-pointer';
+        removeBtn.textContent = '✕';
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentPicks[i] = null;
+          activeDraftStep = i;
+          render();
+        });
+        topRow.append(removeBtn);
+      }
+      slotCard.append(topRow);
+
+      const heroWrapper = document.createElement('div');
+      heroWrapper.className = 'flex flex-col items-center gap-1 my-1';
+      
+      const avatarPath = heroMeta.avatarFile || (heroMeta.hasAvatar ? `assets/heroes/${heroId}.webp` : null);
+      const smallGlow = starGlowClass(heroSnap?.star, false);
+      if (avatarPath) {
+        const img = document.createElement('img');
+        img.src = avatarPath;
+        img.className = `size-10 rounded-full object-cover shrink-0 ${smallGlow}`;
+        heroWrapper.append(img);
+      } else {
+        heroWrapper.append(createInitialsBadge(heroMeta.name || `#${heroId}`, heroMeta.faction, false));
+      }
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'text-xs font-bold text-slate-800 truncate max-w-[100px]';
+      nameSpan.textContent = heroMeta.name || globalThis.hwaHelperNameMap.hero(heroId) || `#${heroId}`;
+      heroWrapper.append(nameSpan);
+
+      if (heroMeta.role) {
+        const roleBadge = document.createElement('span');
+        roleBadge.className = 'text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium';
+        roleBadge.textContent = heroMeta.role;
+        heroWrapper.append(roleBadge);
+      }
+      slotCard.append(heroWrapper);
+    } else {
+      slotCard.className = `flex flex-col items-center justify-between p-2.5 rounded-xl border-2 border-dashed transition-all text-center min-h-[110px] ${
+        isActiveStep ? 'border-blue-400 bg-blue-50/50 text-blue-700 ring-2 ring-blue-300 cursor-pointer' :
+        !isLocked ? 'border-slate-200 bg-slate-50/50 hover:border-blue-200 text-slate-400 cursor-pointer' :
+        'border-slate-200 bg-slate-50/30 text-slate-400'
+      }`;
+
+      const topRow = document.createElement('div');
+      topRow.className = 'w-full flex items-center justify-between';
+      const stepBadge = document.createElement('span');
+      stepBadge.className = `text-[10px] px-1.5 py-0.2 rounded font-bold ${isActiveStep ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`;
+      stepBadge.textContent = `Bước ${i + 1}`;
+      topRow.append(stepBadge);
+      if (isActiveStep) {
+        const activeTag = document.createElement('span');
+        activeTag.className = 'text-[9px] font-bold text-blue-600 animate-pulse';
+        activeTag.textContent = 'Đang chọn';
+        topRow.append(activeTag);
+      }
+      slotCard.append(topRow);
+
+      const placeholderWrap = document.createElement('div');
+      placeholderWrap.className = 'flex flex-col items-center justify-center my-auto';
+      placeholderWrap.innerHTML = `<span class="text-xl font-bold leading-none ${isActiveStep ? 'text-blue-500' : 'text-slate-300'}">+</span><span class="text-[11px] font-medium mt-1">Chọn 1 trong 3</span>`;
+      slotCard.append(placeholderWrap);
+    }
+
+    if (!isLocked) {
+      slotCard.addEventListener('click', () => {
+        activeDraftStep = i;
+        activeHeroSwapCandidateIndex = null;
+        render();
+      });
+    }
+    slotsGrid.append(slotCard);
+  }
+  teamSection.append(slotsGrid);
+  container.append(teamSection);
+
+  // 4. Active Step Chooser (Chọn 1 trong 3 Tướng)
+  if (!isLocked) {
+    const chooserSection = document.createElement('div');
+    chooserSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4';
+
+    const chooserHeader = document.createElement('div');
+    chooserHeader.className = 'flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-100';
+
+    const chooserTitleCol = document.createElement('div');
+    chooserTitleCol.className = 'space-y-0.5';
+    const chooserTitle = document.createElement('h3');
+    chooserTitle.className = 'text-sm font-bold text-slate-900 flex items-center gap-2';
+    chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">${activeDraftStep + 1}</span> <span>Vòng ${activeDraftStep + 1}/5: Chọn 1 trong 3 Tướng</span>`;
+    chooserTitleCol.append(chooserTitle);
+
+    const chooserSub = document.createElement('div');
+    chooserSub.className = 'text-xs text-slate-500';
+    chooserSub.textContent = 'Mỗi bước pick sẽ chọn 1 tướng từ 3 lựa chọn để đưa vào đội hình.';
+    chooserTitleCol.append(chooserSub);
+    chooserHeader.append(chooserTitleCol);
+
+    const chooserActions = document.createElement('div');
+    chooserActions.className = 'flex items-center gap-2';
+    
+    // Reset button
+    const hasAnyPick = currentPicks.some(Boolean);
+    if (hasAnyPick) {
+      const resetBtn = document.createElement('button');
+      resetBtn.type = 'button';
+      resetBtn.className = 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 cursor-pointer transition-colors';
+      resetBtn.textContent = 'Đặt lại cả 5 bước';
+      resetBtn.addEventListener('click', () => {
+        if (isAttack) localDraftAttackPicks = [null, null, null, null, null];
+        else localDraftDefencePicks = [null, null, null, null, null];
+        activeDraftStep = 0;
+        activeHeroSwapCandidateIndex = null;
+        render();
+      });
+      chooserActions.append(resetBtn);
+    }
+    chooserHeader.append(chooserActions);
+    chooserSection.append(chooserHeader);
+
+    // 3 Candidate Hero Cards Grid
+    const candidatesGrid = document.createElement('div');
+    candidatesGrid.className = 'grid grid-cols-1 md:grid-cols-3 gap-3.5';
+
+    const currentStepCandidates = draftStepCandidates[activeDraftStep] || [24, 4, 38];
+
+    for (let cIdx = 0; cIdx < currentStepCandidates.length; cIdx++) {
+      const cHeroId = currentStepCandidates[cIdx];
+      const meta = globalThis.hwaHelperHeroMetadata?.[cHeroId] || {};
+      const snap = cache.heroGetAll?.data?.[cHeroId];
+      const isChosen = currentPicks[activeDraftStep] === cHeroId;
+
+      const card = document.createElement('div');
+      card.className = `rounded-xl p-4 flex flex-col items-center justify-between min-h-[220px] transition-all relative ${
+        isChosen ?
+          'border-2 border-emerald-500 bg-emerald-50/40 shadow-sm ring-1 ring-emerald-300' :
+          'border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-md cursor-pointer'
+      }`;
+
+      // Choice header tag
+      const cardTop = document.createElement('div');
+      cardTop.className = 'w-full flex items-center justify-between text-xs mb-2';
+      const choiceTag = document.createElement('span');
+      choiceTag.className = `px-2 py-0.5 rounded-full text-[10px] font-bold ${
+        isChosen ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+      }`;
+      choiceTag.textContent = `Lựa chọn #${cIdx + 1}`;
+      cardTop.append(choiceTag);
+
+      const swapCandidateBtn = document.createElement('button');
+      swapCandidateBtn.type = 'button';
+      swapCandidateBtn.className = 'text-[11px] text-blue-600 hover:underline font-medium cursor-pointer';
+      swapCandidateBtn.textContent = 'Thay tướng ✎';
+      swapCandidateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeHeroSwapCandidateIndex = (activeHeroSwapCandidateIndex === cIdx) ? null : cIdx;
+        render();
+      });
+      cardTop.append(swapCandidateBtn);
+      card.append(cardTop);
+
+      // Hero Avatar & Meta
+      const heroContent = document.createElement('div');
+      heroContent.className = 'flex flex-col items-center gap-1.5 text-center my-1';
+
+      const avatarPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${cHeroId}.webp` : null);
+      const largeGlow = starGlowClass(snap?.star, true);
+      if (avatarPath) {
+        const img = document.createElement('img');
+        img.src = avatarPath;
+        img.alt = meta.name || `#${cHeroId}`;
+        img.className = `size-16 rounded-full object-cover shrink-0 ${largeGlow} transition-transform group-hover:scale-105`;
+        heroContent.append(img);
+      } else {
+        heroContent.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, true));
+      }
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'text-sm font-bold text-slate-900 mt-1';
+      nameEl.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
+      heroContent.append(nameEl);
+
+      const badgesRow = document.createElement('div');
+      badgesRow.className = 'flex items-center gap-1.5 flex-wrap justify-center text-[10px]';
+      if (meta.role) {
+        const roleSpan = document.createElement('span');
+        roleSpan.className = 'px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold';
+        roleSpan.textContent = meta.role;
+        badgesRow.append(roleSpan);
+      }
+      if (meta.faction) {
+        const facSpan = document.createElement('span');
+        facSpan.className = 'px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium';
+        facSpan.textContent = meta.faction;
+        badgesRow.append(facSpan);
+      }
+      if (snap?.power) {
+        const pwrSpan = document.createElement('span');
+        pwrSpan.className = 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold';
+        pwrSpan.textContent = `Lực chiến: ${formatNumber(snap.power)}`;
+        badgesRow.append(pwrSpan);
+      }
+      heroContent.append(badgesRow);
+      card.append(heroContent);
+
+      // Action button
+      const selectBtn = document.createElement('button');
+      selectBtn.type = 'button';
+      if (isChosen) {
+        selectBtn.className = 'w-full py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-default mt-2';
+        selectBtn.innerHTML = `<span>✓</span> <span>Đã chọn cho Bước ${activeDraftStep + 1}</span>`;
+      } else {
+        selectBtn.className = 'w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer mt-2 transition-colors';
+        selectBtn.textContent = `Chọn Tướng Này (Bước ${activeDraftStep + 1})`;
+      }
+      card.append(selectBtn);
+
+      card.addEventListener('click', () => {
+        currentPicks[activeDraftStep] = cHeroId;
+        // Auto-advance to next unfilled step
+        const nextUnfilled = currentPicks.findIndex((h) => !h);
+        if (nextUnfilled !== -1) {
+          activeDraftStep = nextUnfilled;
+        } else if (activeDraftStep < 4) {
+          activeDraftStep++;
+        }
+        activeHeroSwapCandidateIndex = null;
+        render();
+      });
+
+      candidatesGrid.append(card);
+    }
+    chooserSection.append(candidatesGrid);
+
+    // If candidate substitution is open:
+    if (activeHeroSwapCandidateIndex !== null) {
+      const swapWrap = document.createElement('div');
+      swapWrap.className = 'p-3 rounded-xl border border-blue-200 bg-blue-50/50 space-y-2 mt-2';
+      
+      const swapHeader = document.createElement('div');
+      swapHeader.className = 'flex items-center justify-between';
+      const swapTitle = document.createElement('div');
+      swapTitle.className = 'text-xs font-bold text-blue-900';
+      swapTitle.textContent = `Chọn tướng thay thế cho Lựa chọn #${activeHeroSwapCandidateIndex + 1} (Bước ${activeDraftStep + 1}):`;
+      swapHeader.append(swapTitle);
+
+      const closeSwapBtn = document.createElement('button');
+      closeSwapBtn.type = 'button';
+      closeSwapBtn.className = 'text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer';
+      closeSwapBtn.textContent = 'Đóng [✕]';
+      closeSwapBtn.addEventListener('click', () => {
+        activeHeroSwapCandidateIndex = null;
+        render();
+      });
+      swapHeader.append(closeSwapBtn);
+      swapWrap.append(swapHeader);
+
+      const swapGrid = document.createElement('div');
+      swapGrid.className = 'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-1.5 max-h-[220px] overflow-y-auto p-1';
+
+      const allHeroEntries = Object.entries(globalThis.hwaHelperHeroMetadata || {}).map(([id, hMeta]) => ({
+        id: Number(id),
+        meta: hMeta,
+        snap: cache.heroGetAll?.data?.[id] || null
+      })).filter((item) => Number.isInteger(item.id) && item.id < 1000)
+        .sort((a, b) => (b.snap?.power || 0) - (a.snap?.power || 0));
+
+      for (const { id: hId, meta: hMeta, snap: hSnap } of allHeroEntries) {
+        const itemBtn = document.createElement('button');
+        itemBtn.type = 'button';
+        itemBtn.className = 'flex items-center gap-1.5 p-1.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50 text-left text-xs cursor-pointer';
+        
+        const avPath = hMeta.avatarFile || (hMeta.hasAvatar ? `assets/heroes/${hId}.webp` : null);
+        const sGlow = starGlowClass(hSnap?.star, false);
+        if (avPath) {
+          const sImg = document.createElement('img');
+          sImg.src = avPath;
+          sImg.className = `size-6 rounded-full object-cover shrink-0 ${sGlow}`;
+          itemBtn.append(sImg);
+        }
+        const sName = document.createElement('span');
+        sName.className = 'truncate font-medium text-[11px] text-slate-800';
+        sName.textContent = hMeta.name || globalThis.hwaHelperNameMap.hero(hId) || `#${hId}`;
+        itemBtn.append(sName);
+
+        itemBtn.addEventListener('click', () => {
+          if (!draftStepCandidates[activeDraftStep]) {
+            draftStepCandidates[activeDraftStep] = [24, 4, 38];
+          }
+          draftStepCandidates[activeDraftStep][activeHeroSwapCandidateIndex] = hId;
+          activeHeroSwapCandidateIndex = null;
+          render();
+        });
+        swapGrid.append(itemBtn);
+      }
+      swapWrap.append(swapGrid);
+      chooserSection.append(swapWrap);
+    }
+
+    container.append(chooserSection);
+  } else {
+    // Locked notice
+    const lockedCard = document.createElement('div');
+    lockedCard.className = 'rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-center space-y-1.5';
+    lockedCard.innerHTML = `
+      <div class="text-base font-bold text-emerald-900 flex items-center justify-center gap-2">
+        <span>✓</span> <span>Đội hình 5 tướng đã được khóa thành công!</span>
+      </div>
+      <div class="text-xs text-emerald-700">Hệ thống đã ghi nhận 5 tướng cho ${isDefense ? 'Đội hình Thủ' : 'Đội hình Công'}. Trận đấu sẽ tự động chuyển sang vòng tiếp theo.</div>
+    `;
+    container.append(lockedCard);
+  }
+
+  view.append(container);
+  status.textContent = `${draft.matchId ? `Trận #${draft.matchId} • ` : ''}${globalThis.hwaHelperPopupData.draftStageDescription(stageId)} • Đã chọn ${val.count}/5 bước`;
+}
+
 async function render() {
   const [stored, session] = await Promise.all([
     chrome.storage.local.get([CACHE_KEY, 'resourceSelection']), chrome.storage.session.get('recordingState')
@@ -790,6 +1457,25 @@ async function render() {
     headerResources.append(pill);
   }
   refreshTimed();
+  const draftStatus = cache.legendDraftStatus?.data;
+  const isDraftActive = globalThis.hwaHelperPopupData.isDraftActive(draftStatus?.stageId);
+  const draftBanner = document.querySelector('#draft-banner');
+  const draftBadge = document.querySelector('#draft-tab-badge');
+  if (draftBanner && draftBadge) {
+    if (isDraftActive) {
+      draftBanner.hidden = false;
+      draftBadge.hidden = false;
+      document.querySelector('#draft-banner-stage').textContent =
+        globalThis.hwaHelperPopupData.draftStageDescription(draftStatus.stageId);
+      if (draftStatus.stageFinishTs) {
+        document.querySelector('#draft-banner-timer').textContent =
+          globalThis.hwaHelperPopupData.formatCountdown(draftStatus.stageFinishTs);
+      }
+    } else {
+      draftBanner.hidden = true;
+      draftBadge.hidden = true;
+    }
+  }
   const recordingState = session.recordingState;
   const recordButton = document.querySelector('#record-toggle');
   recordButton.hidden = activeTab !== 'log';
@@ -806,11 +1492,15 @@ async function render() {
   document.querySelector('#item-group-filter').hidden = activeTab !== 'items';
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
   document.querySelector('#resource-sort-wrap').hidden = activeTab !== 'resources';
-  document.querySelector('#search-label').textContent = activeTab === 'log' ? 'Filter endpoint' : 'Search ID, name, or group';
-  search.placeholder = activeTab === 'log' ? 'Filter endpoint' : 'Search ID, name, or group';
+  document.querySelector('#search-label').textContent = activeTab === 'log' ? 'Filter endpoint' :
+    activeTab === 'draft' ? 'Search hero by name, role, or ID' : 'Search ID, name, or group';
+  search.placeholder = activeTab === 'log' ? 'Filter endpoint' :
+    activeTab === 'draft' ? 'Search hero by name, role, or ID' : 'Search ID, name, or group';
 
   if (activeTab === 'config') {
     status.textContent = 'Settings and data stored in this browser.';
+  } else if (activeTab === 'draft') {
+    renderDraft(cache);
   } else if (activeTab === 'heroes') {
     showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones / needed', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, hero]) => {

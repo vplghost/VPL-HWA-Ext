@@ -101,18 +101,39 @@ test('mission actions spend their configured Energy and reset a full refill cloc
     args: { id: 99, result: { win: true } } }],
     [{ ident: 'end', result: { response: {} } }], '2026-11-01T12:02:00.000Z');
   const afterRaid = cache.merge({}, [baseline, raid]).cache;
-  assert.equal(afterRaid['resource:energy'].data.amount, 126);
+  assert.equal(afterRaid['resource:energy'].data.amount, 122);
   assert.equal(afterRaid['resource:energy'].data.lastRefillAt,
     Date.parse('2026-11-01T12:01:00.000Z'));
   const afterBattle = cache.merge(afterRaid, [start, end]).cache;
-  assert.equal(afterBattle['resource:energy'].data.amount, 120);
-  assert.equal(afterBattle.energyStatus.data.energy, 120);
+  assert.equal(afterBattle['resource:energy'].data.amount, 114);
+  assert.equal(afterBattle.energyStatus.data.energy, 114);
   assert.equal(cache.merge(afterBattle, [raid, start, end]).changed, false);
   const latest = record([{ name: 'userGetInfo', ident: 'latest' }],
     [{ ident: 'latest', result: { response: { level: 78,
       refillable: [{ id: 1, amount: 119, lastRefill: 1793534520 }] } } }],
     '2026-11-01T12:03:00.000Z');
   assert.equal(cache.merge(afterBattle, [latest, raid]).cache['resource:energy'].data.amount, 119);
+});
+
+test('missionRaid uses experience from response and awards gold', () => {
+  const baseline = record([{ name: 'userGetInfo', ident: 'snapshot' }],
+    [{ ident: 'snapshot', result: { response: { level: 78, gold: 50000,
+      refillable: [{ id: 1, amount: 100, lastRefill: 1793534400 }] } } }],
+    '2026-11-01T12:00:00.000Z');
+  const raid99 = record([{ name: 'missionRaid', ident: 'raid99', args: { id: 99, times: 1 } }],
+    [{ ident: 'raid99', result: { response: { '0': { experience: 8, gold: 1273 }, raid: { consumable: { 9: 4, 10: 1 } } } } }],
+    '2026-11-01T12:01:00.000Z');
+  const raid63 = record([{ name: 'missionRaid', ident: 'raid63', args: { id: 63, times: 1 } }],
+    [{ ident: 'raid63', result: { response: { '0': { experience: 6, gold: 1038 }, raid: { consumable: { 9: 5 } } } } }],
+    '2026-11-01T12:02:00.000Z');
+
+  const after99 = cache.merge({}, [baseline, raid99]).cache;
+  assert.equal(after99['resource:energy'].data.amount, 92);
+  assert.equal(after99['resource:gold'].data.amount, 51273);
+
+  const after63 = cache.merge(after99, [raid63]).cache;
+  assert.equal(after63['resource:energy'].data.amount, 86);
+  assert.equal(after63['resource:gold'].data.amount, 52311);
 });
 
 test('successful empty skill results spend once and only refill below soft cap', () => {
@@ -413,4 +434,58 @@ test('stores only production inputs from config, bonus, producer and mission RPC
   assert.equal(entries.find((item) => item.key === 'productionStatus').data.producers[0].residentCount, 2);
   assert.equal(JSON.stringify(entries.find((item) => item.key === 'productionStatus')).includes('100'), false);
   assert.deepEqual([...entries.find((item) => item.key === 'missionProgressStatus').data.completed], [0]);
+});
+
+test('building actions start construction, retain buildingId and level, and update queue', () => {
+  const at = '2026-11-01T16:49:08.368Z';
+  const start = record([
+    { name: 'startConstruction', feature: 'building', args: {
+      buildingId: 183, nextLevel: 13, startDate: 1793551748368, durationMs: 17432800
+    }, ident: 'start-1' }
+  ], [
+    { ident: 'start-1', result: { response: {} } }
+  ], at);
+  const extracted = cache.extract(start);
+  assert.equal(extracted[0].key, 'buildingStatus');
+  assert.equal(extracted[0].data.action, 'start');
+  assert.equal(extracted[0].data.queue.buildingId, 183);
+  assert.equal(extracted[0].data.queue.level, 13);
+
+  const merged = cache.merge({}, [start]).cache.buildingStatus;
+  assert.equal(merged.data.queues.length, 1);
+  assert.equal(merged.data.queues[0].buildingId, 183);
+  assert.equal(merged.data.queues[0].level, 13);
+  assert.equal(merged.data.queues[0].durationMs, 17432800);
+});
+
+test('heroUpgradeSkill upgrades hero skill in heroGetAll and decrements skill points', () => {
+  const at = '2026-11-01T17:03:42.349Z';
+  const heroGetAll = record([
+    { name: 'heroGetAll', ident: 'heroes-1' },
+    { name: 'userGetInfo', ident: 'info-1' }
+  ], [
+    { ident: 'heroes-1', result: { response: {
+      '60': { id: 60, level: 75, skills: { '350': 74, '351': 60, '352': 50, '353': 70 } }
+    } } },
+    { ident: 'info-1', result: { response: {
+      level: 78,
+      refillable: [{ id: 2, amount: 10, lastRefill: 1793550000 }]
+    } } }
+  ], '2026-11-01T17:00:00.000Z');
+
+  const upgradeSkill = record([
+    { name: 'heroUpgradeSkill', args: { heroId: 60, skill: 3 }, ident: 'skill-up-1' }
+  ], [
+    { ident: 'skill-up-1', result: { response: null, quests: [] } }
+  ], at);
+
+  const extracted = cache.extract(upgradeSkill);
+  assert.equal(extracted.some(e => e.key === 'resourceAction' && e.data.resourceKey === 'resource:refillable:2'), true);
+  assert.equal(extracted.some(e => e.key === 'heroSkillAction' && e.data.heroId === 60 && e.data.skillIndex === 3), true);
+
+  const state = cache.merge({}, [heroGetAll, upgradeSkill]).cache;
+  assert.equal(state['resource:refillable:2'].data.amount, 9);
+  // Skill index 3 corresponds to the 3rd sorted skill key ('352'), incremented from 50 to 51
+  assert.equal(state.heroGetAll.data['60'].skills['352'], 51);
+  assert.equal(state.heroGetAll.data['60'].skills['350'], 74);
 });

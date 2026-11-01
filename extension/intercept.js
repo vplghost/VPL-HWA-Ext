@@ -5,11 +5,35 @@
   const MAX_BODY_CHARS = 512 * 1024;
   const isTrackingUrl = globalThis.hwaHelperIsTrackingUrl;
   let captureEnabled = false;
+  let lastRpcUrl = null;
+  let lastRpcHeaders = null;
 
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled === true;
+    }
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'draft-action') {
+      const { action, heroes } = event.data;
+      if (!lastRpcUrl || !Array.isArray(heroes) || heroes.length === 0) return;
+      const callName = action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack';
+      const randHex = () => Math.random().toString(16).slice(2).padStart(16, '0').slice(0, 16);
+      const ident1 = randHex() + randHex();
+      const ident2 = randHex() + randHex();
+      const payload = {
+        calls: [
+          { name: callName, args: { heroes }, ident: ident1 },
+          { name: 'randomDraft_getInfo', args: {}, ident: ident2 }
+        ]
+      };
+      const headers = { 'content-type': 'application/json', ...(lastRpcHeaders || {}) };
+      try {
+        (window.fetch || originalFetch)(lastRpcUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+      } catch (_) {}
     }
   });
   window.postMessage({ source: 'hwa-helper-api', kind: 'ready' }, location.origin);
@@ -117,6 +141,19 @@
       const input = args[0];
       const options = args[1];
       const url = typeof input === 'string' || input instanceof URL ? input : input?.url;
+      const urlStr = String(url || '');
+      if (urlStr.includes('/api/rpc') || urlStr.includes('api.hero-wars-alliance.com')) {
+        lastRpcUrl = urlStr;
+        if (options?.headers) {
+          try {
+            if (typeof Headers !== 'undefined' && options.headers instanceof Headers) {
+              lastRpcHeaders = Object.fromEntries(options.headers.entries());
+            } else if (typeof options.headers === 'object') {
+              lastRpcHeaders = { ...options.headers };
+            }
+          } catch (_) {}
+        }
+      }
       if (!captureEnabled || isTrackingUrl(url, location.href)) return originalFetch.apply(this, args);
       const method = options?.method || input?.method || 'GET';
       const isPost = String(method).toUpperCase() === 'POST';

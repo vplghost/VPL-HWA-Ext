@@ -85,6 +85,103 @@
     });
   }
 
+  function draftStageDescription(stageId) {
+    if (stageId === 1) return 'Đang ghép trận...';
+    if (stageId === 2 || stageId === 3) return 'Lượt chọn Đội hình Thủ';
+    if (stageId === 4) return 'Lượt chọn Đội hình Công';
+    if (stageId === 5) return 'Sẵn sàng chiến đấu';
+    return 'Chưa trong trận';
+  }
+
+  function formatCountdown(finishTs, nowSec = Math.floor(Date.now() / 1000)) {
+    if (!Number.isFinite(finishTs)) return '—';
+    const remaining = Math.max(0, finishTs - nowSec);
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function isDraftActive(stageId) {
+    return Number.isInteger(stageId) && stageId >= 1 && stageId <= 4;
+  }
+
+  function buildingTooltip(status, now, buildingName) {
+    const queues = (status?.data?.queues || []).filter((q) =>
+      Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now);
+    if (!queues.length) return 'Construction: Idle';
+    const lines = ['Construction in progress:'];
+    for (const q of queues) {
+      const name = (buildingName && q.buildingId ? buildingName(q.buildingId) : null) ||
+        (q.buildingId ? `Building #${q.buildingId}` : 'Building');
+      const level = q.level ? ` (Lv. ${q.level})` : '';
+      const mins = Math.ceil((q.startDate + q.durationMs - now) / 60000);
+      const time = globalThis.hwaHelperResourceData?.hoursMinutes ?
+        globalThis.hwaHelperResourceData.hoursMinutes(mins) : `${mins}m`;
+      lines.push(`${name}${level} · ${time} remaining`);
+    }
+    return lines.join('\n');
+  }
+
+  function researchTooltip(status, now, researchName) {
+    const queues = (status?.data?.queues || []).filter((q) =>
+      Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now);
+    if (!queues.length) return 'Research: Idle';
+    const lines = ['Research in progress:'];
+    for (const q of queues) {
+      const name = (researchName && q.researchId ? researchName(q.researchId) : null) ||
+        (q.researchId ? `Research #${q.researchId}` : 'Research');
+      const level = q.level ? ` (Lv. ${q.level})` : '';
+      const mins = Math.ceil((q.startDate + q.durationMs - now) / 60000);
+      const time = globalThis.hwaHelperResourceData?.hoursMinutes ?
+        globalThis.hwaHelperResourceData.hoursMinutes(mins) : `${mins}m`;
+      lines.push(`${name}${level} · ${time} remaining`);
+    }
+    return lines.join('\n');
+  }
+
+  function defaultDraftCandidates() {
+    return [
+      [24, 4, 38],    // Round 1: Cleaver, Astaroth, Corvus
+      [12, 16, 49],   // Round 2: Arachne, Dante, Yasmine
+      [51, 55, 10],   // Round 3: Xe'Sha, Mushy and Shroom, Orion
+      [502, 39, 503], // Round 4: Morrigan, Martha, Alvanor
+      [68, 56, 36]    // Round 5: Peech, Fafnir, Jorgen
+    ];
+  }
+
+  function validateDraftPicks(picks) {
+    if (!Array.isArray(picks)) {
+      return { valid: false, count: 0, missingSteps: [1, 2, 3, 4, 5], heroes: [] };
+    }
+    const missingSteps = [];
+    const heroes = [];
+    for (let i = 0; i < 5; i++) {
+      const h = picks[i];
+      if (Number.isInteger(h) && h > 0) {
+        heroes.push(h);
+      } else {
+        missingSteps.push(i + 1);
+      }
+    }
+    return {
+      valid: heroes.length === 5 && missingSteps.length === 0,
+      count: heroes.length,
+      missingSteps,
+      heroes
+    };
+  }
+
+  function getDraftActiveStep(picks) {
+    if (!Array.isArray(picks)) return 0;
+    for (let i = 0; i < 5; i++) {
+      if (!Number.isInteger(picks[i]) || picks[i] <= 0) return i;
+    }
+    return 4;
+  }
+
   globalThis.hwaHelperPopupData = { heroSoulProgress, teamRows, sortRows,
-    isNumericColumn, rallyTooltip, marchDuration };
+    isNumericColumn, rallyTooltip, marchDuration,
+    draftStageDescription, formatCountdown, isDraftActive,
+    defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
+    buildingTooltip, researchTooltip };
 })();

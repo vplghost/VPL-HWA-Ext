@@ -142,16 +142,64 @@
         }
         if (result && Object.hasOwn(result, 'response') && !result.error) {
           if (call.name === 'heroUpgradeSkill') {
-            return resourceAction(record, call, 'refillable:2', -1);
+            const actions = resourceAction(record, call, 'refillable:2', -1);
+            if (Number.isInteger(call.args?.heroId) && Number.isInteger(call.args?.skill)) {
+              actions.push({
+                key: 'heroSkillAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  heroId: call.args.heroId,
+                  skillIndex: call.args.skill,
+                  token: `${call.ident}:heroSkill`
+                },
+                updatedAt: record.timestamp
+              });
+            }
+            return actions;
           }
           if (['missionRaid', 'missionStart', 'missionEnd'].includes(call.name)) {
-            const costs = globalThis.hwaHelperMissionCosts?.[call.args?.id];
-            if (!costs) return [];
-            const [startCost, winCost] = costs;
-            const delta = call.name === 'missionRaid' ? -winCost * call.args?.times :
-              call.name === 'missionStart' ? -startCost :
-              call.args?.result?.win === true ? -(winCost - startCost) : 0;
-            return resourceAction(record, call, 'energy', delta);
+            let delta = 0;
+            if (call.name === 'missionRaid') {
+              let expTotal = 0;
+              const times = call.args?.times || 1;
+              for (let i = 0; i < times; i++) {
+                if (Number.isFinite(result?.response?.[i]?.experience)) {
+                  expTotal += result.response[i].experience;
+                }
+              }
+              if (expTotal > 0) {
+                delta = -expTotal;
+              } else {
+                const costs = globalThis.hwaHelperMissionCosts?.[call.args?.id];
+                if (!costs) return [];
+                const [startCost, addCost] = costs;
+                delta = -(startCost + addCost) * times;
+              }
+            } else if (call.name === 'missionStart') {
+              const costs = globalThis.hwaHelperMissionCosts?.[call.args?.id];
+              if (!costs) return [];
+              delta = -costs[0];
+            } else if (call.name === 'missionEnd') {
+              const costs = globalThis.hwaHelperMissionCosts?.[call.args?.id];
+              if (!costs) return [];
+              delta = call.args?.result?.win === true ? -costs[1] : 0;
+            }
+            const actions = resourceAction(record, call, 'energy', delta);
+            if (call.name === 'missionRaid' && result?.response) {
+              let raidGold = 0;
+              const times = call.args?.times || 1;
+              for (let i = 0; i < times; i++) {
+                if (Number.isFinite(result.response?.[i]?.gold)) {
+                  raidGold += result.response[i].gold;
+                }
+              }
+              if (raidGold > 0) {
+                actions.push(...resourceAction(record, call, 'gold', raidGold));
+              }
+            }
+            return actions;
           }
           if (call.name === 'readAndClaimAll' && Array.isArray(result.response?.claimedRewards)) {
             const rewards = new Map();
@@ -280,10 +328,31 @@
             Array.isArray(result?.response?.queues)) {
           const queues = result.response.queues.filter((queue) =>
             Number.isFinite(queue.startDate) && Number.isFinite(queue.durationMs) && queue.durationMs >= 0)
-            .map((queue, index) => ({ startDate: queue.startDate, durationMs: queue.durationMs,
-              researchId: queue.researchId, queueNumber: queue.queueNumber ?? index }));
+            .map((queue, index) => ({
+              startDate: queue.startDate,
+              durationMs: queue.durationMs,
+              buildingId: queue.buildingId,
+              researchId: queue.researchId,
+              level: queue.level ?? queue.nextLevel,
+              queueNumber: queue.queueNumber ?? index
+            }));
           return [{ key: call.feature === 'building' ? 'buildingStatus' : 'researchStatus',
             method: call.name, feature: call.feature, group: 'header', data: { queues },
+            updatedAt: record.timestamp }];
+        }
+        if (key === 'startConstruction:building' && result?.response &&
+            Number.isFinite(call.args?.startDate) && Number.isFinite(call.args?.durationMs) &&
+            call.args.durationMs >= 0) {
+          return [{ key: 'buildingStatus', method: call.name, feature: call.feature,
+            group: 'header', data: { action: 'start', queue: {
+              buildingId: call.args.buildingId, level: call.args.nextLevel ?? call.args.level,
+              queueNumber: call.args.queueNumber ?? 0,
+              startDate: call.args.startDate, durationMs: call.args.durationMs
+            } }, updatedAt: record.timestamp }];
+        }
+        if (key === 'completeConstruction:building' && result?.response) {
+          return [{ key: 'buildingStatus', method: call.name, feature: call.feature,
+            group: 'header', data: { action: 'complete', buildingId: call.args?.buildingId },
             updatedAt: record.timestamp }];
         }
         if (key === 'startResearch:personalResearch' && result?.response &&
@@ -291,7 +360,8 @@
             call.args.durationMs >= 0) {
           return [{ key: 'researchStatus', method: call.name, feature: call.feature,
             group: 'header', data: { action: 'start', queue: {
-              researchId: call.args.researchId, queueNumber: call.args.queueNumber,
+              researchId: call.args.researchId, level: call.args.level ?? call.args.nextLevel,
+              queueNumber: call.args.queueNumber,
               startDate: call.args.startDate, durationMs: call.args.durationMs
             } }, updatedAt: record.timestamp }];
         }
@@ -318,6 +388,87 @@
           { key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'cancel', rallyId: call.args.rallyId },
             updatedAt: record.timestamp }];
+        }
+        if (call.name === 'randomDraft_getInfo' && result?.response) {
+          const info = result.response;
+          const stageId = Number(info.stageId);
+          const matchId = info.matchId ?? null;
+          const stageFinishTs = Number.isFinite(info.stageFinishTs) ? info.stageFinishTs : null;
+          const enemyUser = info.enemyUser ? {
+            id: String(info.enemyUser.id || ''),
+            name: String(info.enemyUser.name || ''),
+            level: Number(info.enemyUser.level) || null,
+            clanTitle: info.enemyUser.clanTitle || null,
+            avatarId: info.enemyUser.avatarId || null
+          } : null;
+          return [{
+            key: 'legendDraftStatus',
+            method: call.name,
+            feature: null,
+            group: 'draft',
+            data: {
+              active: stageId > 0 && stageId < 5,
+              stageId,
+              matchId,
+              stageFinishTs,
+              enemyUser,
+              rating: info.rating || null,
+              winstreak: info.winstreak || null
+            },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'randomDraft_saveDefence' && Array.isArray(call.args?.heroes)) {
+          return [{
+            key: 'legendDraftAction',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: { action: 'saveDefence', heroes: call.args.heroes.filter(Number.isInteger) },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'randomDraft_saveAttack' && Array.isArray(call.args?.heroes)) {
+          return [{
+            key: 'legendDraftAction',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: { action: 'saveAttack', heroes: call.args.heroes.filter(Number.isInteger) },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'randomDraft_startBattle' && result?.response?.battleReplay) {
+          const replay = result.response.battleReplay;
+          return [{
+            key: 'legendDraftAction',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: {
+              action: 'startBattle',
+              attackers: replay.attackers ? Object.keys(replay.attackers).map(Number) : [],
+              defenders: Array.isArray(replay.defenders) && replay.defenders[0] ?
+                Object.keys(replay.defenders[0]).map(Number) : []
+            },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'randomDraft_result') {
+          return [{
+            key: 'legendDraftAction',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: {
+              action: 'result',
+              matchId: call.args?.matchId,
+              result: result?.response?.result ?? null,
+              rating: result?.response?.rating ?? null,
+              reward: result?.response?.reward ?? null
+            },
+            updatedAt: record.timestamp
+          }];
         }
         if (!group || !result || !Object.hasOwn(result, 'response') || result.response == null) return [];
         return [{ key, method: call.name, feature: call.feature || null,
@@ -447,6 +598,95 @@
           changed = true;
           continue;
         }
+        if (entry.key === 'legendDraftStatus') {
+          const previous = next.legendDraftStatus?.data || {};
+          if (next.legendDraftStatus && next.legendDraftStatus.updatedAt > entry.updatedAt) continue;
+          next.legendDraftStatus = {
+            key: 'legendDraftStatus',
+            method: entry.method,
+            feature: null,
+            group: 'draft',
+            data: {
+              ...previous,
+              ...entry.data,
+              defenceHeroes: previous.defenceHeroes || [],
+              attackHeroes: previous.attackHeroes || []
+            },
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'legendDraftAction') {
+          const draft = next.legendDraftStatus ? { ...next.legendDraftStatus.data } : { active: true };
+          if (entry.data.action === 'saveDefence') {
+            draft.defenceHeroes = entry.data.heroes;
+            draft.stageId = 4;
+            draft.lastPickAction = 'saveDefence';
+          } else if (entry.data.action === 'saveAttack') {
+            draft.attackHeroes = entry.data.heroes;
+            draft.stageId = 5;
+            draft.lastPickAction = 'saveAttack';
+          } else if (entry.data.action === 'startBattle') {
+            draft.stageId = 5;
+            draft.inBattle = true;
+            if (entry.data.attackers?.length) draft.attackHeroes = entry.data.attackers;
+            if (entry.data.defenders?.length) draft.enemyDefenceHeroes = entry.data.defenders;
+          } else if (entry.data.action === 'result') {
+            draft.active = false;
+            draft.inBattle = false;
+            draft.stageId = 0;
+            draft.lastResult = entry.data;
+          }
+          next.legendDraftStatus = {
+            key: 'legendDraftStatus',
+            method: entry.method,
+            feature: null,
+            group: 'draft',
+            data: draft,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'heroSkillAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.heroId) continue;
+          const heroId = String(entry.data.heroId);
+          const heroSnap = next.heroGetAll?.data?.[heroId];
+          if (heroSnap && heroSnap.skills) {
+            const skills = { ...heroSnap.skills };
+            const sortedKeys = Object.keys(skills).sort((a, b) => Number(a) - Number(b));
+            const targetKey = sortedKeys[(entry.data.skillIndex || 1) - 1];
+            if (targetKey) {
+              skills[targetKey] = (skills[targetKey] || 0) + 1;
+              next.heroGetAll = {
+                ...next.heroGetAll,
+                data: {
+                  ...next.heroGetAll.data,
+                  [heroId]: {
+                    ...heroSnap,
+                    skills
+                  }
+                }
+              };
+              const history = { ...seen, [entry.data.token]: entry.updatedAt };
+              const tokens = Object.keys(history).sort((a, b) =>
+                history[b].localeCompare(history[a]));
+              for (const token of tokens.slice(500)) delete history[token];
+              next.resourceActionHistory = {
+                key: 'resourceActionHistory',
+                method: entry.method,
+                feature: null,
+                group: 'internal',
+                data: history,
+                updatedAt: entry.updatedAt
+              };
+              changed = true;
+            }
+          }
+          continue;
+        }
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
         if (entry.key === 'marchStatus') {
           const previous = next.marchStatus?.data?.marches || [];
@@ -463,6 +703,24 @@
             }
             return { ...march, kind: 'raid', rally };
           });
+        }
+        if (entry.key === 'buildingStatus' && entry.data.action &&
+            next[entry.key]?.updatedAt === entry.updatedAt) continue;
+        if (entry.key === 'buildingStatus' && entry.data.action) {
+          const queues = [...(next.buildingStatus?.data?.queues || [])];
+          if (entry.data.action === 'start') {
+            const queue = entry.data.queue;
+            const index = queues.findIndex((item) =>
+              Number.isInteger(queue.queueNumber) ? item.queueNumber === queue.queueNumber :
+                item.buildingId === queue.buildingId);
+            if (index >= 0) queues[index] = queue;
+            else queues.push(queue);
+          } else {
+            const index = queues.findIndex((item) => item.buildingId === entry.data.buildingId);
+            if (index >= 0) queues.splice(index, 1);
+            else if (queues.length === 1) queues.length = 0;
+          }
+          entry.data = { queues };
         }
         if (entry.key === 'researchStatus' && entry.data.action &&
             next[entry.key]?.updatedAt === entry.updatedAt) continue;

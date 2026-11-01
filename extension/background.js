@@ -114,6 +114,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.catch(() => {});
     return true;
   }
+  if (message?.kind === 'draft-action' && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+    chrome.tabs?.query({ url: `${GAME_ORIGIN}/*` }, (tabs) => {
+      for (const tab of tabs || []) {
+        if (tab.id) chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+      }
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
+  if (message?.kind === 'open-tab') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?view=tab') });
+    sendResponse({ ok: true });
+    return true;
+  }
   if (message?.kind !== 'api-record' || !sender.url?.startsWith(`${GAME_ORIGIN}/`)) return;
   const record = normalize(message.record);
   if (!record) return;

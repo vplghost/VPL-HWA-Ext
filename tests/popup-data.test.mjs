@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
 const context = {};
-for (const file of ['data-names.js', 'name-map.js', 'popup-data.js']) {
+for (const file of ['data-names.js', 'name-map.js', 'resource-data.js', 'popup-data.js']) {
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 const { heroSoulProgress, teamRows, sortRows, isNumericColumn,
@@ -61,4 +61,51 @@ test('rally tooltip names the target and departing team with exact wait and mark
   context.hwaHelperNameMap.hero);
   assert.match(exact, /Arrival: 30 sec remaining/);
   assert.match(exact, /Return to base: 40 sec remaining/);
+});
+
+test('buildingTooltip and researchTooltip display queue details with name, level, and remaining time', () => {
+  const now = 10000000;
+  const buildingStatus = {
+    data: {
+      queues: [{
+        buildingId: 183,
+        level: 13,
+        startDate: now - 10000,
+        durationMs: 70000
+      }]
+    }
+  };
+  const bTooltip = context.hwaHelperPopupData.buildingTooltip(
+    buildingStatus, now, context.hwaHelperNameMap.building
+  );
+  assert.match(bTooltip, /Construction in progress:/);
+  assert.match(bTooltip, /Headquarters 2 \(Lv\. 13\)/);
+  assert.match(bTooltip, /00:01 remaining/);
+
+  const idleBuilding = context.hwaHelperPopupData.buildingTooltip(
+    { data: { queues: [] } }, now, context.hwaHelperNameMap.building
+  );
+  assert.equal(idleBuilding, 'Construction: Idle');
+
+  const researchStatus = {
+    data: {
+      queues: [{
+        researchId: 119,
+        level: 2,
+        startDate: now - 20000,
+        durationMs: 140000
+      }]
+    }
+  };
+  const rTooltip = context.hwaHelperPopupData.researchTooltip(
+    researchStatus, now, context.hwaHelperNameMap.research
+  );
+  assert.match(rTooltip, /Research in progress:/);
+  assert.match(rTooltip, /Enhanced Spears III \(Lv\. 2\)/);
+  assert.match(rTooltip, /00:02 remaining/);
+
+  const idleResearch = context.hwaHelperPopupData.researchTooltip(
+    { data: { queues: [] } }, now, context.hwaHelperNameMap.research
+  );
+  assert.equal(idleResearch, 'Research: Idle');
 });
