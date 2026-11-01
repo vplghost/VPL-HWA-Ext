@@ -14,7 +14,7 @@
 
 Sau khi sửa mã, chạy lại `npm run build`, nhấn **Reload** tại thẻ extension trong `chrome://extensions`, rồi tải lại trang game. `npm run check` chạy kiểm thử và build.
 
-Kiểm tra số phiên bản trong popup sau khi reload; bản **0.6.0** dùng Tailwind CSS đóng gói, hiển thị tên tiếng Anh của heroes, titans và phần lớn items từ locale CDN đã đóng gói. Nút cạnh tên **HWA Helper** mở giao diện trong một tab trình duyệt; trang này cuộn được khi bảng dài. Bản ghi log cũ trong `chrome.storage.local` được xóa khi nâng cấp vì cơ chế log mới chỉ giữ dữ liệu trong phiên trình duyệt.
+Kiểm tra số phiên bản trong popup sau khi reload; bản **0.7.0** dùng Tailwind CSS đóng gói, hiển thị tên tiếng Anh của heroes, titans và phần lớn items từ locale CDN đã đóng gói. Nút cạnh tên **HWA Helper** mở giao diện trong một tab trình duyệt; trang này cuộn được khi bảng dài. Bản ghi log cũ trong `chrome.storage.local` được xóa khi nâng cấp vì cơ chế log mới chỉ giữ dữ liệu trong phiên trình duyệt.
 
 ## Xem log API
 
@@ -24,11 +24,13 @@ Extension không ghi request tới các endpoint analytics, AppsFlyer và Google
 
 ## Các tab dữ liệu và cache
 
-Popup có các tab **Heroes**, **Items**, **Titans**, **Teams**, **Khác**, **Log** và tab bánh răng **Cấu hình** ở cuối. Nhấn tiêu đề cột để sắp xếp tăng/giảm; tab Log có lựa chọn sắp xếp theo thời gian hoặc thời lượng. Tab Items có dropdown nhóm bên cạnh ô tìm kiếm. Tab Heroes hiển thị soul stone đang có / số cần để nâng lên bậc sao kế tiếp; khi chưa có snapshot inventory, số đang có hiện `—`. Hero 6 sao hiện `Tối đa`. Tab Teams hiển thị cả ID lẫn tên, tách từng đội lồng nhau thành dòng riêng. Tab **Khác** cho phép mở JSON của các snapshot phụ đã chọn.
+Popup có các tab **Heroes**, **Items**, **Resources**, **Titans**, **Teams**, **Khác**, **Log** và tab bánh răng **Cấu hình** ở cuối. Nhấn tiêu đề cột để sắp xếp tăng/giảm; tab Log có lựa chọn sắp xếp theo thời gian hoặc thời lượng. Tab Items có dropdown nhóm bên cạnh ô tìm kiếm. Tab Resources liệt kê các số dư quan sát được, cho phép tìm kiếm, sắp xếp theo tên hoặc số lượng và chọn checkbox để hiện resource bên dưới Energy trên header. Tab Heroes hiển thị soul stone đang có / số cần để nâng lên bậc sao kế tiếp; khi chưa có snapshot inventory, số đang có hiện `—`. Hero 6 sao hiện `Tối đa`. Tab Teams hiển thị cả ID lẫn tên, tách từng đội lồng nhau thành dòng riêng. Tab **Khác** cho phép mở JSON của các snapshot phụ đã chọn.
 
 Tab **Cấu hình** chứa công tắc **Theo dõi API** và hai nút **Xóa cache**, **Xóa log**. **Record / Stop** và **Xuất JSON** nằm ở tab Log. Cache nằm trong `chrome.storage.local` dưới khóa riêng `rpcCache`, nên xóa log không xóa cache và ngược lại. Cache chỉ giữ các response RPC đã chọn, tối đa khoảng 2 MB; dữ liệu đăng nhập, chat, mail và analytics không được đưa vào cache.
 
-Góc phải của header hiển thị Energy và World Energy bằng biểu tượng. Energy lấy từ `userGetInfo.refillable[id=1]` hoặc `refillableGetAll.refillables[refillableId=1]`; World Energy lấy từ `refillableGetAll.refillables[refillableId=2]`. Extension chỉ lưu số lượng, không lưu hồ sơ tài khoản. Giá trị là snapshot gần nhất từ RPC game tự phát sinh, không tự tính hồi năng lượng. Khi chưa quan sát được dữ liệu, popup hiện `—`.
+Góc phải của header hiển thị Energy và World Energy bằng biểu tượng. Energy lấy từ `userGetInfo.refillable[id=1]` hoặc `refillableGetAll.refillables[refillableId=1]` khi có; World Energy lấy từ `refillableGetAll.refillables[refillableId=2]`. World Energy được tính tăng 1 điểm sau mỗi 5 phút kể từ `lastRefillAt`, tối đa 200, theo cấu hình game được xác minh trong log; snapshot API mới luôn thay thế mốc tính cũ. Energy thường và các resource không có chu kỳ xác minh giữ nguyên số API gần nhất. Bên phải tên extension hiện tên account từ `userGetInfo.name`; trước hai số Energy là thời gian building và research còn lại dạng `giờ:phút` lấy từ `getSummary.queues`. Khi chưa quan sát được dữ liệu hoặc không có hàng đợi đang chạy, hiện `—`.
+
+Resources lấy số dư Gold, Emeralds và refillables từ `userGetInfo`; World Energy và refillables của bản đồ từ `refillableGetAll`; nguyên liệu, speedup, teleporter, lootbox từ `getInventory:inventory`; và các nhóm coin/scroll/consumable khi `inventoryGet` có dữ liệu. ID chưa có tên xác minh hiện dưới dạng loại và ID. Lựa chọn checkbox được lưu trong `chrome.storage.local` dưới khóa `resourceSelection`. Cache chỉ giữ số lượng, mốc hồi cần thiết, tên account và thời gian hàng đợi; không lưu các định danh tài khoản từ `userGetInfo` vào phần snapshot này.
 
 Các tab Heroes, Items và Titans hiển thị thêm cột **Tên**, có thể lọc theo tên hoặc ID. Bảng tên tiếng Anh được đóng gói sẵn trong extension, không làm phát sinh request khi mở popup. ID chưa có tên xác thực vẫn được giữ lại với dấu `—` ở cột Tên. Xem [nguồn asset CDN và cách cập nhật bảng tên](CDN-ASSETS.md).
 

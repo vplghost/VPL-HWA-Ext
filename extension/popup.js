@@ -4,6 +4,7 @@ const status = document.querySelector('#status');
 const search = document.querySelector('#search');
 const itemGroup = document.querySelector('#item-group');
 const logSort = document.querySelector('#log-sort');
+const resourceSort = document.querySelector('#resource-sort');
 const tabs = [...document.querySelectorAll('[data-tab]')];
 let activeTab = 'heroes';
 let settingsPending = Promise.resolve();
@@ -18,6 +19,58 @@ document.querySelector('#open-tab').addEventListener('click', () => {
 const formatNumber = (value) => typeof value === 'number' ? value.toLocaleString() : '—';
 const formatTime = (value) => value ? new Date(value).toLocaleString() : 'chưa có';
 const byId = ([a], [b]) => Number(a) - Number(b);
+const resourceData = globalThis.hwaHelperResourceData;
+
+function resourceLabel(entry) {
+  const id = entry.key.slice('resource:'.length);
+  const [type, itemId] = id.split(':');
+  if (type && itemId && !id.startsWith('refillable:') && !id.startsWith('world-refillable:')) {
+    return globalThis.hwaHelperNameMap.item(type, itemId) || entry.data.label;
+  }
+  return entry.data.label;
+}
+
+function resourceEntries(cache) {
+  return Object.values(cache).filter((entry) => entry.key?.startsWith('resource:') &&
+    Number.isFinite(entry.data?.amount));
+}
+
+function renderResources(entries, selection) {
+  const selected = new Set(selection);
+  const rows = entries.filter((entry) => matches([resourceLabel(entry), entry.key]));
+  const sort = resourceSort.value;
+  rows.sort((a, b) => sort === 'name' ? resourceLabel(a).localeCompare(resourceLabel(b)) :
+    (resourceData.amountAt(a) - resourceData.amountAt(b)) * (sort === 'amount-desc' ? -1 : 1));
+  status.textContent = `${rows.length} resources · chọn để hiện trên header`;
+  if (!rows.length) return showEmpty('Chưa quan sát được resource phù hợp.');
+  const list = document.createElement('div');
+  list.className = 'divide-y divide-slate-100';
+  for (const entry of rows) {
+    const label = document.createElement('label');
+    label.className = 'flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-blue-50/50';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = selected.has(entry.key);
+    checkbox.className = 'size-4 accent-blue-600';
+    checkbox.addEventListener('change', async () => {
+      const stored = await chrome.storage.local.get('resourceSelection');
+      const next = new Set(stored.resourceSelection || []);
+      if (checkbox.checked) next.add(entry.key);
+      else next.delete(entry.key);
+      await chrome.storage.local.set({ resourceSelection: [...next] });
+    });
+    const name = document.createElement('span');
+    name.className = 'min-w-0 flex-1 truncate text-slate-700';
+    name.textContent = resourceLabel(entry);
+    name.title = entry.key;
+    const amount = document.createElement('strong');
+    amount.className = 'tabular-nums text-slate-900';
+    amount.textContent = formatNumber(resourceData.amountAt(entry));
+    label.append(checkbox, name, amount);
+    list.append(label);
+  }
+  view.append(list);
+}
 
 function table(headings, rows) {
   const element = document.createElement('table');
@@ -164,11 +217,28 @@ function updateItemGroups(data) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get(CACHE_KEY), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
-  document.querySelector('#energy-value').textContent = formatNumber(cache.energyStatus?.data?.energy);
-  document.querySelector('#world-energy-value').textContent = formatNumber(cache.worldEnergyStatus?.data?.energy);
+  const resources = resourceEntries(cache);
+  const selectedResources = stored.resourceSelection || [];
+  document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
+  document.querySelector('#energy-value').textContent = formatNumber(
+    resourceData.amountAt(cache['resource:energy']) ?? cache.energyStatus?.data?.energy);
+  document.querySelector('#world-energy-value').textContent = formatNumber(
+    resourceData.amountAt(cache['resource:world-energy']) ?? cache.worldEnergyStatus?.data?.energy);
+  document.querySelector('#building-time').textContent = resourceData.hoursMinutes(
+    resourceData.remainingMinutes(cache.buildingStatus));
+  document.querySelector('#research-time').textContent = resourceData.hoursMinutes(
+    resourceData.remainingMinutes(cache.researchStatus));
+  const headerResources = document.querySelector('#header-resources');
+  headerResources.replaceChildren();
+  for (const entry of resources.filter((item) => selectedResources.includes(item.key))) {
+    const pill = document.createElement('span');
+    pill.className = 'rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200';
+    pill.textContent = `${resourceLabel(entry)}: ${formatNumber(resourceData.amountAt(entry))}`;
+    headerResources.append(pill);
+  }
   const recordingState = session.recordingState;
   const recordButton = document.querySelector('#record-toggle');
   recordButton.hidden = activeTab !== 'log';
@@ -183,6 +253,7 @@ async function render() {
   document.querySelector('#export').hidden = activeTab !== 'log';
   document.querySelector('#item-group-filter').hidden = activeTab !== 'items';
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
+  document.querySelector('#resource-sort-wrap').hidden = activeTab !== 'resources';
   document.querySelector('#search-label').textContent = activeTab === 'log' ? 'Lọc endpoint' : 'Lọc theo ID, tên hoặc nhóm';
   search.placeholder = activeTab === 'log' ? 'Lọc endpoint' : 'Nhập ID, tên hoặc nhóm';
 
@@ -202,6 +273,8 @@ async function render() {
       Object.entries(data).filter(([category]) => !itemGroup.value || category === itemGroup.value).flatMap(([category, items]) =>
         Object.entries(items ?? {}).sort(byId).map(([id, quantity]) =>
           [category, id, globalThis.hwaHelperNameMap.item(category, id) || '—', formatNumber(quantity)])));
+  } else if (activeTab === 'resources') {
+    renderResources(resources, selectedResources);
   } else if (activeTab === 'titans') {
     showSnapshot(cache.titanGetAll, ['Titan ID', 'Tên', 'Level', 'Star', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, titan]) =>
@@ -212,7 +285,9 @@ async function render() {
       globalThis.hwaHelperPopupData.teamRows(data, globalThis.hwaHelperNameMap));
   } else if (activeTab === 'other') {
     const entries = Object.values(cache).filter((entry) =>
-      !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'energyStatus', 'worldEnergyStatus'].includes(entry.key)
+      !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'energyStatus',
+        'worldEnergyStatus', 'accountStatus', 'buildingStatus', 'researchStatus'].includes(entry.key)
+      && !entry.key.startsWith('resource:')
       && matches([entry.method, entry.feature || entry.group]));
     const rows = entries.map((entry) => [entry.method, entry.feature || entry.group,
       Array.isArray(entry.data) ? `${entry.data.length} phần tử` : `${Object.keys(entry.data ?? {}).length} khóa`,
@@ -251,6 +326,7 @@ tabs.forEach((button) => button.addEventListener('click', () => {
 search.addEventListener('input', render);
 itemGroup.addEventListener('change', render);
 logSort.addEventListener('change', render);
+resourceSort.addEventListener('change', render);
 
 document.querySelector('#clear-cache').addEventListener('click', async () => {
   await chrome.storage.local.remove(CACHE_KEY);
@@ -316,7 +392,7 @@ document.querySelector('#clear').addEventListener('click', async () => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
     if ('captureSettings' in changes) renderSettings();
-    if (CACHE_KEY in changes) queueRender();
+    if (CACHE_KEY in changes || 'resourceSelection' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
     queueRender();
   }
@@ -335,3 +411,4 @@ render().then(async () => {
     await render();
   }
 });
+setInterval(queueRender, 60000);

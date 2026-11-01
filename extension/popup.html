@@ -11,11 +11,14 @@
     <div class="flex items-center justify-between gap-3">
       <div class="flex min-w-0 items-center gap-2">
         <h1 class="truncate text-lg font-semibold tracking-tight">HWA Helper</h1>
+        <span id="account-name" class="max-w-36 truncate text-sm font-medium text-slate-600" title="Tên account">—</span>
         <button id="open-tab" type="button" title="Mở HWA Helper trong tab mới" aria-label="Mở HWA Helper trong tab mới" class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
           <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false"><path d="M14 4h6v6m0-6-9 9M20 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
-      <div class="flex shrink-0 items-center gap-2" aria-label="Năng lượng hiện tại">
+      <div class="flex shrink-0 flex-wrap items-center justify-end gap-2" aria-label="Trạng thái hiện tại">
+        <span title="Building còn lại" class="text-xs font-medium text-slate-600">🏗 <span id="building-time">—</span></span>
+        <span title="Research còn lại" class="text-xs font-medium text-slate-600">🔬 <span id="research-time">—</span></span>
         <span title="Energy (snapshot gần nhất)" aria-label="Energy" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-800 ring-1 ring-amber-200">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 10-13h-7V2Z" fill="currentColor"/></svg><span id="energy-value">—</span>
         </span>
@@ -24,12 +27,14 @@
         </span>
       </div>
     </div>
+    <div id="header-resources" class="mt-2 flex flex-wrap justify-end gap-1.5" aria-label="Resources đã chọn"></div>
     <p class="mt-1 text-xs text-slate-500">Phiên bản extension: <strong id="version"></strong></p>
   </header>
 
   <nav id="tabs" role="tablist" aria-label="Dữ liệu game" class="mt-3 flex gap-1 overflow-x-auto border-b border-slate-200">
     <button type="button" role="tab" data-tab="heroes" aria-selected="true" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Heroes</button>
     <button type="button" role="tab" data-tab="items" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Items</button>
+    <button type="button" role="tab" data-tab="resources" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Resources</button>
     <button type="button" role="tab" data-tab="titans" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Titans</button>
     <button type="button" role="tab" data-tab="teams" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Teams</button>
     <button type="button" role="tab" data-tab="other" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Khác</button>
@@ -51,6 +56,10 @@
     <div id="log-sort-wrap" hidden class="w-36 shrink-0">
       <label for="log-sort" class="mb-1 block text-xs font-medium text-slate-600">Sắp xếp log</label>
       <select id="log-sort" class="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option><option value="duration-desc">Lâu nhất</option><option value="duration-asc">Nhanh nhất</option></select>
+    </div>
+    <div id="resource-sort-wrap" hidden class="w-36 shrink-0">
+      <label for="resource-sort" class="mb-1 block text-xs font-medium text-slate-600">Sắp xếp</label>
+      <select id="resource-sort" class="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 outline-none"><option value="name">Tên</option><option value="amount-desc">Số lượng giảm</option><option value="amount-asc">Số lượng tăng</option></select>
     </div>
     <button id="record-toggle" type="button" hidden class="cursor-pointer rounded-lg border border-red-300 bg-red-50 px-3 py-2 font-medium text-red-800 hover:bg-red-100">Record</button>
     <button id="export" type="button" hidden class="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-100">Xuất JSON</button>
@@ -75,6 +84,7 @@
   <script src="data-names.js"></script>
   <script src="name-map.js"></script>
   <script src="popup-data.js"></script>
+  <script src="resource-data.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
