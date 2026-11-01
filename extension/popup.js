@@ -10,6 +10,7 @@ let activeTab = 'heroes';
 let settingsPending = Promise.resolve();
 let renderTimer;
 let currentCache = {};
+let currentProductionRates = {};
 const sortState = {};
 
 document.querySelector('#version').textContent = chrome.runtime.getManifest().version;
@@ -79,7 +80,10 @@ function resourceTooltip(entry, now = Date.now()) {
   const cap = Number.isFinite(entry.data.cap) ?
     ` / ${resourceData.formatAmount(entry.data.cap)}` : '';
   const refill = resourceData.refillDescription(entry, now);
-  const detail = refill || (isRenewable(entry) ?
+  const materialId = /^resource:material:([1-5])$/.exec(entry.key)?.[1];
+  const production = materialId ? currentProductionRates[materialId] : null;
+  const detail = refill || (Number.isFinite(production) ?
+    `Estimated production: ~${formatNumber(Math.round(production))}/min` : isRenewable(entry) ?
     'Production rate unavailable; inventory updates after collection' : '');
   return `${resourceLabel(entry)}: ${amount}${exact}${cap}${detail ? `\n${detail}` : ''}`;
 }
@@ -334,6 +338,8 @@ async function render() {
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
+  currentProductionRates = Object.fromEntries([1, 2, 3, 4, 5].map((id) =>
+    [id, globalThis.hwaHelperProductionData.ratePerMinute(cache, id)]));
   const resources = resourceEntries(cache);
   const selectedResources = stored.resourceSelection || [];
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
@@ -405,7 +411,8 @@ async function render() {
     const entries = Object.values(cache).filter((entry) =>
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'energyStatus',
         'worldEnergyStatus', 'worldEnergyRallies', 'accountStatus', 'buildingStatus',
-        'researchStatus'].includes(entry.key)
+        'researchStatus', 'productionConfigStatus', 'productionStatus',
+        'productionBonusStatus', 'missionProgressStatus'].includes(entry.key)
       && !entry.key.startsWith('resource:')
       && matches([entry.method, entry.feature || entry.group]));
     const rows = entries.map((entry) => [entry.method, entry.feature || entry.group,

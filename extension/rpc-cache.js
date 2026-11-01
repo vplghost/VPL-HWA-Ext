@@ -62,6 +62,46 @@
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
         const result = results.get(call.ident);
+        if (call.name === 'remoteConfigInit' && result?.response?.index?.configs) {
+          const configs = result.response.index.configs;
+          return [{ key: 'productionConfigStatus', method: call.name, feature: null,
+            group: 'internal', data: { bonusUrl: configs.bonus?.url,
+              campaignUrl: configs.resourceProductionCampaign?.url },
+            updatedAt: record.timestamp }];
+        }
+        if (key === 'getSummary:resourceProduction' && Array.isArray(result?.response?.producers)) {
+          return [{ key: 'productionStatus', method: call.name, feature: call.feature,
+            group: 'internal', data: { producers: result.response.producers
+              .filter((producer) => Number.isInteger(producer.id))
+              .map((producer) => ({ id: producer.id,
+                residentCount: Array.isArray(producer.residents) ? producer.residents.length : 0 })) },
+            updatedAt: record.timestamp }];
+        }
+        if (key === 'getSummary:bonus' && Array.isArray(result?.response?.persistentBonuses)) {
+          const active = result.response;
+          const entries = [];
+          for (const source of [active, active.clanBonuses]) {
+            if (!source) continue;
+            for (const field of ['persistentBonuses', 'temporaryBonuses', 'stackableBonuses']) {
+              for (const bonus of source[field] || []) {
+                const id = typeof bonus === 'number' ? bonus : bonus?.id;
+                const count = typeof bonus === 'number' ? 1 : bonus?.counter ?? 1;
+                if (Number.isInteger(id) && Number.isFinite(count) && count > 0) entries.push([id, count]);
+              }
+            }
+          }
+          return [{ key: 'productionBonusStatus', method: call.name, feature: call.feature,
+            group: 'internal', data: { bonuses: entries }, updatedAt: record.timestamp }];
+        }
+        if (call.name === 'missionGetAll' && result?.response) {
+          const completed = Object.entries(result.response).filter(([id, mission]) =>
+            /^\d+$/.test(id) && Number.isFinite(mission?.stars) && mission.stars > 0)
+            .map(([id]) => Number(id));
+          const progress = { key: 'missionProgressStatus', method: call.name, feature: null,
+            group: 'internal', data: { completed }, updatedAt: record.timestamp };
+          return group ? [progress, { key, method: call.name, feature: null,
+            group, data: result.response, updatedAt: record.timestamp }] : [progress];
+        }
         if (call.name === 'userGetInfo' && result?.response) {
           const info = result.response;
           const entries = [

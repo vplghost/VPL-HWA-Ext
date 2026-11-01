@@ -185,3 +185,32 @@ test('raid from a full World Energy bar restarts the refill clock', () => {
   assert.equal(result.data.amount, 175);
   assert.equal(result.data.lastRefillAt, Date.parse(at));
 });
+
+test('stores only production inputs from config, bonus, producer and mission RPCs', () => {
+  const input = record([
+    { name: 'remoteConfigInit', ident: 1 },
+    { name: 'getSummary', feature: 'bonus', ident: 2 },
+    { name: 'getSummary', feature: 'resourceProduction', ident: 3 },
+    { name: 'missionGetAll', ident: 4 }
+  ], [
+    { ident: 1, result: { response: { index: { configs: {
+      bonus: { url: 'bonus-config' }, resourceProductionCampaign: { url: 'campaign-config' }
+    } } } } },
+    { ident: 2, result: { response: { persistentBonuses: [10], temporaryBonuses: [],
+      stackableBonuses: [], clanBonuses: { stackableBonuses: [{ id: 20, counter: 2 }] } } } },
+    { ident: 3, result: { response: { producers: [
+      { id: 1, residents: [100, 101], lastCollectDate: 123 },
+      { id: 2, residents: [] }
+    ] } } },
+    { ident: 4, result: { response: { 0: { stars: 3 }, 1: { stars: 0 } } } }
+  ]);
+  const entries = cache.extract(input);
+  assert.equal(entries.find((item) => item.key === 'productionConfigStatus').data.bonusUrl,
+    'bonus-config');
+  assert.deepEqual([...entries.find((item) => item.key === 'productionBonusStatus').data.bonuses]
+    .map((pair) => [...pair]),
+    [[10, 1], [20, 2]]);
+  assert.equal(entries.find((item) => item.key === 'productionStatus').data.producers[0].residentCount, 2);
+  assert.equal(JSON.stringify(entries.find((item) => item.key === 'productionStatus')).includes('100'), false);
+  assert.deepEqual([...entries.find((item) => item.key === 'missionProgressStatus').data.completed], [0]);
+});
