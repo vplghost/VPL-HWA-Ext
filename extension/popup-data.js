@@ -8,7 +8,7 @@
     const quantity = fragments && Object.hasOwn(fragments, id) ? fragments[id] : 0;
     const owned = fragments && Number.isFinite(quantity) && quantity >= 0 ? quantity : null;
     const star = hero?.star;
-    const needed = star === 6 ? 'Tối đa' : evolveFragmentCost[star + 1] ?? null;
+    const needed = star === 6 ? 'Max' : evolveFragmentCost[star + 1] ?? null;
     return { owned, needed };
   }
 
@@ -25,7 +25,7 @@
     });
   }
 
-  const collator = new Intl.Collator('vi', { numeric: true, sensitivity: 'base' });
+  const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
   function sortRows(rows, column, direction) {
     const numeric = (value) => {
       if (typeof value === 'number') return value;

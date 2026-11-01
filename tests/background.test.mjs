@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm';
 const source = await readFile(new URL('../extension/background.js', import.meta.url), 'utf8');
 const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
 const cacheSource = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
+const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
 const popupSender = { url: 'chrome-extension://test-extension/popup.html' };
 
@@ -40,7 +41,7 @@ function setup(quota = Infinity) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${cacheSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
@@ -132,7 +133,7 @@ test('session quota failure stops recording and preserves earlier records', asyn
   });
   assert.equal(result.saved, false);
   assert.equal(session.recordingState.active, false);
-  assert.match(session.recordingState.error, /đầy/);
+  assert.match(session.recordingState.error, /full/);
   assert.equal(session['record:0'].endpoint, 'https://www.hero-wars-alliance.com/api/test');
   assert.equal('record:1' in session, false);
 });

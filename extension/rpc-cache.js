@@ -26,6 +26,7 @@
     'speedUpConstruction', 'speedUpResearch', 'teleporter', 'lootboxChanced']);
   const worldMaterialNames = { 1: 'Elarite Shards', 2: 'Iron', 3: 'Stone',
     4: 'Wood', 5: 'Food', 12: 'Honor Marks' };
+  const producedMaterialIds = new Set([1, 2, 3, 4, 5]);
   const typeNames = { speedUpUnitTraining: 'Training Speedup',
     speedUpUniversal: 'Universal Speedup', speedUpUnitHealing: 'Healing Speedup',
     speedUpConstruction: 'Construction Speedup', speedUpResearch: 'Research Speedup',
@@ -42,7 +43,8 @@
       if (!resourceTypes.has(item?.type)) return [];
       const label = item.type === 'material' ? worldMaterialNames[item.id] : null;
       return resource(`${item.type}:${item.id}`, item.quantity, record, method,
-        label || `${typeNames[item.type] || item.type} #${item.id}`);
+        label || `${typeNames[item.type] || item.type} #${item.id}`,
+        item.type === 'material' && producedMaterialIds.has(item.id) ? { renewable: true } : {});
     });
   }
 
@@ -68,12 +70,19 @@
           ];
           if (typeof info.name === 'string' && info.name.trim()) entries.push({
             key: 'accountStatus', method: call.name, feature: null, group: 'header',
-            data: { name: info.name.slice(0, 80) }, updatedAt: record.timestamp
+            data: { name: info.name.slice(0, 80), level: info.level }, updatedAt: record.timestamp
           });
           for (const item of info.refillable || []) {
-            const label = item.id === 1 ? 'Energy' : `Refillable #${item.id}`;
+            const rule = globalThis.hwaHelperRefillableRules?.[item.id];
+            const label = rule?.label || `Refillable #${item.id}`;
+            const cap = rule?.capFromTeamLevel && Number.isInteger(info.level) ?
+              (info.level === 1 ? 60 : 60 + info.level) : rule?.cap;
+            const timed = rule && Number.isFinite(item.lastRefill) && Number.isFinite(cap) ? {
+              lastRefillAt: item.lastRefill * 1000, refillEveryMs: rule.interval,
+              refillAmount: 1, cap, renewable: true
+            } : {};
             entries.push(...resource(item.id === 1 ? 'energy' : `refillable:${item.id}`,
-              item.amount, record, call.name, label));
+              item.amount, record, call.name, label, timed));
             if (item.id === 1 && Number.isFinite(item.amount)) entries.push({
               key: 'energyStatus', method: call.name, feature: null, group: 'header',
               data: { energy: item.amount }, updatedAt: record.timestamp
@@ -85,8 +94,12 @@
           return result.response.refillables.flatMap((item) => {
             const cacheKey = item.refillableId === 1 ? 'energyStatus' :
               item.refillableId === 2 ? 'worldEnergyStatus' : null;
-            const timed = item.refillableId === 2 && Number.isFinite(item.lastRefillAt) ?
-              { lastRefillAt: item.lastRefillAt, refillAmount: 1, refillEveryMs: 300000, cap: 200 } : {};
+            const timed = item.refillableId === 1 && Number.isFinite(item.lastRefillAt) ?
+              { lastRefillAt: item.lastRefillAt, refillAmount: 1, refillEveryMs: 360000,
+                renewable: true } :
+              item.refillableId === 2 && Number.isFinite(item.lastRefillAt) ?
+              { lastRefillAt: item.lastRefillAt, refillAmount: 1, refillEveryMs: 300000,
+                cap: 200, renewable: true } : {};
             const label = item.refillableId === 1 ? 'Energy' :
               item.refillableId === 2 ? 'World Energy' :
               item.refillableId === 6 ? 'Free Teleport' : `World refillable #${item.refillableId}`;
@@ -108,7 +121,9 @@
             if (!resourceTypes.has(type) || !items || typeof items !== 'object') continue;
             for (const [id, amount] of Object.entries(items)) {
               entries.push(...resource(`${type}:${id}`, amount, record, call.name,
-                `${typeNames[type] || type} #${id}`));
+                worldMaterialNames[id] && type === 'material' ? worldMaterialNames[id] :
+                  `${typeNames[type] || type} #${id}`,
+                type === 'material' && producedMaterialIds.has(Number(id)) ? { renewable: true } : {}));
             }
           }
           return [{ key, method: call.name, feature: null, group,
@@ -138,6 +153,10 @@
     for (const record of records) {
       for (const entry of extract(record)) {
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
+        if (entry.key === 'resource:energy' && !Number.isFinite(entry.data.cap) &&
+            Number.isFinite(next[entry.key]?.data?.cap)) {
+          entry.data.cap = next[entry.key].data.cap;
+        }
         next[entry.key] = entry;
         changed = true;
       }

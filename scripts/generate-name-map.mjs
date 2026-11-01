@@ -61,6 +61,15 @@ for (const [group, prefix] of Object.entries(prefixes)) {
         !/^LIB_[A-Z0-9_]+$/.test(value.trim())) names[group][id] = value.trim();
   }
 }
+// The upstream English locale currently contains these non-English entries.
+const englishCorrections = {
+  hero: { 5016: 'Golem' },
+  consumable: { 2001: "Captain's Coin" },
+  coin: { 40094: 'Ancient Coin' }
+};
+for (const [group, corrections] of Object.entries(englishCorrections)) {
+  Object.assign(names[group], corrections);
+}
 const output = `// Generated from ${assetUrl}\n` +
   `globalThis.hwaHelperNameData = ${JSON.stringify({ assetUrl, names })};\n`;
 await writeFile(join(root, 'extension/data-names.js'), output);

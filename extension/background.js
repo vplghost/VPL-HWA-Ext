@@ -1,4 +1,5 @@
 importScripts('tracking-filter.js');
+importScripts('refillable-rules.js');
 importScripts('rpc-cache.js');
 
 const RECORD_STATE_KEY = 'recordingState';
@@ -127,7 +128,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return { saved: true, cached: cacheResult.changed };
     } catch (error) {
       // Browser session storage has a finite quota. Stop rather than silently dropping records.
-      const next = { ...state, active: false, error: 'Bộ nhớ phiên đã đầy; hãy xuất log hiện có.' };
+      const next = { ...state, active: false, error: 'Session storage is full. Export the current log.' };
       try {
         await chrome.storage.session.set({ [RECORD_STATE_KEY]: next });
       } catch (_) {

@@ -4,7 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
+const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const context = { TextEncoder };
+runInNewContext(refillRules, context);
 runInNewContext(source, context);
 const cache = context.hwaHelperRpcCache;
 
@@ -47,13 +49,22 @@ test('keeps newer snapshot and ignores incomplete or unrelated records', () => {
 
 test('caches resource amounts and account name without account identifiers', () => {
   const input = record([{ name: 'userGetInfo', ident: 1 }], [{ ident: 1, result: {
-    response: { id: 'private-id', name: 'private-name', refillable: [{ id: 1, amount: 42 }] }
+    response: { id: 'private-id', name: 'private-name', level: 120,
+      refillable: [{ id: 1, amount: 42, lastRefill: 1793532258 },
+        { id: 2, amount: 10, lastRefill: 1793532258 },
+        { id: 5, amount: 150, lastRefill: 1793532258 }] }
   } }]);
   const entries = cache.extract(input);
   assert.deepEqual([...entries.map((entry) => entry.key)],
-    ['accountStatus', 'resource:energy', 'energyStatus']);
+    ['accountStatus', 'resource:energy', 'energyStatus', 'resource:refillable:2',
+      'resource:refillable:5']);
   assert.equal(entries.find((entry) => entry.key === 'accountStatus').data.name, 'private-name');
   assert.equal(entries.find((entry) => entry.key === 'resource:energy').data.amount, 42);
+  assert.equal(entries.find((entry) => entry.key === 'resource:energy').data.cap, 180);
+  assert.equal(entries.find((entry) => entry.key === 'resource:energy').data.refillEveryMs, 360000);
+  assert.equal(entries.find((entry) => entry.key === 'resource:refillable:2').data.label, 'Skill Points');
+  assert.equal(entries.find((entry) => entry.key === 'resource:refillable:2').data.renewable, true);
+  assert.equal(entries.find((entry) => entry.key === 'resource:refillable:5').data.renewable, undefined);
   assert.equal(JSON.stringify(entries).includes('private-id'), false);
 });
 
@@ -98,6 +109,8 @@ test('extracts material and speedups from World inventory, and queue timers', ()
     'researchStatus', 'buildingStatus'
   ]);
   assert.equal(entries[0].data.label, 'Stone');
+  assert.equal(entries[0].data.renewable, true);
+  assert.equal(entries[1].data.renewable, undefined);
   assert.equal(entries[3].data.queues[0].durationMs, 8136000);
 });
 

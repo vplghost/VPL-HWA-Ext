@@ -17,7 +17,7 @@ test('hero soul progress uses inventory fragments and next-star cost', () => {
   assert.deepEqual({ ...heroSoulProgress('1', { star: 3 }, null) },
     { owned: null, needed: 100 });
   assert.deepEqual({ ...heroSoulProgress('1', { star: 6 }, { fragmentHero: { 1: 12 } }) },
-    { owned: 12, needed: 'Tối đa' });
+    { owned: 12, needed: 'Max' });
 });
 
 test('teams retain every nested squad and resolve hero/titan names', () => {

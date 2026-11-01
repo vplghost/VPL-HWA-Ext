@@ -14,7 +14,7 @@
   function item(category, id) {
     const group = itemGroups[category];
     const name = group && lookup(group, id);
-    return name ? (category.startsWith('fragment') ? `Mảnh ${name}` : name) : null;
+    return name ? (category.startsWith('fragment') ? `${name} fragment` : name) : null;
   }
   globalThis.hwaHelperNameMap = { hero, item };
 })();
