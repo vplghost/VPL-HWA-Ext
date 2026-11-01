@@ -35,6 +35,22 @@
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
         const result = results.get(call.ident);
+        if (call.name === 'userGetInfo' && result?.response) {
+          const energy = result.response.refillable?.find((item) => item?.id === 1)?.amount;
+          if (Number.isFinite(energy) && energy >= 0) {
+            return [{ key: 'energyStatus', method: 'userGetInfo', feature: null,
+              group: 'header', data: { energy }, updatedAt: record.timestamp }];
+          }
+        }
+        if (key === 'refillableGetAll:refillable' && Array.isArray(result?.response?.refillables)) {
+          return result.response.refillables.flatMap((item) => {
+            const cacheKey = item.refillableId === 1 ? 'energyStatus' :
+              item.refillableId === 2 ? 'worldEnergyStatus' : null;
+            if (!cacheKey || !Number.isFinite(item.amount) || item.amount < 0) return [];
+            return [{ key: cacheKey, method: call.name, feature: call.feature,
+              group: 'header', data: { energy: item.amount }, updatedAt: record.timestamp }];
+          });
+        }
         if (!group || !result || !Object.hasOwn(result, 'response') || result.response == null) return [];
         return [{ key, method: call.name, feature: call.feature || null,
           group, data: result.response, updatedAt: record.timestamp }];

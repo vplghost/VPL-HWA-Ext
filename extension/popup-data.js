@@ -25,5 +25,25 @@
     });
   }
 
-  globalThis.hwaHelperPopupData = { heroSoulProgress, teamRows };
+  const collator = new Intl.Collator('vi', { numeric: true, sensitivity: 'base' });
+  function sortRows(rows, column, direction) {
+    const numeric = (value) => {
+      if (typeof value === 'number') return value;
+      const text = String(value ?? '');
+      if (/^\d[\d,]*(?:\s*\/.*)?$/.test(text)) return Number(text.split('/')[0].replaceAll(',', '').trim());
+      return null;
+    };
+    return [...rows].sort((left, right) => {
+      const a = left[column];
+      const b = right[column];
+      if (a == null || a === '—') return b == null || b === '—' ? 0 : 1;
+      if (b == null || b === '—') return -1;
+      const an = numeric(a);
+      const bn = numeric(b);
+      const result = an !== null && bn !== null ? an - bn : collator.compare(String(a), String(b));
+      return direction === 'desc' ? -result : result;
+    });
+  }
+
+  globalThis.hwaHelperPopupData = { heroSoulProgress, teamRows, sortRows };
 })();

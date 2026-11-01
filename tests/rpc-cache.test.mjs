@@ -44,3 +44,26 @@ test('keeps newer snapshot and ignores incomplete or unrelated records', () => {
   assert.equal(result.cache.heroGetAll.data[1].level, 80);
   assert.equal(Object.keys(result.cache).length, 1);
 });
+
+test('caches only Energy from userGetInfo without account fields', () => {
+  const input = record([{ name: 'userGetInfo', ident: 1 }], [{ ident: 1, result: {
+    response: { id: 'private-id', name: 'private-name', refillable: [{ id: 1, amount: 42 }] }
+  } }]);
+  const entries = cache.extract(input);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].key, 'energyStatus');
+  assert.equal(JSON.stringify(entries[0].data), '{"energy":42}');
+});
+
+test('updates World Energy from refillableGetAll without storing other resources', () => {
+  const input = record([{ name: 'refillableGetAll', feature: 'refillable', ident: 1 }], [
+    { ident: 1, result: { response: { refillables: [
+      { refillableId: 2, amount: 44, lastRefillAt: 123 },
+      { refillableId: 6, amount: 1, lastRefillAt: 456 }
+    ] } } }
+  ]);
+  const entries = cache.extract(input);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].key, 'worldEnergyStatus');
+  assert.equal(JSON.stringify(entries[0].data), '{"energy":44}');
+});

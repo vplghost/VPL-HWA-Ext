@@ -19,3 +19,4 @@ node_modules/
 !/temp/**/
 !/temp/**/README
 !/temp/**/README.*
+/temp/edge-*/

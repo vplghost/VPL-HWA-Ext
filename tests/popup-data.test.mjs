@@ -7,7 +7,7 @@ const context = {};
 for (const file of ['data-names.js', 'name-map.js', 'popup-data.js']) {
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
-const { heroSoulProgress, teamRows } = context.hwaHelperPopupData;
+const { heroSoulProgress, teamRows, sortRows } = context.hwaHelperPopupData;
 
 test('hero soul progress uses inventory fragments and next-star cost', () => {
   assert.deepEqual({ ...heroSoulProgress('1', { star: 3 }, { fragmentHero: { 1: 73 } }) },
@@ -27,4 +27,10 @@ test('teams retain every nested squad and resolve hero/titan names', () => {
     ['grand', 1, 2, '1, 999999', 'Aurora, #999999'],
     ['grand', 2, 1, '4000', 'Sigurd']
   ]);
+});
+
+test('table sorting handles numeric counts, names, and missing values', () => {
+  const rows = [['Aurora', '73 / 100'], ['Thea', '9 / 150'], ['Unknown', '—']];
+  assert.deepEqual(Array.from(sortRows(rows, 1, 'asc'), (row) => row[0]), ['Thea', 'Aurora', 'Unknown']);
+  assert.deepEqual(Array.from(sortRows(rows, 0, 'desc'), (row) => row[0]), ['Unknown', 'Thea', 'Aurora']);
 });
