@@ -1,4 +1,12 @@
 (() => {
+  function formatAmount(value) {
+    if (!Number.isFinite(value)) return '—';
+    if (Math.abs(value) < 1000000) return value.toLocaleString('en-US');
+    const unit = Math.abs(value) >= 1000000000 ? 1000000000 : 1000000;
+    const suffix = unit === 1000000000 ? 'B' : 'M';
+    return `${(value / unit).toFixed(1)}${suffix}`;
+  }
+
   function amountAt(entry, now = Date.now()) {
     const data = entry?.data;
     if (!Number.isFinite(data?.amount)) return null;
@@ -26,6 +34,18 @@
     return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   }
 
+  function refillDescription(entry, now = Date.now()) {
+    const data = entry?.data;
+    if (!Number.isFinite(data?.refillEveryMs) || data.refillEveryMs <= 0 ||
+        !Number.isFinite(data.refillAmount) || data.refillAmount <= 0) return null;
+    const perMinute = data.refillAmount * 60000 / data.refillEveryMs;
+    if (perMinute >= 1) return `+${Number(perMinute.toFixed(2)).toLocaleString('en-US')}/min`;
+    const next = nextRefillSeconds(entry, now);
+    if (next != null) return `Next +${data.refillAmount} in ${minutesSeconds(next)}`;
+    return Number.isFinite(data.cap) && amountAt(entry, now) >= data.cap ?
+      'Full; refill resumes after spending' : 'Next refill time unavailable';
+  }
+
   function remainingMinutes(entry, now = Date.now()) {
     const queues = entry?.data?.queues;
     if (!Array.isArray(queues) || !queues.length) return null;
@@ -41,5 +61,5 @@
   }
 
   globalThis.hwaHelperResourceData = { amountAt, nextRefillSeconds, minutesSeconds,
-    remainingMinutes, hoursMinutes };
+    remainingMinutes, hoursMinutes, formatAmount, refillDescription };
 })();

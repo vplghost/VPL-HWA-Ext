@@ -71,19 +71,35 @@ function resourceEntries(cache) {
     Number.isFinite(entry.data?.amount));
 }
 
+function resourceTooltip(entry, now = Date.now()) {
+  const value = resourceData.amountAt(entry, now);
+  const amount = resourceData.formatAmount(value);
+  const exact = Number.isFinite(value) && Math.abs(value) >= 1000000 ?
+    ` (${formatNumber(value)})` : '';
+  const cap = Number.isFinite(entry.data.cap) ?
+    ` / ${resourceData.formatAmount(entry.data.cap)}` : '';
+  const refill = resourceData.refillDescription(entry, now);
+  const detail = refill || (isRenewable(entry) ?
+    'Production rate unavailable; inventory updates after collection' : '');
+  return `${resourceLabel(entry)}: ${amount}${exact}${cap}${detail ? `\n${detail}` : ''}`;
+}
+
 function refreshTimed() {
   const energy = currentCache['resource:energy'];
-  document.querySelector('#energy-value').textContent = formatNumber(
+  document.querySelector('#energy-value').textContent = resourceData.formatAmount(
     resourceData.amountAt(energy) ?? currentCache.energyStatus?.data?.energy);
-  document.querySelector('#energy-max').textContent = formatNumber(energy?.data?.cap);
+  document.querySelector('#energy-max').textContent = resourceData.formatAmount(energy?.data?.cap);
   const next = resourceData.nextRefillSeconds(energy);
   document.querySelector('#energy-next').textContent = next == null ?
     (Number.isFinite(energy?.data?.cap) &&
       resourceData.amountAt(energy) >= energy.data.cap ? 'Full' : '—') :
     `+1 in ${resourceData.minutesSeconds(next)}`;
-  document.querySelector('#world-energy-value').textContent = formatNumber(
+  document.querySelector('#world-energy-value').textContent = resourceData.formatAmount(
     resourceData.amountAt(currentCache['resource:world-energy']) ??
       currentCache.worldEnergyStatus?.data?.energy);
+  if (energy) document.querySelector('#energy-badge').title = resourceTooltip(energy);
+  const worldEnergy = currentCache['resource:world-energy'];
+  if (worldEnergy) document.querySelector('#world-energy-badge').title = resourceTooltip(worldEnergy);
   document.querySelector('#building-time').textContent = resourceData.hoursMinutes(
     resourceData.remainingMinutes(currentCache.buildingStatus));
   document.querySelector('#research-time').textContent = resourceData.hoursMinutes(
@@ -91,17 +107,8 @@ function refreshTimed() {
   for (const node of document.querySelectorAll('[data-resource-amount]')) {
     const entry = currentCache[node.dataset.resourceAmount];
     if (!entry) continue;
-    const amount = formatNumber(resourceData.amountAt(entry));
-    node.textContent = amount;
-    if (node.dataset.resourceHeader) {
-      const nextRefill = resourceData.nextRefillSeconds(entry);
-      const kind = entry.data.refillEveryMs ?
-        `Timed estimate; latest API snapshot takes priority${nextRefill == null ? '' :
-          `\nNext +1 in ${resourceData.minutesSeconds(nextRefill)}`}` :
-        'Produced over time; collected balance updates from the API';
-      node.parentElement.title = `${resourceLabel(entry)}: ${amount}${
-        Number.isFinite(entry.data.cap) ? ` / ${formatNumber(entry.data.cap)}` : ''}\n${kind}`;
-    }
+    node.textContent = resourceData.formatAmount(resourceData.amountAt(entry));
+    node.parentElement.title = resourceTooltip(entry);
   }
 }
 
@@ -123,9 +130,6 @@ function renderResources(entries, selection) {
       checkbox.type = 'checkbox';
       checkbox.checked = selected.has(entry.key);
       checkbox.className = 'size-4 accent-blue-600';
-      checkbox.title = entry.data.refillEveryMs || entry.key.startsWith('resource:refillable:') ?
-        'Automatically refills over time' :
-        'Produced over time; inventory updates after collection';
       checkbox.addEventListener('change', async () => {
         const stored = await chrome.storage.local.get('resourceSelection');
         const next = new Set(stored.resourceSelection || []);
@@ -142,11 +146,10 @@ function renderResources(entries, selection) {
     const name = document.createElement('span');
     name.className = 'min-w-0 flex-1 truncate text-slate-700';
     name.textContent = resourceLabel(entry);
-    name.title = entry.key;
     const amount = document.createElement('strong');
     amount.className = 'tabular-nums text-slate-900';
     amount.dataset.resourceAmount = entry.key;
-    amount.textContent = formatNumber(resourceData.amountAt(entry));
+    amount.textContent = resourceData.formatAmount(resourceData.amountAt(entry));
     label.append(name, amount);
     list.append(label);
   }

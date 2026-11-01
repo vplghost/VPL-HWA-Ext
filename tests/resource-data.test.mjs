@@ -32,3 +32,24 @@ test('building and research queues show nearest remaining hours and minutes', ()
   assert.equal(resources.remainingMinutes(entry, 1000000 + 8000000), null);
   assert.equal(resources.hoursMinutes(null), '—');
 });
+
+test('resource amounts use M and B notation from each threshold', () => {
+  assert.equal(resources.formatAmount(999999), '999,999');
+  assert.equal(resources.formatAmount(1000000), '1.0M');
+  assert.equal(resources.formatAmount(1250000), '1.3M');
+  assert.equal(resources.formatAmount(1000000000), '1.0B');
+  assert.equal(resources.formatAmount(2500000000), '2.5B');
+  assert.equal(resources.formatAmount(null), '—');
+});
+
+test('renewable tooltip shows per-minute rate or next refill countdown', () => {
+  const fast = { data: { amount: 5, lastRefillAt: 1000000,
+    refillEveryMs: 30000, refillAmount: 1, cap: 20 } };
+  const slow = { data: { amount: 5, lastRefillAt: 1000000,
+    refillEveryMs: 300000, refillAmount: 1, cap: 20 } };
+  assert.equal(resources.refillDescription(fast, 1000000), '+2/min');
+  assert.equal(resources.refillDescription(slow, 1000000 + 60000), 'Next +1 in 04:00');
+  assert.equal(resources.refillDescription({ data: { ...slow.data, amount: 20 } }, 1000000),
+    'Full; refill resumes after spending');
+  assert.equal(resources.refillDescription({ data: { amount: 100 } }, 1000000), null);
+});
