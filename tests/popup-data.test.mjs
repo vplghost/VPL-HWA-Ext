@@ -7,7 +7,7 @@ const context = {};
 for (const file of ['data-names.js', 'name-map.js', 'popup-data.js']) {
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
-const { heroSoulProgress, teamRows, sortRows } = context.hwaHelperPopupData;
+const { heroSoulProgress, teamRows, sortRows, isNumericColumn } = context.hwaHelperPopupData;
 
 test('hero soul progress uses inventory fragments and next-star cost', () => {
   assert.deepEqual({ ...heroSoulProgress('1', { star: 3 }, { fragmentHero: { 1: 73 } }) },
@@ -33,4 +33,11 @@ test('table sorting handles numeric counts, names, and missing values', () => {
   const rows = [['Aurora', '73 / 100'], ['Thea', '9 / 150'], ['Unknown', '—']];
   assert.deepEqual(Array.from(sortRows(rows, 1, 'asc'), (row) => row[0]), ['Thea', 'Aurora', 'Unknown']);
   assert.deepEqual(Array.from(sortRows(rows, 0, 'desc'), (row) => row[0]), ['Unknown', 'Thea', 'Aurora']);
+});
+
+test('numeric columns align values and headings while IDs and ordinals stay left', () => {
+  for (const heading of ['Level', 'Star', 'Soul stones / needed', 'Power',
+    'Amount', 'Members', 'Size']) assert.equal(isNumericColumn(heading), true);
+  for (const heading of ['Hero ID', 'Titan ID', 'Item ID', 'Skin ID',
+    'Hero/Titan ID', 'Team', 'Name']) assert.equal(isNumericColumn(heading), false);
 });

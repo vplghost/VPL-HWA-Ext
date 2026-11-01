@@ -26,6 +26,9 @@
   }
 
   const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+  const numericHeadings = new Set(['Level', 'Star', 'Soul stones / needed',
+    'Power', 'Amount', 'Members', 'Size']);
+  const isNumericColumn = (heading) => numericHeadings.has(heading);
   function sortRows(rows, column, direction) {
     const numeric = (value) => {
       if (typeof value === 'number') return value;
@@ -45,5 +48,6 @@
     });
   }
 
-  globalThis.hwaHelperPopupData = { heroSoulProgress, teamRows, sortRows };
+  globalThis.hwaHelperPopupData = { heroSoulProgress, teamRows, sortRows,
+    isNumericColumn };
 })();

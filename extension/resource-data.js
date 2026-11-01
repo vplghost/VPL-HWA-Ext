@@ -33,11 +33,6 @@
     return Math.ceil((data.refillEveryMs - remainder) / 1000);
   }
 
-  function minutesSeconds(seconds) {
-    if (seconds == null) return '—';
-    return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-  }
-
   function tooltipTime(seconds) {
     if (!Number.isFinite(seconds) || seconds < 0) return '—';
     const minutes = Math.max(1, Math.floor(seconds / 60));
@@ -71,6 +66,6 @@
     return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
   }
 
-  globalThis.hwaHelperResourceData = { amountAt, nextRefillSeconds, minutesSeconds,
+  globalThis.hwaHelperResourceData = { amountAt, nextRefillSeconds,
     remainingMinutes, hoursMinutes, formatAmount, refillDescription, tooltipTime };
 })();

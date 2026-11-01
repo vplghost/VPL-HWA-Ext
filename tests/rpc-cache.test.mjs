@@ -73,6 +73,18 @@ test('caches resource amounts and account name without account identifiers', () 
   assert.equal(JSON.stringify(entries).includes('private-id'), false);
 });
 
+test('numeric-string team level sets the Energy soft cap and six-minute fallback', () => {
+  const input = record([{ name: 'userGetInfo', ident: 'level-string' }],
+    [{ ident: 'level-string', result: { response: { name: 'Player', level: '78',
+      refillable: [{ id: 1, amount: 8, lastRefill: 1793540178 }] } } }]);
+  const entries = cache.extract(input);
+  const energy = entries.find((entry) => entry.key === 'resource:energy');
+  assert.equal(energy.data.cap, 138);
+  assert.equal(energy.data.refillEveryMs, 360000);
+  assert.equal(energy.data.lastRefillAt, 1793540178000);
+  assert.equal(entries.find((entry) => entry.key === 'accountStatus').data.level, 78);
+});
+
 test('mission actions spend their configured Energy and reset a full refill clock', () => {
   const baseline = record([{ name: 'userGetInfo', ident: 'snapshot' }],
     [{ ident: 'snapshot', result: { response: { level: 78,

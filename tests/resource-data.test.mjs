@@ -18,7 +18,6 @@ test('World Energy refills at verified interval, caps, and accepts newer API bas
   assert.equal(resources.amountAt({ data: { ...entry.data, amount: 250 } }, 1000000 + 300000), 250);
   assert.equal(resources.nextRefillSeconds(entry, 1000000), 300);
   assert.equal(resources.nextRefillSeconds(entry, 1000000 + 299000), 1);
-  assert.equal(resources.minutesSeconds(301), '05:01');
   assert.equal(resources.amountAt({ data: { ...entry.data, amount: 10, lastRefillAt: 2000000 } },
     2000000), 10);
 });

@@ -139,19 +139,20 @@
         }
         if (call.name === 'userGetInfo' && result?.response) {
           const info = result.response;
+          const teamLevel = Number(info.level);
           const entries = [
             ...resource('gold', info.gold, record, call.name, 'Gold'),
             ...resource('starMoney', info.starMoney, record, call.name, 'Emeralds')
           ];
           if (typeof info.name === 'string' && info.name.trim()) entries.push({
             key: 'accountStatus', method: call.name, feature: null, group: 'header',
-            data: { name: info.name.slice(0, 80), level: info.level }, updatedAt: record.timestamp
+            data: { name: info.name.slice(0, 80), level: teamLevel }, updatedAt: record.timestamp
           });
           for (const item of info.refillable || []) {
             const rule = globalThis.hwaHelperRefillableRules?.[item.id];
             const label = rule?.label || `Refillable #${item.id}`;
-            const cap = rule?.capFromTeamLevel && Number.isInteger(info.level) ?
-              (info.level === 1 ? 60 : 60 + info.level) : rule?.cap;
+            const cap = rule?.capFromTeamLevel && Number.isInteger(teamLevel) && teamLevel > 0 ?
+              (teamLevel === 1 ? 60 : 60 + teamLevel) : rule?.cap;
             const timed = rule && Number.isFinite(item.lastRefill) && Number.isFinite(cap) ? {
               lastRefillAt: item.lastRefill * 1000, refillEveryMs: rule.interval,
               refillAmount: 1, cap, renewable: true

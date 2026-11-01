@@ -77,9 +77,14 @@ function resourceTooltip(entry, now = Date.now()) {
   const amount = resourceData.formatAmount(value);
   const exact = Number.isFinite(value) && Math.abs(value) >= 1000000 ?
     ` (${formatNumber(value)})` : '';
+  const softCap = ['resource:energy', 'resource:refillable:2'].includes(entry.key);
   const cap = Number.isFinite(entry.data.cap) ?
-    ` / ${resourceData.formatAmount(entry.data.cap)}${entry.key === 'resource:refillable:2' ? ' soft cap' : ''}` : '';
-  const refill = resourceData.refillDescription(entry, now);
+    ` / ${resourceData.formatAmount(entry.data.cap)}${softCap ? ' soft cap' : ''}` : '';
+  const energyInterval = Number.isFinite(entry.data.refillEveryMs) &&
+    entry.data.refillEveryMs > 0 ? entry.data.refillEveryMs : 360000;
+  const refill = entry.key === 'resource:energy' ?
+    `+1 every ${Math.round(energyInterval / 60000)} min` :
+    resourceData.refillDescription(entry, now);
   const materialId = /^resource:material:([1-5])$/.exec(entry.key)?.[1];
   const production = materialId ? currentProductionRates[materialId] : null;
   const detail = refill || (Number.isFinite(production) ?
@@ -97,11 +102,6 @@ function refreshTimed() {
   document.querySelector('#energy-value').textContent = resourceData.formatAmount(
     resourceData.amountAt(energy) ?? currentCache.energyStatus?.data?.energy);
   document.querySelector('#energy-max').textContent = resourceData.formatAmount(energy?.data?.cap);
-  const next = resourceData.nextRefillSeconds(energy);
-  document.querySelector('#energy-next').textContent = next == null ?
-    (Number.isFinite(energy?.data?.cap) &&
-      resourceData.amountAt(energy) >= energy.data.cap ? 'Full' : '—') :
-    `+1 in ${resourceData.minutesSeconds(next)}`;
   document.querySelector('#world-energy-value').textContent = resourceData.formatAmount(
     resourceData.amountAt(currentCache['resource:world-energy']) ??
       currentCache.worldEnergyStatus?.data?.energy);
@@ -189,6 +189,7 @@ function starIcons(count) {
 }
 
 function table(headings, rows) {
+  const isNumericColumn = globalThis.hwaHelperPopupData.isNumericColumn;
   const element = document.createElement('table');
   element.className = 'min-w-full border-collapse text-left text-xs';
   const header = document.createElement('tr');
@@ -196,11 +197,12 @@ function table(headings, rows) {
   for (const [index, heading] of headings.entries()) {
     const cell = document.createElement('th');
     cell.className = 'sticky top-0 z-10 border-b border-slate-200 bg-slate-100 px-3 py-2 font-semibold whitespace-nowrap text-slate-700';
+    if (isNumericColumn(heading)) cell.className += ' text-right tabular-nums';
     cell.setAttribute('aria-sort', selectedSort?.column === index ?
       (selectedSort.direction === 'asc' ? 'ascending' : 'descending') : 'none');
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'flex cursor-pointer items-center gap-1 text-left hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600';
+    button.className = `flex w-full cursor-pointer items-center gap-1 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600 ${isNumericColumn(heading) ? 'justify-end text-right' : 'text-left'}`;
     button.textContent = `${heading} ${selectedSort?.column === index ?
       (selectedSort.direction === 'asc' ? '↑' : '↓') : '↕'}`;
     button.addEventListener('click', () => {
@@ -222,7 +224,7 @@ function table(headings, rows) {
       cell.className = 'px-3 py-2 align-top text-slate-700';
       if (headings[column] === 'Star') cell.append(starIcons(value));
       else cell.textContent = String(value ?? '—');
-      if (typeof value === 'number') cell.className += ' text-right tabular-nums';
+      if (isNumericColumn(headings[column])) cell.className += ' text-right tabular-nums';
       line.append(cell);
     }
     element.append(line);
@@ -410,7 +412,8 @@ async function render() {
   } else if (activeTab === 'other') {
     const entries = Object.values(cache).filter((entry) =>
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'energyStatus',
-        'worldEnergyStatus', 'worldEnergyRallies', 'accountStatus', 'buildingStatus',
+        'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
+        'accountStatus', 'buildingStatus',
         'researchStatus', 'productionConfigStatus', 'productionStatus',
         'productionBonusStatus', 'missionProgressStatus'].includes(entry.key)
       && !entry.key.startsWith('resource:')
