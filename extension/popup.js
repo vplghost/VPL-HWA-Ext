@@ -802,6 +802,7 @@ async function render() {
   document.querySelector('#settings-panel').hidden = activeTab !== 'config';
   view.hidden = activeTab === 'config';
   document.querySelector('#export').hidden = activeTab !== 'log';
+  document.querySelector('#clear').hidden = activeTab !== 'log';
   document.querySelector('#item-group-filter').hidden = activeTab !== 'items';
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
   document.querySelector('#resource-sort-wrap').hidden = activeTab !== 'resources';
