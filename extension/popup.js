@@ -78,7 +78,7 @@ function resourceTooltip(entry, now = Date.now()) {
   const exact = Number.isFinite(value) && Math.abs(value) >= 1000000 ?
     ` (${formatNumber(value)})` : '';
   const cap = Number.isFinite(entry.data.cap) ?
-    ` / ${resourceData.formatAmount(entry.data.cap)}` : '';
+    ` / ${resourceData.formatAmount(entry.data.cap)}${entry.key === 'resource:refillable:2' ? ' soft cap' : ''}` : '';
   const refill = resourceData.refillDescription(entry, now);
   const materialId = /^resource:material:([1-5])$/.exec(entry.key)?.[1];
   const production = materialId ? currentProductionRates[materialId] : null;

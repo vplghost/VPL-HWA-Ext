@@ -3,7 +3,7 @@
 (() => {
   const rules = {
     1: { label: 'Energy', interval: 360000, capFromTeamLevel: true },
-    2: { label: 'Skill Points', interval: 300000, cap: 20 },
+    2: { label: 'Skill Points', interval: 300000, cap: 10 },
     3: { label: 'Bronze Free Chest', interval: 600000, cap: 1 },
     4: { label: 'Gold Free Chest', interval: 129600000, cap: 1 },
     35: { label: 'Diamond Free Chest', interval: 259200000, cap: 1 },

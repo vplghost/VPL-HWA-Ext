@@ -5,8 +5,12 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
+const missionCosts = await readFile(new URL('../extension/mission-costs.js', import.meta.url), 'utf8');
+const resourceDataSource = await readFile(new URL('../extension/resource-data.js', import.meta.url), 'utf8');
 const context = { TextEncoder };
 runInNewContext(refillRules, context);
+runInNewContext(missionCosts, context);
+runInNewContext(resourceDataSource, context);
 runInNewContext(source, context);
 const cache = context.hwaHelperRpcCache;
 
@@ -63,9 +67,99 @@ test('caches resource amounts and account name without account identifiers', () 
   assert.equal(entries.find((entry) => entry.key === 'resource:energy').data.cap, 180);
   assert.equal(entries.find((entry) => entry.key === 'resource:energy').data.refillEveryMs, 360000);
   assert.equal(entries.find((entry) => entry.key === 'resource:refillable:2').data.label, 'Skill Points');
+  assert.equal(entries.find((entry) => entry.key === 'resource:refillable:2').data.cap, 10);
   assert.equal(entries.find((entry) => entry.key === 'resource:refillable:2').data.renewable, true);
   assert.equal(entries.find((entry) => entry.key === 'resource:refillable:5').data.renewable, undefined);
   assert.equal(JSON.stringify(entries).includes('private-id'), false);
+});
+
+test('mission actions spend their configured Energy and reset a full refill clock', () => {
+  const baseline = record([{ name: 'userGetInfo', ident: 'snapshot' }],
+    [{ ident: 'snapshot', result: { response: { level: 78,
+      refillable: [{ id: 1, amount: 138, lastRefill: 1793534400 }] } } }],
+    '2026-11-01T12:00:00.000Z');
+  const raid = record([{ name: 'missionRaid', ident: 'raid', args: { id: 99, times: 2 } }],
+    [{ ident: 'raid', result: { response: { raid: {} } } }],
+    '2026-11-01T12:01:00.000Z');
+  const start = record([{ name: 'missionStart', ident: 'start', args: { id: 99 } }],
+    [{ ident: 'start', result: { response: {} } }], '2026-11-01T12:01:30.000Z');
+  const end = record([{ name: 'missionEnd', ident: 'end',
+    args: { id: 99, result: { win: true } } }],
+    [{ ident: 'end', result: { response: {} } }], '2026-11-01T12:02:00.000Z');
+  const afterRaid = cache.merge({}, [baseline, raid]).cache;
+  assert.equal(afterRaid['resource:energy'].data.amount, 126);
+  assert.equal(afterRaid['resource:energy'].data.lastRefillAt,
+    Date.parse('2026-11-01T12:01:00.000Z'));
+  const afterBattle = cache.merge(afterRaid, [start, end]).cache;
+  assert.equal(afterBattle['resource:energy'].data.amount, 120);
+  assert.equal(afterBattle.energyStatus.data.energy, 120);
+  assert.equal(cache.merge(afterBattle, [raid, start, end]).changed, false);
+  const latest = record([{ name: 'userGetInfo', ident: 'latest' }],
+    [{ ident: 'latest', result: { response: { level: 78,
+      refillable: [{ id: 1, amount: 119, lastRefill: 1793534520 }] } } }],
+    '2026-11-01T12:03:00.000Z');
+  assert.equal(cache.merge(afterBattle, [latest, raid]).cache['resource:energy'].data.amount, 119);
+});
+
+test('successful empty skill results spend once and only refill below soft cap', () => {
+  const baseline = record([{ name: 'userGetInfo', ident: 'snapshot' }],
+    [{ ident: 'snapshot', result: { response: { level: 78,
+      refillable: [{ id: 2, amount: 10, lastRefill: 1793534400 }] } } }],
+    '2026-11-01T12:00:00.000Z');
+  const spend = record([
+    { name: 'heroUpgradeSkill', ident: 'a', args: { heroId: 16, skill: 3 } },
+    { name: 'heroUpgradeSkill', ident: 'b', args: { heroId: 16, skill: 3 } }
+  ], [{ ident: 'a', result: { response: null } },
+    { ident: 'b', result: { response: null } }], '2026-11-01T12:01:00.000Z');
+  const after = cache.merge({}, [baseline, spend]).cache;
+  assert.equal(after['resource:refillable:2'].data.amount, 8);
+  assert.equal(after['resource:refillable:2'].data.lastRefillAt,
+    Date.parse('2026-11-01T12:01:00.000Z'));
+  assert.equal(cache.merge(after, [spend]).changed, false);
+  assert.equal(context.hwaHelperResourceData.amountAt(after['resource:refillable:2'],
+    Date.parse('2026-11-01T12:05:59.000Z')), 8);
+  assert.equal(context.hwaHelperResourceData.amountAt(after['resource:refillable:2'],
+    Date.parse('2026-11-01T12:06:00.000Z')), 9);
+  const failed = record([{ name: 'heroUpgradeSkill', ident: 'failed' }],
+    [{ ident: 'failed', result: { error: 'no skill point' } }]);
+  assert.equal(cache.extract(failed).length, 0);
+});
+
+test('a paid Skill Point balance above the soft cap waits until it drops below 10', () => {
+  const baseline = record([{ name: 'userGetInfo', ident: 'snapshot' }],
+    [{ ident: 'snapshot', result: { response: { level: 78,
+      refillable: [{ id: 2, amount: 12, lastRefill: 1793534400 }] } } }],
+    '2026-11-01T12:00:00.000Z');
+  const spends = ['a', 'b', 'c'].map((ident, index) =>
+    record([{ name: 'heroUpgradeSkill', ident }],
+      [{ ident, result: { response: null } }],
+      `2026-11-01T12:0${index + 1}:00.000Z`));
+  const afterTwo = cache.merge({}, [baseline, ...spends.slice(0, 2)]).cache;
+  assert.equal(afterTwo['resource:refillable:2'].data.amount, 10);
+  assert.equal(context.hwaHelperResourceData.amountAt(afterTwo['resource:refillable:2'],
+    Date.parse('2026-11-01T12:12:00.000Z')), 10);
+  const afterThree = cache.merge(afterTwo, [spends[2]]).cache;
+  assert.equal(afterThree['resource:refillable:2'].data.amount, 9);
+  assert.equal(afterThree['resource:refillable:2'].data.lastRefillAt,
+    Date.parse('2026-11-01T12:03:00.000Z'));
+});
+
+test('mail claims add each reward once to observed resource balances', () => {
+  const baseline = record([{ name: 'getInventory', feature: 'inventory', ident: 'snapshot' }],
+    [{ ident: 'snapshot', result: { response: { inventory: { items: [
+      { type: 'material', id: 5, quantity: 1000 },
+      { type: 'material', id: 4, quantity: 500 }
+    ] } } } }], '2026-11-01T12:00:00.000Z');
+  const claim = record([{ name: 'readAndClaimAll', ident: 'claim' }],
+    [{ ident: 'claim', result: { response: { claimedRewards: [
+      { type: 'material', id: 5, amount: 700 },
+      { type: 'material', id: 5, amount: 5 },
+      { type: 'material', id: 4, amount: 50 }
+    ] } } }], '2026-11-01T12:01:00.000Z');
+  const after = cache.merge({}, [baseline, claim]).cache;
+  assert.equal(after['resource:material:5'].data.amount, 1705);
+  assert.equal(after['resource:material:4'].data.amount, 550);
+  assert.equal(cache.merge(after, [claim]).changed, false);
 });
 
 test('updates World Energy and other observed refillables with timing metadata', () => {

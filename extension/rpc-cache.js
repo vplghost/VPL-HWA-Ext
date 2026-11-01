@@ -48,6 +48,13 @@
     });
   }
 
+  function resourceAction(record, call, key, delta) {
+    if (!Number.isFinite(delta) || delta === 0 || !call.ident) return [];
+    return [{ key: 'resourceAction', method: call.name, feature: call.feature || null,
+      group: 'internal', data: { resourceKey: `resource:${key}`, delta,
+        token: `${call.ident}:${key}` }, updatedAt: record.timestamp }];
+  }
+
   function extract(record) {
     if (record?.method !== 'POST' || record.status !== 200 ||
         record.endpoint !== 'https://api.hero-wars-alliance.com/api/rpc' ||
@@ -62,6 +69,34 @@
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
         const result = results.get(call.ident);
+        if (result && Object.hasOwn(result, 'response') && !result.error) {
+          if (call.name === 'heroUpgradeSkill') {
+            return resourceAction(record, call, 'refillable:2', -1);
+          }
+          if (['missionRaid', 'missionStart', 'missionEnd'].includes(call.name)) {
+            const costs = globalThis.hwaHelperMissionCosts?.[call.args?.id];
+            if (!costs) return [];
+            const [startCost, winCost] = costs;
+            const delta = call.name === 'missionRaid' ? -winCost * call.args?.times :
+              call.name === 'missionStart' ? -startCost :
+              call.args?.result?.win === true ? -(winCost - startCost) : 0;
+            return resourceAction(record, call, 'energy', delta);
+          }
+          if (call.name === 'readAndClaimAll' && Array.isArray(result.response?.claimedRewards)) {
+            const rewards = new Map();
+            for (const reward of result.response.claimedRewards) {
+              const type = reward?.type;
+              const id = reward?.id;
+              const key = type === 'gold' || type === 'starMoney' ? type :
+                resourceTypes.has(type) && Number.isInteger(id) ? `${type}:${id}` : null;
+              if (key && Number.isFinite(reward.amount) && reward.amount > 0) {
+                rewards.set(key, (rewards.get(key) || 0) + reward.amount);
+              }
+            }
+            return [...rewards].flatMap(([rewardKey, amount]) =>
+              resourceAction(record, call, rewardKey, amount));
+          }
+        }
         if (call.name === 'remoteConfigInit' && result?.response?.index?.configs) {
           const configs = result.response.index.configs;
           return [{ key: 'productionConfigStatus', method: call.name, feature: null,
@@ -217,6 +252,46 @@
     let changed = false;
     for (const record of records) {
       for (const entry of extract(record)) {
+        if (entry.key === 'resourceAction') {
+          const resourceEntry = next[entry.data.resourceKey];
+          const seen = next.resourceActionHistory?.data || {};
+          if (!resourceEntry || !Number.isFinite(resourceEntry.data?.amount) ||
+              seen[entry.data.token] || resourceEntry.updatedAt > entry.updatedAt) continue;
+          const actionAt = Date.parse(entry.updatedAt);
+          if (!Number.isFinite(actionAt)) continue;
+          const data = { ...resourceEntry.data };
+          const timed = Number.isFinite(data.lastRefillAt) &&
+            Number.isFinite(data.refillEveryMs) && data.refillEveryMs > 0 &&
+            Number.isFinite(data.refillAmount) && data.refillAmount > 0 &&
+            Number.isFinite(data.cap);
+          if (timed && data.amount < data.cap) {
+            const cycles = Math.floor(Math.max(0, actionAt - data.lastRefillAt) /
+              data.refillEveryMs);
+            data.amount = Math.min(data.cap, data.amount + cycles * data.refillAmount);
+            data.lastRefillAt += cycles * data.refillEveryMs;
+          }
+          const wasFull = timed && data.amount >= data.cap;
+          data.amount = Math.max(0, data.amount + entry.data.delta);
+          if (wasFull && entry.data.delta < 0 && data.amount < data.cap) {
+            data.lastRefillAt = actionAt;
+          }
+          next[entry.data.resourceKey] = { ...resourceEntry, method: entry.method,
+            data, updatedAt: entry.updatedAt };
+          if (entry.data.resourceKey === 'resource:energy') {
+            next.energyStatus = { key: 'energyStatus', method: entry.method,
+              feature: null, group: 'header', data: { energy: data.amount },
+              updatedAt: entry.updatedAt };
+          }
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) =>
+            history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = { key: 'resourceActionHistory',
+            method: entry.method, feature: null, group: 'internal', data: history,
+            updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
         if (entry.key === 'worldEnergyAction') {
           const state = next.worldEnergyRallies?.data || {};
           const previous = state[entry.data.rallyId];
