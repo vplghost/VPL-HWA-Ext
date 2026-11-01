@@ -55,6 +55,36 @@
         token: `${call.ident}:${key}` }, updatedAt: record.timestamp }];
   }
 
+  function extractMarches(response) {
+    const marches = [];
+    const seenSquads = new Set();
+    for (const [group, stages] of [['marches', response.marches],
+      ['scoutMarches', response.scoutMarches]]) {
+      if (!stages || typeof stages !== 'object') continue;
+      for (const [stage, list] of Object.entries(stages)) {
+        if (!Array.isArray(list)) continue;
+        for (const march of list) {
+          if (march?.squadId && seenSquads.has(march.squadId)) continue;
+          if (march?.squadId) seenSquads.add(march.squadId);
+          const route = march?.route;
+          const startedAt = route?.startedAt ?? march?.startedAt;
+          const duration = route?.durationMs ?? march?.durationMs ?? march?.duration;
+          const endsAt = Number.isFinite(startedAt) && Number.isFinite(duration) ?
+            startedAt + duration : march?.plannedStartTime;
+          const targetType = march?.targetType || march?.target?.objectType;
+          const mineType = targetType === 'mine' ?
+            globalThis.hwaHelperMineTypes?.[march?.target?.objectConfigId] : null;
+          const kind = group === 'scoutMarches' ? 'scout' :
+            stage === 'returnToOutpost' ? 'return' :
+            mineType || (targetType === 'mine' ? 'mine' :
+              stage.toLowerCase().includes('rally') ? 'raid' : 'attack');
+          marches.push({ kind, stage, endsAt: Number.isFinite(endsAt) ? endsAt : null });
+        }
+      }
+    }
+    return marches;
+  }
+
   function extract(record) {
     if (record?.method !== 'POST' || record.status !== 200 ||
         record.endpoint !== 'https://api.hero-wars-alliance.com/api/rpc' ||
@@ -69,6 +99,11 @@
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
         const result = results.get(call.ident);
+        if (key === 'getMarches:march' && result?.response?.marches) {
+          return [{ key: 'marchStatus', method: call.name, feature: call.feature,
+            group: 'header', data: { marches: extractMarches(result.response) },
+            updatedAt: record.timestamp }];
+        }
         if (result && Object.hasOwn(result, 'response') && !result.error) {
           if (call.name === 'heroUpgradeSkill') {
             return resourceAction(record, call, 'refillable:2', -1);

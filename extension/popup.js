@@ -97,7 +97,47 @@ function setResourceTooltip(node, value) {
   if (node.dataset.resourceTooltip !== value) node.dataset.resourceTooltip = value;
 }
 
+const marchStyles = {
+  food: { icon: '🌾', label: 'Food', classes: 'bg-amber-100 text-amber-800 ring-amber-300' },
+  wood: { icon: '🌲', label: 'Wood', classes: 'bg-green-100 text-green-800 ring-green-300' },
+  stone: { icon: '◆', label: 'Stone', classes: 'bg-slate-200 text-slate-700 ring-slate-300' },
+  iron: { icon: '⚙', label: 'Iron', classes: 'bg-blue-100 text-blue-800 ring-blue-300' },
+  mine: { icon: '⛏', label: 'Mine', classes: 'bg-teal-100 text-teal-800 ring-teal-300' },
+  attack: { icon: '⚔', label: 'Attack', classes: 'bg-red-100 text-red-800 ring-red-300' },
+  raid: { icon: '⚑', label: 'Raid', classes: 'bg-orange-100 text-orange-800 ring-orange-300' },
+  scout: { icon: '⌖', label: 'Scout', classes: 'bg-violet-100 text-violet-800 ring-violet-300' },
+  return: { icon: '↩', label: 'Return', classes: 'bg-slate-100 text-slate-600 ring-slate-200' }
+};
+
+function marchTooltip(march, now) {
+  const style = marchStyles[march.kind] || marchStyles.attack;
+  const isMine = ['food', 'wood', 'stone', 'iron', 'mine'].includes(march.kind);
+  const action = isMine ?
+    `${march.stage === 'interactionWithTarget' ? 'Gathering' : 'Traveling to'} ${style.label}` :
+    march.kind === 'return' ? 'Returning' :
+    march.stage === 'waitingForRallyStart' ? 'Preparing raid' : `${style.label} march`;
+  const remaining = Number.isFinite(march.endsAt) ?
+    Math.ceil((march.endsAt - now) / 1000) : null;
+  const time = remaining === null ? 'Time unavailable' :
+    remaining <= 0 ? 'Due now' : `${resourceData.tooltipTime(remaining)} remaining`;
+  return `${action}\n${time}`;
+}
+
 function refreshTimed() {
+  const now = Date.now();
+  const marches = currentCache.marchStatus?.data?.marches || [];
+  const marchesWrap = document.querySelector('#marches');
+  for (const badge of marchesWrap.querySelectorAll('[data-march-index]')) {
+    const march = marches[Number(badge.dataset.marchIndex)];
+    if (!march) continue;
+    badge.hidden = Number.isFinite(march.endsAt) && march.endsAt <= now;
+    if (!badge.hidden) {
+      const tooltip = marchTooltip(march, now);
+      setResourceTooltip(badge, tooltip);
+      if (badge.getAttribute('aria-label') !== tooltip) badge.setAttribute('aria-label', tooltip);
+    }
+  }
+  marchesWrap.hidden = ![...marchesWrap.children].some((badge) => !badge.hidden);
   const energy = currentCache['resource:energy'];
   document.querySelector('#energy-value').textContent = resourceData.formatAmount(
     resourceData.amountAt(energy) ?? currentCache.energyStatus?.data?.energy);
@@ -345,6 +385,19 @@ async function render() {
   const resources = resourceEntries(cache);
   const selectedResources = stored.resourceSelection || [];
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
+  const marchesWrap = document.querySelector('#marches');
+  marchesWrap.replaceChildren();
+  for (const [index, march] of (cache.marchStatus?.data?.marches || []).entries()) {
+    const style = marchStyles[march.kind] || marchStyles.attack;
+    const badge = document.createElement('span');
+    badge.className = `inline-flex size-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ${style.classes}`;
+    badge.dataset.marchIndex = String(index);
+    badge.dataset.resourceTooltip = '';
+    badge.dataset.tooltipBelow = '';
+    badge.tabIndex = 0;
+    badge.textContent = style.icon;
+    marchesWrap.append(badge);
+  }
   const headerResources = document.querySelector('#header-resources');
   headerResources.replaceChildren();
   for (const entry of resources.filter((item) => isSelectableForHeader(item) && selectedResources.includes(item.key))) {
@@ -413,7 +466,7 @@ async function render() {
     const entries = Object.values(cache).filter((entry) =>
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'energyStatus',
         'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
-        'accountStatus', 'buildingStatus',
+        'accountStatus', 'buildingStatus', 'marchStatus',
         'researchStatus', 'productionConfigStatus', 'productionStatus',
         'productionBonusStatus', 'missionProgressStatus'].includes(entry.key)
       && !entry.key.startsWith('resource:')

@@ -1,6 +1,7 @@
 importScripts('tracking-filter.js');
 importScripts('refillable-rules.js');
 importScripts('mission-costs.js');
+importScripts('march-rules.js');
 importScripts('rpc-cache.js');
 
 const RECORD_STATE_KEY = 'recordingState';

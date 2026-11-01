@@ -6,10 +6,12 @@ import { runInNewContext } from 'node:vm';
 const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const missionCosts = await readFile(new URL('../extension/mission-costs.js', import.meta.url), 'utf8');
+const marchRules = await readFile(new URL('../extension/march-rules.js', import.meta.url), 'utf8');
 const resourceDataSource = await readFile(new URL('../extension/resource-data.js', import.meta.url), 'utf8');
 const context = { TextEncoder };
 runInNewContext(refillRules, context);
 runInNewContext(missionCosts, context);
+runInNewContext(marchRules, context);
 runInNewContext(resourceDataSource, context);
 runInNewContext(source, context);
 const cache = context.hwaHelperRpcCache;
@@ -231,6 +233,38 @@ test('newer World Energy API snapshot replaces older balance and refill clock', 
   const merged = cache.merge({}, [older, newer, older]).cache['resource:world-energy'];
   assert.equal(merged.data.amount, 20);
   assert.equal(merged.data.lastRefillAt, 2000000);
+});
+
+test('march snapshots classify resource mines and movement without retaining raw route data', () => {
+  const at = '2026-11-01T13:40:00.000Z';
+  const march = (stage, targetType, objectConfigId, id) => ({
+    squadId: id, startedAt: Date.parse(at), durationMs: 600000,
+    targetType, target: { objectConfigId, coordinates: { x: 473, y: 304 } }
+  });
+  const first = record([{ name: 'getMarches', feature: 'march', ident: 'marches' }],
+    [{ ident: 'marches', result: { response: { marches: {
+      interactionWithTarget: [march('interactionWithTarget', 'mine', 55, 'wood-squad'),
+        march('interactionWithTarget', 'mine', 75, 'stone-squad')],
+      moveToTargetInSolo: [march('moveToTargetInSolo', 'mob', 0, 'attack-squad'),
+        march('moveToTargetInSolo', 'mine', 55, 'wood-squad')],
+      moveToTargetInRally: [march('moveToTargetInRally', 'mob', 0, 'raid-squad')],
+      returnToOutpost: [{ squadId: 'return-squad', route: {
+        startedAt: Date.parse(at), durationMs: 300000 } }]
+    }, scoutMarches: { moveToTargetInSolo: [march('moveToTargetInSolo',
+      'outpost', 0, 'scout-squad')] } } } }], at);
+  const entries = cache.extract(first);
+  assert.equal(entries.length, 1);
+  const projected = entries[0].data.marches;
+  assert.deepEqual(Array.from(projected, (item) => item.kind),
+    ['wood', 'stone', 'attack', 'raid', 'return', 'scout']);
+  assert.equal(projected[0].endsAt, Date.parse(at) + 600000);
+  assert.equal(projected[4].endsAt, Date.parse(at) + 300000);
+  assert.equal(JSON.stringify(entries).includes('wood-squad'), false);
+  assert.equal(JSON.stringify(entries).includes('473'), false);
+  const cleared = record([{ name: 'getMarches', feature: 'march', ident: 'later' }],
+    [{ ident: 'later', result: { response: { marches: {}, scoutMarches: {} } } }],
+    '2026-11-01T13:45:00.000Z');
+  assert.equal(cache.merge({}, [first, cleared, first]).cache.marchStatus.data.marches.length, 0);
 });
 
 test('research actions update and clear the live countdown', () => {
