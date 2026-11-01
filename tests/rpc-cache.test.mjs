@@ -259,12 +259,72 @@ test('march snapshots classify resource mines and movement without retaining raw
     ['wood', 'stone', 'attack', 'raid', 'return', 'scout']);
   assert.equal(projected[0].endsAt, Date.parse(at) + 600000);
   assert.equal(projected[4].endsAt, Date.parse(at) + 300000);
-  assert.equal(JSON.stringify(entries).includes('wood-squad'), false);
+  assert.equal(projected[0].squadId, 'wood-squad');
   assert.equal(JSON.stringify(entries).includes('473'), false);
   const cleared = record([{ name: 'getMarches', feature: 'march', ident: 'later' }],
     [{ ident: 'later', result: { response: { marches: {}, scoutMarches: {} } } }],
     '2026-11-01T13:45:00.000Z');
   assert.equal(cache.merge({}, [first, cleared, first]).cache.marchStatus.data.marches.length, 0);
+});
+
+test('created rally keeps its departing team and gains target and leg estimates only for its own ID', () => {
+  const at = '2026-11-01T14:17:51.731Z';
+  const waitUntil = Date.parse(at) + 300000;
+  const create = record([{ name: 'createRally', feature: 'mob', ident: 'create',
+    args: { squad: { heroes: [{ heroId: 16 }, { heroId: 79 }],
+      units: [{ unitId: 7, count: 1556 }] } } }],
+  [{ ident: 'create', result: { response: { squadId: 'my-squad',
+    rally: { rallyId: 'my-rally', plannedStartTime: waitUntil } } } }], at);
+  const details = record([{ name: 'getRallyById', feature: 'rally', ident: 'details',
+    args: { rallyId: 'my-rally' } }],
+  [{ ident: 'details', result: { response: { rally: {
+    rallyId: 'my-rally', plannedStartTime: waitUntil,
+    leader: { squad: { squadId: 'my-squad', heroes: [{ heroId: 16 }, { heroId: 79 }],
+      units: [{ unitId: 7, count: 1556 }] } },
+    leaderCoordinates: { x: 507, y: 113 },
+    target: { objectConfigId: 79, coordinates: { x: 569, y: 104 } }
+  } } } }], '2026-11-01T14:17:53.061Z');
+  const other = record([{ name: 'getRallyById', feature: 'rally', ident: 'other' }],
+    [{ ident: 'other', result: { response: { rally: { rallyId: 'their-rally',
+      target: { objectConfigId: 74 } } } } }], '2026-11-01T14:17:54.000Z');
+  const after = cache.merge({}, [create, details, other]).cache;
+  assert.equal(after.marchStatus.data.marches.length, 1);
+  const march = after.marchStatus.data.marches[0];
+  assert.equal(march.kind, 'raid');
+  assert.equal(march.rally.waitUntil, waitUntil);
+  assert.equal(march.rally.target, '[PvP] Boss, level 20');
+  assert.deepEqual(Array.from(march.rally.team.heroIds), [16, 79]);
+  assert.ok(march.rally.outboundMs > 30000 && march.rally.outboundMs < 33000);
+  assert.ok(march.rally.returnMs > 40000 && march.rally.returnMs < 43000);
+  assert.equal(cache.merge(after, [create, details]).changed, false);
+  assert.equal(JSON.stringify(after.marchStatus).includes('507'), false);
+});
+
+test('rally march uses observed route ETA and disappears on cancel', () => {
+  const at = '2026-11-01T14:17:51.731Z';
+  const create = record([{ name: 'createRally', feature: 'mob', ident: 'create' }],
+    [{ ident: 'create', result: { response: { squadId: 'squad',
+      rally: { rallyId: 'rally', plannedStartTime: Date.parse(at) + 300000 } } } }], at);
+  const route = (stage, stamp, duration, timestamp) => record(
+    [{ name: 'getMarches', feature: 'march', ident: stage }],
+    [{ ident: stage, result: { response: { marches: { [stage]: [
+      { squadId: 'squad', route: { startedAt: stamp, durationMs: duration } }
+    ] }, scoutMarches: {} } } }], timestamp);
+  const outbound = route('moveToTargetInRally', Date.parse(at) + 300000,
+    32000, '2026-11-01T14:22:52.000Z');
+  const returning = route('returnToOutpost', Date.parse(at) + 340000,
+    44000, '2026-11-01T14:23:32.000Z');
+  const canceled = record([{ name: 'cancelRally', feature: 'rally', ident: 'cancel',
+    args: { rallyId: 'rally' } }],
+    [{ ident: 'cancel', result: { response: {} } }], '2026-11-01T14:24:00.000Z');
+  const traveling = cache.merge({}, [create, outbound]).cache;
+  assert.equal(traveling.marchStatus.data.marches[0].rally.arrivalAt,
+    Date.parse(at) + 332000);
+  assert.equal(traveling.marchStatus.data.marches[0].kind, 'raid');
+  const back = cache.merge(traveling, [returning]).cache;
+  assert.equal(back.marchStatus.data.marches[0].rally.returnAt,
+    Date.parse(at) + 384000);
+  assert.equal(cache.merge(back, [canceled]).cache.marchStatus.data.marches.length, 0);
 });
 
 test('research actions update and clear the live countdown', () => {

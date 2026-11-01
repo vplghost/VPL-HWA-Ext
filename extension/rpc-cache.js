@@ -78,11 +78,31 @@
             stage === 'returnToOutpost' ? 'return' :
             mineType || (targetType === 'mine' ? 'mine' :
               stage.toLowerCase().includes('rally') ? 'raid' : 'attack');
-          marches.push({ kind, stage, endsAt: Number.isFinite(endsAt) ? endsAt : null });
+          marches.push({ squadId: typeof march.squadId === 'string' ? march.squadId : null,
+            kind, stage, endsAt: Number.isFinite(endsAt) ? endsAt : null });
         }
       }
     }
     return marches;
+  }
+
+  function rallyTeam(squad) {
+    return {
+      heroIds: (squad?.heroes || []).map((hero) => hero.heroId)
+        .filter(Number.isInteger).slice(0, 5),
+      units: (squad?.units || []).filter((unit) =>
+        Number.isInteger(unit.unitId) && Number.isFinite(unit.count) && unit.count > 0)
+        .map((unit) => ({ id: unit.unitId, count: unit.count })).slice(0, 5)
+    };
+  }
+
+  function routeEstimate(from, to, routeType) {
+    const speed = globalThis.hwaHelperRouteSpeeds?.[routeType];
+    if (!Number.isFinite(from?.x) || !Number.isFinite(from?.y) ||
+        !Number.isFinite(to?.x) || !Number.isFinite(to?.y) ||
+        !Number.isFinite(speed) || speed <= 0) return null;
+    // Approximate straight-line route: observed route durations are near 10,000 ms per tile / speed.
+    return Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) * 10000 / speed);
   }
 
   function extract(record) {
@@ -102,6 +122,22 @@
         if (key === 'getMarches:march' && result?.response?.marches) {
           return [{ key: 'marchStatus', method: call.name, feature: call.feature,
             group: 'header', data: { marches: extractMarches(result.response) },
+            updatedAt: record.timestamp }];
+        }
+        if (key === 'getRallyById:rally' && result?.response?.rally?.rallyId) {
+          const rally = result.response.rally;
+          const targetConfigId = rally.target?.objectConfigId ?? rally.mob?.mobConfigId;
+          return [{ key: 'rallyAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { action: 'details', rallyId: rally.rallyId,
+              squadId: rally.leader?.squad?.squadId,
+              target: globalThis.hwaHelperRallyTargets?.[targetConfigId] ||
+                `Rally target #${targetConfigId ?? 'unknown'}`,
+              waitUntil: rally.plannedStartTime,
+              team: rallyTeam(rally.leader?.squad),
+              outboundMs: routeEstimate(rally.leaderCoordinates,
+                rally.target?.coordinates, 'toTargetRallyPve'),
+              returnMs: routeEstimate(rally.target?.coordinates,
+                rally.leaderCoordinates, 'returnToOutpost') },
             updatedAt: record.timestamp }];
         }
         if (result && Object.hasOwn(result, 'response') && !result.error) {
@@ -267,10 +303,19 @@
         if (key === 'createRally:mob' && result?.response?.rally?.rallyId) {
           return [{ key: 'worldEnergyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'create', rallyId: result.response.rally.rallyId },
-            updatedAt: record.timestamp }];
+            updatedAt: record.timestamp },
+          { key: 'rallyAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { action: 'create',
+              rallyId: result.response.rally.rallyId,
+              squadId: result.response.squadId,
+              waitUntil: result.response.rally.plannedStartTime,
+              team: rallyTeam(call.args?.squad) }, updatedAt: record.timestamp }];
         }
         if (key === 'cancelRally:rally' && result?.response && call.args?.rallyId) {
           return [{ key: 'worldEnergyAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { action: 'cancel', rallyId: call.args.rallyId },
+            updatedAt: record.timestamp },
+          { key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'cancel', rallyId: call.args.rallyId },
             updatedAt: record.timestamp }];
         }
@@ -288,6 +333,38 @@
     let changed = false;
     for (const record of records) {
       for (const entry of extract(record)) {
+        if (entry.key === 'rallyAction') {
+          const current = next.marchStatus;
+          if (current?.updatedAt > entry.updatedAt) continue;
+          const marches = [...(current?.data?.marches || [])];
+          const index = marches.findIndex((march) => march.rally?.id === entry.data.rallyId);
+          if (entry.data.action === 'create') {
+            if (index >= 0 || !entry.data.squadId ||
+                !Number.isFinite(entry.data.waitUntil)) continue;
+            marches.push({ squadId: entry.data.squadId, kind: 'raid',
+              stage: 'waitingForRallyStart', endsAt: entry.data.waitUntil,
+              rally: { id: entry.data.rallyId, waitUntil: entry.data.waitUntil,
+                team: entry.data.team } });
+          } else if (entry.data.action === 'details') {
+            if (index < 0 || current.updatedAt === entry.updatedAt) continue;
+            const previous = marches[index];
+            marches[index] = { ...previous, rally: { ...previous.rally,
+              target: entry.data.target,
+              waitUntil: Number.isFinite(entry.data.waitUntil) ?
+                entry.data.waitUntil : previous.rally.waitUntil,
+              team: entry.data.team?.heroIds?.length ? entry.data.team : previous.rally.team,
+              outboundMs: entry.data.outboundMs,
+              returnMs: entry.data.returnMs } };
+          } else if (entry.data.action === 'cancel') {
+            if (index < 0) continue;
+            marches.splice(index, 1);
+          }
+          next.marchStatus = { key: 'marchStatus', method: entry.method,
+            feature: entry.feature, group: 'header', data: { marches },
+            updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
         if (entry.key === 'resourceAction') {
           const resourceEntry = next[entry.data.resourceKey];
           const seen = next.resourceActionHistory?.data || {};
@@ -371,6 +448,22 @@
           continue;
         }
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
+        if (entry.key === 'marchStatus') {
+          const previous = next.marchStatus?.data?.marches || [];
+          entry.data.marches = entry.data.marches.map((march) => {
+            const prior = previous.find((item) => item.squadId &&
+              item.squadId === march.squadId && item.rally);
+            if (!prior) return march;
+            const rally = { ...prior.rally };
+            if (march.stage === 'moveToTargetInRally' && Number.isFinite(march.endsAt)) {
+              rally.arrivalAt = march.endsAt;
+            }
+            if (march.stage === 'returnToOutpost' && Number.isFinite(march.endsAt)) {
+              rally.returnAt = march.endsAt;
+            }
+            return { ...march, kind: 'raid', rally };
+          });
+        }
         if (entry.key === 'researchStatus' && entry.data.action &&
             next[entry.key]?.updatedAt === entry.updatedAt) continue;
         if (entry.key === 'researchStatus' && entry.data.action) {

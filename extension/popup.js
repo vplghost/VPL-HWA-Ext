@@ -110,6 +110,8 @@ const marchStyles = {
 };
 
 function marchTooltip(march, now) {
+  if (march.rally) return globalThis.hwaHelperPopupData.rallyTooltip(march, now,
+    globalThis.hwaHelperNameMap.hero);
   const style = marchStyles[march.kind] || marchStyles.attack;
   const isMine = ['food', 'wood', 'stone', 'iron', 'mine'].includes(march.kind);
   const action = isMine ?
@@ -130,7 +132,11 @@ function refreshTimed() {
   for (const badge of marchesWrap.querySelectorAll('[data-march-index]')) {
     const march = marches[Number(badge.dataset.marchIndex)];
     if (!march) continue;
-    badge.hidden = Number.isFinite(march.endsAt) && march.endsAt <= now;
+    const expired = Number.isFinite(march.endsAt) && march.endsAt <= now;
+    const rallyStale = Number.isFinite(march.rally?.waitUntil) &&
+      now > march.rally.waitUntil + 30 * 60000;
+    badge.hidden = march.rally ?
+      (march.stage === 'returnToOutpost' ? expired : rallyStale) : expired;
     if (!badge.hidden) {
       const tooltip = marchTooltip(march, now);
       setResourceTooltip(badge, tooltip);
