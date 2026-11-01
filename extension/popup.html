@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HWA Helper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>HWA Helper</h1>
+    <p>Phiên bản extension: <strong id="version"></strong></p>
+  </header>
+  <div class="settings" aria-label="Cài đặt theo dõi">
+    <label><input id="intercept-enabled" type="checkbox" checked> Theo dõi API</label>
+    <label><input id="log-enabled" type="checkbox" checked> Ghi log</label>
+  </div>
+  <nav id="tabs" role="tablist" aria-label="Dữ liệu game">
+    <button type="button" role="tab" data-tab="heroes" aria-selected="true">Heroes</button>
+    <button type="button" role="tab" data-tab="items" aria-selected="false">Items</button>
+    <button type="button" role="tab" data-tab="titans" aria-selected="false">Titans</button>
+    <button type="button" role="tab" data-tab="teams" aria-selected="false">Teams</button>
+    <button type="button" role="tab" data-tab="other" aria-selected="false">Khác</button>
+    <button type="button" role="tab" data-tab="log" aria-selected="false">Log</button>
+  </nav>
+  <div class="actions">
+    <button id="clear-cache" type="button">Xóa cache</button>
+    <button id="export" type="button" hidden>Xuất JSON</button>
+    <button id="clear" type="button" hidden>Xóa log</button>
+  </div>
+  <p id="status" role="status"></p>
+  <label id="search-label" for="search">Lọc theo ID hoặc nhóm</label>
+  <input id="search" type="search" placeholder="Nhập ID hoặc tên nhóm">
+  <div id="view" role="tabpanel" aria-live="polite"></div>
+  <script src="tracking-filter.js"></script>
+  <script src="export-name.js"></script>
+  <script src="data-names.js"></script>
+  <script src="name-map.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

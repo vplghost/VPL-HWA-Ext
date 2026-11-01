@@ -1,0 +1,21 @@
+dist/
+node_modules/
+
+# Knowns sync regenerates these platform skill copies.
+/.agents/skills/kn-*/
+/.claude/skills/kn-*/
+/.gemini/skills/kn-*/
+
+# Local Knowns runtime state; keep tasks, decisions, and task history tracked.
+/.knowns/history/locks/
+/.knowns/history/state/
+/.knowns/chats.json
+/.knowns/time.json
+/.knowns/time-entries.json
+/.knowns/workspaces.json
+
+# Keep temporary data out of Git; allow README files at any depth.
+/temp/**
+!/temp/**/
+!/temp/**/README
+!/temp/**/README.*

@@ -1,0 +1,200 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
+
+const source = await readFile(new URL('../extension/intercept.js', import.meta.url), 'utf8');
+const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
+
+function setup(fetchImplementation, enable = true) {
+  const messages = [];
+  const listeners = [];
+  let now = 0;
+  class FakeXHR {
+    listeners = new Map();
+    status = 204;
+    responseText = '{"ok":true}';
+    responseType = '';
+    addEventListener(name, handler) {
+      const handlers = this.listeners.get(name) ?? [];
+      handlers.push(handler);
+      this.listeners.set(name, handlers);
+    }
+    open(method, url) { this.method = method; this.url = url; }
+    send() { this.emit('loadend'); return undefined; }
+    emit(name) { for (const handler of this.listeners.get(name) ?? []) handler(); }
+  }
+  const window = {
+    fetch: fetchImplementation,
+    XMLHttpRequest: FakeXHR,
+    addEventListener: (name, handler) => { if (name === 'message') listeners.push(handler); },
+    postMessage: (data, targetOrigin) => {
+      if (data.kind === 'api-record') messages.push({ data, targetOrigin });
+      for (const handler of listeners) handler({ source: window, origin: targetOrigin, data });
+    }
+  };
+  runInNewContext(`${filterSource}\n${source}`, {
+    window, URL, Date, Promise, Symbol, WeakMap, TextDecoder, URLSearchParams, FormData, Blob,
+    location: { href: 'https://www.hero-wars-alliance.com/', origin: 'https://www.hero-wars-alliance.com' },
+    performance: { now: () => ++now }
+  });
+  if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true },
+    'https://www.hero-wars-alliance.com');
+  return { window, messages };
+}
+
+async function waitForMessage(messages) {
+  for (let attempt = 0; attempt < 20 && messages.length === 0; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  assert.ok(messages.length > 0, 'expected an API record');
+}
+
+test('POST fetch preserves response and stores request/response text', async () => {
+  const response = new Response('{"hero":1}', { status: 200, headers: { 'content-type': 'application/json' } });
+  const { window, messages } = setup(async () => response);
+  assert.equal(await window.fetch('/api/heroes?token=secret#fragment', {
+    method: 'POST', body: '{"id":1}'
+  }), response);
+  await waitForMessage(messages);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].targetOrigin, 'https://www.hero-wars-alliance.com');
+  assert.equal(messages[0].data.record.endpoint, 'https://www.hero-wars-alliance.com/api/heroes');
+  assert.equal(messages[0].data.record.method, 'POST');
+  assert.equal(messages[0].data.record.status, 200);
+  assert.equal(messages[0].data.record.durationMs, 1);
+  assert.equal(messages[0].data.record.requestBody, '{"id":1}');
+  assert.equal(messages[0].data.record.responseBody, '{"hero":1}');
+  assert.equal(await response.text(), '{"hero":1}');
+});
+
+test('tracking fetch bypasses interception while game RPC is recorded', async () => {
+  let calls = 0;
+  const { window, messages } = setup(async () => { calls++; return new Response('ok'); });
+  await window.fetch('https://analytics.nextersglobal.com/analytics/event/gamebeat', {
+    method: 'POST', body: '{}'
+  });
+  assert.equal(calls, 1);
+  assert.equal(messages.length, 0);
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', { method: 'POST', body: '{}' });
+  await waitForMessage(messages);
+  assert.equal(messages.length, 1);
+});
+
+test('intercept off bypasses request capture and resumes on next request', async () => {
+  let calls = 0;
+  const { window, messages } = setup(async () => { calls++; return new Response('ok'); });
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: false },
+    'https://www.hero-wars-alliance.com');
+  await window.fetch('/api/rpc', { method: 'POST', body: '{}' });
+  const xhr = new window.XMLHttpRequest();
+  xhr.open('POST', '/api/rpc');
+  xhr.send('{}');
+  assert.equal(messages.length, 0);
+  assert.equal(calls, 1);
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true },
+    'https://www.hero-wars-alliance.com');
+  await window.fetch('/api/rpc', { method: 'GET' });
+  await waitForMessage(messages);
+  assert.equal(messages.length, 1);
+});
+
+test('capture waits for saved settings and drops in-flight result after switch off', async () => {
+  let resolveFetch;
+  const { window, messages } = setup(() => new Promise((resolve) => { resolveFetch = resolve; }), false);
+  const beforeSettings = window.fetch('/api/rpc');
+  resolveFetch(new Response('before'));
+  await beforeSettings;
+  assert.equal(messages.length, 0);
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true },
+    'https://www.hero-wars-alliance.com');
+  const inFlight = window.fetch('/api/rpc');
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: false },
+    'https://www.hero-wars-alliance.com');
+  resolveFetch(new Response('after'));
+  assert.equal(await (await inFlight).text(), 'after');
+  assert.equal(messages.length, 0);
+});
+
+test('fetch failure remains a rejection and is recorded', async () => {
+  const failure = new Error('network');
+  const { window, messages } = setup(() => Promise.reject(failure));
+  await assert.rejects(window.fetch('/api/fail'), failure);
+  await waitForMessage(messages);
+  assert.equal(messages[0].data.record.outcome, 'failed');
+  assert.equal(messages[0].data.record.status, null);
+});
+
+test('GET fetch keeps metadata without body', async () => {
+  const { window, messages } = setup(async () => new Response('secret'));
+  await window.fetch('/api/get');
+  await waitForMessage(messages);
+  assert.equal('responseBody' in messages[0].data.record, false);
+});
+
+test('POST fetch marks long bodies as truncated', async () => {
+  const { window, messages } = setup(async () => new Response('b'.repeat(530000), {
+    headers: { 'content-type': 'text/plain' }
+  }));
+  await window.fetch('/api/post', { method: 'POST', body: 'a'.repeat(530000) });
+  await waitForMessage(messages);
+  assert.equal(messages[0].data.record.requestBody.length, 524288);
+  assert.equal(messages[0].data.record.responseBody.length, 524288);
+  assert.equal(messages[0].data.record.requestBodyTruncated, true);
+  assert.equal(messages[0].data.record.responseBodyTruncated, true);
+});
+
+test('POST fetch retains an RPC-sized JSON response in full', async () => {
+  const body = JSON.stringify({ data: 'x'.repeat(325000) });
+  const { window, messages } = setup(async () => new Response(body, {
+    headers: { 'content-type': 'application/json' }
+  }));
+  await window.fetch('/api/rpc', { method: 'POST', body: '{"calls":[]}' });
+  await waitForMessage(messages);
+  assert.equal(messages[0].data.record.responseBody, body);
+  assert.equal(messages[0].data.record.responseBodyTruncated, false);
+});
+
+test('POST fetch reads a Request clone without consuming the game request', async () => {
+  let gameBody;
+  const { window, messages } = setup(async (request) => {
+    gameBody = await request.text();
+    return new Response('accepted', { headers: { 'content-type': 'text/plain' } });
+  });
+  const request = new Request('https://www.hero-wars-alliance.com/api/request', {
+    method: 'POST', body: '{"unit":2}'
+  });
+  await window.fetch(request);
+  await waitForMessage(messages);
+  assert.equal(gameBody, '{"unit":2}');
+  assert.equal(messages[0].data.record.requestBody, '{"unit":2}');
+  assert.equal(messages[0].data.record.responseBody, 'accepted');
+});
+
+test('XHR logs status and endpoint after loadend', () => {
+  const { window, messages } = setup(async () => ({ status: 200 }));
+  const xhr = new window.XMLHttpRequest();
+  xhr.open('GET', '/api/inventory?user=123');
+  xhr.send();
+  assert.equal(messages[0].data.record.transport, 'xhr');
+  assert.equal(messages[0].data.record.status, 204);
+  assert.equal(messages[0].data.record.endpoint, 'https://www.hero-wars-alliance.com/api/inventory');
+});
+
+test('POST XHR captures text response after loadend', async () => {
+  const { window, messages } = setup(async () => ({ status: 200 }));
+  const xhr = new window.XMLHttpRequest();
+  xhr.open('POST', '/api/save');
+  xhr.send('{"save":1}');
+  await waitForMessage(messages);
+  assert.equal(messages[0].data.record.requestBody, '{"save":1}');
+  assert.equal(messages[0].data.record.responseBody, '{"ok":true}');
+});
+
+test('tracking XHR is not recorded', () => {
+  const { window, messages } = setup(async () => ({ status: 200 }));
+  const xhr = new window.XMLHttpRequest();
+  xhr.open('POST', 'https://wa.appsflyersdk.com/events');
+  xhr.send('{}');
+  assert.equal(messages.length, 0);
+});

@@ -1,0 +1,61 @@
+{
+  "name": "VPL-HWA-Ext",
+  "id": "VPL-HWA-Ext",
+  "createdAt": "2026-11-01T08:24:55.4828531Z",
+  "settings": {
+    "defaultPriority": "medium",
+    "taskLifecycle": {
+      "excludeDoneFromDefaultRetrieval": true,
+      "autoArchive": true,
+      "archiveAfter": "30d",
+      "purgeAfter": null
+    },
+    "gitTrackingMode": "git-tracked",
+    "gitTracking": {
+      "tasks": true,
+      "docs": true,
+      "templates": true,
+      "memories": true,
+      "decisions": true
+    },
+    "statuses": [
+      "todo",
+      "in-progress",
+      "in-review",
+      "done",
+      "blocked",
+      "on-hold",
+      "urgent"
+    ],
+    "statusColors": {
+      "blocked": "red",
+      "done": "green",
+      "in-progress": "blue",
+      "in-review": "purple",
+      "on-hold": "yellow",
+      "todo": "gray",
+      "urgent": "orange"
+    },
+    "visibleColumns": [
+      "todo",
+      "in-progress",
+      "blocked",
+      "done",
+      "in-review"
+    ],
+    "platforms": [
+      "claude-code",
+      "agents",
+      "gemini"
+    ],
+    "lsp": {
+      "enabled": true,
+      "languages": {
+        "markdown": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "schemaVersion": 1
+}
