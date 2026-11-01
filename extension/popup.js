@@ -84,6 +84,10 @@ function resourceTooltip(entry, now = Date.now()) {
   return `${resourceLabel(entry)}: ${amount}${exact}${cap}${detail ? `\n${detail}` : ''}`;
 }
 
+function setResourceTooltip(node, value) {
+  if (node.dataset.resourceTooltip !== value) node.dataset.resourceTooltip = value;
+}
+
 function refreshTimed() {
   const energy = currentCache['resource:energy'];
   document.querySelector('#energy-value').textContent = resourceData.formatAmount(
@@ -97,9 +101,10 @@ function refreshTimed() {
   document.querySelector('#world-energy-value').textContent = resourceData.formatAmount(
     resourceData.amountAt(currentCache['resource:world-energy']) ??
       currentCache.worldEnergyStatus?.data?.energy);
-  if (energy) document.querySelector('#energy-badge').title = resourceTooltip(energy);
+  if (energy) setResourceTooltip(document.querySelector('#energy-badge'), resourceTooltip(energy));
   const worldEnergy = currentCache['resource:world-energy'];
-  if (worldEnergy) document.querySelector('#world-energy-badge').title = resourceTooltip(worldEnergy);
+  if (worldEnergy) setResourceTooltip(document.querySelector('#world-energy-badge'),
+    resourceTooltip(worldEnergy));
   document.querySelector('#building-time').textContent = resourceData.hoursMinutes(
     resourceData.remainingMinutes(currentCache.buildingStatus));
   document.querySelector('#research-time').textContent = resourceData.hoursMinutes(
@@ -108,7 +113,7 @@ function refreshTimed() {
     const entry = currentCache[node.dataset.resourceAmount];
     if (!entry) continue;
     node.textContent = resourceData.formatAmount(resourceData.amountAt(entry));
-    node.parentElement.title = resourceTooltip(entry);
+    setResourceTooltip(node.parentElement, resourceTooltip(entry));
   }
 }
 
@@ -125,6 +130,8 @@ function renderResources(entries, selection) {
   for (const entry of rows) {
     const label = document.createElement('label');
     label.className = 'flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-blue-50/50';
+    label.tabIndex = 0;
+    label.dataset.resourceTooltip = '';
     if (isSelectableForHeader(entry)) {
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -337,6 +344,9 @@ async function render() {
     const appearance = resourceAppearance(entry);
     pill.className = `inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${appearance.classes}`;
     pill.setAttribute('aria-label', resourceLabel(entry));
+    pill.tabIndex = 0;
+    pill.dataset.resourceTooltip = '';
+    pill.dataset.tooltipBelow = '';
     const icon = document.createElement('span');
     icon.textContent = appearance.icon;
     icon.setAttribute('aria-hidden', 'true');

@@ -5,3 +5,43 @@
 @layer base {
   [hidden] { display: none !important; }
 }
+
+@layer components {
+  [data-resource-tooltip] { position: relative; }
+  [data-resource-tooltip]::after {
+    content: attr(data-resource-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.4rem);
+    transform: translateX(-50%);
+    z-index: 50;
+    width: max-content;
+    max-width: min(18rem, calc(100vw - 2rem));
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.5rem;
+    background: #0f172a;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.35;
+    text-align: left;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  [data-resource-tooltip][data-tooltip-below]::after {
+    top: calc(100% + 0.4rem);
+    bottom: auto;
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  [data-resource-tooltip]:not([data-resource-tooltip=""]):hover::after,
+  [data-resource-tooltip]:not([data-resource-tooltip=""]):focus-visible::after,
+  [data-resource-tooltip]:not([data-resource-tooltip=""]):focus-within::after {
+    opacity: 1;
+    visibility: visible;
+  }
+}

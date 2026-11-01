@@ -50,7 +50,11 @@ test('renewable tooltip shows per-minute rate or next refill countdown', () => {
   const slow = { data: { amount: 5, lastRefillAt: 1000000,
     refillEveryMs: 300000, refillAmount: 1, cap: 20 } };
   assert.equal(resources.refillDescription(fast, 1000000), '+2/min');
-  assert.equal(resources.refillDescription(slow, 1000000 + 60000), 'Next +1 in 04:00');
+  assert.equal(resources.refillDescription(slow, 1000000 + 60000), 'Next +1 in 04 min');
+  assert.equal(resources.tooltipTime(3599), '59 min');
+  assert.equal(resources.tooltipTime(3600), '01:00');
+  assert.equal(resources.tooltipTime(7261), '02:01');
+  assert.equal(resources.tooltipTime(30), '01 min');
   assert.equal(resources.refillDescription({ data: { ...slow.data, amount: 20 } }, 1000000),
     'Full; refill resumes after spending');
   assert.equal(resources.refillDescription({ data: { amount: 100 } }, 1000000), null);
