@@ -2,6 +2,7 @@
   // enum_evolutionStar.json from the verified 1.292.0 splitlib asset.
   // Each value is the cost to evolve TO that star, not the current star.
   const evolveFragmentCost = { 2: 20, 3: 50, 4: 100, 5: 150, 6: 300 };
+  const evolveTitanFragmentCost = { 2: 50, 3: 150, 4: 500, 5: 900, 6: 1500 };
 
   function heroSoulProgress(id, hero, inventory) {
     const fragments = inventory?.fragmentHero;
@@ -9,6 +10,15 @@
     const owned = fragments && Number.isFinite(quantity) && quantity >= 0 ? quantity : null;
     const star = hero?.star;
     const needed = star === 6 ? 'Max' : evolveFragmentCost[star + 1] ?? null;
+    return { owned, needed };
+  }
+
+  function titanSoulProgress(id, titan, inventory) {
+    const fragments = inventory?.fragmentTitan;
+    const quantity = fragments && Object.hasOwn(fragments, id) ? fragments[id] : 0;
+    const owned = fragments && Number.isFinite(quantity) && quantity >= 0 ? quantity : null;
+    const star = titan?.star;
+    const needed = star === 6 ? 'Max' : evolveTitanFragmentCost[star + 1] ?? null;
     return { owned, needed };
   }
 
@@ -26,9 +36,21 @@
   }
 
   const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
-  const numericHeadings = new Set(['Level', 'Star', 'Soul stones / needed',
+  const numericHeadings = new Set(['Level', 'Star', 'Soul stones / needed', 'Soul stone', 'Soul stones',
     'Power', 'Amount', 'Members', 'Size']);
   const isNumericColumn = (heading) => numericHeadings.has(heading);
+
+  function isSoulUpgradeReady(soulStringOrOwned, needed) {
+    if (typeof soulStringOrOwned === 'string' && soulStringOrOwned.includes('/')) {
+      const [ownedStr, neededStr] = soulStringOrOwned.split('/').map((s) => s.trim().replaceAll(',', ''));
+      const o = Number(ownedStr);
+      const n = Number(neededStr);
+      return Number.isFinite(o) && Number.isFinite(n) && o >= n;
+    }
+    const o = Number(soulStringOrOwned);
+    const n = Number(needed);
+    return Number.isFinite(o) && Number.isFinite(n) && o >= n;
+  }
 
   function marchDuration(ms, precise = false) {
     if (!Number.isFinite(ms)) return '—';
@@ -179,9 +201,27 @@
     return 4;
   }
 
-  globalThis.hwaHelperPopupData = { heroSoulProgress, teamRows, sortRows,
+  function formatChatRole(role) {
+    const r = String(role ?? '');
+    if (r === '255') return { label: 'Leader', badgeClass: 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' };
+    if (r === '4') return { label: 'Officer', badgeClass: 'bg-blue-100 text-blue-800 ring-1 ring-blue-300' };
+    if (r === '3') return { label: 'Member', badgeClass: 'bg-slate-100 text-slate-700' };
+    return { label: r ? `Role #${r}` : 'Member', badgeClass: 'bg-slate-100 text-slate-600' };
+  }
+
+  function formatChatTime(ctimeSec) {
+    if (!Number.isFinite(Number(ctimeSec))) return '—';
+    const d = new Date(Number(ctimeSec) * 1000);
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${month}/${day} ${hours}:${mins}`;
+  }
+
+  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, teamRows, sortRows,
     isNumericColumn, rallyTooltip, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
-    buildingTooltip, researchTooltip };
+    buildingTooltip, researchTooltip, formatChatRole, formatChatTime };
 })();

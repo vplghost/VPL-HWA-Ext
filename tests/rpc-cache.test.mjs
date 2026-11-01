@@ -489,3 +489,60 @@ test('heroUpgradeSkill upgrades hero skill in heroGetAll and decrements skill po
   assert.equal(state.heroGetAll.data['60'].skills['352'], 51);
   assert.equal(state.heroGetAll.data['60'].skills['350'], 74);
 });
+
+test('chatGetAll extracts clan and announcement messages and merges deduplicated messages', () => {
+  const at1 = '2026-11-01T13:00:00.000Z';
+  const chatClan1 = record([
+    { name: 'chatGetAll', ident: 'chat-1', args: { chatType: 'clan' } }
+  ], [
+    { ident: 'chat-1', result: { response: {
+      messages: [
+        { id: '101', userId: 'u1', messageType: 'text', chatType: 'clan', ctime: '1793530000', data: { text: 'Hello clan', clanRole: '3' } },
+        { id: '100', userId: 'u2', messageType: 'text', chatType: 'clan', ctime: '1793529000', data: { text: 'Welcome', clanRole: '255' } }
+      ],
+      users: {
+        u1: { id: 'u1', name: 'MemberBob', level: '70', clanRole: '3' },
+        u2: { id: 'u2', name: 'LeaderAlice', level: '85', clanRole: '255' }
+      }
+    } } }
+  ], at1);
+
+  const entries = cache.extract(chatClan1);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].key, 'guildChat');
+  assert.equal(entries[0].data.messages.length, 2);
+
+  const state1 = cache.merge({}, [chatClan1]).cache;
+  assert.ok(state1.guildChat);
+  assert.equal(state1.guildChat.data.messages.length, 2);
+  assert.equal(state1.guildChat.data.users.u1.name, 'MemberBob');
+
+  const at2 = '2026-11-01T13:05:00.000Z';
+  const chatClan2 = record([
+    { name: 'chatGetAll', ident: 'chat-2', args: { chatType: 'clan' } },
+    { name: 'chatGetAll', ident: 'chat-ann', args: { chatType: 'announcement' } }
+  ], [
+    { ident: 'chat-2', result: { response: {
+      messages: [
+        { id: '102', userId: 'u3', messageType: 'text', chatType: 'clan', ctime: '1793531000', data: { text: 'Promo code: TEST', clanRole: '4' } },
+        { id: '101', userId: 'u1', messageType: 'text', chatType: 'clan', ctime: '1793530000', data: { text: 'Hello clan', clanRole: '3' } }
+      ],
+      users: {
+        u3: { id: 'u3', name: 'OfficerCharlie', level: '80', clanRole: '4' }
+      }
+    } } },
+    { ident: 'chat-ann', result: { response: {
+      messages: [
+        { id: '999', userId: 'u2', messageType: 'text', chatType: 'announcement', ctime: '1793532000', data: { text: 'Guild War tonight', clanRole: '255' } }
+      ],
+      users: {}
+    } } }
+  ], at2);
+
+  const state2 = cache.merge(state1, [chatClan2]).cache;
+  assert.equal(state2.guildChat.data.messages.length, 4);
+  assert.equal(state2.guildChat.data.messages[0].id, '999');
+  assert.equal(state2.guildChat.data.messages[1].id, '102');
+  assert.equal(state2.guildChat.data.users.u3.name, 'OfficerCharlie');
+  assert.equal(state2.guildChat.data.users.u1.name, 'MemberBob');
+});

@@ -21,6 +21,21 @@ test('hero soul progress uses inventory fragments and next-star cost', () => {
     { owned: 12, needed: 'Max' });
 });
 
+test('titan soul progress uses inventory fragments and next-star cost', () => {
+  const { titanSoulProgress } = context.hwaHelperPopupData;
+  // 4000 Sigurd with star 3 needs 500 fragments for star 4
+  assert.deepEqual({ ...titanSoulProgress('4000', { star: 3 }, { fragmentTitan: { 4000: 472 } }) },
+    { owned: 472, needed: 500 });
+  assert.deepEqual({ ...titanSoulProgress('4001', { star: 1 }, { fragmentTitan: { 4001: 50 } }) },
+    { owned: 50, needed: 50 });
+  assert.deepEqual({ ...titanSoulProgress('4001', { star: 5 }, { fragmentTitan: {} }) },
+    { owned: 0, needed: 1500 });
+  assert.deepEqual({ ...titanSoulProgress('4001', { star: 6 }, { fragmentTitan: { 4001: 250 } }) },
+    { owned: 250, needed: 'Max' });
+  assert.deepEqual({ ...titanSoulProgress('4001', { star: 2 }, null) },
+    { owned: null, needed: 150 });
+});
+
 test('teams retain every nested squad and resolve hero/titan names', () => {
   const rows = teamRows({ arena: [1, 4000], grand: [[1, 999999], [4000]] }, context.hwaHelperNameMap);
   assert.deepEqual(Array.from(rows, (row) => Array.from(row)), [
@@ -37,10 +52,24 @@ test('table sorting handles numeric counts, names, and missing values', () => {
 });
 
 test('numeric columns align values and headings while IDs and ordinals stay left', () => {
-  for (const heading of ['Level', 'Star', 'Soul stones / needed', 'Power',
+  for (const heading of ['Level', 'Star', 'Soul stones / needed', 'Soul stone', 'Soul stones', 'Power',
     'Amount', 'Members', 'Size']) assert.equal(isNumericColumn(heading), true);
   for (const heading of ['Hero ID', 'Titan ID', 'Item ID', 'Skin ID',
     'Hero/Titan ID', 'Team', 'Name']) assert.equal(isNumericColumn(heading), false);
+});
+
+test('isSoulUpgradeReady correctly determines if soul stones meet upgrade threshold', () => {
+  const { isSoulUpgradeReady } = context.hwaHelperPopupData;
+  assert.equal(isSoulUpgradeReady('73 / 50'), true);
+  assert.equal(isSoulUpgradeReady('50 / 50'), true);
+  assert.equal(isSoulUpgradeReady('1,500 / 900'), true);
+  assert.equal(isSoulUpgradeReady('30 / 50'), false);
+  assert.equal(isSoulUpgradeReady('500 / Max'), false);
+  assert.equal(isSoulUpgradeReady('— / 50'), false);
+  assert.equal(isSoulUpgradeReady(100, 50), true);
+  assert.equal(isSoulUpgradeReady(50, 100), false);
+  assert.equal(isSoulUpgradeReady(null, 50), false);
+  assert.equal(isSoulUpgradeReady(100, 'Max'), false);
 });
 
 test('rally tooltip names the target and departing team with exact wait and marked route estimates', () => {
@@ -108,4 +137,17 @@ test('buildingTooltip and researchTooltip display queue details with name, level
     { data: { queues: [] } }, now, context.hwaHelperNameMap.research
   );
   assert.equal(idleResearch, 'Research: Idle');
+});
+
+test('formatChatRole and formatChatTime format roles and timestamps properly', () => {
+  const { formatChatRole, formatChatTime } = context.hwaHelperPopupData;
+  assert.equal(formatChatRole('255').label, 'Leader');
+  assert.equal(formatChatRole('4').label, 'Officer');
+  assert.equal(formatChatRole('3').label, 'Member');
+  assert.equal(formatChatRole('99').label, 'Role #99');
+  assert.equal(formatChatRole(null).label, 'Member');
+
+  assert.equal(formatChatTime('invalid'), '—');
+  const formatted = formatChatTime(1793538537);
+  assert.match(formatted, /\d{2}\/\d{2} \d{2}:\d{2}/);
 });

@@ -554,6 +554,20 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
 
   card.append(details);
 
+  container.addEventListener('mouseenter', () => {
+    if (typeof container.getBoundingClientRect !== 'function') return;
+    const rect = container.getBoundingClientRect();
+    const viewEl = document.getElementById('view');
+    const viewRect = viewEl?.getBoundingClientRect?.();
+    if (viewRect && viewRect.bottom - rect.bottom < 300 && rect.top - viewRect.top > 250) {
+      card.style.top = 'auto';
+      card.style.bottom = 'calc(100% + 0.35rem)';
+    } else {
+      card.style.top = 'calc(100% + 0.35rem)';
+      card.style.bottom = 'auto';
+    }
+  });
+
   container.append(card);
 
   return container;
@@ -681,6 +695,20 @@ function createTitanInline(titanId, displayName, titanSnapshot) {
   details.append(roleBox, elemBox);
   card.append(details);
 
+  container.addEventListener('mouseenter', () => {
+    if (typeof container.getBoundingClientRect !== 'function') return;
+    const rect = container.getBoundingClientRect();
+    const viewEl = document.getElementById('view');
+    const viewRect = viewEl?.getBoundingClientRect?.();
+    if (viewRect && viewRect.bottom - rect.bottom < 300 && rect.top - viewRect.top > 250) {
+      card.style.top = 'auto';
+      card.style.bottom = 'calc(100% + 0.35rem)';
+    } else {
+      card.style.top = 'calc(100% + 0.35rem)';
+      card.style.bottom = 'auto';
+    }
+  });
+
   container.append(card);
 
   return container;
@@ -742,9 +770,15 @@ function table(headings, rows) {
   element.append(header);
   const sortedRows = selectedSort ?
     globalThis.hwaHelperPopupData.sortRows(rows, selectedSort.column, selectedSort.direction) : rows;
+  const soulColIndex = headings.indexOf('Soul stones');
+  const isSoulUpgradeReady = globalThis.hwaHelperPopupData?.isSoulUpgradeReady;
   for (const values of sortedRows) {
     const line = document.createElement('tr');
-    line.className = 'border-b border-slate-100 hover:bg-blue-50/50';
+    const canEvolve = soulColIndex !== -1 && Boolean(isSoulUpgradeReady?.(values[soulColIndex]));
+    line.className = canEvolve ?
+      'border-b border-emerald-100 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-950 font-medium' :
+      'border-b border-slate-100 hover:bg-blue-50/50';
+    if (canEvolve) line.dataset.canEvolve = 'true';
     for (const [column, heading] of headings.entries()) {
       const value = values[column];
       const cell = document.createElement('td');
@@ -762,6 +796,9 @@ function table(headings, rows) {
       } else if (heading === 'Hero/Titan names' && activeTab === 'teams') {
         const ids = values[4];
         cell.append(createTeamSquadCell(ids, String(value ?? '—')));
+      } else if (heading === 'Soul stones' && canEvolve) {
+        cell.className += ' text-emerald-800 font-bold';
+        cell.textContent = String(value ?? '—');
       } else {
         cell.textContent = String(value ?? '—');
       }
@@ -885,7 +922,7 @@ let draftStepCandidates = globalThis.hwaHelperPopupData?.defaultDraftCandidates?
   [502, 39, 503],
   [68, 56, 36]
 ];
-let activeHeroSwapCandidateIndex = null;
+let activeHeroSwapTarget = null;
 let selectedRoleFilter = 'all';
 
 function renderDraft(cache) {
@@ -1173,7 +1210,7 @@ function renderDraft(cache) {
   teamSection.append(slotsGrid);
   container.append(teamSection);
 
-  // 4. Active Step Chooser (Chọn 1 trong 3 Tướng)
+  // 4. Full 15-Hero Draft Grid (5 Columns x 3 Rows)
   if (!isLocked) {
     const chooserSection = document.createElement('div');
     chooserSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4';
@@ -1185,18 +1222,18 @@ function renderDraft(cache) {
     chooserTitleCol.className = 'space-y-0.5';
     const chooserTitle = document.createElement('h3');
     chooserTitle.className = 'text-sm font-bold text-slate-900 flex items-center gap-2';
-    chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">${activeDraftStep + 1}</span> <span>Vòng ${activeDraftStep + 1}/5: Chọn 1 trong 3 Tướng</span>`;
+    chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">15</span> <span>Bảng Chọn 15 Tướng (5 Bước × 3 Lựa Chọn)</span>`;
     chooserTitleCol.append(chooserTitle);
 
     const chooserSub = document.createElement('div');
     chooserSub.className = 'text-xs text-slate-500';
-    chooserSub.textContent = 'Mỗi bước pick sẽ chọn 1 tướng từ 3 lựa chọn để đưa vào đội hình.';
+    chooserSub.textContent = 'Mỗi cột tương ứng 1 bước pick (chọn 1 trong 3 tướng). Bạn có thể chọn trực tiếp trên cả 5 cột để hoàn tất đội hình.';
     chooserTitleCol.append(chooserSub);
     chooserHeader.append(chooserTitleCol);
 
     const chooserActions = document.createElement('div');
     chooserActions.className = 'flex items-center gap-2';
-    
+
     // Reset button
     const hasAnyPick = currentPicks.some(Boolean);
     if (hasAnyPick) {
@@ -1207,8 +1244,7 @@ function renderDraft(cache) {
       resetBtn.addEventListener('click', () => {
         if (isAttack) localDraftAttackPicks = [null, null, null, null, null];
         else localDraftDefencePicks = [null, null, null, null, null];
-        activeDraftStep = 0;
-        activeHeroSwapCandidateIndex = null;
+        activeHeroSwapTarget = null;
         render();
       });
       chooserActions.append(resetBtn);
@@ -1216,130 +1252,148 @@ function renderDraft(cache) {
     chooserHeader.append(chooserActions);
     chooserSection.append(chooserHeader);
 
-    // 3 Candidate Hero Cards Grid
-    const candidatesGrid = document.createElement('div');
-    candidatesGrid.className = 'grid grid-cols-1 md:grid-cols-3 gap-3.5';
+    // 5 Columns x 3 Rows Grid
+    const fullGrid = document.createElement('div');
+    fullGrid.className = 'grid grid-cols-1 sm:grid-cols-5 gap-3';
 
-    const currentStepCandidates = draftStepCandidates[activeDraftStep] || [24, 4, 38];
+    for (let stepIdx = 0; stepIdx < 5; stepIdx++) {
+      const colBox = document.createElement('div');
+      const stepCandidates = draftStepCandidates[stepIdx] || [24, 4, 38];
+      const isColChosen = Number.isInteger(currentPicks[stepIdx]) && currentPicks[stepIdx] > 0;
 
-    for (let cIdx = 0; cIdx < currentStepCandidates.length; cIdx++) {
-      const cHeroId = currentStepCandidates[cIdx];
-      const meta = globalThis.hwaHelperHeroMetadata?.[cHeroId] || {};
-      const snap = cache.heroGetAll?.data?.[cHeroId];
-      const isChosen = currentPicks[activeDraftStep] === cHeroId;
-
-      const card = document.createElement('div');
-      card.className = `rounded-xl p-4 flex flex-col items-center justify-between min-h-[220px] transition-all relative ${
-        isChosen ?
-          'border-2 border-emerald-500 bg-emerald-50/40 shadow-sm ring-1 ring-emerald-300' :
-          'border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-md cursor-pointer'
+      colBox.className = `flex flex-col space-y-2 rounded-xl p-2.5 transition-colors ${
+        isColChosen ? 'bg-slate-50/80 border border-emerald-200' : 'bg-slate-50/40 border border-slate-200'
       }`;
 
-      // Choice header tag
-      const cardTop = document.createElement('div');
-      cardTop.className = 'w-full flex items-center justify-between text-xs mb-2';
-      const choiceTag = document.createElement('span');
-      choiceTag.className = `px-2 py-0.5 rounded-full text-[10px] font-bold ${
-        isChosen ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+      // Column Step Header
+      const colHeader = document.createElement('div');
+      colHeader.className = 'flex items-center justify-between pb-1.5 border-b border-slate-200/80 text-xs';
+
+      const colTitle = document.createElement('span');
+      colTitle.className = 'font-bold text-slate-800 flex items-center gap-1';
+      colTitle.innerHTML = `<span class="size-4 rounded-full ${isColChosen ? 'bg-emerald-600' : 'bg-slate-700'} text-white text-[10px] flex items-center justify-center font-bold">${stepIdx + 1}</span> <span>Bước ${stepIdx + 1}</span>`;
+
+      const colStatusTag = document.createElement('span');
+      colStatusTag.className = `text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+        isColChosen ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
       }`;
-      choiceTag.textContent = `Lựa chọn #${cIdx + 1}`;
-      cardTop.append(choiceTag);
+      colStatusTag.textContent = isColChosen ? '✓ Đã chọn' : 'Chưa chọn';
 
-      const swapCandidateBtn = document.createElement('button');
-      swapCandidateBtn.type = 'button';
-      swapCandidateBtn.className = 'text-[11px] text-blue-600 hover:underline font-medium cursor-pointer';
-      swapCandidateBtn.textContent = 'Thay tướng ✎';
-      swapCandidateBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        activeHeroSwapCandidateIndex = (activeHeroSwapCandidateIndex === cIdx) ? null : cIdx;
-        render();
-      });
-      cardTop.append(swapCandidateBtn);
-      card.append(cardTop);
+      colHeader.append(colTitle, colStatusTag);
+      colBox.append(colHeader);
 
-      // Hero Avatar & Meta
-      const heroContent = document.createElement('div');
-      heroContent.className = 'flex flex-col items-center gap-1.5 text-center my-1';
+      // 3 Candidate Hero Cards in this column
+      for (let cIdx = 0; cIdx < stepCandidates.length; cIdx++) {
+        const cHeroId = stepCandidates[cIdx];
+        const meta = globalThis.hwaHelperHeroMetadata?.[cHeroId] || {};
+        const snap = cache.heroGetAll?.data?.[cHeroId];
+        const isChosen = currentPicks[stepIdx] === cHeroId;
 
-      const avatarPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${cHeroId}.webp` : null);
-      const largeGlow = starGlowClass(snap?.star, true);
-      if (avatarPath) {
-        const img = document.createElement('img');
-        img.src = avatarPath;
-        img.alt = meta.name || `#${cHeroId}`;
-        img.className = `size-16 rounded-full object-cover shrink-0 ${largeGlow} transition-transform group-hover:scale-105`;
-        heroContent.append(img);
-      } else {
-        heroContent.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, true));
-      }
+        const card = document.createElement('div');
+        card.className = `rounded-lg p-2.5 flex flex-col items-center justify-between transition-all relative ${
+          isChosen ?
+            'border-2 border-emerald-500 bg-emerald-50/90 shadow-sm ring-1 ring-emerald-300' :
+            'border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 hover:shadow-xs cursor-pointer'
+        }`;
 
-      const nameEl = document.createElement('div');
-      nameEl.className = 'text-sm font-bold text-slate-900 mt-1';
-      nameEl.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
-      heroContent.append(nameEl);
+        // Top tag row
+        const cardTop = document.createElement('div');
+        cardTop.className = 'w-full flex items-center justify-between text-xs mb-1';
 
-      const badgesRow = document.createElement('div');
-      badgesRow.className = 'flex items-center gap-1.5 flex-wrap justify-center text-[10px]';
-      if (meta.role) {
-        const roleSpan = document.createElement('span');
-        roleSpan.className = 'px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold';
-        roleSpan.textContent = meta.role;
-        badgesRow.append(roleSpan);
-      }
-      if (meta.faction) {
-        const facSpan = document.createElement('span');
-        facSpan.className = 'px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium';
-        facSpan.textContent = meta.faction;
-        badgesRow.append(facSpan);
-      }
-      if (snap?.power) {
-        const pwrSpan = document.createElement('span');
-        pwrSpan.className = 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold';
-        pwrSpan.textContent = `Lực chiến: ${formatNumber(snap.power)}`;
-        badgesRow.append(pwrSpan);
-      }
-      heroContent.append(badgesRow);
-      card.append(heroContent);
+        const choiceTag = document.createElement('span');
+        choiceTag.className = `px-1.5 py-0.2 rounded text-[9px] font-bold ${
+          isChosen ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+        }`;
+        choiceTag.textContent = `#${cIdx + 1}`;
+        cardTop.append(choiceTag);
 
-      // Action button
-      const selectBtn = document.createElement('button');
-      selectBtn.type = 'button';
-      if (isChosen) {
-        selectBtn.className = 'w-full py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-default mt-2';
-        selectBtn.innerHTML = `<span>✓</span> <span>Đã chọn cho Bước ${activeDraftStep + 1}</span>`;
-      } else {
-        selectBtn.className = 'w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer mt-2 transition-colors';
-        selectBtn.textContent = `Chọn Tướng Này (Bước ${activeDraftStep + 1})`;
-      }
-      card.append(selectBtn);
+        const swapCandidateBtn = document.createElement('button');
+        swapCandidateBtn.type = 'button';
+        swapCandidateBtn.title = 'Thay thế tướng đề cử';
+        swapCandidateBtn.className = 'text-[10px] text-blue-600 hover:underline font-medium cursor-pointer';
+        swapCandidateBtn.textContent = '✎';
+        swapCandidateBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (activeHeroSwapTarget && activeHeroSwapTarget.step === stepIdx && activeHeroSwapTarget.candidateIndex === cIdx) {
+            activeHeroSwapTarget = null;
+          } else {
+            activeHeroSwapTarget = { step: stepIdx, candidateIndex: cIdx };
+          }
+          render();
+        });
+        cardTop.append(swapCandidateBtn);
+        card.append(cardTop);
 
-      card.addEventListener('click', () => {
-        currentPicks[activeDraftStep] = cHeroId;
-        // Auto-advance to next unfilled step
-        const nextUnfilled = currentPicks.findIndex((h) => !h);
-        if (nextUnfilled !== -1) {
-          activeDraftStep = nextUnfilled;
-        } else if (activeDraftStep < 4) {
-          activeDraftStep++;
+        // Hero Avatar & Meta
+        const avatarPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${cHeroId}.webp` : null);
+        const glow = starGlowClass(snap?.star, false);
+        if (avatarPath) {
+          const img = document.createElement('img');
+          img.src = avatarPath;
+          img.alt = meta.name || `#${cHeroId}`;
+          img.className = `size-11 rounded-full object-cover shrink-0 ${glow}`;
+          card.append(img);
+        } else {
+          card.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, false));
         }
-        activeHeroSwapCandidateIndex = null;
-        render();
-      });
 
-      candidatesGrid.append(card);
+        const nameEl = document.createElement('div');
+        nameEl.className = 'text-xs font-bold text-slate-900 mt-1 text-center truncate max-w-[110px]';
+        nameEl.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
+        card.append(nameEl);
+
+        const badgesRow = document.createElement('div');
+        badgesRow.className = 'flex items-center gap-1 flex-wrap justify-center text-[9px] my-1';
+        if (meta.role) {
+          const roleSpan = document.createElement('span');
+          roleSpan.className = 'px-1 py-0.2 rounded bg-blue-100 text-blue-800 font-semibold';
+          roleSpan.textContent = meta.role;
+          badgesRow.append(roleSpan);
+        }
+        if (snap?.power) {
+          const pwrSpan = document.createElement('span');
+          pwrSpan.className = 'px-1 py-0.2 rounded bg-amber-100 text-amber-900 font-medium tabular-nums';
+          pwrSpan.textContent = `⚡${formatNumber(snap.power)}`;
+          badgesRow.append(pwrSpan);
+        }
+        card.append(badgesRow);
+
+        // Selection indicator button
+        const selectBtn = document.createElement('button');
+        selectBtn.type = 'button';
+        if (isChosen) {
+          selectBtn.className = 'w-full py-1 rounded bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center gap-1 cursor-default mt-1';
+          selectBtn.textContent = '✓ Đã chọn';
+        } else {
+          selectBtn.className = 'w-full py-1 rounded bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-[10px] font-semibold flex items-center justify-center cursor-pointer mt-1 transition-colors';
+          selectBtn.textContent = 'Chọn';
+        }
+        card.append(selectBtn);
+
+        card.addEventListener('click', () => {
+          currentPicks[stepIdx] = cHeroId;
+          activeHeroSwapTarget = null;
+          render();
+        });
+
+        colBox.append(card);
+      }
+
+      fullGrid.append(colBox);
     }
-    chooserSection.append(candidatesGrid);
+    chooserSection.append(fullGrid);
 
-    // If candidate substitution is open:
-    if (activeHeroSwapCandidateIndex !== null) {
+    // If candidate substitution drawer is open
+    if (activeHeroSwapTarget) {
+      const { step: sIdx, candidateIndex: cIdx } = activeHeroSwapTarget;
       const swapWrap = document.createElement('div');
       swapWrap.className = 'p-3 rounded-xl border border-blue-200 bg-blue-50/50 space-y-2 mt-2';
-      
+
       const swapHeader = document.createElement('div');
       swapHeader.className = 'flex items-center justify-between';
       const swapTitle = document.createElement('div');
       swapTitle.className = 'text-xs font-bold text-blue-900';
-      swapTitle.textContent = `Chọn tướng thay thế cho Lựa chọn #${activeHeroSwapCandidateIndex + 1} (Bước ${activeDraftStep + 1}):`;
+      swapTitle.textContent = `Chọn tướng thay thế cho Bước ${sIdx + 1} - Lựa chọn #${cIdx + 1}:`;
       swapHeader.append(swapTitle);
 
       const closeSwapBtn = document.createElement('button');
@@ -1347,7 +1401,7 @@ function renderDraft(cache) {
       closeSwapBtn.className = 'text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer';
       closeSwapBtn.textContent = 'Đóng [✕]';
       closeSwapBtn.addEventListener('click', () => {
-        activeHeroSwapCandidateIndex = null;
+        activeHeroSwapTarget = null;
         render();
       });
       swapHeader.append(closeSwapBtn);
@@ -1367,7 +1421,7 @@ function renderDraft(cache) {
         const itemBtn = document.createElement('button');
         itemBtn.type = 'button';
         itemBtn.className = 'flex items-center gap-1.5 p-1.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50 text-left text-xs cursor-pointer';
-        
+
         const avPath = hMeta.avatarFile || (hMeta.hasAvatar ? `assets/heroes/${hId}.webp` : null);
         const sGlow = starGlowClass(hSnap?.star, false);
         if (avPath) {
@@ -1382,11 +1436,11 @@ function renderDraft(cache) {
         itemBtn.append(sName);
 
         itemBtn.addEventListener('click', () => {
-          if (!draftStepCandidates[activeDraftStep]) {
-            draftStepCandidates[activeDraftStep] = [24, 4, 38];
+          if (!draftStepCandidates[sIdx]) {
+            draftStepCandidates[sIdx] = [24, 4, 38];
           }
-          draftStepCandidates[activeDraftStep][activeHeroSwapCandidateIndex] = hId;
-          activeHeroSwapCandidateIndex = null;
+          draftStepCandidates[sIdx][cIdx] = hId;
+          activeHeroSwapTarget = null;
           render();
         });
         swapGrid.append(itemBtn);
@@ -1411,6 +1465,100 @@ function renderDraft(cache) {
 
   view.append(container);
   status.textContent = `${draft.matchId ? `Trận #${draft.matchId} • ` : ''}${globalThis.hwaHelperPopupData.draftStageDescription(stageId)} • Đã chọn ${val.count}/5 bước`;
+}
+
+function renderGuildChat(cache) {
+  const chatData = cache.guildChat?.data;
+  const messages = Array.isArray(chatData?.messages) ? chatData.messages : [];
+  const users = chatData?.users || {};
+
+  const query = search.value.trim().toLowerCase();
+  const filtered = messages.filter((m) => {
+    if (!query) return true;
+    const text = (m.data?.text || '').toLowerCase();
+    const sender = (users[m.userId]?.name || m.userId || '').toLowerCase();
+    return text.includes(query) || sender.includes(query);
+  });
+
+  status.textContent = `${filtered.length} guild message${filtered.length === 1 ? '' : 's'}`;
+
+  if (!filtered.length) {
+    if (messages.length > 0 && query) {
+      showEmpty(`No guild messages matching "${search.value}".`);
+    } else {
+      showEmpty('No guild chat messages observed yet. Open Guild Chat in game to sync.');
+    }
+    return;
+  }
+
+  const container = document.createElement('div');
+  container.className = 'p-3 space-y-2.5';
+
+  for (const m of filtered) {
+    const user = users[m.userId] || {};
+    const senderName = user.name || (m.userId === '0' ? 'System' : `User #${m.userId}`);
+    const isAnnouncement = m.chatType === 'announcement';
+    const roleInfo = globalThis.hwaHelperPopupData?.formatChatRole
+      ? globalThis.hwaHelperPopupData.formatChatRole(m.data?.clanRole ?? user.clanRole)
+      : { label: 'Member', badgeClass: 'bg-slate-100 text-slate-700' };
+    const timeText = globalThis.hwaHelperPopupData?.formatChatTime
+      ? globalThis.hwaHelperPopupData.formatChatTime(m.ctime)
+      : '—';
+
+    const card = document.createElement('div');
+    card.className = `rounded-xl border p-3 transition-colors ${
+      isAnnouncement
+        ? 'border-amber-300 bg-amber-50/70 shadow-xs'
+        : 'border-slate-200 bg-white hover:border-slate-300 shadow-xs'
+    }`;
+
+    const header = document.createElement('div');
+    header.className = 'flex items-center gap-2 flex-wrap text-xs';
+
+    const initial = (senderName[0] || '?').toUpperCase();
+    const avatarBadge = document.createElement('span');
+    avatarBadge.className = `size-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+      isAnnouncement
+        ? 'bg-amber-600 text-white'
+        : roleInfo.label === 'Leader'
+          ? 'bg-amber-500 text-white ring-1 ring-amber-300'
+          : roleInfo.label === 'Officer'
+            ? 'bg-blue-600 text-white'
+            : 'bg-slate-600 text-white'
+    }`;
+    avatarBadge.textContent = initial;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'font-semibold text-slate-900';
+    nameSpan.textContent = senderName;
+
+    const levelBadge = document.createElement('span');
+    levelBadge.className = 'rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 tabular-nums';
+    levelBadge.textContent = user.level ? `Lv.${user.level}` : '';
+
+    const roleBadge = document.createElement('span');
+    roleBadge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+      isAnnouncement ? 'bg-amber-200 text-amber-900 ring-1 ring-amber-400' : roleInfo.badgeClass
+    }`;
+    roleBadge.textContent = isAnnouncement ? 'Announcement' : roleInfo.label;
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'ml-auto text-[11px] text-slate-400 tabular-nums';
+    timeSpan.textContent = timeText;
+
+    header.append(avatarBadge, nameSpan);
+    if (user.level) header.append(levelBadge);
+    header.append(roleBadge, timeSpan);
+
+    const body = document.createElement('div');
+    body.className = 'mt-1.5 text-xs text-slate-800 break-words whitespace-pre-wrap select-text pl-8';
+    body.textContent = m.data?.text || '—';
+
+    card.append(header, body);
+    container.append(card);
+  }
+
+  view.append(container);
 }
 
 async function render() {
@@ -1493,16 +1641,18 @@ async function render() {
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
   document.querySelector('#resource-sort-wrap').hidden = activeTab !== 'resources';
   document.querySelector('#search-label').textContent = activeTab === 'log' ? 'Filter endpoint' :
-    activeTab === 'draft' ? 'Search hero by name, role, or ID' : 'Search ID, name, or group';
+    activeTab === 'draft' ? 'Search hero by name, role, or ID' :
+    activeTab === 'chat' ? 'Search message or sender' : 'Search ID, name, or group';
   search.placeholder = activeTab === 'log' ? 'Filter endpoint' :
-    activeTab === 'draft' ? 'Search hero by name, role, or ID' : 'Search ID, name, or group';
+    activeTab === 'draft' ? 'Search hero by name, role, or ID' :
+    activeTab === 'chat' ? 'Search message or sender' : 'Search ID, name, or group';
 
   if (activeTab === 'config') {
     status.textContent = 'Settings and data stored in this browser.';
   } else if (activeTab === 'draft') {
     renderDraft(cache);
   } else if (activeTab === 'heroes') {
-    showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones / needed', 'Power'], (data) =>
+    showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, hero]) => {
         const { owned, needed } = globalThis.hwaHelperPopupData.heroSoulProgress(id, hero, cache.inventoryGet?.data);
         const soulStones = `${formatNumber(owned)} / ${typeof needed === 'number' ? formatNumber(needed) : needed ?? '—'}`;
@@ -1518,16 +1668,21 @@ async function render() {
   } else if (activeTab === 'resources') {
     renderResources(resources, selectedResources);
   } else if (activeTab === 'titans') {
-    showSnapshot(cache.titanGetAll, ['Titan ID', 'Name', 'Level', 'Star', 'Power'], (data) =>
-      Object.entries(data).sort(byId).map(([id, titan]) =>
-        [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(titan?.level),
-          titan?.star, formatNumber(titan?.power)]));
+    showSnapshot(cache.titanGetAll, ['Titan ID', 'Name', 'Level', 'Star', 'Soul stones', 'Power'], (data) =>
+      Object.entries(data).sort(byId).map(([id, titan]) => {
+        const { owned, needed } = globalThis.hwaHelperPopupData.titanSoulProgress(id, titan, cache.inventoryGet?.data);
+        const soulStones = `${formatNumber(owned)} / ${typeof needed === 'number' ? formatNumber(needed) : needed ?? '—'}`;
+        return [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(titan?.level),
+          titan?.star, soulStones, formatNumber(titan?.power)];
+      }));
   } else if (activeTab === 'teams') {
     showSnapshot(cache.teamGetAll, ['Mode', 'Team', 'Members', 'Hero/Titan names'], (data) =>
       globalThis.hwaHelperPopupData.teamRows(data, globalThis.hwaHelperNameMap));
+  } else if (activeTab === 'chat') {
+    renderGuildChat(cache);
   } else if (activeTab === 'other') {
     const entries = Object.values(cache).filter((entry) =>
-      !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'energyStatus',
+      !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
         'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
         'accountStatus', 'buildingStatus', 'marchStatus',
         'researchStatus', 'productionConfigStatus', 'productionStatus',

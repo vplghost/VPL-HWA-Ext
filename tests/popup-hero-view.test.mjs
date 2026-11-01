@@ -52,21 +52,26 @@ const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url)
 const heroMetaJs = await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8');
 const titanMetaJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
 const heroStatJs = await readFile(new URL('../extension/hero-stat-data.js', import.meta.url), 'utf8');
+const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
 
 // Extract helper functions and run in context
 const context = {
   document: mockDoc,
   globalThis: {},
-  formatNumber: (n) => String(n)
+  formatNumber: (n) => String(n),
+  currentCache: {},
+  sortState: {},
+  activeTab: 'heroes'
 };
 vm.runInNewContext(heroMetaJs, context);
 vm.runInNewContext(titanMetaJs, context);
 vm.runInNewContext(heroStatJs, context);
+vm.runInNewContext(popupDataJs, context);
 
-// Extract the required functions: starIcons, starGlowClass, createInitialsBadge, createHeroInline, factionColors
+// Extract helper functions including table(headings, rows)
 const codeToRun = popupJs.slice(
   popupJs.indexOf('function starIcons('),
-  popupJs.indexOf('function createTeamSquadCell')
+  popupJs.indexOf('function showEmpty(')
 );
 vm.runInNewContext(codeToRun, context);
 
@@ -194,4 +199,38 @@ test('createTitanInline creates hover trigger, avatar, star-glow, and card for t
   assert.ok(card.textContent.includes('Water'), 'Card should mention Water element');
   assert.ok(card.textContent.includes('Tank'), 'Card should mention Tank role');
   assert.ok(!card.textContent.includes('(6★)'), 'Card should not contain (6★) text');
+});
+
+test('table highlights rows when soul stones meet or exceed upgrade threshold', () => {
+  const { table } = context;
+  const headings = ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones', 'Power'];
+  const rows = [
+    ['1', 'Aurora', '120', 3, '100 / 100', '150,000'],
+    ['2', 'Galahad', '120', 4, '40 / 150', '160,000'],
+    ['3', 'Keira', '120', 6, '500 / Max', '180,000'],
+    ['4', 'Astaroth', '120', 2, '— / 50', '140,000']
+  ];
+
+  const tableEl = table(headings, rows);
+  const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
+  assert.equal(dataRows.length, 4);
+
+  // Row 0: Aurora (100 / 100) -> eligible for evolution
+  assert.equal(dataRows[0].dataset.canEvolve, 'true');
+  assert.ok(dataRows[0].className.includes('bg-emerald-50/70'));
+  const soulCell0 = dataRows[0].children[4];
+  assert.ok(soulCell0.className.includes('text-emerald-800'));
+  assert.ok(soulCell0.className.includes('font-bold'));
+
+  // Row 1: Galahad (40 / 150) -> not eligible
+  assert.notEqual(dataRows[1].dataset.canEvolve, 'true');
+  assert.ok(!dataRows[1].className.includes('bg-emerald-50/70'));
+
+  // Row 2: Keira (500 / Max) -> already maxed
+  assert.notEqual(dataRows[2].dataset.canEvolve, 'true');
+  assert.ok(!dataRows[2].className.includes('bg-emerald-50/70'));
+
+  // Row 3: Astaroth (— / 50) -> fragments unknown/null
+  assert.notEqual(dataRows[3].dataset.canEvolve, 'true');
+  assert.ok(!dataRows[3].className.includes('bg-emerald-50/70'));
 });

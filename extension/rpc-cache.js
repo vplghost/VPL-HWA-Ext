@@ -470,6 +470,18 @@
             updatedAt: record.timestamp
           }];
         }
+        if (call.name === 'chatGetAll' && (call.args?.chatType === 'clan' || call.args?.chatType === 'announcement') && result?.response) {
+          const messages = Array.isArray(result.response.messages) ? result.response.messages : [];
+          const users = result.response.users && typeof result.response.users === 'object' ? result.response.users : {};
+          return [{
+            key: 'guildChat',
+            method: call.name,
+            feature: call.args.chatType,
+            group: 'chat',
+            data: { messages, users },
+            updatedAt: record.timestamp
+          }];
+        }
         if (!group || !result || !Object.hasOwn(result, 'response') || result.response == null) return [];
         return [{ key, method: call.name, feature: call.feature || null,
           group, data: result.response, updatedAt: record.timestamp }];
@@ -685,6 +697,34 @@
               changed = true;
             }
           }
+          continue;
+        }
+        if (entry.key === 'guildChat') {
+          const existing = next.guildChat?.data || { messages: [], users: {} };
+          const incomingMessages = entry.data.messages || [];
+          const incomingUsers = entry.data.users || {};
+          const mergedUsers = { ...existing.users, ...incomingUsers };
+          const msgMap = new Map();
+          for (const m of existing.messages || []) {
+            if (m?.id) msgMap.set(String(m.id), m);
+          }
+          for (const m of incomingMessages) {
+            if (m?.id) msgMap.set(String(m.id), m);
+          }
+          const mergedMessages = Array.from(msgMap.values()).sort((a, b) => Number(b.ctime || 0) - Number(a.ctime || 0));
+          const latestTime = entry.updatedAt > (next.guildChat?.updatedAt || '') ? entry.updatedAt : (next.guildChat?.updatedAt || entry.updatedAt);
+          next.guildChat = {
+            key: 'guildChat',
+            method: entry.method,
+            feature: entry.feature,
+            group: entry.group,
+            data: {
+              messages: mergedMessages,
+              users: mergedUsers
+            },
+            updatedAt: latestTime
+          };
+          changed = true;
           continue;
         }
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;

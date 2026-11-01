@@ -171,6 +171,16 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   // Verify status contains step count
   assert.match(statusEl.textContent, /Đã chọn 0\/5 bước/);
 
+  // Check that all 15 heroes across 5 columns x 3 rows are rendered at once
+  assert.match(viewEl.textContent, /Bảng Chọn 15 Tướng/);
+  assert.match(viewEl.textContent, /Bước 1/);
+  assert.match(viewEl.textContent, /Bước 5/);
+  assert.match(viewEl.textContent, /Cleaver/); // Round 1
+  assert.match(viewEl.textContent, /Arachne/); // Round 2
+  assert.match(viewEl.textContent, /Xe'Sha/);  // Round 3
+  assert.match(viewEl.textContent, /Morrigan/); // Round 4
+  assert.match(viewEl.textContent, /Peech/);   // Round 5
+
   // Check candidates helper
   const defaultCandidates = context.hwaHelperPopupData.defaultDraftCandidates();
   assert.equal(defaultCandidates.length, 5);
