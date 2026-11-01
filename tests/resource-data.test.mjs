@@ -37,8 +37,10 @@ test('resource amounts use M and B notation from each threshold', () => {
   assert.equal(resources.formatAmount(999999), '999,999');
   assert.equal(resources.formatAmount(1000000), '1.0M');
   assert.equal(resources.formatAmount(1250000), '1.3M');
+  assert.equal(resources.formatAmount(999950000), '1.0B');
   assert.equal(resources.formatAmount(1000000000), '1.0B');
   assert.equal(resources.formatAmount(2500000000), '2.5B');
+  assert.equal(resources.formatAmount(1000000000000), '1,000.0B');
   assert.equal(resources.formatAmount(null), '—');
 });
 

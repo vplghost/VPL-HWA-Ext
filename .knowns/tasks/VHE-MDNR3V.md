@@ -5,8 +5,8 @@ status: done
 priority: medium
 labels: []
 createdAt: '2026-11-01T13:05:39.061Z'
-updatedAt: '2026-11-01T13:08:07.960Z'
-completedAt: '2026-11-01T13:08:07.960Z'
+updatedAt: '2026-11-01T13:19:47.498Z'
+completedAt: '2026-11-01T13:19:47.498Z'
 timeSpent: 0
 ---
 # Compact resource values and show renewable tooltip rate
@@ -34,5 +34,9 @@ Inspect existing resource data and tooltip rendering; add shared formatting/refi
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented compact formatting and live tooltip descriptions for timed refillables. Produced materials have no rate in captured inventory or resourceProduction summaries, so the UI marks rate unavailable. npm run check passed: 39 tests and build. System Decision Impact: none; this is a local display change.
+
+Reopened: fix compact display when rounding crosses from M to B while investigating produced-material rates.
+
+Follow-up: fixed 999.95M rounding to 1.0B and grouped billion values; 39 tests/build pass. Material rate remains unavailable until a producer-rate source or validated formula is observed. System Decision Impact: none.
 <!-- SECTION:NOTES:END -->
 

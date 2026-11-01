@@ -2,9 +2,13 @@
   function formatAmount(value) {
     if (!Number.isFinite(value)) return '—';
     if (Math.abs(value) < 1000000) return value.toLocaleString('en-US');
-    const unit = Math.abs(value) >= 1000000000 ? 1000000000 : 1000000;
+    const roundedMillions = Math.round(Math.abs(value) / 100000);
+    const unit = Math.abs(value) >= 1000000000 || roundedMillions >= 10000 ?
+      1000000000 : 1000000;
     const suffix = unit === 1000000000 ? 'B' : 'M';
-    return `${(value / unit).toFixed(1)}${suffix}`;
+    return `${(value / unit).toLocaleString('en-US', {
+      minimumFractionDigits: 1, maximumFractionDigits: 1
+    })}${suffix}`;
   }
 
   function amountAt(entry, now = Date.now()) {
