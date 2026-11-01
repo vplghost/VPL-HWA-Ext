@@ -8,6 +8,9 @@ let activeTab = 'heroes';
 let settingsPending = Promise.resolve();
 
 document.querySelector('#version').textContent = chrome.runtime.getManifest().version;
+document.querySelector('#open-tab').addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+});
 
 const formatNumber = (value) => typeof value === 'number' ? value.toLocaleString() : '—';
 const formatTime = (value) => value ? new Date(value).toLocaleString() : 'chưa có';
@@ -114,13 +117,16 @@ async function render() {
   document.querySelector('#clear').hidden = activeTab !== 'log';
   document.querySelector('#clear-cache').hidden = activeTab === 'log';
   document.querySelector('#search-label').hidden = activeTab === 'log';
-  search.placeholder = activeTab === 'log' ? 'Lọc endpoint' : 'Nhập ID hoặc tên nhóm';
+  search.placeholder = activeTab === 'log' ? 'Lọc endpoint' : 'Nhập ID, tên hoặc nhóm';
 
   if (activeTab === 'heroes') {
-    showSnapshot(cache.heroGetAll, ['Hero ID', 'Tên', 'Level', 'Star', 'Power', 'Skin ID'], (data) =>
-      Object.entries(data).sort(byId).map(([id, hero]) =>
-        [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(hero?.level),
-          formatNumber(hero?.star), formatNumber(hero?.power), formatNumber(hero?.currentSkin)]));
+    showSnapshot(cache.heroGetAll, ['Hero ID', 'Tên', 'Level', 'Star', 'Soul stone / cần', 'Power', 'Skin ID'], (data) =>
+      Object.entries(data).sort(byId).map(([id, hero]) => {
+        const { owned, needed } = globalThis.hwaHelperPopupData.heroSoulProgress(id, hero, cache.inventoryGet?.data);
+        const soulStones = `${formatNumber(owned)} / ${typeof needed === 'number' ? formatNumber(needed) : needed ?? '—'}`;
+        return [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(hero?.level),
+          formatNumber(hero?.star), soulStones, formatNumber(hero?.power), formatNumber(hero?.currentSkin)];
+      }));
   } else if (activeTab === 'items') {
     showSnapshot(cache.inventoryGet, ['Nhóm', 'Item ID', 'Tên', 'Số lượng'], (data) =>
       Object.entries(data).flatMap(([category, items]) =>
@@ -132,10 +138,8 @@ async function render() {
         [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(titan?.level),
           formatNumber(titan?.star), formatNumber(titan?.power)]));
   } else if (activeTab === 'teams') {
-    showSnapshot(cache.teamGetAll, ['Chế độ', 'Số phần tử', 'ID lớp đầu'], (data) =>
-      Object.entries(data).map(([mode, members]) => [mode,
-        Array.isArray(members) ? members.length : 0,
-        Array.isArray(members) ? members.filter((value) => typeof value === 'number').join(', ') || 'đội lồng nhau' : '—']));
+    showSnapshot(cache.teamGetAll, ['Chế độ', 'Đội', 'Số thành viên', 'Hero/Titan ID', 'Tên heroes/titans'], (data) =>
+      globalThis.hwaHelperPopupData.teamRows(data, globalThis.hwaHelperNameMap));
   } else if (activeTab === 'other') {
     const entries = Object.values(cache).filter((entry) =>
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll'].includes(entry.key)

@@ -1,5 +1,8 @@
 body { font: 13px/1.4 system-ui, sans-serif; width: 620px; max-height: 620px; margin: 0; padding: 14px; color: #20242a; }
 h1 { font-size: 18px; margin: 0; }
+.title-row { display: flex; align-items: center; gap: 6px; }
+#open-tab { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 4px; background: transparent; color: #475569; padding: 4px; }
+#open-tab:hover, #open-tab:focus-visible { background: #e2e8f0; color: #1d4ed8; }
 p { margin: 6px 0 10px; }
 .settings { display: flex; gap: 16px; padding: 5px 0; }
 .settings label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
@@ -26,3 +29,7 @@ td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
 details { margin-top: 6px; }
 summary { cursor: pointer; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; background: #f1f5f9; padding: 6px; margin: 4px 0 8px; }
+@media (min-width: 800px) {
+  body { box-sizing: border-box; width: auto; max-width: 1200px; max-height: none; margin: 0 auto; }
+  #view { max-height: none; }
+}

@@ -14,7 +14,7 @@
 
 Sau khi sửa mã, chạy lại `npm run build`, nhấn **Reload** tại thẻ extension trong `chrome://extensions`, rồi tải lại trang game. `npm run check` chạy kiểm thử và build.
 
-Kiểm tra số phiên bản trong popup sau khi reload; bản **0.3.0** hiển thị tên tiếng Anh của heroes, titans và phần lớn items từ bảng locale CDN đã đóng gói. Bản này vẫn có các tab dữ liệu game, công tắc theo dõi/ghi log, lọc request đo lường và giữ POST body tối đa 524.288 ký tự. Bản ghi đã tạo trước khi cập nhật vẫn chỉ có metadata và không thể bổ sung body về sau. Có thể dùng **Xóa log**, sau đó thực hiện lại thao tác trong game và xuất JSON mới để kiểm tra.
+Kiểm tra số phiên bản trong popup sau khi reload; bản **0.4.0** hiển thị tên tiếng Anh của heroes, titans và phần lớn items từ bảng locale CDN đã đóng gói. Nút cạnh tên **HWA Helper** mở giao diện trong một tab trình duyệt. Bản này vẫn có các tab dữ liệu game, công tắc theo dõi/ghi log, lọc request đo lường và giữ POST body tối đa 524.288 ký tự. Bản ghi đã tạo trước khi cập nhật vẫn chỉ có metadata và không thể bổ sung body về sau. Có thể dùng **Xóa log**, sau đó thực hiện lại thao tác trong game và xuất JSON mới để kiểm tra.
 
 ## Xem log API
 
@@ -24,7 +24,7 @@ Extension không ghi request tới các endpoint analytics, AppsFlyer và Google
 
 ## Các tab dữ liệu và cache
 
-Popup có các tab **Heroes**, **Items**, **Titans**, **Teams**, **Khác** và **Log**. Bảng cache tự cập nhật khi trang game thực hiện RPC tương ứng; mỗi tab cho biết thời điểm snapshot gần nhất. Tab **Khác** cho phép mở JSON của các snapshot phụ đã chọn. Cache nằm trong `chrome.storage.local` dưới khóa riêng `rpcCache`, nên **Xóa log** không xóa cache và **Xóa cache** không xóa log. Cache chỉ lưu các response RPC đã chọn, tối đa khoảng 2 MB; dữ liệu đăng nhập, chat, mail và analytics không được đưa vào cache.
+Popup có các tab **Heroes**, **Items**, **Titans**, **Teams**, **Khác** và **Log**. Tab Heroes hiển thị soul stone đang có / số cần để nâng lên bậc sao kế tiếp, lấy từ inventory và bảng giá nâng sao của asset game; khi chưa có snapshot inventory, số đang có hiện `—`. Hero 6 sao hiện `Tối đa`. Tab Teams hiển thị cả ID lẫn tên, tách từng đội lồng nhau thành dòng riêng. Bảng cache tự cập nhật khi trang game thực hiện RPC tương ứng; mỗi tab cho biết thời điểm snapshot gần nhất. Tab **Khác** cho phép mở JSON của các snapshot phụ đã chọn. Cache nằm trong `chrome.storage.local` dưới khóa riêng `rpcCache`, nên **Xóa log** không xóa cache và **Xóa cache** không xóa log. Cache chỉ lưu các response RPC đã chọn, tối đa khoảng 2 MB; dữ liệu đăng nhập, chat, mail và analytics không được đưa vào cache.
 
 Các tab Heroes, Items và Titans hiển thị thêm cột **Tên**, có thể lọc theo tên hoặc ID. Bảng tên tiếng Anh được đóng gói sẵn trong extension, không làm phát sinh request khi mở popup. ID chưa có tên xác thực vẫn được giữ lại với dấu `—` ở cột Tên. Xem [nguồn asset CDN và cách cập nhật bảng tên](CDN-ASSETS.md).
 

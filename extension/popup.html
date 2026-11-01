@@ -8,7 +8,12 @@
 </head>
 <body>
   <header>
-    <h1>HWA Helper</h1>
+    <div class="title-row">
+      <h1>HWA Helper</h1>
+      <button id="open-tab" type="button" title="Mở HWA Helper trong tab mới" aria-label="Mở HWA Helper trong tab mới">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false"><path d="M14 4h6v6m0-6-9 9M20 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
     <p>Phiên bản extension: <strong id="version"></strong></p>
   </header>
   <div class="settings" aria-label="Cài đặt theo dõi">
@@ -29,13 +34,14 @@
     <button id="clear" type="button" hidden>Xóa log</button>
   </div>
   <p id="status" role="status"></p>
-  <label id="search-label" for="search">Lọc theo ID hoặc nhóm</label>
-  <input id="search" type="search" placeholder="Nhập ID hoặc tên nhóm">
+  <label id="search-label" for="search">Lọc theo ID, tên hoặc nhóm</label>
+  <input id="search" type="search" placeholder="Nhập ID, tên hoặc nhóm">
   <div id="view" role="tabpanel" aria-live="polite"></div>
   <script src="tracking-filter.js"></script>
   <script src="export-name.js"></script>
   <script src="data-names.js"></script>
   <script src="name-map.js"></script>
+  <script src="popup-data.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

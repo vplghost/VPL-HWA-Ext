@@ -13,6 +13,8 @@ Log `temp/tracking-data/hwa-api-2026-11-01_latest.json` chứa response `indexGe
 
 `indexGet` còn trả `locale` và `lib` ngay trong response RPC; các URL locale/lib không nhất thiết xuất hiện thành request `fetch`/XHR trong log extension vì game Unity có cơ chế tải tài nguyên riêng. Không suy luận nội dung từ tên file đơn thuần: bảng tên được lấy từ `en.json.gz` và kiểm tra bằng kích thước cùng MD5 do `indexGet` cung cấp.
 
+Bảng giá nâng sao hero lấy từ `enum_evolutionStar.json` trong `splitlib.json.zip`. File ZIP tải về khớp metadata `indexGet` (**5.748.648 byte**, MD5 `8a6990b2cc35a86fa40bf5c7b666746b`); riêng `enum_evolutionStar.json` khớp **989 byte**, MD5 `544c35f92cad823ac5f832f5844d2f1f`. Trường `evolveFragmentCost` cho bậc sao 2–6 lần lượt là **20, 50, 100, 150, 300**. Popup dùng bảng giá tĩnh này cùng số `inventoryGet.fragmentHero[heroId]`; không tải asset lúc chạy.
+
 ## Ánh xạ ID sang tên
 
 `extension/data-names.js` đóng gói các khóa tên số từ locale. `extension/name-map.js` tra cứu theo **nhóm + ID**; cùng ID ở các nhóm item có thể mang nghĩa khác nhau. `fragmentHero` và `fragmentTitan` dùng tên trong `LIB_HERO_NAME_<id>`, `fragmentGear`/`fragmentScroll`/`fragmentArtifact` dùng tên của item gốc và thêm tiền tố `Mảnh`. Heroes và Titans dùng `LIB_HERO_NAME_<id>`.

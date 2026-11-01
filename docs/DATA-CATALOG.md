@@ -31,28 +31,34 @@ RPC `titanGetAll`; cập nhật lúc `2026-11-01T09:18:28.248Z`.
 
 ## Đội hình
 
-RPC `teamGetAll`; cập nhật lúc `2026-11-01T09:18:28.248Z`. Một số chế độ chứa nhiều đội lồng nhau; cột ID chỉ liệt kê các phần tử số ở lớp đầu.
+RPC `teamGetAll`; cập nhật lúc `2026-11-01T09:18:28.248Z`. Mỗi đội lồng nhau có một dòng riêng. Tên tra theo ID từ locale đã đóng gói; ID thiếu tên hiện dưới dạng `#ID`.
 
-| Chế độ | Số phần tử lớp đầu | ID lớp đầu |
-| --- | ---: | --- |
-| `mission` | 5 | 79, 72, 16, 70, 60 |
-| `arena` | 5 | 4, 79, 72, 16, 60 |
-| `boss_fight` | 5 | 1, 2, 64, 15, 7 |
-| `magicTower` | 5 | 4, 79, 72, 16, 60 |
-| `clanDefence_heroes` | 5 | 79, 72, 16, 70, 60 |
-| `clanDefence_titans` | 5 | 4000, 4001, 4004, 4002, 4053 |
-| `dungeon_water` | 5 | 4000, 4001, 4052, 4004, 4002 |
-| `dungeon_neutral` | 5 | 4000, 4001, 4004, 4002, 4053 |
-| `adventure_battle` | 5 | 70, 72, 79, 16, 60 |
-| `dungeon_fire` | 4 | 4010, 4011, 4013, 4012 |
-| `clan_boss` | 3 | cấu trúc đội lồng nhau |
-| `brawl` | 5 | 24, 504, 72, 5, 74 |
-| `dungeon_earth` | 1 | 4021 |
-| `grand` | 3 | cấu trúc đội lồng nhau |
-| `champClanDefence_heroes` | 3 | cấu trúc đội lồng nhau |
-| `champClanDefence_titans` | 5 | 4000, 4001, 4004, 4002, 4053 |
-| `clan_pvp_hero` | 5 | 60, 70, 16, 72, 79 |
-| `clan_pvp_titan` | 5 | 4053, 4002, 4004, 4001, 4000 |
+| Chế độ | Đội | Số thành viên | Hero/Titan ID | Tên heroes/titans |
+| --- | ---: | ---: | --- | --- |
+| `mission` | — | 5 | 79, 72, 16, 70, 60 | Leonel, Byrna, Dante, Somna, Octavia |
+| `arena` | — | 5 | 4, 79, 72, 16, 60 | Astaroth, Leonel, Byrna, Dante, Octavia |
+| `boss_fight` | — | 5 | 1, 2, 64, 15, 7 | Aurora, Galahad, Folio, Ginger, Thea |
+| `magicTower` | — | 5 | 4, 79, 72, 16, 60 | Astaroth, Leonel, Byrna, Dante, Octavia |
+| `clanDefence_heroes` | — | 5 | 79, 72, 16, 70, 60 | Leonel, Byrna, Dante, Somna, Octavia |
+| `clanDefence_titans` | — | 5 | 4000, 4001, 4004, 4002, 4053 | Sigurd, Nova, Tydus, Mairi, Metida |
+| `dungeon_water` | — | 5 | 4000, 4001, 4052, 4004, 4002 | Sigurd, Nova, Orm, Tydus, Mairi |
+| `dungeon_neutral` | — | 5 | 4000, 4001, 4004, 4002, 4053 | Sigurd, Nova, Tydus, Mairi, Metida |
+| `adventure_battle` | — | 5 | 70, 72, 79, 16, 60 | Somna, Byrna, Leonel, Dante, Octavia |
+| `dungeon_fire` | — | 4 | 4010, 4011, 4013, 4012 | Moloch, Vulcan, Araji, Ignis |
+| `clan_boss` | 1 | 5 | 4, 79, 67, 30, 7 | Astaroth, Leonel, Polaris, Cornelius, Thea |
+| `clan_boss` | 2 | 5 | 71, 72, 16, 51, 60 | Electra von Grave, Byrna, Dante, Xe'Sha, Octavia |
+| `clan_boss` | 3 | 5 | 56, 2, 503, 36, 37 | Julius, Galahad, Alvanor, Maya, Jhu |
+| `brawl` | — | 5 | 24, 504, 72, 5, 74 | Cleaver, Tristan, Byrna, Kai, Miu |
+| `dungeon_earth` | — | 1 | 4021 | Sylva |
+| `grand` | 1 | 5 | 7, 67, 51, 4, 71 | Thea, Polaris, Xe'Sha, Astaroth, Electra von Grave |
+| `grand` | 2 | 5 | 60, 70, 16, 72, 79 | Octavia, Somna, Dante, Byrna, Leonel |
+| `grand` | 3 | 5 | 5, 36, 503, 2, 56 | Kai, Maya, Alvanor, Galahad, Julius |
+| `champClanDefence_heroes` | 1 | 5 | 4, 79, 72, 16, 60 | Astaroth, Leonel, Byrna, Dante, Octavia |
+| `champClanDefence_heroes` | 2 | 5 | 1, 2, 3, 70, 7 | Aurora, Galahad, Keira, Somna, Thea |
+| `champClanDefence_heroes` | 3 | 5 | 71, 36, 51, 5, 30 | Electra von Grave, Maya, Xe'Sha, Kai, Cornelius |
+| `champClanDefence_titans` | — | 5 | 4000, 4001, 4004, 4002, 4053 | Sigurd, Nova, Tydus, Mairi, Metida |
+| `clan_pvp_hero` | — | 5 | 60, 70, 16, 72, 79 | Octavia, Somna, Dante, Byrna, Leonel |
+| `clan_pvp_titan` | — | 5 | 4053, 4002, 4004, 4001, 4000 | Metida, Mairi, Tydus, Nova, Sigurd |
 
 ## Các snapshot khác
 
