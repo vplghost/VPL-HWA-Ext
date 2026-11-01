@@ -16,11 +16,11 @@ const popupData = globalThis.hwaHelperPopupData;
 const rawLog = JSON.parse(readFileSync(new URL('../temp/hwa-api-202611012327_legend_draft.json', import.meta.url), 'utf8'));
 
 test('legend draft stage descriptions and countdown helpers work as expected', () => {
-  assert.equal(popupData.draftStageDescription(0), 'Chưa trong trận');
-  assert.equal(popupData.draftStageDescription(1), 'Đang ghép trận...');
-  assert.equal(popupData.draftStageDescription(2), 'Lượt chọn Đội hình Thủ');
-  assert.equal(popupData.draftStageDescription(4), 'Lượt chọn Đội hình Công');
-  assert.equal(popupData.draftStageDescription(5), 'Sẵn sàng chiến đấu');
+  assert.equal(popupData.draftStageDescription(0), 'Not in match');
+  assert.equal(popupData.draftStageDescription(1), 'Matching...');
+  assert.equal(popupData.draftStageDescription(2), 'Defense Draft');
+  assert.equal(popupData.draftStageDescription(4), 'Attack Draft');
+  assert.equal(popupData.draftStageDescription(5), 'Ready for Battle');
 
   assert.equal(popupData.isDraftActive(0), false);
   assert.equal(popupData.isDraftActive(1), true);

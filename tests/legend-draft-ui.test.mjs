@@ -169,12 +169,12 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   assert.ok(mainContainer, 'Main container should exist');
 
   // Verify status contains step count
-  assert.match(statusEl.textContent, /Đã chọn 0\/5 bước/);
+  assert.match(statusEl.textContent, /Selected 0\/5 steps/);
 
   // Check that all 15 heroes across 5 columns x 3 rows are rendered at once
-  assert.match(viewEl.textContent, /Bảng Chọn 15 Tướng/);
-  assert.match(viewEl.textContent, /Bước 1/);
-  assert.match(viewEl.textContent, /Bước 5/);
+  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /Step 1/);
+  assert.match(viewEl.textContent, /Step 5/);
   assert.match(viewEl.textContent, /Cleaver/); // Round 1
   assert.match(viewEl.textContent, /Arachne/); // Round 2
   assert.match(viewEl.textContent, /Xe'Sha/);  // Round 3
@@ -189,8 +189,8 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   // Test in-game pick sync: when defenceHeroes has 5 heroes, it renders locked UI
   sampleCache.legendDraftStatus.data.defenceHeroes = [24, 12, 47, 68, 51];
   context.renderDraft(sampleCache);
-  assert.match(statusEl.textContent, /Đã chọn 5\/5 bước/);
-  assert.match(viewEl.textContent, /Đã khóa đội hình/);
+  assert.match(statusEl.textContent, /Selected 5\/5 steps/);
+  assert.match(viewEl.textContent, /Lineup successfully locked/);
 });
 
 test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => {
@@ -278,7 +278,7 @@ test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => 
 
   context.renderDraft(attackCache);
 
-  assert.match(viewEl.textContent, /Đội hình Thủ của Đối thủ/);
+  assert.match(viewEl.textContent, /Opponent Defense Lineup/);
   assert.match(viewEl.textContent, /Cleaver/);
-  assert.match(viewEl.textContent, /Lượt chọn Đội hình Công/);
+  assert.match(viewEl.textContent, /Attack Draft/);
 });

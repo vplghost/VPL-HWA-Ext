@@ -967,7 +967,7 @@ function renderDraft(cache) {
   
   const matchInfo = document.createElement('div');
   matchInfo.className = 'text-xs text-slate-500 font-medium';
-  matchInfo.textContent = draft.matchId ? `Match #${draft.matchId}` : 'Chế độ Legend Draft';
+  matchInfo.textContent = draft.matchId ? `Match #${draft.matchId}` : 'Legend Draft Mode';
   stageCol.append(matchInfo);
 
   const stageTitle = document.createElement('div');
@@ -983,7 +983,7 @@ function renderDraft(cache) {
   if (draft.stageFinishTs) {
     const timerRow = document.createElement('div');
     timerRow.className = 'flex items-center gap-2 pt-1';
-    timerRow.innerHTML = `<span class="text-xs text-slate-500">Thời gian còn lại:</span>
+    timerRow.innerHTML = `<span class="text-xs text-slate-500">Time remaining:</span>
       <span id="draft-countdown" class="text-xl font-bold font-mono text-red-600">${globalThis.hwaHelperPopupData.formatCountdown(draft.stageFinishTs)}</span>`;
     stageCol.append(timerRow);
   }
@@ -1009,18 +1009,18 @@ function renderDraft(cache) {
     enemyInfo.className = 'min-w-0 flex-1 space-y-0.5';
     const enemyName = document.createElement('div');
     enemyName.className = 'font-bold text-sm text-slate-900 truncate';
-    enemyName.textContent = enemyUser.name || 'Đối thủ';
+    enemyName.textContent = enemyUser.name || 'Opponent';
     enemyInfo.append(enemyName);
 
     const enemySub = document.createElement('div');
     enemySub.className = 'text-xs text-slate-500 flex items-center gap-2';
-    enemySub.innerHTML = `<span>Lv.${enemyUser.level || '—'}</span>${enemyUser.clanTitle ? `<span>• Bang: ${enemyUser.clanTitle}</span>` : ''}`;
+    enemySub.innerHTML = `<span>Lv.${enemyUser.level || '—'}</span>${enemyUser.clanTitle ? `<span>• Guild: ${enemyUser.clanTitle}</span>` : ''}`;
     enemyInfo.append(enemySub);
 
     if (draft.rating) {
       const ratingRow = document.createElement('div');
       ratingRow.className = 'text-xs text-slate-600 font-medium pt-0.5';
-      ratingRow.textContent = `Rating: Bạn ${draft.rating.userRating ?? '—'} vs Đối thủ ${draft.rating.enemyRating ?? '—'}`;
+      ratingRow.textContent = `Rating: You ${draft.rating.userRating ?? '—'} vs Opponent ${draft.rating.enemyRating ?? '—'}`;
       enemyInfo.append(ratingRow);
     }
     enemyCol.append(enemyInfo);
@@ -1036,7 +1036,7 @@ function renderDraft(cache) {
     
     const enemyTitle = document.createElement('div');
     enemyTitle.className = 'text-xs font-bold text-amber-900 flex items-center gap-1.5';
-    enemyTitle.innerHTML = `<span>🛡️ Đội hình Thủ của Đối thủ (5 tướng):</span>`;
+    enemyTitle.innerHTML = `<span>🛡️ Opponent Defense Lineup (5 heroes):</span>`;
     enemyLineupCard.append(enemyTitle);
 
     const enemySlotRow = document.createElement('div');
@@ -1064,13 +1064,13 @@ function renderDraft(cache) {
   teamTitleCol.className = 'space-y-0.5';
   const teamTitle = document.createElement('h3');
   teamTitle.className = 'text-sm font-bold text-slate-800 flex items-center gap-1.5';
-  teamTitle.textContent = isAttack ? '⚔️ Đội hình Tấn công của bạn (5 bước chọn):' : '🛡️ Đội hình Phòng thủ của bạn (5 bước chọn):';
+  teamTitle.textContent = isAttack ? '⚔️ Your Attack Lineup (5 pick steps):' : '🛡️ Your Defense Lineup (5 pick steps):';
   teamTitleCol.append(teamTitle);
 
   const teamSub = document.createElement('div');
   teamSub.className = 'text-xs text-slate-500';
-  teamSub.textContent = val.valid ? '✓ Đã chọn đủ 5/5 tướng (5 bước hoàn tất)' :
-    `Đã chọn: ${val.count}/5 bước • Nhấp vào từng bước để xem hoặc đổi lựa chọn`;
+  teamSub.textContent = val.valid ? '✓ Selected 5/5 heroes (5 steps completed)' :
+    `Selected: ${val.count}/5 steps • Click any step to view or change choice`;
   teamTitleCol.append(teamSub);
   teamHeader.append(teamTitleCol);
 
@@ -1080,17 +1080,17 @@ function renderDraft(cache) {
   if (isLocked) {
     lockBtn.className = 'px-3.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800 flex items-center gap-1';
     lockBtn.disabled = true;
-    lockBtn.textContent = isDefense ? '✓ Đã khóa đội hình Thủ' : '✓ Đã khóa đội hình Công';
+    lockBtn.textContent = isDefense ? '✓ Defense Lineup Locked' : '✓ Attack Lineup Locked';
   } else {
     lockBtn.className = val.valid ?
       'cursor-pointer px-4 py-1.5 rounded-lg bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all' :
       'px-4 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-400 cursor-not-allowed border border-slate-200';
     lockBtn.disabled = !val.valid;
-    lockBtn.textContent = isDefense ? 'Khóa Đội Hình Thủ (5 Tướng)' : isAttack ? 'Khóa Đội Hình Công (5 Tướng)' : 'Khóa Đội Hình (5 Tướng)';
+    lockBtn.textContent = isDefense ? 'Lock Defense Lineup (5 Heroes)' : isAttack ? 'Lock Attack Lineup (5 Heroes)' : 'Lock Lineup (5 Heroes)';
     if (val.valid) {
       lockBtn.addEventListener('click', () => {
         lockBtn.disabled = true;
-        lockBtn.textContent = 'Đang gửi...';
+        lockBtn.textContent = 'Submitting...';
         const action = isDefense ? 'saveDefence' : 'saveAttack';
         chrome.runtime?.sendMessage?.({ kind: 'draft-action', action, heroes: val.heroes }, () => {
           setTimeout(render, 500);
@@ -1122,18 +1122,18 @@ function renderDraft(cache) {
       topRow.className = 'w-full flex items-center justify-between gap-1';
       const stepBadge = document.createElement('span');
       stepBadge.className = `text-[10px] px-1.5 py-0.2 rounded font-bold ${isActiveStep ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`;
-      stepBadge.textContent = `Bước ${i + 1}`;
+      stepBadge.textContent = `Step ${i + 1}`;
       topRow.append(stepBadge);
 
       if (isActiveStep) {
         const activeTag = document.createElement('span');
         activeTag.className = 'text-[9px] font-bold text-blue-600 animate-pulse';
-        activeTag.textContent = 'Đang chọn';
+        activeTag.textContent = 'Picking';
         topRow.append(activeTag);
       } else if (!isLocked) {
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.title = 'Bỏ chọn bước này';
+        removeBtn.title = 'Deselect this step';
         removeBtn.className = 'size-4 rounded-full bg-slate-200 hover:bg-red-100 hover:text-red-700 text-slate-600 flex items-center justify-center text-[10px] font-bold cursor-pointer';
         removeBtn.textContent = '✕';
         removeBtn.addEventListener('click', (e) => {
@@ -1182,19 +1182,19 @@ function renderDraft(cache) {
       topRow.className = 'w-full flex items-center justify-between';
       const stepBadge = document.createElement('span');
       stepBadge.className = `text-[10px] px-1.5 py-0.2 rounded font-bold ${isActiveStep ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`;
-      stepBadge.textContent = `Bước ${i + 1}`;
+      stepBadge.textContent = `Step ${i + 1}`;
       topRow.append(stepBadge);
       if (isActiveStep) {
         const activeTag = document.createElement('span');
         activeTag.className = 'text-[9px] font-bold text-blue-600 animate-pulse';
-        activeTag.textContent = 'Đang chọn';
+        activeTag.textContent = 'Picking';
         topRow.append(activeTag);
       }
       slotCard.append(topRow);
 
       const placeholderWrap = document.createElement('div');
       placeholderWrap.className = 'flex flex-col items-center justify-center my-auto';
-      placeholderWrap.innerHTML = `<span class="text-xl font-bold leading-none ${isActiveStep ? 'text-blue-500' : 'text-slate-300'}">+</span><span class="text-[11px] font-medium mt-1">Chọn 1 trong 3</span>`;
+      placeholderWrap.innerHTML = `<span class="text-xl font-bold leading-none ${isActiveStep ? 'text-blue-500' : 'text-slate-300'}">+</span><span class="text-[11px] font-medium mt-1">Pick 1 of 3</span>`;
       slotCard.append(placeholderWrap);
     }
 
@@ -1222,12 +1222,12 @@ function renderDraft(cache) {
     chooserTitleCol.className = 'space-y-0.5';
     const chooserTitle = document.createElement('h3');
     chooserTitle.className = 'text-sm font-bold text-slate-900 flex items-center gap-2';
-    chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">15</span> <span>Bảng Chọn 15 Tướng (5 Bước × 3 Lựa Chọn)</span>`;
+    chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">15</span> <span>15 Candidate Heroes Matrix (5 Steps × 3 Choices)</span>`;
     chooserTitleCol.append(chooserTitle);
 
     const chooserSub = document.createElement('div');
     chooserSub.className = 'text-xs text-slate-500';
-    chooserSub.textContent = 'Mỗi cột tương ứng 1 bước pick (chọn 1 trong 3 tướng). Bạn có thể chọn trực tiếp trên cả 5 cột để hoàn tất đội hình.';
+    chooserSub.textContent = 'Each column represents 1 pick step (choose 1 of 3 heroes). You can pick directly across all 5 columns to complete your lineup.';
     chooserTitleCol.append(chooserSub);
     chooserHeader.append(chooserTitleCol);
 
@@ -1240,7 +1240,7 @@ function renderDraft(cache) {
       const resetBtn = document.createElement('button');
       resetBtn.type = 'button';
       resetBtn.className = 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 cursor-pointer transition-colors';
-      resetBtn.textContent = 'Đặt lại cả 5 bước';
+      resetBtn.textContent = 'Reset all 5 steps';
       resetBtn.addEventListener('click', () => {
         if (isAttack) localDraftAttackPicks = [null, null, null, null, null];
         else localDraftDefencePicks = [null, null, null, null, null];
@@ -1271,13 +1271,13 @@ function renderDraft(cache) {
 
       const colTitle = document.createElement('span');
       colTitle.className = 'font-bold text-slate-800 flex items-center gap-1';
-      colTitle.innerHTML = `<span class="size-4 rounded-full ${isColChosen ? 'bg-emerald-600' : 'bg-slate-700'} text-white text-[10px] flex items-center justify-center font-bold">${stepIdx + 1}</span> <span>Bước ${stepIdx + 1}</span>`;
+      colTitle.innerHTML = `<span class="size-4 rounded-full ${isColChosen ? 'bg-emerald-600' : 'bg-slate-700'} text-white text-[10px] flex items-center justify-center font-bold">${stepIdx + 1}</span> <span>Step ${stepIdx + 1}</span>`;
 
       const colStatusTag = document.createElement('span');
       colStatusTag.className = `text-[10px] px-1.5 py-0.2 rounded font-semibold ${
         isColChosen ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
       }`;
-      colStatusTag.textContent = isColChosen ? '✓ Đã chọn' : 'Chưa chọn';
+      colStatusTag.textContent = isColChosen ? '✓ Selected' : 'Not picked';
 
       colHeader.append(colTitle, colStatusTag);
       colBox.append(colHeader);
@@ -1309,7 +1309,7 @@ function renderDraft(cache) {
 
         const swapCandidateBtn = document.createElement('button');
         swapCandidateBtn.type = 'button';
-        swapCandidateBtn.title = 'Thay thế tướng đề cử';
+        swapCandidateBtn.title = 'Substitute candidate hero';
         swapCandidateBtn.className = 'text-[10px] text-blue-600 hover:underline font-medium cursor-pointer';
         swapCandidateBtn.textContent = '✎';
         swapCandidateBtn.addEventListener('click', (e) => {
@@ -1363,10 +1363,10 @@ function renderDraft(cache) {
         selectBtn.type = 'button';
         if (isChosen) {
           selectBtn.className = 'w-full py-1 rounded bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center gap-1 cursor-default mt-1';
-          selectBtn.textContent = '✓ Đã chọn';
+          selectBtn.textContent = '✓ Selected';
         } else {
           selectBtn.className = 'w-full py-1 rounded bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-[10px] font-semibold flex items-center justify-center cursor-pointer mt-1 transition-colors';
-          selectBtn.textContent = 'Chọn';
+          selectBtn.textContent = 'Select';
         }
         card.append(selectBtn);
 
@@ -1393,13 +1393,13 @@ function renderDraft(cache) {
       swapHeader.className = 'flex items-center justify-between';
       const swapTitle = document.createElement('div');
       swapTitle.className = 'text-xs font-bold text-blue-900';
-      swapTitle.textContent = `Chọn tướng thay thế cho Bước ${sIdx + 1} - Lựa chọn #${cIdx + 1}:`;
+      swapTitle.textContent = `Select substitute hero for Step ${sIdx + 1} - Choice #${cIdx + 1}:`;
       swapHeader.append(swapTitle);
 
       const closeSwapBtn = document.createElement('button');
       closeSwapBtn.type = 'button';
       closeSwapBtn.className = 'text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer';
-      closeSwapBtn.textContent = 'Đóng [✕]';
+      closeSwapBtn.textContent = 'Close [✕]';
       closeSwapBtn.addEventListener('click', () => {
         activeHeroSwapTarget = null;
         render();
@@ -1456,15 +1456,15 @@ function renderDraft(cache) {
     lockedCard.className = 'rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-center space-y-1.5';
     lockedCard.innerHTML = `
       <div class="text-base font-bold text-emerald-900 flex items-center justify-center gap-2">
-        <span>✓</span> <span>Đội hình 5 tướng đã được khóa thành công!</span>
+        <span>✓</span> <span>5-Hero Lineup successfully locked!</span>
       </div>
-      <div class="text-xs text-emerald-700">Hệ thống đã ghi nhận 5 tướng cho ${isDefense ? 'Đội hình Thủ' : 'Đội hình Công'}. Trận đấu sẽ tự động chuyển sang vòng tiếp theo.</div>
+      <div class="text-xs text-emerald-700">The system recorded 5 heroes for ${isDefense ? 'Defense Lineup' : 'Attack Lineup'}. The match will proceed to the next stage.</div>
     `;
     container.append(lockedCard);
   }
 
   view.append(container);
-  status.textContent = `${draft.matchId ? `Trận #${draft.matchId} • ` : ''}${globalThis.hwaHelperPopupData.draftStageDescription(stageId)} • Đã chọn ${val.count}/5 bước`;
+  status.textContent = `${draft.matchId ? `Match #${draft.matchId} • ` : ''}${globalThis.hwaHelperPopupData.draftStageDescription(stageId)} • Selected ${val.count}/5 steps`;
 }
 
 function renderGuildChat(cache) {

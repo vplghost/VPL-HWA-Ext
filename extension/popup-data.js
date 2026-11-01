@@ -108,11 +108,11 @@
   }
 
   function draftStageDescription(stageId) {
-    if (stageId === 1) return 'Đang ghép trận...';
-    if (stageId === 2 || stageId === 3) return 'Lượt chọn Đội hình Thủ';
-    if (stageId === 4) return 'Lượt chọn Đội hình Công';
-    if (stageId === 5) return 'Sẵn sàng chiến đấu';
-    return 'Chưa trong trận';
+    if (stageId === 1) return 'Matching...';
+    if (stageId === 2 || stageId === 3) return 'Defense Draft';
+    if (stageId === 4) return 'Attack Draft';
+    if (stageId === 5) return 'Ready for Battle';
+    return 'Not in match';
   }
 
   function formatCountdown(finishTs, nowSec = Math.floor(Date.now() / 1000)) {
