@@ -134,13 +134,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.catch(() => {});
     return true;
   }
-  if (message?.kind === 'draft-action' && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+  if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc') && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     chrome.tabs?.query({ url: `${GAME_ORIGIN}/*` }, (tabs) => {
+      let forwarded = false;
       for (const tab of tabs || []) {
-        if (tab.id) chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+          forwarded = true;
+        }
       }
+      sendResponse({ ok: forwarded, error: forwarded ? null : 'No active Hero Wars tab found' });
     });
-    sendResponse({ ok: true });
     return true;
   }
   if (message?.kind === 'open-tab') {

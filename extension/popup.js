@@ -234,6 +234,16 @@ function refreshTimed() {
     }
   }
   marchesWrap.hidden = ![...marchesWrap.children].some((badge) => !badge.hidden);
+  const mailStatus = currentCache.mailStatus?.data;
+  const mailBadge = document.querySelector('#mail-badge');
+  if (mailBadge) {
+    const hasUnclaimed = Boolean(mailStatus?.hasUnclaimed || (mailStatus?.totalUnclaimed && mailStatus.totalUnclaimed > 0) || (mailStatus?.unclaimedReportsCount && mailStatus.unclaimedReportsCount > 0));
+    const count = mailStatus?.totalUnclaimed || mailStatus?.unclaimedReportsCount || 0;
+    mailBadge.hidden = !hasUnclaimed;
+    if (hasUnclaimed) {
+      setResourceTooltip(mailBadge, `New mail / battle report with reward${count > 1 ? `s (${count})` : ''}`);
+    }
+  }
   const energy = currentCache['resource:energy'];
   document.querySelector('#energy-value').textContent = resourceData.formatAmount(
     resourceData.amountAt(energy) ?? currentCache.energyStatus?.data?.energy);
@@ -273,6 +283,36 @@ function refreshTimed() {
     const hasActiveEvents = Boolean(currentCache.clanVersusStatus || currentCache.clanWarChampStatus || currentCache.clanClashStatus || currentCache.brawlStatus || currentCache.questEvents);
     eventsBadge.hidden = !hasActiveEvents;
   }
+  const heroesBadge = document.querySelector('#heroes-tab-badge');
+  if (heroesBadge) {
+    const heroCount = globalThis.hwaHelperPopupData?.countEvolvableHeroes
+      ? globalThis.hwaHelperPopupData.countEvolvableHeroes(currentCache.heroGetAll?.data, currentCache.inventoryGet?.data)
+      : 0;
+    if (heroCount > 0) {
+      heroesBadge.textContent = String(heroCount);
+      heroesBadge.hidden = false;
+      heroesBadge.classList?.remove?.('hidden');
+    } else {
+      heroesBadge.hidden = true;
+      heroesBadge.classList?.add?.('hidden');
+    }
+  }
+
+  const titansBadge = document.querySelector('#titans-tab-badge');
+  if (titansBadge) {
+    const titanCount = globalThis.hwaHelperPopupData?.countEvolvableTitans
+      ? globalThis.hwaHelperPopupData.countEvolvableTitans(currentCache.titanGetAll?.data, currentCache.inventoryGet?.data)
+      : 0;
+    if (titanCount > 0) {
+      titansBadge.textContent = String(titanCount);
+      titansBadge.hidden = false;
+      titansBadge.classList?.remove?.('hidden');
+    } else {
+      titansBadge.hidden = true;
+      titansBadge.classList?.add?.('hidden');
+    }
+  }
+
   document.querySelector('#building-time').textContent = resourceData.hoursMinutes(
     resourceData.remainingMinutes(currentCache.buildingStatus, now));
   document.querySelector('#research-time').textContent = resourceData.hoursMinutes(
@@ -3857,6 +3897,84 @@ search.addEventListener('input', render);
 itemGroup.addEventListener('change', render);
 logSort.addEventListener('change', render);
 resourceSort.addEventListener('change', render);
+
+
+const refreshGroups = {
+  all: [
+    { name: 'userGetInfo' },
+    { name: 'inventoryGet' },
+    { name: 'heroGetAll' },
+    { name: 'titanGetAll' },
+    { name: 'teamGetAll' },
+    { name: 'refillableGetAll', feature: 'refillable' },
+    { name: 'questGetAll' },
+    { name: 'missionGetAll' },
+    { name: 'questGetEvents' },
+    { name: 'artifact_getAll' },
+    { name: 'skin_getAll' },
+    { name: 'rune_getAll' },
+    { name: 'arenaGetAll' },
+    { name: 'clanWarGetBriefInfo' },
+    { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
+    { name: 'mailGetAll' }
+  ],
+  core: [
+    { name: 'userGetInfo' },
+    { name: 'inventoryGet' },
+    { name: 'refillableGetAll', feature: 'refillable' }
+  ],
+  roster: [
+    { name: 'heroGetAll' },
+    { name: 'titanGetAll' },
+    { name: 'teamGetAll' },
+    { name: 'artifact_getAll' },
+    { name: 'skin_getAll' },
+    { name: 'rune_getAll' }
+  ],
+  quests: [
+    { name: 'questGetAll' },
+    { name: 'missionGetAll' },
+    { name: 'questGetEvents' },
+    { name: 'clanWarGetBriefInfo' }
+  ],
+  mail: [
+    { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
+    { name: 'mailGetAll' }
+  ]
+};
+
+function triggerRefresh(groupKey) {
+  const calls = refreshGroups[groupKey];
+  if (!calls) return;
+  const statusEl = document.querySelector('#config-refresh-status');
+  if (statusEl) {
+    statusEl.textContent = 'Requesting refresh...';
+    statusEl.className = 'text-xs text-blue-600 font-medium';
+  }
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+      if (chrome.runtime.lastError || !response?.ok) {
+        if (statusEl) {
+          statusEl.textContent = response?.error || 'No active Hero Wars tab found.';
+          statusEl.className = 'text-xs text-amber-600 font-medium';
+        }
+      } else {
+        if (statusEl) {
+          const time = new Date().toLocaleTimeString();
+          statusEl.textContent = `Refreshed at ${time}`;
+          statusEl.className = 'text-xs text-emerald-600 font-medium';
+        }
+      }
+    });
+  }
+}
+
+document.querySelector('#btn-refresh-all')?.addEventListener('click', () => triggerRefresh('all'));
+document.querySelector('#btn-refresh-core')?.addEventListener('click', () => triggerRefresh('core'));
+document.querySelector('#btn-refresh-roster')?.addEventListener('click', () => triggerRefresh('roster'));
+document.querySelector('#btn-refresh-quests')?.addEventListener('click', () => triggerRefresh('quests'));
+document.querySelector('#btn-refresh-mail')?.addEventListener('click', () => triggerRefresh('mail'));
+document.querySelector('#mail-badge')?.addEventListener('click', () => triggerRefresh('mail'));
 
 document.querySelector('#clear-cache').addEventListener('click', async () => {
   await chrome.storage.local.remove(CACHE_KEY);

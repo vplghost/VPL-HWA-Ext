@@ -13,6 +13,28 @@
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled === true;
     }
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
+      const calls = event.data.calls;
+      const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null);
+      if (!url || !Array.isArray(calls) || calls.length === 0) return;
+      const randHex = () => Math.random().toString(16).slice(2).padStart(16, '0').slice(0, 16);
+      const payload = {
+        calls: calls.map((c) => ({
+          name: typeof c === 'string' ? c : c.name,
+          args: (typeof c === 'object' && c.args) ? c.args : {},
+          ident: randHex() + randHex(),
+          ...(typeof c === 'object' && c.feature ? { feature: c.feature } : {})
+        }))
+      };
+      const headers = { 'content-type': 'application/json', ...(lastRpcHeaders || {}) };
+      try {
+        (window.fetch || originalFetch)(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+      } catch (_) {}
+    }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'draft-action') {
       const { action, heroes } = event.data;
       if (!lastRpcUrl || !Array.isArray(heroes) || heroes.length === 0) return;
@@ -144,6 +166,9 @@
       const urlStr = String(url || '');
       if (urlStr.includes('/api/rpc') || urlStr.includes('api.hero-wars-alliance.com')) {
         lastRpcUrl = urlStr;
+        try {
+          if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('hwa_last_rpc_url', urlStr);
+        } catch (_) {}
         if (options?.headers) {
           try {
             if (typeof Headers !== 'undefined' && options.headers instanceof Headers) {

@@ -1258,3 +1258,41 @@ test('replaying captured gathering and return traces produces coherent marchStat
   assert.equal(returningMarch.returnAt, 1793621071226 + 126008);
   assert.equal(returningMarch.endsAt, 1793621071226 + 126008);
 });
+
+test('getPage:report extracts mailStatus and detects unclaimed rewards', () => {
+  const repRecord = record([
+    { name: 'getPage', feature: 'report', ident: 'rep-test' }
+  ], [
+    { ident: 'rep-test', result: { response: { reports: [
+      { id: 'rep-1', type: 'rallyMobAttackResult', read: false, claimedReward: false, createdAt: 1793623635307 },
+      { id: 'rep-2', type: 'rallyMobAttackResult', read: true, claimedReward: true, createdAt: 1793623445151 }
+    ] } } }
+  ], '2026-11-02T12:00:00.000Z');
+
+  const extracted = cache.extract(repRecord);
+  const mailEntry = extracted.find((e) => e.key === 'mailStatus');
+  assert.ok(mailEntry);
+  assert.equal(mailEntry.data.unclaimedReportsCount, 1);
+  assert.equal(mailEntry.data.hasUnclaimedReports, true);
+
+  const merged = cache.merge({}, [repRecord]).cache;
+  assert.ok(merged.mailStatus);
+  assert.equal(merged.mailStatus.data.unclaimedReportsCount, 1);
+  assert.equal(merged.mailStatus.data.hasUnclaimed, true);
+
+  const claimRecord = record([{ name: 'readAndClaimAll', ident: 'claim-1' }], [
+    { ident: 'claim-1', result: { response: { claimedRewards: [] } } }
+  ], '2026-11-02T12:01:00.000Z');
+
+  const afterClaim = cache.merge(merged, [claimRecord]).cache;
+  assert.equal(afterClaim.mailStatus.data.hasUnclaimed, false);
+  assert.equal(afterClaim.mailStatus.data.unclaimedReportsCount, 0);
+});
+
+test('replaying rally success trace captures unclaimed battle reports', async () => {
+  const rallyTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611021947_rally_success.json', import.meta.url), 'utf8'));
+  const merged = cache.merge({}, rallyTrace).cache;
+  assert.ok(merged.mailStatus);
+  assert.equal(merged.mailStatus.data.hasUnclaimed, true);
+  assert.equal(merged.mailStatus.data.unclaimedReportsCount, 2);
+});

@@ -887,3 +887,41 @@ test('exportTableData enriches titans with structured artifacts and skins', () =
   assert.equal(titan.skins[1].stat, 'MD');
   assert.equal(titan.skins[1].isCurrent, false);
 });
+
+test('countEvolvableHeroes counts only heroes with sufficient soul stones for star upgrade', () => {
+  const { countEvolvableHeroes } = context.hwaHelperPopupData;
+  const heroes = {
+    1: { star: 3 },
+    2: { star: 5 },
+    3: { star: 6 }
+  };
+  const inventory = {
+    fragmentHero: {
+      1: 150,
+      2: 290,
+      3: 500
+    }
+  };
+  assert.equal(countEvolvableHeroes(heroes, inventory), 1);
+  assert.equal(countEvolvableHeroes(null, inventory), 0);
+  assert.equal(countEvolvableHeroes(heroes, null), 0);
+});
+
+test('countEvolvableTitans counts titans with sufficient soul stones for star upgrade', () => {
+  const { countEvolvableTitans } = context.hwaHelperPopupData;
+  const titans = {
+    4000: { star: 2 },
+    4001: { star: 3 },
+    4002: { star: 6 }
+  };
+  const inventory = {
+    fragmentTitan: {
+      4000: 164,
+      4001: 500,
+      4002: 1000
+    }
+  };
+  assert.equal(countEvolvableTitans(titans, inventory), 2);
+  assert.equal(countEvolvableTitans(null, inventory), 0);
+  assert.equal(countEvolvableTitans(titans, null), 0);
+});

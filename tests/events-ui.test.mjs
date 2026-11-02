@@ -156,6 +156,29 @@ const marchesWrap = new MockElement('div');
 marchesWrap.setAttribute('id', 'marches');
 const headerResources = new MockElement('div');
 headerResources.setAttribute('id', 'header-resources');
+const mailBadge = new MockElement('span');
+mailBadge.setAttribute('id', 'mail-badge');
+mailBadge.hidden = true;
+const heroesBadge = new MockElement('span');
+heroesBadge.setAttribute('id', 'heroes-tab-badge');
+heroesBadge.hidden = true;
+const titansBadge = new MockElement('span');
+titansBadge.setAttribute('id', 'titans-tab-badge');
+titansBadge.hidden = true;
+const btnRefreshAll = new MockElement('button');
+btnRefreshAll.setAttribute('id', 'btn-refresh-all');
+const btnRefreshCore = new MockElement('button');
+btnRefreshCore.setAttribute('id', 'btn-refresh-core');
+const btnRefreshRoster = new MockElement('button');
+btnRefreshRoster.setAttribute('id', 'btn-refresh-roster');
+const btnRefreshQuests = new MockElement('button');
+btnRefreshQuests.setAttribute('id', 'btn-refresh-quests');
+const btnRefreshMail = new MockElement('button');
+btnRefreshMail.setAttribute('id', 'btn-refresh-mail');
+const configRefreshStatus = new MockElement('span');
+configRefreshStatus.setAttribute('id', 'config-refresh-status');
+const clearCacheBtn = new MockElement('button');
+clearCacheBtn.setAttribute('id', 'clear-cache');
 const dungeonModal = new MockElement('div');
 dungeonModal.setAttribute('id', 'dungeon-modal');
 dungeonModal.hidden = true;
@@ -202,7 +225,17 @@ const mockDoc = {
     ['research-badge', researchBadge],
     ['research-time', researchTime],
     ['marches', marchesWrap],
-    ['header-resources', headerResources]
+    ['header-resources', headerResources],
+    ['mail-badge', mailBadge],
+    ['heroes-tab-badge', heroesBadge],
+    ['titans-tab-badge', titansBadge],
+    ['btn-refresh-all', btnRefreshAll],
+    ['btn-refresh-core', btnRefreshCore],
+    ['btn-refresh-roster', btnRefreshRoster],
+    ['btn-refresh-quests', btnRefreshQuests],
+    ['btn-refresh-mail', btnRefreshMail],
+    ['config-refresh-status', configRefreshStatus],
+    ['clear-cache', clearCacheBtn]
   ]),
   querySelector(sel) {
     if (sel.startsWith('#')) return this.elementsById.get(sel.slice(1)) || null;
@@ -237,7 +270,7 @@ const context = {
     p.textContent = msg;
     view.append(p);
   },
-  setResourceTooltip: () => {},
+  setResourceTooltip: (node, val) => { if (node && node.dataset) { node.dataset.resourceTooltip = val; node.setAttribute('data-resource-tooltip', val); } },
   resourceTooltip: () => '',
   isMarchExpired: (march, now) => context.hwaHelperPopupData.isMarchExpired(march, now),
   marchTooltip: () => ''
@@ -270,6 +303,13 @@ context.formatTime = (t) => t;
 context.matches = () => true;
 context.table = () => new MockElement('table');
 vm.runInContext(popupJs.slice(snapStart, snapEnd), context);
+
+// Extract refresh logic
+const refreshLogicStart = popupJs.indexOf("const refreshGroups =");
+const refreshLogicEnd = popupJs.indexOf("document.querySelector('#clear-cache')");
+if (refreshLogicStart !== -1 && refreshLogicEnd !== -1) {
+  vm.runInContext(popupJs.slice(refreshLogicStart, refreshLogicEnd), context);
+}
 
 // Extract resource helpers and renderResources
 const resHelperStart = popupJs.indexOf('function resourceLabel(');
@@ -928,4 +968,67 @@ test("header march icon renders gathering and return badges and hides upon retur
   } finally {
     Date.now = origNow;
   }
+});
+
+test('header mail badge, heroes/titans soul evolve badges, and config refresh buttons', async () => {
+  // 1. Mail badge test
+  assert.equal(mailBadge.hidden, true);
+  context.currentCache.mailStatus = {
+    key: 'mailStatus',
+    data: { hasUnclaimed: true, unclaimedReportsCount: 2, totalUnclaimed: 2 }
+  };
+  context.refreshTimed();
+  assert.equal(mailBadge.hidden, false);
+  assert.equal(mailBadge.dataset.resourceTooltip, 'New mail / battle report with rewards (2)');
+
+  context.currentCache.mailStatus.data = { hasUnclaimed: false, unclaimedReportsCount: 0, totalUnclaimed: 0 };
+  context.refreshTimed();
+  assert.equal(mailBadge.hidden, true);
+
+  // 2. Tab badges test
+  context.currentCache.heroGetAll = {
+    data: {
+      '1': { star: 3 } // needs 100
+    }
+  };
+  context.currentCache.titanGetAll = {
+    data: {
+      '4000': { star: 2 } // needs 150
+    }
+  };
+  context.currentCache.inventoryGet = {
+    data: {
+      fragmentHero: { 1: 120 }, // 120 >= 100 -> 1 hero
+      fragmentTitan: { 4000: 164 } // 164 >= 150 -> 1 titan
+    }
+  };
+  context.refreshTimed();
+  assert.equal(heroesBadge.hidden, false);
+  assert.equal(heroesBadge.textContent, '1');
+  assert.equal(titansBadge.hidden, false);
+  assert.equal(titansBadge.textContent, '1');
+
+  // When no fragments, badges hide
+  context.currentCache.inventoryGet.data = { fragmentHero: {}, fragmentTitan: {} };
+  context.refreshTimed();
+  assert.equal(heroesBadge.hidden, true);
+  assert.equal(titansBadge.hidden, true);
+
+  // 3. Refresh button trigger test
+  let sentMessage = null;
+  context.chrome.runtime = { sendMessage: (msg, cb) => {
+    sentMessage = msg;
+    if (cb) cb({ ok: true });
+  } };
+  const dummy = (msg, cb) => {
+    sentMessage = msg;
+    if (cb) cb({ ok: true });
+  };
+  btnRefreshAll.dispatch('click');
+  assert.ok(sentMessage);
+  assert.equal(sentMessage.kind, 'refresh-rpc');
+  assert.ok(Array.isArray(sentMessage.calls));
+  assert.ok(sentMessage.calls.some((c) => c.name === 'heroGetAll'));
+  assert.ok(sentMessage.calls.some((c) => c.name === 'getPage' && c.feature === 'report'));
+  assert.ok(configRefreshStatus.textContent.includes('Refreshed at'));
 });

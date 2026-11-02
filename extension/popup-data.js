@@ -52,6 +52,32 @@
     return Number.isFinite(o) && Number.isFinite(n) && o >= n;
   }
 
+  function countEvolvableHeroes(heroGetAllData, inventoryData) {
+    if (!heroGetAllData || typeof heroGetAllData !== 'object') return 0;
+    let count = 0;
+    for (const [idStr, hero] of Object.entries(heroGetAllData)) {
+      const id = Number(idStr);
+      const { owned, needed } = heroSoulProgress(id, hero, inventoryData);
+      if (needed !== 'Max' && needed != null && isSoulUpgradeReady(owned, needed)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  function countEvolvableTitans(titanGetAllData, inventoryData) {
+    if (!titanGetAllData || typeof titanGetAllData !== 'object') return 0;
+    let count = 0;
+    for (const [idStr, titan] of Object.entries(titanGetAllData)) {
+      const id = Number(idStr);
+      const { owned, needed } = titanSoulProgress(id, titan, inventoryData);
+      if (needed !== 'Max' && needed != null && isSoulUpgradeReady(owned, needed)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   function formatTitanArtifactLevels(titanId, titan) {
     if (!titan || !Array.isArray(titan.artifacts) || !titan.artifacts.length) {
       return '—';
@@ -1151,7 +1177,7 @@
     return false;
   }
 
-  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, formatTitanArtifactLevels, isTitanArtifactUpgradable, teamRows, sortRows,
+  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans, formatTitanArtifactLevels, isTitanArtifactUpgradable, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,

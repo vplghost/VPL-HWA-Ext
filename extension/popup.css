@@ -212,4 +212,36 @@
   .chest-deck-layer-2 {
     transform: translateY(8px) scale(0.97);
   }
+
+  /* Mail Alert Badge Dot Animation */
+  .hwa-mail-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+  }
+  .hwa-mail-dot-ping {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+    animation: hwa-ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  @keyframes hwa-ping {
+    75%, 100% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hwa-mail-dot-ping {
+      animation: none !important;
+    }
+  }
 }

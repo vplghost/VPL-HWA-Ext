@@ -46,7 +46,7 @@ try {
   });
 } catch {}
 
-chrome.runtime?.onMessage?.addListener((message) => {
+chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
   if (message?.kind === 'draft-action') {
     window.postMessage({
       source: 'hwa-helper-control',
@@ -54,6 +54,17 @@ chrome.runtime?.onMessage?.addListener((message) => {
       action: message.action,
       heroes: message.heroes
     }, location.origin);
+    sendResponse?.({ ok: true });
+    return true;
+  }
+  if (message?.kind === 'refresh-rpc') {
+    window.postMessage({
+      source: 'hwa-helper-control',
+      kind: 'refresh-rpc',
+      calls: message.calls
+    }, location.origin);
+    sendResponse?.({ ok: true });
+    return true;
   }
 });
 

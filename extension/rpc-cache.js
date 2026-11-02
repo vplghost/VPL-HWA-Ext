@@ -36,7 +36,8 @@
     'searchMine:mine': 'other',
     'getChunks:globalMap': 'other',
     'getRoutesByIds:globalMap': 'other',
-    'getPage:report': 'other',
+    'getPage:report': 'header',
+    mailGetAll: 'header',
     dungeonEndBattle: 'events',
     dungeonSaveProgress: 'events',
     dungeonStartBattle: 'events',
@@ -226,7 +227,26 @@
               });
             }
           }
-          if (actions.length) return actions;
+          const unclaimedReports = result.response.reports.filter((r) => r && r.claimedReward === false);
+          actions.push({
+            key: 'mailStatus',
+            method: call.name,
+            feature: call.feature,
+            group: 'header',
+            data: {
+              unclaimedReportsCount: unclaimedReports.length,
+              hasUnclaimedReports: unclaimedReports.length > 0,
+              reports: result.response.reports.map((r) => ({
+                id: r.id,
+                type: r.type,
+                read: r.read,
+                claimedReward: r.claimedReward,
+                createdAt: r.createdAt
+              }))
+            },
+            updatedAt: record.timestamp
+          });
+          return actions;
         }
         if (key === 'searchMine:mine' && Array.isArray(result?.response?.mines) && Array.isArray(call.args?.mineConfigIds)) {
           const mineConfigId = call.args.mineConfigIds[0];
@@ -588,19 +608,33 @@
             }
             return actions;
           }
-          if (call.name === 'readAndClaimAll' && Array.isArray(result.response?.claimedRewards)) {
-            const rewards = new Map();
-            for (const reward of result.response.claimedRewards) {
-              const type = reward?.type;
-              const id = reward?.id;
-              const key = type === 'gold' || type === 'starMoney' ? type :
-                resourceTypes.has(type) && Number.isInteger(id) ? `${type}:${id}` : null;
-              if (key && Number.isFinite(reward.amount) && reward.amount > 0) {
-                rewards.set(key, (rewards.get(key) || 0) + reward.amount);
+          if (call.name === 'readAndClaimAll') {
+            const actions = [];
+            if (Array.isArray(result.response?.claimedRewards)) {
+              const rewards = new Map();
+              for (const reward of result.response.claimedRewards) {
+                const type = reward?.type;
+                const id = reward?.id;
+                const key = type === 'gold' || type === 'starMoney' ? type :
+                  resourceTypes.has(type) && Number.isInteger(id) ? `${type}:${id}` : null;
+                if (key && Number.isFinite(reward.amount) && reward.amount > 0) {
+                  rewards.set(key, (rewards.get(key) || 0) + reward.amount);
+                }
               }
+              actions.push(...[...rewards].flatMap(([rewardKey, amount]) =>
+                resourceAction(record, call, rewardKey, amount)));
             }
-            return [...rewards].flatMap(([rewardKey, amount]) =>
-              resourceAction(record, call, rewardKey, amount));
+            actions.push({
+              key: 'mailStatus',
+              method: call.name,
+              feature: call.feature,
+              group: 'header',
+              data: {
+                action: 'claimAll'
+              },
+              updatedAt: record.timestamp
+            });
+            return actions;
           }
           if (call.name === 'claimChest' && call.feature === 'clanVersus') {
             const chestNumber = call.args?.chestNumber;
@@ -745,6 +779,25 @@
             feature: null,
             group: 'events',
             data: { brawls: result.response },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'mailGetAll' && result?.response) {
+          const letters = Array.isArray(result.response.letters) ? result.response.letters : [];
+          const unclaimedLetters = letters.filter((l) =>
+            l && !l.deleted && (l.reward || l.q_reward || l.items) &&
+            !l.claimed && !l.rewardReceived && !l.rewardClaimed
+          );
+          return [{
+            key: 'mailStatus',
+            method: call.name,
+            feature: null,
+            group: 'header',
+            data: {
+              unclaimedLettersCount: unclaimedLetters.length,
+              hasUnclaimedLetters: unclaimedLetters.length > 0,
+              letters
+            },
             updatedAt: record.timestamp
           }];
         }
@@ -1992,6 +2045,44 @@
               isCleared: Boolean(incoming.isCleared || existing.isCleared || incoming.state === 'win' || existing.state === 'win')
             }
           };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'mailStatus') {
+          if (next.mailStatus && next.mailStatus.updatedAt === entry.updatedAt) continue;
+          const existing = next.mailStatus?.data || {};
+          if (entry.data?.action === 'claimAll') {
+            next.mailStatus = {
+              ...entry,
+              data: {
+                ...existing,
+                unclaimedReportsCount: 0,
+                unclaimedLettersCount: 0,
+                totalUnclaimed: 0,
+                hasUnclaimed: false,
+                reports: (existing.reports || []).map((r) => ({ ...r, claimedReward: true }))
+              }
+            };
+          } else {
+            const unclaimedReportsCount = entry.data.unclaimedReportsCount !== undefined
+              ? entry.data.unclaimedReportsCount
+              : (existing.unclaimedReportsCount || 0);
+            const unclaimedLettersCount = entry.data.unclaimedLettersCount !== undefined
+              ? entry.data.unclaimedLettersCount
+              : (existing.unclaimedLettersCount || 0);
+            const totalUnclaimed = unclaimedReportsCount + unclaimedLettersCount;
+            next.mailStatus = {
+              ...entry,
+              data: {
+                ...existing,
+                ...entry.data,
+                unclaimedReportsCount,
+                unclaimedLettersCount,
+                totalUnclaimed,
+                hasUnclaimed: totalUnclaimed > 0
+              }
+            };
+          }
           changed = true;
           continue;
         }
