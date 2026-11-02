@@ -117,14 +117,17 @@
       aggregated.set(key, (aggregated.get(key) || 0) + delta);
     };
 
-    if (Number.isFinite(rewardObj.stamina) && rewardObj.stamina > 0) {
-      addReward('energy', rewardObj.stamina);
+    const numStamina = Number(rewardObj.stamina);
+    if (Number.isFinite(numStamina) && numStamina > 0) {
+      addReward('energy', numStamina);
     }
-    if (Number.isFinite(rewardObj.gold) && rewardObj.gold > 0) {
-      addReward('gold', rewardObj.gold);
+    const numGold = Number(rewardObj.gold);
+    if (Number.isFinite(numGold) && numGold > 0) {
+      addReward('gold', numGold);
     }
-    if (Number.isFinite(rewardObj.starMoney) && rewardObj.starMoney > 0) {
-      addReward('starMoney', rewardObj.starMoney);
+    const numStarMoney = Number(rewardObj.starMoney || rewardObj.starmoney);
+    if (Number.isFinite(numStarMoney) && numStarMoney > 0) {
+      addReward('starMoney', numStarMoney);
     }
     if (rewardObj.refillableResource && typeof rewardObj.refillableResource === 'object') {
       for (const [rId, amt] of Object.entries(rewardObj.refillableResource)) {
@@ -135,7 +138,7 @@
         }
       }
     }
-    for (const groupType of ['consumable', 'material', 'coin', 'lootboxChanced', 'patron', 'scroll', 'teleporter']) {
+    for (const groupType of ['consumable', 'material', 'coin', 'gear', 'fragmentHero', 'fragmentTitan', 'lootboxChanced', 'patron', 'scroll', 'teleporter']) {
       if (rewardObj[groupType] && typeof rewardObj[groupType] === 'object') {
         for (const [id, amt] of Object.entries(rewardObj[groupType])) {
           const numAmt = Number(amt);
@@ -167,6 +170,53 @@
     for (const [key, totalAmt] of aggregated) {
       const label = resolveResourceLabel(key);
       actions.push(...resourceAction(record, call, key, totalAmt, label, tokenPrefix));
+    }
+    return actions;
+  }
+
+  function extractCostActions(record, call, costObj, tokenPrefix = 'cost') {
+    if (!costObj || typeof costObj !== 'object') return [];
+    const aggregated = new Map();
+    const addCost = (key, delta) => {
+      if (!key || !Number.isFinite(delta) || delta <= 0) return;
+      aggregated.set(key, (aggregated.get(key) || 0) + delta);
+    };
+
+    const numStamina = Number(costObj.stamina);
+    if (Number.isFinite(numStamina) && numStamina > 0) {
+      addCost('energy', numStamina);
+    }
+    const numGold = Number(costObj.gold);
+    if (Number.isFinite(numGold) && numGold > 0) {
+      addCost('gold', numGold);
+    }
+    const numStarMoney = Number(costObj.starMoney || costObj.starmoney);
+    if (Number.isFinite(numStarMoney) && numStarMoney > 0) {
+      addCost('starMoney', numStarMoney);
+    }
+    if (costObj.refillableResource && typeof costObj.refillableResource === 'object') {
+      for (const [rId, amt] of Object.entries(costObj.refillableResource)) {
+        const numAmt = Number(amt);
+        if (Number.isFinite(numAmt) && numAmt > 0) {
+          const resKey = rId === '1' ? 'energy' : (rId === '2' ? 'world-energy' : `refillable:${rId}`);
+          addCost(resKey, numAmt);
+        }
+      }
+    }
+    for (const groupType of ['coin', 'consumable', 'material', 'gear', 'fragmentHero', 'fragmentTitan', 'scroll']) {
+      if (costObj[groupType] && typeof costObj[groupType] === 'object') {
+        for (const [id, amt] of Object.entries(costObj[groupType])) {
+          const numAmt = Number(amt);
+          if (Number.isFinite(numAmt) && numAmt > 0) {
+            addCost(`${groupType}:${id}`, numAmt);
+          }
+        }
+      }
+    }
+    const actions = [];
+    for (const [key, totalCost] of aggregated) {
+      const label = resolveResourceLabel(key);
+      actions.push(...resourceAction(record, call, key, -totalCost, label, tokenPrefix));
     }
     return actions;
   }
@@ -977,6 +1027,22 @@
               data: { energy: item.amount }, updatedAt: record.timestamp
             });
           }
+          if (Array.isArray(info.refillable)) {
+            const ref62 = info.refillable.find(r => r.id === 62);
+            if (ref62) {
+              const hasFree = (ref62.amount ?? 0) > 0 || ref62.boughtToday === 0;
+              entries.push({
+                key: 'wheelFortuneStatus', method: call.name, feature: null, group: 'header',
+                data: {
+                  hasFree,
+                  amount: ref62.amount ?? 0,
+                  boughtToday: ref62.boughtToday ?? 0,
+                  nextResetTs: info.nextDayTs || null
+                },
+                updatedAt: record.timestamp
+              });
+            }
+          }
           return entries;
         }
         if (key === 'refillableGetAll:refillable' && Array.isArray(result?.response?.refillables)) {
@@ -1082,6 +1148,63 @@
           { key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'cancel', rallyId: call.args.rallyId },
             updatedAt: record.timestamp }];
+        }
+        if (call.name === 'shopBuy') {
+          const resp = result?.response;
+          const cost = resp?.slot?.cost || resp?.cost || call.args?.cost;
+          const reward = resp?.reward || resp?.slot?.reward || call.args?.reward;
+          const slotId = resp?.slot?.id ?? call.args?.slot ?? 'default';
+          const actions = [];
+          if (cost) {
+            actions.push(...extractCostActions(record, call, cost, `shopBuy:cost:${slotId}`));
+          }
+          if (reward) {
+            actions.push(...extractRewardActions(record, call, reward, `shopBuy:reward:${slotId}`));
+          }
+          return actions;
+        }
+        if (call.name === 'alchemyUseFree') {
+          return [
+            ...resourceAction(record, call, 'refillable:62', -1, 'Wheel of Fortune', 'alchemyUseFree'),
+            {
+              key: 'wheelFortuneStatus',
+              method: call.name,
+              feature: null,
+              group: 'header',
+              data: {
+                hasFree: false,
+                amount: 0,
+                boughtToday: 1,
+                nextResetTs: null
+              },
+              updatedAt: record.timestamp
+            }
+          ];
+        }
+        if (call.name === 'randomDraft_register') {
+          return [
+            ...resourceAction(record, call, 'refillable:60', -1, 'Draft Chips', 'randomDraft_register'),
+            {
+              key: 'legendDraftStatus',
+              method: call.name,
+              feature: null,
+              group: 'draft',
+              data: {
+                active: true,
+                stageId: 1,
+                matchId: null,
+                stageFinishTs: null,
+                defenceHeroes: [],
+                attackHeroes: [],
+                enemyDefenceHeroes: [],
+                enemyAttackHeroes: [],
+                lastResult: null,
+                lastPickAction: null,
+                inBattle: false
+              },
+              updatedAt: record.timestamp
+            }
+          ];
         }
         if (call.name === 'randomDraft_getInfo' && result?.response) {
           const info = result.response;
@@ -1567,11 +1690,32 @@
           changed = true;
           continue;
         }
+        if (entry.key === 'wheelFortuneStatus') {
+          const prev = next.wheelFortuneStatus?.data || {};
+          next.wheelFortuneStatus = {
+            key: 'wheelFortuneStatus',
+            method: entry.method,
+            feature: null,
+            group: 'header',
+            data: {
+              ...prev,
+              ...entry.data,
+              nextResetTs: entry.data.nextResetTs || prev.nextResetTs || next.userGetInfo?.data?.nextDayTs || null
+            },
+            updatedAt: entry.updatedAt
+          };
+          if (next['resource:refillable:62']?.data && entry.data.boughtToday != null) {
+            next['resource:refillable:62'].data.boughtToday = entry.data.boughtToday;
+          }
+          changed = true;
+          continue;
+        }
         if (entry.key === 'legendDraftStatus') {
           const previous = next.legendDraftStatus?.data || {};
           if (next.legendDraftStatus && next.legendDraftStatus.updatedAt > entry.updatedAt) continue;
 
           const isNewMatch = Boolean(
+            entry.method === 'randomDraft_register' ||
             (entry.data.matchId && previous.matchId && entry.data.matchId !== previous.matchId) ||
             (entry.data.stageId >= 1 && entry.data.stageId <= 5 && (previous.stageId === 0 || previous.stageId === 7 || previous.lastResult != null || !previous.active)) ||
             (entry.data.stageId === 1 && previous.stageId !== 1) ||

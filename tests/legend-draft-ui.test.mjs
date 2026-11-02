@@ -186,9 +186,9 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   assert.match(viewEl.textContent, /Step 5/);
   assert.match(viewEl.textContent, /Wodryn/);  // Step 1 choice
   assert.match(viewEl.textContent, /Crow/);    // Step 2 choice
-  assert.match(viewEl.textContent, /Ishmael/); // Step 3 choice
+  assert.match(viewEl.textContent, /Lian/);    // Step 3 choice
   assert.match(viewEl.textContent, /Jhu/);     // Step 4 choice
-  assert.match(viewEl.textContent, /Guus/);    // Step 5 choice
+  assert.match(viewEl.textContent, /Qing Mao/); // Step 5 choice
 
   // Check candidates helper returns 5 steps of 3 choices
   const defaultCandidates = context.hwaHelperPopupData.defaultDraftCandidates('defense');
@@ -337,6 +337,7 @@ test('Legend Draft UI displays candidate stats, team power calculation, and swap
     },
     heroGetAll: {
       data: {
+        4: { star: 5, power: 120500 },
         78: { star: 5, power: 120500 },
         49: { star: 4, power: 95000 },
         44: { star: 3, power: 80000 }

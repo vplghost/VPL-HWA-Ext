@@ -15,6 +15,7 @@
     59: { label: 'Adventure Energy', interval: 3600000, cap: 50 },
     60: { label: 'Draft Chips', interval: 10800000, cap: 5 },
     61: { label: 'Event Energy #61', interval: 3600000, cap: 100 },
+    62: { label: 'Wheel of Fortune', interval: null, cap: 1 },
     68: { label: 'Event Boss Battles', interval: 1800000, cap: 5 }
   };
   for (const id of [64, 66, 67, 69, 70, 71, 72, 75, 76, 77, 79, 80, 81, 82,

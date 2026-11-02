@@ -1465,3 +1465,114 @@ test('inventoryGet snapshot syncs resource:coin and resource:consumable balances
   assert.equal(result['resource:consumable:46'].data.amount, 0);
   assert.equal(result['resource:coin:1'].data.amount, 200);
 });
+
+test('shopBuy deducts slot cost currency and adds reward to inventory and resource caches', () => {
+  const initial = {
+    'resource:coin:1000': { data: { amount: 50 } },
+    'resource:gold': { data: { amount: 100000 } },
+    inventory: { data: { coin: { 1000: 50 }, consumable: {} } }
+  };
+
+  const buyTrace = record([
+    {
+      name: 'shopBuy',
+      ident: 'buy1',
+      args: { shopId: 1000, slot: 4, reward: { gold: 75000 }, amount: 1 }
+    }
+  ], [
+    {
+      ident: 'buy1',
+      result: {
+        response: {
+          slot: {
+            cost: { coin: { '1000': 5 } }
+          },
+          reward: { gold: '75000' }
+        }
+      }
+    }
+  ]);
+
+  const extracted = cache.extract(buyTrace);
+  assert.equal(extracted.some(e => e.key === 'resourceAction' && e.data.resourceKey === 'resource:coin:1000' && e.data.delta === -5), true);
+  assert.equal(extracted.some(e => e.key === 'resourceAction' && e.data.resourceKey === 'resource:gold' && e.data.delta === 75000), true);
+
+  const merged = cache.merge(initial, [buyTrace]).cache;
+  assert.equal(merged['resource:coin:1000'].data.amount, 45);
+  assert.equal(merged['resource:gold'].data.amount, 175000);
+});
+
+test('randomDraft_register deducts 1 draft chip and resets legendDraftStatus', () => {
+  const initial = {
+    'resource:refillable:60': { data: { amount: 3, cap: 5 } },
+    legendDraftStatus: {
+      data: {
+        active: false,
+        stageId: 0,
+        matchId: 12345,
+        lastResult: { result: 0 },
+        defenceHeroes: [1, 2, 3, 4, 5],
+        attackHeroes: [6, 7, 8, 9, 10]
+      }
+    }
+  };
+
+  const registerTrace = record([
+    { name: 'randomDraft_register', ident: 'reg1' }
+  ], [
+    { ident: 'reg1', result: { response: null } }
+  ]);
+
+  const extracted = cache.extract(registerTrace);
+  assert.equal(extracted.some(e => e.key === 'resourceAction' && e.data.resourceKey === 'resource:refillable:60' && e.data.delta === -1), true);
+  assert.equal(extracted.some(e => e.key === 'legendDraftStatus' && e.data.stageId === 1), true);
+
+  const merged = cache.merge(initial, [registerTrace]).cache;
+  assert.equal(merged['resource:refillable:60'].data.amount, 2);
+  assert.equal(merged.legendDraftStatus.data.active, true);
+  assert.equal(merged.legendDraftStatus.data.stageId, 1);
+  assert.deepEqual([...merged.legendDraftStatus.data.defenceHeroes], []);
+  assert.deepEqual([...merged.legendDraftStatus.data.attackHeroes], []);
+  assert.equal(merged.legendDraftStatus.data.lastResult, null);
+});
+
+test('userGetInfo extracts wheelFortuneStatus and alchemyUseFree marks free spin used', () => {
+  const infoTrace = record([
+    { name: 'userGetInfo', ident: 'info1' }
+  ], [
+    {
+      ident: 'info1',
+      result: {
+        response: {
+          getTime: 1793642304,
+          nextDayTs: 1793656800,
+          refillable: [
+            { id: 62, amount: 1, lastRefill: 1793642306, boughtToday: 0 }
+          ]
+        }
+      }
+    }
+  ]);
+
+  const extracted = cache.extract(infoTrace);
+  const wheelEntry = extracted.find(e => e.key === 'wheelFortuneStatus');
+  assert.ok(wheelEntry);
+  assert.equal(wheelEntry.data.hasFree, true);
+  assert.equal(wheelEntry.data.nextResetTs, 1793656800);
+
+  const state1 = cache.merge({}, [infoTrace]).cache;
+  assert.equal(state1.wheelFortuneStatus.data.hasFree, true);
+  assert.equal(state1['resource:refillable:62'].data.amount, 1);
+
+  // Use free spin
+  const useFreeTrace = record([
+    { name: 'alchemyUseFree', ident: 'spin1' }
+  ], [
+    { ident: 'spin1', result: { response: { gold: 100000 } } }
+  ]);
+
+  const state2 = cache.merge(state1, [useFreeTrace]).cache;
+  assert.equal(state2.wheelFortuneStatus.data.hasFree, false);
+  assert.equal(state2['resource:refillable:62'].data.amount, 0);
+  assert.equal(state2['resource:refillable:62'].data.boughtToday, 1);
+});
