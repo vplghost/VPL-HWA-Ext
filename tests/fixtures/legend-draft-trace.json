@@ -1,0 +1,79 @@
+[
+  null,
+  null,
+  null,
+  null,
+  {
+    "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+    "method": "POST",
+    "status": 200,
+    "timestamp": "2026-11-01T23:27:00.000Z",
+    "requestBody": "{\"calls\":[{\"name\":\"randomDraft_getInfo\",\"ident\":\"d4\"}]}",
+    "responseBody": "{\"results\":[{\"ident\":\"d4\",\"result\":{\"response\":{\"stageId\":0}}}]}"
+  },
+  {
+    "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+    "method": "POST",
+    "status": 200,
+    "timestamp": "2026-11-01T23:27:05.000Z",
+    "requestBody": "{\"calls\":[{\"name\":\"randomDraft_getInfo\",\"ident\":\"d5\"}]}",
+    "responseBody": "{\"results\":[{\"ident\":\"d5\",\"result\":{\"response\":{\"stageId\":1}}}]}"
+  },
+  null,
+  {
+    "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+    "method": "POST",
+    "status": 200,
+    "timestamp": "2026-11-01T23:27:10.000Z",
+    "requestBody": "{\"calls\":[{\"name\":\"randomDraft_getInfo\",\"ident\":\"d7\"}]}",
+    "responseBody": "{\"results\":[{\"ident\":\"d7\",\"result\":{\"response\":{\"stageId\":2,\"matchId\":358200026,\"stageFinishTs\":1793550458,\"enemyUser\":{\"name\":\"Ieon1973\",\"level\":72}}}}]}"
+  },
+  {
+    "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+    "method": "POST",
+    "status": 200,
+    "timestamp": "2026-11-01T23:27:15.000Z",
+    "requestBody": "{\"calls\":[{\"name\":\"randomDraft_saveDefence\",\"ident\":\"d8\",\"args\":{\"heroes\":[24,12,47,68,51]}}]}",
+    "responseBody": "{\"results\":[{\"ident\":\"d8\",\"result\":{\"response\":{}}}]}"
+  },
+  null,
+  {
+    "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+    "method": "POST",
+    "status": 200,
+    "timestamp": "2026-11-01T23:27:20.000Z",
+    "requestBody": "{\"calls\":[{\"name\":\"randomDraft_saveAttack\",\"ident\":\"d10\",\"args\":{\"heroes\":[51,55,16,502,503]}}]}",
+    "responseBody": "{\"results\":[{\"ident\":\"d10\",\"result\":{\"response\":{}}}]}"
+  },
+  {
+    "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+    "method": "POST",
+    "status": 200,
+    "timestamp": "2026-11-01T23:27:25.000Z",
+    "requestBody": "{\"calls\":[{\"name\":\"randomDraft_startBattle\",\"ident\":\"d11\"}]}",
+    "responseBody": "{\"results\":[{\"ident\":\"d11\",\"result\":{\"response\":{\"battleReplay\":{\"attackers\":{\"51\":{},\"55\":{},\"16\":{},\"502\":{},\"503\":{}},\"defenders\":[{\"1\":{},\"2\":{}}]}}}}]}"
+  },
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  {
+    "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+    "method": "POST",
+    "status": 200,
+    "timestamp": "2026-11-01T23:28:00.000Z",
+    "requestBody": "{\"calls\":[{\"name\":\"randomDraft_result\",\"ident\":\"d27\",\"args\":{\"matchId\":358200026}}]}",
+    "responseBody": "{\"results\":[{\"ident\":\"d27\",\"result\":{\"response\":{\"result\":0,\"reward\":{\"draftBpExp\":100}}}}]}"
+  }
+]

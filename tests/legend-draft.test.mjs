@@ -13,7 +13,12 @@ const rpcCache = globalThis.hwaHelperRpcCache;
 const popupData = globalThis.hwaHelperPopupData;
 
 // Load sample records from the draft trace log
-const rawLog = JSON.parse(readFileSync(new URL('../temp/hwa-api-202611012327_legend_draft.json', import.meta.url), 'utf8'));
+let rawLog;
+try {
+  rawLog = JSON.parse(readFileSync(new URL('../temp/hwa-api-202611012327_legend_draft.json', import.meta.url), 'utf8'));
+} catch (_) {
+  rawLog = JSON.parse(readFileSync(new URL('./fixtures/legend-draft-trace.json', import.meta.url), 'utf8'));
+}
 
 test('legend draft stage descriptions and countdown helpers work as expected', () => {
   assert.equal(popupData.draftStageDescription(0), 'Not in match');
