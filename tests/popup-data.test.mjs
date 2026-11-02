@@ -8,7 +8,8 @@ for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'res
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 const { heroSoulProgress, teamRows, sortRows, isNumericColumn,
-  rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount, isTowerCleared } = context.hwaHelperPopupData;
+  rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount, isTowerCleared,
+  isResourceSelectableForHeader, isDebugOrEventResource } = context.hwaHelperPopupData;
 
 test('hero soul progress uses inventory fragments and next-star cost', () => {
   assert.deepEqual({ ...heroSoulProgress('1', { star: 3 }, { fragmentHero: { 1: 73 } }) },
@@ -702,4 +703,38 @@ test('extractEventGoals disables and deprioritizes Tower Chest goal when tower i
   assert.ok(towerUnavailable.hint.includes('Tower cleared today'));
   // Not included in readyCount
   assert.equal(clearedGoals.metrics.readyCount, 0);
+});
+
+test('isResourceSelectableForHeader allows all resources except energy and world-energy', () => {
+  assert.equal(isResourceSelectableForHeader({ key: 'resource:energy' }), false);
+  assert.equal(isResourceSelectableForHeader({ key: 'resource:world-energy' }), false);
+  assert.equal(isResourceSelectableForHeader({ key: 'resource:gold' }), true);
+  assert.equal(isResourceSelectableForHeader({ key: 'resource:starMoney' }), true);
+  assert.equal(isResourceSelectableForHeader({ key: 'resource:coin:1' }), true);
+  assert.equal(isResourceSelectableForHeader({ key: 'resource:refillable:2' }), true);
+  assert.equal(isResourceSelectableForHeader({ key: 'resource:material:5' }), true);
+  assert.equal(isResourceSelectableForHeader({ key: 'resource:consumable:20' }), true);
+  assert.equal(isResourceSelectableForHeader(null), false);
+});
+
+test('isDebugOrEventResource identifies test, unmapped, and inactive event resources', () => {
+  // Standard resources are not debug/event
+  assert.equal(isDebugOrEventResource({ key: 'resource:gold', data: { label: 'Gold', amount: 5000 } }), false);
+  assert.equal(isDebugOrEventResource({ key: 'resource:starMoney', data: { label: 'Emeralds', amount: 100 } }), false);
+  assert.equal(isDebugOrEventResource({ key: 'resource:refillable:2', data: { label: 'Skill Points', amount: 10 } }), false);
+  assert.equal(isDebugOrEventResource({ key: 'resource:coin:1', data: { label: 'Arena coin', amount: 120 } }), false);
+  assert.equal(isDebugOrEventResource({ key: 'resource:material:5', data: { label: 'Food', amount: 2000 } }), false);
+
+  // Test / debug keywords
+  assert.equal(isDebugOrEventResource({ key: 'resource:coin:1101', data: { label: 'Test Coin', amount: 10 } }), true);
+  assert.equal(isDebugOrEventResource({ key: 'resource:debugItem', data: { label: 'Debug Item', amount: 1 } }), true);
+
+  // Unmapped fallback labels
+  assert.equal(isDebugOrEventResource({ key: 'resource:coin:100011', data: { label: 'coin #100011', amount: 50 } }), true);
+  assert.equal(isDebugOrEventResource({ key: 'resource:material:8', data: { label: 'material #8', amount: 2 } }), true);
+
+  // Event refillables with 0 balance or Event Energy / Refillable #
+  assert.equal(isDebugOrEventResource({ key: 'resource:refillable:10', data: { label: 'Refillable #10', amount: 0 } }), true);
+  assert.equal(isDebugOrEventResource({ key: 'resource:refillable:61', data: { label: 'Event Energy #61', amount: 0 } }), true);
+  assert.equal(isDebugOrEventResource({ key: 'resource:refillable:70', data: { label: 'Refillable #70', amount: 5 } }), true);
 });

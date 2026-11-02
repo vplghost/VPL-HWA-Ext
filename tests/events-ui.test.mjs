@@ -166,12 +166,18 @@ dungeonFloorBadge.setAttribute('id', 'dungeon-floor-badge');
 const tableExportBtn = new MockElement('button');
 tableExportBtn.setAttribute('id', 'table-export-btn');
 tableExportBtn.hidden = true;
+const resourceFilterToggle = new MockElement('button');
+resourceFilterToggle.setAttribute('id', 'resource-filter-toggle');
+const resourceFilterToggleText = new MockElement('span');
+resourceFilterToggleText.setAttribute('id', 'resource-filter-toggle-text');
 
 const mockDoc = {
   createElement: (tag) => new MockElement(tag),
   createElementNS: (_, tag) => new MockElement(tag),
   elementsById: new Map([
     ['table-export-btn', tableExportBtn],
+    ['resource-filter-toggle', resourceFilterToggle],
+    ['resource-filter-toggle-text', resourceFilterToggleText],
     ['view', view],
     ['status', status],
     ['search', search],
@@ -240,7 +246,7 @@ vm.runInContext(resourceDataJs, context);
 vm.runInContext(titanMetadataJs, context);
 vm.runInContext(popupDataJs, context);
 context.resourceData = context.globalThis.hwaHelperResourceData;
-context.globalThis.hwaHelperNameMap = { building: () => '', research: () => '' };
+context.globalThis.hwaHelperNameMap = { building: () => '', research: () => '', item: () => null, hero: () => null };
 
 // Extract renderEvents, openGuildVersusModal, setupGuildVersusModal from popupJs
 const eventsStart = popupJs.indexOf('function openGuildVersusModal(');
@@ -260,6 +266,20 @@ context.formatTime = (t) => t;
 context.matches = () => true;
 context.table = () => new MockElement('table');
 vm.runInContext(popupJs.slice(snapStart, snapEnd), context);
+
+// Extract resource helpers and renderResources
+const resHelperStart = popupJs.indexOf('function resourceLabel(');
+const resHelperEnd = popupJs.indexOf('function resourceEntries(');
+vm.runInContext(popupJs.slice(resHelperStart, resHelperEnd), context);
+
+const resStart = popupJs.indexOf('function renderResources(');
+const resEnd = popupJs.indexOf('function starIcons(');
+context.resourceSort = { value: 'name' };
+context.resourceFilterToggle = resourceFilterToggle;
+context.resourceFilterToggleText = resourceFilterToggleText;
+context.showAllResources = false;
+context.chrome = { storage: { local: { get: async () => ({ resourceSelection: [] }), set: async () => {} } } };
+vm.runInContext(popupJs.slice(resStart, resEnd), context);
 
 test('renderEvents renders Guild Versus and active event cards', () => {
   const cache = {
@@ -782,4 +802,48 @@ test('renderGoals displays Cleared Today badge on Tower Chest card when tower is
   assert.ok(text.includes('Open 1 Tower Chest'));
   assert.ok(text.includes('Cleared Today'));
   assert.ok(!text.includes('Daily Limited'));
+});
+
+test('renderResources splits items into renewable and other groups and filters inactive items by default', () => {
+  view.replaceChildren();
+  context.showAllResources = false;
+  context.search.value = '';
+
+  const sampleEntries = [
+    { key: 'resource:material:5', data: { label: 'Food', amount: 5000, renewable: true } },
+    { key: 'resource:refillable:2', data: { label: 'Skill Points', amount: 10, renewable: true } },
+    { key: 'resource:gold', data: { label: 'Gold', amount: 1000000 } },
+    { key: 'resource:starMoney', data: { label: 'Emeralds', amount: 500 } },
+    { key: 'resource:coin:1', data: { label: 'Arena coin', amount: 200 } },
+    { key: 'resource:coin:1101', data: { label: 'Test Coin', amount: 5 } },
+    { key: 'resource:refillable:10', data: { label: 'Refillable #10', amount: 0 } }
+  ];
+
+  context.renderResources(sampleEntries, ['resource:gold']);
+
+  const text = view.textContent;
+  assert.ok(text.includes('Renewable Resources'));
+  assert.ok(text.includes('Other Resources'));
+  assert.ok(text.includes('Food'));
+  assert.ok(text.includes('Skill Points'));
+  assert.ok(text.includes('Gold'));
+  assert.ok(text.includes('Emeralds'));
+  assert.ok(text.includes('Arena coin'));
+
+  // Inactive/test items hidden by default
+  assert.equal(text.includes('Test Coin'), false);
+  assert.equal(text.includes('Refillable #10'), false);
+  assert.ok(status.textContent.includes('5 resources (2 inactive hidden)'));
+  assert.ok(resourceFilterToggleText.textContent.includes('Show All (2)'));
+
+  // When toggle is active (showAllResources = true)
+  view.replaceChildren();
+  context.showAllResources = true;
+  context.renderResources(sampleEntries, ['resource:gold']);
+
+  const allText = view.textContent;
+  assert.ok(allText.includes('Test Coin'));
+  assert.ok(allText.includes('Refillable #10'));
+  assert.ok(status.textContent.includes('7 resources'));
+  assert.ok(resourceFilterToggleText.textContent.includes('Hide Inactive (2)'));
 });

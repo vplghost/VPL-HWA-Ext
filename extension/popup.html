@@ -79,11 +79,17 @@
     <button id="clear" type="button" hidden class="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-100 hover:text-red-700">Clear log</button>
     <button id="export" type="button" hidden class="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-100">Export JSON</button>
   </div>
-  <div id="status-bar" class="my-2 flex items-center gap-1.5 min-h-5">
-    <button id="table-export-btn" type="button" hidden title="Export table data as JSON" aria-label="Export table data as JSON" class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-slate-500 hover:bg-slate-200 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+  <div id="status-bar" class="my-2 flex items-center justify-between gap-1.5 min-h-5">
+    <div class="flex items-center gap-1.5 min-w-0">
+      <button id="table-export-btn" type="button" hidden title="Export table data as JSON" aria-label="Export table data as JSON" class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-slate-500 hover:bg-slate-200 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      </button>
+      <p id="status" role="status" class="text-xs text-slate-500 truncate"></p>
+    </div>
+    <button id="resource-filter-toggle" type="button" hidden title="Toggle test and event resources" class="inline-flex cursor-pointer items-center gap-1 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700 shadow-2xs">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span id="resource-filter-toggle-text">Show All</span>
     </button>
-    <p id="status" role="status" class="text-xs text-slate-500"></p>
   </div>
 
   <section id="settings-panel" hidden class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Settings">

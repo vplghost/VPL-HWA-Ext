@@ -1028,10 +1028,44 @@
     return messages.filter((m) => Number(m.ctime || 0) > threshold).length;
   }
 
+  function isResourceSelectableForHeader(entry) {
+    if (!entry || !entry.key) return false;
+    return !['resource:energy', 'resource:world-energy'].includes(entry.key);
+  }
+
+  function isDebugOrEventResource(entry, nameMap = globalThis.hwaHelperNameMap, refillRules = globalThis.hwaHelperRefillableRules) {
+    if (!entry || !entry.key) return false;
+    const id = entry.key.slice('resource:'.length);
+    const [type, itemId] = id.split(':');
+    let label = entry.data?.label || '';
+    if (type === 'refillable') {
+      label = refillRules?.[itemId]?.label || label;
+    } else if (type && itemId && !id.startsWith('refillable:') && !id.startsWith('world-refillable:')) {
+      label = nameMap?.item?.(type, itemId) || label;
+    }
+
+    if (/test|debug|dummy|placeholder|deprecated|beta|unreleased/i.test(label) || /test|debug/i.test(entry.key)) {
+      return true;
+    }
+
+    if (type === 'refillable' && itemId !== '2') {
+      if (/^Refillable #|^Event Energy #/i.test(label) || entry.data?.amount === 0) {
+        return true;
+      }
+    }
+
+    if (/^(coin|consumable|material|scroll|refillable) #\d+/i.test(label)) {
+      return true;
+    }
+
+    return false;
+  }
+
   globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
     buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, exportTableData,
-    getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount, isTowerCleared };
+    getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount, isTowerCleared,
+    isResourceSelectableForHeader, isDebugOrEventResource };
 })();

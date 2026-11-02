@@ -22,6 +22,13 @@ const search = document.querySelector('#search');
 const itemGroup = document.querySelector('#item-group');
 const logSort = document.querySelector('#log-sort');
 const resourceSort = document.querySelector('#resource-sort');
+const resourceFilterToggle = document.querySelector('#resource-filter-toggle');
+const resourceFilterToggleText = document.querySelector('#resource-filter-toggle-text');
+let showAllResources = false;
+resourceFilterToggle?.addEventListener('click', () => {
+  showAllResources = !showAllResources;
+  render();
+});
 const tabs = [...document.querySelectorAll('[data-tab]')];
 let activeTab = 'heroes';
 let settingsPending = Promise.resolve();
@@ -83,11 +90,12 @@ function isRenewable(entry) {
 }
 
 function isSelectableForHeader(entry) {
-  return isRenewable(entry) && !['resource:energy', 'resource:world-energy'].includes(entry.key);
+  return globalThis.hwaHelperPopupData?.isResourceSelectableForHeader?.(entry) ??
+    !['resource:energy', 'resource:world-energy'].includes(entry?.key);
 }
 
 function resourceAppearance(entry) {
-  const key = entry.key;
+  const key = entry?.key || '';
   if (key === 'resource:refillable:2') return { icon: '✦',
     classes: 'bg-violet-50 text-violet-800 ring-violet-200' };
   if (key === 'resource:material:5') return { icon: '🍞',
@@ -102,6 +110,18 @@ function resourceAppearance(entry) {
     classes: 'bg-cyan-50 text-cyan-800 ring-cyan-200' };
   if (key.includes('energy') || key.startsWith('resource:refillable:')) return { icon: '⚡',
     classes: 'bg-orange-50 text-orange-800 ring-orange-200' };
+  if (key === 'resource:gold') return { icon: '🪙',
+    classes: 'bg-yellow-50 text-yellow-800 ring-yellow-200' };
+  if (key === 'resource:starMoney') return { icon: '💎',
+    classes: 'bg-emerald-50 text-emerald-800 ring-emerald-200' };
+  if (key.startsWith('resource:coin:')) return { icon: '🪙',
+    classes: 'bg-amber-50 text-amber-800 ring-amber-200' };
+  if (key.startsWith('resource:consumable:')) return { icon: '🧪',
+    classes: 'bg-teal-50 text-teal-800 ring-teal-200' };
+  if (key.startsWith('resource:speedUp')) return { icon: '⏱️',
+    classes: 'bg-sky-50 text-sky-800 ring-sky-200' };
+  if (key.startsWith('resource:fragment')) return { icon: '🧩',
+    classes: 'bg-indigo-50 text-indigo-800 ring-indigo-200' };
   return { icon: '◉', classes: 'bg-slate-100 text-slate-700 ring-slate-200' };
 }
 
@@ -222,7 +242,9 @@ function refreshTimed() {
     const entry = currentCache[node.dataset.resourceAmount];
     const pill = node.parentElement;
     if (!entry || !pill) continue;
-    const amt = resourceData.amountAt(entry);
+    node.textContent = resourceData.formatAmount(resourceData.amountAt(entry, now));
+    setResourceTooltip(pill, resourceTooltip(entry, now));
+    const amt = resourceData.amountAt(entry, now);
     const cap = entry.data?.cap;
     const isCapped = Number.isFinite(amt) && Number.isFinite(cap) && amt >= cap;
     pill?.classList?.toggle('resource-capped', isCapped);
@@ -268,20 +290,57 @@ function refreshTimed() {
 
 function renderResources(entries, selection) {
   const selected = new Set(selection);
-  const rows = entries.filter((entry) => matches([resourceLabel(entry), entry.key]));
+  const isDebug = (entry) => globalThis.hwaHelperPopupData?.isDebugOrEventResource?.(entry) ?? false;
+
+  const matchingEntries = entries.filter((entry) => matches([resourceLabel(entry), entry.key]));
+  const hiddenCount = matchingEntries.filter((entry) => isDebug(entry)).length;
+
+  if (resourceFilterToggle && resourceFilterToggleText) {
+    resourceFilterToggle.hidden = false;
+    if (showAllResources) {
+      resourceFilterToggle.className = 'inline-flex cursor-pointer items-center gap-1 shrink-0 rounded-md border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 shadow-2xs';
+      resourceFilterToggleText.textContent = hiddenCount > 0 ? `Hide Inactive (${hiddenCount})` : 'Hide Inactive';
+      resourceFilterToggle.title = 'Hide test, debug, and unreleased event resources';
+    } else {
+      resourceFilterToggle.className = 'inline-flex cursor-pointer items-center gap-1 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700 shadow-2xs';
+      resourceFilterToggleText.textContent = hiddenCount > 0 ? `Show All (${hiddenCount})` : 'Show All';
+      resourceFilterToggle.title = 'Show test, debug, and unreleased event resources';
+    }
+  }
+
+  const visibleEntries = matchingEntries.filter((entry) => showAllResources || !isDebug(entry));
+  const renewableRows = [];
+  const otherRows = [];
+  for (const entry of visibleEntries) {
+    if (isRenewable(entry)) renewableRows.push(entry);
+    else otherRows.push(entry);
+  }
+
   const sort = resourceSort.value;
-  rows.sort((a, b) => sort === 'name' ? resourceLabel(a).localeCompare(resourceLabel(b)) :
-    (resourceData.amountAt(a) - resourceData.amountAt(b)) * (sort === 'amount-desc' ? -1 : 1));
-  status.textContent = `${rows.length} resources · select renewable resources for the header`;
-  if (tableExportBtn) tableExportBtn.hidden = !rows.length;
-  if (!rows.length) return showEmpty('No matching resources observed yet.');
+  const sortFn = (a, b) => sort === 'name' ? resourceLabel(a).localeCompare(resourceLabel(b)) :
+    (resourceData.amountAt(a) - resourceData.amountAt(b)) * (sort === 'amount-desc' ? -1 : 1);
+  renewableRows.sort(sortFn);
+  otherRows.sort(sortFn);
+
+  const totalVisible = renewableRows.length + otherRows.length;
+  status.textContent = `${totalVisible} resources${!showAllResources && hiddenCount > 0 ? ` (${hiddenCount} inactive hidden)` : ''} · select resources for the header`;
+  if (tableExportBtn) tableExportBtn.hidden = !totalVisible;
+  if (!totalVisible) return showEmpty('No matching resources observed yet.');
+
   const list = document.createElement('div');
   list.className = 'divide-y divide-slate-100';
-  for (const entry of rows) {
+
+  function createResourceRow(entry) {
+    const amt = resourceData.amountAt(entry);
+    const cap = entry.data?.cap;
+    const isCapped = Number.isFinite(amt) && Number.isFinite(cap) && amt >= cap;
+
     const label = document.createElement('label');
-    label.className = 'flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-blue-50/50';
+    label.className = `flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-blue-50/50 ${isCapped ? 'bg-amber-50/40' : ''}`;
     label.tabIndex = 0;
     label.dataset.resourceTooltip = '';
+    setResourceTooltip(label, resourceTooltip(entry));
+
     if (isSelectableForHeader(entry)) {
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -300,16 +359,48 @@ function renderResources(entries, selection) {
       spacer.className = 'size-4 shrink-0';
       label.append(spacer);
     }
+
+    const iconSpan = document.createElement('span');
+    const appearance = resourceAppearance(entry);
+    iconSpan.textContent = appearance.icon;
+    iconSpan.className = 'text-xs shrink-0';
+    iconSpan.setAttribute('aria-hidden', 'true');
+
     const name = document.createElement('span');
-    name.className = 'min-w-0 flex-1 truncate text-slate-700';
+    name.className = 'min-w-0 flex-1 truncate text-slate-700 flex items-center gap-1.5';
     name.textContent = resourceLabel(entry);
+    if (isCapped) {
+      const fullBadge = document.createElement('span');
+      fullBadge.className = 'rounded bg-amber-500 px-1 py-0.2 text-[9px] font-bold text-white uppercase';
+      fullBadge.textContent = 'Full';
+      name.append(fullBadge);
+    }
+
     const amount = document.createElement('strong');
     amount.className = 'tabular-nums text-slate-900';
     amount.dataset.resourceAmount = entry.key;
-    amount.textContent = resourceData.formatAmount(resourceData.amountAt(entry));
-    label.append(name, amount);
-    list.append(label);
+    amount.textContent = resourceData.formatAmount(amt);
+
+    label.append(iconSpan, name, amount);
+    return label;
   }
+
+  if (renewableRows.length > 0) {
+    const groupHeader = document.createElement('div');
+    groupHeader.className = 'sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-slate-100/90 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 backdrop-blur-xs';
+    groupHeader.innerHTML = `<span>⚡ Renewable Resources</span><span class="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">${renewableRows.length}</span>`;
+    list.append(groupHeader);
+    for (const entry of renewableRows) list.append(createResourceRow(entry));
+  }
+
+  if (otherRows.length > 0) {
+    const groupHeader = document.createElement('div');
+    groupHeader.className = 'sticky top-0 z-10 flex items-center justify-between border-b border-t border-slate-200 bg-slate-100/90 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 backdrop-blur-xs';
+    groupHeader.innerHTML = `<span>📦 Other Resources</span><span class="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">${otherRows.length}</span>`;
+    list.append(groupHeader);
+    for (const entry of otherRows) list.append(createResourceRow(entry));
+  }
+
   view.append(list);
 }
 
@@ -3468,6 +3559,7 @@ async function render() {
   document.querySelector('#item-group-filter').hidden = activeTab !== 'items';
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
   document.querySelector('#resource-sort-wrap').hidden = activeTab !== 'resources';
+  if (resourceFilterToggle) resourceFilterToggle.hidden = activeTab !== 'resources';
   document.querySelector('#search-label').textContent = activeTab === 'log' ? 'Filter endpoint' :
     activeTab === 'draft' ? 'Search hero by name, role, or ID' :
     activeTab === 'chat' ? 'Search message or sender' :
