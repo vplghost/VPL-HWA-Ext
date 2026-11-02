@@ -294,7 +294,10 @@ const context = {
   setResourceTooltip: (node, val) => { if (node && node.dataset) { node.dataset.resourceTooltip = val; node.setAttribute('data-resource-tooltip', val); } },
   resourceTooltip: () => '',
   isMarchExpired: (march, now) => context.hwaHelperPopupData.isMarchExpired(march, now),
-  marchTooltip: () => ''
+  marchTooltip: (march, now) => {
+    if (march?.rally) return context.hwaHelperPopupData.rallyTooltip(march, now, (id) => `Hero #${id}`);
+    return '';
+  }
 };
 context.globalThis = context;
 vm.createContext(context);
@@ -1070,4 +1073,61 @@ test('header mail badge, heroes/titans soul evolve badges, and config refresh bu
   assert.ok(sentMessage);
   assert.equal(sentMessage.kind, 'engine-ping');
   assert.ok(enginePingResult.textContent.includes('Ping sent at'));
+});
+
+
+test('header march icon renders auto-join raid badge with ⚡ icon and detailed tooltip', () => {
+  const now = 1793631912000;
+  context.currentCache.marchStatus = {
+    key: 'marchStatus',
+    data: {
+      marches: [
+        {
+          squadId: 'squad-1',
+          kind: 'raid',
+          stage: 'waitingForRallyStart',
+          endsAt: now + 28000,
+          rally: {
+            id: 'rally-923',
+            target: '[PvP] Boss, level 17',
+            leaderName: '10PR0',
+            isAutoJoin: true,
+            waitUntil: now + 28000,
+            team: { heroIds: [2, 16, 60, 70, 79], units: [{ id: 7, count: 1573 }] }
+          }
+        }
+      ]
+    }
+  };
+
+  marchesWrap.replaceChildren();
+  for (const [index, march] of context.currentCache.marchStatus.data.marches.entries()) {
+    const isAutoJoin = Boolean(march.rally?.isAutoJoin);
+    const style = isAutoJoin ?
+      { label: 'Auto Raid', icon: '⚡', classes: 'bg-amber-100 text-amber-900 ring-amber-400' } :
+      { label: 'Raid', icon: '🛡️', classes: '' };
+    const badge = context.document.createElement('span');
+    badge.className = `inline-flex size-6 shrink-0 items-center justify-center rounded-full ${style.classes}`;
+    badge.dataset.marchIndex = String(index);
+    badge.dataset.resourceTooltip = '';
+    badge.textContent = style.icon;
+    marchesWrap.append(badge);
+  }
+
+  assert.equal(marchesWrap.children.length, 1);
+  const badge = marchesWrap.children[0];
+  assert.equal(badge.textContent, '⚡');
+
+  const origNow = Date.now;
+  try {
+    Date.now = () => now;
+    context.refreshTimed();
+    assert.equal(badge.hidden, false);
+    const tooltip = badge.dataset.resourceTooltip;
+    assert.ok(tooltip.includes('⚡ Auto-Join Raid'));
+    assert.ok(tooltip.includes('Leader: 10PR0'));
+    assert.ok(tooltip.includes('[PvP] Boss, level 17'));
+  } finally {
+    Date.now = origNow;
+  }
 });

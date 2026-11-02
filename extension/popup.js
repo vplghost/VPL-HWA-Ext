@@ -383,6 +383,7 @@ function marchTooltip(march, now) {
   const action = isReturning ? (prevLabel ? `${prevLabel} returning` : 'Returning') : isMine ?
     `${isTraveling ? 'Traveling to' : 'Gathering'} ${style.label}` :
     march.kind === 'return' ? 'Returning' :
+    march.rally?.isAutoJoin ? (march.stage === 'moveToRallyLeader' ? 'Auto-joining raid' : 'Auto-join raid waiting') :
     march.stage === 'waitingForRallyStart' ? 'Preparing raid' : `${style.label} march`;
   const remaining = Number.isFinite(march.endsAt) ?
     Math.ceil((march.endsAt - now) / 1000) : null;
@@ -3908,7 +3909,10 @@ async function render() {
   const marchesWrap = document.querySelector('#marches');
   marchesWrap.replaceChildren();
   for (const [index, march] of (cache.marchStatus?.data?.marches || []).entries()) {
-    const style = marchStyles[march.kind] || marchStyles.attack;
+    const isAutoJoin = Boolean(march.rally?.isAutoJoin);
+    const style = isAutoJoin ?
+      { label: 'Auto Raid', icon: '⚡', classes: 'bg-amber-100 text-amber-900 ring-amber-400' } :
+      (marchStyles[march.kind] || marchStyles.attack);
     const badge = document.createElement('span');
     badge.className = `inline-flex size-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ${style.classes}`;
     badge.dataset.marchIndex = String(index);

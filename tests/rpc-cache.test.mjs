@@ -1427,3 +1427,26 @@ test('replaying onload trace extracts getLeaderboardPowerSummary and retains mai
   assert.equal(result.mailStatus.data.totalUnclaimed, 2);
   assert.equal(result.mailStatus.data.hasUnclaimed, true);
 });
+
+
+test('replaying auto-join raid trace tracks guild rally and auto-joined march', async () => {
+  const autoJoinTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611022205_auto_joi_raid.json', import.meta.url), 'utf8'));
+  const initial = {
+    accountStatus: { data: { name: 'VplGhost', id: 1216438103 } }
+  };
+  const result = cache.merge(initial, autoJoinTrace).cache;
+
+  assert.ok(result.marchStatus);
+  assert.ok(Array.isArray(result.marchStatus.data.marches));
+  assert.equal(result.marchStatus.data.marches.length, 1);
+
+  const march = result.marchStatus.data.marches[0];
+  assert.equal(march.kind, 'raid');
+  assert.equal(march.squadId, 'f9eb4c1a-d6a5-4019-9c72-31f560694b0e');
+  assert.equal(march.rally.id, '923ec3fa-32d8-42a3-8c5b-ee30421ab17d');
+  assert.equal(march.rally.target, '[PvP] Boss, level 17');
+  assert.equal(march.rally.leaderName, '10PR0');
+  assert.equal(march.rally.isAutoJoin, true);
+  assert.deepEqual([...march.rally.team.heroIds], [2, 16, 60, 70, 79]);
+  assert.equal(march.rally.waitUntil, 1793631940951);
+});

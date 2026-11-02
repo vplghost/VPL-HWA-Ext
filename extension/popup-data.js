@@ -142,9 +142,11 @@
 
   function rallyTooltip(march, now, heroName) {
     const rally = march.rally;
+    const isAutoJoin = Boolean(rally.isAutoJoin);
     const heroes = (rally.team?.heroIds || []).map((id) => heroName(id) || `Hero #${id}`);
     const troops = (rally.team?.units || []).map((unit) =>
       `#${unit.id} ×${unit.count.toLocaleString('en-US')}`);
+    const isJoiningLeader = Number.isFinite(rally.memberEta) && rally.memberEta > now;
     const wait = Number.isFinite(rally.waitUntil) && rally.waitUntil > now ?
       marchDuration(rally.waitUntil - now) : 'Complete';
     const arrivalAt = Number.isFinite(rally.arrivalAt) ? rally.arrivalAt :
@@ -158,13 +160,17 @@
       `${rally.returnAt > now ? `${marchDuration(rally.returnAt - now)} remaining` : 'Due now'}` :
       Number.isFinite(rally.returnMs) ?
         `~${marchDuration(rally.returnMs, true)} travel after battle` : 'Route pending';
-    return [`Raid · ${rally.target || 'Target pending'}`,
+    return [
+      `${isAutoJoin ? '⚡ Auto-Join Raid' : 'Raid'} · ${rally.target || 'Target pending'}`,
+      ...(rally.leaderName ? [`Leader: ${rally.leaderName}`] : []),
       `Team: ${heroes.join(', ') || '—'}`,
       ...(troops.length ? [`Troops: ${troops.join(', ')}`] : []),
+      ...(isJoiningLeader ? [`Joining leader camp: ~${marchDuration(rally.memberEta - now, true)} remaining`] : []),
       `Wait: ${wait}`,
       ...(Number.isFinite(rally.outboundMs) ?
         [`Travel to target: ~${marchDuration(rally.outboundMs, true)}`] : []),
-      `Arrival: ${arrival}`, `Return to base: ${returning}`].join('\n');
+      `Arrival: ${arrival}`, `Return to base: ${returning}`
+    ].join('\n');
   }
   function isMarchExpired(march, now = Date.now()) {
     if (!march) return true;

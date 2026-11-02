@@ -245,6 +245,8 @@
           const targetConfigId = rally.target?.objectConfigId ?? rally.mob?.mobConfigId;
           return [{ key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'details', rallyId: rally.rallyId,
+              leader: rally.leader,
+              members: rally.members || [],
               squadId: rally.leader?.squad?.squadId,
               target: globalThis.hwaHelperRallyTargets?.[targetConfigId] ||
                 `Rally target #${targetConfigId ?? 'unknown'}`,
@@ -957,7 +959,7 @@
           ];
           if (typeof info.name === 'string' && info.name.trim()) entries.push({
             key: 'accountStatus', method: call.name, feature: null, group: 'header',
-            data: { name: info.name.slice(0, 80), level: teamLevel }, updatedAt: record.timestamp
+            data: { name: info.name.slice(0, 80), level: teamLevel, id: info.id ? Number(info.id) : null }, updatedAt: record.timestamp
           });
           for (const item of info.refillable || []) {
             const rule = globalThis.hwaHelperRefillableRules?.[item.id];
@@ -1215,15 +1217,65 @@
               rally: { id: entry.data.rallyId, waitUntil: entry.data.waitUntil,
                 team: entry.data.team } });
           } else if (entry.data.action === 'details') {
-            if (index < 0 || current.updatedAt === entry.updatedAt) continue;
-            const previous = marches[index];
-            marches[index] = { ...previous, rally: { ...previous.rally,
-              target: entry.data.target,
-              waitUntil: Number.isFinite(entry.data.waitUntil) ?
-                entry.data.waitUntil : previous.rally.waitUntil,
-              team: entry.data.team?.heroIds?.length ? entry.data.team : previous.rally.team,
-              outboundMs: entry.data.outboundMs,
-              returnMs: entry.data.returnMs } };
+            if (current?.updatedAt === entry.updatedAt) continue;
+            const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id ?? 1216438103;
+            const accountName = next.accountStatus?.data?.name ?? next.userGetInfo?.data?.name ?? 'VplGhost';
+            const isLeader = Boolean(
+              (accountId && Number(entry.data.leader?.userId) === Number(accountId)) ||
+              (accountName && entry.data.leader?.user?.name && entry.data.leader.user.name === accountName)
+            );
+            const myMember = (entry.data.members || []).find((m) =>
+              (accountId && Number(m.userId) === Number(accountId)) ||
+              (accountName && m.user?.name && m.user.name === accountName)
+            );
+
+            if (index >= 0) {
+              const previous = marches[index];
+              const squadId = myMember?.squad?.squadId || previous.squadId || entry.data.squadId;
+              const team = myMember ? rallyTeam(myMember.squad) : (entry.data.team?.heroIds?.length ? entry.data.team : previous.rally.team);
+              marches[index] = {
+                ...previous,
+                squadId,
+                stage: myMember && Number.isFinite(myMember.eta) && Date.now() < myMember.eta ? 'moveToRallyLeader' : previous.stage,
+                endsAt: myMember && Number.isFinite(myMember.eta) && Date.now() < myMember.eta ? myMember.eta : previous.endsAt,
+                rally: {
+                  ...previous.rally,
+                  target: entry.data.target,
+                  waitUntil: Number.isFinite(entry.data.waitUntil) ? entry.data.waitUntil : previous.rally.waitUntil,
+                  team,
+                  leaderName: entry.data.leader?.user?.name || previous.rally?.leaderName,
+                  isAutoJoin: Boolean(myMember && !isLeader),
+                  memberEta: myMember?.eta,
+                  outboundMs: entry.data.outboundMs,
+                  returnMs: entry.data.returnMs
+                }
+              };
+            } else if (isLeader || myMember) {
+              const squadId = myMember?.squad?.squadId || entry.data.squadId;
+              const team = myMember ? rallyTeam(myMember.squad) : entry.data.team;
+              const now = Date.now();
+              const stage = myMember && Number.isFinite(myMember.eta) && now < myMember.eta ?
+                'moveToRallyLeader' : 'waitingForRallyStart';
+              const endsAt = stage === 'moveToRallyLeader' ? myMember.eta : entry.data.waitUntil;
+
+              marches.push({
+                squadId,
+                kind: 'raid',
+                stage,
+                endsAt,
+                rally: {
+                  id: entry.data.rallyId,
+                  target: entry.data.target,
+                  waitUntil: entry.data.waitUntil,
+                  team,
+                  leaderName: entry.data.leader?.user?.name,
+                  isAutoJoin: Boolean(myMember && !isLeader),
+                  memberEta: myMember?.eta,
+                  outboundMs: entry.data.outboundMs,
+                  returnMs: entry.data.returnMs
+                }
+              });
+            }
           } else if (entry.data.action === 'cancel') {
             if (index < 0) continue;
             marches.splice(index, 1);
