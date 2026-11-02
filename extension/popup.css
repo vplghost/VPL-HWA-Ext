@@ -188,13 +188,34 @@
     transform-origin: center;
   }
 
+  /* Raid & Rally march badge pulsing animation */
+  @keyframes raid-pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.65), 0 0 6px rgba(245, 158, 11, 0.35);
+      transform: scale(1);
+      filter: brightness(1);
+    }
+    50% {
+      box-shadow: 0 0 0 3.5px rgba(234, 88, 12, 0.95), 0 0 16px 3px rgba(245, 158, 11, 0.85);
+      transform: scale(1.1);
+      filter: brightness(1.1);
+    }
+  }
+
+  .march-raid-pulse {
+    animation: raid-pulse-glow 1.5s ease-in-out infinite !important;
+    transform-origin: center;
+    z-index: 1;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .resource-capped-amber,
     .resource-capped-sky,
     .resource-capped,
     .resource-capped-amber svg,
     .resource-capped-sky svg,
-    .resource-capped span[aria-hidden="true"] {
+    .resource-capped span[aria-hidden="true"],
+    .march-raid-pulse {
       animation: none !important;
     }
   }

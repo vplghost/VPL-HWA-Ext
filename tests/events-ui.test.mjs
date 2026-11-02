@@ -314,8 +314,8 @@ const eventsStart = popupJs.indexOf('function openGuildVersusModal(');
 const eventsEnd = popupJs.indexOf('function renderGuildChat(');
 vm.runInContext(popupJs.slice(eventsStart, eventsEnd), context);
 
-// Extract refreshTimed
-const refreshStart = popupJs.indexOf('function isMarchExpired(');
+// Extract marches and refreshTimed
+const refreshStart = popupJs.indexOf('const marchStyles =');
 const refreshEnd = popupJs.indexOf('function renderResources(');
 vm.runInContext(popupJs.slice(refreshStart, refreshEnd), context);
 
@@ -950,17 +950,7 @@ test("header march icon renders gathering and return badges and hides upon retur
     }
   };
 
-  marchesWrap.replaceChildren();
-  for (const [index, march] of context.currentCache.marchStatus.data.marches.entries()) {
-    const style = marchStyles[march.kind] || { icon: "⚔", classes: "" };
-    const badge = context.document.createElement("span");
-    badge.className = `inline-flex size-6 shrink-0 items-center justify-center rounded-full ${style.classes}`;
-    badge.dataset.marchIndex = String(index);
-    badge.dataset.resourceTooltip = "";
-    badge.tabIndex = 0;
-    badge.textContent = style.icon;
-    marchesWrap.append(badge);
-  }
+  context.renderMarches(context.currentCache, marchesWrap);
 
   assert.equal(marchesWrap.children.length, 2);
   const gatherBadge = marchesWrap.children[0];
@@ -968,6 +958,8 @@ test("header march icon renders gathering and return badges and hides upon retur
 
   assert.equal(gatherBadge.textContent, "🌲");
   assert.equal(returnBadge.textContent, "↩");
+  assert.equal(gatherBadge.className.includes('march-raid-pulse'), false);
+  assert.equal(returnBadge.className.includes('march-raid-pulse'), false);
 
   // Verify expiration evaluation via isMarchExpired
   assert.equal(context.isMarchExpired(context.currentCache.marchStatus.data.marches[0], now), false);
@@ -1113,23 +1105,13 @@ test('header march icon renders auto-join raid badge with ⚡ icon and detailed 
     }
   };
 
-  marchesWrap.replaceChildren();
-  for (const [index, march] of context.currentCache.marchStatus.data.marches.entries()) {
-    const isAutoJoin = Boolean(march.rally?.isAutoJoin);
-    const style = isAutoJoin ?
-      { label: 'Auto Raid', icon: '⚡', classes: 'bg-amber-100 text-amber-900 ring-amber-400' } :
-      { label: 'Raid', icon: '🛡️', classes: '' };
-    const badge = context.document.createElement('span');
-    badge.className = `inline-flex size-6 shrink-0 items-center justify-center rounded-full ${style.classes}`;
-    badge.dataset.marchIndex = String(index);
-    badge.dataset.resourceTooltip = '';
-    badge.textContent = style.icon;
-    marchesWrap.append(badge);
-  }
+  context.renderMarches(context.currentCache, marchesWrap);
 
   assert.equal(marchesWrap.children.length, 1);
   const badge = marchesWrap.children[0];
   assert.equal(badge.textContent, '⚡');
+  assert.ok(badge.className.includes('march-raid-pulse'));
+  assert.ok(badge.className.includes('animate-pulse'));
 
   const origNow = Date.now;
   try {
@@ -1143,4 +1125,27 @@ test('header march icon renders auto-join raid badge with ⚡ icon and detailed 
   } finally {
     Date.now = origNow;
   }
+});
+
+
+test('header march icon renders raid rally badges with pulse animation for both leader rally and auto-join', () => {
+  const cache = {
+    marchStatus: {
+      data: {
+        marches: [
+          { squadId: 'squad-auto', kind: 'raid', rally: { id: 'r1', isAutoJoin: true } },
+          { squadId: 'squad-manual', kind: 'raid', rally: { id: 'r2' } },
+          { squadId: 'squad-attack', kind: 'attack' }
+        ]
+      }
+    }
+  };
+  context.renderMarches(cache, marchesWrap);
+  assert.equal(marchesWrap.children.length, 3);
+  assert.ok(marchesWrap.children[0].className.includes('march-raid-pulse'));
+  assert.ok(marchesWrap.children[0].className.includes('animate-pulse'));
+  assert.ok(marchesWrap.children[1].className.includes('march-raid-pulse'));
+  assert.ok(marchesWrap.children[1].className.includes('animate-pulse'));
+  assert.equal(marchesWrap.children[2].className.includes('march-raid-pulse'), false);
+  assert.equal(marchesWrap.children[2].className.includes('animate-pulse'), false);
 });

@@ -397,6 +397,27 @@ function isMarchExpired(march, now = Date.now()) {
   return globalThis.hwaHelperPopupData.isMarchExpired(march, now);
 }
 
+function renderMarches(cache, wrap = document.querySelector('#marches')) {
+  if (!wrap) return;
+  wrap.replaceChildren();
+  for (const [index, march] of (cache?.marchStatus?.data?.marches || []).entries()) {
+    const isAutoJoin = Boolean(march.rally?.isAutoJoin);
+    const isRaid = march.kind === 'raid' || isAutoJoin || Boolean(march.rally);
+    const style = isAutoJoin ?
+      { label: 'Auto Raid', icon: '⚡', classes: 'bg-amber-100 text-amber-900 ring-amber-400' } :
+      (marchStyles[march.kind] || marchStyles.attack);
+    const badge = document.createElement('span');
+    const pulseClass = isRaid ? 'animate-pulse march-raid-pulse' : '';
+    badge.className = ('inline-flex size-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ' + style.classes + (pulseClass ? ' ' + pulseClass : '')).trim();
+    badge.dataset.marchIndex = String(index);
+    badge.dataset.resourceTooltip = '';
+    badge.dataset.tooltipBelow = '';
+    badge.tabIndex = 0;
+    badge.textContent = style.icon;
+    wrap.append(badge);
+  }
+}
+
 function refreshTimed() {
   const now = Date.now();
   const marches = currentCache.marchStatus?.data?.marches || [];
@@ -4011,22 +4032,7 @@ async function render() {
   const resources = resourceEntries(cache);
   const selectedResources = stored.resourceSelection || [];
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
-  const marchesWrap = document.querySelector('#marches');
-  marchesWrap.replaceChildren();
-  for (const [index, march] of (cache.marchStatus?.data?.marches || []).entries()) {
-    const isAutoJoin = Boolean(march.rally?.isAutoJoin);
-    const style = isAutoJoin ?
-      { label: 'Auto Raid', icon: '⚡', classes: 'bg-amber-100 text-amber-900 ring-amber-400' } :
-      (marchStyles[march.kind] || marchStyles.attack);
-    const badge = document.createElement('span');
-    badge.className = `inline-flex size-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ${style.classes}`;
-    badge.dataset.marchIndex = String(index);
-    badge.dataset.resourceTooltip = '';
-    badge.dataset.tooltipBelow = '';
-    badge.tabIndex = 0;
-    badge.textContent = style.icon;
-    marchesWrap.append(badge);
-  }
+  renderMarches(cache);
   const headerResources = document.querySelector('#header-resources');
   headerResources.replaceChildren();
   for (const entry of resources.filter((item) => isSelectableForHeader(item) && selectedResources.includes(item.key))) {
