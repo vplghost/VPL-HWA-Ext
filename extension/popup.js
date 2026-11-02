@@ -3992,6 +3992,9 @@ async function render() {
     status.textContent = 'Settings and data stored in this browser.';
     renderConfigTabs();
     renderConfigOther(cache);
+    chrome.storage?.local?.get?.('gameEngineStatus')?.then?.((stored) => {
+      renderEngineStatus(stored?.gameEngineStatus);
+    });
   } else if (activeTab === 'draft') {
     renderDraft(cache);
   } else if (activeTab === 'heroes') {
@@ -4189,6 +4192,87 @@ document.querySelector('#btn-refresh-quests')?.addEventListener('click', () => t
 document.querySelector('#btn-refresh-mail')?.addEventListener('click', () => triggerRefresh('mail'));
 document.querySelector('#mail-badge')?.addEventListener('click', () => triggerRefresh('mail'));
 
+function renderEngineStatus(status) {
+  const badgeEl = document.querySelector('#engine-status-badge');
+  const instanceEl = document.querySelector('#engine-unity-instance');
+  const sendMsgEl = document.querySelector('#engine-send-message');
+  const rpcHeadersEl = document.querySelector('#engine-rpc-headers');
+
+  if (!badgeEl || !instanceEl || !sendMsgEl || !rpcHeadersEl) return;
+
+  if (!status) {
+    badgeEl.textContent = 'Standby';
+    badgeEl.className = 'rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600';
+    instanceEl.textContent = 'Waiting for game tab...';
+    instanceEl.className = 'font-medium text-slate-500';
+    sendMsgEl.textContent = 'Unknown';
+    sendMsgEl.className = 'font-medium text-slate-500';
+    rpcHeadersEl.textContent = 'None detected';
+    rpcHeadersEl.className = 'font-medium text-slate-500';
+    return;
+  }
+
+  if (status.ready) {
+    badgeEl.textContent = 'Connected';
+    badgeEl.className = 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800';
+    instanceEl.textContent = 'Active (In-Page WebGL)';
+    instanceEl.className = 'font-medium text-emerald-700';
+  } else if (status.hasCanvas) {
+    badgeEl.textContent = 'Canvas Ready';
+    badgeEl.className = 'rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800';
+    instanceEl.textContent = 'Canvas detected, initializing...';
+    instanceEl.className = 'font-medium text-blue-700';
+  } else {
+    badgeEl.textContent = 'Waiting';
+    badgeEl.className = 'rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800';
+    instanceEl.textContent = 'Game tab loading or not found';
+    instanceEl.className = 'font-medium text-amber-700';
+  }
+
+  if (status.hasSendMessage) {
+    sendMsgEl.textContent = 'Available (unityInstance.SendMessage)';
+    sendMsgEl.className = 'font-medium text-emerald-700';
+  } else {
+    sendMsgEl.textContent = status.ready ? 'Not exposed by engine' : 'Checking...';
+    sendMsgEl.className = 'font-medium text-slate-500';
+  }
+
+  if (status.hasRpcHeaders) {
+    rpcHeadersEl.textContent = 'Active (Auth headers captured)';
+    rpcHeadersEl.className = 'font-medium text-emerald-700';
+  } else {
+    rpcHeadersEl.textContent = status.rpcUrlAvailable ? 'RPC URL detected (needs refresh)' : 'None detected (reload game tab)';
+    rpcHeadersEl.className = 'font-medium text-slate-500';
+  }
+}
+
+document.querySelector('#btn-ping-engine')?.addEventListener('click', () => {
+  const resultEl = document.querySelector('#engine-ping-result');
+  if (resultEl) {
+    resultEl.textContent = 'Pinging game tab...';
+    resultEl.className = 'text-xs text-blue-600 font-medium';
+  }
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({ kind: 'engine-ping' }, (response) => {
+      if (chrome.runtime.lastError || !response?.ok) {
+        if (resultEl) {
+          resultEl.textContent = response?.error || 'No active Hero Wars tab found.';
+          resultEl.className = 'text-xs text-amber-600 font-medium';
+        }
+      } else {
+        if (resultEl) {
+          const time = new Date().toLocaleTimeString();
+          resultEl.textContent = `Ping sent at ${time}`;
+          resultEl.className = 'text-xs text-emerald-600 font-medium';
+        }
+        chrome.storage?.local?.get?.('gameEngineStatus')?.then?.((res) => {
+          if (res?.gameEngineStatus) renderEngineStatus(res.gameEngineStatus);
+        });
+      }
+    });
+  }
+});
+
 document.querySelector('#btn-reset-tabs')?.addEventListener('click', async () => {
   currentTabConfig = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
   await saveTabConfig(currentTabConfig);
@@ -4260,6 +4344,7 @@ document.querySelector('#clear').addEventListener('click', async () => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
     if ('captureSettings' in changes) renderSettings();
+    if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
     if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
     queueRender();

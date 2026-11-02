@@ -19,11 +19,13 @@ function setup(quota = Infinity) {
     Object.fromEntries((Array.isArray(keys) ? keys : [keys])
       .filter((key) => Object.hasOwn(state, key)).map((key) => [key, state[key]]));
   const tabsList = [];
+  const forwardedMessages = [];
   let reloadedTabId = null;
   const chrome = {
     tabs: {
       query: (filter, cb) => cb(tabsList),
-      reload: (tabId, opts, cb) => { reloadedTabId = tabId; if (cb) cb(); }
+      reload: (tabId, opts, cb) => { reloadedTabId = tabId; if (cb) cb(); },
+      sendMessage: async (tabId, msg) => { forwardedMessages.push({ tabId, msg }); }
     },
     runtime: {
       id: 'test-extension',
@@ -52,7 +54,7 @@ function setup(quota = Infinity) {
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
     new Promise((resolve) => listener({ kind, record }, sender, resolve));
-  return { local, session, send, installed, listener, tabsList, getReloadedTabId: () => reloadedTabId };
+  return { local, session, send, installed, listener, tabsList, forwardedMessages, getReloadedTabId: () => reloadedTabId };
 }
 
 function rpc(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
@@ -178,4 +180,13 @@ test('reload-game-tab reloads matching game tab or returns error when none found
   assert.equal(tabResult.ok, true);
   assert.equal(tabResult.error, null);
   assert.equal(getReloadedTabId(), 42);
+});
+
+
+test('engine-ping forwards to active game tab', async () => {
+  const { send, tabsList, forwardedMessages } = setup();
+  tabsList.push({ id: 99, url: 'https://www.hero-wars-alliance.com/' });
+  const result = await send('engine-ping');
+  assert.equal(result.ok, true);
+  assert.ok(forwardedMessages.some((f) => f.tabId === 99 && f.msg.kind === 'engine-ping'));
 });

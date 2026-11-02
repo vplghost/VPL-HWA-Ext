@@ -139,7 +139,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.catch(() => {});
     return true;
   }
-  if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc') && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+  if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc' || message?.kind === 'engine-ping' || message?.kind === 'engine-send-message') && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     const queryPatterns = GAME_ORIGINS.map((o) => `${o}/*`);
     chrome.tabs?.query({ url: queryPatterns }, (tabs) => {
       let forwarded = false;

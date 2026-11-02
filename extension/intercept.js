@@ -77,8 +77,126 @@
         }).catch(() => {});
       } catch (_) {}
     }
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'engine-ping') {
+      reportEngineStatus('ping');
+    }
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'engine-send-message') {
+      const { objectName, methodName, param } = event.data;
+      let ok = false;
+      let error = null;
+      try {
+        if (activeUnityInstance && typeof activeUnityInstance.SendMessage === 'function') {
+          activeUnityInstance.SendMessage(objectName, methodName, param ?? '');
+          ok = true;
+        } else {
+          error = 'Unity instance not ready or SendMessage not available';
+        }
+      } catch (err) {
+        error = err?.message || String(err);
+      }
+      window.postMessage({
+        source: 'hwa-helper-api',
+        kind: 'engine-send-message-result',
+        ok,
+        error,
+        call: { objectName, methodName, param }
+      }, location.origin);
+    }
   });
+
+  let activeUnityInstance = null;
+
+  function reportEngineStatus(reason = 'check') {
+    try {
+      const hasSendMessage = typeof activeUnityInstance?.SendMessage === 'function';
+      const hasCanvas = typeof document !== 'undefined' && Boolean(document.querySelector('canvas#unity-canvas, canvas#canvas, canvas'));
+      const status = {
+        ready: Boolean(activeUnityInstance),
+        hasSendMessage,
+        hasCanvas,
+        hasRpcHeaders: Boolean(lastRpcHeaders && Object.keys(lastRpcHeaders).length > 0),
+        rpcUrlAvailable: Boolean(lastRpcUrl),
+        updatedAt: new Date().toISOString(),
+        reason
+      };
+      window.postMessage({
+        source: 'hwa-helper-api',
+        kind: 'engine-status',
+        status
+      }, location.origin);
+    } catch (_) {}
+  }
+
+  function setUnityInstance(instance, source = 'detected') {
+    if (!instance || activeUnityInstance === instance) return;
+    activeUnityInstance = instance;
+    window.__hwaUnityInstance = instance;
+    reportEngineStatus(`instance-${source}`);
+  }
+
+  function hookCreateUnityInstance(original) {
+    if (typeof original !== 'function' || original.__hwaHooked) return original;
+    const hooked = function (canvas, config, onProgress) {
+      reportEngineStatus('createUnityInstance-called');
+      const res = original.apply(this, arguments);
+      if (res && typeof res.then === 'function') {
+        return res.then((instance) => {
+          setUnityInstance(instance, 'createUnityInstance-resolve');
+          return instance;
+        });
+      }
+      return res;
+    };
+    hooked.__hwaHooked = true;
+    return hooked;
+  }
+
+  try {
+    if (typeof window.createUnityInstance === 'function') {
+      window.createUnityInstance = hookCreateUnityInstance(window.createUnityInstance);
+    } else {
+      let _cui = undefined;
+      Object.defineProperty(window, 'createUnityInstance', {
+        configurable: true,
+        enumerable: true,
+        get: () => _cui,
+        set: (fn) => {
+          _cui = hookCreateUnityInstance(fn);
+        }
+      });
+    }
+  } catch (_) {}
+
+  function watchGlobalProperty(propName) {
+    try {
+      let val = window[propName];
+      if (val && typeof val === 'object') setUnityInstance(val, `existing-${propName}`);
+      Object.defineProperty(window, propName, {
+        configurable: true,
+        enumerable: true,
+        get: () => val,
+        set: (newVal) => {
+          val = newVal;
+          if (newVal && typeof newVal === 'object') setUnityInstance(newVal, `set-${propName}`);
+        }
+      });
+    } catch (_) {}
+  }
+
+  watchGlobalProperty('unityInstance');
+  watchGlobalProperty('gameInstance');
+
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => reportEngineStatus('dom-ready'), { once: true });
+    }
+  }
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('load', () => reportEngineStatus('window-load'), { once: true });
+  }
+
   window.postMessage({ source: 'hwa-helper-api', kind: 'ready' }, location.origin);
+  reportEngineStatus('initial');
 
   function limit(text) {
     return { text: text.slice(0, MAX_BODY_CHARS), truncated: text.length > MAX_BODY_CHARS };

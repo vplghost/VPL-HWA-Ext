@@ -255,3 +255,62 @@ test('XHR captures RPC url and headers via setRequestHeader into sessionStorage'
   assert.equal(storedHeaders['x-auth-user-id'], '777');
   assert.equal(storedHeaders['x-auth-token'], 'secret-token');
 });
+
+test('createUnityInstance hook captures instance and reports engine status', async () => {
+  const engineMessages = [];
+  const { window } = setup(async () => new Response('ok'));
+  window.addEventListener('message', (ev) => {
+    if (ev.data?.source === 'hwa-helper-api' && ev.data?.kind === 'engine-status') {
+      engineMessages.push(ev.data.status);
+    }
+  });
+
+  const fakeInstance = {
+    SendMessage: (obj, method, val) => { fakeInstance.lastCall = { obj, method, val }; }
+  };
+  window.createUnityInstance = async (canvas, config) => fakeInstance;
+
+  const instance = await window.createUnityInstance({}, {});
+  assert.equal(instance, fakeInstance);
+  assert.equal(window.__hwaUnityInstance, fakeInstance);
+
+  const lastStatus = engineMessages[engineMessages.length - 1];
+  assert.equal(lastStatus.ready, true);
+  assert.equal(lastStatus.hasSendMessage, true);
+
+  window.postMessage({
+    source: 'hwa-helper-control',
+    kind: 'engine-send-message',
+    objectName: 'GameController',
+    methodName: 'ClaimReward',
+    param: '123'
+  }, 'https://www.hero-wars-alliance.com');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(fakeInstance.lastCall, { obj: 'GameController', method: 'ClaimReward', val: '123' });
+});
+
+test('property setter for unityInstance captures instance and responds to engine-ping', async () => {
+  const engineMessages = [];
+  const { window } = setup(async () => new Response('ok'));
+  window.addEventListener('message', (ev) => {
+    if (ev.data?.source === 'hwa-helper-api' && ev.data?.kind === 'engine-status') {
+      engineMessages.push(ev.data.status);
+    }
+  });
+
+  const fakeInstance = { SendMessage: () => {} };
+  window.unityInstance = fakeInstance;
+  assert.equal(window.__hwaUnityInstance, fakeInstance);
+
+  window.postMessage({
+    source: 'hwa-helper-control',
+    kind: 'engine-ping'
+  }, 'https://www.hero-wars-alliance.com');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const pingStatus = engineMessages.find((s) => s.reason === 'ping');
+  assert.ok(pingStatus);
+  assert.equal(pingStatus.ready, true);
+  assert.equal(pingStatus.hasSendMessage, true);
+});

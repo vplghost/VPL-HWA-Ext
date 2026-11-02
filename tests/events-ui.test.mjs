@@ -165,6 +165,18 @@ heroesBadge.hidden = true;
 const titansBadge = new MockElement('span');
 titansBadge.setAttribute('id', 'titans-tab-badge');
 titansBadge.hidden = true;
+const engineStatusBadge = new MockElement('span');
+engineStatusBadge.setAttribute('id', 'engine-status-badge');
+const engineUnityInstance = new MockElement('span');
+engineUnityInstance.setAttribute('id', 'engine-unity-instance');
+const engineSendMessage = new MockElement('span');
+engineSendMessage.setAttribute('id', 'engine-send-message');
+const engineRpcHeaders = new MockElement('span');
+engineRpcHeaders.setAttribute('id', 'engine-rpc-headers');
+const btnPingEngine = new MockElement('button');
+btnPingEngine.setAttribute('id', 'btn-ping-engine');
+const enginePingResult = new MockElement('span');
+enginePingResult.setAttribute('id', 'engine-ping-result');
 const btnReloadGame = new MockElement('button');
 btnReloadGame.setAttribute('id', 'btn-reload-game');
 const btnRefreshAll = new MockElement('button');
@@ -231,6 +243,12 @@ const mockDoc = {
     ['mail-badge', mailBadge],
     ['heroes-tab-badge', heroesBadge],
     ['titans-tab-badge', titansBadge],
+        ['engine-status-badge', engineStatusBadge],
+    ['engine-unity-instance', engineUnityInstance],
+    ['engine-send-message', engineSendMessage],
+    ['engine-rpc-headers', engineRpcHeaders],
+    ['btn-ping-engine', btnPingEngine],
+    ['engine-ping-result', enginePingResult],
     ['btn-reload-game', btnReloadGame],
     ['btn-refresh-all', btnRefreshAll],
     ['btn-refresh-core', btnRefreshCore],
@@ -1038,4 +1056,18 @@ test('header mail badge, heroes/titans soul evolve badges, and config refresh bu
   assert.ok(sentMessage);
   assert.equal(sentMessage.kind, 'reload-game-tab');
   assert.ok(configRefreshStatus.textContent.includes('Game tab reloaded'));
+  // 4. Game engine status & ping test
+  context.renderEngineStatus(null);
+  assert.equal(engineStatusBadge.textContent, 'Standby');
+  assert.equal(engineUnityInstance.textContent, 'Waiting for game tab...');
+
+  context.renderEngineStatus({ ready: true, hasSendMessage: true, hasRpcHeaders: true });
+  assert.equal(engineStatusBadge.textContent, 'Connected');
+  assert.ok(engineSendMessage.textContent.includes('Available'));
+  assert.ok(engineRpcHeaders.textContent.includes('Active'));
+
+  btnPingEngine.dispatch('click');
+  assert.ok(sentMessage);
+  assert.equal(sentMessage.kind, 'engine-ping');
+  assert.ok(enginePingResult.textContent.includes('Ping sent at'));
 });

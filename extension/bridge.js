@@ -13,6 +13,12 @@ window.addEventListener('message', (event) => {
   if (event.source !== window || event.origin !== location.origin) return;
   if (event.data?.source !== 'hwa-helper-api') return;
   if (event.data.kind === 'ready') return sendControl();
+  if (event.data.kind === 'engine-status' && event.data.status) {
+    try {
+      chrome.storage?.local?.set?.({ gameEngineStatus: event.data.status });
+    } catch (_) {}
+    return;
+  }
   if (event.data.kind !== 'api-record') return;
   if (!chrome.runtime?.id) return;
   try {
@@ -62,6 +68,25 @@ chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
       source: 'hwa-helper-control',
       kind: 'refresh-rpc',
       calls: message.calls
+    }, location.origin);
+    sendResponse?.({ ok: true });
+    return true;
+  }
+  if (message?.kind === 'engine-ping') {
+    window.postMessage({
+      source: 'hwa-helper-control',
+      kind: 'engine-ping'
+    }, location.origin);
+    sendResponse?.({ ok: true });
+    return true;
+  }
+  if (message?.kind === 'engine-send-message') {
+    window.postMessage({
+      source: 'hwa-helper-control',
+      kind: 'engine-send-message',
+      objectName: message.objectName,
+      methodName: message.methodName,
+      param: message.param
     }, location.origin);
     sendResponse?.({ ok: true });
     return true;

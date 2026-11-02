@@ -144,6 +144,33 @@
     <div class="mt-5 flex gap-2 border-t border-slate-200 pt-4">
       <button id="clear-cache" type="button" class="cursor-pointer rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 font-medium text-amber-900 hover:bg-amber-100">Clear cache</button>
     </div>
+    <div id="config-engine-section" class="mt-5 border-t border-slate-200 pt-4">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-sm font-semibold text-slate-800">Game Engine & Automation Bridge</h3>
+        <span id="engine-status-badge" class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Checking...</span>
+      </div>
+      <p class="mb-3 text-xs text-slate-500">Monitors connection to the in-page Unity WebGL instance for authorized, desync-free in-game automation.</p>
+      <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-600">Unity WebGL Instance:</span>
+          <span id="engine-unity-instance" class="font-medium text-slate-700">Waiting for game load...</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-600">SendMessage Capability:</span>
+          <span id="engine-send-message" class="font-medium text-slate-700">Checking...</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-600">Authorized RPC Headers:</span>
+          <span id="engine-rpc-headers" class="font-medium text-slate-700">None detected</span>
+        </div>
+      </div>
+      <div class="mt-2.5 flex items-center justify-between">
+        <button id="btn-ping-engine" type="button" class="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-1.5">
+          <span>📡 Ping Game Engine</span>
+        </button>
+        <span id="engine-ping-result" class="text-xs text-slate-500"></span>
+      </div>
+    </div>
     <div id="config-other-section" class="mt-5 border-t border-slate-200 pt-4">
       <div class="flex items-center justify-between mb-1">
         <h3 class="text-sm font-semibold text-slate-800">Other Game Snapshots</h3>

@@ -196,3 +196,68 @@ test('bridge window message safely handles extension context invalidated without
     });
   });
 });
+
+
+test('bridge handles engine-status message and forwards engine commands', async () => {
+  let storedData = {};
+  const windowMessages = [];
+  let runtimeListener = null;
+  const listeners = [];
+  const window = {
+    addEventListener: (name, handler) => { if (name === 'message') listeners.push(handler); },
+    postMessage: (data, origin) => {
+      windowMessages.push(data);
+      for (const h of listeners) h({ source: window, origin, data });
+    }
+  };
+  const chrome = {
+    runtime: {
+      id: 'test-ext',
+      sendMessage: async () => ({}),
+      onMessage: {
+        addListener: (handler) => { runtimeListener = handler; }
+      }
+    },
+    storage: {
+      local: {
+        get: async () => ({}),
+        set: async (val) => { Object.assign(storedData, val); }
+      },
+      onChanged: { addListener: () => {} }
+    }
+  };
+
+  runInNewContext(source, {
+    window,
+    chrome,
+    document: { readyState: 'complete', getElementById: () => ({}) },
+    location: { origin: 'https://www.hero-wars-alliance.com' }
+  });
+
+  window.postMessage({
+    source: 'hwa-helper-api',
+    kind: 'engine-status',
+    status: { ready: true, hasSendMessage: true }
+  }, 'https://www.hero-wars-alliance.com');
+
+  assert.deepEqual(storedData.gameEngineStatus, { ready: true, hasSendMessage: true });
+
+  assert.ok(runtimeListener);
+  let reply = null;
+  runtimeListener({ kind: 'engine-ping' }, {}, (r) => { reply = r; });
+  assert.equal(reply.ok, true);
+  assert.ok(windowMessages.some((m) => m.kind === 'engine-ping'));
+
+  runtimeListener({
+    kind: 'engine-send-message',
+    objectName: 'UI',
+    methodName: 'Claim',
+    param: 'all'
+  }, {}, (r) => { reply = r; });
+  assert.equal(reply.ok, true);
+  const sentCall = windowMessages.find((m) => m.kind === 'engine-send-message');
+  assert.ok(sentCall);
+  assert.equal(sentCall.objectName, 'UI');
+  assert.equal(sentCall.methodName, 'Claim');
+  assert.equal(sentCall.param, 'all');
+});
