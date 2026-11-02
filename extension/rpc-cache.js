@@ -36,6 +36,8 @@
     dungeonEndBattle: 'events',
     dungeonSaveProgress: 'events',
     dungeonStartBattle: 'events',
+    magicTower_briefInfo: 'other',
+    magicTower_getAll: 'other',
     inventory_use: 'items'
   };
 
@@ -530,6 +532,23 @@
             feature: call.feature || null,
             group: 'events',
             data: { events: result.response.events },
+            updatedAt: record.timestamp
+          }];
+        }
+        if ((call.name === 'magicTower_briefInfo' || call.name === 'magicTower_getAll') && result?.response) {
+          const resp = result.response;
+          const isCleared = resp.state === 'win' || resp.state === 'completed' || (Number(resp.floorData?.floorNumber) > 25);
+          return [{
+            key: 'towerStatus',
+            method: call.name,
+            feature: null,
+            group: 'other',
+            data: {
+              state: resp.state || (resp.floorData ? 'inProgress' : 'unknown'),
+              isCleared,
+              deadHeroesCount: resp.deadHeroesCount ?? 0,
+              floorNumber: resp.floorData?.floorNumber ?? (isCleared ? 26 : 0)
+            },
             updatedAt: record.timestamp
           }];
         }
@@ -1584,6 +1603,20 @@
             group: 'events',
             data: { events: Array.from(evMap.values()) },
             updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'towerStatus') {
+          const existing = next.towerStatus?.data || {};
+          const incoming = entry.data || {};
+          next.towerStatus = {
+            ...entry,
+            data: {
+              ...existing,
+              ...incoming,
+              isCleared: Boolean(incoming.isCleared || existing.isCleared || incoming.state === 'win' || existing.state === 'win')
+            }
           };
           changed = true;
           continue;

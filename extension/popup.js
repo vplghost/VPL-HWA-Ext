@@ -2844,7 +2844,7 @@ function renderGoals(cache) {
   status.textContent = `${goalsData.metrics.totalGoals} active goals • ${goalsData.metrics.synergiesCount} synergies • ${goalsData.metrics.readyCount} ready`;
 
   const container = document.createElement('div');
-  container.className = 'space-y-4';
+  container.className = 'p-4 space-y-4';
 
   // 1. KPI Stats Cards Bar
   const kpiBar = document.createElement('div');
@@ -2912,7 +2912,7 @@ function renderGoals(cache) {
     if (activeGoalsFilter === 'activities' && g.category !== 'Activities') return false;
     if (activeGoalsFilter === 'resources' && g.category !== 'Resources') return false;
     if (activeGoalsFilter === 'synergies' && g.overlapCount <= 1) return false;
-    if (activeGoalsFilter === 'ready' && !(g.category === 'Resources' ? g.inStock : g.isLimited)) return false;
+    if (activeGoalsFilter === 'ready' && !(g.category === 'Resources' ? g.inStock : (g.isLimited && !g.isUnavailable && !g.isCompleted))) return false;
 
     if (query) {
       const q = query.toLowerCase();
@@ -2955,12 +2955,15 @@ function renderGoals(cache) {
     for (const act of visibleActivities) {
       const card = document.createElement('div');
       const isSynergy = act.overlapCount > 1;
+      const isCleared = act.isUnavailable || act.isCompleted;
       card.className = `rounded-xl border p-3 text-xs space-y-2 transition-colors ${
-        isSynergy
-          ? 'border-amber-300 bg-amber-50/40 shadow-xs'
-          : act.isLimited
-            ? 'border-blue-200 bg-blue-50/30'
-            : 'border-slate-200 bg-white'
+        isCleared
+          ? 'border-slate-200 bg-slate-50/70 opacity-80'
+          : isSynergy
+            ? 'border-amber-300 bg-amber-50/40 shadow-xs'
+            : act.isLimited
+              ? 'border-blue-200 bg-blue-50/30'
+              : 'border-slate-200 bg-white'
       }`;
 
       // Card Header
@@ -2978,9 +2981,11 @@ function renderGoals(cache) {
               : ''
           }
           ${
-            act.isLimited
-              ? '<span class="rounded-full bg-blue-100 text-blue-800 text-[10px] font-semibold px-2 py-0.5 border border-blue-200">⚡ Daily Limited</span>'
-              : ''
+            isCleared
+              ? '<span class="rounded-full bg-slate-200 text-slate-700 text-[10px] font-semibold px-2 py-0.5 border border-slate-300">🔒 Cleared Today</span>'
+              : act.isLimited
+                ? '<span class="rounded-full bg-blue-100 text-blue-800 text-[10px] font-semibold px-2 py-0.5 border border-blue-200">⚡ Daily Limited</span>'
+                : ''
           }
         </div>
       `;

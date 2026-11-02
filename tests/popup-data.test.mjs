@@ -8,7 +8,7 @@ for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'res
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 const { heroSoulProgress, teamRows, sortRows, isNumericColumn,
-  rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount } = context.hwaHelperPopupData;
+  rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount, isTowerCleared } = context.hwaHelperPopupData;
 
 test('hero soul progress uses inventory fragments and next-star cost', () => {
   assert.deepEqual({ ...heroSoulProgress('1', { star: 3 }, { fragmentHero: { 1: 73 } }) },
@@ -460,6 +460,35 @@ test('extractEventGoals groups activities and resources, calculates synergies, a
         tries: 2
       }
     },
+    specialQuestStatus: {
+      data: {
+        events: [
+          {
+            id: 100347,
+            groups: [
+              {
+                id: 101,
+                localeKey: 'QUEST_TAB_NAME_TITAN_SKINSTONES_SPEND',
+                repeatType: 'chain',
+                quests: [{ id: 1, state: 'inProgress', progress: 15 }]
+              },
+              {
+                id: 102,
+                localeKey: 'QUEST_TAB_NAME_TOWER_CHESTS',
+                repeatType: 'chain',
+                quests: [{ id: 2, state: 'inProgress', progress: 5 }]
+              },
+              {
+                id: 103,
+                localeKey: 'STRATEGIC_GLOBAL_MAP_RALLY_POPUP_TITLE',
+                repeatType: 'daily',
+                quests: [{ id: 3, state: 'inProgress', progress: 1 }]
+              }
+            ]
+          }
+        ]
+      }
+    },
     inventoryGet: {
       data: {
         coin: {
@@ -491,7 +520,7 @@ test('extractEventGoals groups activities and resources, calculates synergies, a
 
   const spheres = goals.resources.find(r => r.key === 'res:elemental_spheres');
   assert.ok(spheres);
-  assert.equal(spheres.overlapCount, 2);
+  assert.equal(spheres.overlapCount, 1);
   assert.equal(spheres.inStock, true);
 
   // Check that overlapping activities are detected
@@ -569,17 +598,17 @@ test('extractEventGoals mines specialQuestStatus and questGetAll into goals and 
   const goals = extractEventGoals(cache);
   assert.ok(goals.all.length > 0);
 
-  // Tower should have 3x synergy: Round 1 + Daily Challenge + Special Quest
+  // Tower should have 2x synergy: Guild Versus Round 1 + Special Quest
   const tower = goals.activities.find(a => a.key === 'act:tower');
   assert.ok(tower);
-  assert.equal(tower.overlapCount, 3);
-  assert.equal(tower.events.length, 3);
+  assert.equal(tower.overlapCount, 2);
+  assert.equal(tower.events.length, 2);
   assert.ok(tower.isLimited);
 
-  // Titan Skin Stones should have 3x synergy: Round 1 + Daily Challenge + Special Quest
+  // Titan Skin Stones should have 2x synergy: Guild Versus Round 1 + Special Quest
   const titanStones = goals.resources.find(r => r.key === 'res:titan_skin_stones');
   assert.ok(titanStones);
-  assert.equal(titanStones.overlapCount, 3);
+  assert.equal(titanStones.overlapCount, 2);
   assert.equal(titanStones.inStock, true);
   assert.equal(titanStones.stock, 500);
 
@@ -626,4 +655,51 @@ test('getUnreadChatCount calculates unread count accurately against lastReadTime
   // When lastReadTime is 300 or greater, no messages are unread
   assert.equal(getUnreadChatCount(messages, 300), 0);
   assert.equal(getUnreadChatCount(messages, 500), 0);
+});
+
+test('isTowerCleared detects win state or isCleared flag across snapshots', () => {
+  assert.equal(isTowerCleared({}), false);
+  assert.equal(isTowerCleared({ towerStatus: { data: { state: 'inProgress', isCleared: false } } }), false);
+  assert.equal(isTowerCleared({ towerStatus: { data: { state: 'win', isCleared: true } } }), true);
+  assert.equal(isTowerCleared({ magicTower_briefInfo: { data: { state: 'win' } } }), true);
+});
+
+test('extractEventGoals disables and deprioritizes Tower Chest goal when tower is cleared', () => {
+  const cacheWithUncleared = {
+    clanVersusStatus: {
+      data: {
+        info: { challenges: [{ id: 31, progress: 5 }] }
+      }
+    },
+    towerStatus: {
+      data: { isCleared: false, state: 'inProgress' }
+    }
+  };
+
+  const unclearedGoals = extractEventGoals(cacheWithUncleared);
+  const towerAvailable = unclearedGoals.activities.find(a => a.key === 'act:tower');
+  assert.ok(towerAvailable);
+  assert.equal(towerAvailable.isUnavailable, false);
+  assert.equal(towerAvailable.isLimited, true);
+  assert.ok(unclearedGoals.metrics.readyCount >= 1);
+
+  const cacheWithCleared = {
+    clanVersusStatus: {
+      data: {
+        info: { challenges: [{ id: 31, progress: 15 }] }
+      }
+    },
+    towerStatus: {
+      data: { isCleared: true, state: 'win' }
+    }
+  };
+
+  const clearedGoals = extractEventGoals(cacheWithCleared);
+  const towerUnavailable = clearedGoals.activities.find(a => a.key === 'act:tower');
+  assert.ok(towerUnavailable);
+  assert.equal(towerUnavailable.isUnavailable, true);
+  assert.equal(towerUnavailable.isLimited, false);
+  assert.ok(towerUnavailable.hint.includes('Tower cleared today'));
+  // Not included in readyCount
+  assert.equal(clearedGoals.metrics.readyCount, 0);
 });

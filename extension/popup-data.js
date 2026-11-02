@@ -722,8 +722,18 @@
     DAEMONSKIN22_UI_TITLE: 'Demon Skin Festival'
   };
 
+  function isTowerCleared(cache) {
+    if (cache?.towerStatus?.data?.isCleared) return true;
+    if (cache?.towerStatus?.data?.state === 'win' || cache?.towerStatus?.data?.state === 'completed') return true;
+    if (cache?.magicTower_briefInfo?.data?.state === 'win') return true;
+    if (cache?.['magicTower_briefInfo']?.data?.state === 'win') return true;
+    if (cache?.['magicTower_briefInfo']?.state === 'win') return true;
+    return false;
+  }
+
   function extractEventGoals(cache) {
     const goalsMap = new Map();
+    const towerCleared = isTowerCleared(cache);
 
     const challengeNames = globalThis.hwaHelperClanVersusChallengeNames || {};
     const challengePoints = globalThis.hwaHelperClanVersusChallengePoints || {};
@@ -731,8 +741,14 @@
     const roundQuestsMap = globalThis.hwaHelperClanVersusRoundQuests || {};
 
     function addOrMergeGoal({ key, title, category, eventName, amount = 1, unit = '', points = 0, stock = null, hint = '' }) {
+      const isTower = key === 'act:tower';
+      const isUnavailable = isTower && towerCleared;
+      const finalHint = (isTower && towerCleared)
+        ? 'Tower cleared today • No more chests available until daily reset'
+        : hint;
+      const isLimited = (isTower && towerCleared) ? false : dailyLimitedKeys.has(key);
+
       if (!goalsMap.has(key)) {
-        const isLimited = dailyLimitedKeys.has(key);
         const icon = goalIconMap[key] || (category === 'Resources' ? '💎' : '🎯');
         goalsMap.set(key, {
           key,
@@ -744,10 +760,11 @@
           stock,
           inStock: stock != null ? stock >= amount : null,
           isLimited,
+          isUnavailable,
           totalPoints: points,
           overlapCount: 1,
           events: [{ name: eventName, amount, points, unit }],
-          hint
+          hint: finalHint
         });
       } else {
         const existing = goalsMap.get(key);
@@ -757,11 +774,16 @@
         if (existing.stock != null && existing.needed != null) {
           existing.inStock = existing.stock >= existing.needed;
         }
+        if (isTower && towerCleared) {
+          existing.isLimited = false;
+          existing.isUnavailable = true;
+          existing.hint = finalHint;
+        }
         existing.events.push({ name: eventName, amount, points, unit });
       }
     }
 
-    // 1. Guild Versus
+    // 1. Guild Versus (use live active challenges from API; fallback to static round config if challenges array absent)
     const vsStatus = cache?.clanVersusStatus?.data;
     if (vsStatus) {
       const battle = vsStatus.battle || {};
@@ -771,45 +793,49 @@
       const roundConfig = roundQuestsMap[liveRound.index] || roundQuestsMap[1] || {};
       const roundName = `Guild Versus Round ${liveRound.index}`;
 
-      // Round Quests
-      for (const q of roundConfig.quests || []) {
-        const stock = getChallengeResourceStock(cache, q.label);
-        const isRes = stock !== null;
-        const key = normalizeGoalKey(q.label);
-        const matchNum = q.label.match(/\b(\d+[\d,]*)\b/);
-        const amount = matchNum ? Number.parseInt(matchNum[1].replace(/,/g, ''), 10) : 1;
+      const activeChallenges = Array.isArray(info.challenges) && info.challenges.length > 0
+        ? info.challenges
+        : null;
 
-        addOrMergeGoal({
-          key,
-          title: q.label.replace(/\s*\(\d+[\d,]*\)$/, ''),
-          category: isRes ? 'Resources' : 'Activities',
-          eventName: roundName,
-          amount,
-          points: q.points || 0,
-          stock,
-          hint: `Earns battle points for ${roundName}`
-        });
-      }
+      if (activeChallenges) {
+        for (const ch of activeChallenges) {
+          const name = challengeNames[ch.id] || `Daily Challenge #${ch.id}`;
+          const stock = getChallengeResourceStock(cache, ch.id);
+          const isRes = stock !== null;
+          const key = normalizeGoalKey(name);
+          const step = challengeSteps[ch.id] || 1;
+          const points = challengePoints[ch.id] || 0;
 
-      // Daily Challenges
-      for (const ch of info.challenges || []) {
-        const name = challengeNames[ch.id] || `Daily Challenge #${ch.id}`;
-        const stock = getChallengeResourceStock(cache, ch.id);
-        const isRes = stock !== null;
-        const key = normalizeGoalKey(name);
-        const step = challengeSteps[ch.id] || 1;
-        const points = challengePoints[ch.id] || 0;
+          addOrMergeGoal({
+            key,
+            title: name.replace(/\s*\(\d+[\d,]*\)$/, ''),
+            category: isRes ? 'Resources' : 'Activities',
+            eventName: roundName,
+            amount: step,
+            points,
+            stock,
+            hint: `Guild Versus challenge for ${roundName}`
+          });
+        }
+      } else if (Array.isArray(roundConfig.quests)) {
+        for (const q of roundConfig.quests) {
+          const stock = getChallengeResourceStock(cache, q.label);
+          const isRes = stock !== null;
+          const key = normalizeGoalKey(q.label);
+          const matchNum = q.label.match(/\b(\d+[\d,]*)\b/);
+          const amount = matchNum ? Number.parseInt(matchNum[1].replace(/,/g, ''), 10) : 1;
 
-        addOrMergeGoal({
-          key,
-          title: name.replace(/\s*\(\d+[\d,]*\)$/, ''),
-          category: isRes ? 'Resources' : 'Activities',
-          eventName: 'Guild Versus Daily',
-          amount: step,
-          points,
-          stock,
-          hint: 'Daily challenge points for guild score'
-        });
+          addOrMergeGoal({
+            key,
+            title: q.label.replace(/\s*\(\d+[\d,]*\)$/, ''),
+            category: isRes ? 'Resources' : 'Activities',
+            eventName: roundName,
+            amount,
+            points: q.points || 0,
+            stock,
+            hint: `Guild Versus quest for ${roundName}`
+          });
+        }
       }
     }
 
@@ -961,8 +987,12 @@
       const bOverlap = b.overlapCount > 1 ? b.overlapCount : 0;
       if (aOverlap !== bOverlap) return bOverlap - aOverlap;
 
-      const aUrgent = a.category === 'Resources' ? Boolean(a.inStock) : Boolean(a.isLimited);
-      const bUrgent = b.category === 'Resources' ? Boolean(b.inStock) : Boolean(b.isLimited);
+      const aUrgent = a.category === 'Resources'
+        ? Boolean(a.inStock)
+        : (Boolean(a.isLimited) && !a.isUnavailable && !a.isCompleted);
+      const bUrgent = b.category === 'Resources'
+        ? Boolean(b.inStock)
+        : (Boolean(b.isLimited) && !b.isUnavailable && !b.isCompleted);
       if (aUrgent !== bUrgent) return aUrgent ? -1 : 1;
 
       const aPts = a.totalPoints || 0;
@@ -983,7 +1013,10 @@
       metrics: {
         totalGoals: allGoals.length,
         synergiesCount: allGoals.filter((g) => g.overlapCount > 1).length,
-        readyCount: allGoals.filter((g) => (g.category === 'Resources' && g.inStock) || (g.category === 'Activities' && g.isLimited)).length
+        readyCount: allGoals.filter((g) =>
+          (g.category === 'Resources' && g.inStock) ||
+          (g.category === 'Activities' && g.isLimited && !g.isUnavailable && !g.isCompleted)
+        ).length
       }
     };
   }
@@ -1000,5 +1033,5 @@
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
     buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, exportTableData,
-    getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount };
+    getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount, isTowerCleared };
 })();

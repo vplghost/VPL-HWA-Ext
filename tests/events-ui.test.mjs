@@ -680,6 +680,29 @@ test('renderGoals renders Activities and Resources with KPI bar, synergy badges,
         tries: 2
       }
     },
+    specialQuestStatus: {
+      data: {
+        events: [
+          {
+            id: 100347,
+            groups: [
+              {
+                id: 101,
+                localeKey: 'QUEST_TAB_NAME_TOWER_CHESTS',
+                repeatType: 'chain',
+                quests: [{ id: 1, state: 'inProgress', progress: 5 }]
+              },
+              {
+                id: 102,
+                localeKey: 'QUEST_TAB_NAME_TITAN_SKINSTONES_SPEND',
+                repeatType: 'chain',
+                quests: [{ id: 2, state: 'inProgress', progress: 15 }]
+              }
+            ]
+          }
+        ]
+      }
+    },
     inventoryGet: {
       data: {
         coin: { '20': 2410 },
@@ -690,6 +713,9 @@ test('renderGoals renders Activities and Resources with KPI bar, synergy badges,
 
   context.renderGoals(testCache);
   const text = view.textContent;
+
+  // View container should have padding class to prevent visual border overlap
+  assert.equal(view.children[0].className.includes('p-4'), true);
 
   // Status & KPI Cards
   assert.ok(status.textContent.includes('active goals'));
@@ -721,4 +747,30 @@ test('renderGoals renders Activities and Resources with KPI bar, synergy badges,
   assert.ok(view.textContent.includes('Open 1 Tower Chest'));
   assert.equal(view.textContent.includes('Elemental Sphere'), false);
   search.value = '';
+});
+
+test('renderGoals displays Cleared Today badge on Tower Chest card when tower is cleared', () => {
+  search.value = '';
+  view.replaceChildren();
+
+  const testCache = {
+    clanVersusStatus: {
+      data: {
+        info: {
+          challenges: [
+            { id: 31, progress: 15 } // Tower Chest
+          ]
+        }
+      }
+    },
+    towerStatus: {
+      data: { isCleared: true, state: 'win' }
+    }
+  };
+
+  context.renderGoals(testCache);
+  const text = view.textContent;
+  assert.ok(text.includes('Open 1 Tower Chest'));
+  assert.ok(text.includes('Cleared Today'));
+  assert.ok(!text.includes('Daily Limited'));
 });

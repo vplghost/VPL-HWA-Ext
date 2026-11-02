@@ -986,3 +986,51 @@ test('inventory_use spends titan potions and updates titan xp', () => {
   assert.equal(afterUse.inventoryGet.data.consumable['20'], 210);
   assert.equal(afterUse.titanGetAll.data['4052'].xp, 690);
 });
+
+test('magicTower_briefInfo and magicTower_getAll extract towerStatus with isCleared state', () => {
+  const briefRecord = record([
+    { name: 'magicTower_briefInfo', ident: 'tower-1' }
+  ], [
+    {
+      ident: 'tower-1',
+      result: {
+        response: {
+          state: 'win',
+          deadHeroesCount: 0
+        }
+      }
+    }
+  ], '2026-11-02T11:37:00.000Z');
+
+  const extracted = cache.extract(briefRecord);
+  const towerEntry = extracted.find((e) => e.key === 'towerStatus');
+  assert.ok(towerEntry);
+  assert.equal(towerEntry.data.state, 'win');
+  assert.equal(towerEntry.data.isCleared, true);
+  assert.equal(towerEntry.data.floorNumber, 26);
+
+  const merged = cache.merge({}, [briefRecord]);
+  assert.equal(merged.cache.towerStatus.data.isCleared, true);
+  assert.equal(merged.cache.towerStatus.data.state, 'win');
+
+  const inProgressRecord = record([
+    { name: 'magicTower_getAll', ident: 'tower-2' }
+  ], [
+    {
+      ident: 'tower-2',
+      result: {
+        response: {
+          floorData: { floorNumber: 12 },
+          state: 'battle'
+        }
+      }
+    }
+  ], '2026-11-02T11:38:00.000Z');
+
+  const inProgressExtracted = cache.extract(inProgressRecord);
+  const inProgressEntry = inProgressExtracted.find((e) => e.key === 'towerStatus');
+  assert.ok(inProgressEntry);
+  assert.equal(inProgressEntry.data.isCleared, false);
+  assert.equal(inProgressEntry.data.floorNumber, 12);
+});
+
