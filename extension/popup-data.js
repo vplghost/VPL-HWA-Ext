@@ -88,6 +88,24 @@
         [`Travel to target: ~${marchDuration(rally.outboundMs, true)}`] : []),
       `Arrival: ${arrival}`, `Return to base: ${returning}`].join('\n');
   }
+  function isMarchExpired(march, now = Date.now()) {
+    if (!march) return true;
+    if (march.rally) {
+      const rally = march.rally;
+      const arrivalAt = Number.isFinite(rally.arrivalAt) ? rally.arrivalAt :
+        (Number.isFinite(rally.waitUntil) && Number.isFinite(rally.outboundMs) ?
+          rally.waitUntil + rally.outboundMs : null);
+      const returnAt = Number.isFinite(rally.returnAt) ? rally.returnAt :
+        (Number.isFinite(march.endsAt) && march.stage === 'returnToOutpost' ? march.endsAt :
+          (Number.isFinite(arrivalAt) && Number.isFinite(rally.returnMs) ?
+            arrivalAt + rally.returnMs : null));
+      if (Number.isFinite(returnAt)) return now >= returnAt;
+      if (march.stage === 'returnToOutpost' && Number.isFinite(march.endsAt)) return now >= march.endsAt;
+      return Number.isFinite(rally.waitUntil) && now > rally.waitUntil + 30 * 60000;
+    }
+    return Number.isFinite(march.endsAt) && march.endsAt <= now;
+  }
+
   function sortRows(rows, column, direction) {
     const numeric = (value) => {
       if (typeof value === 'number') return value;
@@ -219,9 +237,216 @@
     return `${month}/${day} ${hours}:${mins}`;
   }
 
+  
+  function tableExportFilename(tab, d = new Date()) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`;
+    return `hwa-${tab}-${stamp}.json`;
+  }
+
+  function exportTableData(tab, cache, query = '', itemGroupFilter = '') {
+    if (!cache) return [];
+    const q = (query || '').trim().toLocaleLowerCase();
+    const matchesFilter = (vals) => !q || vals.some(v => String(v ?? '').toLocaleLowerCase().includes(q));
+
+    if (tab === 'heroes') {
+      const data = cache.heroGetAll?.data || {};
+      const heroes = Object.entries(data).sort(([a], [b]) => Number(a) - Number(b));
+      const result = [];
+      for (const [id, hero] of heroes) {
+        const meta = globalThis.hwaHelperHeroMetadata?.[id];
+        const name = meta?.name || globalThis.hwaHelperNameMap?.hero?.(id) || `#${id}`;
+        if (!matchesFilter([id, name, hero?.level, hero?.star, hero?.power, meta?.role, meta?.class, meta?.faction])) {
+          continue;
+        }
+        const { owned, needed } = heroSoulProgress(id, hero, cache.inventoryGet?.data);
+        const sparkLevel = Number.isInteger(hero?.titanGiftLevel) ? hero.titanGiftLevel : 0;
+
+        const skills = hero?.skills ? Object.entries(hero.skills)
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([k, lvl], idx) => ({
+            slot: idx + 1,
+            skillId: Number(k),
+            level: Number(lvl)
+          })) : [];
+
+        const skins = hero?.skins ? Object.entries(hero.skins)
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([skinId, lvl]) => {
+            let stat = globalThis.hwaHelperSkinStats?.[skinId];
+            if (!stat || stat === 'MAIN' || Number(skinId) === Number(hero?.baseSkinId) || (Number(skinId) <= 100 && !globalThis.hwaHelperSkinStats?.[skinId])) {
+              const mainStat = meta?.mainStat || (meta?.role === 'Tank' || meta?.class === 'Warrior' ? 'strength' : meta?.class === 'Marksman' ? 'agility' : 'intelligence');
+              stat = mainStat === 'strength' ? 'Str' : mainStat === 'agility' ? 'Agi' : 'Int';
+            }
+            return {
+              skinId: Number(skinId),
+              stat: stat || 'Skin',
+              level: Number(lvl),
+              isCurrent: Number(skinId) === Number(hero?.currentSkin)
+            };
+          }) : [];
+
+        const rawRunes = hero?.hero_runes || hero?.runes;
+        const heroRunes = Array.isArray(rawRunes) ? rawRunes :
+          (rawRunes && typeof rawRunes === 'object' ? Object.values(rawRunes) : []);
+        const glyphStats = globalThis.hwaHelperHeroGlyphs?.[id] || ['PA', 'HP', 'Arm', 'Crit', 'Str'];
+        const glyphs = heroRunes.map((lvl, idx) => ({
+          slot: idx + 1,
+          stat: glyphStats[idx] || `G${idx + 1}`,
+          level: Number(lvl)
+        }));
+
+        const artifacts = Array.isArray(hero?.artifacts) ? hero.artifacts.map((art, idx) => ({
+          slot: idx + 1,
+          id: art?.id ?? null,
+          star: art?.star ?? null,
+          level: art?.level ?? null
+        })) : [];
+
+        result.push({
+          id: Number(id),
+          name,
+          level: Number(hero?.level) || null,
+          star: Number(hero?.star) || 1,
+          power: Number(hero?.power) || 0,
+          role: meta?.role || null,
+          class: meta?.class || null,
+          faction: meta?.faction || null,
+          soulStones: {
+            current: owned,
+            needed: needed
+          },
+          sparksOfPower: {
+            level: sparkLevel,
+            max: 30
+          },
+          skills,
+          skins,
+          glyphs,
+          artifacts
+        });
+      }
+      return result;
+    }
+
+    if (tab === 'titans') {
+      const data = cache.titanGetAll?.data || {};
+      const titans = Object.entries(data).sort(([a], [b]) => Number(a) - Number(b));
+      const result = [];
+      for (const [id, titan] of titans) {
+        const meta = globalThis.hwaHelperTitanMetadata?.[id];
+        const name = meta?.name || globalThis.hwaHelperNameMap?.hero?.(id) || `#${id}`;
+        if (!matchesFilter([id, name, titan?.level, titan?.star, titan?.power, meta?.role, meta?.element])) {
+          continue;
+        }
+        const { owned, needed } = titanSoulProgress(id, titan, cache.inventoryGet?.data);
+        const skills = titan?.skills ? Object.entries(titan.skills)
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([k, lvl], idx) => ({
+            slot: idx + 1,
+            skillId: Number(k),
+            level: Number(lvl)
+          })) : [];
+
+        result.push({
+          id: Number(id),
+          name,
+          level: Number(titan?.level) || null,
+          star: Number(titan?.star) || 1,
+          power: Number(titan?.power) || 0,
+          role: meta?.role || null,
+          element: meta?.element || null,
+          soulStones: {
+            current: owned,
+            needed: needed
+          },
+          skills,
+          artifacts: Array.isArray(titan?.artifacts) ? titan.artifacts : [],
+          skins: titan?.skins || titan?.skin || null
+        });
+      }
+      return result;
+    }
+
+    if (tab === 'items') {
+      const data = cache.inventoryGet?.data || {};
+      const result = [];
+      for (const [category, items] of Object.entries(data)) {
+        if (itemGroupFilter && category !== itemGroupFilter) continue;
+        for (const [id, quantity] of Object.entries(items ?? {})) {
+          const name = globalThis.hwaHelperNameMap?.item?.(category, id) || '—';
+          if (!matchesFilter([category, id, name, quantity])) continue;
+          result.push({
+            group: category,
+            id: Number(id) || id,
+            name,
+            amount: Number(quantity) || 0
+          });
+        }
+      }
+      return result;
+    }
+
+    if (tab === 'resources') {
+      const result = [];
+      const resEntries = Object.entries(cache).filter(([k]) => k.startsWith('resource:'));
+      for (const [key, entry] of resEntries) {
+        const d = entry?.data || {};
+        const name = d.label || d.name || key.replace('resource:', '');
+        if (!matchesFilter([key, name, d.amount])) continue;
+        result.push({
+          key,
+          name,
+          amount: Number(d.amount) || 0,
+          cap: Number.isFinite(d.cap) ? d.cap : null,
+          renewable: Boolean(d.renewable),
+          refillEveryMs: Number.isFinite(d.refillEveryMs) ? d.refillEveryMs : null,
+          refillAmount: Number.isFinite(d.refillAmount) ? d.refillAmount : null
+        });
+      }
+      return result;
+    }
+
+    if (tab === 'teams') {
+      const data = cache.teamGetAll?.data || {};
+      const rows = teamRows(data, globalThis.hwaHelperNameMap);
+      return rows
+        .filter(row => matchesFilter(row))
+        .map(row => ({
+          mode: row[0],
+          teamNumber: row[1],
+          memberCount: row[2],
+          names: row[3],
+          members: Array.isArray(row[4]) ? row[4] : []
+        }));
+    }
+
+    if (tab === 'other') {
+      const entries = Object.values(cache).filter((entry) =>
+        entry?.key && !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
+          'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
+          'accountStatus', 'buildingStatus', 'marchStatus',
+          'researchStatus', 'productionConfigStatus', 'productionStatus',
+          'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents',
+          'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry.key)
+        && !entry.key.startsWith('resource:')
+        && matchesFilter([entry.method, entry.feature || entry.group]));
+      return entries.map(entry => ({
+        key: entry.key,
+        method: entry.method,
+        feature: entry.feature || entry.group,
+        size: Array.isArray(entry.data) ? entry.data.length : Object.keys(entry.data ?? {}).length,
+        updatedAt: entry.updatedAt,
+        data: entry.data
+      }));
+    }
+
+    return [];
+  }
+
   globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, teamRows, sortRows,
-    isNumericColumn, rallyTooltip, marchDuration,
+    isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
-    buildingTooltip, researchTooltip, formatChatRole, formatChatTime };
+    buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, exportTableData };
 })();
