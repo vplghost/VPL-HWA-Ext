@@ -20,6 +20,8 @@
     'getSpecialQuestState:quest': 'events',
     clanBoss_getAll: 'other',
     clanWarGetBriefInfo: 'other',
+    'getLeaderboardPowerSummary:leaderboardPower': 'other',
+    getLeaderboardPowerSummary: 'other',
     'getInfo:clanVersus': 'events',
     'getCurrentBattle:clanVersus': 'events',
     'getUserProgress:clanVersus': 'events',

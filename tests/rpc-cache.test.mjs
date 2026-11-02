@@ -1408,3 +1408,22 @@ test('replaying titan evolve trace updates star, power, fragments, gold, and que
   assert.equal(afterEvolve.questGetAll.data['335'].state, 3);
   assert.equal(afterEvolve.questGetAll.data['335'].progress, 13);
 });
+
+test('replaying onload trace extracts getLeaderboardPowerSummary and retains mail unclaimed status', async () => {
+  const onloadTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611022043_total_power_up_onload.json', import.meta.url), 'utf8'));
+  const result = cache.merge({}, onloadTrace).cache;
+
+  // getLeaderboardPowerSummary snapshot extracted
+  const powerSummary = result['getLeaderboardPowerSummary:leaderboardPower'] || result.getLeaderboardPowerSummary;
+  assert.ok(powerSummary);
+  assert.ok(Array.isArray(powerSummary.data.places));
+  const heroPowerPlace = powerSummary.data.places.find(p => p.leaderboardType === 'heroPowerServer');
+  assert.ok(heroPowerPlace);
+  assert.equal(heroPowerPlace.place, 64);
+
+  // Mail unclaimed status retained across page 2
+  assert.ok(result.mailStatus);
+  assert.equal(result.mailStatus.data.unclaimedReportsCount, 2);
+  assert.equal(result.mailStatus.data.totalUnclaimed, 2);
+  assert.equal(result.mailStatus.data.hasUnclaimed, true);
+});

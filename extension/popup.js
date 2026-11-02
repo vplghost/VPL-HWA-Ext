@@ -31,6 +31,177 @@ resourceFilterToggle?.addEventListener('click', () => {
 });
 const tabs = [...document.querySelectorAll('[data-tab]')];
 let activeTab = 'heroes';
+
+const DEFAULT_TAB_CONFIG = [
+  { id: 'heroes', label: 'Heroes' },
+  { id: 'draft', label: 'Draft' },
+  { id: 'items', label: 'Items' },
+  { id: 'resources', label: 'Resources' },
+  { id: 'titans', label: 'Titans' },
+  { id: 'teams', label: 'Teams' },
+  { id: 'events', label: 'Events' },
+  { id: 'goals', label: 'Goals' },
+  { id: 'log', label: 'Log' }
+];
+
+let currentTabConfig = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
+
+function normalizeTabConfig(storedConfig) {
+  if (!Array.isArray(storedConfig) || storedConfig.length === 0) {
+    return DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
+  }
+  const knownIds = new Set(DEFAULT_TAB_CONFIG.map((t) => t.id));
+  const result = [];
+  const seenIds = new Set();
+  for (const item of storedConfig) {
+    if (item && knownIds.has(item.id) && !seenIds.has(item.id)) {
+      result.push({
+        id: item.id,
+        visible: item.visible !== false
+      });
+      seenIds.add(item.id);
+    }
+  }
+  for (const def of DEFAULT_TAB_CONFIG) {
+    if (!seenIds.has(def.id)) {
+      result.push({ id: def.id, visible: true });
+    }
+  }
+  if (!result.some((t) => t.visible)) {
+    result[0].visible = true;
+  }
+  return result;
+}
+
+function applyTabConfig(config) {
+  const tabsNav = document.querySelector('#tabs');
+  if (!tabsNav) return;
+  const configBtn = tabsNav.querySelector('[data-tab="config"]');
+
+  config.forEach((item) => {
+    const btn = tabsNav.querySelector(`[data-tab="${item.id}"]`);
+    if (btn) {
+      btn.hidden = !item.visible;
+      if (configBtn) {
+        tabsNav.insertBefore(btn, configBtn);
+      } else {
+        tabsNav.appendChild(btn);
+      }
+    }
+  });
+
+  if (activeTab !== 'config') {
+    const currentTabItem = config.find((t) => t.id === activeTab);
+    if (currentTabItem && !currentTabItem.visible) {
+      const firstVisible = config.find((t) => t.visible);
+      if (firstVisible) {
+        activeTab = firstVisible.id;
+        const allTabs = [...tabsNav.querySelectorAll('[data-tab]')];
+        allTabs.forEach((t) => { t.setAttribute('aria-selected', String(t.dataset.tab === activeTab)); });
+      }
+    }
+  }
+}
+
+async function saveTabConfig(config) {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    await chrome.storage.local.set({ tabConfig: config }).catch(() => {});
+  }
+}
+
+function renderConfigTabs() {
+  const container = document.querySelector('#config-tabs-list');
+  if (!container) return;
+  container.replaceChildren();
+
+  const labelMap = Object.fromEntries(DEFAULT_TAB_CONFIG.map((t) => [t.id, t.label]));
+
+  currentTabConfig.forEach((item, index) => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between rounded-md bg-white px-3 py-2 border border-slate-200 shadow-xs text-xs';
+
+    const left = document.createElement('label');
+    left.className = 'flex items-center gap-2 cursor-pointer font-medium text-slate-700 select-none';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = item.visible;
+    checkbox.className = 'tab-visibility-toggle size-4 accent-blue-600 cursor-pointer';
+    checkbox.dataset.tabId = item.id;
+    checkbox.addEventListener('change', async () => {
+      if (!checkbox.checked) {
+        const visibleCount = currentTabConfig.filter((t) => t.visible).length;
+        if (visibleCount <= 1) {
+          checkbox.checked = true;
+          return;
+        }
+      }
+      item.visible = checkbox.checked;
+      await saveTabConfig(currentTabConfig);
+      applyTabConfig(currentTabConfig);
+      renderConfigTabs();
+    });
+
+    const span = document.createElement('span');
+    span.textContent = labelMap[item.id] || item.id;
+    left.append(checkbox, span);
+
+    const right = document.createElement('div');
+    right.className = 'flex items-center gap-1';
+
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.title = 'Move Up';
+    upBtn.setAttribute('aria-label', `Move ${span.textContent} up`);
+    upBtn.disabled = index === 0;
+    upBtn.className = 'tab-move-up-btn cursor-pointer rounded p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed';
+    upBtn.dataset.tabIndex = String(index);
+    upBtn.innerHTML = '<svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor"><path fill-rule="evenodd" d="M10 17a1 1 0 0 1-1-1V5.414l-3.293 3.293a1 1 0 0 1-1.414-1.414l5-5a1 1 0 0 1 1.414 0l5 5a1 1 0 0 1-1.414 1.414L11 5.414V16a1 1 0 0 1-1 1z" clip-rule="evenodd"/></svg>';
+    upBtn.addEventListener('click', async () => {
+      if (index > 0) {
+        const temp = currentTabConfig[index];
+        currentTabConfig[index] = currentTabConfig[index - 1];
+        currentTabConfig[index - 1] = temp;
+        await saveTabConfig(currentTabConfig);
+        applyTabConfig(currentTabConfig);
+        renderConfigTabs();
+      }
+    });
+
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.title = 'Move Down';
+    downBtn.setAttribute('aria-label', `Move ${span.textContent} down`);
+    downBtn.disabled = index === currentTabConfig.length - 1;
+    downBtn.className = 'tab-move-down-btn cursor-pointer rounded p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed';
+    downBtn.dataset.tabIndex = String(index);
+    downBtn.innerHTML = '<svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 0 1 1 1v10.586l3.293-3.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 1 1 1.414-1.414L9 14.586V4a1 1 0 0 1 1-1z" clip-rule="evenodd"/></svg>';
+    downBtn.addEventListener('click', async () => {
+      if (index < currentTabConfig.length - 1) {
+        const temp = currentTabConfig[index];
+        currentTabConfig[index] = currentTabConfig[index + 1];
+        currentTabConfig[index + 1] = temp;
+        await saveTabConfig(currentTabConfig);
+        applyTabConfig(currentTabConfig);
+        renderConfigTabs();
+      }
+    });
+
+    right.append(upBtn, downBtn);
+    row.append(left, right);
+    container.append(row);
+  });
+}
+
+globalThis.hwaHelperTabConfig = {
+  DEFAULT_TAB_CONFIG,
+  normalizeTabConfig,
+  applyTabConfig,
+  saveTabConfig,
+  renderConfigTabs,
+  get currentTabConfig() { return currentTabConfig; },
+  set currentTabConfig(v) { currentTabConfig = v; }
+};
 let settingsPending = Promise.resolve();
 let renderTimer;
 let currentCache = {};
@@ -84,6 +255,12 @@ const draftBannerBtn = document.querySelector('#draft-banner-btn');
 if (draftBannerBtn) {
   draftBannerBtn.addEventListener('click', () => {
     activeTab = 'draft';
+    const draftTab = currentTabConfig.find((t) => t.id === 'draft');
+    if (draftTab && !draftTab.visible) {
+      draftTab.visible = true;
+      saveTabConfig(currentTabConfig);
+      applyTabConfig(currentTabConfig);
+    }
     const tabButtons = [...document.querySelectorAll('[data-tab]')];
     tabButtons.forEach((tab) => { tab.setAttribute('aria-selected', String(tab.dataset.tab === 'draft')); });
     search.value = '';
@@ -3714,13 +3891,15 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
   currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
   favoriteHeroes = new Set(Array.isArray(stored.favoriteHeroes) ? stored.favoriteHeroes.map(String) : []);
   favoriteTitans = new Set(Array.isArray(stored.favoriteTitans) ? stored.favoriteTitans.map(String) : []);
+  currentTabConfig = normalizeTabConfig(stored.tabConfig);
+  applyTabConfig(currentTabConfig);
   currentProductionRates = Object.fromEntries([1, 2, 3, 4, 5].map((id) =>
     [id, globalThis.hwaHelperProductionData.ratePerMinute(cache, id)]));
   const resources = resourceEntries(cache);
@@ -3811,6 +3990,7 @@ async function render() {
 
   if (activeTab === 'config') {
     status.textContent = 'Settings and data stored in this browser.';
+    renderConfigTabs();
     renderConfigOther(cache);
   } else if (activeTab === 'draft') {
     renderDraft(cache);
@@ -3986,6 +4166,13 @@ document.querySelector('#btn-refresh-quests')?.addEventListener('click', () => t
 document.querySelector('#btn-refresh-mail')?.addEventListener('click', () => triggerRefresh('mail'));
 document.querySelector('#mail-badge')?.addEventListener('click', () => triggerRefresh('mail'));
 
+document.querySelector('#btn-reset-tabs')?.addEventListener('click', async () => {
+  currentTabConfig = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
+  await saveTabConfig(currentTabConfig);
+  applyTabConfig(currentTabConfig);
+  renderConfigTabs();
+});
+
 document.querySelector('#clear-cache').addEventListener('click', async () => {
   await chrome.storage.local.remove(CACHE_KEY);
   await render();
@@ -4050,7 +4237,7 @@ document.querySelector('#clear').addEventListener('click', async () => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
     if ('captureSettings' in changes) renderSettings();
-    if (CACHE_KEY in changes || 'resourceSelection' in changes) queueRender();
+    if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
     queueRender();
   }
