@@ -39,6 +39,7 @@ class MockElement {
   }
   setAttribute(k, v) { this.attributes[k] = String(v); }
   getAttribute(k) { return this.attributes[k]; }
+  removeAttribute(k) { delete this.attributes[k]; }
   addEventListener() {}
   replaceChildren(...nodes) { this.children = nodes; }
   querySelector(selector) {
@@ -51,6 +52,29 @@ class MockElement {
 
 const otherList = new MockElement('div');
 const otherCount = new MockElement('span');
+const chatBadge = new MockElement('span');
+const chatCount = new MockElement('span');
+const chatMessages = new MockElement('div');
+const chatPanel = new MockElement('div');
+
+const mockLocalStorage = {};
+const mockChrome = {
+  storage: {
+    local: {
+      get: async (keys) => {
+        const res = {};
+        const list = Array.isArray(keys) ? keys : [keys];
+        for (const k of list) {
+          if (k in mockLocalStorage) res[k] = mockLocalStorage[k];
+        }
+        return res;
+      },
+      set: async (obj) => {
+        Object.assign(mockLocalStorage, obj);
+      }
+    }
+  }
+};
 
 const mockDoc = {
   createElement: (tag) => new MockElement(tag),
@@ -58,6 +82,10 @@ const mockDoc = {
   querySelector: (sel) => {
     if (sel === '#config-other-list') return otherList;
     if (sel === '#config-other-count') return otherCount;
+    if (sel === '#guild-chat-badge') return chatBadge;
+    if (sel === '#guild-chat-count') return chatCount;
+    if (sel === '#guild-chat-messages') return chatMessages;
+    if (sel === '#guild-chat-panel') return chatPanel;
     return null;
   }
 };
@@ -75,6 +103,8 @@ const context = {
   view,
   status,
   search,
+  chrome: mockChrome,
+  currentGuildChatLastReadTime: 0,
   showEmpty: (msg) => {
     const p = new MockElement('p');
     p.textContent = msg;
@@ -246,4 +276,84 @@ test('renderConfigOther populates other snapshots section with keys and count', 
   assert.equal(otherCount.textContent, '2 snapshots');
   assert.ok(otherList.textContent.includes('clanRaid_getInfo'));
   assert.ok(otherList.textContent.includes('user_getSettings'));
+});
+
+test('updateGuildChatBadge computes unread count accurately against lastReadTime and toggles badge', () => {
+  const cache = {
+    guildChat: {
+      data: {
+        messages: [
+          { id: '1', ctime: '1793530000', data: { text: 'Msg 1' } },
+          { id: '2', ctime: '1793531000', data: { text: 'Msg 2' } },
+          { id: '3', ctime: '1793532000', data: { text: 'Msg 3' } }
+        ]
+      }
+    }
+  };
+
+  // When lastReadTime is 0 (never read), all messages are unread
+  const unread1 = context.updateGuildChatBadge(cache, 0);
+  assert.equal(unread1, 3);
+  assert.equal(chatBadge.hidden, false);
+  assert.equal(chatBadge.textContent, '3');
+  assert.equal(chatCount.textContent, '3');
+
+  // When lastReadTime is 1793531000, only message 3 is unread
+  const unread2 = context.updateGuildChatBadge(cache, 1793531000);
+  assert.equal(unread2, 1);
+  assert.equal(chatBadge.hidden, false);
+  assert.equal(chatBadge.textContent, '1');
+
+  // When lastReadTime is 1793532000 (all read), badge is hidden
+  const unread3 = context.updateGuildChatBadge(cache, 1793532000);
+  assert.equal(unread3, 0);
+  assert.equal(chatBadge.hidden, true);
+  assert.equal(chatBadge.textContent, '');
+});
+
+test('markGuildChatAsRead persists max ctime in chrome.storage.local and clears badge', async () => {
+  const cache = {
+    guildChat: {
+      data: {
+        messages: [
+          { id: '1', ctime: '1793530000', data: { text: 'Msg 1' } },
+          { id: '2', ctime: '1793535000', data: { text: 'Msg 2' } }
+        ]
+      }
+    }
+  };
+
+  context.currentGuildChatLastReadTime = 1793530000;
+  await context.markGuildChatAsRead(cache);
+
+  assert.equal(context.currentGuildChatLastReadTime, 1793535000);
+  assert.equal(mockLocalStorage.guildChatLastReadTime, 1793535000);
+  assert.equal(chatBadge.hidden, true);
+});
+
+test('renderGuildChat flags messages newer than previousReadTime with New badge', () => {
+  view.replaceChildren();
+  search.value = '';
+  const cache = {
+    guildChat: {
+      data: {
+        messages: [
+          { id: '1', userId: '1001', ctime: '1793530000', chatType: 'clan', data: { text: 'Old message' } },
+          { id: '2', userId: '1001', ctime: '1793535000', chatType: 'clan', data: { text: 'Brand new message' } }
+        ],
+        users: { '1001': { id: '1001', name: 'Member1', level: '70', clanRole: '3' } }
+      }
+    }
+  };
+
+  // Pass previousReadTime as 1793530000 -> message 2 should have New badge
+  context.renderGuildChat(cache, false, 1793530000);
+
+  assert.equal(view.children.length, 2);
+  const oldCard = view.children[0];
+  const newCard = view.children[1];
+
+  assert.ok(!oldCard.textContent.includes('New'));
+  assert.ok(newCard.textContent.includes('New'));
+  assert.ok(newCard.textContent.includes('Brand new message'));
 });

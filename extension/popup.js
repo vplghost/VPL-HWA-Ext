@@ -27,6 +27,7 @@ let activeTab = 'heroes';
 let settingsPending = Promise.resolve();
 let renderTimer;
 let currentCache = {};
+let currentGuildChatLastReadTime = 0;
 let currentProductionRates = {};
 const sortState = {};
 
@@ -253,6 +254,15 @@ function refreshTimed() {
     if (bannerTimer) bannerTimer.textContent = formatted;
     const pageTimer = document.querySelector('#draft-countdown');
     if (pageTimer) pageTimer.textContent = formatted;
+  }
+  const chatPanel = document.querySelector('#guild-chat-panel');
+  if (!chatPanel || chatPanel.hidden) {
+    if (typeof activeTab === 'undefined' || activeTab !== 'chat') {
+      if (typeof updateGuildChatBadge === 'function') {
+        const lastRead = typeof currentGuildChatLastReadTime !== 'undefined' ? currentGuildChatLastReadTime : 0;
+        updateGuildChatBadge(currentCache, lastRead);
+      }
+    }
   }
 }
 
@@ -3156,10 +3166,53 @@ function renderConfigOther(cache) {
   }
 }
 
+function updateGuildChatBadge(cache, lastReadTime) {
+  const chatBadgeEl = document.querySelector?.('#guild-chat-badge');
+  const chatCountEl = document.querySelector?.('#guild-chat-count');
+  const messages = cache?.guildChat?.data?.messages || [];
+  const unreadCount = globalThis.hwaHelperPopupData?.getUnreadChatCount
+    ? globalThis.hwaHelperPopupData.getUnreadChatCount(messages, lastReadTime)
+    : (Array.isArray(messages) ? messages.filter((m) => Number(m.ctime || 0) > Number(lastReadTime || 0)).length : 0);
+
+  if (chatCountEl) {
+    chatCountEl.textContent = String(messages.length);
+  }
+  if (chatBadgeEl) {
+    if (unreadCount > 0) {
+      chatBadgeEl.hidden = false;
+      chatBadgeEl.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+      chatBadgeEl.title = `${unreadCount} unread guild message${unreadCount === 1 ? '' : 's'}`;
+    } else {
+      chatBadgeEl.hidden = true;
+      chatBadgeEl.textContent = '';
+      chatBadgeEl.title = '';
+      chatBadgeEl.removeAttribute?.('title');
+    }
+  }
+  return unreadCount;
+}
+
+async function markGuildChatAsRead(cache) {
+  const messages = cache?.guildChat?.data?.messages || [];
+  if (!messages.length) return 0;
+  const maxCtime = messages.reduce((max, m) => {
+    const t = Number(m.ctime || 0);
+    return t > max ? t : max;
+  }, 0);
+  if (maxCtime > currentGuildChatLastReadTime) {
+    currentGuildChatLastReadTime = maxCtime;
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      await chrome.storage.local.set({ guildChatLastReadTime: maxCtime }).catch(() => {});
+    }
+  }
+  updateGuildChatBadge(cache, currentGuildChatLastReadTime);
+  return currentGuildChatLastReadTime;
+}
+
 let chatVisibleCount = 15;
 let chatScrollListenerAttached = false;
 
-function renderGuildChat(cache, keepScroll = false) {
+function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   const visibleLimit = (typeof chatVisibleCount !== 'undefined') ? chatVisibleCount : (renderGuildChat.visibleCount || 15);
   renderGuildChat.visibleCount = visibleLimit;
   const chatData = cache?.guildChat?.data;
@@ -3181,10 +3234,12 @@ function renderGuildChat(cache, keepScroll = false) {
   const chatCountEl = document.querySelector?.('#guild-chat-count');
   const chatBadgeEl = document.querySelector?.('#guild-chat-badge');
 
-  if (chatCountEl) chatCountEl.textContent = String(filtered.length);
+  if (chatCountEl) chatCountEl.textContent = String(rawMessages.length);
   if (chatBadgeEl) {
-    chatBadgeEl.hidden = filtered.length === 0;
-    chatBadgeEl.textContent = filtered.length > 99 ? '99+' : String(filtered.length);
+    chatBadgeEl.hidden = true;
+    chatBadgeEl.textContent = '';
+    chatBadgeEl.title = '';
+    chatBadgeEl.removeAttribute?.('title');
   }
 
   const targetEl = chatMessagesEl || view;
@@ -3280,6 +3335,12 @@ function renderGuildChat(cache, keepScroll = false) {
       header.append(levelBadge);
     }
     header.append(roleBadge, timeSpan);
+    if (previousReadTime > 0 && Number(m.ctime || 0) > previousReadTime) {
+      const newBadge = document.createElement('span');
+      newBadge.className = 'rounded bg-emerald-100 px-1.5 py-0.2 text-[9px] font-bold text-emerald-800 ring-1 ring-emerald-300';
+      newBadge.textContent = 'New';
+      header.append(newBadge);
+    }
 
     const body = document.createElement('div');
     body.className = 'mt-1 text-xs text-slate-800 break-words whitespace-pre-wrap select-text pl-6.5';
@@ -3321,10 +3382,11 @@ function renderGuildChat(cache, keepScroll = false) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
+  currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
   currentProductionRates = Object.fromEntries([1, 2, 3, 4, 5].map((id) =>
     [id, globalThis.hwaHelperProductionData.ratePerMinute(cache, id)]));
   const resources = resourceEntries(cache);
@@ -3445,7 +3507,9 @@ async function render() {
     showSnapshot(cache.teamGetAll, ['Mode', 'Team', 'Members', 'Hero/Titan names'], (data) =>
       globalThis.hwaHelperPopupData.teamRows(data, globalThis.hwaHelperNameMap));
   } else if (activeTab === 'chat') {
-    renderGuildChat(cache);
+    const prevRead = currentGuildChatLastReadTime;
+    renderGuildChat(cache, false, prevRead);
+    await markGuildChatAsRead(cache);
   } else if (activeTab === 'events') {
     renderEvents(cache);
   } else if (activeTab === 'goals') {
@@ -3484,6 +3548,13 @@ async function render() {
     } else showEmpty('No other snapshots observed yet.');
   } else {
     renderLog(await recordedEntries(), recordingState);
+  }
+  const chatPanel = document.querySelector('#guild-chat-panel');
+  if (chatPanel && !chatPanel.hidden) {
+    await markGuildChatAsRead(cache);
+    renderGuildChat(cache, true);
+  } else if (activeTab !== 'chat') {
+    updateGuildChatBadge(cache, currentGuildChatLastReadTime);
   }
 }
 
@@ -3591,15 +3662,20 @@ const chatFab = document.querySelector('#guild-chat-fab');
 const chatPanel = document.querySelector('#guild-chat-panel');
 const chatClose = document.querySelector('#guild-chat-close');
 if (chatFab && chatPanel) {
-  chatFab.addEventListener('click', () => {
+  chatFab.addEventListener('click', async () => {
     chatPanel.hidden = !chatPanel.hidden;
     if (!chatPanel.hidden) {
-      renderGuildChat(currentCache);
+      const prevRead = currentGuildChatLastReadTime;
+      renderGuildChat(currentCache, false, prevRead);
+      await markGuildChatAsRead(currentCache);
+    } else {
+      updateGuildChatBadge(currentCache, currentGuildChatLastReadTime);
     }
   });
 }
 if (chatClose && chatPanel) {
   chatClose.addEventListener('click', () => {
     chatPanel.hidden = true;
+    updateGuildChatBadge(currentCache, currentGuildChatLastReadTime);
   });
 }

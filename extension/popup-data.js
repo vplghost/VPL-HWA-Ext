@@ -988,10 +988,17 @@
     };
   }
 
+  function getUnreadChatCount(messages, lastReadTime) {
+    if (!Array.isArray(messages) || messages.length === 0) return 0;
+    const threshold = Number(lastReadTime) || 0;
+    if (threshold <= 0) return messages.length;
+    return messages.filter((m) => Number(m.ctime || 0) > threshold).length;
+  }
+
   globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
     buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, exportTableData,
-    getChallengeResourceStock, normalizeGoalKey, extractEventGoals };
+    getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount };
 })();

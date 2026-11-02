@@ -8,7 +8,7 @@ for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'res
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 const { heroSoulProgress, teamRows, sortRows, isNumericColumn,
-  rallyTooltip, getChallengeResourceStock, extractEventGoals } = context.hwaHelperPopupData;
+  rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount } = context.hwaHelperPopupData;
 
 test('hero soul progress uses inventory fragments and next-star cost', () => {
   assert.deepEqual({ ...heroSoulProgress('1', { star: 3 }, { fragmentHero: { 1: 73 } }) },
@@ -601,4 +601,29 @@ test('getChallengeResourceStock resolves emerald and starmoney balances', () => 
   };
   assert.equal(getChallengeResourceStock(cache, 'Spend Emeralds'), 12500);
   assert.equal(getChallengeResourceStock(cache, 'Spend StarMoney'), 12500);
+});
+
+test('getUnreadChatCount calculates unread count accurately against lastReadTime', () => {
+  assert.equal(getUnreadChatCount(null, 1000), 0);
+  assert.equal(getUnreadChatCount([], 1000), 0);
+
+  const messages = [
+    { id: '1', ctime: '100' },
+    { id: '2', ctime: '200' },
+    { id: '3', ctime: '300' }
+  ];
+
+  // When lastReadTime <= 0, all messages are unread
+  assert.equal(getUnreadChatCount(messages, 0), 3);
+  assert.equal(getUnreadChatCount(messages, null), 3);
+
+  // When lastReadTime is 150, messages 2 and 3 are unread
+  assert.equal(getUnreadChatCount(messages, 150), 2);
+
+  // When lastReadTime is 250, only message 3 is unread
+  assert.equal(getUnreadChatCount(messages, 250), 1);
+
+  // When lastReadTime is 300 or greater, no messages are unread
+  assert.equal(getUnreadChatCount(messages, 300), 0);
+  assert.equal(getUnreadChatCount(messages, 500), 0);
 });
