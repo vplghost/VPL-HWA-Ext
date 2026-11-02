@@ -14,22 +14,37 @@ window.addEventListener('message', (event) => {
   if (event.data?.source !== 'hwa-helper-api') return;
   if (event.data.kind === 'ready') return sendControl();
   if (event.data.kind !== 'api-record') return;
-  chrome.runtime.sendMessage({ kind: 'api-record', record: event.data.record }).then(() => syncRecordingState()).catch(() => {});
+  if (!chrome.runtime?.id) return;
+  try {
+    const p = chrome.runtime?.sendMessage?.({ kind: 'api-record', record: event.data.record });
+    if (p && typeof p.then === 'function') {
+      p.then(() => syncRecordingState()).catch(() => {});
+    }
+  } catch {
+    // Extension context was invalidated; ignore safely
+  }
 });
 
-chrome.storage.local.get('captureSettings').then((stored) => {
-  currentSettings = stored.captureSettings || {};
-  sendControl();
-}).catch(() => {
+try {
+  chrome.storage?.local?.get?.('captureSettings')?.then?.((stored) => {
+    currentSettings = stored?.captureSettings || {};
+    sendControl();
+  })?.catch?.(() => {
+    currentSettings = {};
+    sendControl();
+  });
+} catch {
   currentSettings = {};
   sendControl();
-});
+}
 
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !('captureSettings' in changes)) return;
-  currentSettings = changes.captureSettings.newValue || {};
-  sendControl();
-});
+try {
+  chrome.storage?.onChanged?.addListener?.((changes, area) => {
+    if (area !== 'local' || !('captureSettings' in changes)) return;
+    currentSettings = changes.captureSettings.newValue || {};
+    sendControl();
+  });
+} catch {}
 
 chrome.runtime?.onMessage?.addListener((message) => {
   if (message?.kind === 'draft-action') {
@@ -104,6 +119,7 @@ function injectHelperButton() {
 
   syncRecordingState = async () => {
     try {
+      if (!chrome.runtime?.id) return;
       const p = chrome.runtime?.sendMessage?.({ kind: 'record-status' });
       if (!p) return;
       const res = typeof p.then === 'function' ? await p : null;
@@ -130,8 +146,8 @@ function injectHelperButton() {
       const clrTitle = `Clear ${count} API log record${count === 1 ? '' : 's'}`;
       clearBtn.title = clrTitle;
       clearBtn.setAttribute('aria-label', clrTitle);
-    } catch (err) {
-      handleContextInvalidated(err);
+    } catch {
+      // Ignore background sync failure when extension context is invalidated
     }
   };
 

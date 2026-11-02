@@ -150,3 +150,49 @@ test('bridge helper button click safely handles extension context invalidated er
   });
   assert.match(alertedMessage, /reloaded|updated|refresh/);
 });
+
+test('bridge window message safely handles extension context invalidated without uncaught error', async () => {
+  let messageHandler = null;
+  const window = {
+    addEventListener: (event, handler) => {
+      if (event === 'message') messageHandler = handler;
+    },
+    postMessage: () => {}
+  };
+  const chrome = {
+    runtime: {
+      get id() { return undefined; },
+      sendMessage: () => {
+        throw new Error('Extension context invalidated.');
+      }
+    },
+    storage: {
+      local: { get: async () => ({}) },
+      onChanged: { addListener: () => {} }
+    }
+  };
+
+  runInNewContext(source, {
+    window,
+    document: {
+      readyState: 'complete',
+      getElementById: (id) => (id === 'hwa-helper-btn' ? {} : null),
+      createElement: () => ({ setAttribute: () => {}, addEventListener: () => {} })
+    },
+    chrome,
+    location: { origin: 'https://www.hero-wars-alliance.com' }
+  });
+
+  assert.ok(messageHandler, 'Message listener should be registered');
+  assert.doesNotThrow(() => {
+    messageHandler({
+      source: window,
+      origin: 'https://www.hero-wars-alliance.com',
+      data: {
+        source: 'hwa-helper-api',
+        kind: 'api-record',
+        record: { endpoint: 'api/rpc', durationMs: 100 }
+      }
+    });
+  });
+});
