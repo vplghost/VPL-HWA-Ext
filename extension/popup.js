@@ -3163,11 +3163,14 @@ function renderGuildChat(cache, keepScroll = false) {
   const visibleLimit = (typeof chatVisibleCount !== 'undefined') ? chatVisibleCount : (renderGuildChat.visibleCount || 15);
   renderGuildChat.visibleCount = visibleLimit;
   const chatData = cache?.guildChat?.data;
-  const messages = Array.isArray(chatData?.messages) ? chatData.messages : [];
+  const rawMessages = Array.isArray(chatData?.messages) ? chatData.messages : [];
   const users = chatData?.users || {};
 
+  // Sort messages chronologically ascending (oldest at top, newest at bottom) for standard chat UI dialog flow
+  const sortedMessages = [...rawMessages].sort((a, b) => Number(a.ctime || 0) - Number(b.ctime || 0));
+
   const query = (typeof search !== 'undefined' && search?.value) ? search.value.trim().toLowerCase() : '';
-  const filtered = messages.filter((m) => {
+  const filtered = sortedMessages.filter((m) => {
     if (!query) return true;
     const text = (m.data?.text || '').toLowerCase();
     const sender = (users[m.userId]?.name || m.userId || '').toLowerCase();
@@ -3195,7 +3198,7 @@ function renderGuildChat(cache, keepScroll = false) {
     targetEl.replaceChildren();
     const emptyP = document.createElement('p');
     emptyP.className = 'text-xs text-slate-400 italic p-3 text-center';
-    emptyP.textContent = (messages.length > 0 && query)
+    emptyP.textContent = (rawMessages.length > 0 && query)
       ? `No guild messages matching "${query}".`
       : 'No guild chat messages observed yet. Open Guild Chat in game to sync.';
     targetEl.append(emptyP);

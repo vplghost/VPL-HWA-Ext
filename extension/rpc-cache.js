@@ -16,7 +16,8 @@
     'getTrainings:unit': 'teams',
     questGetAll: 'other',
     missionGetAll: 'other',
-    'getDailyQuests:quest': 'other',
+    'getDailyQuests:quest': 'events',
+    'getSpecialQuestState:quest': 'events',
     clanBoss_getAll: 'other',
     clanWarGetBriefInfo: 'other',
     'getInfo:clanVersus': 'events',
@@ -519,6 +520,16 @@
             feature: null,
             group: 'events',
             data: { events: result.response },
+            updatedAt: record.timestamp
+          }];
+        }
+        if ((call.name === 'getSpecialQuestState' || call.name === 'getDailyQuests') && result?.response?.events) {
+          return [{
+            key: 'specialQuestStatus',
+            method: call.name,
+            feature: call.feature || null,
+            group: 'events',
+            data: { events: result.response.events },
             updatedAt: record.timestamp
           }];
         }
@@ -1552,6 +1563,27 @@
               users: mergedUsers
             },
             updatedAt: latestTime
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'specialQuestStatus') {
+          const existing = next.specialQuestStatus?.data?.events || [];
+          const incoming = entry.data?.events || [];
+          const evMap = new Map();
+          for (const ev of existing) {
+            if (ev?.id) evMap.set(ev.id, ev);
+          }
+          for (const ev of incoming) {
+            if (ev?.id) evMap.set(ev.id, ev);
+          }
+          next.specialQuestStatus = {
+            key: 'specialQuestStatus',
+            method: entry.method,
+            feature: entry.feature,
+            group: 'events',
+            data: { events: Array.from(evMap.values()) },
+            updatedAt: entry.updatedAt
           };
           changed = true;
           continue;

@@ -504,3 +504,101 @@ test('extractEventGoals groups activities and resources, calculates synergies, a
   assert.ok(goals.resources[0].overlapCount > 1);
   assert.ok(goals.activities[0].overlapCount > 1);
 });
+
+test('extractEventGoals mines specialQuestStatus and questGetAll into goals and finds synergies', () => {
+  const cache = {
+    clanVersusStatus: {
+      data: {
+        battle: { rounds: [{ index: 1, status: 'inProgress' }] },
+        info: {
+          challenges: [
+            { id: 31, progress: 5 },  // Tower Chest
+            { id: 54, progress: 10 }  // Titan Skin Stones
+          ]
+        }
+      }
+    },
+    specialQuestStatus: {
+      data: {
+        events: [
+          {
+            id: 100347,
+            groups: [
+              {
+                id: 101,
+                localeKey: 'QUEST_TAB_NAME_TOWER_CHESTS',
+                repeatType: 'chain',
+                quests: [
+                  { id: 1, state: 'inProgress', progress: 5 }
+                ]
+              },
+              {
+                id: 102,
+                localeKey: 'QUEST_TAB_NAME_TITAN_SKINSTONES_SPEND',
+                repeatType: 'chain',
+                quests: [
+                  { id: 2, state: 'inProgress', progress: 15 }
+                ]
+              },
+              {
+                id: 103,
+                localeKey: 'QUEST_TAB_NAME_LOGIN',
+                repeatType: 'daily',
+                quests: [
+                  { id: 3, state: 'inProgress', progress: 1 }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    questGetAll: {
+      data: [
+        { id: 1020640, state: 2, progress: 4 }, // ready to claim!
+        { id: 249, state: 1, progress: 0 }
+      ]
+    },
+    inventoryGet: {
+      data: {
+        coin: { '20': 500 }
+      }
+    }
+  };
+
+  const goals = extractEventGoals(cache);
+  assert.ok(goals.all.length > 0);
+
+  // Tower should have 3x synergy: Round 1 + Daily Challenge + Special Quest
+  const tower = goals.activities.find(a => a.key === 'act:tower');
+  assert.ok(tower);
+  assert.equal(tower.overlapCount, 3);
+  assert.equal(tower.events.length, 3);
+  assert.ok(tower.isLimited);
+
+  // Titan Skin Stones should have 3x synergy: Round 1 + Daily Challenge + Special Quest
+  const titanStones = goals.resources.find(r => r.key === 'res:titan_skin_stones');
+  assert.ok(titanStones);
+  assert.equal(titanStones.overlapCount, 3);
+  assert.equal(titanStones.inStock, true);
+  assert.equal(titanStones.stock, 500);
+
+  // Claim completed quests should be extracted as ready activity
+  const claimGoal = goals.activities.find(a => a.key === 'act:claim_completed_quests');
+  assert.ok(claimGoal);
+  assert.equal(claimGoal.needed, 1);
+  assert.ok(claimGoal.isLimited);
+
+  // Login quest extracted
+  const loginGoal = goals.activities.find(a => a.key === 'act:login');
+  assert.ok(loginGoal);
+  assert.ok(loginGoal.isLimited);
+});
+
+test('getChallengeResourceStock resolves emerald and starmoney balances', () => {
+  const cache = {
+    'resource:starMoney': { data: { amount: 12500 } }
+  };
+  assert.equal(getChallengeResourceStock(cache, 'Spend Emeralds'), 12500);
+  assert.equal(getChallengeResourceStock(cache, 'Spend StarMoney'), 12500);
+});

@@ -551,6 +551,11 @@
       return Number(coins['2']) || 0;
     }
 
+    // 18. Emeralds / StarMoney
+    if (tStr.includes('emerald') || tStr.includes('starmoney')) {
+      return cache['resource:starMoney']?.data?.amount ?? cache.userGetInfo?.data?.user?.starMoney ?? null;
+    }
+
     return null;
   }
 
@@ -568,14 +573,15 @@
     if (s.includes('rune sphere')) return 'res:rune_spheres';
     if (s.includes('rune stone')) return 'res:rune_stones';
     if (s.includes('mastery crystal')) return 'res:mastery_crystals';
-    if (s.includes('spend') && s.includes('energy')) return 'res:energy';
+    if ((s.includes('spend') && s.includes('energy')) || s.includes('pseudo_stamina')) return 'res:energy';
+    if (s.includes('emerald') || s.includes('starmoney')) return 'res:emerald_spend';
     if (s.includes('hero soul stone')) return 'res:hero_soul_stones';
     if (s.includes('skill book')) return 'res:skill_books';
     if (s.includes('honor mark')) return 'res:honor_marks';
     if (s.includes('outland chest')) return 'res:outland_chests';
     if (s.includes('building speedup')) return 'res:building_speedups';
     if (s.includes('research speedup')) return 'res:research_speedups';
-    if (s.includes('training speedup')) return 'res:training_speedups';
+    if (s.includes('training speedup') || s.includes('train_speedup')) return 'res:training_speedups';
     if (s.includes('healing speedup')) return 'res:healing_speedups';
 
     // Activities
@@ -584,16 +590,24 @@
     if (s.includes('boss') || s.includes('rally')) return 'act:map_boss';
     if (s.includes('monster')) return 'act:map_monster';
     if (s.includes('expedition')) return 'act:expedition';
-    if (s.includes('daily quest')) return 'act:daily_quest';
+    if (s.includes('daily quest') || s.includes('claim completed')) return 'act:daily_quest';
     if (s.includes('grand arena')) return 'act:grand_arena';
     if (s.includes('arena')) return 'act:arena';
+    if (s.includes('login') || s.includes('sign in')) return 'act:login';
+    if (s.includes('vip')) return 'act:vip_points';
+    if (s.includes('artlevel') || s.includes('artifact level')) return 'act:artifact_level';
+    if (s.includes('artifact evolution') || s.includes('artifact_evolution')) return 'act:artifact_evolution';
+    if (s.includes('hero rank') || s.includes('hero_rank')) return 'act:hero_rank';
+    if (s.includes('hero level') || s.includes('hero_level')) return 'act:hero_level';
+    if (s.includes('altar')) return 'act:clan_altar';
+    if (s.includes('battle pass') || s.includes('bp_daily')) return 'act:battle_pass_daily';
     if (s.includes('gather') || s.includes('food') || s.includes('wood') || s.includes('stone') || s.includes('iron')) return 'act:gathering';
     if (s.includes('titan power')) return 'act:titan_power';
     if (s.includes('hero power')) return 'act:hero_power';
     if (s.includes('building power')) return 'act:building_power';
     if (s.includes('research power')) return 'act:research_power';
     if (s.includes('train') && s.includes('troop')) return 'act:train_troops';
-    if (s.includes('unit in pvp')) return 'act:pvp_clash';
+    if (s.includes('unit in pvp') || s.includes('loseunits') || s.includes('pvp unit')) return 'act:pvp_clash';
     if (s.includes('equip') && s.includes('item')) return 'act:equip_items';
     if (s.includes('dungeon')) return 'act:dungeon';
     if (s.includes('guild war')) return 'act:guild_war';
@@ -615,6 +629,7 @@
     'res:rune_stones': '🪨',
     'res:mastery_crystals': '🔶',
     'res:energy': '⚡',
+    'res:emerald_spend': '💎',
     'res:hero_soul_stones': '✨',
     'res:skill_books': '📖',
     'res:honor_marks': '🎖️',
@@ -640,7 +655,19 @@
     'act:pvp_clash': '⚔️',
     'act:equip_items': '🗡️',
     'act:dungeon': '🏰',
-    'act:guild_war': '🏆'
+    'act:guild_war': '🏆',
+    'act:login': '📅',
+    'act:vip_points': '⭐',
+    'act:artifact_level': '⚔️',
+    'act:artifact_evolution': '🌟',
+    'act:hero_rank': '🎖️',
+    'act:hero_level': '📈',
+    'act:clan_altar': '🙏',
+    'act:battle_pass_daily': '🎟️',
+    'act:battle_pass_milestone': '🏅',
+    'act:seasonal_faction_1': '🛡️',
+    'act:seasonal_faction_2': '⚔️',
+    'act:claim_completed_quests': '🎁'
   };
 
   const dailyLimitedKeys = new Set([
@@ -650,8 +677,50 @@
     'act:arena',
     'act:grand_arena',
     'act:guild_war',
-    'act:dungeon'
+    'act:dungeon',
+    'act:login',
+    'act:claim_completed_quests',
+    'act:clan_altar'
   ]);
+
+  const questLocaleMap = {
+    QUEST_TAB_NAME_SKINSTONES_SPEND: { key: 'res:hero_skin_stones', title: 'Spend Hero Skin Stones', category: 'Resources', unit: 'stones', amount: 100 },
+    QUEST_TAB_NAME_TITAN_SKINSTONES_SPEND: { key: 'res:titan_skin_stones', title: 'Spend Titan Skin Stones', category: 'Resources', unit: 'stones', amount: 15 },
+    LIB_PSEUDO_STAMINA: { key: 'res:energy', title: 'Spend Energy', category: 'Resources', unit: 'energy', amount: 100 },
+    LIB_PSEUDO_STARMONEY: { key: 'res:emerald_spend', title: 'Spend Emeralds', category: 'Resources', unit: 'emeralds', amount: 100 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TRAIN_SPEEDUP: { key: 'res:training_speedups', title: 'Use Training Speedups', category: 'Resources', unit: 'speedups', amount: 1 },
+    RECOMMENDATION_RUNES_NEW: { key: 'res:rune_stones', title: 'Upgrade Runes', category: 'Resources', unit: 'runes', amount: 1 },
+    QUEST_TAB_NAME_TOWER_CHESTS: { key: 'act:tower', title: 'Open 1 Tower Chest', category: 'Activities', unit: 'chests', amount: 1 },
+    UI_FEATURE_HUB_ARENA_TITLE: { key: 'act:arena', title: 'Fight 1 Arena Battle', category: 'Activities', unit: 'battles', amount: 1 },
+    STRATEGIC_GLOBAL_MAP_RALLY_POPUP_TITLE: { key: 'act:map_boss', title: 'Defeat 1 Map Boss / Rally', category: 'Activities', unit: 'bosses', amount: 1 },
+    QUEST_TAB_NAME_GET_VIP: { key: 'act:vip_points', title: 'Obtain 1 VIP Point', category: 'Activities', unit: 'points', amount: 1 },
+    QUEST_TAB_NAME_LOGIN: { key: 'act:login', title: 'Daily Sign In', category: 'Activities', unit: 'days', amount: 1 },
+    UI_DIALOG_HERO_ARTIFACTS_ARTIFACT_EVOLUTION: { key: 'act:artifact_evolution', title: 'Evolve Hero Artifacts', category: 'Activities', unit: 'evolutions', amount: 1 },
+    QUEST_TAB_NAME_ARTLEVEL: { key: 'act:artifact_level', title: 'Level Up Artifacts', category: 'Activities', unit: 'levels', amount: 1 },
+    QUEST_TAB_NAME_HERO_RANK: { key: 'act:hero_rank', title: 'Promote Hero Rank', category: 'Activities', unit: 'ranks', amount: 1 },
+    QUEST_TAB_HERO_LEVEL: { key: 'act:hero_level', title: 'Level Up Heroes', category: 'Activities', unit: 'levels', amount: 1 },
+    UI_CLANBOSS_MENU_ALTAR: { key: 'act:clan_altar', title: 'Pray at Clan Altar', category: 'Activities', unit: 'prayers', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_LOSEUNITS: { key: 'act:pvp_clash', title: 'PvP Unit Battles', category: 'Activities', unit: 'units', amount: 1 },
+    LIB_TEST_BP_DAILY_QUESTS: { key: 'act:battle_pass_daily', title: 'Battle Pass Daily Quests', category: 'Activities', unit: 'quests', amount: 1 },
+    LIB_TEST_BP_SINGLE_QUESTS: { key: 'act:battle_pass_milestone', title: 'Battle Pass Milestones', category: 'Activities', unit: 'milestones', amount: 1 },
+    LIB_SEASONAL_EVENT_NAME_FACTION_1: { key: 'act:seasonal_faction_1', title: 'Faction Quests: Honor', category: 'Activities', unit: 'quests', amount: 1 },
+    LIB_SEASONAL_EVENT_NAME_FACTION_2: { key: 'act:seasonal_faction_2', title: 'Faction Quests: Mastery', category: 'Activities', unit: 'quests', amount: 1 }
+  };
+
+  const knownEventNames = {
+    100273: 'Demon Skin Festival',
+    100292: 'Soleil Upgrade Event',
+    100309: 'Battle Pass Daily',
+    100344: 'Titan & Combat Event',
+    100347: 'Hero Advancement Festival',
+    100351: 'Faction Clash',
+    100353: 'Battle Pass Daily',
+    100356: 'Battle Pass Season',
+    90249: 'Soleil Upgrade Event',
+    97682: 'Demon Skin Festival',
+    ADVENTURE_HERO62_TITLE_EVENT_UPGRADE: 'Soleil Upgrade Event',
+    DAEMONSKIN22_UI_TITLE: 'Demon Skin Festival'
+  };
 
   function extractEventGoals(cache) {
     const goalsMap = new Map();
@@ -782,11 +851,11 @@
     const questEvents = cache?.questEvents?.data?.events;
     if (Array.isArray(questEvents)) {
       for (const qe of questEvents) {
-        const titleMap = {
-          ADVENTURE_HERO62_TITLE_EVENT_UPGRADE: 'Soleil Upgrade Event',
-          DAEMONSKIN22_UI_TITLE: 'Demon Skin Festival'
-        };
-        const title = titleMap[qe.name_localeKey] || qe.name_localeKey?.replace(/_/g, ' ') || `Special Event #${qe.id}`;
+        const title = knownEventNames[qe.name_localeKey] || knownEventNames[qe.id] || qe.name_localeKey?.replace(/_/g, ' ') || `Special Event #${qe.id}`;
+        const hasDetailedGroups = Array.isArray(cache?.specialQuestStatus?.data?.events)
+          && cache.specialQuestStatus.data.events.some((e) => e.id === qe.id && Array.isArray(e.groups) && e.groups.length > 0);
+        if (hasDetailedGroups) continue;
+
         addOrMergeGoal({
           key: `act:special_event_${qe.id}`,
           title: `Special Quest: ${title}`,
@@ -799,6 +868,87 @@
           hint: 'Active special event quests and milestones'
         });
       }
+    }
+
+    // 5. Special Quest Status (Detailed Chains & Daily Tasks from getSpecialQuestState / getDailyQuests)
+    const specialEvents = cache?.specialQuestStatus?.data?.events
+      || cache?.['getSpecialQuestState:quest']?.data?.events
+      || cache?.['getDailyQuests:quest']?.data?.events;
+
+    if (Array.isArray(specialEvents)) {
+      for (const ev of specialEvents) {
+        const evTitle = knownEventNames[ev.id] || `Special Event #${ev.id}`;
+        for (const group of ev.groups || []) {
+          if (group.hide) continue;
+          const questsList = Array.isArray(group.quests) ? group.quests : [];
+          const activeQ = questsList.find((q) => q.state === 'inProgress');
+          const completedCount = questsList.filter((q) => q.state === 'completed').length;
+          if (!activeQ && completedCount === questsList.length && questsList.length > 0) continue;
+
+          const mapping = questLocaleMap[group.localeKey];
+          const repeatLabel = group.repeatType === 'daily' ? 'Daily' : 'Chain';
+          const subEventName = `${evTitle} (${repeatLabel})`;
+
+          if (mapping) {
+            const stock = mapping.category === 'Resources'
+              ? getChallengeResourceStock(cache, mapping.title)
+              : null;
+            const progress = activeQ?.progress || 0;
+            const hint = activeQ
+              ? `Tier progress: ${progress.toLocaleString()} (${completedCount}/${questsList.length} completed)`
+              : `${completedCount}/${questsList.length} completed`;
+
+            addOrMergeGoal({
+              key: mapping.key,
+              title: mapping.title,
+              category: mapping.category,
+              eventName: subEventName,
+              amount: mapping.amount || 1,
+              unit: mapping.unit || '',
+              points: 0,
+              stock,
+              hint
+            });
+          } else if (group.localeKey) {
+            const humanTitle = group.localeKey
+              .replace(/^(LIB_SPECIAL_QUEST_EVENT_|LIB_SEASONAL_EVENT_NAME_|QUEST_TAB_|UI_)/, '')
+              .replace(/_/g, ' ')
+              .toLowerCase()
+              .replace(/\b\w/g, (c) => c.toUpperCase());
+            const key = normalizeGoalKey(group.localeKey);
+            addOrMergeGoal({
+              key,
+              title: humanTitle,
+              category: 'Activities',
+              eventName: subEventName,
+              amount: 1,
+              unit: 'tier',
+              points: 0,
+              stock: null,
+              hint: activeQ ? `In progress (${completedCount}/${questsList.length})` : `${completedCount} completed`
+            });
+          }
+        }
+      }
+    }
+
+    // 6. Game Quests (questGetAll - completed rewards ready to claim)
+    const allQuests = Array.isArray(cache?.questGetAll?.data)
+      ? cache.questGetAll.data
+      : (Array.isArray(cache?.questGetAll) ? cache.questGetAll : []);
+    const readyQuests = allQuests.filter((q) => q.state === 2);
+    if (readyQuests.length > 0) {
+      addOrMergeGoal({
+        key: 'act:claim_completed_quests',
+        title: `Claim Completed Quests (${readyQuests.length} ready)`,
+        category: 'Activities',
+        eventName: 'Daily Quests',
+        amount: readyQuests.length,
+        unit: 'quests',
+        points: 0,
+        stock: null,
+        hint: `${readyQuests.length} completed quest${readyQuests.length > 1 ? 's' : ''} waiting to collect rewards in game`
+      });
     }
 
     // Sort comparator:

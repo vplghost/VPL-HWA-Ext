@@ -208,6 +208,32 @@ test('renderGuildChat limits visible messages to latest batch and indicates olde
   assert.ok(!view.textContent.includes('Message number 10'));
 });
 
+test('renderGuildChat sorts messages chronologically ascending with newest at the bottom', () => {
+  view.replaceChildren();
+  search.value = '';
+  // Messages provided out of order / descending ctime (as cached from server)
+  const messages = [
+    { id: '3', userId: '1001', ctime: '1793539000', chatType: 'clan', data: { text: 'Newest message (bottom)', clanRole: '3' } },
+    { id: '1', userId: '1001', ctime: '1793537000', chatType: 'clan', data: { text: 'Oldest message (top)', clanRole: '3' } },
+    { id: '2', userId: '1001', ctime: '1793538000', chatType: 'clan', data: { text: 'Middle message', clanRole: '3' } }
+  ];
+  const cache = {
+    guildChat: {
+      data: {
+        messages,
+        users: { '1001': { id: '1001', name: 'Member1', level: '60', clanRole: '3' } }
+      }
+    }
+  };
+
+  context.renderGuildChat(cache);
+  assert.equal(status.textContent, '3 guild messages');
+  assert.equal(view.children.length, 3);
+  assert.ok(view.children[0].textContent.includes('Oldest message (top)'));
+  assert.ok(view.children[1].textContent.includes('Middle message'));
+  assert.ok(view.children[2].textContent.includes('Newest message (bottom)'));
+});
+
 test('renderConfigOther populates other snapshots section with keys and count', () => {
   otherList.replaceChildren();
   const cache = {
