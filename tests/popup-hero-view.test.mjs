@@ -172,7 +172,7 @@ test('createHeroInline renders skills, skins, glyphs, artifacts, and spark of po
 
 test('createHeroInline renders accurate glyph stats and titles for Dante and Somna', () => {
   const { createHeroInline } = context;
-  // Dante (Hero 16): PA: 30, Arm: 15, HP: 6, Dodge: 23, Agi: 15
+  // Dante (Hero 16): PA: 30, Arm: 15, HP: 6, Ddg: 23, Agi: 15
   const danteCard = createHeroInline('16', 'Dante', {
     star: 5,
     hero_runes: [30, 15, 6, 23, 15]
@@ -181,7 +181,7 @@ test('createHeroInline renders accurate glyph stats and titles for Dante and Som
   assert.ok(danteText.includes('PA: 30'), 'Dante should have PA glyph');
   assert.ok(danteText.includes('Arm: 15'), 'Dante should have Arm glyph');
   assert.ok(danteText.includes('HP: 6'), 'Dante should have HP glyph');
-  assert.ok(danteText.includes('Dodge: 23'), 'Dante should have Dodge glyph');
+  assert.ok(danteText.includes('Ddg: 23'), 'Dante should have Ddg glyph');
   assert.ok(danteText.includes('Agi: 15'), 'Dante should have Agi glyph');
 
   // Somna (Hero 70): PA: 15, HP: 10, Tough: 10, Arm: 0, Agi: 0
@@ -351,7 +351,7 @@ test('favorite hero icon toggles favorite state and prioritizes favorite heroes 
   context.favoriteHeroes.clear();
 });
 
-test('createHeroInline renders Dante skin stats accurately with Dodge for skin 58', () => {
+test('createHeroInline renders Dante skin stats accurately with Ddg for skin 58', () => {
   const { createHeroInline } = context;
   const danteSnapshot = {
     star: 3,
@@ -365,7 +365,7 @@ test('createHeroInline renders Dante skin stats accurately with Dodge for skin 5
   const card = container.querySelector('.hero-hover-card');
   assert.ok(card, 'Card should exist');
   assert.ok(card.textContent.includes('Agi: 32'), 'Base skin should show Agi');
-  assert.ok(card.textContent.includes('Dodge: 21'), 'Active skin 58 should show Dodge');
+  assert.ok(card.textContent.includes('Ddg: 21'), 'Active skin 58 should show Ddg');
   assert.ok(!card.textContent.includes('PA: 21'), 'Skin 58 should NOT show PA');
 });
 
@@ -504,15 +504,13 @@ test('table renders Artifacts column with bold level when upgradable', () => {
 });
 
 test('popup header displays extension version formatted as v.#.#.#', () => {
-  const versionEl = new MockElement('strong');
-  versionEl.attributes.id = 'version';
   const headerVersionEl = new MockElement('span');
   headerVersionEl.attributes.id = 'extension-header-version';
 
   const doc = {
     ...mockDoc,
     querySelector: (sel) => {
-      if (sel === '#version') return versionEl;
+      if (sel === '#version') return null;
       if (sel === '#extension-header-version') return headerVersionEl;
       return mockDoc.createElement('div');
     }
@@ -522,7 +520,7 @@ test('popup header displays extension version formatted as v.#.#.#', () => {
     document: doc,
     chrome: {
       runtime: {
-        getManifest: () => ({ version: '0.9.29' })
+        getManifest: () => ({ version: '0.9.30' })
       }
     }
   };
@@ -533,6 +531,5 @@ test('popup header displays extension version formatted as v.#.#.#', () => {
   );
   vm.runInNewContext(verSnippet, vContext);
 
-  assert.equal(versionEl.textContent, '0.9.29');
-  assert.equal(headerVersionEl.textContent, 'v.0.9.29');
+  assert.equal(headerVersionEl.textContent, 'v.0.9.30');
 });

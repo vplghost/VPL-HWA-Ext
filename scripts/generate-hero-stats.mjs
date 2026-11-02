@@ -25,7 +25,7 @@ const runeStatIdToAbbr = {
   7: 'Arm',
   8: 'MD',
   9: 'Crit',
-  10: 'Dodge',
+  10: 'Ddg',
   11: 'MP',
   12: 'AP',
   13: 'MCrit',
@@ -35,7 +35,7 @@ const runeStatIdToAbbr = {
 
 const skinStatIdToAbbr = {
   1: 'HP', 2: 'MA', 3: 'MP', 4: 'MAIN', 5: 'PA', 6: 'MD', 7: 'MD',
-  8: 'Dodge', 9: 'Arm', 10: 'MA', 11: 'MP', 12: 'AP', 13: 'MCrit', 14: 'MAIN', 15: 'Crit'
+  8: 'Ddg', 9: 'Arm', 10: 'MA', 11: 'MP', 12: 'AP', 13: 'MCrit', 14: 'MAIN', 15: 'Crit'
 };
 
 let p = 0;
@@ -88,7 +88,7 @@ for (let i = 0; i < skinBuf.length - 15; i++) {
     }
   }
 }
-skinStats[58] = 'Dodge'; // Dante Romantic skin (active skin in recent logs)
+skinStats[58] = 'Ddg'; // Dante Romantic skin (active skin in recent logs)
 
 const content = `// Generated hero glyph & skin stat mapping
 (() => {

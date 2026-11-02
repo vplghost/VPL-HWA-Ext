@@ -23,7 +23,7 @@ class MockElement {
   }
   get textContent() {
     if (this._textContent) return this._textContent;
-    return this.children.map(c => c.textContent).join('');
+    return this.children.map(c => (c ? c.textContent : '')).join('');
   }
   set textContent(val) {
     this._textContent = String(val);
@@ -55,7 +55,7 @@ class MockElement {
     const list = this.eventListeners[event] || [];
     for (const h of list) h({ stopPropagation: () => {} });
   }
-  replaceChildren(...nodes) { this.children = nodes; }
+  replaceChildren(...nodes) { this.children = nodes.filter(Boolean); }
   querySelector(sel) {
     return this.querySelectorAll(sel)[0] || null;
   }
@@ -73,6 +73,17 @@ class MockElement {
 }
 
 async function createDraftContext(viewEl, statusEl, searchEl) {
+  const elements = {};
+  function getEl(sel) {
+    if (!elements[sel]) {
+      const tag = sel.startsWith('input') ? 'input' : (sel.startsWith('button') ? 'button' : 'div');
+      const el = new MockElement(tag);
+      if (sel.startsWith('#')) el.attributes.id = sel.slice(1);
+      elements[sel] = el;
+    }
+    return elements[sel];
+  }
+
   const mockDoc = {
     createElement: (tag) => new MockElement(tag),
     createElementNS: (_, tag) => new MockElement(tag),
@@ -80,7 +91,7 @@ async function createDraftContext(viewEl, statusEl, searchEl) {
       if (sel === '#view') return viewEl;
       if (sel === '#status') return statusEl;
       if (sel === '#search') return searchEl;
-      return new MockElement('div');
+      return getEl(sel);
     },
     querySelectorAll: () => []
   };
@@ -346,4 +357,77 @@ test('Legend Draft UI displays candidate stats, team power calculation, and swap
 
   context.renderDraft(activeCache);
   assert.match(viewEl.textContent, /Team Power: 120,500/);
+});
+
+test('Legend Draft UI does NOT lock defense at match start and renders 15 candidate matrix even if old match data previously existed', async () => {
+  const viewEl = new MockElement('div');
+  const statusEl = new MockElement('div');
+  const searchEl = new MockElement('input');
+  const context = await createDraftContext(viewEl, statusEl, searchEl);
+
+  // Cache state at start of stage 2 (defense draft)
+  const freshDraftCache = {
+    legendDraftStatus: {
+      data: {
+        active: true,
+        stageId: 2, // Defense draft start
+        matchId: 44556677,
+        defenceHeroes: [],
+        attackHeroes: [],
+        enemyDefenceHeroes: [],
+        enemyAttackHeroes: [],
+        lastResult: null,
+        lastPickAction: null,
+        stageFinishTs: Math.floor(Date.now() / 1000) + 90
+      }
+    },
+    heroGetAll: { data: {} }
+  };
+
+  context.renderDraft(freshDraftCache);
+
+  // Defense MUST NOT be locked at the start of stage 2
+  assert.doesNotMatch(viewEl.textContent, /Defense Lineup locked!/);
+  assert.doesNotMatch(statusEl.textContent, /Defense lineup locked/);
+
+  // 15 Candidate Heroes Matrix MUST be rendered
+  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /Step 1/);
+  assert.match(viewEl.textContent, /Step 5/);
+});
+
+test('Legend Draft modal dialog opens on banner click and setupDraftModal wires close buttons', async () => {
+  const viewEl = new MockElement('div');
+  const statusEl = new MockElement('div');
+  const searchEl = new MockElement('input');
+  const context = await createDraftContext(viewEl, statusEl, searchEl);
+
+  const activeCache = {
+    legendDraftStatus: {
+      data: {
+        active: true,
+        stageId: 2,
+        matchId: 44556677,
+        stageFinishTs: Math.floor(Date.now() / 1000) + 90,
+        defenceHeroes: []
+      }
+    },
+    heroGetAll: { data: {} }
+  };
+
+  // Open modal via openDraftModal
+  context.openDraftModal(activeCache);
+
+  const draftModal = context.document.querySelector('#draft-modal');
+  assert.equal(draftModal.hidden, false, 'Modal should be visible after openDraftModal');
+
+  const draftModalBody = context.document.querySelector('#draft-modal-body');
+  assert.ok(draftModalBody.children.length > 0, 'Modal body should contain rendered draft');
+  assert.match(draftModalBody.textContent, /15 Candidate Heroes Matrix/);
+
+  // Close button click hides modal
+  const closeBtn = context.document.querySelector('#draft-modal-close');
+  assert.ok(closeBtn, 'Close button should exist');
+  closeBtn.dispatchEvent('click');
+  assert.equal(draftModal.hidden, true, 'Modal should be hidden after clicking close');
 });

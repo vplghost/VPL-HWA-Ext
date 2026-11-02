@@ -259,20 +259,17 @@ openTabButton.addEventListener('click', () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?view=tab') });
 });
 
+const draftBanner = document.querySelector('#draft-banner');
 const draftBannerBtn = document.querySelector('#draft-banner-btn');
+if (draftBanner) {
+  draftBanner.addEventListener('click', () => {
+    openDraftModal(currentCache);
+  });
+}
 if (draftBannerBtn) {
-  draftBannerBtn.addEventListener('click', () => {
-    activeTab = 'draft';
-    const draftTab = currentTabConfig.find((t) => t.id === 'draft');
-    if (draftTab && !draftTab.visible) {
-      draftTab.visible = true;
-      saveTabConfig(currentTabConfig);
-      applyTabConfig(currentTabConfig);
-    }
-    const tabButtons = [...document.querySelectorAll('[data-tab]')];
-    tabButtons.forEach((tab) => { tab.setAttribute('aria-selected', String(tab.dataset.tab === 'draft')); });
-    search.value = '';
-    render();
+  draftBannerBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openDraftModal(currentCache);
   });
 }
 
@@ -935,6 +932,7 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
         const mainStat = meta.mainStat || (meta.role === 'Tank' || meta.class === 'Warrior' ? 'strength' : meta.class === 'Marksman' ? 'agility' : 'intelligence');
         stat = mainStat === 'strength' ? 'Str' : mainStat === 'agility' ? 'Agi' : 'Int';
       }
+      if (stat === 'Dodge') stat = 'Ddg';
       badge.textContent = `${stat}: ${level}`;
       skinsList.append(badge);
     }
@@ -958,11 +956,12 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
     const statFullName = {
       PA: 'Physical Attack', MA: 'Magic Attack', HP: 'Health', Arm: 'Armor',
       MD: 'Magic Defense', Crit: 'Crit Hit Chance', MCrit: 'Magic Crit Chance',
-      Dodge: 'Dodge', AP: 'Armor Penetration', MP: 'Magic Penetration',
+      Ddg: 'Dodge', Dodge: 'Dodge', AP: 'Armor Penetration', MP: 'Magic Penetration',
       Agi: 'Agility', Str: 'Strength', Int: 'Intelligence', Tough: 'Toughness', Crush: 'Crush'
     };
     heroRunes.forEach((lvl, idx) => {
-      const stat = glyphStats[idx] || `G${idx + 1}`;
+      let stat = glyphStats[idx] || `G${idx + 1}`;
+      if (stat === 'Dodge') stat = 'Ddg';
       const badge = document.createElement('span');
       badge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
         lvl > 0 ? 'bg-slate-700/80 text-emerald-300' : 'bg-slate-800 text-slate-500'
@@ -1594,7 +1593,7 @@ function renderDraft(cache) {
   const isAttackStage = stageId === 4;
   const isReady = stageId === 5;
   const isSearching = stageId === 1;
-  const isMatchCompleted = stageId === 7 || Boolean(draft.lastResult);
+  const isMatchCompleted = (stageId === 0 || stageId === 7) && Boolean(draft.lastResult);
 
   // Reset local picks when entering a new match
   if (draft.matchId && draft.matchId !== lastRenderedMatchId) {
@@ -1602,25 +1601,36 @@ function renderDraft(cache) {
     localDraftDefencePicks = [null, null, null, null, null];
     localDraftAttackPicks = [null, null, null, null, null];
     activeHeroSwapTarget = null;
+  } else if (isDefenseStage && (!draft.defenceHeroes || draft.defenceHeroes.length === 0) && localDraftDefencePicks.every(Boolean)) {
+    localDraftDefencePicks = [null, null, null, null, null];
+    localDraftAttackPicks = [null, null, null, null, null];
+    activeHeroSwapTarget = null;
   }
 
   // A mode is only locked if it was explicitly submitted in this match, or the server advanced past it
-  const isDefenseLocked = Boolean(
-    (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5 && (draft.lastPickAction === 'saveDefence' || stageId >= 4 || isMatchCompleted)) ||
-    (Array.isArray(draft.lastResult?.defenceHeroes) && draft.lastResult.defenceHeroes.length === 5)
+  const isDefenseLocked = !isDefenseStage ? Boolean(
+    stageId >= 4 ||
+    (isMatchCompleted && Array.isArray(draft.lastResult?.defenceHeroes) && draft.lastResult.defenceHeroes.length === 5) ||
+    (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5)
+  ) : Boolean(
+    Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5 && draft.lastPickAction === 'saveDefence'
   );
-  const isAttackLocked = Boolean(
-    (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5 && (draft.lastPickAction === 'saveAttack' || stageId >= 5 || isMatchCompleted)) ||
-    (Array.isArray(draft.lastResult?.attackHeroes) && draft.lastResult.attackHeroes.length === 5)
+
+  const isAttackLocked = !isAttackStage ? Boolean(
+    stageId >= 5 ||
+    (isMatchCompleted && Array.isArray(draft.lastResult?.attackHeroes) && draft.lastResult.attackHeroes.length === 5) ||
+    (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5)
+  ) : Boolean(
+    Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5 && draft.lastPickAction === 'saveAttack'
   );
 
   if (isDefenseLocked) {
     const src = (draft.defenceHeroes?.length === 5 ? draft.defenceHeroes : draft.lastResult?.defenceHeroes) || [];
-    localDraftDefencePicks = [...src];
+    if (src.length === 5) localDraftDefencePicks = [...src];
   }
   if (isAttackLocked) {
     const src = (draft.attackHeroes?.length === 5 ? draft.attackHeroes : draft.lastResult?.attackHeroes) || [];
-    localDraftAttackPicks = [...src];
+    if (src.length === 5) localDraftAttackPicks = [...src];
   }
 
   // Determine active view mode (toggle takes priority, else match stage)
@@ -2337,6 +2347,7 @@ function renderDraft(cache) {
   const pickInfo = isActivelyDrafting ? ` • Selected ${val.count}/5 steps` :
     (val.count === 5 ? ` • ${isViewingAttack ? 'Attack' : 'Defense'} lineup locked (5 heroes)` : '');
   status.textContent = `${matchPrefix}${stageDesc}${pickInfo}`;
+  return container;
 }
 
 function openGuildVersusModal(vsStatus, cache) {
@@ -3501,6 +3512,41 @@ function setupDungeonModal() {
   });
 }
 
+function openDraftModal(cache) {
+  const modal = document.querySelector('#draft-modal');
+  const body = document.querySelector('#draft-modal-body');
+  if (!modal || !body) return;
+  const activeCache = cache || currentCache || {};
+  const draft = activeCache.legendDraftStatus?.data || {};
+  const stageId = Number.isInteger(draft.stageId) ? draft.stageId : 0;
+
+  const stageBadge = document.querySelector('#draft-modal-stage-badge');
+  if (stageBadge) {
+    stageBadge.textContent = globalThis.hwaHelperPopupData?.draftStageDescription?.(stageId) || 'Draft Active';
+  }
+
+  body.replaceChildren(renderDraft(activeCache));
+  modal.hidden = false;
+}
+
+function setupDraftModal() {
+  const modal = document.querySelector('#draft-modal');
+  const closeBtn = document.querySelector('#draft-modal-close');
+  if (!modal) return;
+
+  function closeModal() {
+    modal.hidden = true;
+  }
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
+  });
+}
+
 let activeGoalsFilter = 'all';
 
 function renderGoals(cache) {
@@ -4117,6 +4163,17 @@ async function render() {
       draftBadge.hidden = true;
     }
   }
+  const draftModal = document.querySelector('#draft-modal');
+  if (draftModal && !draftModal.hidden) {
+    const modalBody = document.querySelector('#draft-modal-body');
+    if (modalBody) {
+      modalBody.replaceChildren(renderDraft(cache));
+    }
+    const stageBadge = document.querySelector('#draft-modal-stage-badge');
+    if (stageBadge) {
+      stageBadge.textContent = globalThis.hwaHelperPopupData?.draftStageDescription?.(draftStatus?.stageId) || 'Draft Active';
+    }
+  }
   const recordingState = session.recordingState;
   const recordButton = document.querySelector('#record-toggle');
   recordButton.hidden = activeTab !== 'log';
@@ -4661,6 +4718,7 @@ render().then(async () => {
 });
 setupGuildVersusModal();
 setupDungeonModal();
+setupDraftModal();
 setupAutoClaimListeners();
 setInterval(refreshTimed, 1000);
 

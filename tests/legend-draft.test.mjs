@@ -206,3 +206,55 @@ test('rpc-cache resets defense and attack picks when a new match begins so defen
   assert.deepEqual(merged.legendDraftStatus.data.attackHeroes, [], 'New match must have empty attackHeroes');
   assert.equal(merged.legendDraftStatus.data.lastResult, null, 'New match must clear previous lastResult');
 });
+
+test('rpc-cache resets old draft cache when starting queue or defense draft without matchId change', () => {
+  const previousMatchEndedState = {
+    legendDraftStatus: {
+      data: {
+        active: false,
+        stageId: 0,
+        matchId: 111111111,
+        defenceHeroes: [24, 12, 47, 68, 51],
+        attackHeroes: [51, 55, 16, 502, 503],
+        enemyDefenceHeroes: [1, 2, 3, 4, 5],
+        enemyAttackHeroes: [6, 7, 8, 9, 10],
+        lastResult: { result: 0, reward: { draftBpExp: 100 } },
+        lastPickAction: 'saveAttack'
+      },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    }
+  };
+
+  const queueRecord = {
+    method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    requestBody: JSON.stringify({ calls: [{ name: 'randomDraft_getInfo', ident: 'info' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'info', result: { response: {
+      stageId: 1
+    } } }] }),
+    timestamp: '2026-11-01T10:05:00.000Z'
+  };
+
+  const queueMerged = rpcCache.merge(previousMatchEndedState, [queueRecord]).cache;
+  assert.equal(queueMerged.legendDraftStatus.data.stageId, 1);
+  assert.equal(queueMerged.legendDraftStatus.data.lastResult, null, 'Queue must clear old lastResult');
+  assert.deepEqual(queueMerged.legendDraftStatus.data.defenceHeroes, [], 'Queue must clear defenceHeroes');
+  assert.deepEqual(queueMerged.legendDraftStatus.data.attackHeroes, [], 'Queue must clear attackHeroes');
+  assert.equal(queueMerged.legendDraftStatus.data.lastPickAction, null, 'Queue must clear lastPickAction');
+
+  const defenseStartRecord = {
+    method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    requestBody: JSON.stringify({ calls: [{ name: 'randomDraft_getInfo', ident: 'info' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'info', result: { response: {
+      stageId: 2,
+      matchId: 333333333,
+      stageFinishTs: 1793550458
+    } } }] }),
+    timestamp: '2026-11-01T10:06:00.000Z'
+  };
+
+  const defenseMerged = rpcCache.merge(queueMerged, [defenseStartRecord]).cache;
+  assert.equal(defenseMerged.legendDraftStatus.data.stageId, 2);
+  assert.deepEqual(defenseMerged.legendDraftStatus.data.defenceHeroes, []);
+  assert.deepEqual(defenseMerged.legendDraftStatus.data.attackHeroes, []);
+  assert.equal(defenseMerged.legendDraftStatus.data.lastResult, null);
+});
