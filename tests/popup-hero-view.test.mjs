@@ -36,8 +36,20 @@ class MockElement {
   addEventListener() {}
   replaceChildren(...nodes) { this.children = nodes; }
   querySelector(selector) {
-    if (selector === '.hero-hover-card') {
-      return this.children.find(c => c.className?.includes('hero-hover-card')) || null;
+    if (selector.startsWith('.')) {
+      const cls = selector.slice(1);
+      if (this.className?.includes(cls)) return this;
+      for (const c of this.children) {
+        const found = c.querySelector?.(selector);
+        if (found) return found;
+      }
+    } else {
+      const tag = selector.toUpperCase();
+      if (this.tagName === tag) return this;
+      for (const c of this.children) {
+        const found = c.querySelector?.(selector);
+        if (found) return found;
+      }
     }
     return null;
   }
@@ -61,7 +73,8 @@ const context = {
   formatNumber: (n) => String(n),
   currentCache: {},
   sortState: {},
-  activeTab: 'heroes'
+  activeTab: 'heroes',
+  favoriteHeroes: new Set()
 };
 vm.runInNewContext(heroMetaJs, context);
 vm.runInNewContext(titanMetaJs, context);
@@ -215,24 +228,93 @@ test('table highlights rows when soul stones meet or exceed upgrade threshold', 
   const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
   assert.equal(dataRows.length, 4);
 
-  // Row 0: Aurora (100 / 100) -> eligible for evolution
-  assert.equal(dataRows[0].dataset.canEvolve, 'true');
-  assert.ok(dataRows[0].className.includes('bg-emerald-50/70'));
-  const soulCell0 = dataRows[0].children[4];
-  assert.ok(soulCell0.className.includes('text-emerald-800'));
-  assert.ok(soulCell0.className.includes('font-bold'));
+  // Sorted by default Power descending: Keira (180k), Galahad (160k), Aurora (150k), Astaroth (140k)
+  // Row 2: Aurora (100 / 100) -> eligible for evolution
+  assert.equal(dataRows[2].dataset.canEvolve, 'true');
+  assert.ok(dataRows[2].className.includes('bg-emerald-50/70'));
+  const soulCell2 = dataRows[2].children[4];
+  assert.ok(soulCell2.className.includes('text-emerald-800'));
+  assert.ok(soulCell2.className.includes('font-bold'));
+
+  // Row 0: Keira (500 / Max) -> already maxed
+  assert.notEqual(dataRows[0].dataset.canEvolve, 'true');
+  assert.ok(!dataRows[0].className.includes('bg-emerald-50/70'));
 
   // Row 1: Galahad (40 / 150) -> not eligible
   assert.notEqual(dataRows[1].dataset.canEvolve, 'true');
   assert.ok(!dataRows[1].className.includes('bg-emerald-50/70'));
 
-  // Row 2: Keira (500 / Max) -> already maxed
-  assert.notEqual(dataRows[2].dataset.canEvolve, 'true');
-  assert.ok(!dataRows[2].className.includes('bg-emerald-50/70'));
-
   // Row 3: Astaroth (— / 50) -> fragments unknown/null
   assert.notEqual(dataRows[3].dataset.canEvolve, 'true');
   assert.ok(!dataRows[3].className.includes('bg-emerald-50/70'));
+});
+
+test('table defaults to Power descending sort on Heroes tab', () => {
+  const { table } = context;
+  const headings = ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones', 'Power'];
+  const rows = [
+    ['1', 'Aurora', '120', 3, '100 / 100', '150,000'],
+    ['2', 'Galahad', '120', 4, '40 / 150', '160,000'],
+    ['3', 'Keira', '120', 6, '500 / Max', '180,000'],
+    ['4', 'Astaroth', '120', 2, '— / 50', '140,000']
+  ];
+
+  const tableEl = table(headings, rows);
+  const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
+
+  // Sorted by Power descending: Keira (180k), Galahad (160k), Aurora (150k), Astaroth (140k)
+  assert.equal(dataRows[0].children[0].textContent, '3');
+  assert.equal(dataRows[1].children[0].textContent, '2');
+  assert.equal(dataRows[2].children[0].textContent, '1');
+  assert.equal(dataRows[3].children[0].textContent, '4');
+
+  // Power header has descending sort mark
+  const headerCells = tableEl.children.find(c => c.tagName === 'TR').children;
+  const powerHeader = headerCells[5];
+  assert.equal(powerHeader.getAttribute('aria-sort'), 'descending');
+  assert.ok(powerHeader.textContent.includes('Power ↓'));
+});
+
+test('favorite hero icon toggles favorite state and prioritizes favorite heroes at the top', () => {
+  const { table } = context;
+  context.favoriteHeroes = new Set(['1', '4']); // Aurora and Astaroth are favorites
+  const headings = ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones', 'Power'];
+  const rows = [
+    ['1', 'Aurora', '120', 3, '100 / 100', '150,000'],
+    ['2', 'Galahad', '120', 4, '40 / 150', '160,000'],
+    ['3', 'Keira', '120', 6, '500 / Max', '180,000'],
+    ['4', 'Astaroth', '120', 2, '— / 50', '140,000']
+  ];
+
+  const tableEl = table(headings, rows);
+  const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
+
+  // Favorites at top (Aurora 150k, Astaroth 140k), then non-favorites (Keira 180k, Galahad 160k)
+  assert.equal(dataRows[0].children[0].textContent, '1');
+  assert.equal(dataRows[1].children[0].textContent, '4');
+  assert.equal(dataRows[2].children[0].textContent, '3');
+  assert.equal(dataRows[3].children[0].textContent, '2');
+
+  assert.equal(dataRows[0].dataset.favorite, 'true');
+  assert.equal(dataRows[1].dataset.favorite, 'true');
+  assert.equal(dataRows[2].dataset.favorite, undefined);
+  assert.equal(dataRows[3].dataset.favorite, undefined);
+
+  // Favorite hero button has filled star and Remove favorite title
+  const favBtn0 = dataRows[0].children[0].querySelector('button');
+  assert.ok(favBtn0);
+  assert.equal(favBtn0.getAttribute('title'), 'Remove favorite');
+  const svg0 = favBtn0.querySelector('svg');
+  assert.equal(svg0.getAttribute('fill'), 'currentColor');
+
+  // Non-favorite hero button has outline star and Add favorite title
+  const favBtn2 = dataRows[2].children[0].querySelector('button');
+  assert.ok(favBtn2);
+  assert.equal(favBtn2.getAttribute('title'), 'Add favorite');
+  const svg2 = favBtn2.querySelector('svg');
+  assert.equal(svg2.getAttribute('fill'), 'none');
+
+  context.favoriteHeroes.clear();
 });
 
 test('createHeroInline renders Dante skin stats accurately with Dodge for skin 58', () => {

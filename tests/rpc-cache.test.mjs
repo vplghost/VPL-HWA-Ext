@@ -1034,3 +1034,97 @@ test('magicTower_briefInfo and magicTower_getAll extract towerStatus with isClea
   assert.equal(inProgressEntry.data.floorNumber, 12);
 });
 
+test('openLootboxChanced deducts spent boxes and merges reward coins, consumables, and hero fragments', () => {
+  const openRecord = record([
+    { name: 'openLootboxChanced', ident: 'open-box-1', args: { lootBoxId: 26, amount: 63, reward: [] } }
+  ], [
+    {
+      ident: 'open-box-1',
+      result: {
+        response: {
+          reward: [
+            { type: 'coin', id: 20, amount: 1755 },
+            { type: 'consumable', id: 20, amount: 9800 },
+            { type: 'fragmentHero', id: 72, amount: 20 }
+          ]
+        }
+      }
+    }
+  ], '2026-11-02T09:58:15.000Z');
+
+  const extracted = cache.extract(openRecord);
+  const action = extracted.find((e) => e.key === 'chestOpenAction');
+  assert.ok(action);
+  assert.equal(action.data.boxType, 'lootboxChanced');
+  assert.equal(action.data.boxId, '26');
+  assert.equal(action.data.amount, 63);
+  assert.equal(action.data.rewards.length, 3);
+
+  const initial = {
+    inventoryGet: {
+      data: {
+        lootboxChanced: { '26': 100 },
+        coin: { '20': 500 },
+        consumable: { '20': 200 },
+        fragmentHero: { '72': 10 }
+      }
+    },
+    'resource:lootboxChanced:26': { data: { amount: 100 } },
+    'resource:coin:20': { data: { amount: 500, label: 'Titan Skin Stone' } },
+    'resource:consumable:20': { data: { amount: 200, label: 'Titan potion' } }
+  };
+
+  const { cache: afterOpen } = cache.merge(initial, [openRecord]);
+  assert.equal(afterOpen.inventoryGet.data.lootboxChanced['26'], 37);
+  assert.equal(afterOpen['resource:lootboxChanced:26'].data.amount, 37);
+  assert.equal(afterOpen.inventoryGet.data.coin['20'], 2255);
+  assert.equal(afterOpen['resource:coin:20'].data.amount, 2255);
+  assert.equal(afterOpen.inventoryGet.data.consumable['20'], 10000);
+  assert.equal(afterOpen['resource:consumable:20'].data.amount, 10000);
+  assert.equal(afterOpen.inventoryGet.data.fragmentHero['72'], 30);
+});
+
+test('inventory_use with chest opening deducts spent consumable chests and merges multi-item rewards', () => {
+  const useChestRecord = record([
+    { name: 'inventory_use', ident: 'use-chest-1', args: { libId: 15, amount: 2, params: { choice: -1 } } }
+  ], [
+    {
+      ident: 'use-chest-1',
+      result: {
+        response: [
+          { consumable: { '10': 2 } },
+          { fragmentGear: { '61': 1 } },
+          { gear: { '21': 1 } }
+        ]
+      }
+    }
+  ], '2026-11-02T09:58:24.000Z');
+
+  const extracted = cache.extract(useChestRecord);
+  const action = extracted.find((e) => e.key === 'chestOpenAction');
+  assert.ok(action);
+  assert.equal(action.data.boxType, 'consumable');
+  assert.equal(action.data.boxId, '15');
+  assert.equal(action.data.amount, 2);
+  assert.equal(action.data.rewards.length, 3);
+
+  const initial = {
+    inventoryGet: {
+      data: {
+        consumable: { '15': 5, '10': 1 },
+        fragmentGear: { '61': 3 },
+        gear: {}
+      }
+    },
+    'resource:consumable:15': { data: { amount: 5 } },
+    'resource:consumable:10': { data: { amount: 1 } }
+  };
+
+  const { cache: afterUse } = cache.merge(initial, [useChestRecord]);
+  assert.equal(afterUse.inventoryGet.data.consumable['15'], 3);
+  assert.equal(afterUse['resource:consumable:15'].data.amount, 3);
+  assert.equal(afterUse.inventoryGet.data.consumable['10'], 3);
+  assert.equal(afterUse['resource:consumable:10'].data.amount, 3);
+  assert.equal(afterUse.inventoryGet.data.fragmentGear['61'], 4);
+  assert.equal(afterUse.inventoryGet.data.gear['21'], 1);
+});

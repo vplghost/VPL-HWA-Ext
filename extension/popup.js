@@ -37,6 +37,20 @@ let currentCache = {};
 let currentGuildChatLastReadTime = 0;
 let currentProductionRates = {};
 const sortState = {};
+let favoriteHeroes = new Set();
+
+async function toggleFavoriteHero(heroId) {
+  const idStr = String(heroId);
+  if (favoriteHeroes.has(idStr)) {
+    favoriteHeroes.delete(idStr);
+  } else {
+    favoriteHeroes.add(idStr);
+  }
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    await chrome.storage.local.set({ favoriteHeroes: Array.from(favoriteHeroes) }).catch(() => {});
+  }
+  render();
+}
 
 document.querySelector('#version').textContent = chrome.runtime.getManifest().version;
 const openTabButton = document.querySelector('#open-tab');
@@ -906,7 +920,9 @@ function table(headings, rows) {
   const element = document.createElement('table');
   element.className = 'min-w-full border-collapse text-left text-xs';
   const header = document.createElement('tr');
-  const selectedSort = sortState[activeTab];
+  const powerIndex = headings.indexOf('Power');
+  const defaultSort = activeTab === 'heroes' && powerIndex !== -1 ? { column: powerIndex, direction: 'desc' } : undefined;
+  const selectedSort = sortState[activeTab] ?? defaultSort;
   for (const [index, heading] of headings.entries()) {
     const cell = document.createElement('th');
     cell.className = 'sticky top-0 z-10 border-b border-slate-200 bg-slate-100 px-3 py-2 font-semibold whitespace-nowrap text-slate-700';
@@ -927,16 +943,23 @@ function table(headings, rows) {
     header.append(cell);
   }
   element.append(header);
+  const isHeroFav = (row) => activeTab === 'heroes' && typeof favoriteHeroes !== 'undefined' && favoriteHeroes.has(String(row[0]));
   const sortedRows = selectedSort ?
-    globalThis.hwaHelperPopupData.sortRows(rows, selectedSort.column, selectedSort.direction) : rows;
+    globalThis.hwaHelperPopupData.sortRows(rows, selectedSort.column, selectedSort.direction, isHeroFav) :
+    (activeTab === 'heroes' && typeof favoriteHeroes !== 'undefined' && favoriteHeroes.size > 0 ?
+      [...rows].sort((a, b) => (isHeroFav(b) ? 1 : 0) - (isHeroFav(a) ? 1 : 0)) : rows);
   const soulColIndex = headings.indexOf('Soul stones');
   const isSoulUpgradeReady = globalThis.hwaHelperPopupData?.isSoulUpgradeReady;
   for (const values of sortedRows) {
     const line = document.createElement('tr');
     const canEvolve = soulColIndex !== -1 && Boolean(isSoulUpgradeReady?.(values[soulColIndex]));
+    const isFav = isHeroFav(values);
+    if (isFav) line.dataset.favorite = 'true';
     line.className = canEvolve ?
       'border-b border-emerald-100 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-950 font-medium' :
-      'border-b border-slate-100 hover:bg-blue-50/50';
+      (isFav ?
+        'border-b border-amber-100/80 bg-amber-50/30 hover:bg-amber-100/40 text-slate-800' :
+        'border-b border-slate-100 hover:bg-blue-50/50');
     if (canEvolve) line.dataset.canEvolve = 'true';
     for (const [column, heading] of headings.entries()) {
       const value = values[column];
@@ -944,6 +967,46 @@ function table(headings, rows) {
       cell.className = 'px-3 py-2 align-top text-slate-700';
       if (heading === 'Star') {
         cell.append(starIcons(value));
+      } else if (heading === 'Hero ID' && activeTab === 'heroes') {
+        const heroId = String(value);
+        const isThisFav = typeof favoriteHeroes !== 'undefined' && favoriteHeroes.has(heroId);
+        const wrap = document.createElement('div');
+        wrap.className = 'inline-flex items-center gap-1.5';
+
+        const favBtn = document.createElement('button');
+        favBtn.type = 'button';
+        favBtn.className = `cursor-pointer rounded p-0.5 transition-colors ${
+          isThisFav ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400'
+        }`;
+        favBtn.title = isThisFav ? 'Remove favorite' : 'Add favorite';
+        favBtn.setAttribute('title', favBtn.title);
+        favBtn.setAttribute('aria-label', favBtn.title);
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('fill', isThisFav ? 'currentColor' : 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+
+        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        polygon.setAttribute('points', '12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2');
+        svg.append(polygon);
+        favBtn.append(svg);
+
+        favBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await toggleFavoriteHero(heroId);
+        });
+
+        const idSpan = document.createElement('span');
+        idSpan.textContent = heroId;
+        wrap.append(favBtn, idSpan);
+        cell.append(wrap);
       } else if (heading === 'Name' && activeTab === 'heroes') {
         const heroId = values[0];
         const heroSnapshot = currentCache.heroGetAll?.data?.[heroId];
@@ -3318,7 +3381,8 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   // Sort messages chronologically ascending (oldest at top, newest at bottom) for standard chat UI dialog flow
   const sortedMessages = [...rawMessages].sort((a, b) => Number(a.ctime || 0) - Number(b.ctime || 0));
 
-  const query = (typeof search !== 'undefined' && search?.value) ? search.value.trim().toLowerCase() : '';
+  const isChatTab = typeof activeTab === 'undefined' || activeTab === 'chat';
+  const query = (isChatTab && typeof search !== 'undefined' && search?.value) ? search.value.trim().toLowerCase() : '';
   const filtered = sortedMessages.filter((m) => {
     if (!query) return true;
     const text = (m.data?.text || '').toLowerCase();
@@ -3341,7 +3405,7 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   const targetEl = chatMessagesEl || view;
   if (!targetEl) return;
 
-  if (typeof status !== 'undefined' && status) {
+  if (targetEl === view && typeof status !== 'undefined' && status) {
     status.textContent = `${filtered.length} guild message${filtered.length === 1 ? '' : 's'}`;
   }
 
@@ -3353,13 +3417,6 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
       ? `No guild messages matching "${query}".`
       : 'No guild chat messages observed yet. Open Guild Chat in game to sync.';
     targetEl.append(emptyP);
-    if (targetEl !== view && typeof view !== 'undefined' && view) {
-      view.replaceChildren();
-      const p = document.createElement('p');
-      p.className = 'text-xs text-slate-400 italic p-3 text-center';
-      p.textContent = emptyP.textContent;
-      view.append(p);
-    }
     return;
   }
 
@@ -3446,14 +3503,6 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
     targetEl.append(card);
   }
 
-  // Also mirror into view if targetEl is chatMessagesEl and view is present
-  if (targetEl !== view && typeof view !== 'undefined' && view) {
-    view.replaceChildren();
-    for (const child of targetEl.children) {
-      view.append(child.cloneNode ? child.cloneNode(true) : child);
-    }
-  }
-
   if (!keepScroll && targetEl.scrollTop !== undefined) {
     targetEl.scrollTop = targetEl.scrollHeight;
   }
@@ -3478,11 +3527,12 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
   currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
+  favoriteHeroes = new Set(Array.isArray(stored.favoriteHeroes) ? stored.favoriteHeroes.map(String) : []);
   currentProductionRates = Object.fromEntries([1, 2, 3, 4, 5].map((id) =>
     [id, globalThis.hwaHelperProductionData.ratePerMinute(cache, id)]));
   const resources = resourceEntries(cache);

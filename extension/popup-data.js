@@ -106,7 +106,7 @@
     return Number.isFinite(march.endsAt) && march.endsAt <= now;
   }
 
-  function sortRows(rows, column, direction) {
+  function sortRows(rows, column, direction, isFavoriteFn) {
     const numeric = (value) => {
       if (typeof value === 'number') return value;
       const text = String(value ?? '');
@@ -114,6 +114,11 @@
       return null;
     };
     return [...rows].sort((left, right) => {
+      if (typeof isFavoriteFn === 'function') {
+        const favA = Boolean(isFavoriteFn(left));
+        const favB = Boolean(isFavoriteFn(right));
+        if (favA !== favB) return favA ? -1 : 1;
+      }
       const a = left[column];
       const b = right[column];
       if (a == null || a === '—') return b == null || b === '—' ? 0 : 1;

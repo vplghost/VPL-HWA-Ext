@@ -122,13 +122,16 @@ vm.runInNewContext(chatCode, context);
 
 test('renderGuildChat shows empty prompt when no chat data is in cache', () => {
   view.replaceChildren();
+  chatMessages.replaceChildren();
   search.value = '';
   context.renderGuildChat({});
-  assert.match(view.textContent, /No guild chat messages observed yet/);
+  assert.match(chatMessages.textContent, /No guild chat messages observed yet/);
+  assert.equal(view.children.length, 0, 'main view must not be overwritten');
 });
 
 test('renderGuildChat renders message cards with sender, role, time, and content', () => {
   view.replaceChildren();
+  chatMessages.replaceChildren();
   search.value = '';
   const cache = {
     guildChat: {
@@ -159,7 +162,7 @@ test('renderGuildChat renders message cards with sender, role, time, and content
 
   context.renderGuildChat(cache);
 
-  const text = view.textContent;
+  const text = chatMessages.textContent;
   assert.ok(text.includes('BobMember'), 'Should render member name');
   assert.ok(text.includes('Lv.75'), 'Should render member level');
   assert.ok(text.includes('Thanks for the gift code!'), 'Should render member text');
@@ -167,11 +170,13 @@ test('renderGuildChat renders message cards with sender, role, time, and content
   assert.ok(text.includes('Lv.90'), 'Should render leader level');
   assert.ok(text.includes('Announcement'), 'Should render Announcement badge');
   assert.ok(text.includes('Code: CRIMSONGROVE'), 'Should render announcement text');
-  assert.equal(status.textContent, '2 guild messages');
+  assert.equal(chatCount.textContent, '2');
+  assert.equal(view.children.length, 0, 'main view must not be overwritten');
 });
 
 test('renderGuildChat filters messages according to search query', () => {
   view.replaceChildren();
+  chatMessages.replaceChildren();
   search.value = 'CRIMSON';
   const cache = {
     guildChat: {
@@ -202,14 +207,16 @@ test('renderGuildChat filters messages according to search query', () => {
 
   context.renderGuildChat(cache);
 
-  const text = view.textContent;
+  const text = chatMessages.textContent;
   assert.ok(text.includes('Code: CRIMSONGROVE'), 'Should include matching announcement');
   assert.ok(!text.includes('Thanks for the gift code!'), 'Should exclude non-matching member text');
-  assert.equal(status.textContent, '1 guild message');
+  assert.equal(chatCount.textContent, '2');
+  assert.equal(view.children.length, 0, 'main view must not be overwritten');
 });
 
 test('renderGuildChat limits visible messages to latest batch and indicates older messages', () => {
   view.replaceChildren();
+  chatMessages.replaceChildren();
   search.value = '';
   const messages = [];
   for (let i = 1; i <= 25; i++) {
@@ -231,15 +238,17 @@ test('renderGuildChat limits visible messages to latest batch and indicates olde
   };
 
   context.renderGuildChat(cache);
-  assert.equal(status.textContent, '25 guild messages');
-  assert.ok(view.textContent.includes('Scroll up for older messages (10 more)'));
-  assert.ok(view.textContent.includes('Message number 25'));
-  assert.ok(view.textContent.includes('Message number 11'));
-  assert.ok(!view.textContent.includes('Message number 10'));
+  assert.equal(chatCount.textContent, '25');
+  assert.ok(chatMessages.textContent.includes('Scroll up for older messages (10 more)'));
+  assert.ok(chatMessages.textContent.includes('Message number 25'));
+  assert.ok(chatMessages.textContent.includes('Message number 11'));
+  assert.ok(!chatMessages.textContent.includes('Message number 10'));
+  assert.equal(view.children.length, 0, 'main view must not be overwritten');
 });
 
 test('renderGuildChat sorts messages chronologically ascending with newest at the bottom', () => {
   view.replaceChildren();
+  chatMessages.replaceChildren();
   search.value = '';
   // Messages provided out of order / descending ctime (as cached from server)
   const messages = [
@@ -257,11 +266,12 @@ test('renderGuildChat sorts messages chronologically ascending with newest at th
   };
 
   context.renderGuildChat(cache);
-  assert.equal(status.textContent, '3 guild messages');
-  assert.equal(view.children.length, 3);
-  assert.ok(view.children[0].textContent.includes('Oldest message (top)'));
-  assert.ok(view.children[1].textContent.includes('Middle message'));
-  assert.ok(view.children[2].textContent.includes('Newest message (bottom)'));
+  assert.equal(chatCount.textContent, '3');
+  assert.equal(chatMessages.children.length, 3);
+  assert.ok(chatMessages.children[0].textContent.includes('Oldest message (top)'));
+  assert.ok(chatMessages.children[1].textContent.includes('Middle message'));
+  assert.ok(chatMessages.children[2].textContent.includes('Newest message (bottom)'));
+  assert.equal(view.children.length, 0, 'main view must not be overwritten');
 });
 
 test('renderConfigOther populates other snapshots section with keys and count', () => {
@@ -333,6 +343,7 @@ test('markGuildChatAsRead persists max ctime in chrome.storage.local and clears 
 
 test('renderGuildChat flags messages newer than previousReadTime with New badge', () => {
   view.replaceChildren();
+  chatMessages.replaceChildren();
   search.value = '';
   const cache = {
     guildChat: {
@@ -349,11 +360,67 @@ test('renderGuildChat flags messages newer than previousReadTime with New badge'
   // Pass previousReadTime as 1793530000 -> message 2 should have New badge
   context.renderGuildChat(cache, false, 1793530000);
 
-  assert.equal(view.children.length, 2);
-  const oldCard = view.children[0];
-  const newCard = view.children[1];
+  assert.equal(chatMessages.children.length, 2);
+  const oldCard = chatMessages.children[0];
+  const newCard = chatMessages.children[1];
 
   assert.ok(!oldCard.textContent.includes('New'));
   assert.ok(newCard.textContent.includes('New'));
   assert.ok(newCard.textContent.includes('Brand new message'));
+  assert.equal(view.children.length, 0, 'main view must not be overwritten');
+});
+
+test('renderGuildChat falls back to view and updates status only when chatMessages element is absent', () => {
+  view.replaceChildren();
+  status.textContent = 'Original Status';
+  search.value = '';
+  const cache = {
+    guildChat: {
+      data: {
+        messages: [
+          { id: '1', userId: '1001', ctime: '1793530000', chatType: 'clan', data: { text: 'Fallback message' } }
+        ],
+        users: { '1001': { id: '1001', name: 'Member1', level: '70', clanRole: '3' } }
+      }
+    }
+  };
+
+  const savedQuerySelector = mockDoc.querySelector;
+  mockDoc.querySelector = (sel) => (sel === '#guild-chat-messages' ? null : savedQuerySelector(sel));
+  try {
+    context.renderGuildChat(cache);
+    assert.equal(view.children.length, 1);
+    assert.ok(view.textContent.includes('Fallback message'));
+    assert.equal(status.textContent, '1 guild message');
+  } finally {
+    mockDoc.querySelector = savedQuerySelector;
+  }
+});
+
+test('opening guild chat FAB preserves existing page tab content in view and status bar', () => {
+  view.replaceChildren();
+  const heroCard = new MockElement('div');
+  heroCard.textContent = 'Dante (Hero details)';
+  view.append(heroCard);
+  status.textContent = '54 heroes';
+  chatMessages.replaceChildren();
+
+  const cache = {
+    guildChat: {
+      data: {
+        messages: [
+          { id: '1', userId: '1001', ctime: '1793530000', chatType: 'clan', data: { text: 'Guild message' } }
+        ]
+      }
+    }
+  };
+
+  context.renderGuildChat(cache);
+
+  // FAB panel gets the messages
+  assert.ok(chatMessages.textContent.includes('Guild message'));
+  // Main view content and status remain completely untouched
+  assert.equal(view.children.length, 1);
+  assert.equal(view.children[0].textContent, 'Dante (Hero details)');
+  assert.equal(status.textContent, '54 heroes');
 });

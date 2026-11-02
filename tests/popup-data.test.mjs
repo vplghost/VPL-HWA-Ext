@@ -52,6 +52,28 @@ test('table sorting handles numeric counts, names, and missing values', () => {
   assert.deepEqual(Array.from(sortRows(rows, 0, 'desc'), (row) => row[0]), ['Unknown', 'Thea', 'Aurora']);
 });
 
+test('sortRows prioritizes favorite rows at top regardless of sort column and direction', () => {
+  const rows = [
+    ['1', 'Aurora', 150000],
+    ['2', 'Galahad', 160000],
+    ['3', 'Keira', 180000],
+    ['4', 'Astaroth', 140000]
+  ];
+  const isFav = (row) => row[0] === '1' || row[0] === '4'; // Aurora and Astaroth are favorites
+
+  // Power desc: favorites (Aurora 150k, Astaroth 140k) then non-favorites (Keira 180k, Galahad 160k)
+  const sortedDesc = sortRows(rows, 2, 'desc', isFav);
+  assert.deepEqual(Array.from(sortedDesc, r => r[1]), ['Aurora', 'Astaroth', 'Keira', 'Galahad']);
+
+  // Power asc: favorites (Astaroth 140k, Aurora 150k) then non-favorites (Galahad 160k, Keira 180k)
+  const sortedAsc = sortRows(rows, 2, 'asc', isFav);
+  assert.deepEqual(Array.from(sortedAsc, r => r[1]), ['Astaroth', 'Aurora', 'Galahad', 'Keira']);
+
+  // Name asc: favorites (Astaroth, Aurora) then non-favorites (Galahad, Keira)
+  const sortedName = sortRows(rows, 1, 'asc', isFav);
+  assert.deepEqual(Array.from(sortedName, r => r[1]), ['Astaroth', 'Aurora', 'Galahad', 'Keira']);
+});
+
 test('numeric columns align values and headings while IDs and ordinals stay left', () => {
   for (const heading of ['Level', 'Star', 'Soul stones / needed', 'Soul stone', 'Soul stones', 'Power',
     'Amount', 'Members', 'Size']) assert.equal(isNumericColumn(heading), true);

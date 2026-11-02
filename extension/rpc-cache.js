@@ -38,6 +38,7 @@
     dungeonStartBattle: 'events',
     magicTower_briefInfo: 'other',
     magicTower_getAll: 'other',
+    openLootboxChanced: 'items',
     inventory_use: 'items'
   };
 
@@ -341,6 +342,37 @@
             }
             return actions;
           }
+          if (call.name === 'openLootboxChanced' && result && !result.error && result.response) {
+            const lootBoxId = call.args?.lootBoxId;
+            const amount = Number(call.args?.amount) || 1;
+            const rawRewards = result.response.reward;
+            const rewards = [];
+            if (Array.isArray(rawRewards)) {
+              for (const r of rawRewards) {
+                if (r && r.type && r.id != null && Number(r.amount) > 0) {
+                  rewards.push({
+                    type: r.type,
+                    id: String(r.id),
+                    amount: Number(r.amount)
+                  });
+                }
+              }
+            }
+            return [{
+              key: 'chestOpenAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                token: `${call.ident}:openLootbox:${lootBoxId}`,
+                boxType: 'lootboxChanced',
+                boxId: String(lootBoxId),
+                amount,
+                rewards
+              },
+              updatedAt: record.timestamp
+            }];
+          }
           if (call.name === 'inventory_use' && result && !result.error) {
             const actions = [];
             const libId = call.args?.libId;
@@ -357,6 +389,36 @@
                   libId: 20,
                   amount,
                   unitId: unitId ? String(unitId) : null
+                },
+                updatedAt: record.timestamp
+              });
+            } else if (Array.isArray(result.response) && Number.isFinite(amount) && amount > 0) {
+              const rewards = [];
+              for (const item of result.response) {
+                if (item && typeof item === 'object') {
+                  for (const [cat, subMap] of Object.entries(item)) {
+                    if (subMap && typeof subMap === 'object') {
+                      for (const [subId, subAmt] of Object.entries(subMap)) {
+                        const num = Number(subAmt);
+                        if (num > 0) {
+                          rewards.push({ type: cat, id: String(subId), amount: num });
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              actions.push({
+                key: 'chestOpenAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  token: `${call.ident}:inventoryUse:${libId}`,
+                  boxType: 'consumable',
+                  boxId: String(libId),
+                  amount,
+                  rewards
                 },
                 updatedAt: record.timestamp
               });
@@ -1459,6 +1521,157 @@
                 },
                 updatedAt: entry.updatedAt
               };
+            }
+          }
+
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) => history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = {
+            key: 'resourceActionHistory',
+            method: entry.method,
+            feature: null,
+            group: 'internal',
+            data: history,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+
+        if (entry.key === 'chestOpenAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token]) continue;
+          const { boxType, boxId, amount, rewards } = entry.data;
+
+          if (boxType === 'lootboxChanced') {
+            if (next.inventoryGet?.data?.lootboxChanced) {
+              const cur = Number(next.inventoryGet.data.lootboxChanced[boxId]) || 0;
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  lootboxChanced: {
+                    ...next.inventoryGet.data.lootboxChanced,
+                    [boxId]: Math.max(0, cur - amount)
+                  }
+                }
+              };
+            }
+            const resKey = `resource:lootboxChanced:${boxId}`;
+            if (next[resKey]?.data) {
+              next[resKey] = {
+                ...next[resKey],
+                data: {
+                  ...next[resKey.data || {}],
+                  amount: Math.max(0, (next[resKey].data.amount ?? 0) - amount)
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+          } else if (boxType === 'consumable') {
+            if (next.inventoryGet?.data?.consumable) {
+              const cur = Number(next.inventoryGet.data.consumable[boxId]) || 0;
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  consumable: {
+                    ...next.inventoryGet.data.consumable,
+                    [boxId]: Math.max(0, cur - amount)
+                  }
+                }
+              };
+            }
+            const resKey = `resource:consumable:${boxId}`;
+            if (next[resKey]?.data) {
+              next[resKey] = {
+                ...next[resKey],
+                data: {
+                  ...next[resKey.data || {}],
+                  amount: Math.max(0, (next[resKey].data.amount ?? 0) - amount)
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+          }
+
+          if (Array.isArray(rewards)) {
+            for (const r of rewards) {
+              const rewardAmt = Number(r.amount) || 0;
+              if (rewardAmt <= 0) continue;
+              const rType = r.type;
+              const rId = String(r.id);
+
+              if (next.inventoryGet?.data) {
+                const group = next.inventoryGet.data[rType] || {};
+                const cur = Number(group[rId]) || 0;
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    [rType]: {
+                      ...group,
+                      [rId]: cur + rewardAmt
+                    }
+                  }
+                };
+              }
+
+              if (rType === 'gold') {
+                const resKey = 'resource:gold';
+                next[resKey] = {
+                  key: resKey,
+                  method: entry.method,
+                  feature: null,
+                  group: 'resources',
+                  data: {
+                    ...(next[resKey]?.data || {}),
+                    amount: (next[resKey]?.data?.amount ?? 0) + rewardAmt,
+                    label: 'Gold'
+                  },
+                  updatedAt: entry.updatedAt
+                };
+              } else if (rType === 'fragmentHero') {
+                const resKey = `resource:fragmentHero:${rId}`;
+                if (next[resKey]?.data) {
+                  next[resKey] = {
+                    ...next[resKey],
+                    data: {
+                      ...next[resKey].data,
+                      amount: (next[resKey].data.amount ?? 0) + rewardAmt
+                    },
+                    updatedAt: entry.updatedAt
+                  };
+                }
+              } else if (rType === 'fragmentTitan') {
+                const resKey = `resource:fragmentTitan:${rId}`;
+                if (next[resKey]?.data) {
+                  next[resKey] = {
+                    ...next[resKey],
+                    data: {
+                      ...next[resKey].data,
+                      amount: (next[resKey].data.amount ?? 0) + rewardAmt
+                    },
+                    updatedAt: entry.updatedAt
+                  };
+                }
+              } else if (resourceTypes.has(rType)) {
+                const resKey = `resource:${rType}:${rId}`;
+                const label = next[resKey]?.data?.label || resolveResourceLabel(`${rType}:${rId}`);
+                next[resKey] = {
+                  key: resKey,
+                  method: entry.method,
+                  feature: null,
+                  group: 'resources',
+                  data: {
+                    ...(next[resKey]?.data || {}),
+                    amount: (next[resKey]?.data?.amount ?? 0) + rewardAmt,
+                    label
+                  },
+                  updatedAt: entry.updatedAt
+                };
+              }
             }
           }
 
