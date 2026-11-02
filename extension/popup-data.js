@@ -85,6 +85,57 @@
     return titan.artifacts.map((a) => (a && a.level != null ? a.level : 1)).join(' - ');
   }
 
+  function getHeroArtifactTier(level) {
+    const lvl = Number(level) || 0;
+    if (lvl <= 25) return 1;
+    if (lvl <= 50) return 2;
+    if (lvl <= 70) return 3;
+    if (lvl <= 85) return 4;
+    return 5;
+  }
+
+  function getHeroArtifactTierStyle(level) {
+    const tier = getHeroArtifactTier(level);
+    switch (tier) {
+      case 1: // 1-25: Gray (formerly white)
+        return {
+          tier,
+          badge: 'bg-slate-700/80 text-slate-300 ring-1 ring-slate-600/60',
+          color: 'text-slate-300',
+          starColor: 'text-slate-400'
+        };
+      case 2: // 26-50: Green
+        return {
+          tier,
+          badge: 'bg-emerald-950/60 text-emerald-300 ring-1 ring-emerald-500/40',
+          color: 'text-emerald-300',
+          starColor: 'text-green-500'
+        };
+      case 3: // 51-70: Blue
+        return {
+          tier,
+          badge: 'bg-sky-950/60 text-sky-300 ring-1 ring-sky-500/40',
+          color: 'text-sky-300',
+          starColor: 'text-blue-500'
+        };
+      case 4: // 71-85: Violet
+        return {
+          tier,
+          badge: 'bg-purple-950/60 text-purple-300 ring-1 ring-purple-500/40',
+          color: 'text-purple-300',
+          starColor: 'text-violet-500'
+        };
+      case 5: // 86-100: Orange
+      default:
+        return {
+          tier,
+          badge: 'bg-amber-950/60 text-amber-300 ring-1 ring-amber-500/40',
+          color: 'text-amber-300',
+          starColor: 'text-orange-400'
+        };
+    }
+  }
+
   function isTitanArtifactUpgradable(titanId, slotIndex, titan, cache) {
     if (!titan) return false;
     const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
@@ -288,19 +339,19 @@
   function defaultDraftCandidates(mode = 'defense') {
     if (mode === 'attack') {
       return [
-        [8, 49, 28],   // Step 1: Chabba, Satori, Qing Mao
-        [73, 56, 12],  // Step 2: Drayne, Fafnir, Arachne
-        [17, 34, 14],  // Step 3: Mojo, Rufus, Heidi
-        [4, 55, 10],   // Step 4: Astaroth, Mushy and Shroom, Dante
-        [29, 25, 78]   // Step 5: Lars, Ishmael, Wodryn
+        [24, 8, 49],   // Step 1: Cleaver (verified trace pick), Chabba, Satori
+        [54, 73, 56],  // Step 2: Iris (verified trace pick), Drayne, Fafnir
+        [503, 17, 34], // Step 3: Alvanor (verified trace pick), Mojo, Rufus
+        [59, 4, 55],   // Step 4: Cascade (verified trace pick), Astaroth, Mushy and Shroom
+        [64, 29, 25]   // Step 5: Folio (verified trace pick), Lars, Ishmael
       ];
     }
     return [
-      [78, 49, 44],  // Step 1: Wodryn, Satori, Astrid and Lucas
-      [76, 20, 38],  // Step 2: Crow, Markus, Ziri
-      [75, 2, 25],   // Step 3: Oya, Ginger, Ishmael
-      [37, 73, 28],  // Step 4: Jhu, Drayne, Qing Mao
-      [5, 35, 69]    // Step 5: Artemis, Faceless, Guus
+      [4, 78, 49],   // Step 1: Astaroth (verified trace pick), Wodryn, Satori
+      [57, 76, 20],  // Step 2: Kayla (verified trace pick), Crow, Markus
+      [23, 75, 2],   // Step 3: Lian (verified trace pick), Oya, Ginger
+      [503, 37, 73], // Step 4: Alvanor (verified trace pick), Jhu, Drayne
+      [28, 5, 35]    // Step 5: Qing Mao (verified trace pick), Artemis, Faceless
     ];
   }
 
@@ -1337,7 +1388,7 @@
     return String(id || '');
   }
 
-  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans, formatTitanArtifactLevels, isTitanArtifactUpgradable, teamRows, sortRows,
+  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans, formatTitanArtifactLevels, isTitanArtifactUpgradable, getHeroArtifactTier, getHeroArtifactTierStyle, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,

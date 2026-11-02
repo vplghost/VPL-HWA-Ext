@@ -506,12 +506,18 @@ function refreshTimed() {
   const energyVal = resourceData.amountAt(energy) ?? currentCache.energyStatus?.data?.energy;
   const energyCap = energy?.data?.cap;
   const isEnergyCapped = Number.isFinite(energyVal) && Number.isFinite(energyCap) && energyVal >= energyCap;
-  document.querySelector('#energy-badge')?.classList?.toggle('resource-capped-amber', isEnergyCapped);
+  const energyBadge = document.querySelector('#energy-badge');
+  energyBadge?.classList?.toggle('resource-capped-amber', isEnergyCapped);
+  const energyPing = energyBadge?.querySelector?.('.hwa-mail-dot-ping');
+  if (energyPing) energyPing.hidden = !isEnergyCapped;
 
   const worldVal = resourceData.amountAt(worldEnergy) ?? currentCache.worldEnergyStatus?.data?.energy;
   const worldCap = worldEnergy?.data?.cap ?? 200;
   const isWorldCapped = Number.isFinite(worldVal) && Number.isFinite(worldCap) && worldVal >= worldCap;
-  document.querySelector('#world-energy-badge')?.classList?.toggle('resource-capped-sky', isWorldCapped);
+  const worldBadge = document.querySelector('#world-energy-badge');
+  worldBadge?.classList?.toggle('resource-capped-sky', isWorldCapped);
+  const worldPing = worldBadge?.querySelector?.('.hwa-mail-dot-ping');
+  if (worldPing) worldPing.hidden = !isWorldCapped;
 
   for (const node of document.querySelectorAll('[data-resource-header="true"]')) {
     const entry = currentCache[node.dataset.resourceAmount];
@@ -523,6 +529,44 @@ function refreshTimed() {
     const cap = entry.data?.cap;
     const isCapped = Number.isFinite(amt) && Number.isFinite(cap) && amt >= cap;
     pill?.classList?.toggle('resource-capped', isCapped);
+    let pillPing = pill?.querySelector?.('.hwa-mail-dot-ping');
+    if (isCapped) {
+      if (!pillPing) {
+        pill?.classList?.add('relative');
+        pillPing = document.createElement('span');
+        pillPing.className = 'hwa-mail-dot-ping';
+        pill.append(pillPing);
+      }
+      pillPing.hidden = false;
+    } else if (pillPing) {
+      pillPing.hidden = true;
+    }
+  }
+
+  const wheelBadge = document.querySelector('#wheel-fortune-badge');
+  const wheelLabel = document.querySelector('#wheel-fortune-label');
+  if (wheelBadge && wheelLabel) {
+    const wheelStatus = currentCache.wheelFortuneStatus?.data;
+    const ref62 = currentCache['resource:refillable:62']?.data;
+    const nextDayTs = wheelStatus?.nextResetTs || currentCache.userGetInfo?.data?.nextDayTs;
+    const hasFree = wheelStatus ? Boolean(wheelStatus.hasFree) : (ref62 ? (Number(ref62.amount) > 0 || ref62.boughtToday === 0) : null);
+
+    if (hasFree === true) {
+      wheelBadge.hidden = false;
+      wheelBadge.className = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer bg-emerald-50 text-emerald-800 ring-1 ring-emerald-300 animate-pulse';
+      wheelLabel.textContent = 'Free Spin';
+      wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Free spin ready!';
+      setResourceTooltip(wheelBadge, 'Wheel of Fortune (Emerald Exchange): Free spin ready!');
+    } else if (hasFree === false && Number.isFinite(nextDayTs)) {
+      const countdown = globalThis.hwaHelperPopupData?.formatCountdown ? globalThis.hwaHelperPopupData.formatCountdown(nextDayTs) : '00:00:00';
+      wheelBadge.hidden = false;
+      wheelBadge.className = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer bg-slate-50 text-slate-700 ring-1 ring-slate-200 font-mono';
+      wheelLabel.textContent = countdown;
+      wheelBadge.title = `Wheel of Fortune (Emerald Exchange): Next free spin in ${countdown}`;
+      setResourceTooltip(wheelBadge, `Wheel of Fortune (Emerald Exchange): Next free spin in ${countdown}`);
+    } else {
+      wheelBadge.hidden = true;
+    }
   }
 
   const eventsBadge = document.querySelector('#events-tab-badge');
@@ -716,8 +760,8 @@ function starIcons(count) {
     wrap.textContent = '—';
     return wrap;
   }
-  const color = ['text-white', 'text-green-500', 'text-blue-500',
-    'text-violet-500', 'text-orange-400'][Math.min(count, 5) - 1];
+  const color = ['text-slate-400', 'text-green-500', 'text-blue-500',
+    'text-violet-500', 'text-orange-400', 'text-amber-400'][Math.min(count, 6) - 1] || 'text-slate-400';
   wrap.setAttribute('aria-label', `${count} stars`);
   wrap.title = `${count} stars`;
   for (let index = 0; index < count; index++) {
@@ -1028,9 +1072,13 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
     const typeAbbr = { weapon: 'Wpn', book: 'Book', ring: 'Ring' };
     for (const art of heroSnapshot.artifacts) {
       const badge = document.createElement('span');
-      badge.className = 'rounded bg-slate-700/80 px-1.5 py-0.5 text-[10px] font-semibold text-violet-300 tabular-nums';
+      const artLvl = Number(art.level) || 0;
+      const tierStyle = globalThis.hwaHelperPopupData?.getHeroArtifactTierStyle?.(artLvl) || {
+        badge: 'bg-slate-700/80 text-slate-300 ring-1 ring-slate-600/60'
+      };
+      badge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${tierStyle.badge}`;
       const name = typeAbbr[art.artifactType] || art.artifactType || 'Art';
-      badge.textContent = `${name}: ${art.star || 0}★ Lv.${art.level || 0}`;
+      badge.textContent = `${name}: ${art.star || 0}★ Lv.${artLvl}`;
       artList.append(badge);
     }
     artBox.append(artLabel, artList);
@@ -1685,35 +1733,52 @@ function renderInventoryGrid(cache) {
     for (const item of group.items) {
       const tile = document.createElement('div');
       tile.className = 'relative aspect-square rounded-xl bg-slate-800 flex items-center justify-center p-1 select-none overflow-hidden ring-1 ring-slate-700/60 hover:ring-2 hover:ring-blue-400 hover:scale-105 transition-all shadow-xs cursor-default';
-      tile.setAttribute('title', `${item.name} (${group.label} #${item.id})\nQuantity: ${formatNumber(item.amount)}`);
+      const fullName = (item.name && item.name !== '—') ? item.name : `${group.label} #${item.id}`;
+      const tooltipText = `${fullName} (${group.label} #${item.id})\nQuantity: ${formatNumber(item.amount)}`;
+      tile.setAttribute('title', tooltipText);
+      setResourceTooltip(tile, tooltipText);
 
       // Visual Content
+      let itemImgSrc = null;
       if (item.category === 'fragmentHero') {
-        const img = document.createElement('img');
-        img.src = `assets/heroes/${item.id}.webp`;
-        img.alt = item.name;
-        img.className = 'size-full object-cover rounded-lg pointer-events-none';
-        img.onerror = () => {
-          img.src = `assets/heroes/${item.id}.png`;
-          img.onerror = () => {
-            img.style.display = 'none';
-          };
-        };
-        tile.append(img);
+        itemImgSrc = `assets/heroes/${item.id}.webp`;
       } else if (item.category === 'fragmentTitan') {
-        const img = document.createElement('img');
-        img.src = `assets/titans/${item.id}.png`;
-        img.alt = item.name;
-        img.className = 'size-full object-cover rounded-lg pointer-events-none';
-        img.onerror = () => {
-          img.style.display = 'none';
-        };
-        tile.append(img);
-      } else {
+        itemImgSrc = `assets/titans/${item.id}.png`;
+      } else if (item.category === 'gear' || item.category === 'fragmentGear') {
+        itemImgSrc = `assets/items/gear/${item.id}.png`;
+      } else if (item.category === 'consumable') {
+        itemImgSrc = `assets/items/consumable/${item.id}.png`;
+      } else if (item.category === 'scroll' || item.category === 'fragmentScroll') {
+        itemImgSrc = `assets/items/scroll/${item.id}.png`;
+      }
+
+      const showFallbackIcon = () => {
         const icon = document.createElement('span');
         icon.className = 'text-2xl select-none drop-shadow-sm opacity-85 pointer-events-none';
         icon.textContent = group.icon;
         tile.append(icon);
+      };
+
+      if (itemImgSrc) {
+        const img = document.createElement('img');
+        img.src = itemImgSrc;
+        img.alt = fullName;
+        img.className = 'size-full object-cover rounded-lg pointer-events-none';
+        img.onerror = () => {
+          if (item.category === 'fragmentHero') {
+            img.src = `assets/heroes/${item.id}.png`;
+            img.onerror = () => {
+              img.style.display = 'none';
+              showFallbackIcon();
+            };
+          } else {
+            img.style.display = 'none';
+            showFallbackIcon();
+          }
+        };
+        tile.append(img);
+      } else {
+        showFallbackIcon();
       }
 
       // Small abbreviated name at top-left
@@ -1745,18 +1810,18 @@ let draftViewMode = null; // 'defense' or 'attack'
 let lastRenderedMatchId = null;
 let draftStepCandidates = {
   defense: globalThis.hwaHelperPopupData?.defaultDraftCandidates?.('defense') || [
-    [78, 49, 44],
-    [76, 20, 38],
-    [75, 2, 25],
-    [37, 73, 28],
-    [5, 35, 69]
+    [4, 78, 49],
+    [57, 76, 20],
+    [23, 75, 2],
+    [503, 37, 73],
+    [28, 5, 35]
   ],
   attack: globalThis.hwaHelperPopupData?.defaultDraftCandidates?.('attack') || [
-    [8, 49, 28],
-    [73, 56, 12],
-    [17, 34, 14],
-    [4, 55, 10],
-    [29, 25, 78]
+    [24, 8, 49],
+    [54, 73, 56],
+    [503, 17, 34],
+    [59, 4, 55],
+    [64, 29, 25]
   ]
 };
 
@@ -1769,11 +1834,42 @@ try {
   });
 } catch (_) {}
 
+function ensureCandidateHasHero(mode, stepIdx, heroId) {
+  if (!heroId || !mode || stepIdx < 0 || stepIdx > 4) return;
+  if (!draftStepCandidates[mode]) {
+    draftStepCandidates[mode] = globalThis.hwaHelperPopupData?.defaultDraftCandidates?.(mode) || [];
+  }
+  while (draftStepCandidates[mode].length <= stepIdx) {
+    draftStepCandidates[mode].push([78, 49, 44]);
+  }
+  const col = draftStepCandidates[mode][stepIdx];
+  if (Array.isArray(col) && !col.includes(heroId)) {
+    col[0] = heroId;
+    try {
+      chrome.storage?.local?.set?.({ draftStepCandidates });
+    } catch (_) {}
+  }
+}
+
 let activeHeroSwapTarget = null;
 let selectedRoleFilter = 'all';
 
 function renderDraft(cache) {
   const draft = cache.legendDraftStatus?.data || {};
+
+  // Auto-inject any picked heroes from game state into the 15 candidate matrix slots
+  if (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length) {
+    draft.defenceHeroes.forEach((hId, idx) => ensureCandidateHasHero('defense', idx, hId));
+  }
+  if (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length) {
+    draft.attackHeroes.forEach((hId, idx) => ensureCandidateHasHero('attack', idx, hId));
+  }
+  if (Array.isArray(draft.lastResult?.defenceHeroes) && draft.lastResult.defenceHeroes.length) {
+    draft.lastResult.defenceHeroes.forEach((hId, idx) => ensureCandidateHasHero('defense', idx, hId));
+  }
+  if (Array.isArray(draft.lastResult?.attackHeroes) && draft.lastResult.attackHeroes.length) {
+    draft.lastResult.attackHeroes.forEach((hId, idx) => ensureCandidateHasHero('attack', idx, hId));
+  }
   const stageId = Number.isInteger(draft.stageId) ? draft.stageId : 0;
   const isDefenseStage = stageId === 2 || stageId === 3;
   const isAttackStage = stageId === 4;

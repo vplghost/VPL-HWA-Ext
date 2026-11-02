@@ -1001,3 +1001,48 @@ test('getItemAbbr generates concise uppercase abbreviations for inventory grid v
   assert.equal(getItemAbbr('', 99), '#99');
   assert.equal(getItemAbbr('—', 105), '#105');
 });
+
+test('getHeroArtifactTier and getHeroArtifactTierStyle apply 5-color scale breakpoints', () => {
+  const { getHeroArtifactTier, getHeroArtifactTierStyle } = context.hwaHelperPopupData;
+
+  // Tier 1: 1-25 (Gray/slate instead of pure white)
+  assert.equal(getHeroArtifactTier(1), 1);
+  assert.equal(getHeroArtifactTier(25), 1);
+  const styleT1 = getHeroArtifactTierStyle(15);
+  assert.equal(styleT1.tier, 1);
+  assert.ok(styleT1.badge.includes('bg-slate-700/80'));
+  assert.equal(styleT1.starColor, 'text-slate-400');
+
+  // Tier 2: 26-50 (Green)
+  assert.equal(getHeroArtifactTier(26), 2);
+  assert.equal(getHeroArtifactTier(50), 2);
+  const styleT2 = getHeroArtifactTierStyle(40);
+  assert.equal(styleT2.tier, 2);
+  assert.ok(styleT2.badge.includes('bg-emerald-950/60'));
+  assert.equal(styleT2.starColor, 'text-green-500');
+
+  // Tier 3: 51-70 (Blue)
+  assert.equal(getHeroArtifactTier(51), 3);
+  assert.equal(getHeroArtifactTier(70), 3);
+  const styleT3 = getHeroArtifactTierStyle(65);
+  assert.equal(styleT3.tier, 3);
+  assert.ok(styleT3.badge.includes('bg-sky-950/60'));
+  assert.equal(styleT3.starColor, 'text-blue-500');
+
+  // Tier 4: 71-85 (Violet)
+  assert.equal(getHeroArtifactTier(71), 4);
+  assert.equal(getHeroArtifactTier(85), 4);
+  const styleT4 = getHeroArtifactTierStyle(80);
+  assert.equal(styleT4.tier, 4);
+  assert.ok(styleT4.badge.includes('bg-purple-950/60'));
+  assert.equal(styleT4.starColor, 'text-violet-500');
+
+  // Tier 5: 86-100 (Orange)
+  assert.equal(getHeroArtifactTier(86), 5);
+  assert.equal(getHeroArtifactTier(100), 5);
+  assert.equal(getHeroArtifactTier(120), 5);
+  const styleT5 = getHeroArtifactTierStyle(95);
+  assert.equal(styleT5.tier, 5);
+  assert.ok(styleT5.badge.includes('bg-amber-950/60'));
+  assert.equal(styleT5.starColor, 'text-orange-400');
+});

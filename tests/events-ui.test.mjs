@@ -137,12 +137,20 @@ const leagueBadge = new MockElement('span');
 leagueBadge.setAttribute('id', 'gvs-league-badge');
 const energyBadge = new MockElement('span');
 energyBadge.setAttribute('id', 'energy-badge');
+const energyPing = new MockElement('span');
+energyPing.className = 'hwa-mail-dot-ping';
+energyPing.hidden = true;
+energyBadge.append(energyPing);
 const energyVal = new MockElement('span');
 energyVal.setAttribute('id', 'energy-value');
 const energyMax = new MockElement('span');
 energyMax.setAttribute('id', 'energy-max');
 const worldEnergyBadge = new MockElement('span');
 worldEnergyBadge.setAttribute('id', 'world-energy-badge');
+const worldEnergyPing = new MockElement('span');
+worldEnergyPing.className = 'hwa-mail-dot-ping';
+worldEnergyPing.hidden = true;
+worldEnergyBadge.append(worldEnergyPing);
 const worldEnergyVal = new MockElement('span');
 worldEnergyVal.setAttribute('id', 'world-energy-value');
 const eventsBadge = new MockElement('span');
@@ -254,11 +262,18 @@ const itemsViewGrid = new MockElement('button');
 itemsViewGrid.setAttribute('id', 'items-view-grid');
 const itemsViewList = new MockElement('button');
 itemsViewList.setAttribute('id', 'items-view-list');
+const wheelFortuneBadge = new MockElement('div');
+wheelFortuneBadge.setAttribute('id', 'wheel-fortune-badge');
+wheelFortuneBadge.hidden = true;
+const wheelFortuneLabel = new MockElement('span');
+wheelFortuneLabel.setAttribute('id', 'wheel-fortune-label');
 
 const mockDoc = {
   createElement: (tag) => new MockElement(tag),
   createElementNS: (_, tag) => new MockElement(tag),
   elementsById: new Map([
+    ['wheel-fortune-badge', wheelFortuneBadge],
+    ['wheel-fortune-label', wheelFortuneLabel],
     ['table-export-btn', tableExportBtn],
     ['resource-filter-toggle', resourceFilterToggle],
     ['resource-filter-toggle-text', resourceFilterToggleText],
@@ -592,7 +607,9 @@ test('header resource capped styling toggles classes when cap reached or exceede
   };
   context.refreshTimed();
   assert.equal(energyBadge.classList.contains('resource-capped-amber'), false);
+  assert.equal(energyPing.hidden, true);
   assert.equal(worldEnergyBadge.classList.contains('resource-capped-sky'), false);
+  assert.equal(worldEnergyPing.hidden, true);
 
   // Exactly at cap
   context.currentCache = {
@@ -601,7 +618,9 @@ test('header resource capped styling toggles classes when cap reached or exceede
   };
   context.refreshTimed();
   assert.equal(energyBadge.classList.contains('resource-capped-amber'), true);
+  assert.equal(energyPing.hidden, false);
   assert.equal(worldEnergyBadge.classList.contains('resource-capped-sky'), true);
+  assert.equal(worldEnergyPing.hidden, false);
 
   // Exceeding soft cap
   context.currentCache = {
@@ -610,7 +629,9 @@ test('header resource capped styling toggles classes when cap reached or exceede
   };
   context.refreshTimed();
   assert.equal(energyBadge.classList.contains('resource-capped-amber'), true);
+  assert.equal(energyPing.hidden, false);
   assert.equal(worldEnergyBadge.classList.contains('resource-capped-sky'), true);
+  assert.equal(worldEnergyPing.hidden, false);
 
   // CSS provides vibrant glow and pulse keyframe animations
   assert.ok(popupCss.includes('@keyframes resource-pulse-amber'));
@@ -1325,7 +1346,12 @@ test('renderInventoryGrid renders grouped items with dividers, abbreviations, qu
 
   context.globalThis.hwaHelperNameMap = {
     hero: (id) => id === '1' ? 'Aurora' : null,
-    item: (cat, id) => id === '1' ? 'Aurora fragment' : null
+    item: (cat, id) => {
+      if (cat === 'fragmentHero' && id === '1') return 'Aurora fragment';
+      if (cat === 'consumable' && id === '20') return 'Bottled Energy';
+      if (cat === 'gear' && id === '10') return 'Flaming Heart';
+      return null;
+    }
   };
 
   view.replaceChildren();
@@ -1347,10 +1373,21 @@ test('renderInventoryGrid renders grouped items with dividers, abbreviations, qu
   const tiles = view.querySelectorAll('div').filter((d) => d.getAttribute('title'));
   assert.equal(tiles.length, 4);
 
-  // First tile is consumable (item 20, qty 15)
+  // First tile is consumable (item 20, qty 15) with extracted asset icon and full name tooltip
   const consumableTile = tiles[0];
-  assert.ok(consumableTile.getAttribute('title').includes('Consumables #20'));
+  assert.ok(consumableTile.getAttribute('title').includes('Bottled Energy (Consumables #20)'));
   assert.ok(consumableTile.getAttribute('title').includes('Quantity: 15'));
+  assert.ok(consumableTile.getAttribute('data-resource-tooltip').includes('Bottled Energy'));
+  const consumableImg = consumableTile.querySelector('img');
+  assert.ok(consumableImg, 'Consumable tile should have item image');
+  assert.equal(consumableImg.src, 'assets/items/consumable/20.png');
+
+  // Second tile is equipment (item 10, qty 2) with extracted gear icon and full name tooltip
+  const gearTile = tiles[1];
+  assert.ok(gearTile.getAttribute('title').includes('Flaming Heart (Equipment #10)'));
+  const gearImg = gearTile.querySelector('img');
+  assert.ok(gearImg, 'Gear tile should have item image');
+  assert.equal(gearImg.src, 'assets/items/gear/10.png');
 
   // Hero fragment tile should have avatar img
   const heroTile = tiles.find((t) => t.getAttribute('title').includes('Hero Soul Stones #1'));
@@ -1364,4 +1401,32 @@ test('renderInventoryGrid renders grouped items with dividers, abbreviations, qu
   assert.ok(spans.length >= 2, 'Must have abbreviation and quantity spans');
   assert.equal(spans[0].textContent, 'AF'); // Aurora fragment -> AF
   assert.equal(spans[1].textContent, '100'); // Quantity 100
+});
+
+test('header wheel fortune badge displays Free Spin when available and countdown timer when cooling down', () => {
+  // 1. Free spin available
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: true, nextResetTs: 1793656800 } }
+  };
+  context.refreshTimed();
+  assert.equal(wheelFortuneBadge.hidden, false);
+  assert.ok(wheelFortuneBadge.className.includes('animate-pulse'));
+  assert.ok(wheelFortuneBadge.className.includes('bg-emerald-50'));
+  assert.equal(wheelFortuneLabel.textContent, 'Free Spin');
+
+  // 2. Free spin used, countdown active
+  const futureTs = Math.floor(Date.now() / 1000) + 7200; // 2 hours in future
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: false, nextResetTs: futureTs } }
+  };
+  context.refreshTimed();
+  assert.equal(wheelFortuneBadge.hidden, false);
+  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
+  assert.ok(wheelFortuneBadge.className.includes('font-mono'));
+  assert.match(wheelFortuneLabel.textContent, /\d+:\d{2}/);
+
+  // 3. No wheel fortune data hides badge
+  context.currentCache = {};
+  context.refreshTimed();
+  assert.equal(wheelFortuneBadge.hidden, true);
 });

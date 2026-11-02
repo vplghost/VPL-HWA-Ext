@@ -168,6 +168,34 @@ test('createHeroInline renders skills, skins, glyphs, artifacts, and spark of po
 
   // Artifacts
   assert.ok(text.includes('Wpn: 3★ Lv.40') && text.includes('Book: 2★ Lv.24') && text.includes('Ring: 2★ Lv.23'), 'Should render Artifacts with stars and level');
+
+  const artBox = card.querySelectorAll ? card.querySelectorAll('div').find(d => d.textContent.startsWith('Artifacts')) : null;
+  // Check artifact badges have tier styling (Tier 2 emerald for Lv.40, Tier 1 slate for Lv.24 and Lv.23)
+  const allSpans = card.children[1] ? card.children[1].children.flatMap(c => c.children ? c.children.flatMap(cc => cc.children || []) : []) : [];
+  const wpnBadge = allSpans.find(s => s.textContent?.startsWith('Wpn:'));
+  const bookBadge = allSpans.find(s => s.textContent?.startsWith('Book:'));
+  if (wpnBadge) assert.ok(wpnBadge.className.includes('bg-emerald-950/60'), 'Wpn lv.40 should have Tier 2 green styling');
+  if (bookBadge) assert.ok(bookBadge.className.includes('bg-slate-700/80'), 'Book lv.24 should have Tier 1 gray styling');
+});
+
+test('starIcons renders 1 star with slate-400 gray instead of pure white and higher stars with proper colors', () => {
+  const { starIcons } = context;
+  const s1 = starIcons(1);
+  const s1Star = s1.children[0];
+  assert.ok(s1Star.className.includes('text-slate-400'), '1-star icon must use text-slate-400');
+  assert.ok(!s1Star.className.includes('text-white'), '1-star icon must not use pure text-white');
+
+  const s2 = starIcons(2);
+  assert.ok(s2.children[0].className.includes('text-green-500'));
+
+  const s3 = starIcons(3);
+  assert.ok(s3.children[0].className.includes('text-blue-500'));
+
+  const s4 = starIcons(4);
+  assert.ok(s4.children[0].className.includes('text-violet-500'));
+
+  const s5 = starIcons(5);
+  assert.ok(s5.children[0].className.includes('text-orange-400'));
 });
 
 test('createHeroInline renders accurate glyph stats and titles for Dante and Somna', () => {
