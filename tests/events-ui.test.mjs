@@ -213,6 +213,7 @@ const resourceDataJs = await readFile(new URL('../extension/resource-data.js', i
 const titanMetadataJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
 const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const popupCss = await readFile(new URL('../extension/popup.css', import.meta.url), 'utf8');
 
 const context = {
   document: mockDoc,
@@ -452,6 +453,14 @@ test('header resource capped styling toggles classes when cap reached or exceede
   context.refreshTimed();
   assert.equal(energyBadge.classList.contains('resource-capped-amber'), true);
   assert.equal(worldEnergyBadge.classList.contains('resource-capped-sky'), true);
+
+  // CSS provides vibrant glow and pulse keyframe animations
+  assert.ok(popupCss.includes('@keyframes resource-pulse-amber'));
+  assert.ok(popupCss.includes('@keyframes resource-pulse-sky'));
+  assert.ok(popupCss.includes('@keyframes resource-icon-bounce'));
+  assert.ok(popupCss.includes('animation: resource-pulse-amber'));
+  assert.ok(popupCss.includes('animation: resource-pulse-sky'));
+  assert.ok(popupCss.includes('@media (prefers-reduced-motion: reduce)'));
 });
 
 test('renderEvents renders Titan Dungeon card and handles search filtering', () => {

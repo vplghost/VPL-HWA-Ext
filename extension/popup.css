@@ -125,18 +125,78 @@
     box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.5), 0 0 6px rgba(0, 0, 0, 0.3);
   }
 
-  /* Capped / Soft cap reached resource badges */
+  /* Capped / Soft cap reached resource badges & glowing pulse animations */
+  @keyframes resource-pulse-amber {
+    0%, 100% {
+      box-shadow: 0 0 0 2px #f59e0b, 0 0 8px 1px rgba(245, 158, 11, 0.45);
+      filter: brightness(1);
+    }
+    50% {
+      box-shadow: 0 0 0 3px #d97706, 0 0 22px 6px rgba(245, 158, 11, 0.95), inset 0 0 8px rgba(245, 158, 11, 0.3);
+      filter: brightness(1.08);
+    }
+  }
+
+  @keyframes resource-pulse-sky {
+    0%, 100% {
+      box-shadow: 0 0 0 2px #0ea5e9, 0 0 8px 1px rgba(14, 165, 233, 0.45);
+      filter: brightness(1);
+    }
+    50% {
+      box-shadow: 0 0 0 3px #0284c7, 0 0 22px 6px rgba(14, 165, 233, 0.95), inset 0 0 8px rgba(14, 165, 233, 0.3);
+      filter: brightness(1.08);
+    }
+  }
+
+  @keyframes resource-icon-bounce {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.22);
+    }
+  }
+
   .resource-capped-amber {
     font-weight: 800 !important;
     box-shadow: 0 0 0 2px #f59e0b, 0 0 10px rgba(245, 158, 11, 0.65) !important;
+    animation: resource-pulse-amber 1.8s ease-in-out infinite !important;
   }
+  .resource-capped-amber svg {
+    animation: resource-icon-bounce 1.8s ease-in-out infinite !important;
+    transform-origin: center;
+  }
+
   .resource-capped-sky {
     font-weight: 800 !important;
     box-shadow: 0 0 0 2px #0ea5e9, 0 0 10px rgba(14, 165, 233, 0.65) !important;
+    animation: resource-pulse-sky 1.8s ease-in-out infinite !important;
   }
+  .resource-capped-sky svg {
+    animation: resource-icon-bounce 1.8s ease-in-out infinite !important;
+    transform-origin: center;
+  }
+
   .resource-capped {
     font-weight: 800 !important;
-    box-shadow: 0 0 0 2px #f59e0b, 0 0 8px rgba(245, 158, 11, 0.5) !important;
+    box-shadow: 0 0 0 2px #f59e0b, 0 0 10px rgba(245, 158, 11, 0.65) !important;
+    animation: resource-pulse-amber 1.8s ease-in-out infinite !important;
+  }
+  .resource-capped span[aria-hidden="true"] {
+    display: inline-block;
+    animation: resource-icon-bounce 1.8s ease-in-out infinite !important;
+    transform-origin: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .resource-capped-amber,
+    .resource-capped-sky,
+    .resource-capped,
+    .resource-capped-amber svg,
+    .resource-capped-sky svg,
+    .resource-capped span[aria-hidden="true"] {
+      animation: none !important;
+    }
   }
 
   /* Guild Versus Milestone Chests Card Deck */
