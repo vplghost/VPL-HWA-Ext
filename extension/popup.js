@@ -1505,6 +1505,7 @@ let localDraftDefencePicks = [null, null, null, null, null];
 let localDraftAttackPicks = [null, null, null, null, null];
 let activeDraftStep = 0;
 let draftViewMode = null; // 'defense' or 'attack'
+let lastRenderedMatchId = null;
 let draftStepCandidates = {
   defense: globalThis.hwaHelperPopupData?.defaultDraftCandidates?.('defense') || [
     [78, 49, 44],
@@ -1521,6 +1522,16 @@ let draftStepCandidates = {
     [29, 25, 78]
   ]
 };
+
+try {
+  chrome.storage?.local?.get?.('draftStepCandidates')?.then?.((res) => {
+    if (res?.draftStepCandidates) {
+      if (Array.isArray(res.draftStepCandidates.defense)) draftStepCandidates.defense = res.draftStepCandidates.defense;
+      if (Array.isArray(res.draftStepCandidates.attack)) draftStepCandidates.attack = res.draftStepCandidates.attack;
+    }
+  });
+} catch (_) {}
+
 let activeHeroSwapTarget = null;
 let selectedRoleFilter = 'all';
 
@@ -1533,15 +1544,31 @@ function renderDraft(cache) {
   const isSearching = stageId === 1;
   const isMatchCompleted = stageId === 7 || Boolean(draft.lastResult);
 
-  if (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5) {
-    localDraftDefencePicks = [...draft.defenceHeroes];
-  } else if (Array.isArray(draft.lastResult?.defenceHeroes) && draft.lastResult.defenceHeroes.length === 5) {
-    localDraftDefencePicks = [...draft.lastResult.defenceHeroes];
+  // Reset local picks when entering a new match
+  if (draft.matchId && draft.matchId !== lastRenderedMatchId) {
+    lastRenderedMatchId = draft.matchId;
+    localDraftDefencePicks = [null, null, null, null, null];
+    localDraftAttackPicks = [null, null, null, null, null];
+    activeHeroSwapTarget = null;
   }
-  if (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5) {
-    localDraftAttackPicks = [...draft.attackHeroes];
-  } else if (Array.isArray(draft.lastResult?.attackHeroes) && draft.lastResult.attackHeroes.length === 5) {
-    localDraftAttackPicks = [...draft.lastResult.attackHeroes];
+
+  // A mode is only locked if it was explicitly submitted in this match, or the server advanced past it
+  const isDefenseLocked = Boolean(
+    (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5 && (draft.lastPickAction === 'saveDefence' || stageId >= 4 || isMatchCompleted)) ||
+    (Array.isArray(draft.lastResult?.defenceHeroes) && draft.lastResult.defenceHeroes.length === 5)
+  );
+  const isAttackLocked = Boolean(
+    (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5 && (draft.lastPickAction === 'saveAttack' || stageId >= 5 || isMatchCompleted)) ||
+    (Array.isArray(draft.lastResult?.attackHeroes) && draft.lastResult.attackHeroes.length === 5)
+  );
+
+  if (isDefenseLocked) {
+    const src = (draft.defenceHeroes?.length === 5 ? draft.defenceHeroes : draft.lastResult?.defenceHeroes) || [];
+    localDraftDefencePicks = [...src];
+  }
+  if (isAttackLocked) {
+    const src = (draft.attackHeroes?.length === 5 ? draft.attackHeroes : draft.lastResult?.attackHeroes) || [];
+    localDraftAttackPicks = [...src];
   }
 
   // Determine active view mode (toggle takes priority, else match stage)
@@ -1554,9 +1581,7 @@ function renderDraft(cache) {
   while (currentPicks.length < 5) currentPicks.push(null);
 
   const val = globalThis.hwaHelperPopupData.validateDraftPicks(currentPicks);
-  const isModeLocked = isViewingAttack ?
-    (draft.attackHeroes?.length === 5 || (isMatchCompleted && localDraftAttackPicks.filter(Boolean).length === 5)) :
-    (draft.defenceHeroes?.length === 5 || (isMatchCompleted && localDraftDefencePicks.filter(Boolean).length === 5));
+  const isModeLocked = isViewingAttack ? isAttackLocked : isDefenseLocked;
 
   // Display 15 pick slots when drafting is active for this phase
   const isActivelyDrafting = !isModeLocked && (draft.matchId || isDefenseStage || isAttackStage) && !isMatchCompleted;
@@ -1781,6 +1806,24 @@ function renderDraft(cache) {
   teamTitleCol.append(teamSub);
   teamHeader.append(teamTitleCol);
 
+  // Total team power calculation
+  let totalLineupPower = 0;
+  for (const hId of currentPicks) {
+    if (hId && cache.heroGetAll?.data?.[hId]?.power) {
+      totalLineupPower += cache.heroGetAll.data[hId].power;
+    }
+  }
+
+  const teamHeaderActions = document.createElement('div');
+  teamHeaderActions.className = 'flex items-center gap-2';
+
+  if (totalLineupPower > 0) {
+    const powerBadge = document.createElement('span');
+    powerBadge.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-900 border border-amber-300 flex items-center gap-1';
+    powerBadge.innerHTML = `<span>⚡</span> <span>Team Power: ${formatNumber(totalLineupPower)}</span>`;
+    teamHeaderActions.append(powerBadge);
+  }
+
   // Lock action button or locked badge
   if (isActivelyDrafting) {
     const lockBtn = document.createElement('button');
@@ -1800,13 +1843,14 @@ function renderDraft(cache) {
         });
       });
     }
-    teamHeader.append(lockBtn);
+    teamHeaderActions.append(lockBtn);
   } else if (isModeLocked) {
     const lockedTag = document.createElement('span');
     lockedTag.className = 'px-3 py-1 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800 flex items-center gap-1';
     lockedTag.textContent = '✓ Lineup successfully locked';
-    teamHeader.append(lockedTag);
+    teamHeaderActions.append(lockedTag);
   }
+  teamHeader.append(teamHeaderActions);
   teamSection.append(teamHeader);
 
   // 5 Heroes Slots Row
@@ -1920,9 +1964,30 @@ function renderDraft(cache) {
   teamSection.append(slotsGrid);
   container.append(teamSection);
 
+  // Locked mode status notification if current phase is locked
+  if (isModeLocked && (isDefenseStage || isAttackStage)) {
+    const lockedCard = document.createElement('div');
+    lockedCard.className = 'rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 text-center space-y-1';
+    lockedCard.innerHTML = `
+      <div class="text-sm font-bold text-emerald-900 flex items-center justify-center gap-1.5">
+        <span>✓</span> <span>${isViewingAttack ? 'Attack' : 'Defense'} Lineup locked!</span>
+      </div>
+      <div class="text-xs text-emerald-700">The 5 heroes for this stage are locked. The candidate matrix below remains accessible for strategic calculation and team planning.</div>
+    `;
+    container.append(lockedCard);
+  } else if (!draft.matchId && !draft.defenceHeroes?.length && !draft.attackHeroes?.length) {
+    const idleCard = document.createElement('div');
+    idleCard.className = 'rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-center space-y-1.5';
+    idleCard.innerHTML = `
+      <div class="text-sm font-bold text-slate-800">Legend Draft: Not in match</div>
+      <div class="text-xs text-slate-500 max-w-md mx-auto">Start a Legend Draft match in Hero Wars to activate live assistance. You can also review candidate stats and customize hero choices below for calculation.</div>
+    `;
+    container.append(idleCard);
+  }
+
   // 5. Full 15-Hero Draft Grid (5 Columns x 3 Rows)
-  // Rendered for both Defense Draft and Attack Draft phases alongside the lineup selection
-  if (isActivelyDrafting) {
+  // Always rendered during active drafting and preparation to ensure all 15 heroes are available for calculation
+  if (!isMatchCompleted) {
     const candidatesMode = isViewingAttack ? 'attack' : 'defense';
     const currentCandidates = draftStepCandidates[candidatesMode] ||
       globalThis.hwaHelperPopupData.defaultDraftCandidates(candidatesMode);
@@ -1930,144 +1995,170 @@ function renderDraft(cache) {
     const chooserSection = document.createElement('div');
     chooserSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4';
 
-    const chooserHeader = document.createElement('div');
-    chooserHeader.className = 'flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-100';
+  const chooserHeader = document.createElement('div');
+  chooserHeader.className = 'flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-100';
 
-    const chooserTitleCol = document.createElement('div');
-    chooserTitleCol.className = 'space-y-0.5';
-    const chooserTitle = document.createElement('h3');
-    chooserTitle.className = 'text-sm font-bold text-slate-900 flex items-center gap-2';
-    chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">15</span> <span>15 Candidate Heroes Matrix (5 Steps × 3 Choices)</span>`;
-    chooserTitleCol.append(chooserTitle);
+  const chooserTitleCol = document.createElement('div');
+  chooserTitleCol.className = 'space-y-0.5';
+  const chooserTitle = document.createElement('h3');
+  chooserTitle.className = 'text-sm font-bold text-slate-900 flex items-center gap-2';
+  chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">15</span> <span>15 Candidate Heroes Matrix (5 Steps × 3 Choices)</span>`;
+  chooserTitleCol.append(chooserTitle);
 
-    const chooserSub = document.createElement('div');
-    chooserSub.className = 'text-xs text-slate-500';
-    chooserSub.textContent = `Each column represents 1 pick step for ${isViewingAttack ? 'Attack' : 'Defense'} (choose 1 of 3 heroes). You can pick directly across all 5 columns to complete your lineup.`;
-    chooserTitleCol.append(chooserSub);
-    chooserHeader.append(chooserTitleCol);
+  const chooserSub = document.createElement('div');
+  chooserSub.className = 'text-xs text-slate-500';
+  chooserSub.textContent = `Each column represents 1 pick step for ${isViewingAttack ? 'Attack' : 'Defense'} (choose 1 of 3 heroes). Review powers, stars, and roles for strategic calculations.`;
+  chooserTitleCol.append(chooserSub);
+  chooserHeader.append(chooserTitleCol);
 
-    const chooserActions = document.createElement('div');
-    chooserActions.className = 'flex items-center gap-2';
+  const chooserActions = document.createElement('div');
+  chooserActions.className = 'flex items-center gap-2';
 
-    // Reset button
-    const hasAnyPick = currentPicks.some(Boolean);
-    if (hasAnyPick) {
-      const resetBtn = document.createElement('button');
-      resetBtn.type = 'button';
-      resetBtn.className = 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 cursor-pointer transition-colors';
-      resetBtn.textContent = 'Reset all 5 steps';
-      resetBtn.addEventListener('click', () => {
-        if (isViewingAttack) localDraftAttackPicks = [null, null, null, null, null];
-        else localDraftDefencePicks = [null, null, null, null, null];
-        activeHeroSwapTarget = null;
+  // Reset picks button
+  const hasAnyPick = currentPicks.some(Boolean);
+  if (hasAnyPick && !isModeLocked) {
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 cursor-pointer transition-colors';
+    resetBtn.textContent = 'Reset picks';
+    resetBtn.addEventListener('click', () => {
+      if (isViewingAttack) localDraftAttackPicks = [null, null, null, null, null];
+      else localDraftDefencePicks = [null, null, null, null, null];
+      activeHeroSwapTarget = null;
+      render();
+    });
+    chooserActions.append(resetBtn);
+  }
+
+  // Restore default candidate matrix button
+  const restoreDefaultBtn = document.createElement('button');
+  restoreDefaultBtn.type = 'button';
+  restoreDefaultBtn.className = 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 cursor-pointer transition-colors';
+  restoreDefaultBtn.textContent = 'Default 15';
+  restoreDefaultBtn.title = 'Reset 15 candidates for this mode to default setup';
+  restoreDefaultBtn.addEventListener('click', () => {
+    draftStepCandidates[candidatesMode] = globalThis.hwaHelperPopupData.defaultDraftCandidates(candidatesMode);
+    try {
+      chrome.storage?.local?.set?.({ draftStepCandidates });
+    } catch (_) {}
+    render();
+  });
+  chooserActions.append(restoreDefaultBtn);
+
+  chooserHeader.append(chooserActions);
+  chooserSection.append(chooserHeader);
+
+  // 5 Columns x 3 Rows Grid
+  const fullGrid = document.createElement('div');
+  fullGrid.className = 'grid grid-cols-1 sm:grid-cols-5 gap-3';
+
+  for (let stepIdx = 0; stepIdx < 5; stepIdx++) {
+    const colBox = document.createElement('div');
+    const stepCandidates = currentCandidates[stepIdx] || [78, 49, 44];
+    const isColChosen = Number.isInteger(currentPicks[stepIdx]) && currentPicks[stepIdx] > 0;
+
+    colBox.className = `flex flex-col space-y-2 rounded-xl p-2.5 transition-colors ${
+      isColChosen ? 'bg-slate-50/80 border border-emerald-200' : 'bg-slate-50/40 border border-slate-200'
+    }`;
+
+    // Column Step Header
+    const colHeader = document.createElement('div');
+    colHeader.className = 'flex items-center justify-between pb-1.5 border-b border-slate-200/80 text-xs';
+
+    const colTitle = document.createElement('span');
+    colTitle.className = 'font-bold text-slate-800 flex items-center gap-1';
+    colTitle.innerHTML = `<span class="size-4 rounded-full ${isColChosen ? 'bg-emerald-600' : 'bg-slate-700'} text-white text-[10px] flex items-center justify-center font-bold">${stepIdx + 1}</span> <span>Step ${stepIdx + 1}</span>`;
+
+    const colStatusTag = document.createElement('span');
+    colStatusTag.className = `text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+      isColChosen ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+    }`;
+    colStatusTag.textContent = isColChosen ? '✓ Selected' : 'Not picked';
+
+    colHeader.append(colTitle, colStatusTag);
+    colBox.append(colHeader);
+
+    // 3 Candidate Hero Cards in this column
+    for (let cIdx = 0; cIdx < stepCandidates.length; cIdx++) {
+      const cHeroId = stepCandidates[cIdx];
+      const meta = globalThis.hwaHelperHeroMetadata?.[cHeroId] || {};
+      const snap = cache.heroGetAll?.data?.[cHeroId];
+      const isChosen = currentPicks[stepIdx] === cHeroId;
+
+      const card = document.createElement('div');
+      card.className = `relative flex flex-col items-center p-2 rounded-xl border transition-all text-center ${
+        isChosen ? 'border-emerald-500 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-400' :
+        'border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs'
+      }`;
+
+      // Top toolbar of candidate card: pick button & swap button
+      const cardTop = document.createElement('div');
+      cardTop.className = 'w-full flex items-center justify-between mb-1';
+
+      const choiceTag = document.createElement('span');
+      choiceTag.className = 'text-[9px] font-bold text-slate-400';
+      choiceTag.textContent = `#${cIdx + 1}`;
+      cardTop.append(choiceTag);
+
+      const swapBtn = document.createElement('button');
+      swapBtn.type = 'button';
+      swapBtn.title = 'Swap this candidate hero';
+      swapBtn.className = 'text-[10px] text-slate-400 hover:text-blue-600 cursor-pointer p-0.5 rounded hover:bg-slate-100';
+      swapBtn.textContent = '⇄';
+      swapBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeHeroSwapTarget = { stepIdx, candidateIdx: cIdx };
         render();
       });
-      chooserActions.append(resetBtn);
-    }
-    chooserHeader.append(chooserActions);
-    chooserSection.append(chooserHeader);
+      cardTop.append(swapBtn);
+      card.append(cardTop);
 
-    // 5 Columns x 3 Rows Grid
-    const fullGrid = document.createElement('div');
-    fullGrid.className = 'grid grid-cols-1 sm:grid-cols-5 gap-3';
+      // Avatar + Name + Role
+      const avWrap = document.createElement('div');
+      avWrap.className = 'relative cursor-pointer my-0.5';
+      const aPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${cHeroId}.webp` : null);
+      const cardGlow = starGlowClass(snap?.star, false);
+      if (aPath) {
+        const aImg = document.createElement('img');
+        aImg.src = aPath;
+        aImg.className = `size-9 rounded-full object-cover shrink-0 ${cardGlow}`;
+        avWrap.append(aImg);
+      } else {
+        avWrap.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, false));
+      }
+      card.append(avWrap);
 
-    for (let stepIdx = 0; stepIdx < 5; stepIdx++) {
-      const colBox = document.createElement('div');
-      const stepCandidates = currentCandidates[stepIdx] || [78, 49, 44];
-      const isColChosen = Number.isInteger(currentPicks[stepIdx]) && currentPicks[stepIdx] > 0;
+      const nameLabel = document.createElement('div');
+      nameLabel.className = 'text-xs font-bold text-slate-800 truncate max-w-[90px] mt-0.5';
+      nameLabel.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
+      card.append(nameLabel);
 
-      colBox.className = `flex flex-col space-y-2 rounded-xl p-2.5 transition-colors ${
-        isColChosen ? 'bg-slate-50/80 border border-emerald-200' : 'bg-slate-50/40 border border-slate-200'
-      }`;
+      if (meta.role) {
+        const rBadge = document.createElement('span');
+        rBadge.className = 'text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium my-0.5';
+        rBadge.textContent = meta.role;
+        card.append(rBadge);
+      }
 
-      // Column Step Header
-      const colHeader = document.createElement('div');
-      colHeader.className = 'flex items-center justify-between pb-1.5 border-b border-slate-200/80 text-xs';
+      // Stats row: Star count and Power
+      const statsRow = document.createElement('div');
+      statsRow.className = 'text-[10px] text-slate-500 font-medium flex items-center justify-center gap-1.5 my-0.5';
+      const pwr = snap?.power ? formatNumber(snap.power) : '—';
+      const star = snap?.star ? `★${snap.star}` : '';
+      statsRow.innerHTML = `<span class="text-amber-700 font-bold">${star}</span> <span class="font-mono text-slate-700">${pwr} pwr</span>`;
+      card.append(statsRow);
 
-      const colTitle = document.createElement('span');
-      colTitle.className = 'font-bold text-slate-800 flex items-center gap-1';
-      colTitle.innerHTML = `<span class="size-4 rounded-full ${isColChosen ? 'bg-emerald-600' : 'bg-slate-700'} text-white text-[10px] flex items-center justify-center font-bold">${stepIdx + 1}</span> <span>Step ${stepIdx + 1}</span>`;
-
-      const colStatusTag = document.createElement('span');
-      colStatusTag.className = `text-[10px] px-1.5 py-0.2 rounded font-semibold ${
-        isColChosen ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-      }`;
-      colStatusTag.textContent = isColChosen ? '✓ Selected' : 'Not picked';
-
-      colHeader.append(colTitle, colStatusTag);
-      colBox.append(colHeader);
-
-      // 3 Candidate Hero Cards in this column
-      for (let cIdx = 0; cIdx < stepCandidates.length; cIdx++) {
-        const cHeroId = stepCandidates[cIdx];
-        const meta = globalThis.hwaHelperHeroMetadata?.[cHeroId] || {};
-        const snap = cache.heroGetAll?.data?.[cHeroId];
-        const isChosen = currentPicks[stepIdx] === cHeroId;
-
-        const card = document.createElement('div');
-        card.className = `relative flex flex-col items-center p-2 rounded-xl border transition-all text-center ${
-          isChosen ? 'border-emerald-500 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-400' :
-          'border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs'
-        }`;
-
-        // Top toolbar of candidate card: pick button & swap button
-        const cardTop = document.createElement('div');
-        cardTop.className = 'w-full flex items-center justify-between mb-1';
-
-        const choiceTag = document.createElement('span');
-        choiceTag.className = 'text-[9px] font-bold text-slate-400';
-        choiceTag.textContent = `#${cIdx + 1}`;
-        cardTop.append(choiceTag);
-
-        const swapBtn = document.createElement('button');
-        swapBtn.type = 'button';
-        swapBtn.title = 'Swap this candidate hero';
-        swapBtn.className = 'text-[10px] text-slate-400 hover:text-blue-600 cursor-pointer p-0.5 rounded hover:bg-slate-100';
-        swapBtn.textContent = '⇄';
-        swapBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          activeHeroSwapTarget = { stepIdx, candidateIdx: cIdx };
-          render();
-        });
-        cardTop.append(swapBtn);
-        card.append(cardTop);
-
-        // Avatar + Name + Role
-        const avWrap = document.createElement('div');
-        avWrap.className = 'relative cursor-pointer my-0.5';
-        const aPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${cHeroId}.webp` : null);
-        const cardGlow = starGlowClass(snap?.star, false);
-        if (aPath) {
-          const aImg = document.createElement('img');
-          aImg.src = aPath;
-          aImg.className = `size-9 rounded-full object-cover shrink-0 ${cardGlow}`;
-          avWrap.append(aImg);
-        } else {
-          avWrap.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, false));
-        }
-        card.append(avWrap);
-
-        const nameLabel = document.createElement('div');
-        nameLabel.className = 'text-xs font-bold text-slate-800 truncate max-w-[90px] mt-0.5';
-        nameLabel.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
-        card.append(nameLabel);
-
-        if (meta.role) {
-          const rBadge = document.createElement('span');
-          rBadge.className = 'text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium my-0.5';
-          rBadge.textContent = meta.role;
-          card.append(rBadge);
-        }
-
-        // Pick / Picked button
+      // Pick button or Chosen indicator
+      if (isChosen) {
+        const pickedTag = document.createElement('div');
+        pickedTag.className = 'mt-1.5 w-full py-1 rounded-md text-[11px] font-bold bg-emerald-600 text-white shadow-xs';
+        pickedTag.textContent = `✓ Picked (Step ${stepIdx + 1})`;
+        card.append(pickedTag);
+      } else if (!isModeLocked) {
         const pickCardBtn = document.createElement('button');
         pickCardBtn.type = 'button';
-        pickCardBtn.className = `mt-1.5 w-full py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-          isChosen ?
-            'bg-emerald-600 text-white shadow-xs' :
-            'bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200'
-        }`;
-        pickCardBtn.textContent = isChosen ? '✓ Selected' : 'Pick';
+        pickCardBtn.className = 'mt-1.5 w-full py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200';
+        pickCardBtn.textContent = 'Pick';
         pickCardBtn.addEventListener('click', () => {
           currentPicks[stepIdx] = cHeroId;
           const nextEmpty = currentPicks.findIndex((p, idx) => idx > stepIdx && !p);
@@ -2078,48 +2169,74 @@ function renderDraft(cache) {
           render();
         });
         card.append(pickCardBtn);
-
-        colBox.append(card);
+      } else {
+        const candTag = document.createElement('div');
+        candTag.className = 'mt-1.5 w-full py-1 rounded-md text-[10px] font-semibold text-slate-400 bg-slate-50 border border-slate-200';
+        candTag.textContent = 'Candidate';
+        card.append(candTag);
       }
-      fullGrid.append(colBox);
+
+      colBox.append(card);
     }
-    chooserSection.append(fullGrid);
+    fullGrid.append(colBox);
+  }
+  chooserSection.append(fullGrid);
 
-    // Swap drawer if active
-    if (activeHeroSwapTarget) {
-      const { stepIdx: sIdx, candidateIdx: cIdx } = activeHeroSwapTarget;
-      const swapWrap = document.createElement('div');
-      swapWrap.className = 'rounded-xl border border-blue-200 bg-blue-50/70 p-3 space-y-2';
+  // Swap drawer if active
+  if (activeHeroSwapTarget) {
+    const { stepIdx: sIdx, candidateIdx: cIdx } = activeHeroSwapTarget;
+    const swapWrap = document.createElement('div');
+    swapWrap.className = 'rounded-xl border border-blue-200 bg-blue-50/70 p-3 space-y-2';
 
-      const swapHeader = document.createElement('div');
-      swapHeader.className = 'flex items-center justify-between';
-      const swapTitle = document.createElement('div');
-      swapTitle.className = 'text-xs font-bold text-blue-900';
-      swapTitle.textContent = `Select substitute hero for Step ${sIdx + 1} - Choice #${cIdx + 1}:`;
-      swapHeader.append(swapTitle);
+    const swapHeader = document.createElement('div');
+    swapHeader.className = 'flex items-center justify-between';
+    const swapTitle = document.createElement('div');
+    swapTitle.className = 'text-xs font-bold text-blue-900';
+    swapTitle.textContent = `Select substitute hero for Step ${sIdx + 1} - Choice #${cIdx + 1}:`;
+    swapHeader.append(swapTitle);
 
-      const closeSwapBtn = document.createElement('button');
-      closeSwapBtn.type = 'button';
-      closeSwapBtn.className = 'text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer';
-      closeSwapBtn.textContent = 'Close [✕]';
-      closeSwapBtn.addEventListener('click', () => {
-        activeHeroSwapTarget = null;
-        render();
+    const closeSwapBtn = document.createElement('button');
+    closeSwapBtn.type = 'button';
+    closeSwapBtn.className = 'text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer';
+    closeSwapBtn.textContent = 'Close [✕]';
+    closeSwapBtn.addEventListener('click', () => {
+      activeHeroSwapTarget = null;
+      render();
+    });
+    swapHeader.append(closeSwapBtn);
+    swapWrap.append(swapHeader);
+
+    // Search input for hero swapping
+    const searchBox = document.createElement('div');
+    searchBox.className = 'pt-0.5';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search hero by name, role, or ID...';
+    searchInput.className = 'w-full px-2.5 py-1 text-xs rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500';
+    searchBox.append(searchInput);
+    swapWrap.append(searchBox);
+
+    const swapGrid = document.createElement('div');
+    swapGrid.className = 'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-1.5 max-h-[220px] overflow-y-auto p-1';
+
+    const allHeroEntries = Object.entries(globalThis.hwaHelperHeroMetadata || {}).map(([id, hMeta]) => ({
+      id: Number(id),
+      meta: hMeta,
+      snap: cache.heroGetAll?.data?.[id] || null
+    })).filter((item) => Number.isInteger(item.id) && item.id < 1000)
+      .sort((a, b) => (b.snap?.power || 0) - (a.snap?.power || 0));
+
+    const renderSwapList = (query = '') => {
+      swapGrid.replaceChildren();
+      const q = query.trim().toLowerCase();
+      const filtered = allHeroEntries.filter(({ id: hId, meta: hMeta }) => {
+        if (!q) return true;
+        const name = (hMeta.name || globalThis.hwaHelperNameMap.hero(hId) || '').toLowerCase();
+        const role = (hMeta.role || '').toLowerCase();
+        return name.includes(q) || role.includes(q) || String(hId).includes(q);
       });
-      swapHeader.append(closeSwapBtn);
-      swapWrap.append(swapHeader);
 
-      const swapGrid = document.createElement('div');
-      swapGrid.className = 'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-1.5 max-h-[220px] overflow-y-auto p-1';
-
-      const allHeroEntries = Object.entries(globalThis.hwaHelperHeroMetadata || {}).map(([id, hMeta]) => ({
-        id: Number(id),
-        meta: hMeta,
-        snap: cache.heroGetAll?.data?.[id] || null
-      })).filter((item) => Number.isInteger(item.id) && item.id < 1000)
-        .sort((a, b) => (b.snap?.power || 0) - (a.snap?.power || 0));
-
-      for (const { id: hId, meta: hMeta, snap: hSnap } of allHeroEntries) {
+      for (const { id: hId, meta: hMeta, snap: hSnap } of filtered) {
         const itemBtn = document.createElement('button');
         itemBtn.type = 'button';
         itemBtn.className = 'flex items-center gap-1.5 p-1.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50 text-left text-xs cursor-pointer';
@@ -2142,36 +2259,24 @@ function renderDraft(cache) {
             currentCandidates[sIdx] = [78, 49, 44];
           }
           currentCandidates[sIdx][cIdx] = hId;
+          try {
+            chrome.storage?.local?.set?.({ draftStepCandidates });
+          } catch (_) {}
           activeHeroSwapTarget = null;
           render();
         });
         swapGrid.append(itemBtn);
       }
-      swapWrap.append(swapGrid);
-      chooserSection.append(swapWrap);
-    }
+    };
 
-    container.append(chooserSection);
-  } else if (!draft.matchId && !draft.defenceHeroes?.length && !draft.attackHeroes?.length) {
-    // Idle state when not in draft and no previous draft exists
-    const idleCard = document.createElement('div');
-    idleCard.className = 'rounded-xl border border-slate-200 bg-slate-50/70 p-6 text-center space-y-2';
-    idleCard.innerHTML = `
-      <div class="text-sm font-bold text-slate-800">Legend Draft: Not in match</div>
-      <div class="text-xs text-slate-500 max-w-md mx-auto">Start a Legend Draft match in Hero Wars to activate live assistance. Once a match begins, you can pick heroes, review enemy defense, and optimize counter-lineups.</div>
-    `;
-    container.append(idleCard);
-  } else if (isModeLocked && (isDefenseStage || isAttackStage)) {
-    // Mode locked notice during active match
-    const lockedCard = document.createElement('div');
-    lockedCard.className = 'rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-center space-y-1';
-    lockedCard.innerHTML = `
-      <div class="text-sm font-bold text-emerald-900 flex items-center justify-center gap-1.5">
-        <span>✓</span> <span>${isViewingAttack ? 'Attack' : 'Defense'} Lineup locked!</span>
-      </div>
-      <div class="text-xs text-emerald-700">The 5 heroes for this stage are locked. The match will proceed to the next stage.</div>
-    `;
-    container.append(lockedCard);
+    searchInput.addEventListener('input', (e) => renderSwapList(e.target.value));
+    renderSwapList('');
+
+    swapWrap.append(swapGrid);
+    chooserSection.append(swapWrap);
+  }
+
+  container.append(chooserSection);
   }
 
   view.replaceChildren(container);

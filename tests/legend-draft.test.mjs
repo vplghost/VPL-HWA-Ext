@@ -171,3 +171,38 @@ test('legend draft 5-step picking process and validation work correctly', () => 
   assert.deepEqual(completeRes.heroes, [24, 12, 47, 68, 51]);
   assert.equal(popupData.getDraftActiveStep(complete), 4);
 });
+
+test('rpc-cache resets defense and attack picks when a new match begins so defense is not falsely locked', () => {
+  const previousMatchState = {
+    legendDraftStatus: {
+      data: {
+        active: false,
+        stageId: 7,
+        matchId: 111111111,
+        defenceHeroes: [24, 12, 47, 68, 51],
+        attackHeroes: [51, 55, 16, 502, 503],
+        lastResult: { result: 0 }
+      },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    }
+  };
+
+  const newMatchRecord = {
+    method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    requestBody: JSON.stringify({ calls: [{ name: 'randomDraft_getInfo', ident: 'info' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'info', result: { response: {
+      matchId: 222222222,
+      stageId: 2,
+      stageFinishTs: 1793550458,
+      enemyUser: { id: '999', name: 'Opponent', level: 80 }
+    } } }] }),
+    timestamp: '2026-11-01T10:05:00.000Z'
+  };
+
+  const merged = rpcCache.merge(previousMatchState, [newMatchRecord]).cache;
+  assert.equal(merged.legendDraftStatus.data.matchId, 222222222);
+  assert.equal(merged.legendDraftStatus.data.stageId, 2);
+  assert.deepEqual(merged.legendDraftStatus.data.defenceHeroes, [], 'New match must have empty defenceHeroes');
+  assert.deepEqual(merged.legendDraftStatus.data.attackHeroes, [], 'New match must have empty attackHeroes');
+  assert.equal(merged.legendDraftStatus.data.lastResult, null, 'New match must clear previous lastResult');
+});

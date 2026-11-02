@@ -1570,6 +1570,27 @@
         if (entry.key === 'legendDraftStatus') {
           const previous = next.legendDraftStatus?.data || {};
           if (next.legendDraftStatus && next.legendDraftStatus.updatedAt > entry.updatedAt) continue;
+
+          const isNewMatch = Boolean(entry.data.matchId && previous.matchId && entry.data.matchId !== previous.matchId);
+          const isQueueStage = entry.data.stageId === 1;
+          const isDefenseDraftStart = entry.data.stageId === 2 && (isNewMatch || previous.stageId !== 2);
+          const isAttackDraftStart = entry.data.stageId === 4 && (isNewMatch || previous.stageId !== 4);
+
+          const defenceHeroes = (isNewMatch || isQueueStage || isDefenseDraftStart)
+            ? []
+            : (previous.defenceHeroes || []);
+          const attackHeroes = (isNewMatch || isQueueStage || isDefenseDraftStart || isAttackDraftStart)
+            ? []
+            : (previous.attackHeroes || []);
+          const enemyDefenceHeroes = (isNewMatch || isQueueStage)
+            ? []
+            : (previous.enemyDefenceHeroes || []);
+          const enemyAttackHeroes = (isNewMatch || isQueueStage)
+            ? []
+            : (previous.enemyAttackHeroes || []);
+          const lastResult = isNewMatch ? null : (previous.lastResult || null);
+          const lastPickAction = isNewMatch ? null : (previous.lastPickAction || null);
+
           next.legendDraftStatus = {
             key: 'legendDraftStatus',
             method: entry.method,
@@ -1578,10 +1599,12 @@
             data: {
               ...previous,
               ...entry.data,
-              defenceHeroes: previous.defenceHeroes || [],
-              attackHeroes: previous.attackHeroes || [],
-              enemyDefenceHeroes: previous.enemyDefenceHeroes || [],
-              enemyAttackHeroes: previous.enemyAttackHeroes || []
+              defenceHeroes,
+              attackHeroes,
+              enemyDefenceHeroes,
+              enemyAttackHeroes,
+              lastResult,
+              lastPickAction
             },
             updatedAt: entry.updatedAt
           };

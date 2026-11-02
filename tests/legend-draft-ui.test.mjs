@@ -184,12 +184,13 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   assert.equal(defaultCandidates.length, 5);
   assert.equal(defaultCandidates[0].length, 3);
 
-  // Test in-game pick sync: when defenceHeroes has 5 heroes, it renders locked UI and hides candidate matrix
+  // Test in-game pick sync: when defenceHeroes has 5 heroes and saveDefence was performed, it renders locked status and retains candidate matrix for calculation
   sampleCache.legendDraftStatus.data.defenceHeroes = [78, 76, 25, 37, 69];
+  sampleCache.legendDraftStatus.data.lastPickAction = 'saveDefence';
   context.renderDraft(sampleCache);
   assert.match(statusEl.textContent, /Defense lineup locked/);
   assert.match(viewEl.textContent, /Lineup successfully locked/);
-  assert.doesNotMatch(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
 });
 
 test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => {
@@ -306,4 +307,43 @@ test('Legend Draft UI supports defense/attack review and hides pick slots after 
   assert.match(viewEl.textContent, /Opponent Defense Lineup/);
   // Pick slots matrix must still be omitted
   assert.doesNotMatch(viewEl.textContent, /15 Candidate Heroes Matrix/);
+});
+
+test('Legend Draft UI displays candidate stats, team power calculation, and swap search', async () => {
+  const viewEl = new MockElement('div');
+  const statusEl = new MockElement('div');
+  const searchEl = new MockElement('input');
+  const context = await createDraftContext(viewEl, statusEl, searchEl);
+
+  const activeCache = {
+    legendDraftStatus: {
+      data: {
+        active: true,
+        stageId: 2,
+        matchId: 99887766,
+        defenceHeroes: []
+      }
+    },
+    heroGetAll: {
+      data: {
+        78: { star: 5, power: 120500 },
+        49: { star: 4, power: 95000 },
+        44: { star: 3, power: 80000 }
+      }
+    }
+  };
+
+  context.renderDraft(activeCache);
+
+  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /★5/);
+  assert.match(viewEl.textContent, /120,500 pwr/);
+
+  const buttons = viewEl.querySelectorAll('button');
+  const pickBtn = buttons.find(b => b.textContent === 'Pick');
+  assert.ok(pickBtn, 'Pick button should exist on candidate card');
+  pickBtn.dispatchEvent('click');
+
+  context.renderDraft(activeCache);
+  assert.match(viewEl.textContent, /Team Power: 120,500/);
 });

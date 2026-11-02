@@ -351,6 +351,21 @@
   window.postMessage({ source: 'hwa-helper-api', kind: 'ready' }, location.origin);
   reportEngineStatus('initial');
 
+  if (typeof setInterval === 'function') {
+    let statusPolls = 0;
+    const statusInterval = setInterval(() => {
+      statusPolls++;
+      const hasCanvas = typeof document !== 'undefined' && typeof document.querySelector === 'function' &&
+        Boolean(document.querySelector('canvas#unity-canvas, canvas#canvas, canvas'));
+      if (hasCanvas || activeUnityInstance || statusPolls >= 20) {
+        reportEngineStatus('canvas-poll');
+        if (hasCanvas && activeUnityInstance) {
+          clearInterval(statusInterval);
+        }
+      }
+    }, 2000);
+  }
+
   function limit(text) {
     return { text: text.slice(0, MAX_BODY_CHARS), truncated: text.length > MAX_BODY_CHARS };
   }
@@ -471,6 +486,7 @@
             if (lastRpcHeaders && typeof sessionStorage !== 'undefined') {
               sessionStorage.setItem('hwa_last_rpc_headers', JSON.stringify(lastRpcHeaders));
             }
+            reportEngineStatus('rpc-traffic');
           } catch (_) {}
         }
       }
@@ -578,6 +594,7 @@
             if (typeof sessionStorage !== 'undefined') {
               sessionStorage.setItem('hwa_last_rpc_headers', JSON.stringify(lastRpcHeaders));
             }
+            reportEngineStatus('rpc-traffic');
           }
         }
       } catch (_) {}
