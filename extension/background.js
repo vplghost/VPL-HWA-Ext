@@ -9,6 +9,11 @@ const RECORD_STATE_KEY = 'recordingState';
 const RECORD_PREFIX = 'record:';
 const MAX_BODY_CHARS = 512 * 1024;
 const GAME_ORIGIN = 'https://www.hero-wars-alliance.com';
+const GAME_ORIGINS = ['https://www.hero-wars-alliance.com', 'https://hero-wars-alliance.com'];
+const isGameUrl = (url) => typeof url === 'string' && (
+  GAME_ORIGINS.some((origin) => url.startsWith(`${origin}/`) || url === origin) ||
+  url.includes('hero-wars-alliance.com')
+);
 let pending = Promise.resolve();
 
 function bodyFields(record) {
@@ -93,7 +98,7 @@ chrome.runtime.onInstalled?.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  const isAllowedOrigin = sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`) || sender.url?.startsWith(`${GAME_ORIGIN}/`);
+  const isAllowedOrigin = sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`) || isGameUrl(sender.url);
   if (['record-start', 'record-stop', 'record-clear'].includes(message?.kind) && isAllowedOrigin) {
     pending = pending.then(() => handleControl(message.kind));
     pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
@@ -135,7 +140,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc') && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
-    chrome.tabs?.query({ url: `${GAME_ORIGIN}/*` }, (tabs) => {
+    const queryPatterns = GAME_ORIGINS.map((o) => `${o}/*`);
+    chrome.tabs?.query({ url: queryPatterns }, (tabs) => {
       let forwarded = false;
       for (const tab of tabs || []) {
         if (tab.id) {
@@ -143,7 +149,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           forwarded = true;
         }
       }
-      sendResponse({ ok: forwarded, error: forwarded ? null : 'No active Hero Wars tab found' });
+      if (!forwarded) {
+        chrome.tabs?.query({}, (allTabs) => {
+          for (const tab of allTabs || []) {
+            if (tab.id && isGameUrl(tab.url)) {
+              chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+              forwarded = true;
+            }
+          }
+          sendResponse({ ok: forwarded, error: forwarded ? null : 'No active Hero Wars tab found.' });
+        });
+        return;
+      }
+      sendResponse({ ok: forwarded, error: null });
     });
     return true;
   }
@@ -152,7 +170,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true });
     return true;
   }
-  if (message?.kind !== 'api-record' || !sender.url?.startsWith(`${GAME_ORIGIN}/`)) return;
+  if (message?.kind !== 'api-record' || !isGameUrl(sender.url)) return;
   const record = normalize(message.record);
   if (!record) return;
   pending = pending.then(async () => {

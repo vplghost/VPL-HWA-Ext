@@ -632,6 +632,7 @@
               data: {
                 titanId: call.args.titanId,
                 consumable: result?.response?.consumable || null,
+                quests: result?.quests || null,
                 token: `${call.ident}:titanEvolve:${call.args.titanId}`
               },
               updatedAt: record.timestamp
@@ -1641,6 +1642,11 @@
           const nextStar = Math.min(6, currentStar + 1);
           const evolveTitanFragmentCost = { 2: 50, 3: 150, 4: 500, 5: 900, 6: 1500 };
           const evolveCost = evolveTitanFragmentCost[nextStar] || 0;
+          const starPowerMultipliers = { 2: 1.466, 3: 1.364, 4: 1.333, 5: 1.250, 6: 1.200 };
+          const curPower = Number(titanSnap?.power);
+          const nextPower = Number.isFinite(curPower) && curPower > 0
+            ? Math.round(curPower * (starPowerMultipliers[nextStar] || 1.2))
+            : (titanSnap?.power ?? null);
 
           if (next.titanGetAll?.data) {
             next.titanGetAll = {
@@ -1649,7 +1655,8 @@
                 ...next.titanGetAll.data,
                 [titanId]: {
                   ...(titanSnap || { id: Number(titanId) }),
-                  star: nextStar
+                  star: nextStar,
+                  ...(nextPower !== null ? { power: nextPower } : {})
                 }
               }
             };
@@ -1679,6 +1686,50 @@
               },
               updatedAt: entry.updatedAt
             };
+          }
+
+          const evolveTitanGoldCost = { 2: 75000, 3: 300000, 4: 750000, 5: 1250000, 6: 2500000 };
+          const goldCost = evolveTitanGoldCost[nextStar] || 0;
+          if (goldCost > 0) {
+            if (next['resource:gold']?.data) {
+              next['resource:gold'] = {
+                ...next['resource:gold'],
+                data: {
+                  ...next['resource:gold'].data,
+                  amount: Math.max(0, (next['resource:gold'].data.amount ?? 0) - goldCost)
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+            if (next.inventoryGet?.data?.coin?.['1'] !== undefined) {
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  coin: {
+                    ...next.inventoryGet.data.coin,
+                    '1': Math.max(0, (next.inventoryGet.data.coin['1'] ?? 0) - goldCost)
+                  }
+                }
+              };
+            }
+            if (next.userGetInfo?.data?.gold !== undefined) {
+              next.userGetInfo = {
+                ...next.userGetInfo,
+                data: {
+                  ...next.userGetInfo.data,
+                  gold: Math.max(0, (next.userGetInfo.data.gold ?? 0) - goldCost)
+                }
+              };
+            }
+          }
+
+          if (Array.isArray(entry.data.quests) && next.questGetAll?.data) {
+            const updatedQuests = { ...next.questGetAll.data };
+            for (const q of entry.data.quests) {
+              if (q?.id) updatedQuests[q.id] = { ...(updatedQuests[q.id] || {}), ...q };
+            }
+            next.questGetAll = { ...next.questGetAll, data: updatedQuests, updatedAt: entry.updatedAt };
           }
 
           if (entry.data.consumable && typeof entry.data.consumable === 'object') {
@@ -2257,18 +2308,46 @@
               }
             };
           } else {
-            const unclaimedReportsCount = entry.data.unclaimedReportsCount !== undefined
-              ? entry.data.unclaimedReportsCount
-              : (existing.unclaimedReportsCount || 0);
-            const unclaimedLettersCount = entry.data.unclaimedLettersCount !== undefined
-              ? entry.data.unclaimedLettersCount
-              : (existing.unclaimedLettersCount || 0);
+            let reports = existing.reports || [];
+            let unclaimedReportsCount = existing.unclaimedReportsCount || 0;
+            if (Array.isArray(entry.data?.reports)) {
+              const repMap = new Map(reports.map((r) => [String(r.id), r]));
+              for (const rep of entry.data.reports) {
+                const prev = repMap.get(String(rep.id));
+                repMap.set(String(rep.id), prev ? { ...prev, ...rep } : rep);
+              }
+              reports = Array.from(repMap.values());
+              unclaimedReportsCount = reports.filter((r) => r && r.claimedReward === false).length;
+            } else if (entry.data?.unclaimedReportsCount !== undefined) {
+              unclaimedReportsCount = entry.data.unclaimedReportsCount;
+            }
+
+            let letters = existing.letters || [];
+            let unclaimedLettersCount = existing.unclaimedLettersCount || 0;
+            if (Array.isArray(entry.data?.letters)) {
+              const letterMap = new Map(letters.map((l) => [String(l.id || l.letterId), l]));
+              for (const l of entry.data.letters) {
+                const lId = String(l.id || l.letterId);
+                const prev = letterMap.get(lId);
+                letterMap.set(lId, prev ? { ...prev, ...l } : l);
+              }
+              letters = Array.from(letterMap.values());
+              unclaimedLettersCount = letters.filter((l) =>
+                l && !l.deleted && (l.reward || l.q_reward || l.items) &&
+                !l.claimed && !l.rewardReceived && !l.rewardClaimed
+              ).length;
+            } else if (entry.data?.unclaimedLettersCount !== undefined) {
+              unclaimedLettersCount = entry.data.unclaimedLettersCount;
+            }
+
             const totalUnclaimed = unclaimedReportsCount + unclaimedLettersCount;
             next.mailStatus = {
               ...entry,
               data: {
                 ...existing,
                 ...entry.data,
+                reports,
+                letters,
                 unclaimedReportsCount,
                 unclaimedLettersCount,
                 totalUnclaimed,

@@ -3918,6 +3918,7 @@ const refreshGroups = {
     { name: 'missionGetAll' },
     { name: 'questGetEvents' },
     { name: 'artifact_getAll' },
+    { name: 'titan_artifactGetCounters' },
     { name: 'skin_getAll' },
     { name: 'rune_getAll' },
     { name: 'arenaGetAll' },
@@ -3933,8 +3934,10 @@ const refreshGroups = {
   roster: [
     { name: 'heroGetAll' },
     { name: 'titanGetAll' },
+    { name: 'inventoryGet' },
     { name: 'teamGetAll' },
     { name: 'artifact_getAll' },
+    { name: 'titan_artifactGetCounters' },
     { name: 'skin_getAll' },
     { name: 'rune_getAll' }
   ],

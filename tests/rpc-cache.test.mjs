@@ -1323,3 +1323,88 @@ test('replaying mail claim trace clears unclaimed reports and updates resources'
   assert.ok(afterClaim['resource:material:5']);
   assert.ok(afterClaim['resource:consumable:11']);
 });
+
+test('paginated getPage:report preserves unclaimed reports across pages without flashing off', () => {
+  const page1 = record([
+    { name: 'getPage', feature: 'report', ident: 'p1', args: { limit: 10, cursor: null } }
+  ], [
+    { ident: 'p1', result: { response: { reports: [
+      { id: 'rep-new-1', type: 'rallyMobAttackResult', read: false, claimedReward: false, createdAt: 1000 },
+      { id: 'rep-new-2', type: 'rallyMobAttackResult', read: false, claimedReward: false, createdAt: 990 }
+    ] } } }
+  ], '2026-11-02T13:00:00.000Z');
+
+  const afterP1 = cache.merge({}, [page1]).cache;
+  assert.equal(afterP1.mailStatus.data.unclaimedReportsCount, 2);
+  assert.equal(afterP1.mailStatus.data.hasUnclaimed, true);
+
+  // Page 2 arrives with cursor and returns empty or already claimed reports
+  const page2 = record([
+    { name: 'getPage', feature: 'report', ident: 'p2', args: { limit: 10, cursor: { id: 'rep-new-2', createdAt: 990 } } }
+  ], [
+    { ident: 'p2', result: { response: { reports: [] } } }
+  ], '2026-11-02T13:00:01.000Z');
+
+  const afterP2 = cache.merge(afterP1, [page2]).cache;
+  assert.equal(afterP2.mailStatus.data.unclaimedReportsCount, 2, 'Unclaimed count should not reset to 0 upon empty next page');
+  assert.equal(afterP2.mailStatus.data.hasUnclaimed, true, 'hasUnclaimed should remain true');
+});
+
+test('replaying titan evolve trace updates star, power, fragments, gold, and quests', async () => {
+  const at = '2026-11-02T13:30:00.000Z';
+  const baseline = {
+    titanGetAll: {
+      key: 'titanGetAll',
+      data: {
+        '4040': { id: 4040, level: 35, star: 2, power: 4012, skills: { '4041': 35 } }
+      },
+      updatedAt: at
+    },
+    inventoryGet: {
+      key: 'inventoryGet',
+      data: {
+        fragmentTitan: { '4040': 164 },
+        coin: { '1': 1000000 },
+        consumable: { '24': 1000 }
+      },
+      updatedAt: at
+    },
+    userGetInfo: {
+      key: 'userGetInfo',
+      data: { gold: 1000000 },
+      updatedAt: at
+    },
+    'resource:fragmentTitan:4040': { data: { amount: 164 }, updatedAt: at },
+    'resource:gold': { data: { amount: 1000000 }, updatedAt: at },
+    questGetAll: {
+      key: 'questGetAll',
+      data: {
+        '334': { id: 334, state: 1, progress: 12 },
+        '335': { id: 335, state: 1, progress: 12 }
+      },
+      updatedAt: at
+    }
+  };
+
+  const titanEvolveTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611022032_titan_evolve.json', import.meta.url), 'utf8'));
+  const afterEvolve = cache.merge(baseline, titanEvolveTrace).cache;
+
+  // Star: 2 -> 3
+  assert.equal(afterEvolve.titanGetAll.data['4040'].star, 3);
+  // Power scaled from 4012 to 5472 (1.364x)
+  assert.equal(afterEvolve.titanGetAll.data['4040'].power, 5472);
+  // Fragments: 164 - 150 = 14
+  assert.equal(afterEvolve.inventoryGet.data.fragmentTitan['4040'], 14);
+  assert.equal(afterEvolve['resource:fragmentTitan:4040'].data.amount, 14);
+  // Gold: 1,000,000 - 300,000 = 700,000
+  assert.equal(afterEvolve['resource:gold'].data.amount, 700000);
+  assert.equal(afterEvolve.inventoryGet.data.coin['1'], 700000);
+  assert.equal(afterEvolve.userGetInfo.data.gold, 700000);
+  // Consumable 24 set to 1250
+  assert.equal(afterEvolve.inventoryGet.data.consumable['24'], 1250);
+  // Quests 334 and 335 updated with state 3 and progress 13
+  assert.equal(afterEvolve.questGetAll.data['334'].state, 3);
+  assert.equal(afterEvolve.questGetAll.data['334'].progress, 13);
+  assert.equal(afterEvolve.questGetAll.data['335'].state, 3);
+  assert.equal(afterEvolve.questGetAll.data['335'].progress, 13);
+});

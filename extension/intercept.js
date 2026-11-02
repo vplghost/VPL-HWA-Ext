@@ -15,7 +15,7 @@
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
       const calls = event.data.calls;
-      const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null);
+      const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null) || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
       const randHex = () => Math.random().toString(16).slice(2).padStart(16, '0').slice(0, 16);
       const payload = {
