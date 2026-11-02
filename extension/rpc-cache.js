@@ -2482,6 +2482,21 @@
             Number.isFinite(next[entry.key]?.data?.cap)) {
           entry.data.cap = next[entry.key].data.cap;
         }
+        if (entry.key === 'inventoryGet' && entry.data) {
+          for (const k of Object.keys(next)) {
+            if (k.startsWith('resource:coin:')) {
+              const id = k.replace('resource:coin:', '');
+              if (entry.data.coin && !Object.hasOwn(entry.data.coin, id) && next[k]?.data) {
+                next[k].data.amount = 0;
+              }
+            } else if (k.startsWith('resource:consumable:')) {
+              const id = k.replace('resource:consumable:', '');
+              if (entry.data.consumable && !Object.hasOwn(entry.data.consumable, id) && next[k]?.data) {
+                next[k].data.amount = 0;
+              }
+            }
+          }
+        }
         next[entry.key] = entry;
         changed = true;
       }

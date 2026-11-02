@@ -578,74 +578,95 @@
 
   function getChallengeResourceStock(cache, target) {
     if (!cache) return null;
-    const inv = cache.inventoryGet?.data || {};
-    const coins = inv.coin || {};
-    const consumables = inv.consumable || {};
-    const fragments = inv.fragmentHero || {};
+    const invData = cache.inventoryGet?.data;
+    const coins = invData?.coin;
+    const consumables = invData?.consumable;
+    const fragments = invData?.fragmentHero || {};
     const tStr = String(target || '').toLowerCase().trim();
     const tId = Number.parseInt(target, 10);
 
+    // Read coin balance: if inventoryGet.data.coin exists, it is the authoritative ground truth
+    // (an omitted key means the player has 0 in game); otherwise fall back to resource:coin:id.
+    const getCoin = (id) => {
+      if (coins && typeof coins === 'object') {
+        const val = coins[id];
+        return val != null ? (Number(val) || 0) : 0;
+      }
+      return cache[`resource:coin:${id}`]?.data?.amount ?? 0;
+    };
+
+    // Read consumable balance: if inventoryGet.data.consumable exists, it is authoritative ground truth
+    // (an omitted key means the player has 0 in game); otherwise fall back to resource:consumable:id.
+    const getConsumable = (id) => {
+      if (consumables && typeof consumables === 'object') {
+        const val = consumables[id];
+        return val != null ? (Number(val) || 0) : 0;
+      }
+      return cache[`resource:consumable:${id}`]?.data?.amount ?? 0;
+    };
+
     // 1. Hero Skin Stones (ID: 37)
     if (tId === 37 || tStr.includes('hero skin stone')) {
-      const s8 = Number(coins['8']) || cache['resource:coin:8']?.data?.amount || 0;
-      const s9 = Number(coins['9']) || cache['resource:coin:9']?.data?.amount || 0;
-      const s10 = Number(coins['10']) || cache['resource:coin:10']?.data?.amount || 0;
-      return s8 + s9 + s10;
+      return getCoin('8') + getCoin('9') + getCoin('10');
     }
 
     // 2. Titan Skin Stones (ID: 54)
     if (tId === 54 || tStr.includes('titan skin stone')) {
-      return Number(coins['20']) || cache['resource:coin:20']?.data?.amount || 0;
+      return getCoin('20');
     }
 
     // 3. Titan Potions (ID: 40)
     if (tId === 40 || tStr.includes('titan potion')) {
-      return Number(consumables['20']) || cache['resource:consumable:20']?.data?.amount || 0;
+      return getConsumable('20');
     }
 
     // 4. Elemental Spheres (ID: 29)
     if (tId === 29 || tStr.includes('elemental sphere')) {
-      return Number(consumables['46']) || cache['resource:consumable:46']?.data?.amount || 0;
+      return getConsumable('46');
     }
 
     // 5. Summon Titan / Circle Spheres (ID: 28)
-    if (tId === 28 || tStr.includes('summon 1 titan') || (tStr.includes('titan') && tStr.includes('circle'))) {
-      return Number(coins['13']) || cache['resource:coin:13']?.data?.amount || 0;
+    if (tId === 28 || tStr.includes('summon 1 titan') || tStr.includes('summoning sphere') || (tStr.includes('titan') && tStr.includes('circle'))) {
+      return getCoin('13');
     }
 
     // 6. Relic Shards (ID: 55)
     if (tId === 55 || tStr.includes('relic shard')) {
-      return Number(coins['40065']) || Number(consumables['24']) || cache['resource:coin:40065']?.data?.amount || 0;
+      const c = getCoin('40065');
+      if (c > 0) return c;
+      const con = getConsumable('24');
+      if (con > 0) return con;
+      return c || con;
     }
 
     // 7. Chaos Cores (ID: 57)
     if (tId === 57 || tStr.includes('chaos core')) {
-      return Number(consumables['44']) || cache['resource:consumable:44']?.data?.amount || 0;
+      return getConsumable('44');
     }
 
     // 8. Artifact Chest Keys (ID: 38)
     if (tId === 38 || tStr.includes('artifact chest')) {
-      return Number(consumables['45']) || cache['resource:consumable:45']?.data?.amount || 0;
+      return getConsumable('45');
     }
 
     // 9. Heroic Chest Keys (ID: 34)
     if (tId === 34 || tStr.includes('heroic chest')) {
-      return Number(consumables['5']) || cache['resource:consumable:5']?.data?.amount || 0;
+      return getConsumable('5');
     }
 
     // 10. Rune Spheres (ID: 50)
     if (tId === 50 || tStr.includes('rune sphere')) {
-      return Number(coins['40078']) || cache['resource:coin:40078']?.data?.amount || 0;
+      return getCoin('40078');
     }
 
     // 11. Rune Stones (ID: 51)
     if (tId === 51 || tStr.includes('rune stone')) {
-      return Number(coins['40077']) || Number(coins['1051']) || cache['resource:coin:40077']?.data?.amount || 0;
+      return getCoin('40077') || getCoin('1051');
     }
 
     // 12. Mastery Crystals (ID: 56)
     if (tId === 56 || tStr.includes('mastery crystal')) {
-      return Number(coins['40067']) || cache['resource:coin:40067']?.data?.amount || 0;
+      return getCoin('40067');
     }
 
     // 13. Energy (ID: 49)
@@ -660,17 +681,17 @@
 
     // 15. Skill Books (ID: 16)
     if (tId === 16 || tStr.includes('skill book')) {
-      return Number(consumables['16']) || 0;
+      return getConsumable('16');
     }
 
     // 16. Honor Marks (ID: 92)
     if (tId === 92 || tStr.includes('honor mark')) {
-      return Number(coins['1']) || cache['resource:coin:1']?.data?.amount || 0;
+      return getCoin('1');
     }
 
     // 17. Outland Chests (ID: 114)
     if (tId === 114 || tStr.includes('outland chest')) {
-      return Number(coins['2']) || 0;
+      return getCoin('2');
     }
 
     // 18. Emeralds / StarMoney
@@ -687,6 +708,7 @@
     if (s.includes('hero skin stone')) return 'res:hero_skin_stones';
     if (s.includes('titan potion')) return 'res:titan_potions';
     if (s.includes('elemental sphere')) return 'res:elemental_spheres';
+    if (s.includes('summoning sphere')) return 'res:summon_titan';
     if (s.includes('summon') || s.includes('circle')) return 'res:summon_titan';
     if (s.includes('relic shard')) return 'res:relic_shards';
     if (s.includes('chaos core')) return 'res:chaos_cores';

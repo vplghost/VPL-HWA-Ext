@@ -925,3 +925,29 @@ test('countEvolvableTitans counts titans with sufficient soul stones for star up
   assert.equal(countEvolvableTitans(null, inventory), 0);
   assert.equal(countEvolvableTitans(titans, null), 0);
 });
+
+test('getChallengeResourceStock resolves 0 for missing inventory items instead of falling back to stale resource cache', () => {
+  const staleCache = {
+    inventoryGet: {
+      data: {
+        coin: { '1': 1000 },
+        consumable: { '20': 500 }
+      }
+    },
+    'resource:coin:13': { data: { amount: 5 } },
+    'resource:consumable:46': { data: { amount: 20 } }
+  };
+  assert.equal(getChallengeResourceStock(staleCache, 'Summon 1 Titan in Circle'), 0);
+  assert.equal(getChallengeResourceStock(staleCache, 28), 0);
+  assert.equal(getChallengeResourceStock(staleCache, 'Summoning sphere'), 0);
+  assert.equal(getChallengeResourceStock(staleCache, 'Open 1 Elemental Sphere'), 0);
+  assert.equal(getChallengeResourceStock(staleCache, 29), 0);
+
+  // When inventoryGet is missing, it still falls back to resource cache
+  const noInvCache = {
+    'resource:coin:13': { data: { amount: 5 } },
+    'resource:consumable:46': { data: { amount: 20 } }
+  };
+  assert.equal(getChallengeResourceStock(noInvCache, 'Summon 1 Titan in Circle'), 5);
+  assert.equal(getChallengeResourceStock(noInvCache, 'Open 1 Elemental Sphere'), 20);
+});

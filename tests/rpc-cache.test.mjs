@@ -1450,3 +1450,18 @@ test('replaying auto-join raid trace tracks guild rally and auto-joined march', 
   assert.deepEqual([...march.rally.team.heroIds], [2, 16, 60, 70, 79]);
   assert.equal(march.rally.waitUntil, 1793631940951);
 });
+
+test('inventoryGet snapshot syncs resource:coin and resource:consumable balances to 0 when omitted', () => {
+  const initial = {
+    'resource:coin:13': { data: { amount: 5 } },
+    'resource:consumable:46': { data: { amount: 20 } },
+    'resource:coin:1': { data: { amount: 100 } }
+  };
+  const snapshot = record([{ name: 'inventoryGet', ident: 'inv1' }], [
+    { ident: 'inv1', result: { response: { coin: { 1: 200 }, consumable: { 20: 50 } } } }
+  ]);
+  const result = cache.merge(initial, [snapshot]).cache;
+  assert.equal(result['resource:coin:13'].data.amount, 0);
+  assert.equal(result['resource:consumable:46'].data.amount, 0);
+  assert.equal(result['resource:coin:1'].data.amount, 200);
+});
