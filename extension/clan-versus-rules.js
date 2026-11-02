@@ -139,6 +139,59 @@
     114: 'Open 1 Outland Chest'
   };
 
+  // Points awarded per completion for each daily challenge ID
+  // Verified from remote config clanVersusChallenge and tracking logs
+  const challengePoints = {
+    7: 2000,     // Defeat 1 Map Monster (Lv. 1+)
+    8: 2500,     // Clear 1 Bandit Camp
+    13: 850,     // Defeat 1 Map Boss / Rally
+    14: 30,      // Increase Research Power by 1
+    15: 200,     // Use 1 Research Speedup
+    16: 5000,    // Spend 1 Skill Book
+    17: 200,     // Use 1 Training Speedup
+    18: 120,     // Train 1 Tier 9 Troop
+    19: 100,     // Train 1 Tier 8 Troop
+    20: 80,      // Train 1 Tier 7 Troop
+    21: 65,      // Train 1 Tier 6 Troop
+    22: 50,      // Train 1 Tier 5 Troop
+    23: 40,      // Train 1 Tier 4 Troop
+    24: 30,      // Train 1 Tier 3 Troop
+    25: 20,      // Train 1 Tier 2 Troop
+    26: 10,      // Train 1 Tier 1 Troop
+    27: 100,     // Increase Titan Power by 3
+    28: 1500,    // Summon 1 Titan in Circle
+    29: 1200,    // Open 1 Elemental Sphere
+    30: 6000,    // Fight 1 Arena Battle
+    31: 4000,    // Open 1 Tower Chest
+    32: 2000,    // Complete 1 Daily Quest
+    34: 4000,    // Open 1 Heroic Chest
+    35: 100,     // Obtain 1 VIP Point
+    37: 700,     // Spend 15 Hero Skin Stones
+    38: 750,     // Open 1 Artifact Chest
+    39: 5000,    // Start 1 Expedition
+    40: 150,     // Spend 100 Titan Potions
+    41: 1250000, // Equip 1 Red Item
+    42: 160000,  // Equip 1 Orange Item
+    43: 27000,   // Equip 1 Violet Item
+    44: 5000,    // Equip 1 Blue Item
+    45: 1000,    // Equip 1 Green Item
+    46: 200,     // Equip 1 White Item
+    47: 500,     // Collect 1 Hero Soul Stone
+    49: 100,     // Spend 3 Energy
+    50: 50000,   // Spend 100 Rune Spheres
+    51: 100,     // Spend 20 Rune Stones
+    52: 30,      // Gain 1 Hero Power
+    53: 6000,    // Fight 1 Grand Arena Battle
+    54: 100,     // Spend 15 Titan Skin Stones
+    55: 150000,  // Spend 10 Relic Shards
+    56: 200,     // Spend 15 Mastery Crystals
+    57: 3000,    // Spend 1 Chaos Core
+    70: 200,     // Use 1 Building Speedup
+    92: 2000,    // Spend 1 Honor Mark
+    113: 200,    // Increase Building Power by 1
+    114: 2000    // Open 1 Outland Chest
+  };
+
   // Quests / point earning activities for all 6 battle rounds
   // Verified from remote config clanVersusRounds and clanVersusChallenge
   const roundQuests = {
@@ -265,5 +318,6 @@
   globalThis.hwaHelperClanVersusRewards = chestRewards;
   globalThis.hwaHelperClanVersusChestThresholds = chestThresholds;
   globalThis.hwaHelperClanVersusChallengeNames = challengeNames;
+  globalThis.hwaHelperClanVersusChallengePoints = challengePoints;
   globalThis.hwaHelperClanVersusRoundQuests = roundQuests;
 })();

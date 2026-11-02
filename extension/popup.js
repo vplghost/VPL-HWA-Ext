@@ -1767,86 +1767,291 @@ function openGuildVersusModal(vsStatus) {
   const rewardMap = globalThis.hwaHelperClanVersusRewards || {};
   const claimedSet = new Set(vsStatus?.chestNumbers || []);
 
-  const chestsSec = document.createElement('div');
-  chestsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
-  chestsSec.innerHTML = `
-    <div class="flex items-center justify-between">
-      <h3 class="text-sm font-bold text-slate-900">🎁 Milestone Chests</h3>
-      <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">${claimedSet.size} / 9 Claimed</span>
-    </div>
-  `;
-
-  let nextTarget = null;
+  let targetChestNum = 1;
   for (let c = 1; c <= 9; c++) {
     if (!claimedSet.has(c)) {
-      nextTarget = { num: c, pts: thresholds[c] };
+      targetChestNum = c;
       break;
     }
   }
-  if (nextTarget) {
-    const pct = Math.min(100, Math.round((pScore / nextTarget.pts) * 100));
-    const progBox = document.createElement('div');
-    progBox.className = 'rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5';
-    progBox.innerHTML = `
-      <div class="flex justify-between font-medium text-slate-700">
-        <span>Next: <strong>Chest ${nextTarget.num}</strong> (${nextTarget.pts.toLocaleString()} pts)</span>
-        <span class="font-bold text-slate-900">${pct}% (${pScore.toLocaleString()} / ${nextTarget.pts.toLocaleString()})</span>
-      </div>
-      <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-        <div class="bg-amber-500 h-2 rounded-full transition-all" style="width: ${pct}%"></div>
-      </div>
-    `;
-    chestsSec.append(progBox);
-  }
+  if (claimedSet.size === 9) targetChestNum = 9;
+  const targetThreshold = thresholds[targetChestNum] || 0;
+  const targetPct = targetThreshold > 0 ? Math.min(100, Math.round((pScore / targetThreshold) * 100)) : 100;
 
-  const chestGrid = document.createElement('div');
-  chestGrid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5';
+  const chestsSec = document.createElement('div');
+  chestsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+
+  let isStackMode = true;
+  let activeChestNum = targetChestNum;
+
+  const headerDiv = document.createElement('div');
+  headerDiv.className = 'flex items-center justify-between flex-wrap gap-2';
+
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'flex items-center gap-2';
+  titleWrap.innerHTML = `
+    <h3 class="text-sm font-bold text-slate-900">🎁 Milestone Chests</h3>
+    <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">${claimedSet.size} / 9 Claimed</span>
+  `;
+
+  const viewToggleWrap = document.createElement('div');
+  viewToggleWrap.className = 'inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium select-none';
+
+  const deckModeBtn = document.createElement('button');
+  deckModeBtn.type = 'button';
+  deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer';
+  deckModeBtn.textContent = '🎴 Stacked Deck';
+
+  const gridModeBtn = document.createElement('button');
+  gridModeBtn.type = 'button';
+  gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer';
+  gridModeBtn.textContent = '🃏 Grid View';
+
+  viewToggleWrap.append(deckModeBtn, gridModeBtn);
+  headerDiv.append(titleWrap, viewToggleWrap);
+  chestsSec.append(headerDiv);
+
+  // Target summary progress banner
+  const progBox = document.createElement('div');
+  progBox.className = 'rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5 border border-slate-100';
+  progBox.innerHTML = `
+    <div class="flex justify-between font-medium text-slate-700">
+      <span>Target: <strong class="text-amber-800">Chest ${targetChestNum}</strong> (${targetThreshold.toLocaleString()} pts)</span>
+      <span class="font-bold text-slate-900">${targetPct}% (${pScore.toLocaleString()} / ${targetThreshold.toLocaleString()})</span>
+    </div>
+    <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+      <div class="bg-amber-500 h-2 rounded-full transition-all duration-300" style="width: ${targetPct}%"></div>
+    </div>
+  `;
+  chestsSec.append(progBox);
+
+  // Selector ribbon for quick jumping to any card (1-9)
+  const ribbonWrap = document.createElement('div');
+  ribbonWrap.className = 'flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin';
+  const ribbonBtns = new Map();
+
+  for (let c = 1; c <= 9; c++) {
+    const isClaimed = claimedSet.has(c);
+    const isReady = !isClaimed && pScore >= (thresholds[c] || 0);
+    const isTarget = c === targetChestNum;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+      isTarget ? 'ring-2 ring-amber-400 font-bold' : ''
+    }`;
+    btn.innerHTML = `
+      <span class="font-mono">№ ${c}</span>
+      <span class="text-[10px]">${isClaimed ? '✓' : isReady ? '★' : isTarget ? '🎯' : '🔒'}</span>
+    `;
+    btn.title = `Chest ${c} (${(thresholds[c] || 0).toLocaleString()} pts)${isTarget ? ' - Target' : ''}`;
+    btn.addEventListener('click', () => {
+      setActiveChest(c);
+    });
+    ribbonBtns.set(c, btn);
+    ribbonWrap.append(btn);
+  }
+  chestsSec.append(ribbonWrap);
+
+  // Deck container & cards wrapper
+  const deckContainer = document.createElement('div');
+  deckContainer.className = 'chest-deck-container relative pt-1 pb-3 flex flex-col justify-center';
+
+  // 3D Deck Stack underlay layers
+  const layer2 = document.createElement('div');
+  layer2.className = 'chest-deck-layer-2 absolute inset-x-4 top-3 bottom-1 rounded-2xl bg-slate-200/70 border border-slate-300 shadow-2xs -z-20 pointer-events-none';
+  const layer1 = document.createElement('div');
+  layer1.className = 'chest-deck-layer-1 absolute inset-x-2 top-2 bottom-2 rounded-2xl bg-slate-100/80 border border-slate-300 shadow-xs -z-10 pointer-events-none';
+  deckContainer.append(layer2, layer1);
+
+  const cardsMap = new Map();
   for (let c = 1; c <= 9; c++) {
     const pts = thresholds[c] || 0;
     const isClaimed = claimedSet.has(c);
     const isReady = !isClaimed && pScore >= pts;
+    const isTarget = c === targetChestNum;
+    const cardPct = pts > 0 ? Math.min(100, Math.round((pScore / pts) * 100)) : 100;
+
     const chestCard = document.createElement('div');
-    chestCard.className = `rounded-lg border p-3 flex flex-col justify-between text-xs transition-colors ${
+    chestCard.className = `chest-playing-card rounded-2xl border-2 p-3.5 flex flex-col justify-between text-xs transition-all relative ${
       isClaimed
-        ? 'border-emerald-200 bg-emerald-50/50'
+        ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-100/50 shadow-sm'
         : isReady
-          ? 'border-amber-300 bg-amber-50/70 shadow-sm resource-capped-amber'
-          : 'border-slate-200 bg-slate-50/50 text-slate-600'
+          ? 'border-amber-400 bg-gradient-to-br from-amber-50/80 via-white to-amber-100/60 shadow-md resource-capped-amber'
+          : isTarget
+            ? 'border-indigo-400 bg-gradient-to-br from-indigo-50/60 via-white to-amber-50/40 shadow-md ring-2 ring-indigo-200'
+            : 'border-slate-200 bg-gradient-to-br from-slate-50/70 via-white to-slate-100/60 text-slate-700 shadow-2xs'
     }`;
 
-    const top = document.createElement('div');
-    top.className = 'flex items-center justify-between mb-2';
-    top.innerHTML = `
-      <span class="font-bold text-slate-900">Chest ${c}</span>
-      <span class="tabular-nums font-semibold ${isClaimed ? 'text-emerald-700' : isReady ? 'text-amber-700' : 'text-slate-500'}">${pts.toLocaleString()} pts</span>
+    // Card Top / Header (Rank + Suit + Status Badge)
+    const cardHeader = document.createElement('div');
+    cardHeader.className = 'flex items-center justify-between mb-2';
+    cardHeader.innerHTML = `
+      <div class="flex items-center gap-1.5">
+        <span class="font-mono font-black text-xs px-2 py-0.5 rounded bg-black/5 border border-black/10">№ ${c}</span>
+        <span class="text-sm">🎁</span>
+        <span class="font-bold text-slate-900 text-sm">Chest ${c}</span>
+      </div>
+      <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${
+        isClaimed
+          ? 'bg-emerald-600 text-white'
+          : isReady
+            ? 'bg-amber-500 text-white animate-pulse'
+            : isTarget
+              ? 'bg-indigo-600 text-white'
+              : 'bg-slate-200 text-slate-600'
+      }">${isClaimed ? '✓ Claimed' : isReady ? '★ Ready to Claim' : isTarget ? '🎯 Target Chest' : '🔒 Locked'}</span>
     `;
 
-    const statusBadge = document.createElement('div');
-    statusBadge.className = 'mb-2';
-    statusBadge.innerHTML = isClaimed
-      ? '<span class="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">✓ Claimed</span>'
-      : isReady
-        ? '<span class="inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">★ Ready to Claim</span>'
-        : '<span class="inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">🔒 Locked</span>';
+    // Milestone Requirement Row
+    const reqRow = document.createElement('div');
+    reqRow.className = 'flex items-baseline justify-between py-1 border-b border-slate-200/60';
+    reqRow.innerHTML = `
+      <span class="text-[11px] text-slate-500 font-medium">Milestone Requirement</span>
+      <span class="tabular-nums font-extrabold text-sm ${isClaimed ? 'text-emerald-700' : isReady ? 'text-amber-800' : isTarget ? 'text-indigo-900' : 'text-slate-700'}">${pts.toLocaleString()} pts</span>
+    `;
 
+    // Progress bar for active / target card
+    const cardProg = document.createElement('div');
+    cardProg.className = 'mt-2 space-y-1';
+    cardProg.innerHTML = `
+      <div class="flex justify-between text-[11px] text-slate-600 font-medium">
+        <span>Progress</span>
+        <span class="tabular-nums font-bold ${isReady || isClaimed ? 'text-emerald-700' : 'text-slate-800'}">${cardPct}% (${pScore.toLocaleString()} / ${pts.toLocaleString()})</span>
+      </div>
+      <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+        <div class="h-1.5 rounded-full transition-all duration-300 ${isClaimed ? 'bg-emerald-500' : isReady ? 'bg-amber-500' : 'bg-indigo-500'}" style="width: ${cardPct}%"></div>
+      </div>
+    `;
+
+    // Rewards List
     const rewardList = document.createElement('div');
-    rewardList.className = 'space-y-1 text-[11px] text-slate-700 mt-auto pt-2 border-t border-slate-200/60';
+    rewardList.className = 'space-y-1.5 text-[11px] text-slate-700 mt-2.5 pt-2 border-t border-slate-200/60';
     const rItems = rewardMap[c];
     if (rItems) {
+      const itemsGrid = document.createElement('div');
+      itemsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-1.5';
       for (const [rKey, rAmt] of Object.entries(rItems)) {
         const itemRow = document.createElement('div');
-        itemRow.className = 'flex items-center gap-1 truncate';
+        itemRow.className = 'flex items-center gap-1.5 rounded-md bg-white/90 px-2 py-1 border border-slate-200/70 shadow-2xs font-medium truncate';
         itemRow.textContent = formatRewardItem(rKey, rAmt);
-        rewardList.append(itemRow);
+        itemsGrid.append(itemRow);
       }
+      rewardList.append(itemsGrid);
     } else {
       rewardList.innerHTML = '<span class="text-slate-400 italic">Bonus milestone reward</span>';
     }
 
-    chestCard.append(top, statusBadge, rewardList);
-    chestGrid.append(chestCard);
+    // Stack navigation footer (visible in Stack mode)
+    const cardNav = document.createElement('div');
+    cardNav.className = 'card-stack-nav flex items-center justify-between pt-2.5 mt-3 border-t border-slate-200/60 text-xs';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'card-prev-btn px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 border border-slate-200 font-semibold text-slate-700 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+    prevBtn.textContent = '‹ Prev';
+
+    const cardCounter = document.createElement('span');
+    cardCounter.className = 'text-slate-500 font-medium';
+    cardCounter.innerHTML = `Chest ${c} of 9 ${isTarget ? '<strong class="text-amber-600 ml-1">(Target)</strong>' : ''}`;
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'card-next-btn px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 border border-slate-200 font-semibold text-slate-700 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+    nextBtn.textContent = 'Next ›';
+
+    if (c === 1) prevBtn.disabled = true;
+    if (c === 9) nextBtn.disabled = true;
+    prevBtn.addEventListener('click', (e) => {
+      e.stopPropagation?.();
+      if (c > 1) setActiveChest(c - 1);
+    });
+    nextBtn.addEventListener('click', (e) => {
+      e.stopPropagation?.();
+      if (c < 9) setActiveChest(c + 1);
+    });
+
+    cardNav.append(prevBtn, cardCounter, nextBtn);
+    chestCard._cardNav = cardNav;
+
+    chestCard.append(cardHeader, reqRow, cardProg, rewardList, cardNav);
+    cardsMap.set(c, chestCard);
+    deckContainer.append(chestCard);
   }
-  chestsSec.append(chestGrid);
+  chestsSec.append(deckContainer);
+
+  function setActiveChest(num) {
+    activeChestNum = num;
+    updateDeckView();
+  }
+
+  function updateDeckView() {
+    // Update selector ribbon button styles
+    for (let c = 1; c <= 9; c++) {
+      const btn = ribbonBtns.get(c);
+      const isClaimed = claimedSet.has(c);
+      const isReady = !isClaimed && pScore >= (thresholds[c] || 0);
+      const isTarget = c === targetChestNum;
+      const isActive = c === activeChestNum;
+
+      if (isActive && isStackMode) {
+        btn.className = `px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer bg-slate-900 text-white border-slate-900 shadow-xs ${
+          isTarget ? 'ring-2 ring-amber-400' : ''
+        }`;
+      } else {
+        btn.className = `px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+          isClaimed
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+            : isReady
+              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+              : isTarget
+                ? 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-2 ring-amber-400 font-bold hover:bg-indigo-100'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+        }`;
+      }
+    }
+
+    if (isStackMode) {
+      deckContainer.className = 'chest-deck-container relative pt-1 pb-3 flex flex-col justify-center';
+      layer1.hidden = false;
+      layer2.hidden = false;
+      for (let c = 1; c <= 9; c++) {
+        const card = cardsMap.get(c);
+        if (card._cardNav) card._cardNav.hidden = false;
+        if (c === activeChestNum) {
+          card.hidden = false;
+          card.classList.add('z-20', 'shadow-xl');
+        } else {
+          card.hidden = true;
+          card.classList.remove('z-20', 'shadow-xl');
+        }
+      }
+    } else {
+      deckContainer.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5';
+      layer1.hidden = true;
+      layer2.hidden = true;
+      for (let c = 1; c <= 9; c++) {
+        const card = cardsMap.get(c);
+        card.hidden = false;
+        if (card._cardNav) card._cardNav.hidden = true;
+      }
+    }
+  }
+
+  deckModeBtn.addEventListener('click', () => {
+    isStackMode = true;
+    deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer';
+    gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer';
+    updateDeckView();
+  });
+  gridModeBtn.addEventListener('click', () => {
+    isStackMode = false;
+    gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer';
+    deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer';
+    updateDeckView();
+  });
+
+  updateDeckView();
   body.append(chestsSec);
 
   // --- SECTION 4: 6-ROUND SCHEDULE & QUESTS ---
@@ -1979,19 +2184,45 @@ function openGuildVersusModal(vsStatus) {
   if (challenges.length > 0) {
     const chSec = document.createElement('div');
     chSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
-    chSec.innerHTML = `<h3 class="text-sm font-bold text-slate-900">🎯 Daily Challenges (${challenges.length})</h3>`;
 
     const challengeNames = globalThis.hwaHelperClanVersusChallengeNames || {};
+    const challengePoints = globalThis.hwaHelperClanVersusChallengePoints || {};
+
+    let totalChallengePts = 0;
+    for (const ch of challenges) {
+      const progress = Number(ch.progress || 0);
+      const ptsPerUnit = challengePoints[ch.id] || 0;
+      totalChallengePts += progress * ptsPerUnit;
+    }
+
+    chSec.innerHTML = `
+      <div class="flex items-center justify-between flex-wrap gap-1">
+        <h3 class="text-sm font-bold text-slate-900">🎯 Daily Challenges (${challenges.length})</h3>
+        <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-900 border border-amber-200">Total: ${totalChallengePts.toLocaleString()} pts</span>
+      </div>
+    `;
+
     const chGrid = document.createElement('div');
     chGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2';
 
     for (const ch of challenges) {
       const name = challengeNames[ch.id] || `Daily Challenge #${ch.id}`;
+      const progress = Number(ch.progress || 0);
+      const ptsPerUnit = challengePoints[ch.id] || 0;
+      const convertedPts = progress * ptsPerUnit;
+
       const item = document.createElement('div');
       item.className = 'flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs';
       item.innerHTML = `
-        <span class="font-medium text-slate-800 truncate mr-2">${name}</span>
-        <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums shrink-0">${ch.progress ?? 0}</span>
+        <span class="font-medium text-slate-800 truncate mr-2" title="${name}">${name}</span>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums">${progress.toLocaleString()}</span>
+          <span class="rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+            convertedPts > 0
+              ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold'
+              : 'bg-slate-100 text-slate-500 border border-slate-200'
+          }" title="${ptsPerUnit > 0 ? `${ptsPerUnit.toLocaleString()} pts per completion` : ''}">${convertedPts.toLocaleString()} pts</span>
+        </div>
       `;
       chGrid.append(item);
     }

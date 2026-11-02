@@ -394,7 +394,11 @@ test('openGuildVersusModal populates all 6 sections and displays modal', () => {
   // Milestone Chests (1 - 9)
   assert.ok(bodyText.includes('Milestone Chests'));
   assert.ok(bodyText.includes('2 / 9 Claimed'));
+  assert.ok(bodyText.includes('Target: Chest 3'));
+  assert.ok(bodyText.includes('Stacked Deck'));
+  assert.ok(bodyText.includes('Grid View'));
   assert.ok(bodyText.includes('Chest 1'));
+  assert.ok(bodyText.includes('Chest 3'));
   assert.ok(bodyText.includes('Chest 6'));
   assert.ok(bodyText.includes('Energy'));
   assert.ok(bodyText.includes('Titan Potion'));
@@ -407,8 +411,11 @@ test('openGuildVersusModal populates all 6 sections and displays modal', () => {
   assert.ok(bodyText.includes('28 / 5 req'));
   assert.ok(bodyText.includes('2,450'));
 
-  // Challenges
+  // Challenges (with converted points)
   assert.ok(bodyText.includes('Daily Challenges'));
+  assert.ok(bodyText.includes('Total: 92,000 pts'));
+  assert.ok(bodyText.includes('44,000 pts'));
+  assert.ok(bodyText.includes('48,000 pts'));
   assert.ok(bodyText.includes('Titan Power'));
   assert.ok(bodyText.includes('Tower Chest'));
   assert.ok(bodyText.includes('Quests to Earn Points'));

@@ -138,4 +138,18 @@
     font-weight: 800 !important;
     box-shadow: 0 0 0 2px #f59e0b, 0 0 8px rgba(245, 158, 11, 0.5) !important;
   }
+
+  /* Guild Versus Milestone Chests Card Deck */
+  .chest-deck-container {
+    perspective: 1000px;
+  }
+  .chest-playing-card {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, opacity 0.2s ease;
+  }
+  .chest-deck-layer-1 {
+    transform: translateY(4px) scale(0.985);
+  }
+  .chest-deck-layer-2 {
+    transform: translateY(8px) scale(0.97);
+  }
 }
