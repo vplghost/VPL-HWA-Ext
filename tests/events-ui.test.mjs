@@ -165,6 +165,8 @@ heroesBadge.hidden = true;
 const titansBadge = new MockElement('span');
 titansBadge.setAttribute('id', 'titans-tab-badge');
 titansBadge.hidden = true;
+const btnReloadGame = new MockElement('button');
+btnReloadGame.setAttribute('id', 'btn-reload-game');
 const btnRefreshAll = new MockElement('button');
 btnRefreshAll.setAttribute('id', 'btn-refresh-all');
 const btnRefreshCore = new MockElement('button');
@@ -229,6 +231,7 @@ const mockDoc = {
     ['mail-badge', mailBadge],
     ['heroes-tab-badge', heroesBadge],
     ['titans-tab-badge', titansBadge],
+    ['btn-reload-game', btnReloadGame],
     ['btn-refresh-all', btnRefreshAll],
     ['btn-refresh-core', btnRefreshCore],
     ['btn-refresh-roster', btnRefreshRoster],
@@ -1030,5 +1033,9 @@ test('header mail badge, heroes/titans soul evolve badges, and config refresh bu
   assert.ok(Array.isArray(sentMessage.calls));
   assert.ok(sentMessage.calls.some((c) => c.name === 'heroGetAll'));
   assert.ok(sentMessage.calls.some((c) => c.name === 'getPage' && c.feature === 'report'));
-  assert.ok(configRefreshStatus.textContent.includes('Refreshed at'));
+  assert.ok(configRefreshStatus.textContent.includes('Quick refresh sent at'));
+  btnReloadGame.dispatch('click');
+  assert.ok(sentMessage);
+  assert.equal(sentMessage.kind, 'reload-game-tab');
+  assert.ok(configRefreshStatus.textContent.includes('Game tab reloaded'));
 });

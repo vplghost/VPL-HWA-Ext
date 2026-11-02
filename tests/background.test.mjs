@@ -18,7 +18,13 @@ function setup(quota = Infinity) {
   const pick = (state, keys) => keys == null ? { ...state } :
     Object.fromEntries((Array.isArray(keys) ? keys : [keys])
       .filter((key) => Object.hasOwn(state, key)).map((key) => [key, state[key]]));
+  const tabsList = [];
+  let reloadedTabId = null;
   const chrome = {
+    tabs: {
+      query: (filter, cb) => cb(tabsList),
+      reload: (tabId, opts, cb) => { reloadedTabId = tabId; if (cb) cb(); }
+    },
     runtime: {
       id: 'test-extension',
       onMessage: { addListener: (callback) => { listener = callback; } },
@@ -46,7 +52,7 @@ function setup(quota = Infinity) {
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
     new Promise((resolve) => listener({ kind, record }, sender, resolve));
-  return { local, session, send, installed, listener };
+  return { local, session, send, installed, listener, tabsList, getReloadedTabId: () => reloadedTabId };
 }
 
 function rpc(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
@@ -156,4 +162,20 @@ test('cache can rebuild from temporary session records and old local logs are re
   const skipped = await send('api-record', getRecord(3));
   assert.equal(skipped.saved, false);
   assert.equal(skipped.cached, false);
+});
+
+test('reload-game-tab reloads matching game tab or returns error when none found', async () => {
+  const { send, tabsList, getReloadedTabId } = setup();
+  // No game tab
+  tabsList.length = 0;
+  const noTabResult = await send('reload-game-tab');
+  assert.equal(noTabResult.ok, false);
+  assert.equal(noTabResult.error, 'No active Hero Wars tab found.');
+
+  // With game tab
+  tabsList.push({ id: 42, url: 'https://www.hero-wars-alliance.com/play' });
+  const tabResult = await send('reload-game-tab');
+  assert.equal(tabResult.ok, true);
+  assert.equal(tabResult.error, null);
+  assert.equal(getReloadedTabId(), 42);
 });

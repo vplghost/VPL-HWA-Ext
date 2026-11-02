@@ -4138,7 +4138,7 @@ function triggerRefresh(groupKey) {
   if (!calls) return;
   const statusEl = document.querySelector('#config-refresh-status');
   if (statusEl) {
-    statusEl.textContent = 'Requesting refresh...';
+    statusEl.textContent = 'Requesting quick refresh...';
     statusEl.className = 'text-xs text-blue-600 font-medium';
   }
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -4151,13 +4151,36 @@ function triggerRefresh(groupKey) {
       } else {
         if (statusEl) {
           const time = new Date().toLocaleTimeString();
-          statusEl.textContent = `Refreshed at ${time}`;
+          statusEl.textContent = `Quick refresh sent at ${time}. If not updating, use Reload Game Tab.`;
           statusEl.className = 'text-xs text-emerald-600 font-medium';
         }
       }
     });
   }
 }
+
+document.querySelector('#btn-reload-game')?.addEventListener('click', () => {
+  const statusEl = document.querySelector('#config-refresh-status');
+  if (statusEl) {
+    statusEl.textContent = 'Reloading game tab...';
+    statusEl.className = 'text-xs text-blue-600 font-medium';
+  }
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({ kind: 'reload-game-tab' }, (response) => {
+      if (chrome.runtime.lastError || !response?.ok) {
+        if (statusEl) {
+          statusEl.textContent = response?.error || 'No active Hero Wars tab found.';
+          statusEl.className = 'text-xs text-amber-600 font-medium';
+        }
+      } else {
+        if (statusEl) {
+          statusEl.textContent = 'Game tab reloaded. New snapshots will load automatically.';
+          statusEl.className = 'text-xs text-emerald-600 font-medium';
+        }
+      }
+    });
+  }
+});
 
 document.querySelector('#btn-refresh-all')?.addEventListener('click', () => triggerRefresh('all'));
 document.querySelector('#btn-refresh-core')?.addEventListener('click', () => triggerRefresh('core'));

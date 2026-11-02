@@ -165,6 +165,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+  if (message?.kind === 'reload-game-tab' && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+    const queryPatterns = GAME_ORIGINS.map((o) => `${o}/*`);
+    chrome.tabs?.query({ url: queryPatterns }, (tabs) => {
+      let reloaded = false;
+      for (const tab of tabs || []) {
+        if (tab.id) {
+          chrome.tabs.reload(tab.id);
+          reloaded = true;
+        }
+      }
+      if (!reloaded) {
+        chrome.tabs?.query({}, (allTabs) => {
+          for (const tab of allTabs || []) {
+            if (tab.id && isGameUrl(tab.url)) {
+              chrome.tabs.reload(tab.id);
+              reloaded = true;
+            }
+          }
+          sendResponse({ ok: reloaded, error: reloaded ? null : 'No active Hero Wars tab found.' });
+        });
+        return;
+      }
+      sendResponse({ ok: reloaded, error: null });
+    });
+    return true;
+  }
   if (message?.kind === 'open-tab') {
     chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?view=tab') });
     sendResponse({ ok: true });

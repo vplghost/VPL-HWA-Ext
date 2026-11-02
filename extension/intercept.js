@@ -5,8 +5,14 @@
   const MAX_BODY_CHARS = 512 * 1024;
   const isTrackingUrl = globalThis.hwaHelperIsTrackingUrl;
   let captureEnabled = false;
-  let lastRpcUrl = null;
+  let lastRpcUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null;
   let lastRpcHeaders = null;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      const stored = sessionStorage.getItem('hwa_last_rpc_headers');
+      if (stored) lastRpcHeaders = JSON.parse(stored);
+    }
+  } catch (_) {}
 
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
@@ -17,6 +23,13 @@
       const calls = event.data.calls;
       const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null) || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
+      let headersToUse = lastRpcHeaders;
+      if (!headersToUse && typeof sessionStorage !== 'undefined') {
+        try {
+          const stored = sessionStorage.getItem('hwa_last_rpc_headers');
+          if (stored) headersToUse = JSON.parse(stored);
+        } catch (_) {}
+      }
       const randHex = () => Math.random().toString(16).slice(2).padStart(16, '0').slice(0, 16);
       const payload = {
         calls: calls.map((c) => ({
@@ -26,7 +39,7 @@
           ...(typeof c === 'object' && c.feature ? { feature: c.feature } : {})
         }))
       };
-      const headers = { 'content-type': 'application/json', ...(lastRpcHeaders || {}) };
+      const headers = { 'content-type': 'application/json', ...(headersToUse || {}) };
       try {
         (window.fetch || originalFetch)(url, {
           method: 'POST',
@@ -48,7 +61,14 @@
           { name: 'randomDraft_getInfo', args: {}, ident: ident2 }
         ]
       };
-      const headers = { 'content-type': 'application/json', ...(lastRpcHeaders || {}) };
+      let headersToUse = lastRpcHeaders;
+      if (!headersToUse && typeof sessionStorage !== 'undefined') {
+        try {
+          const stored = sessionStorage.getItem('hwa_last_rpc_headers');
+          if (stored) headersToUse = JSON.parse(stored);
+        } catch (_) {}
+      }
+      const headers = { 'content-type': 'application/json', ...(headersToUse || {}) };
       try {
         (window.fetch || originalFetch)(lastRpcUrl, {
           method: 'POST',
@@ -169,12 +189,16 @@
         try {
           if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('hwa_last_rpc_url', urlStr);
         } catch (_) {}
-        if (options?.headers) {
+        const rawHeaders = options?.headers || (input && typeof input === 'object' && input.headers ? input.headers : null);
+        if (rawHeaders) {
           try {
-            if (typeof Headers !== 'undefined' && options.headers instanceof Headers) {
-              lastRpcHeaders = Object.fromEntries(options.headers.entries());
-            } else if (typeof options.headers === 'object') {
-              lastRpcHeaders = { ...options.headers };
+            if (typeof Headers !== 'undefined' && rawHeaders instanceof Headers) {
+              lastRpcHeaders = Object.fromEntries(rawHeaders.entries());
+            } else if (typeof rawHeaders === 'object') {
+              lastRpcHeaders = { ...rawHeaders };
+            }
+            if (lastRpcHeaders && typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem('hwa_last_rpc_headers', JSON.stringify(lastRpcHeaders));
             }
           } catch (_) {}
         }
@@ -238,10 +262,35 @@
   const xhr = window.XMLHttpRequest?.prototype;
   if (xhr) {
     const originalOpen = xhr.open;
+    const originalSetRequestHeader = xhr.setRequestHeader;
     const originalSend = xhr.send;
     const requestInfo = new WeakMap();
+    const xhrHeaders = new WeakMap();
+    const xhrUrls = new WeakMap();
+
+    if (typeof originalSetRequestHeader === 'function') {
+      xhr.setRequestHeader = function (name, value) {
+        try {
+          let headers = xhrHeaders.get(this);
+          if (!headers) {
+            headers = {};
+            xhrHeaders.set(this, headers);
+          }
+          if (name) headers[String(name).toLowerCase()] = String(value);
+        } catch (_) {}
+        return originalSetRequestHeader.apply(this, arguments);
+      };
+    }
 
     xhr.open = function (method, url, ...rest) {
+      const urlStr = String(url || '');
+      xhrUrls.set(this, urlStr);
+      if (urlStr.includes('/api/rpc') || urlStr.includes('api.hero-wars-alliance.com')) {
+        lastRpcUrl = urlStr;
+        try {
+          if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('hwa_last_rpc_url', urlStr);
+        } catch (_) {}
+      }
       const result = originalOpen.call(this, method, url, ...rest);
       if (!captureEnabled || isTrackingUrl(url, location.href)) requestInfo.delete(this);
       else requestInfo.set(this, { method, url, outcome: 'completed' });
@@ -249,6 +298,18 @@
     };
 
     xhr.send = function (...args) {
+      try {
+        const urlStr = xhrUrls.get(this) || '';
+        if (urlStr.includes('/api/rpc') || urlStr.includes('api.hero-wars-alliance.com')) {
+          const headers = xhrHeaders.get(this);
+          if (headers && Object.keys(headers).length > 0) {
+            lastRpcHeaders = { ...headers };
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem('hwa_last_rpc_headers', JSON.stringify(lastRpcHeaders));
+            }
+          }
+        }
+      } catch (_) {}
       const info = captureEnabled ? requestInfo.get(this) : null;
       if (info) {
         info.started = performance.now();

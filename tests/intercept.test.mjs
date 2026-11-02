@@ -21,12 +21,20 @@ function setup(fetchImplementation, enable = true) {
       this.listeners.set(name, handlers);
     }
     open(method, url) { this.method = method; this.url = url; }
+    setRequestHeader(name, value) { this[name] = value; }
     send() { this.emit('loadend'); return undefined; }
     emit(name) { for (const handler of this.listeners.get(name) ?? []) handler(); }
   }
+  const storage = {};
+  const sessionStorage = {
+    getItem: (k) => storage[k] ?? null,
+    setItem: (k, v) => { storage[k] = String(v); },
+    removeItem: (k) => { delete storage[k]; }
+  };
   const window = {
     fetch: fetchImplementation,
     XMLHttpRequest: FakeXHR,
+    sessionStorage,
     addEventListener: (name, handler) => { if (name === 'message') listeners.push(handler); },
     postMessage: (data, targetOrigin) => {
       if (data.kind === 'api-record') messages.push({ data, targetOrigin });
@@ -34,13 +42,13 @@ function setup(fetchImplementation, enable = true) {
     }
   };
   runInNewContext(`${filterSource}\n${source}`, {
-    window, URL, Date, Promise, Symbol, WeakMap, TextDecoder, URLSearchParams, FormData, Blob,
+    window, URL, Date, Promise, Symbol, WeakMap, TextDecoder, URLSearchParams, FormData, Blob, sessionStorage,
     location: { href: 'https://www.hero-wars-alliance.com/', origin: 'https://www.hero-wars-alliance.com' },
     performance: { now: () => ++now }
   });
   if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true },
     'https://www.hero-wars-alliance.com');
-  return { window, messages };
+  return { window, messages, sessionStorage };
 }
 
 async function waitForMessage(messages) {
@@ -197,4 +205,53 @@ test('tracking XHR is not recorded', () => {
   xhr.open('POST', 'https://wa.appsflyersdk.com/events');
   xhr.send('{}');
   assert.equal(messages.length, 0);
+});
+
+test('fetch captures RPC url and headers into sessionStorage and refresh-rpc sends them', async () => {
+  let refreshSent = null;
+  const { window, sessionStorage } = setup(async (url, opts) => {
+    if (opts?.body?.includes('userGetInfo')) {
+      refreshSent = { url, opts };
+    }
+    return new Response('ok');
+  });
+
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST',
+    headers: {
+      'x-auth-user-id': '12345',
+      'x-auth-session-id': 'abc-session'
+    },
+    body: '{"calls":[]}'
+  });
+
+  assert.equal(sessionStorage.getItem('hwa_last_rpc_url'), 'https://api.hero-wars-alliance.com/api/rpc');
+  const storedHeaders = JSON.parse(sessionStorage.getItem('hwa_last_rpc_headers'));
+  assert.equal(storedHeaders['x-auth-user-id'], '12345');
+  assert.equal(storedHeaders['x-auth-session-id'], 'abc-session');
+
+  window.postMessage({
+    source: 'hwa-helper-control',
+    kind: 'refresh-rpc',
+    calls: ['userGetInfo']
+  }, 'https://www.hero-wars-alliance.com');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.ok(refreshSent);
+  assert.equal(refreshSent.opts.headers['x-auth-user-id'], '12345');
+  assert.equal(refreshSent.opts.headers['x-auth-session-id'], 'abc-session');
+});
+
+test('XHR captures RPC url and headers via setRequestHeader into sessionStorage', async () => {
+  const { window, sessionStorage } = setup(async () => new Response('ok'));
+  const xhr = new window.XMLHttpRequest();
+  xhr.open('POST', 'https://api.hero-wars-alliance.com/api/rpc');
+  xhr.setRequestHeader('X-Auth-User-Id', '777');
+  xhr.setRequestHeader('X-Auth-Token', 'secret-token');
+  xhr.send('{}');
+
+  assert.equal(sessionStorage.getItem('hwa_last_rpc_url'), 'https://api.hero-wars-alliance.com/api/rpc');
+  const storedHeaders = JSON.parse(sessionStorage.getItem('hwa_last_rpc_headers'));
+  assert.equal(storedHeaders['x-auth-user-id'], '777');
+  assert.equal(storedHeaders['x-auth-token'], 'secret-token');
 });
