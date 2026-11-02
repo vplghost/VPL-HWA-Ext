@@ -4,10 +4,10 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
 const context = {};
-for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'resource-data.js', 'hero-metadata.js', 'titan-metadata.js', 'popup-data.js']) {
+for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'resource-data.js', 'hero-metadata.js', 'titan-metadata.js', 'hero-stat-data.js', 'popup-data.js']) {
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
-const { heroSoulProgress, teamRows, sortRows, isNumericColumn,
+const { heroSoulProgress, formatTitanArtifactLevels, isTitanArtifactUpgradable, exportTableData, teamRows, sortRows, isNumericColumn,
   rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount, isTowerCleared,
   isResourceSelectableForHeader, isDebugOrEventResource } = context.hwaHelperPopupData;
 
@@ -790,4 +790,100 @@ test('isDebugOrEventResource identifies test, unmapped, and inactive event resou
   assert.equal(isDebugOrEventResource({ key: 'resource:refillable:10', data: { label: 'Refillable #10', amount: 0 } }), true);
   assert.equal(isDebugOrEventResource({ key: 'resource:refillable:61', data: { label: 'Event Energy #61', amount: 0 } }), true);
   assert.equal(isDebugOrEventResource({ key: 'resource:refillable:70', data: { label: 'Refillable #70', amount: 5 } }), true);
+});
+
+test('formatTitanArtifactLevels formats artifact levels joined by dash', () => {
+  assert.equal(formatTitanArtifactLevels('4000', {
+    artifacts: [{ level: 20 }, { level: 15 }, { level: 20 }]
+  }), '20 - 15 - 20');
+  assert.equal(formatTitanArtifactLevels('4001', {
+    artifacts: [{ level: 10 }, { level: 5 }, { level: 10 }]
+  }), '10 - 5 - 10');
+  assert.equal(formatTitanArtifactLevels('4030', { artifacts: [] }), '—');
+  assert.equal(formatTitanArtifactLevels('4030', null), '—');
+});
+
+test('isTitanArtifactUpgradable evaluates level upgrade and star evolution readiness', () => {
+  const titan4000 = {
+    level: 45,
+    artifacts: [
+      { level: 20, star: 3 },
+      { level: 45, star: 1 },
+      { level: 45, star: 6 }
+    ]
+  };
+
+  const cache1 = {
+    inventoryGet: {
+      data: {
+        coin: { '18': 200 },
+        fragmentArtifact: { '11001': 10, '12003': 50, '13003': 0 }
+      }
+    },
+    'resource:gold': { value: 100000 }
+  };
+  assert.equal(isTitanArtifactUpgradable('4000', 0, titan4000, cache1), true);
+  assert.equal(isTitanArtifactUpgradable('4000', 1, titan4000, cache1), false);
+  assert.equal(isTitanArtifactUpgradable('4000', 2, titan4000, cache1), false);
+
+  const cache2 = {
+    inventoryGet: {
+      data: {
+        coin: { '18': 0 },
+        fragmentArtifact: { '11001': 10, '12003': 400, '13003': 0 }
+      }
+    },
+    'resource:gold': { value: 0 }
+  };
+  assert.equal(isTitanArtifactUpgradable('4000', 0, titan4000, cache2), false);
+  assert.equal(isTitanArtifactUpgradable('4000', 1, titan4000, cache2), true);
+  assert.equal(isTitanArtifactUpgradable('4000', 2, titan4000, cache2), false);
+
+  assert.equal(isTitanArtifactUpgradable('4000', 0, null, cache1), false);
+  assert.equal(isTitanArtifactUpgradable('4000', 0, titan4000, null), false);
+  assert.equal(isTitanArtifactUpgradable('4000', 5, titan4000, cache1), false);
+});
+
+test('exportTableData enriches titans with structured artifacts and skins', () => {
+  const cache = {
+    titanGetAll: {
+      data: {
+        '4000': {
+          level: 45,
+          star: 3,
+          power: 7358,
+          currentSkin: 10001,
+          skins: { '10001': 20, '10013': 10 },
+          artifacts: [
+            { level: 20, star: 3 },
+            { level: 15, star: 1 },
+            { level: 20, star: 2 }
+          ]
+        }
+      }
+    },
+    inventoryGet: {
+      data: {
+        coin: { '18': 500 },
+        fragmentArtifact: { '11001': 10 }
+      }
+    },
+    'resource:gold': { value: 500000 }
+  };
+
+  const exported = exportTableData('titans', cache);
+  assert.equal(exported.length, 1);
+  const titan = exported[0];
+  assert.equal(titan.id, 4000);
+  assert.equal(titan.name, 'Sigurd');
+  assert.equal(titan.artifacts.length, 3);
+  assert.equal(titan.artifacts[0].type, 'weapon');
+  assert.equal(titan.artifacts[0].level, 20);
+  assert.equal(titan.artifacts[0].isUpgradable, true);
+  assert.equal(titan.skins.length, 2);
+  assert.equal(titan.skins[0].skinId, 10001);
+  assert.equal(titan.skins[0].stat, 'Arm');
+  assert.equal(titan.skins[0].isCurrent, true);
+  assert.equal(titan.skins[1].stat, 'MD');
+  assert.equal(titan.skins[1].isCurrent, false);
 });

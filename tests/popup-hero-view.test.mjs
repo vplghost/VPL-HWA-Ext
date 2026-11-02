@@ -74,7 +74,8 @@ const context = {
   currentCache: {},
   sortState: {},
   activeTab: 'heroes',
-  favoriteHeroes: new Set()
+  favoriteHeroes: new Set(),
+  favoriteTitans: new Set()
 };
 vm.runInNewContext(heroMetaJs, context);
 vm.runInNewContext(titanMetaJs, context);
@@ -333,4 +334,132 @@ test('createHeroInline renders Dante skin stats accurately with Dodge for skin 5
   assert.ok(card.textContent.includes('Agi: 32'), 'Base skin should show Agi');
   assert.ok(card.textContent.includes('Dodge: 21'), 'Active skin 58 should show Dodge');
   assert.ok(!card.textContent.includes('PA: 21'), 'Skin 58 should NOT show PA');
+});
+
+test('createTitanInline renders enriched hover card with skills, skins, and artifacts', () => {
+  const { createTitanInline } = context;
+  const sigurdSnapshot = {
+    star: 3,
+    level: 45,
+    power: 7358,
+    skills: { '4001': 45 },
+    currentSkin: 10001,
+    skins: { '10001': 20, '10013': 10 },
+    artifacts: [
+      { level: 20, star: 3 },
+      { level: 15, star: 1 },
+      { level: 20, star: 2 }
+    ]
+  };
+
+  const container = createTitanInline('4000', 'Sigurd', sigurdSnapshot);
+  const card = container.querySelector('.hero-hover-card');
+  assert.ok(card, 'Card should exist');
+  assert.ok(card.textContent.includes('Tank'), 'Should mention Tank');
+  assert.ok(card.textContent.includes('Water'), 'Should mention Water');
+  assert.ok(card.textContent.includes('S1: 45'), 'Should display skill level');
+  assert.ok(card.textContent.includes('Arm: 20'), 'Should display skin 10001 with Armor stat');
+  assert.ok(card.textContent.includes('MD: 10'), 'Should display skin 10013 with MD stat');
+  assert.ok(card.textContent.includes('Wpn: 3★ Lv.20'), 'Should display weapon artifact');
+  assert.ok(card.textContent.includes('Crown: 1★ Lv.15'), 'Should display crown artifact');
+  assert.ok(card.textContent.includes('Seal: 2★ Lv.20'), 'Should display seal artifact');
+});
+
+test('table supports favorite titans toggle and prioritizes favorites at the top', () => {
+  const { table } = context;
+  context.activeTab = 'titans';
+  context.favoriteTitans = new Set(['4000', '4020']); // Sigurd and Angus are favorites
+  const headings = ['Titan ID', 'Name', 'Level', 'Star', 'Soul stones', 'Artifacts', 'Power'];
+  const rows = [
+    ['4000', 'Sigurd', '45', 3, '100 / 150', '20 - 15 - 20', '7,358'],
+    ['4001', 'Nova', '45', 4, '50 / 500', '10 - 5 - 10', '8,200'],
+    ['4013', 'Araji', '45', 3, '200 / 150', '20 - 10 - 10', '12,500'],
+    ['4020', 'Angus', '45', 3, '80 / 150', '10 - 10 - 16', '7,100']
+  ];
+
+  const tableEl = table(headings, rows);
+  const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
+
+  // Favorites at top (Sigurd 7358, Angus 7100), then non-favorites (Araji 12500, Nova 8200)
+  assert.equal(dataRows[0].children[0].textContent, '4000');
+  assert.equal(dataRows[1].children[0].textContent, '4020');
+  assert.equal(dataRows[2].children[0].textContent, '4013');
+  assert.equal(dataRows[3].children[0].textContent, '4001');
+
+  assert.equal(dataRows[0].dataset.favorite, 'true');
+  assert.equal(dataRows[1].dataset.favorite, 'true');
+  assert.equal(dataRows[2].dataset.favorite, undefined);
+  assert.equal(dataRows[3].dataset.favorite, undefined);
+
+  // Favorite titan button has filled star
+  const favBtn0 = dataRows[0].children[0].querySelector('button');
+  assert.ok(favBtn0);
+  assert.equal(favBtn0.getAttribute('title'), 'Remove favorite');
+  assert.equal(favBtn0.querySelector('svg')?.getAttribute('fill'), 'currentColor');
+
+  // Non-favorite titan button has outline star
+  const favBtn2 = dataRows[2].children[0].querySelector('button');
+  assert.ok(favBtn2);
+  assert.equal(favBtn2.getAttribute('title'), 'Add favorite');
+  assert.equal(favBtn2.querySelector('svg')?.getAttribute('fill'), 'none');
+
+  context.favoriteTitans.clear();
+  context.activeTab = 'heroes';
+});
+
+test('table renders Artifacts column with bold level when upgradable', () => {
+  const { table } = context;
+  context.activeTab = 'titans';
+  context.currentCache = {
+    titanGetAll: {
+      data: {
+        '4000': {
+          level: 45,
+          artifacts: [
+            { level: 20, star: 3 },
+            { level: 15, star: 1 },
+            { level: 20, star: 2 }
+          ]
+        },
+        '4001': {
+          level: 45,
+          artifacts: [
+            { level: 45, star: 4 },
+            { level: 45, star: 4 },
+            { level: 45, star: 4 }
+          ]
+        }
+      }
+    },
+    inventoryGet: {
+      data: {
+        coin: { '18': 500, '1': 1000000 },
+        fragmentArtifact: { '11001': 10, '12003': 10, '13003': 10 }
+      }
+    }
+  };
+
+  const headings = ['Titan ID', 'Name', 'Level', 'Star', 'Soul stones', 'Artifacts', 'Power'];
+  const rows = [
+    ['4000', 'Sigurd', '45', 3, '100 / 150', '20 - 15 - 20', '7,358'],
+    ['4001', 'Nova', '45', 4, '50 / 500', '45 - 45 - 45', '8,200']
+  ];
+
+  const tableEl = table(headings, rows);
+  const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
+
+  const sigurdRow = dataRows.find(r => r.children[0].textContent.includes('4000'));
+  const sigurdArtCell = sigurdRow.children[5];
+  assert.equal(sigurdArtCell.textContent, '20 - 15 - 20');
+  const boldNodes = sigurdArtCell.children.filter(c => c.tagName === 'STRONG');
+  assert.equal(boldNodes.length, 3, 'All 3 upgradable artifact levels should be strong/bolded');
+
+  const novaRow = dataRows.find(r => r.children[0].textContent.includes('4001'));
+  const novaArtCell = novaRow.children[5];
+  assert.equal(novaArtCell.textContent, '45 - 45 - 45');
+  const novaBoldNodes = novaArtCell.children.filter(c => c.tagName === 'STRONG');
+  assert.equal(novaBoldNodes.length, 0, 'No artifacts should be bolded when at level cap and lacking fragments');
+
+  context.activeTab = 'heroes';
+  context.currentCache = {};
 });

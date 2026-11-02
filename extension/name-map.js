@@ -11,6 +11,7 @@
     return entries && Object.hasOwn(entries, id) ? entries[id] : null;
   }
   function hero(id) { return lookup('hero', id); }
+  function artifact(id) { return lookup('artifact', id); }
   function building(id) { return lookup('building', id) || (id ? `Building #${id}` : null); }
   function research(id) { return lookup('research', id) || (id ? `Research #${id}` : null); }
   function item(category, id) {
@@ -18,5 +19,5 @@
     const name = group && lookup(group, id);
     return name ? (category.startsWith('fragment') ? `${name} fragment` : name) : null;
   }
-  globalThis.hwaHelperNameMap = { hero, item, building, research };
+  globalThis.hwaHelperNameMap = { hero, item, building, research, artifact };
 })();

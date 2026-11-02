@@ -52,3 +52,27 @@ test('sigurd, hyperion, araji, and eden have verified metadata', () => {
   assert.equal(eden.role, 'Supertitan');
   assert.equal(eden.element, 'Earth');
 });
+
+test('titan metadata includes 3 artifact IDs, evolution costs, and level costs', () => {
+  const sigurd = metadata['4000'];
+  assert.deepEqual([...sigurd.artifacts], [11001, 12003, 13003]);
+
+  const araji = metadata['4013'];
+  assert.deepEqual([...araji.artifacts], [11008, 12001, 13001]);
+
+  const evolveCost = context.hwaHelperTitanArtifactEvolveCost;
+  assert.ok(evolveCost);
+  assert.equal(evolveCost[1], 15);
+  assert.equal(evolveCost[2], 300);
+  assert.equal(evolveCost[3], 900);
+  assert.equal(evolveCost[4], 1500);
+  assert.equal(evolveCost[5], 4500);
+  assert.equal(evolveCost[6], 15000);
+
+  const levelCosts = context.hwaHelperTitanArtifactLevelCosts;
+  assert.ok(Array.isArray(levelCosts));
+  assert.equal(levelCosts.length, 121);
+  assert.deepEqual([...levelCosts[2]], [25, 20000]);
+  assert.deepEqual([...levelCosts[20]], [120, 53900]);
+  assert.deepEqual([...levelCosts[120]], [11000, 10000000]);
+});

@@ -38,6 +38,7 @@ let currentGuildChatLastReadTime = 0;
 let currentProductionRates = {};
 const sortState = {};
 let favoriteHeroes = new Set();
+let favoriteTitans = new Set();
 
 async function toggleFavoriteHero(heroId) {
   const idStr = String(heroId);
@@ -48,6 +49,19 @@ async function toggleFavoriteHero(heroId) {
   }
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await chrome.storage.local.set({ favoriteHeroes: Array.from(favoriteHeroes) }).catch(() => {});
+  }
+  render();
+}
+
+async function toggleFavoriteTitan(titanId) {
+  const idStr = String(titanId);
+  if (favoriteTitans.has(idStr)) {
+    favoriteTitans.delete(idStr);
+  } else {
+    favoriteTitans.add(idStr);
+  }
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    await chrome.storage.local.set({ favoriteTitans: Array.from(favoriteTitans) }).catch(() => {});
   }
   render();
 }
@@ -856,6 +870,74 @@ function createTitanInline(titanId, displayName, titanSnapshot) {
   elemBox.append(elemLabel, elemVal);
 
   details.append(roleBox, elemBox);
+
+  if (titanSnapshot?.skills && Object.keys(titanSnapshot.skills).length) {
+    const skillsBox = document.createElement('div');
+    skillsBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5';
+    const skillsLabel = document.createElement('span');
+    skillsLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+    skillsLabel.textContent = 'Skills';
+    const skillsList = document.createElement('div');
+    skillsList.className = 'flex items-center gap-1.5 mt-0.5 flex-wrap';
+    const sortedKeys = Object.keys(titanSnapshot.skills).sort((a, b) => Number(a) - Number(b));
+    sortedKeys.forEach((key, idx) => {
+      const badge = document.createElement('span');
+      badge.className = 'rounded bg-slate-700/80 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300 tabular-nums';
+      badge.textContent = `S${idx + 1}: ${titanSnapshot.skills[key]}`;
+      skillsList.append(badge);
+    });
+    skillsBox.append(skillsLabel, skillsList);
+    details.append(skillsBox);
+  }
+
+  if (titanSnapshot?.skins && typeof titanSnapshot.skins === 'object' && Object.keys(titanSnapshot.skins).length) {
+    const skinsBox = document.createElement('div');
+    skinsBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5';
+    const skinsLabel = document.createElement('span');
+    skinsLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+    skinsLabel.textContent = 'Skins';
+    const skinsList = document.createElement('div');
+    skinsList.className = 'flex items-center gap-1.5 mt-0.5 flex-wrap';
+    const skinEntries = Object.entries(titanSnapshot.skins).sort(([a], [b]) => Number(a) - Number(b));
+    for (const [skinId, level] of skinEntries) {
+      const isCurrent = Number(skinId) === Number(titanSnapshot.currentSkin);
+      const badge = document.createElement('span');
+      badge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+        isCurrent ? 'bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/50' : 'bg-slate-700/80 text-amber-300'
+      }`;
+      let stat = globalThis.hwaHelperSkinStats?.[skinId];
+      if (!stat || stat === 'MAIN') stat = 'HP';
+      badge.textContent = `${stat}: ${level}`;
+      skinsList.append(badge);
+    }
+    skinsBox.append(skinsLabel, skinsList);
+    details.append(skinsBox);
+  }
+
+  if (Array.isArray(titanSnapshot?.artifacts) && titanSnapshot.artifacts.length) {
+    const artBox = document.createElement('div');
+    artBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5';
+    const artLabel = document.createElement('span');
+    artLabel.className = 'text-slate-400 block text-[10px] uppercase tracking-wider font-semibold';
+    artLabel.textContent = 'Artifacts';
+    const artList = document.createElement('div');
+    artList.className = 'flex items-center gap-1.5 mt-0.5 flex-wrap';
+    const typeNames = ['Wpn', 'Crown', 'Seal'];
+    titanSnapshot.artifacts.forEach((art, idx) => {
+      const badge = document.createElement('span');
+      const isUpgradable = globalThis.hwaHelperPopupData?.isTitanArtifactUpgradable?.(titanId, idx, titanSnapshot, currentCache);
+      badge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+        isUpgradable ? 'bg-emerald-900/60 text-emerald-300 ring-1 ring-emerald-500/50' : 'bg-slate-700/80 text-violet-300'
+      }`;
+      const typeLabel = typeNames[idx] || `Art${idx + 1}`;
+      const star = art?.star ?? 0;
+      const level = art?.level ?? 1;
+      badge.textContent = `${typeLabel}: ${star}★ Lv.${level}`;
+      artList.append(badge);
+    });
+    artBox.append(artLabel, artList);
+    details.append(artBox);
+  }
   card.append(details);
 
   container.addEventListener('mouseenter', () => {
@@ -911,7 +993,7 @@ function table(headings, rows) {
   element.className = 'min-w-full border-collapse text-left text-xs';
   const header = document.createElement('tr');
   const powerIndex = headings.indexOf('Power');
-  const defaultSort = activeTab === 'heroes' && powerIndex !== -1 ? { column: powerIndex, direction: 'desc' } : undefined;
+  const defaultSort = (activeTab === 'heroes' || activeTab === 'titans') && powerIndex !== -1 ? { column: powerIndex, direction: 'desc' } : undefined;
   const selectedSort = sortState[activeTab] ?? defaultSort;
   for (const [index, heading] of headings.entries()) {
     const cell = document.createElement('th');
@@ -934,16 +1016,20 @@ function table(headings, rows) {
   }
   element.append(header);
   const isHeroFav = (row) => activeTab === 'heroes' && typeof favoriteHeroes !== 'undefined' && favoriteHeroes.has(String(row[0]));
+  const isTitanFav = (row) => activeTab === 'titans' && typeof favoriteTitans !== 'undefined' && favoriteTitans.has(String(row[0]));
+  const isFavFn = activeTab === 'heroes' ? isHeroFav : (activeTab === 'titans' ? isTitanFav : null);
+  const hasFavs = activeTab === 'heroes' ? (typeof favoriteHeroes !== 'undefined' && favoriteHeroes.size > 0) :
+    (activeTab === 'titans' ? (typeof favoriteTitans !== 'undefined' && favoriteTitans.size > 0) : false);
   const sortedRows = selectedSort ?
-    globalThis.hwaHelperPopupData.sortRows(rows, selectedSort.column, selectedSort.direction, isHeroFav) :
-    (activeTab === 'heroes' && typeof favoriteHeroes !== 'undefined' && favoriteHeroes.size > 0 ?
-      [...rows].sort((a, b) => (isHeroFav(b) ? 1 : 0) - (isHeroFav(a) ? 1 : 0)) : rows);
+    globalThis.hwaHelperPopupData.sortRows(rows, selectedSort.column, selectedSort.direction, isFavFn) :
+    (hasFavs ?
+      [...rows].sort((a, b) => (isFavFn(b) ? 1 : 0) - (isFavFn(a) ? 1 : 0)) : rows);
   const soulColIndex = headings.indexOf('Soul stones');
   const isSoulUpgradeReady = globalThis.hwaHelperPopupData?.isSoulUpgradeReady;
   for (const values of sortedRows) {
     const line = document.createElement('tr');
     const canEvolve = soulColIndex !== -1 && Boolean(isSoulUpgradeReady?.(values[soulColIndex]));
-    const isFav = isHeroFav(values);
+    const isFav = isFavFn ? isFavFn(values) : false;
     if (isFav) line.dataset.favorite = 'true';
     line.className = canEvolve ?
       'border-b border-emerald-100 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-950 font-medium' :
@@ -997,6 +1083,46 @@ function table(headings, rows) {
         idSpan.textContent = heroId;
         wrap.append(favBtn, idSpan);
         cell.append(wrap);
+      } else if (heading === 'Titan ID' && activeTab === 'titans') {
+        const titanId = String(value);
+        const isThisFav = typeof favoriteTitans !== 'undefined' && favoriteTitans.has(titanId);
+        const wrap = document.createElement('div');
+        wrap.className = 'inline-flex items-center gap-1.5';
+
+        const favBtn = document.createElement('button');
+        favBtn.type = 'button';
+        favBtn.className = `cursor-pointer rounded p-0.5 transition-colors ${
+          isThisFav ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400'
+        }`;
+        favBtn.title = isThisFav ? 'Remove favorite' : 'Add favorite';
+        favBtn.setAttribute('title', favBtn.title);
+        favBtn.setAttribute('aria-label', favBtn.title);
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('fill', isThisFav ? 'currentColor' : 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+
+        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        polygon.setAttribute('points', '12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2');
+        svg.append(polygon);
+        favBtn.append(svg);
+
+        favBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await toggleFavoriteTitan(titanId);
+        });
+
+        const idSpan = document.createElement('span');
+        idSpan.textContent = titanId;
+        wrap.append(favBtn, idSpan);
+        cell.append(wrap);
       } else if (heading === 'Name' && activeTab === 'heroes') {
         const heroId = values[0];
         const heroSnapshot = currentCache.heroGetAll?.data?.[heroId];
@@ -1008,6 +1134,30 @@ function table(headings, rows) {
       } else if (heading === 'Hero/Titan names' && activeTab === 'teams') {
         const ids = values[4];
         cell.append(createTeamSquadCell(ids, String(value ?? '—')));
+      } else if (heading === 'Artifacts' && activeTab === 'titans') {
+        const titanId = values[0];
+        const titanSnapshot = currentCache.titanGetAll?.data?.[titanId];
+        const arts = titanSnapshot?.artifacts;
+        const isUpgradableFn = globalThis.hwaHelperPopupData?.isTitanArtifactUpgradable;
+        if (Array.isArray(arts) && arts.length > 0) {
+          arts.forEach((art, idx) => {
+            if (idx > 0) cell.append(' - ');
+            const lvl = art && art.level != null ? art.level : 1;
+            const canUp = Boolean(isUpgradableFn?.(titanId, idx, titanSnapshot, currentCache));
+            if (canUp) {
+              const strong = document.createElement('strong');
+              strong.className = 'font-bold text-emerald-800';
+              strong.textContent = String(lvl);
+              cell.append(strong);
+            } else {
+              const span = document.createElement('span');
+              span.textContent = String(lvl);
+              cell.append(span);
+            }
+          });
+        } else {
+          cell.textContent = String(value ?? '—');
+        }
       } else if (heading === 'Soul stones' && canEvolve) {
         cell.className += ' text-emerald-800 font-bold';
         cell.textContent = String(value ?? '—');
@@ -3517,12 +3667,13 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
   currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
   favoriteHeroes = new Set(Array.isArray(stored.favoriteHeroes) ? stored.favoriteHeroes.map(String) : []);
+  favoriteTitans = new Set(Array.isArray(stored.favoriteTitans) ? stored.favoriteTitans.map(String) : []);
   currentProductionRates = Object.fromEntries([1, 2, 3, 4, 5].map((id) =>
     [id, globalThis.hwaHelperProductionData.ratePerMinute(cache, id)]));
   const resources = resourceEntries(cache);
@@ -3633,12 +3784,13 @@ async function render() {
   } else if (activeTab === 'resources') {
     renderResources(resources, selectedResources);
   } else if (activeTab === 'titans') {
-    showSnapshot(cache.titanGetAll, ['Titan ID', 'Name', 'Level', 'Star', 'Soul stones', 'Power'], (data) =>
+    showSnapshot(cache.titanGetAll, ['Titan ID', 'Name', 'Level', 'Star', 'Soul stones', 'Artifacts', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, titan]) => {
         const { owned, needed } = globalThis.hwaHelperPopupData.titanSoulProgress(id, titan, cache.inventoryGet?.data);
         const soulStones = `${formatNumber(owned)} / ${typeof needed === 'number' ? formatNumber(needed) : needed ?? '—'}`;
+        const artifactLevels = globalThis.hwaHelperPopupData.formatTitanArtifactLevels(id, titan);
         return [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(titan?.level),
-          titan?.star, soulStones, formatNumber(titan?.power)];
+          titan?.star, soulStones, artifactLevels, formatNumber(titan?.power)];
       }));
   } else if (activeTab === 'teams') {
     showSnapshot(cache.teamGetAll, ['Mode', 'Team', 'Members', 'Hero/Titan names'], (data) =>

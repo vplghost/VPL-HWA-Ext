@@ -52,6 +52,58 @@
     return Number.isFinite(o) && Number.isFinite(n) && o >= n;
   }
 
+  function formatTitanArtifactLevels(titanId, titan) {
+    if (!titan || !Array.isArray(titan.artifacts) || !titan.artifacts.length) {
+      return '—';
+    }
+    return titan.artifacts.map((a) => (a && a.level != null ? a.level : 1)).join(' - ');
+  }
+
+  function isTitanArtifactUpgradable(titanId, slotIndex, titan, cache) {
+    if (!titan) return false;
+    const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
+    const artifactId = meta?.artifacts?.[slotIndex];
+    const art = titan.artifacts?.[slotIndex];
+    if (!art) return false;
+
+    const currentLevel = Number(art.level) || 1;
+    const currentStar = Number(art.star) || 0;
+    const titanLevel = Number(titan.level) || 120;
+
+    // 1. Level upgrade eligibility
+    let canLevelUp = false;
+    if (currentLevel < 120 && currentLevel < titanLevel) {
+      const nextLevel = currentLevel + 1;
+      const cost = globalThis.hwaHelperTitanArtifactLevelCosts?.[nextLevel];
+      if (cost) {
+        const [dustNeeded, goldNeeded] = cost;
+        const fairyDust = Number(cache?.inventoryGet?.data?.coin?.['18'] ?? 0);
+        const userGold = Number(
+          cache?.['resource:gold']?.value ??
+          cache?.userGetInfo?.data?.gold ??
+          cache?.inventoryGet?.data?.coin?.['1'] ??
+          Infinity
+        );
+        if (fairyDust >= dustNeeded && userGold >= goldNeeded) {
+          canLevelUp = true;
+        }
+      }
+    }
+
+    // 2. Star evolution eligibility
+    let canEvolveStar = false;
+    if (currentStar < 6 && artifactId) {
+      const nextStar = Math.max(1, currentStar + 1);
+      const fragmentsNeeded = globalThis.hwaHelperTitanArtifactEvolveCost?.[nextStar] ?? Infinity;
+      const fragmentsOwned = Number(cache?.inventoryGet?.data?.fragmentArtifact?.[String(artifactId)] ?? 0);
+      if (fragmentsOwned >= fragmentsNeeded) {
+        canEvolveStar = true;
+      }
+    }
+
+    return canLevelUp || canEvolveStar;
+  }
+
   function marchDuration(ms, precise = false) {
     if (!Number.isFinite(ms)) return '—';
     if (ms <= 0) return 'Due now';
@@ -392,8 +444,25 @@
             needed: needed
           },
           skills,
-          artifacts: Array.isArray(titan?.artifacts) ? titan.artifacts : [],
-          skins: titan?.skins || titan?.skin || null
+          artifacts: Array.isArray(titan?.artifacts) ? titan.artifacts.map((art, idx) => ({
+            slot: idx + 1,
+            type: ['weapon', 'crown', 'seal'][idx] || `artifact${idx + 1}`,
+            star: Number(art?.star) || 0,
+            level: Number(art?.level) || 0,
+            isUpgradable: isTitanArtifactUpgradable(id, idx, titan, cache)
+          })) : [],
+          skins: titan?.skins && typeof titan.skins === 'object' ? Object.entries(titan.skins)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([skinId, lvl]) => {
+              let stat = globalThis.hwaHelperSkinStats?.[skinId];
+              if (!stat || stat === 'MAIN') stat = 'HP';
+              return {
+                skinId: Number(skinId),
+                stat: stat || 'Skin',
+                level: Number(lvl),
+                isCurrent: Number(skinId) === Number(titan?.currentSkin)
+              };
+            }) : (titan?.skins || titan?.skin || null)
         });
       }
       return result;
@@ -1082,7 +1151,7 @@
     return false;
   }
 
-  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, teamRows, sortRows,
+  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, formatTitanArtifactLevels, isTitanArtifactUpgradable, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,

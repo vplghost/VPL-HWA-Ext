@@ -62,12 +62,12 @@ const skinStats = {};
 for (let i = 0; i < skinBuf.length - 15; i++) {
   if (skinBuf[i] === 0x08) {
     const [skinId, n] = readVarint(skinBuf, i + 1);
-    if (skinId > 0 && skinId < 2000 && skinBuf[n] === 0x12) {
-      for (let j = n + 1; j < Math.min(skinBuf.length - 3, n + 40); j++) {
+    if (((skinId > 0 && skinId < 2000) || (skinId >= 10000 && skinId < 20000)) && skinBuf[n] === 0x12) {
+      for (let j = n + 1; j < Math.min(skinBuf.length - 3, n + 60); j++) {
         if (skinBuf[j] === 0x1a && skinBuf[j + 2] === 0x08) {
           const statId = skinBuf[j + 3];
           if (statId > 0 && statId < 25) {
-            skinStats[skinId] = skinStatIdToAbbr[statId] || 'PA';
+            skinStats[skinId] = (skinId >= 10000 && (statId === 4 || statId === 14)) ? 'HP' : (skinStatIdToAbbr[statId] || 'PA');
             break;
           }
         }
