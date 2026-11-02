@@ -426,3 +426,101 @@ test('engine scanner discovers direct window.SendMessage function', async () => 
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.deepEqual(directCall, { o: 'Audio', m: 'Mute', p: 'true' });
 });
+
+test("refresh-rpc cleans headers, strips stale x-auth-signature, increments x-request-id, and attaches Authorization", async () => {
+  let dispatched = null;
+  const { window } = setup(async (url, opts) => {
+    if (opts?.body?.includes("mailFarm")) {
+      dispatched = { url, opts };
+    }
+    return new Response("{\"results\":[]}", { status: 200, headers: { "content-type": "application/json" } });
+  }, true, {
+    window: {
+      webglAuth: {
+        accessToken: "mock-jwt-token-xyz",
+        accountId: "999888"
+      }
+    }
+  });
+
+  // Simulate a previous game RPC request having captured headers with stale signature and request-id
+  await window.fetch("https://api.hero-wars-alliance.com/api/rpc", {
+    method: "POST",
+    headers: {
+      ":authority": "api.hero-wars-alliance.com",
+      ":method": "POST",
+      "x-auth-signature": "stale-md5-signature-abc",
+      "x-request-id": "42",
+      "x-auth-user-id": "12345",
+      "x-auth-session-id": "session-789",
+      "x-env-timestamp": "1000000000",
+      "content-length": "999"
+    },
+    body: "{\"calls\":[{\"name\":\"mobileLogin\"}]}"
+  });
+
+  // Now trigger refresh-rpc for mailFarm
+  window.postMessage({
+    source: "hwa-helper-control",
+    kind: "refresh-rpc",
+    calls: [{ name: "mailFarm", args: { letterId: 101 } }]
+  }, "https://www.hero-wars-alliance.com");
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.ok(dispatched, "Dispatched request should be captured");
+  const headers = dispatched.opts.headers;
+
+  // Stale signature must be stripped to prevent HTTP 500 Invalid signature from server
+  assert.equal(headers["x-auth-signature"], undefined);
+  assert.equal(headers[":authority"], undefined);
+  assert.equal(headers["content-length"], undefined);
+
+  // Valid session headers preserved
+  assert.equal(headers["x-auth-user-id"], "12345");
+  assert.equal(headers["x-auth-session-id"], "session-789");
+
+  // Request ID monotonically incremented above 42
+  const nextReqId = parseInt(headers["x-request-id"], 10);
+  assert.ok(nextReqId > 42, `Next request ID ${nextReqId} must be greater than 42`);
+
+  // Timestamp updated
+  assert.ok(parseInt(headers["x-env-timestamp"], 10) > 1000000000);
+
+  // Authorization Bearer token attached from window.webglAuth
+  assert.equal(headers["Authorization"], "Bearer mock-jwt-token-xyz");
+});
+
+test("unityFramework hook captures Module and SendMessage on postRun", async () => {
+  const engineMessages = [];
+  const { window } = setup(async () => new Response("ok"), true);
+  window.addEventListener("message", (ev) => {
+    if (ev.data?.source === "hwa-helper-api" && ev.data?.kind === "engine-status") {
+      engineMessages.push(ev.data.status);
+    }
+  });
+
+  // Simulate framework.js assigning unityFramework
+  let fakeSendMessageCalled = null;
+  const mockModule = {
+    postRun: [],
+    SendMessage: (o, m, p) => { fakeSendMessageCalled = { o, m, p }; }
+  };
+
+  assert.equal(typeof window.unityFramework, "undefined");
+  window.unityFramework = function (mod) {
+    return mod;
+  };
+
+  // Simulate loader.js calling unityFramework(mockModule)
+  window.unityFramework(mockModule);
+
+  // Trigger postRun callbacks
+  for (const cb of mockModule.postRun) cb();
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const postRunStatus = engineMessages.find((s) => s.reason === "instance-unityFramework-postRun");
+  assert.ok(postRunStatus, "Should receive instance-unityFramework-postRun status");
+  assert.equal(postRunStatus.ready, true);
+  assert.equal(postRunStatus.hasSendMessage, true);
+});
+

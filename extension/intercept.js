@@ -14,6 +14,58 @@
     }
   } catch (_) {}
 
+  let rpcRequestSequence = 1000;
+
+  function buildDispatchHeaders(baseHeaders) {
+    const headers = {};
+    if (baseHeaders && typeof baseHeaders === 'object') {
+      for (const [rawKey, val] of Object.entries(baseHeaders)) {
+        if (!rawKey || val === undefined || val === null) continue;
+        const key = rawKey.toLowerCase();
+        // Exclude HTTP/2 pseudo-headers
+        if (key.startsWith(':')) continue;
+        // Exclude headers that must not be carried over or are browser fetch controlled
+        if (key === 'content-length' || key === 'host' || key === 'origin' || key === 'referer') continue;
+        // CRITICAL: Strip stale signature! A signature is strictly bound to its specific payload.
+        // Sending a stale signature causes Nexters server to fail signature verification with HTTP 500.
+        if (key === 'x-auth-signature') continue;
+        // Strip request-id and timestamp as we generate fresh sequential ones
+        if (key === 'x-request-id' || key === 'x-env-timestamp') continue;
+
+        headers[rawKey] = val;
+      }
+    }
+
+    // Set standard content headers
+    headers['content-type'] = 'application/json; charset=UTF-8';
+    headers['accept'] = '*/*';
+    headers['x-requested-with'] = 'XMLHttpRequest';
+
+    // Sequence ID: must be monotonic and greater than previous request IDs
+    if (baseHeaders && (baseHeaders['x-request-id'] || baseHeaders['X-Request-Id'])) {
+      const parsed = parseInt(baseHeaders['x-request-id'] || baseHeaders['X-Request-Id'], 10);
+      if (!isNaN(parsed) && parsed >= rpcRequestSequence) {
+        rpcRequestSequence = parsed + 10;
+      }
+    }
+    rpcRequestSequence++;
+    headers['x-request-id'] = String(rpcRequestSequence);
+    headers['x-env-timestamp'] = String(Math.floor(Date.now() / 1000));
+
+    // If webglAuth accessToken is available on window, attach Authorization
+    try {
+      const auth = window.webglAuth;
+      if (auth && auth.accessToken) {
+        headers['Authorization'] = `Bearer ${auth.accessToken}`;
+        if (auth.accountId && !headers['x-auth-user-id'] && !headers['X-Auth-User-Id']) {
+          headers['x-auth-user-id'] = String(auth.accountId);
+        }
+      }
+    } catch (_) {}
+
+    return headers;
+  }
+
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
@@ -39,14 +91,35 @@
           ...(typeof c === 'object' && c.feature ? { feature: c.feature } : {})
         }))
       };
-      const headers = { 'content-type': 'application/json', ...(headersToUse || {}) };
+      const headers = buildDispatchHeaders(headersToUse);
       try {
         (window.fetch || originalFetch)(url, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
-        }).catch(() => {});
-      } catch (_) {}
+        }).then((res) => {
+          window.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'refresh-rpc-result',
+            ok: res.ok,
+            status: res.status
+          }, location.origin);
+        }).catch((err) => {
+          window.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'refresh-rpc-result',
+            ok: false,
+            error: err?.message || String(err)
+          }, location.origin);
+        });
+      } catch (err) {
+        window.postMessage({
+          source: 'hwa-helper-api',
+          kind: 'refresh-rpc-result',
+          ok: false,
+          error: err?.message || String(err)
+        }, location.origin);
+      }
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'draft-action') {
       const { action, heroes } = event.data;
@@ -68,7 +141,7 @@
           if (stored) headersToUse = JSON.parse(stored);
         } catch (_) {}
       }
-      const headers = { 'content-type': 'application/json', ...(headersToUse || {}) };
+      const headers = buildDispatchHeaders(headersToUse);
       try {
         (window.fetch || originalFetch)(lastRpcUrl, {
           method: 'POST',
@@ -282,6 +355,36 @@
         }
       });
     }
+  } catch (_) {}
+
+  try {
+    let _uf = window.unityFramework;
+    Object.defineProperty(window, 'unityFramework', {
+      configurable: true,
+      enumerable: true,
+      get: () => _uf,
+      set: (fn) => {
+        if (typeof fn === 'function' && !fn.__hwaHooked) {
+          const origFn = fn;
+          _uf = function (mod) {
+            if (mod && typeof mod === 'object') {
+              if (Array.isArray(mod.postRun)) {
+                mod.postRun.push(() => {
+                  setUnityInstance({
+                    SendMessage: typeof mod.SendMessage === 'function' ? mod.SendMessage.bind(mod) : null,
+                    Module: mod
+                  }, 'unityFramework-postRun');
+                });
+              }
+            }
+            return origFn.apply(this, arguments);
+          };
+          _uf.__hwaHooked = true;
+        } else {
+          _uf = fn;
+        }
+      }
+    });
   } catch (_) {}
 
   function watchGlobalProperty(propName) {

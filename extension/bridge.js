@@ -19,6 +19,19 @@ window.addEventListener('message', (event) => {
     } catch (_) {}
     return;
   }
+  if (event.data.kind === 'refresh-rpc-result') {
+    try {
+      chrome.storage?.local?.set?.({
+        lastRefreshRpcResult: {
+          ok: event.data.ok === true,
+          status: event.data.status || null,
+          error: event.data.error || null,
+          updatedAt: new Date().toISOString()
+        }
+      });
+    } catch (_) {}
+    return;
+  }
   if (event.data.kind !== 'api-record') return;
   if (!chrome.runtime?.id) return;
   try {

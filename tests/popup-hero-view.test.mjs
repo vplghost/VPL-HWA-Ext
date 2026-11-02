@@ -522,7 +522,7 @@ test('popup header displays extension version formatted as v.#.#.#', () => {
     document: doc,
     chrome: {
       runtime: {
-        getManifest: () => ({ version: '0.9.28' })
+        getManifest: () => ({ version: '0.9.29' })
       }
     }
   };
@@ -533,6 +533,6 @@ test('popup header displays extension version formatted as v.#.#.#', () => {
   );
   vm.runInNewContext(verSnippet, vContext);
 
-  assert.equal(versionEl.textContent, '0.9.28');
-  assert.equal(headerVersionEl.textContent, 'v.0.9.28');
+  assert.equal(versionEl.textContent, '0.9.29');
+  assert.equal(headerVersionEl.textContent, 'v.0.9.29');
 });
