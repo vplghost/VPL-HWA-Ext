@@ -85,6 +85,10 @@
       let ok = false;
       let error = null;
       try {
+        if (!activeUnityInstance || typeof activeUnityInstance.SendMessage !== 'function') {
+          const found = findActiveUnityInstance(window, typeof document !== 'undefined' ? document : null);
+          if (found) setUnityInstance(found, 'pre-send-message');
+        }
         if (activeUnityInstance && typeof activeUnityInstance.SendMessage === 'function') {
           activeUnityInstance.SendMessage(objectName, methodName, param ?? '');
           ok = true;
@@ -106,16 +110,122 @@
 
   let activeUnityInstance = null;
 
+  function findActiveUnityInstance(win = typeof window !== 'undefined' ? window : null, doc = typeof document !== 'undefined' ? document : null) {
+    if (!win) return null;
+
+    // 1. Direct window SendMessage
+    if (typeof win.SendMessage === 'function') {
+      return {
+        SendMessage: win.SendMessage.bind(win),
+        _source: 'window.SendMessage'
+      };
+    }
+
+    // 2. Candidate global objects
+    const candidateProps = [
+      'unityInstance',
+      'gameInstance',
+      'Module',
+      'unity',
+      'Unity',
+      'hwa',
+      'HWA',
+      'nexters',
+      'Nexters',
+      'app',
+      'engine',
+      'game'
+    ];
+
+    for (const prop of candidateProps) {
+      try {
+        const val = win[prop];
+        if (val && typeof val === 'object') {
+          if (typeof val.SendMessage === 'function') {
+            return val;
+          }
+          if (val.unityInstance && typeof val.unityInstance.SendMessage === 'function') {
+            return val.unityInstance;
+          }
+          if (val.instance && typeof val.instance.SendMessage === 'function') {
+            return val.instance;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Canvas element properties
+    if (doc) {
+      try {
+        const canvases = (typeof doc.querySelectorAll === 'function' ? doc.querySelectorAll('canvas#unity-canvas, canvas#canvas, canvas') : []) || [];
+        for (const canvas of canvases) {
+          if (!canvas) continue;
+          const canvasCandidates = [
+            canvas.unityInstance,
+            canvas._unityInstance,
+            canvas.gameInstance,
+            canvas._gameInstance,
+            canvas.Module
+          ];
+          for (const cand of canvasCandidates) {
+            if (cand && typeof cand === 'object' && typeof cand.SendMessage === 'function') {
+              return cand;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 4. Sweep window properties for anything with SendMessage
+    try {
+      const props = Object.getOwnPropertyNames(win);
+      for (const prop of props) {
+        if (/unity|game|hwa|nexter|module|engine/i.test(prop)) {
+          try {
+            const val = win[prop];
+            if (val && typeof val === 'object' && typeof val.SendMessage === 'function') {
+              return val;
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    // 5. Fallback: check if unityInstance or gameInstance exists as an object without SendMessage
+    try {
+      if (win.unityInstance && typeof win.unityInstance === 'object') return win.unityInstance;
+      if (win.gameInstance && typeof win.gameInstance === 'object') return win.gameInstance;
+    } catch (_) {}
+
+    return null;
+  }
+
   function reportEngineStatus(reason = 'check') {
     try {
+      if (!activeUnityInstance || typeof activeUnityInstance.SendMessage !== 'function') {
+        const candidate = findActiveUnityInstance(window, typeof document !== 'undefined' ? document : null);
+        if (candidate) {
+          setUnityInstance(candidate, `scanner-${reason}`);
+        }
+      }
+
       const hasSendMessage = typeof activeUnityInstance?.SendMessage === 'function';
-      const hasCanvas = typeof document !== 'undefined' && Boolean(document.querySelector('canvas#unity-canvas, canvas#canvas, canvas'));
+      const hasCanvas = typeof document !== 'undefined' && typeof document.querySelector === 'function' && Boolean(document.querySelector('canvas#unity-canvas, canvas#canvas, canvas'));
+
+      let detectedGlobals = [];
+      try {
+        detectedGlobals = Object.getOwnPropertyNames(window).filter((k) =>
+          /unity|game|hwa|nexter|launch|module/i.test(k)
+        ).slice(0, 20);
+      } catch (_) {}
+
       const status = {
         ready: Boolean(activeUnityInstance),
         hasSendMessage,
         hasCanvas,
         hasRpcHeaders: Boolean(lastRpcHeaders && Object.keys(lastRpcHeaders).length > 0),
         rpcUrlAvailable: Boolean(lastRpcUrl),
+        detectedGlobals,
         updatedAt: new Date().toISOString(),
         reason
       };
@@ -128,7 +238,11 @@
   }
 
   function setUnityInstance(instance, source = 'detected') {
-    if (!instance || activeUnityInstance === instance) return;
+    if (!instance) return;
+    if (activeUnityInstance === instance) return;
+    if (activeUnityInstance && typeof activeUnityInstance.SendMessage === 'function' && typeof instance.SendMessage !== 'function') {
+      return;
+    }
     activeUnityInstance = instance;
     window.__hwaUnityInstance = instance;
     reportEngineStatus(`instance-${source}`);
@@ -144,6 +258,9 @@
           setUnityInstance(instance, 'createUnityInstance-resolve');
           return instance;
         });
+      }
+      if (res && typeof res === 'object') {
+        setUnityInstance(res, 'createUnityInstance-return');
       }
       return res;
     };
@@ -170,14 +287,24 @@
   function watchGlobalProperty(propName) {
     try {
       let val = window[propName];
-      if (val && typeof val === 'object') setUnityInstance(val, `existing-${propName}`);
+      if (val) {
+        if (typeof val === 'function' && propName === 'SendMessage') {
+          setUnityInstance({ SendMessage: val.bind(window), _source: 'window.SendMessage' }, 'existing-SendMessage');
+        } else if (typeof val === 'object') {
+          setUnityInstance(val, `existing-${propName}`);
+        }
+      }
       Object.defineProperty(window, propName, {
         configurable: true,
         enumerable: true,
         get: () => val,
         set: (newVal) => {
           val = newVal;
-          if (newVal && typeof newVal === 'object') setUnityInstance(newVal, `set-${propName}`);
+          if (typeof newVal === 'function' && propName === 'SendMessage') {
+            setUnityInstance({ SendMessage: newVal.bind(window), _source: 'window.SendMessage' }, 'set-SendMessage');
+          } else if (newVal && typeof newVal === 'object') {
+            setUnityInstance(newVal, `set-${propName}`);
+          }
         }
       });
     } catch (_) {}
@@ -185,6 +312,32 @@
 
   watchGlobalProperty('unityInstance');
   watchGlobalProperty('gameInstance');
+  watchGlobalProperty('Module');
+  watchGlobalProperty('SendMessage');
+
+  if (typeof setInterval === 'function') {
+    let pollAttempts = 0;
+    const pollInterval = setInterval(() => {
+      pollAttempts++;
+      try {
+        if (typeof window.createUnityInstance === 'function' && !window.createUnityInstance.__hwaHooked) {
+          window.createUnityInstance = hookCreateUnityInstance(window.createUnityInstance);
+        }
+        if (!activeUnityInstance || typeof activeUnityInstance.SendMessage !== 'function') {
+          const candidate = findActiveUnityInstance(window, typeof document !== 'undefined' ? document : null);
+          if (candidate) {
+            setUnityInstance(candidate, 'startup-poll');
+          }
+        }
+      } catch (_) {}
+      if (pollAttempts >= 50 || (activeUnityInstance && typeof activeUnityInstance.SendMessage === 'function')) {
+        clearInterval(pollInterval);
+      }
+    }, 200);
+    if (pollInterval && typeof pollInterval.unref === 'function') {
+      pollInterval.unref();
+    }
+  }
 
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {

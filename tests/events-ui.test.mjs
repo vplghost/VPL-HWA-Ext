@@ -1069,6 +1069,19 @@ test('header mail badge, heroes/titans soul evolve badges, and config refresh bu
   assert.ok(engineSendMessage.textContent.includes('Available'));
   assert.ok(engineRpcHeaders.textContent.includes('Active'));
 
+  // Test RPC Bridge active mode when WebGL SendMessage is not exposed
+  context.renderEngineStatus({ ready: false, hasCanvas: true, hasRpcHeaders: true, hasSendMessage: false });
+  assert.equal(engineStatusBadge.textContent, 'Active (RPC Bridge)');
+  assert.equal(engineUnityInstance.textContent, 'Game Canvas Active (RPC Auth Connected)');
+  assert.equal(engineSendMessage.textContent, 'Not exposed by WebGL (RPC Dispatch active)');
+  assert.equal(engineRpcHeaders.textContent, 'Active (Auth headers captured)');
+
+  // Test Canvas detected waiting for RPC
+  context.renderEngineStatus({ ready: false, hasCanvas: true, hasRpcHeaders: false, hasSendMessage: false });
+  assert.equal(engineStatusBadge.textContent, 'Canvas Ready');
+  assert.equal(engineUnityInstance.textContent, 'Canvas detected, awaiting RPC traffic...');
+  assert.equal(engineSendMessage.textContent, 'Checking...');
+
   btnPingEngine.dispatch('click');
   assert.ok(sentMessage);
   assert.equal(sentMessage.kind, 'engine-ping');

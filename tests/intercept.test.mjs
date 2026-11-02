@@ -6,7 +6,7 @@ import { runInNewContext } from 'node:vm';
 const source = await readFile(new URL('../extension/intercept.js', import.meta.url), 'utf8');
 const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
 
-function setup(fetchImplementation, enable = true) {
+function setup(fetchImplementation, enable = true, extraContext = {}) {
   const messages = [];
   const listeners = [];
   let now = 0;
@@ -39,13 +39,17 @@ function setup(fetchImplementation, enable = true) {
     postMessage: (data, targetOrigin) => {
       if (data.kind === 'api-record') messages.push({ data, targetOrigin });
       for (const handler of listeners) handler({ source: window, origin: targetOrigin, data });
-    }
+    },
+    ...extraContext.window
   };
-  runInNewContext(`${filterSource}\n${source}`, {
+  const context = {
     window, URL, Date, Promise, Symbol, WeakMap, TextDecoder, URLSearchParams, FormData, Blob, sessionStorage,
     location: { href: 'https://www.hero-wars-alliance.com/', origin: 'https://www.hero-wars-alliance.com' },
-    performance: { now: () => ++now }
-  });
+    performance: { now: () => ++now },
+    ...extraContext
+  };
+  context.window = window;
+  runInNewContext(`${filterSource}\n${source}`, context);
   if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true },
     'https://www.hero-wars-alliance.com');
   return { window, messages, sessionStorage };
@@ -313,4 +317,112 @@ test('property setter for unityInstance captures instance and responds to engine
   assert.ok(pingStatus);
   assert.equal(pingStatus.ready, true);
   assert.equal(pingStatus.hasSendMessage, true);
+});
+
+test('engine scanner discovers SendMessage on window.Module and executes calls', async () => {
+  const engineMessages = [];
+  const fakeModule = {
+    lastCall: null,
+    SendMessage: (obj, method, param) => { fakeModule.lastCall = { obj, method, param }; }
+  };
+  const { window } = setup(async () => new Response('ok'), true, {
+    window: { Module: fakeModule }
+  });
+  window.addEventListener('message', (ev) => {
+    if (ev.data?.source === 'hwa-helper-api' && ev.data?.kind === 'engine-status') {
+      engineMessages.push(ev.data.status);
+    }
+  });
+
+  window.postMessage({
+    source: 'hwa-helper-control',
+    kind: 'engine-ping'
+  }, 'https://www.hero-wars-alliance.com');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const pingStatus = engineMessages.find((s) => s.reason === 'ping');
+  assert.ok(pingStatus);
+  assert.equal(pingStatus.ready, true);
+  assert.equal(pingStatus.hasSendMessage, true);
+  assert.ok(Array.isArray(pingStatus.detectedGlobals));
+  assert.ok(pingStatus.detectedGlobals.includes('Module'));
+
+  window.postMessage({
+    source: 'hwa-helper-control',
+    kind: 'engine-send-message',
+    objectName: 'UI',
+    methodName: 'ClaimMail',
+    param: 'all'
+  }, 'https://www.hero-wars-alliance.com');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(fakeModule.lastCall, { obj: 'UI', method: 'ClaimMail', param: 'all' });
+});
+
+test('engine scanner discovers unity instance attached to canvas element', async () => {
+  const engineMessages = [];
+  const canvasInstance = {
+    SendMessage: (o, m, p) => {}
+  };
+  const fakeDoc = {
+    querySelector: (sel) => ({ id: 'canvas' }),
+    querySelectorAll: (sel) => (sel.includes('canvas') ? [{ _unityInstance: canvasInstance }] : [])
+  };
+  const { window } = setup(async () => new Response('ok'), true, {
+    document: fakeDoc
+  });
+  window.addEventListener('message', (ev) => {
+    if (ev.data?.source === 'hwa-helper-api' && ev.data?.kind === 'engine-status') {
+      engineMessages.push(ev.data.status);
+    }
+  });
+
+  window.postMessage({
+    source: 'hwa-helper-control',
+    kind: 'engine-ping'
+  }, 'https://www.hero-wars-alliance.com');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const pingStatus = engineMessages.find((s) => s.reason === 'ping');
+  assert.ok(pingStatus);
+  assert.equal(pingStatus.ready, true);
+  assert.equal(pingStatus.hasSendMessage, true);
+  assert.equal(pingStatus.hasCanvas, true);
+});
+
+test('engine scanner discovers direct window.SendMessage function', async () => {
+  const engineMessages = [];
+  let directCall = null;
+  const { window } = setup(async () => new Response('ok'), true, {
+    window: {
+      SendMessage: (o, m, p) => { directCall = { o, m, p }; }
+    }
+  });
+  window.addEventListener('message', (ev) => {
+    if (ev.data?.source === 'hwa-helper-api' && ev.data?.kind === 'engine-status') {
+      engineMessages.push(ev.data.status);
+    }
+  });
+
+  window.postMessage({
+    source: 'hwa-helper-control',
+    kind: 'engine-ping'
+  }, 'https://www.hero-wars-alliance.com');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const pingStatus = engineMessages.find((s) => s.reason === 'ping');
+  assert.ok(pingStatus);
+  assert.equal(pingStatus.ready, true);
+  assert.equal(pingStatus.hasSendMessage, true);
+
+  window.postMessage({
+    source: 'hwa-helper-control',
+    kind: 'engine-send-message',
+    objectName: 'Audio',
+    methodName: 'Mute',
+    param: 'true'
+  }, 'https://www.hero-wars-alliance.com');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(directCall, { o: 'Audio', m: 'Mute', p: 'true' });
 });

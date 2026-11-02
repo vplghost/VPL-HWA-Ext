@@ -4221,10 +4221,15 @@ function renderEngineStatus(status) {
     badgeEl.className = 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800';
     instanceEl.textContent = 'Active (In-Page WebGL)';
     instanceEl.className = 'font-medium text-emerald-700';
+  } else if (status.hasCanvas && status.hasRpcHeaders) {
+    badgeEl.textContent = 'Active (RPC Bridge)';
+    badgeEl.className = 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800';
+    instanceEl.textContent = 'Game Canvas Active (RPC Auth Connected)';
+    instanceEl.className = 'font-medium text-emerald-700';
   } else if (status.hasCanvas) {
     badgeEl.textContent = 'Canvas Ready';
     badgeEl.className = 'rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800';
-    instanceEl.textContent = 'Canvas detected, initializing...';
+    instanceEl.textContent = 'Canvas detected, awaiting RPC traffic...';
     instanceEl.className = 'font-medium text-blue-700';
   } else {
     badgeEl.textContent = 'Waiting';
@@ -4236,16 +4241,25 @@ function renderEngineStatus(status) {
   if (status.hasSendMessage) {
     sendMsgEl.textContent = 'Available (unityInstance.SendMessage)';
     sendMsgEl.className = 'font-medium text-emerald-700';
+  } else if (status.ready) {
+    sendMsgEl.textContent = 'Not exposed by WebGL build';
+    sendMsgEl.className = 'font-medium text-slate-500';
+  } else if (status.hasCanvas && status.hasRpcHeaders) {
+    sendMsgEl.textContent = 'Not exposed by WebGL (RPC Dispatch active)';
+    sendMsgEl.className = 'font-medium text-slate-500';
   } else {
-    sendMsgEl.textContent = status.ready ? 'Not exposed by engine' : 'Checking...';
+    sendMsgEl.textContent = status.hasCanvas ? 'Checking...' : 'Standby';
     sendMsgEl.className = 'font-medium text-slate-500';
   }
 
   if (status.hasRpcHeaders) {
     rpcHeadersEl.textContent = 'Active (Auth headers captured)';
     rpcHeadersEl.className = 'font-medium text-emerald-700';
+  } else if (status.rpcUrlAvailable) {
+    rpcHeadersEl.textContent = 'RPC URL detected (needs refresh)';
+    rpcHeadersEl.className = 'font-medium text-amber-600';
   } else {
-    rpcHeadersEl.textContent = status.rpcUrlAvailable ? 'RPC URL detected (needs refresh)' : 'None detected (reload game tab)';
+    rpcHeadersEl.textContent = 'None detected (reload game tab)';
     rpcHeadersEl.className = 'font-medium text-slate-500';
   }
 }
