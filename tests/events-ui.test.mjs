@@ -163,11 +163,15 @@ const dungeonModalClose = new MockElement('button');
 dungeonModalClose.setAttribute('id', 'dungeon-modal-close');
 const dungeonFloorBadge = new MockElement('span');
 dungeonFloorBadge.setAttribute('id', 'dungeon-floor-badge');
+const tableExportBtn = new MockElement('button');
+tableExportBtn.setAttribute('id', 'table-export-btn');
+tableExportBtn.hidden = true;
 
 const mockDoc = {
   createElement: (tag) => new MockElement(tag),
   createElementNS: (_, tag) => new MockElement(tag),
   elementsById: new Map([
+    ['table-export-btn', tableExportBtn],
     ['view', view],
     ['status', status],
     ['search', search],
@@ -246,6 +250,15 @@ vm.runInContext(popupJs.slice(eventsStart, eventsEnd), context);
 const refreshStart = popupJs.indexOf('function refreshTimed(');
 const refreshEnd = popupJs.indexOf('function renderResources(');
 vm.runInContext(popupJs.slice(refreshStart, refreshEnd), context);
+
+// Extract showSnapshot
+const snapStart = popupJs.indexOf('function showSnapshot(');
+const snapEnd = popupJs.indexOf('function renderLog(');
+context.tableExportBtn = tableExportBtn;
+context.formatTime = (t) => t;
+context.matches = () => true;
+context.table = () => new MockElement('table');
+vm.runInContext(popupJs.slice(snapStart, snapEnd), context);
 
 test('renderEvents renders Guild Versus and active event cards', () => {
   const cache = {
@@ -551,4 +564,22 @@ test('openDungeonModal populates overview, elements, doors, and titan states', (
   assert.ok(text.includes('0 / 795,326 (0%)'));
   assert.ok(text.includes('1,000 / 1,000 (100%)'));
   assert.ok(text.includes('Fallen'));
+});
+
+test('tableExportBtn is visible for snapshot tables with rows and hidden otherwise', () => {
+  tableExportBtn.hidden = true;
+  const snapshotData = {
+    updatedAt: '2026-11-02T06:00:00.000Z',
+    data: {
+      '1': { name: 'Aurora', star: 3 },
+      '2': { name: 'Galahad', star: 4 }
+    }
+  };
+  context.showSnapshot(snapshotData, ['ID', 'Name'], (data) =>
+    Object.entries(data).map(([id, h]) => [id, h.name]));
+  assert.equal(tableExportBtn.hidden, false, 'tableExportBtn should be visible when rows exist');
+
+  // Empty data hides button
+  context.showSnapshot(null, ['ID', 'Name'], () => []);
+  assert.equal(tableExportBtn.hidden, true, 'tableExportBtn should be hidden when no data');
 });

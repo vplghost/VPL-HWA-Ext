@@ -882,12 +882,14 @@ function matches(values) {
 
 function showSnapshot(entry, headings, makeRows) {
   if (!entry?.data) {
+    if (tableExportBtn) tableExportBtn.hidden = true;
     status.textContent = 'No cached data yet. Use the game to observe RPCs.';
     showEmpty('No matching RPC observed yet.');
     return;
   }
   const rows = makeRows(entry.data).filter(matches);
   status.textContent = `${rows.length} rows · Updated ${formatTime(entry.updatedAt)}`;
+  if (tableExportBtn) tableExportBtn.hidden = !rows.length;
   if (rows.length) view.append(table(headings, rows));
   else showEmpty('No rows match the filter.');
 }
@@ -2100,8 +2102,9 @@ function openDungeonModal(dungeonStatus) {
           const name = meta?.name || `Titan ${titanId}`;
           const starStr = unit.star ? '★'.repeat(unit.star) : '';
           const unitTag = document.createElement('span');
-          unitTag.className = 'inline-flex items-center gap-1 rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700';
-          unitTag.textContent = `${name} (Lv.${unit.level || '?'}${starStr ? ` ${starStr}` : ''})`;
+          unitTag.className = 'inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 shadow-2xs';
+          const avatarImg = `<img src="assets/titans/${titanId}.png" class="size-4 rounded-full object-cover shrink-0 border border-slate-200" onerror="this.style.display='none'">`;
+          unitTag.innerHTML = `${avatarImg}<span>${name}</span> <span class="text-slate-400 font-normal">(Lv.${unit.level || '?'}${starStr ? ` ${starStr}` : ''})</span>`;
           teamBox.append(unitTag);
         }
         doorCard.append(teamBox);
@@ -2112,6 +2115,11 @@ function openDungeonModal(dungeonStatus) {
 
     doorsSec.append(doorsGrid);
     body.append(doorsSec);
+  } else {
+    const emptyDoors = document.createElement('div');
+    emptyDoors.className = 'rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400';
+    emptyDoors.textContent = 'Floor doors will update when a new dungeon floor is unlocked in game.';
+    body.append(emptyDoors);
   }
 
   // --- SECTION 4: TITANS HEALTH & ENERGY STATUS ---
@@ -2144,11 +2152,15 @@ function openDungeonModal(dungeonStatus) {
       const row = document.createElement('div');
       row.className = `rounded-xl border p-3 ${isDead ? 'border-rose-200 bg-rose-50/40 opacity-70' : 'border-slate-200 bg-slate-50/50'}`;
 
+      const avatarImg = `<img src="assets/titans/${tId}.png" class="size-8 rounded-full object-cover shrink-0 border border-slate-200" onerror="this.style.display='none'">`;
       row.innerHTML = `
         <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-1.5 min-w-0">
-            <span class="font-bold text-xs sm:text-sm text-slate-900 truncate">${name}</span>
-            ${elem ? `<span class="rounded bg-slate-200 px-1.5 py-0.2 text-[10px] font-semibold text-slate-600">${elem}</span>` : ''}
+          <div class="flex items-center gap-2 min-w-0">
+            ${avatarImg}
+            <div class="min-w-0">
+              <div class="font-bold text-xs sm:text-sm text-slate-900 truncate">${name}</div>
+              ${elem ? `<span class="rounded bg-slate-200 px-1.5 py-0.2 text-[10px] font-semibold text-slate-600">${elem}</span>` : ''}
+            </div>
           </div>
           <span class="rounded-full px-2 py-0.5 text-[10px] font-bold ${isDead ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}">
             ${isDead ? 'Fallen' : 'Alive'}
@@ -2181,6 +2193,11 @@ function openDungeonModal(dungeonStatus) {
 
     titansSec.append(titansList);
     body.append(titansSec);
+  } else {
+    const emptyTitans = document.createElement('div');
+    emptyTitans.className = 'rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400';
+    emptyTitans.textContent = 'Deployed titan health and energy will update during dungeon battles.';
+    body.append(emptyTitans);
   }
 
   modal.hidden = false;
@@ -2728,6 +2745,9 @@ async function render() {
   document.querySelector('#settings-panel').hidden = activeTab !== 'config';
   view.hidden = activeTab === 'config';
   document.querySelector('#export').hidden = activeTab !== 'log';
+  if (tableExportBtn && !['heroes', 'titans', 'items', 'resources', 'teams', 'other'].includes(activeTab)) {
+    tableExportBtn.hidden = true;
+  }
   document.querySelector('#clear').hidden = activeTab !== 'log';
   document.querySelector('#item-group-filter').hidden = activeTab !== 'items';
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
