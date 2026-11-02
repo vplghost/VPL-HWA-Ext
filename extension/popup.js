@@ -1029,11 +1029,8 @@ function renderDraft(cache) {
     (draft.attackHeroes?.length === 5 || (isMatchCompleted && localDraftAttackPicks.filter(Boolean).length === 5)) :
     (draft.defenceHeroes?.length === 5 || (isMatchCompleted && localDraftDefencePicks.filter(Boolean).length === 5));
 
-  // ONLY display 15 pick slots when actively drafting this stage!
-  const isActivelyDrafting = !isModeLocked && (
-    (!isViewingAttack && isDefenseStage) ||
-    (isViewingAttack && isAttackStage)
-  );
+  // Display 15 pick slots when drafting is active for this phase
+  const isActivelyDrafting = !isModeLocked && (draft.matchId || isDefenseStage || isAttackStage) && !isMatchCompleted;
 
   if (activeDraftStep < 0 || activeDraftStep > 4) {
     activeDraftStep = globalThis.hwaHelperPopupData.getDraftActiveStep(currentPicks);
@@ -1395,7 +1392,7 @@ function renderDraft(cache) {
   container.append(teamSection);
 
   // 5. Full 15-Hero Draft Grid (5 Columns x 3 Rows)
-  // ONLY SHOWN WHEN ACTIVELY DRAFTING!
+  // Rendered for both Defense Draft and Attack Draft phases alongside the lineup selection
   if (isActivelyDrafting) {
     const candidatesMode = isViewingAttack ? 'attack' : 'defense';
     const currentCandidates = draftStepCandidates[candidatesMode] ||
@@ -2807,12 +2804,62 @@ function setupDungeonModal() {
   });
 }
 
-function renderGuildChat(cache) {
-  const chatData = cache.guildChat?.data;
+function renderConfigOther(cache) {
+  const container = document.querySelector('#config-other-list');
+  const countBadge = document.querySelector('#config-other-count');
+  if (!container) return;
+  container.replaceChildren();
+
+  const entries = Object.values(cache || {}).filter((entry) =>
+    !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
+      'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
+      'accountStatus', 'buildingStatus', 'marchStatus',
+      'researchStatus', 'productionConfigStatus', 'productionStatus',
+      'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents',
+      'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry?.key)
+    && !entry?.key?.startsWith('resource:'));
+
+  if (countBadge) countBadge.textContent = `${entries.length} snapshot${entries.length === 1 ? '' : 's'}`;
+
+  if (!entries.length) {
+    const empty = document.createElement('p');
+    empty.className = 'text-xs text-slate-400 italic py-2';
+    empty.textContent = 'No other snapshots observed yet.';
+    container.append(empty);
+    return;
+  }
+
+  for (const entry of entries) {
+    const details = document.createElement('details');
+    details.className = 'rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs transition-colors';
+    const summary = document.createElement('summary');
+    summary.className = 'cursor-pointer font-medium text-slate-800 flex items-center justify-between select-none';
+    const sizeStr = Array.isArray(entry.data) ? `${entry.data.length} elements` : `${Object.keys(entry.data ?? {}).length} keys`;
+    summary.innerHTML = `<span class="font-bold text-blue-700">${entry.method || entry.key}</span> <span class="text-slate-500 text-[11px]">${entry.feature || entry.group || 'data'} • ${sizeStr}</span>`;
+    details.append(summary);
+
+    details.addEventListener('toggle', () => {
+      if (!details.open || details.querySelector('pre')) return;
+      const body = document.createElement('pre');
+      body.className = 'mt-2 max-h-44 overflow-auto rounded bg-white border border-slate-200 p-2 whitespace-pre-wrap break-all text-[11px] text-slate-800';
+      body.textContent = JSON.stringify(entry.data, null, 2);
+      details.append(body);
+    });
+    container.append(details);
+  }
+}
+
+let chatVisibleCount = 15;
+let chatScrollListenerAttached = false;
+
+function renderGuildChat(cache, keepScroll = false) {
+  const visibleLimit = (typeof chatVisibleCount !== 'undefined') ? chatVisibleCount : (renderGuildChat.visibleCount || 15);
+  renderGuildChat.visibleCount = visibleLimit;
+  const chatData = cache?.guildChat?.data;
   const messages = Array.isArray(chatData?.messages) ? chatData.messages : [];
   const users = chatData?.users || {};
 
-  const query = search.value.trim().toLowerCase();
+  const query = (typeof search !== 'undefined' && search?.value) ? search.value.trim().toLowerCase() : '';
   const filtered = messages.filter((m) => {
     if (!query) return true;
     const text = (m.data?.text || '').toLowerCase();
@@ -2820,21 +2867,54 @@ function renderGuildChat(cache) {
     return text.includes(query) || sender.includes(query);
   });
 
-  status.textContent = `${filtered.length} guild message${filtered.length === 1 ? '' : 's'}`;
+  const chatMessagesEl = document.querySelector?.('#guild-chat-messages');
+  const chatCountEl = document.querySelector?.('#guild-chat-count');
+  const chatBadgeEl = document.querySelector?.('#guild-chat-badge');
+
+  if (chatCountEl) chatCountEl.textContent = String(filtered.length);
+  if (chatBadgeEl) {
+    chatBadgeEl.hidden = filtered.length === 0;
+    chatBadgeEl.textContent = filtered.length > 99 ? '99+' : String(filtered.length);
+  }
+
+  const targetEl = chatMessagesEl || view;
+  if (!targetEl) return;
+
+  if (typeof status !== 'undefined' && status) {
+    status.textContent = `${filtered.length} guild message${filtered.length === 1 ? '' : 's'}`;
+  }
 
   if (!filtered.length) {
-    if (messages.length > 0 && query) {
-      showEmpty(`No guild messages matching "${search.value}".`);
-    } else {
-      showEmpty('No guild chat messages observed yet. Open Guild Chat in game to sync.');
+    targetEl.replaceChildren();
+    const emptyP = document.createElement('p');
+    emptyP.className = 'text-xs text-slate-400 italic p-3 text-center';
+    emptyP.textContent = (messages.length > 0 && query)
+      ? `No guild messages matching "${query}".`
+      : 'No guild chat messages observed yet. Open Guild Chat in game to sync.';
+    targetEl.append(emptyP);
+    if (targetEl !== view && typeof view !== 'undefined' && view) {
+      view.replaceChildren();
+      const p = document.createElement('p');
+      p.className = 'text-xs text-slate-400 italic p-3 text-center';
+      p.textContent = emptyP.textContent;
+      view.append(p);
     }
     return;
   }
 
-  const container = document.createElement('div');
-  container.className = 'p-3 space-y-2.5';
+  const startIdx = Math.max(0, filtered.length - visibleLimit);
+  const visibleMessages = filtered.slice(startIdx);
 
-  for (const m of filtered) {
+  targetEl.replaceChildren();
+
+  if (startIdx > 0) {
+    const moreNotice = document.createElement('div');
+    moreNotice.className = 'text-center text-[10px] text-slate-400 py-1 select-none';
+    moreNotice.textContent = `↑ Scroll up for older messages (${startIdx} more)`;
+    targetEl.append(moreNotice);
+  }
+
+  for (const m of visibleMessages) {
     const user = users[m.userId] || {};
     const senderName = user.name || (m.userId === '0' ? 'System' : `User #${m.userId}`);
     const isAnnouncement = m.chatType === 'announcement';
@@ -2846,18 +2926,18 @@ function renderGuildChat(cache) {
       : '—';
 
     const card = document.createElement('div');
-    card.className = `rounded-xl border p-3 transition-colors ${
+    card.className = `rounded-xl border p-2.5 transition-colors text-xs ${
       isAnnouncement
-        ? 'border-amber-300 bg-amber-50/70 shadow-xs'
-        : 'border-slate-200 bg-white hover:border-slate-300 shadow-xs'
+        ? 'border-amber-300 bg-amber-50/70 shadow-2xs'
+        : 'border-slate-200 bg-white hover:border-slate-300 shadow-2xs'
     }`;
 
     const header = document.createElement('div');
-    header.className = 'flex items-center gap-2 flex-wrap text-xs';
+    header.className = 'flex items-center gap-1.5 flex-wrap text-xs';
 
     const initial = (senderName[0] || '?').toUpperCase();
     const avatarBadge = document.createElement('span');
-    avatarBadge.className = `size-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+    avatarBadge.className = `size-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
       isAnnouncement
         ? 'bg-amber-600 text-white'
         : roleInfo.label === 'Leader'
@@ -2869,36 +2949,64 @@ function renderGuildChat(cache) {
     avatarBadge.textContent = initial;
 
     const nameSpan = document.createElement('span');
-    nameSpan.className = 'font-semibold text-slate-900';
+    nameSpan.className = 'font-semibold text-slate-900 truncate max-w-[120px]';
     nameSpan.textContent = senderName;
 
-    const levelBadge = document.createElement('span');
-    levelBadge.className = 'rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 tabular-nums';
-    levelBadge.textContent = user.level ? `Lv.${user.level}` : '';
-
     const roleBadge = document.createElement('span');
-    roleBadge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+    roleBadge.className = `rounded px-1.5 py-0.2 text-[9px] font-semibold ${
       isAnnouncement ? 'bg-amber-200 text-amber-900 ring-1 ring-amber-400' : roleInfo.badgeClass
     }`;
     roleBadge.textContent = isAnnouncement ? 'Announcement' : roleInfo.label;
 
     const timeSpan = document.createElement('span');
-    timeSpan.className = 'ml-auto text-[11px] text-slate-400 tabular-nums';
+    timeSpan.className = 'ml-auto text-[10px] text-slate-400 tabular-nums';
     timeSpan.textContent = timeText;
 
     header.append(avatarBadge, nameSpan);
-    if (user.level) header.append(levelBadge);
+    if (user.level) {
+      const levelBadge = document.createElement('span');
+      levelBadge.className = 'rounded bg-slate-100 px-1 py-0.2 text-[9px] font-medium text-slate-600 tabular-nums';
+      levelBadge.textContent = `Lv.${user.level}`;
+      header.append(levelBadge);
+    }
     header.append(roleBadge, timeSpan);
 
     const body = document.createElement('div');
-    body.className = 'mt-1.5 text-xs text-slate-800 break-words whitespace-pre-wrap select-text pl-8';
+    body.className = 'mt-1 text-xs text-slate-800 break-words whitespace-pre-wrap select-text pl-6.5';
     body.textContent = m.data?.text || '—';
 
     card.append(header, body);
-    container.append(card);
+    targetEl.append(card);
   }
 
-  view.append(container);
+  // Also mirror into view if targetEl is chatMessagesEl and view is present
+  if (targetEl !== view && typeof view !== 'undefined' && view) {
+    view.replaceChildren();
+    for (const child of targetEl.children) {
+      view.append(child.cloneNode ? child.cloneNode(true) : child);
+    }
+  }
+
+  if (!keepScroll && targetEl.scrollTop !== undefined) {
+    targetEl.scrollTop = targetEl.scrollHeight;
+  }
+
+  const isListenerAttached = (typeof chatScrollListenerAttached !== 'undefined') ? chatScrollListenerAttached : renderGuildChat.listenerAttached;
+  if (chatMessagesEl && !isListenerAttached) {
+    if (typeof chatScrollListenerAttached !== 'undefined') chatScrollListenerAttached = true;
+    renderGuildChat.listenerAttached = true;
+    chatMessagesEl.addEventListener('scroll', () => {
+      const currentLimit = (typeof chatVisibleCount !== 'undefined') ? chatVisibleCount : (renderGuildChat.visibleCount || 15);
+      if (chatMessagesEl.scrollTop < 25 && currentLimit < filtered.length) {
+        const oldHeight = chatMessagesEl.scrollHeight;
+        const newLimit = Math.min(filtered.length, currentLimit + 15);
+        renderGuildChat.visibleCount = newLimit;
+        if (typeof chatVisibleCount !== 'undefined') chatVisibleCount = newLimit;
+        renderGuildChat(currentCache, true);
+        chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight - oldHeight;
+      }
+    });
+  }
 }
 
 async function render() {
@@ -2994,6 +3102,7 @@ async function render() {
 
   if (activeTab === 'config') {
     status.textContent = 'Settings and data stored in this browser.';
+    renderConfigOther(cache);
   } else if (activeTab === 'draft') {
     renderDraft(cache);
   } else if (activeTab === 'heroes') {
@@ -3161,3 +3270,22 @@ render().then(async () => {
 setupGuildVersusModal();
 setupDungeonModal();
 setInterval(refreshTimed, 1000);
+
+
+// Setup Guild Chat FAB and Panel
+const chatFab = document.querySelector('#guild-chat-fab');
+const chatPanel = document.querySelector('#guild-chat-panel');
+const chatClose = document.querySelector('#guild-chat-close');
+if (chatFab && chatPanel) {
+  chatFab.addEventListener('click', () => {
+    chatPanel.hidden = !chatPanel.hidden;
+    if (!chatPanel.hidden) {
+      renderGuildChat(currentCache);
+    }
+  });
+}
+if (chatClose && chatPanel) {
+  chatClose.addEventListener('click', () => {
+    chatPanel.hidden = true;
+  });
+}

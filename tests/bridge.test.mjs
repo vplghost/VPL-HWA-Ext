@@ -79,7 +79,14 @@ test('bridge injects helper button when document is available and sends open-tab
   assert.ok(btn, 'Button should be injected');
   assert.equal(btn.attributes['aria-label'], 'Open HWA Helper in new tab');
   btn.click();
-  assert.equal(sentMessages[0]?.kind, 'open-tab');
+  assert.ok(sentMessages.some((m) => m.kind === 'open-tab'));
+
+  const recordBtn = elements.get('hwa-record-btn');
+  assert.ok(recordBtn, 'Record button should be injected');
+  const exportBtn = elements.get('hwa-export-btn');
+  assert.ok(exportBtn, 'Export button should be injected');
+  const clearBtn = elements.get('hwa-clear-btn');
+  assert.ok(clearBtn, 'Clear button should be injected');
 });
 
 test('bridge helper button click safely handles extension context invalidated error', async () => {

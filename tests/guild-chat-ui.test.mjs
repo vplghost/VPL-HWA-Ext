@@ -21,6 +21,11 @@ class MockElement {
     this._textContent = String(val);
     this.children = [];
   }
+  get innerHTML() { return this._innerHTML || ''; }
+  set innerHTML(val) {
+    this._innerHTML = String(val);
+    this._textContent = String(val).replace(/<[^>]*>/g, '');
+  }
   append(...nodes) {
     for (const node of nodes) {
       if (typeof node === 'string') {
@@ -44,9 +49,17 @@ class MockElement {
   }
 }
 
+const otherList = new MockElement('div');
+const otherCount = new MockElement('span');
+
 const mockDoc = {
   createElement: (tag) => new MockElement(tag),
-  createElementNS: (_, tag) => new MockElement(tag)
+  createElementNS: (_, tag) => new MockElement(tag),
+  querySelector: (sel) => {
+    if (sel === '#config-other-list') return otherList;
+    if (sel === '#config-other-count') return otherCount;
+    return null;
+  }
 };
 
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
@@ -71,8 +84,8 @@ const context = {
 
 vm.runInNewContext(popupDataJs, context);
 
-// Extract renderGuildChat function
-const startIdx = popupJs.indexOf('function renderGuildChat(');
+// Extract renderConfigOther and renderGuildChat functions
+const startIdx = popupJs.indexOf('function renderConfigOther(');
 const endIdx = popupJs.indexOf('async function render()');
 const chatCode = popupJs.slice(startIdx, endIdx);
 vm.runInNewContext(chatCode, context);
@@ -163,4 +176,48 @@ test('renderGuildChat filters messages according to search query', () => {
   assert.ok(text.includes('Code: CRIMSONGROVE'), 'Should include matching announcement');
   assert.ok(!text.includes('Thanks for the gift code!'), 'Should exclude non-matching member text');
   assert.equal(status.textContent, '1 guild message');
+});
+
+test('renderGuildChat limits visible messages to latest batch and indicates older messages', () => {
+  view.replaceChildren();
+  search.value = '';
+  const messages = [];
+  for (let i = 1; i <= 25; i++) {
+    messages.push({
+      id: String(i),
+      userId: '1001',
+      ctime: String(1793538500 + i),
+      chatType: 'clan',
+      data: { text: `Message number ${i}`, clanRole: '3' }
+    });
+  }
+  const cache = {
+    guildChat: {
+      data: {
+        messages,
+        users: { '1001': { id: '1001', name: 'Member1', level: '50', clanRole: '3' } }
+      }
+    }
+  };
+
+  context.renderGuildChat(cache);
+  assert.equal(status.textContent, '25 guild messages');
+  assert.ok(view.textContent.includes('Scroll up for older messages (10 more)'));
+  assert.ok(view.textContent.includes('Message number 25'));
+  assert.ok(view.textContent.includes('Message number 11'));
+  assert.ok(!view.textContent.includes('Message number 10'));
+});
+
+test('renderConfigOther populates other snapshots section with keys and count', () => {
+  otherList.replaceChildren();
+  const cache = {
+    heroGetAll: { key: 'heroGetAll', data: {} },
+    unknownRpcSnapshot: { key: 'unknownRpcSnapshot', method: 'clanRaid_getInfo', feature: 'clan', data: { raidId: 123, active: true } },
+    customSettingSnapshot: { key: 'customSettingSnapshot', method: 'user_getSettings', feature: 'user', data: [1, 2, 3] }
+  };
+
+  context.renderConfigOther(cache);
+  assert.equal(otherCount.textContent, '2 snapshots');
+  assert.ok(otherList.textContent.includes('clanRaid_getInfo'));
+  assert.ok(otherList.textContent.includes('user_getSettings'));
 });

@@ -93,9 +93,28 @@ chrome.runtime.onInstalled?.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (['record-start', 'record-stop', 'record-clear'].includes(message?.kind) &&
-      sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+  const isAllowedOrigin = sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`) || sender.url?.startsWith(`${GAME_ORIGIN}/`);
+  if (['record-start', 'record-stop', 'record-clear'].includes(message?.kind) && isAllowedOrigin) {
     pending = pending.then(() => handleControl(message.kind));
+    pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'record-status' && isAllowedOrigin) {
+    pending = pending.then(async () => {
+      const state = (await chrome.storage.session.get(RECORD_STATE_KEY))[RECORD_STATE_KEY] || { active: false };
+      const entries = await recordedEntries();
+      return { active: Boolean(state.active), count: entries.length };
+    });
+    pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'record-export' && isAllowedOrigin) {
+    pending = pending.then(async () => {
+      const entries = await recordedEntries();
+      return { records: entries.map(([, r]) => r) };
+    });
     pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
     pending = pending.catch(() => {});
     return true;
