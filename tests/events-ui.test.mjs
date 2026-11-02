@@ -591,3 +591,134 @@ test('tableExportBtn is visible for snapshot tables with rows and hidden otherwi
   context.showSnapshot(null, ['ID', 'Name'], () => []);
   assert.equal(tableExportBtn.hidden, true, 'tableExportBtn should be hidden when no data');
 });
+
+test('openGuildVersusModal appends (num) in-stock inventory balance next to resource targets', () => {
+  modal.hidden = true;
+  modalBody.replaceChildren();
+
+  const vsData = {
+    battle: {
+      league: 'bronze',
+      rounds: [
+        { index: 1, theme: 'Radar Training & Titan Power', status: 'inProgress' }
+      ]
+    },
+    info: {
+      roundNumber: 1,
+      challenges: [
+        { id: 54, progress: 30 }, // Spend 15 Titan Skin Stones (resource)
+        { id: 29, progress: 2 },  // Open 1 Elemental Sphere (resource)
+        { id: 40, progress: 200 },// Spend 100 Titan Potions (resource)
+        { id: 27, progress: 6 }   // Increase Titan Power by 3 (activity - not resource)
+      ]
+    },
+    rewards: {},
+    chestNumbers: []
+  };
+
+  const cacheWithStock = {
+    clanVersusStatus: { data: vsData },
+    inventoryGet: {
+      data: {
+        coin: { '20': 2410 },
+        consumable: { '46': 23, '20': 11650 }
+      }
+    }
+  };
+
+  context.openGuildVersusModal(vsData, cacheWithStock);
+  const text = modalBody.textContent;
+
+  // Daily challenges with stock balance
+  assert.ok(text.includes('Spend 15 Titan Skin Stones (2,410)'));
+  assert.ok(text.includes('Open 1 Elemental Sphere (23)'));
+  assert.ok(text.includes('Spend 100 Titan Potions (11,650)'));
+
+  // Activity challenge should not have stock suffix
+  assert.ok(text.includes('Increase Titan Power by 3'));
+  assert.equal(text.includes('Increase Titan Power by 3 ('), false);
+
+  // Round 1 quests with stock balance
+  assert.ok(text.includes('Spend 15 Titan Skin Stones (2,410)'));
+  assert.ok(text.includes('Open 1 Elemental Sphere (23)'));
+  assert.ok(text.includes('Spend 100 Titan Potions (11,650)'));
+});
+
+test('renderGoals renders Activities and Resources with KPI bar, synergy badges, and event pills', () => {
+  search.value = '';
+  view.replaceChildren();
+
+  const testCache = {
+    clanVersusStatus: {
+      data: {
+        battle: {
+          rounds: [
+            { index: 1, theme: 'Radar Training & Titan Power', status: 'inProgress' }
+          ]
+        },
+        info: {
+          roundNumber: 1,
+          challenges: [
+            { id: 54, progress: 30 }, // Titan Skin Stones (overlap)
+            { id: 29, progress: 2 },  // Elemental Spheres (overlap)
+            { id: 31, progress: 15 }, // Tower Chest (overlap)
+            { id: 27, progress: 9 }   // Titan Power (overlap)
+          ]
+        }
+      }
+    },
+    dungeonStatus: {
+      data: {
+        floorNumber: 581,
+        maxFloorPassed: 580,
+        elements: { prime: 'earth' }
+      }
+    },
+    clanWarChampStatus: {
+      data: {
+        seasonId: 58,
+        tries: 2
+      }
+    },
+    inventoryGet: {
+      data: {
+        coin: { '20': 2410 },
+        consumable: { '46': 23, '20': 11650 }
+      }
+    }
+  };
+
+  context.renderGoals(testCache);
+  const text = view.textContent;
+
+  // Status & KPI Cards
+  assert.ok(status.textContent.includes('active goals'));
+  assert.ok(text.includes('Active Goals'));
+  assert.ok(text.includes('Synergies'));
+  assert.ok(text.includes('Ready / Stocked'));
+
+  // Groups
+  assert.ok(text.includes('Activities & Quests'));
+  assert.ok(text.includes('Resources to Spend'));
+
+  // Activities synergy badges and limited badges
+  assert.ok(text.includes('Open 1 Tower Chest'));
+  assert.ok(text.includes('Synergy'));
+  assert.ok(text.includes('Daily Limited'));
+  assert.ok(text.includes('Titan Dungeon Exploration'));
+  assert.ok(text.includes('Guild War Championship Attacks'));
+
+  // Resources cards with stock info
+  assert.ok(text.includes('Spend 15 Titan Skin Stones'));
+  assert.ok(text.includes('Open 1 Elemental Sphere'));
+  assert.ok(text.includes('2,410 owned'));
+  assert.ok(text.includes('23 owned'));
+  assert.ok(text.includes('In Stock'));
+
+  // Filter testing
+  search.value = 'Tower';
+  context.renderGoals(testCache);
+  assert.ok(view.textContent.includes('Open 1 Tower Chest'));
+  assert.equal(view.textContent.includes('Elemental Sphere'), false);
+  search.value = '';
+});

@@ -1653,10 +1653,12 @@ function renderDraft(cache) {
   status.textContent = `${matchPrefix}${stageDesc}${pickInfo}`;
 }
 
-function openGuildVersusModal(vsStatus) {
+function openGuildVersusModal(vsStatus, cache) {
   const modal = document.querySelector('#guild-versus-modal');
   const body = document.querySelector('#gvs-modal-body');
   if (!modal || !body) return;
+
+  const activeCache = cache || currentCache || {};
 
   const battle = vsStatus?.battle || {};
   const info = vsStatus?.info || {};
@@ -2124,10 +2126,13 @@ function openGuildVersusModal(vsStatus) {
     const qList = document.createElement('div');
     qList.className = 'grid grid-cols-1 sm:grid-cols-2 gap-1.5';
     for (const q of quests) {
+      const stock = globalThis.hwaHelperPopupData?.getChallengeResourceStock?.(activeCache, q.label) ?? null;
+      const cleanLabel = q.label.replace(/\s*\(\d+[\d,]*\)$/, '');
+      const displayLabel = stock != null ? `${cleanLabel} (${stock.toLocaleString()})` : cleanLabel;
       const qItem = document.createElement('div');
       qItem.className = 'flex items-center justify-between rounded bg-white border border-slate-200/80 px-2 py-1 text-[11px]';
       qItem.innerHTML = `
-        <span class="text-slate-800 font-medium truncate mr-1.5">${q.label}</span>
+        <span class="text-slate-800 font-medium truncate mr-1.5" title="${displayLabel}">${displayLabel}</span>
         <span class="rounded bg-emerald-50 text-emerald-700 px-1.5 py-0.2 font-bold tabular-nums shrink-0 border border-emerald-100">+${q.points.toLocaleString()} pts</span>
       `;
       qList.append(qItem);
@@ -2206,6 +2211,9 @@ function openGuildVersusModal(vsStatus) {
 
     for (const ch of challenges) {
       const name = challengeNames[ch.id] || `Daily Challenge #${ch.id}`;
+      const stock = globalThis.hwaHelperPopupData?.getChallengeResourceStock?.(activeCache, ch.id) ?? null;
+      const cleanName = name.replace(/\s*\(\d+[\d,]*\)$/, '');
+      const displayName = stock != null ? `${cleanName} (${stock.toLocaleString()})` : cleanName;
       const progress = Number(ch.progress || 0);
       const step = Number(challengeSteps[ch.id] || 1);
       const ptsPerStep = Number(challengePoints[ch.id] || 0);
@@ -2214,7 +2222,7 @@ function openGuildVersusModal(vsStatus) {
       const item = document.createElement('div');
       item.className = 'flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs';
       item.innerHTML = `
-        <span class="font-medium text-slate-800 truncate mr-2" title="${name}">${name}</span>
+        <span class="font-medium text-slate-800 truncate mr-2" title="${displayName}">${displayName}</span>
         <div class="flex items-center gap-1.5 shrink-0">
           <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums">${progress.toLocaleString()}</span>
           <span class="rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
@@ -2467,7 +2475,7 @@ function renderEvents(cache) {
       render: () => {
         const card = document.createElement('div');
         card.className = 'rounded-xl border border-emerald-300 bg-emerald-50/50 p-4 shadow-sm hover:border-emerald-400 transition-colors cursor-pointer';
-        card.addEventListener('click', () => openGuildVersusModal(vsStatus));
+        card.addEventListener('click', () => openGuildVersusModal(vsStatus, cache));
 
         const topRow = document.createElement('div');
         topRow.className = 'flex items-center justify-between gap-2 flex-wrap mb-2.5';
@@ -2807,6 +2815,302 @@ function setupDungeonModal() {
   });
 }
 
+let activeGoalsFilter = 'all';
+
+function renderGoals(cache) {
+  const query = search.value.trim().toLowerCase();
+  const goalsData = globalThis.hwaHelperPopupData?.extractEventGoals?.(cache) || {
+    all: [], activities: [], resources: [], metrics: { totalGoals: 0, synergiesCount: 0, readyCount: 0 }
+  };
+
+  view.replaceChildren();
+
+  if (!goalsData.all || goalsData.all.length === 0) {
+    status.textContent = '0 active event goals';
+    showEmpty('No active event goals or challenges detected in current cache.');
+    return;
+  }
+
+  status.textContent = `${goalsData.metrics.totalGoals} active goals • ${goalsData.metrics.synergiesCount} synergies • ${goalsData.metrics.readyCount} ready`;
+
+  const container = document.createElement('div');
+  container.className = 'space-y-4';
+
+  // 1. KPI Stats Cards Bar
+  const kpiBar = document.createElement('div');
+  kpiBar.className = 'grid grid-cols-3 gap-2.5';
+  kpiBar.innerHTML = `
+    <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+      <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+        <span>Active Goals</span>
+        <span>🎯</span>
+      </div>
+      <div class="text-xl font-black text-slate-900 tabular-nums">${goalsData.metrics.totalGoals}</div>
+      <div class="text-[10px] text-slate-400 mt-0.5">Across current events</div>
+    </div>
+    <div class="rounded-xl border border-amber-200 bg-amber-50/60 p-3 shadow-xs">
+      <div class="flex items-center justify-between text-xs text-amber-800 mb-1">
+        <span class="font-semibold">Synergies</span>
+        <span>🔥</span>
+      </div>
+      <div class="text-xl font-black text-amber-900 tabular-nums">${goalsData.metrics.synergiesCount}</div>
+      <div class="text-[10px] text-amber-700/80 mt-0.5">Completes 2+ events at once</div>
+    </div>
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 shadow-xs">
+      <div class="flex items-center justify-between text-xs text-emerald-800 mb-1">
+        <span class="font-semibold">Ready / Stocked</span>
+        <span>✓</span>
+      </div>
+      <div class="text-xl font-black text-emerald-900 tabular-nums">${goalsData.metrics.readyCount}</div>
+      <div class="text-[10px] text-emerald-700/80 mt-0.5">In-stock & daily-limited</div>
+    </div>
+  `;
+  container.append(kpiBar);
+
+  // 2. Filter Pills Bar
+  const filterBar = document.createElement('div');
+  filterBar.className = 'flex items-center gap-1.5 flex-wrap overflow-x-auto pb-1';
+
+  const filterOptions = [
+    { id: 'all', label: `All (${goalsData.all.length})` },
+    { id: 'activities', label: `⚡ Activities (${goalsData.activities.length})` },
+    { id: 'resources', label: `💎 Resources (${goalsData.resources.length})` },
+    { id: 'synergies', label: `🔥 Synergies (${goalsData.metrics.synergiesCount})` },
+    { id: 'ready', label: `✓ Ready (${goalsData.metrics.readyCount})` }
+  ];
+
+  for (const opt of filterOptions) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    const isActive = activeGoalsFilter === opt.id;
+    btn.className = `cursor-pointer rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+      isActive
+        ? 'bg-blue-600 text-white shadow-xs'
+        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+    }`;
+    btn.textContent = opt.label;
+    btn.addEventListener('click', () => {
+      activeGoalsFilter = opt.id;
+      renderGoals(cache);
+    });
+    filterBar.append(btn);
+  }
+  container.append(filterBar);
+
+  // Filter items
+  function matchGoal(g) {
+    if (activeGoalsFilter === 'activities' && g.category !== 'Activities') return false;
+    if (activeGoalsFilter === 'resources' && g.category !== 'Resources') return false;
+    if (activeGoalsFilter === 'synergies' && g.overlapCount <= 1) return false;
+    if (activeGoalsFilter === 'ready' && !(g.category === 'Resources' ? g.inStock : g.isLimited)) return false;
+
+    if (query) {
+      const q = query.toLowerCase();
+      const inTitle = g.title.toLowerCase().includes(q);
+      const inCat = g.category.toLowerCase().includes(q);
+      const inEvents = g.events.some((e) => e.name.toLowerCase().includes(q));
+      if (!inTitle && !inCat && !inEvents) return false;
+    }
+    return true;
+  }
+
+  const visibleActivities = goalsData.activities.filter(matchGoal);
+  const visibleResources = goalsData.resources.filter(matchGoal);
+
+  if (visibleActivities.length === 0 && visibleResources.length === 0) {
+    const noResults = document.createElement('div');
+    noResults.className = 'rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500';
+    noResults.textContent = 'No event goals match current filter or search criteria.';
+    container.append(noResults);
+    view.append(container);
+    return;
+  }
+
+  // 3. Render Activities Group
+  if (visibleActivities.length > 0) {
+    const actSec = document.createElement('div');
+    actSec.className = 'space-y-2.5';
+    actSec.innerHTML = `
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+          <span>⚡</span> Activities & Quests (${visibleActivities.length})
+        </h3>
+        <span class="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">Daily-Limited & Battle Tasks</span>
+      </div>
+    `;
+
+    const actGrid = document.createElement('div');
+    actGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5';
+
+    for (const act of visibleActivities) {
+      const card = document.createElement('div');
+      const isSynergy = act.overlapCount > 1;
+      card.className = `rounded-xl border p-3 text-xs space-y-2 transition-colors ${
+        isSynergy
+          ? 'border-amber-300 bg-amber-50/40 shadow-xs'
+          : act.isLimited
+            ? 'border-blue-200 bg-blue-50/30'
+            : 'border-slate-200 bg-white'
+      }`;
+
+      // Card Header
+      const header = document.createElement('div');
+      header.className = 'flex items-center justify-between gap-1.5 flex-wrap';
+      header.innerHTML = `
+        <div class="flex items-center gap-1.5 font-bold text-slate-900 truncate">
+          <span class="shrink-0 text-sm">${act.icon}</span>
+          <span class="truncate" title="${act.title}">${act.title}</span>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          ${
+            isSynergy
+              ? `<span class="rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 border border-amber-300">🔥 ${act.overlapCount}x Synergy</span>`
+              : ''
+          }
+          ${
+            act.isLimited
+              ? '<span class="rounded-full bg-blue-100 text-blue-800 text-[10px] font-semibold px-2 py-0.5 border border-blue-200">⚡ Daily Limited</span>'
+              : ''
+          }
+        </div>
+      `;
+
+      // Events pills
+      const pillBox = document.createElement('div');
+      pillBox.className = 'flex flex-wrap gap-1';
+      for (const ev of act.events) {
+        const pill = document.createElement('span');
+        pill.className = 'inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium border border-slate-200/90 text-slate-700 shadow-2xs';
+        pill.innerHTML = `<span class="font-bold text-slate-900 mr-1">${ev.name}:</span> ${ev.amount ? `${ev.amount.toLocaleString()} ${ev.unit || ''}` : ''} ${ev.points > 0 ? `<span class="ml-1 text-emerald-700 font-bold tabular-nums">(+${ev.points.toLocaleString()} pts)</span>` : ''}`;
+        pillBox.append(pill);
+      }
+
+      // Hint / Footer
+      const footer = document.createElement('div');
+      footer.className = 'text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between flex-wrap gap-1';
+      footer.innerHTML = `
+        <span class="text-slate-600 font-medium">
+          ${
+            isSynergy
+              ? `💡 <strong class="text-amber-900">Priority Route:</strong> Progresses ${act.overlapCount} events simultaneously.`
+              : act.isLimited
+                ? '💡 Daily task: Complete before reset to optimize score.'
+                : act.hint
+                  ? `💡 ${act.hint}`
+                  : ''
+          }
+        </span>
+        ${act.totalPoints > 0 ? `<span class="font-bold text-emerald-700 tabular-nums">+${act.totalPoints.toLocaleString()} total pts</span>` : ''}
+      `;
+
+      card.append(header, pillBox, footer);
+      actGrid.append(card);
+    }
+
+    actSec.append(actGrid);
+    container.append(actSec);
+  }
+
+  // 4. Render Resources Group
+  if (visibleResources.length > 0) {
+    const resSec = document.createElement('div');
+    resSec.className = 'space-y-2.5';
+    resSec.innerHTML = `
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+          <span>💎</span> Resources to Spend (${visibleResources.length})
+        </h3>
+        <span class="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">Stock & Spending Targets</span>
+      </div>
+    `;
+
+    const resGrid = document.createElement('div');
+    resGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5';
+
+    for (const res of visibleResources) {
+      const card = document.createElement('div');
+      const isSynergy = res.overlapCount > 1;
+      card.className = `rounded-xl border p-3 text-xs space-y-2 transition-colors ${
+        isSynergy
+          ? 'border-amber-300 bg-amber-50/40 shadow-xs'
+          : res.inStock
+            ? 'border-emerald-200 bg-emerald-50/30'
+            : 'border-rose-200 bg-rose-50/20'
+      }`;
+
+      // Card Header
+      const header = document.createElement('div');
+      header.className = 'flex items-center justify-between gap-1.5 flex-wrap';
+      header.innerHTML = `
+        <div class="flex items-center gap-1.5 font-bold text-slate-900 truncate">
+          <span class="shrink-0 text-sm">${res.icon}</span>
+          <span class="truncate" title="${res.title}">${res.title}</span>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          ${
+            isSynergy
+              ? `<span class="rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 border border-amber-300">🔥 ${res.overlapCount}x Synergy</span>`
+              : ''
+          }
+          ${
+            res.inStock
+              ? '<span class="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 border border-emerald-300">✓ In Stock</span>'
+              : '<span class="rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 border border-rose-300">⚠️ Shortage</span>'
+          }
+        </div>
+      `;
+
+      // Stock comparison bar
+      const stockBar = document.createElement('div');
+      stockBar.className = 'flex items-center justify-between text-xs bg-white rounded-lg p-2 border border-slate-200/80';
+      const completions = res.needed > 0 ? Math.floor((res.stock || 0) / res.needed) : 0;
+      stockBar.innerHTML = `
+        <div>Stock: <strong class="text-slate-900 tabular-nums">${(res.stock || 0).toLocaleString()}</strong> owned</div>
+        <div class="text-slate-400">•</div>
+        <div>Target: <strong class="text-slate-900 tabular-nums">${res.needed.toLocaleString()}</strong> per step</div>
+        <div class="text-slate-400">•</div>
+        <div class="${res.inStock ? 'text-emerald-700 font-bold' : 'text-rose-700 font-bold'} tabular-nums">
+          ${res.inStock ? `${completions}x ready` : `Need ${((res.needed || 0) - (res.stock || 0)).toLocaleString()}`}
+        </div>
+      `;
+
+      // Events pills
+      const pillBox = document.createElement('div');
+      pillBox.className = 'flex flex-wrap gap-1';
+      for (const ev of res.events) {
+        const pill = document.createElement('span');
+        pill.className = 'inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium border border-slate-200/90 text-slate-700 shadow-2xs';
+        pill.innerHTML = `<span class="font-bold text-slate-900 mr-1">${ev.name}:</span> ${ev.amount ? `${ev.amount.toLocaleString()} ${ev.unit || ''}` : ''} ${ev.points > 0 ? `<span class="ml-1 text-emerald-700 font-bold tabular-nums">(+${ev.points.toLocaleString()} pts)</span>` : ''}`;
+        pillBox.append(pill);
+      }
+
+      // Hint / Footer
+      const footer = document.createElement('div');
+      footer.className = 'text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between flex-wrap gap-1';
+      footer.innerHTML = `
+        <span class="text-slate-600 font-medium">
+          ${
+            isSynergy
+              ? `💡 <strong class="text-amber-900">High Synergy:</strong> Spending this satisfies ${res.overlapCount} events simultaneously.`
+              : res.inStock
+                ? '💡 Sufficient inventory to claim event points immediately.'
+                : `💡 Shortage: Save resources or accumulate ${((res.needed || 0) - (res.stock || 0)).toLocaleString()} more before spending.`
+          }
+        </span>
+        ${res.totalPoints > 0 ? `<span class="font-bold text-emerald-700 tabular-nums">+${res.totalPoints.toLocaleString()} total pts</span>` : ''}
+      `;
+
+      card.append(header, stockBar, pillBox, footer);
+      resGrid.append(card);
+    }
+
+    resSec.append(resGrid);
+    container.append(resSec);
+  }
+
+  view.append(container);
+}
+
 function renderConfigOther(cache) {
   const container = document.querySelector('#config-other-list');
   const countBadge = document.querySelector('#config-other-count');
@@ -3097,10 +3401,12 @@ async function render() {
   document.querySelector('#search-label').textContent = activeTab === 'log' ? 'Filter endpoint' :
     activeTab === 'draft' ? 'Search hero by name, role, or ID' :
     activeTab === 'chat' ? 'Search message or sender' :
+    activeTab === 'goals' ? 'Search goal, activity, or event' :
     activeTab === 'events' ? 'Search event name or type' : 'Search ID, name, or group';
   search.placeholder = activeTab === 'log' ? 'Filter endpoint' :
     activeTab === 'draft' ? 'Search hero by name, role, or ID' :
     activeTab === 'chat' ? 'Search message or sender' :
+    activeTab === 'goals' ? 'Search goal, activity, or event' :
     activeTab === 'events' ? 'Search event name or type' : 'Search ID, name, or group';
 
   if (activeTab === 'config') {
@@ -3139,6 +3445,8 @@ async function render() {
     renderGuildChat(cache);
   } else if (activeTab === 'events') {
     renderEvents(cache);
+  } else if (activeTab === 'goals') {
+    renderGoals(cache);
   } else if (activeTab === 'other') {
     const entries = Object.values(cache).filter((entry) =>
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',

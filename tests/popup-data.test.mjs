@@ -4,11 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
 const context = {};
-for (const file of ['data-names.js', 'name-map.js', 'resource-data.js', 'hero-metadata.js', 'titan-metadata.js', 'popup-data.js']) {
+for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'resource-data.js', 'hero-metadata.js', 'titan-metadata.js', 'popup-data.js']) {
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 const { heroSoulProgress, teamRows, sortRows, isNumericColumn,
-  rallyTooltip } = context.hwaHelperPopupData;
+  rallyTooltip, getChallengeResourceStock, extractEventGoals } = context.hwaHelperPopupData;
 
 test('hero soul progress uses inventory fragments and next-star cost', () => {
   assert.deepEqual({ ...heroSoulProgress('1', { star: 3 }, { fragmentHero: { 1: 73 } }) },
@@ -364,4 +364,143 @@ test('exportTableData exports titans, items, resources, teams, and other snapsho
   assert.equal(other.length, 1);
   assert.equal(other[0].key, 'sampleSnapshot');
   assert.equal(other[0].method, 'getSampleData');
+});
+
+test('getChallengeResourceStock resolves inventory balances and returns null for activities', () => {
+  const cache = {
+    inventoryGet: {
+      data: {
+        coin: {
+          '8': 410, '9': 460, '10': 150, // Hero Skin Stones total: 1020
+          '20': 2410, // Titan Skin Stones
+          '13': 17,   // Summon Titan Circle
+          '40065': 250, // Relic Shards
+          '40078': 1585, // Rune Spheres
+          '40077': 9195  // Rune Stones
+        },
+        consumable: {
+          '20': 11650, // Titan Potions
+          '46': 23,    // Elemental Spheres
+          '44': 3,     // Chaos Cores
+          '45': 24     // Artifact Chest Keys
+        },
+        fragmentHero: { '1': 50, '2': 30 }
+      }
+    },
+    energyStatus: { data: { energy: 59 } }
+  };
+
+  // Resources by numeric ID
+  assert.equal(getChallengeResourceStock(cache, 37), 1020);
+  assert.equal(getChallengeResourceStock(cache, 54), 2410);
+  assert.equal(getChallengeResourceStock(cache, 40), 11650);
+  assert.equal(getChallengeResourceStock(cache, 29), 23);
+  assert.equal(getChallengeResourceStock(cache, 28), 17);
+  assert.equal(getChallengeResourceStock(cache, 55), 250);
+  assert.equal(getChallengeResourceStock(cache, 57), 3);
+  assert.equal(getChallengeResourceStock(cache, 38), 24);
+  assert.equal(getChallengeResourceStock(cache, 50), 1585);
+  assert.equal(getChallengeResourceStock(cache, 51), 9195);
+  assert.equal(getChallengeResourceStock(cache, 49), 59);
+  assert.equal(getChallengeResourceStock(cache, 47), 80);
+
+  // Resources by label string
+  assert.equal(getChallengeResourceStock(cache, 'Spend 15 Titan Skin Stones'), 2410);
+  assert.equal(getChallengeResourceStock(cache, 'Open 1 Elemental Sphere'), 23);
+  assert.equal(getChallengeResourceStock(cache, 'Spend 100 Titan Potions'), 11650);
+  assert.equal(getChallengeResourceStock(cache, 'Spend 15 Hero Skin Stones'), 1020);
+  assert.equal(getChallengeResourceStock(cache, 'Spend 10 Relic Shards'), 250);
+  assert.equal(getChallengeResourceStock(cache, 'Spend 1 Chaos Core'), 3);
+  assert.equal(getChallengeResourceStock(cache, 'Open 1 Artifact Chest'), 24);
+  assert.equal(getChallengeResourceStock(cache, 'Spend 3 Energy'), 59);
+
+  // Activities (should return null)
+  assert.equal(getChallengeResourceStock(cache, 27), null); // Increase Titan Power by 3
+  assert.equal(getChallengeResourceStock(cache, 'Increase Titan Power by 3'), null);
+  assert.equal(getChallengeResourceStock(cache, 'Defeat 1 Map Boss / Rally'), null);
+  assert.equal(getChallengeResourceStock(cache, 'Open 1 Tower Chest'), null);
+  assert.equal(getChallengeResourceStock(cache, 'Fight 1 Arena Battle'), null);
+  assert.equal(getChallengeResourceStock(cache, 'Start 1 Expedition'), null);
+  assert.equal(getChallengeResourceStock(cache, 'Complete 1 Daily Quest'), null);
+  assert.equal(getChallengeResourceStock(cache, 'Clear 1 Bandit Camp'), null);
+});
+
+test('extractEventGoals groups activities and resources, calculates synergies, and prioritizes optimal roadmap', () => {
+  const cache = {
+    clanVersusStatus: {
+      data: {
+        battle: {
+          rounds: [
+            { index: 1, theme: 'Radar Training & Titan Power', status: 'inProgress' }
+          ]
+        },
+        info: {
+          roundNumber: 1,
+          challenges: [
+            { id: 27, progress: 9 },   // Titan Power
+            { id: 54, progress: 30 },  // Titan Skin Stones
+            { id: 29, progress: 2 },   // Elemental Spheres
+            { id: 31, progress: 15 },  // Tower Chest
+            { id: 13, progress: 5 }    // Map Boss / Rally
+          ]
+        }
+      }
+    },
+    dungeonStatus: {
+      data: {
+        floorNumber: 581,
+        maxFloorPassed: 580,
+        dungeonActivity: 738,
+        elements: { prime: 'earth' }
+      }
+    },
+    clanWarChampStatus: {
+      data: {
+        seasonId: 58,
+        tries: 2
+      }
+    },
+    inventoryGet: {
+      data: {
+        coin: {
+          '20': 2410,
+          '13': 17,
+          '40065': 250
+        },
+        consumable: {
+          '20': 11650,
+          '46': 23
+        }
+      }
+    }
+  };
+
+  const goals = extractEventGoals(cache);
+  assert.ok(goals.all.length > 0);
+  assert.ok(goals.activities.length > 0);
+  assert.ok(goals.resources.length > 0);
+  assert.equal(goals.metrics.totalGoals, goals.all.length);
+  assert.ok(goals.metrics.synergiesCount >= 3);
+
+  // Check that overlapping resources are detected
+  const titanStones = goals.resources.find(r => r.key === 'res:titan_skin_stones');
+  assert.ok(titanStones);
+  assert.equal(titanStones.overlapCount, 2);
+  assert.equal(titanStones.inStock, true);
+  assert.equal(titanStones.stock, 2410);
+
+  const spheres = goals.resources.find(r => r.key === 'res:elemental_spheres');
+  assert.ok(spheres);
+  assert.equal(spheres.overlapCount, 2);
+  assert.equal(spheres.inStock, true);
+
+  // Check that overlapping activities are detected
+  const tower = goals.activities.find(a => a.key === 'act:tower');
+  assert.ok(tower);
+  assert.equal(tower.overlapCount, 2);
+  assert.equal(tower.isLimited, true);
+
+  // Synergies / overlaps appear first in sorted lists
+  assert.ok(goals.resources[0].overlapCount > 1);
+  assert.ok(goals.activities[0].overlapCount > 1);
 });
