@@ -973,37 +973,65 @@ function updateItemGroups(data) {
 let localDraftDefencePicks = [null, null, null, null, null];
 let localDraftAttackPicks = [null, null, null, null, null];
 let activeDraftStep = 0;
-let draftStepCandidates = globalThis.hwaHelperPopupData?.defaultDraftCandidates?.() || [
-  [24, 4, 38],
-  [12, 16, 49],
-  [51, 55, 10],
-  [502, 39, 503],
-  [68, 56, 36]
-];
+let draftViewMode = null; // 'defense' or 'attack'
+let draftStepCandidates = {
+  defense: globalThis.hwaHelperPopupData?.defaultDraftCandidates?.('defense') || [
+    [78, 49, 44],
+    [76, 20, 38],
+    [75, 2, 25],
+    [37, 73, 28],
+    [5, 35, 69]
+  ],
+  attack: globalThis.hwaHelperPopupData?.defaultDraftCandidates?.('attack') || [
+    [8, 49, 28],
+    [73, 56, 12],
+    [17, 34, 14],
+    [4, 55, 10],
+    [29, 25, 78]
+  ]
+};
 let activeHeroSwapTarget = null;
 let selectedRoleFilter = 'all';
 
 function renderDraft(cache) {
   const draft = cache.legendDraftStatus?.data || {};
-  const stageId = draft.stageId || 0;
-  const isDefense = stageId === 2 || stageId === 3;
-  const isAttack = stageId === 4;
+  const stageId = Number.isInteger(draft.stageId) ? draft.stageId : 0;
+  const isDefenseStage = stageId === 2 || stageId === 3;
+  const isAttackStage = stageId === 4;
   const isReady = stageId === 5;
   const isSearching = stageId === 1;
+  const isMatchCompleted = stageId === 7 || Boolean(draft.lastResult);
 
   if (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5) {
     localDraftDefencePicks = [...draft.defenceHeroes];
+  } else if (Array.isArray(draft.lastResult?.defenceHeroes) && draft.lastResult.defenceHeroes.length === 5) {
+    localDraftDefencePicks = [...draft.lastResult.defenceHeroes];
   }
   if (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5) {
     localDraftAttackPicks = [...draft.attackHeroes];
+  } else if (Array.isArray(draft.lastResult?.attackHeroes) && draft.lastResult.attackHeroes.length === 5) {
+    localDraftAttackPicks = [...draft.lastResult.attackHeroes];
   }
 
-  const currentPicks = isAttack ? localDraftAttackPicks : localDraftDefencePicks;
+  // Determine active view mode (toggle takes priority, else match stage)
+  if (!draftViewMode) {
+    draftViewMode = isAttackStage ? 'attack' : 'defense';
+  }
+  const isViewingAttack = draftViewMode === 'attack';
+
+  const currentPicks = isViewingAttack ? localDraftAttackPicks : localDraftDefencePicks;
   while (currentPicks.length < 5) currentPicks.push(null);
 
   const val = globalThis.hwaHelperPopupData.validateDraftPicks(currentPicks);
-  const isLocked = isDefense ? (draft.defenceHeroes?.length === 5) :
-                   isAttack ? (draft.attackHeroes?.length === 5) : false;
+  const isModeLocked = isViewingAttack ?
+    (draft.attackHeroes?.length === 5 || (isMatchCompleted && localDraftAttackPicks.filter(Boolean).length === 5)) :
+    (draft.defenceHeroes?.length === 5 || (isMatchCompleted && localDraftDefencePicks.filter(Boolean).length === 5));
+
+  // ONLY display 15 pick slots when actively drafting this stage!
+  const isActivelyDrafting = !isModeLocked && (
+    (!isViewingAttack && isDefenseStage) ||
+    (isViewingAttack && isAttackStage)
+  );
 
   if (activeDraftStep < 0 || activeDraftStep > 4) {
     activeDraftStep = globalThis.hwaHelperPopupData.getDraftActiveStep(currentPicks);
@@ -1030,21 +1058,38 @@ function renderDraft(cache) {
 
   const stageTitle = document.createElement('div');
   stageTitle.className = 'text-base font-bold text-slate-900 flex items-center gap-2';
-  const stageBadgeColor = isDefense ? 'bg-amber-100 text-amber-800 border-amber-300' :
-                          isAttack ? 'bg-red-100 text-red-800 border-red-300' :
+  const stageBadgeColor = isDefenseStage ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                          isAttackStage ? 'bg-red-100 text-red-800 border-red-300' :
                           isReady ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
                           isSearching ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                          isMatchCompleted ? 'bg-purple-100 text-purple-800 border-purple-300' :
                           'bg-slate-100 text-slate-700 border-slate-300';
   stageTitle.innerHTML = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${stageBadgeColor}">${globalThis.hwaHelperPopupData.draftStageDescription(stageId)}</span>`;
   stageCol.append(stageTitle);
 
-  if (draft.stageFinishTs) {
+  if (draft.stageFinishTs && !isMatchCompleted) {
     const timerRow = document.createElement('div');
     timerRow.className = 'flex items-center gap-2 pt-1';
     timerRow.innerHTML = `<span class="text-xs text-slate-500">Time remaining:</span>
       <span id="draft-countdown" class="text-xl font-bold font-mono text-red-600">${globalThis.hwaHelperPopupData.formatCountdown(draft.stageFinishTs)}</span>`;
     stageCol.append(timerRow);
   }
+
+  // Result box if match completed or lastResult exists
+  if (draft.lastResult) {
+    const resultBox = document.createElement('div');
+    const isWin = draft.lastResult.result === 0;
+    resultBox.className = `mt-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center justify-between ${
+      isWin ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-slate-100 border-slate-300 text-slate-700'
+    }`;
+    const diff = draft.lastResult.rating?.userDifRating;
+    const diffStr = diff != null ? ` (${diff >= 0 ? '+' : ''}${diff})` : '';
+    const ratingStr = draft.lastResult.rating?.userRating != null ? `Rating: ${draft.lastResult.rating.userRating}${diffStr}` : '';
+    const rewardStr = draft.lastResult.reward?.draftBpExp ? `+${draft.lastResult.reward.draftBpExp} BP EXP` : '';
+    resultBox.innerHTML = `<span>${isWin ? '🏆 Victory' : '⚔️ Defeat / Finished'}</span> <span>${ratingStr}</span> <span>${rewardStr}</span>`;
+    stageCol.append(resultBox);
+  }
+
   headerGrid.append(stageCol);
 
   // Right: Opponent Profile Card
@@ -1087,14 +1132,63 @@ function renderDraft(cache) {
   headerCard.append(headerGrid);
   container.append(headerCard);
 
-  // 2. Enemy Defense Lineup (Shown in Attack Draft Stage 4)
-  if (isAttack && draft.enemyDefenceHeroes?.length) {
+  // 2. Draft Team Switcher: Defense Draft vs Attack Draft
+  const switcherCard = document.createElement('div');
+  switcherCard.className = 'flex items-center justify-between flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs';
+  
+  const switcherBtns = document.createElement('div');
+  switcherBtns.className = 'inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 gap-1';
+
+  const defCount = (draft.defenceHeroes?.length || localDraftDefencePicks.filter(Boolean).length) || 0;
+  const atkCount = (draft.attackHeroes?.length || localDraftAttackPicks.filter(Boolean).length) || 0;
+
+  const defBtn = document.createElement('button');
+  defBtn.type = 'button';
+  defBtn.className = `px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+    !isViewingAttack ?
+      'bg-amber-600 text-white shadow-xs' :
+      'text-slate-600 hover:bg-slate-200'
+  }`;
+  defBtn.innerHTML = `<span>🛡️ Defense Draft</span> <span class="px-1.5 py-0.2 rounded-full text-[10px] ${!isViewingAttack ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'}">${defCount}/5</span>`;
+  defBtn.addEventListener('click', () => {
+    draftViewMode = 'defense';
+    activeHeroSwapTarget = null;
+    render();
+  });
+
+  const atkBtn = document.createElement('button');
+  atkBtn.type = 'button';
+  atkBtn.className = `px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+    isViewingAttack ?
+      'bg-red-600 text-white shadow-xs' :
+      'text-slate-600 hover:bg-slate-200'
+  }`;
+  atkBtn.innerHTML = `<span>⚔️ Attack Draft</span> <span class="px-1.5 py-0.2 rounded-full text-[10px] ${isViewingAttack ? 'bg-red-700 text-white' : 'bg-slate-200 text-slate-700'}">${atkCount}/5</span>`;
+  atkBtn.addEventListener('click', () => {
+    draftViewMode = 'attack';
+    activeHeroSwapTarget = null;
+    render();
+  });
+
+  switcherBtns.append(defBtn, atkBtn);
+  switcherCard.append(switcherBtns);
+
+  const switcherDesc = document.createElement('span');
+  switcherDesc.className = 'text-xs text-slate-500 font-medium px-2';
+  switcherDesc.textContent = isViewingAttack ?
+    'Viewing Attack Draft lineup & Opponent Defense counter' :
+    'Viewing Defense Draft lineup & Opponent Attack';
+  switcherCard.append(switcherDesc);
+  container.append(switcherCard);
+
+  // 3. Counter Lineup Card
+  if (isViewingAttack && draft.enemyDefenceHeroes?.length) {
     const enemyLineupCard = document.createElement('div');
     enemyLineupCard.className = 'rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2';
     
     const enemyTitle = document.createElement('div');
     enemyTitle.className = 'text-xs font-bold text-amber-900 flex items-center gap-1.5';
-    enemyTitle.innerHTML = `<span>🛡️ Opponent Defense Lineup (5 heroes):</span>`;
+    enemyTitle.innerHTML = `<span>🛡️ Opponent Defense Lineup (5 heroes to counter):</span>`;
     enemyLineupCard.append(enemyTitle);
 
     const enemySlotRow = document.createElement('div');
@@ -1109,9 +1203,30 @@ function renderDraft(cache) {
     }
     enemyLineupCard.append(enemySlotRow);
     container.append(enemyLineupCard);
+  } else if (!isViewingAttack && draft.enemyAttackHeroes?.length) {
+    const enemyLineupCard = document.createElement('div');
+    enemyLineupCard.className = 'rounded-xl border border-red-200 bg-red-50/50 p-3 space-y-2';
+    
+    const enemyTitle = document.createElement('div');
+    enemyTitle.className = 'text-xs font-bold text-red-900 flex items-center gap-1.5';
+    enemyTitle.innerHTML = `<span>⚔️ Opponent Attack Lineup (5 heroes deployed against your defense):</span>`;
+    enemyLineupCard.append(enemyTitle);
+
+    const enemySlotRow = document.createElement('div');
+    enemySlotRow.className = 'flex flex-wrap gap-2';
+    for (const heroId of draft.enemyAttackHeroes) {
+      const heroMeta = globalThis.hwaHelperHeroMetadata?.[heroId] || {};
+      const heroSnap = cache.heroGetAll?.data?.[heroId];
+      const slot = document.createElement('div');
+      slot.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-red-200 bg-white shadow-xs';
+      slot.append(createHeroInline(heroId, heroMeta.name || globalThis.hwaHelperNameMap.hero(heroId) || `#${heroId}`, heroSnap));
+      enemySlotRow.append(slot);
+    }
+    enemyLineupCard.append(enemySlotRow);
+    container.append(enemyLineupCard);
   }
 
-  // 3. Current Selected Team (5 Steps)
+  // 4. Lineup Display / Step Picking Slots
   const teamSection = document.createElement('div');
   teamSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3';
   
@@ -1122,49 +1237,56 @@ function renderDraft(cache) {
   teamTitleCol.className = 'space-y-0.5';
   const teamTitle = document.createElement('h3');
   teamTitle.className = 'text-sm font-bold text-slate-800 flex items-center gap-1.5';
-  teamTitle.textContent = isAttack ? '⚔️ Your Attack Lineup (5 pick steps):' : '🛡️ Your Defense Lineup (5 pick steps):';
+  teamTitle.textContent = isViewingAttack ? '⚔️ Your Attack Lineup:' : '🛡️ Your Defense Lineup:';
   teamTitleCol.append(teamTitle);
 
   const teamSub = document.createElement('div');
   teamSub.className = 'text-xs text-slate-500';
-  teamSub.textContent = val.valid ? '✓ Selected 5/5 heroes (5 steps completed)' :
-    `Selected: ${val.count}/5 steps • Click any step to view or change choice`;
+  if (isModeLocked) {
+    teamSub.textContent = `✓ Lineup locked (${val.count}/5 heroes)`;
+  } else if (isActivelyDrafting) {
+    teamSub.textContent = val.valid ? '✓ Selected 5/5 heroes (5 steps completed)' :
+      `Selected: ${val.count}/5 steps • Click any step to choose candidate`;
+  } else {
+    teamSub.textContent = val.count === 5 ? '5 Heroes recorded' : (val.count > 0 ? `${val.count}/5 heroes recorded` : 'No heroes drafted yet');
+  }
   teamTitleCol.append(teamSub);
   teamHeader.append(teamTitleCol);
 
-  // Lock action button
-  const lockBtn = document.createElement('button');
-  lockBtn.type = 'button';
-  if (isLocked) {
-    lockBtn.className = 'px-3.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800 flex items-center gap-1';
-    lockBtn.disabled = true;
-    lockBtn.textContent = isDefense ? '✓ Defense Lineup Locked' : '✓ Attack Lineup Locked';
-  } else {
+  // Lock action button or locked badge
+  if (isActivelyDrafting) {
+    const lockBtn = document.createElement('button');
+    lockBtn.type = 'button';
     lockBtn.className = val.valid ?
       'cursor-pointer px-4 py-1.5 rounded-lg bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all' :
       'px-4 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-400 cursor-not-allowed border border-slate-200';
     lockBtn.disabled = !val.valid;
-    lockBtn.textContent = isDefense ? 'Lock Defense Lineup (5 Heroes)' : isAttack ? 'Lock Attack Lineup (5 Heroes)' : 'Lock Lineup (5 Heroes)';
+    lockBtn.textContent = isViewingAttack ? 'Lock Attack Lineup (5 Heroes)' : 'Lock Defense Lineup (5 Heroes)';
     if (val.valid) {
       lockBtn.addEventListener('click', () => {
         lockBtn.disabled = true;
         lockBtn.textContent = 'Submitting...';
-        const action = isDefense ? 'saveDefence' : 'saveAttack';
+        const action = isViewingAttack ? 'saveAttack' : 'saveDefence';
         chrome.runtime?.sendMessage?.({ kind: 'draft-action', action, heroes: val.heroes }, () => {
           setTimeout(render, 500);
         });
       });
     }
+    teamHeader.append(lockBtn);
+  } else if (isModeLocked) {
+    const lockedTag = document.createElement('span');
+    lockedTag.className = 'px-3 py-1 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800 flex items-center gap-1';
+    lockedTag.textContent = '✓ Lineup successfully locked';
+    teamHeader.append(lockedTag);
   }
-  teamHeader.append(lockBtn);
   teamSection.append(teamHeader);
 
-  // 5 Step Slots Row
+  // 5 Heroes Slots Row
   const slotsGrid = document.createElement('div');
   slotsGrid.className = 'grid grid-cols-2 sm:grid-cols-5 gap-2.5';
   for (let i = 0; i < 5; i++) {
     const heroId = currentPicks[i];
-    const isActiveStep = !isLocked && activeDraftStep === i;
+    const isActiveStep = isActivelyDrafting && activeDraftStep === i;
     const slotCard = document.createElement('div');
 
     if (heroId) {
@@ -1172,15 +1294,15 @@ function renderDraft(cache) {
       const heroSnap = cache.heroGetAll?.data?.[heroId];
       slotCard.className = `flex flex-col items-center justify-between p-2.5 rounded-xl border transition-all text-center min-h-[110px] relative ${
         isActiveStep ? 'border-blue-500 bg-blue-50/70 shadow-sm ring-2 ring-blue-400 cursor-pointer' :
-        !isLocked ? 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50/60 cursor-pointer' :
-        'border-slate-200 bg-slate-50/40'
+        isActivelyDrafting ? 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50/60 cursor-pointer' :
+        'border-slate-200 bg-slate-50/50'
       }`;
       
       const topRow = document.createElement('div');
       topRow.className = 'w-full flex items-center justify-between gap-1';
       const stepBadge = document.createElement('span');
       stepBadge.className = `text-[10px] px-1.5 py-0.2 rounded font-bold ${isActiveStep ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`;
-      stepBadge.textContent = `Step ${i + 1}`;
+      stepBadge.textContent = isActivelyDrafting ? `Step ${i + 1}` : `Hero ${i + 1}`;
       topRow.append(stepBadge);
 
       if (isActiveStep) {
@@ -1188,7 +1310,7 @@ function renderDraft(cache) {
         activeTag.className = 'text-[9px] font-bold text-blue-600 animate-pulse';
         activeTag.textContent = 'Picking';
         topRow.append(activeTag);
-      } else if (!isLocked) {
+      } else if (isActivelyDrafting) {
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.title = 'Deselect this step';
@@ -1232,7 +1354,7 @@ function renderDraft(cache) {
     } else {
       slotCard.className = `flex flex-col items-center justify-between p-2.5 rounded-xl border-2 border-dashed transition-all text-center min-h-[110px] ${
         isActiveStep ? 'border-blue-400 bg-blue-50/50 text-blue-700 ring-2 ring-blue-300 cursor-pointer' :
-        !isLocked ? 'border-slate-200 bg-slate-50/50 hover:border-blue-200 text-slate-400 cursor-pointer' :
+        isActivelyDrafting ? 'border-slate-200 bg-slate-50/50 hover:border-blue-200 text-slate-400 cursor-pointer' :
         'border-slate-200 bg-slate-50/30 text-slate-400'
       }`;
 
@@ -1240,7 +1362,7 @@ function renderDraft(cache) {
       topRow.className = 'w-full flex items-center justify-between';
       const stepBadge = document.createElement('span');
       stepBadge.className = `text-[10px] px-1.5 py-0.2 rounded font-bold ${isActiveStep ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`;
-      stepBadge.textContent = `Step ${i + 1}`;
+      stepBadge.textContent = isActivelyDrafting ? `Step ${i + 1}` : `Hero ${i + 1}`;
       topRow.append(stepBadge);
       if (isActiveStep) {
         const activeTag = document.createElement('span');
@@ -1252,14 +1374,16 @@ function renderDraft(cache) {
 
       const placeholderWrap = document.createElement('div');
       placeholderWrap.className = 'flex flex-col items-center justify-center my-auto';
-      placeholderWrap.innerHTML = `<span class="text-xl font-bold leading-none ${isActiveStep ? 'text-blue-500' : 'text-slate-300'}">+</span><span class="text-[11px] font-medium mt-1">Pick 1 of 3</span>`;
+      placeholderWrap.innerHTML = isActivelyDrafting ?
+        `<span class="text-xl font-bold leading-none ${isActiveStep ? 'text-blue-500' : 'text-slate-300'}">+</span><span class="text-[11px] font-medium mt-1">Pick 1 of 3</span>` :
+        `<span class="text-xs text-slate-400">Empty</span>`;
       slotCard.append(placeholderWrap);
     }
 
-    if (!isLocked) {
+    if (isActivelyDrafting) {
       slotCard.addEventListener('click', () => {
         activeDraftStep = i;
-        activeHeroSwapCandidateIndex = null;
+        activeHeroSwapTarget = null;
         render();
       });
     }
@@ -1268,8 +1392,13 @@ function renderDraft(cache) {
   teamSection.append(slotsGrid);
   container.append(teamSection);
 
-  // 4. Full 15-Hero Draft Grid (5 Columns x 3 Rows)
-  if (!isLocked) {
+  // 5. Full 15-Hero Draft Grid (5 Columns x 3 Rows)
+  // ONLY SHOWN WHEN ACTIVELY DRAFTING!
+  if (isActivelyDrafting) {
+    const candidatesMode = isViewingAttack ? 'attack' : 'defense';
+    const currentCandidates = draftStepCandidates[candidatesMode] ||
+      globalThis.hwaHelperPopupData.defaultDraftCandidates(candidatesMode);
+
     const chooserSection = document.createElement('div');
     chooserSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4';
 
@@ -1285,7 +1414,7 @@ function renderDraft(cache) {
 
     const chooserSub = document.createElement('div');
     chooserSub.className = 'text-xs text-slate-500';
-    chooserSub.textContent = 'Each column represents 1 pick step (choose 1 of 3 heroes). You can pick directly across all 5 columns to complete your lineup.';
+    chooserSub.textContent = `Each column represents 1 pick step for ${isViewingAttack ? 'Attack' : 'Defense'} (choose 1 of 3 heroes). You can pick directly across all 5 columns to complete your lineup.`;
     chooserTitleCol.append(chooserSub);
     chooserHeader.append(chooserTitleCol);
 
@@ -1300,7 +1429,7 @@ function renderDraft(cache) {
       resetBtn.className = 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 cursor-pointer transition-colors';
       resetBtn.textContent = 'Reset all 5 steps';
       resetBtn.addEventListener('click', () => {
-        if (isAttack) localDraftAttackPicks = [null, null, null, null, null];
+        if (isViewingAttack) localDraftAttackPicks = [null, null, null, null, null];
         else localDraftDefencePicks = [null, null, null, null, null];
         activeHeroSwapTarget = null;
         render();
@@ -1316,7 +1445,7 @@ function renderDraft(cache) {
 
     for (let stepIdx = 0; stepIdx < 5; stepIdx++) {
       const colBox = document.createElement('div');
-      const stepCandidates = draftStepCandidates[stepIdx] || [24, 4, 38];
+      const stepCandidates = currentCandidates[stepIdx] || [78, 49, 44];
       const isColChosen = Number.isInteger(currentPicks[stepIdx]) && currentPicks[stepIdx] > 0;
 
       colBox.className = `flex flex-col space-y-2 rounded-xl p-2.5 transition-colors ${
@@ -1348,104 +1477,91 @@ function renderDraft(cache) {
         const isChosen = currentPicks[stepIdx] === cHeroId;
 
         const card = document.createElement('div');
-        card.className = `rounded-lg p-2.5 flex flex-col items-center justify-between transition-all relative ${
-          isChosen ?
-            'border-2 border-emerald-500 bg-emerald-50/90 shadow-sm ring-1 ring-emerald-300' :
-            'border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 hover:shadow-xs cursor-pointer'
+        card.className = `relative flex flex-col items-center p-2 rounded-xl border transition-all text-center ${
+          isChosen ? 'border-emerald-500 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-400' :
+          'border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs'
         }`;
 
-        // Top tag row
+        // Top toolbar of candidate card: pick button & swap button
         const cardTop = document.createElement('div');
-        cardTop.className = 'w-full flex items-center justify-between text-xs mb-1';
+        cardTop.className = 'w-full flex items-center justify-between mb-1';
 
         const choiceTag = document.createElement('span');
-        choiceTag.className = `px-1.5 py-0.2 rounded text-[9px] font-bold ${
-          isChosen ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
-        }`;
+        choiceTag.className = 'text-[9px] font-bold text-slate-400';
         choiceTag.textContent = `#${cIdx + 1}`;
         cardTop.append(choiceTag);
 
-        const swapCandidateBtn = document.createElement('button');
-        swapCandidateBtn.type = 'button';
-        swapCandidateBtn.title = 'Substitute candidate hero';
-        swapCandidateBtn.className = 'text-[10px] text-blue-600 hover:underline font-medium cursor-pointer';
-        swapCandidateBtn.textContent = '✎';
-        swapCandidateBtn.addEventListener('click', (e) => {
+        const swapBtn = document.createElement('button');
+        swapBtn.type = 'button';
+        swapBtn.title = 'Swap this candidate hero';
+        swapBtn.className = 'text-[10px] text-slate-400 hover:text-blue-600 cursor-pointer p-0.5 rounded hover:bg-slate-100';
+        swapBtn.textContent = '⇄';
+        swapBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (activeHeroSwapTarget && activeHeroSwapTarget.step === stepIdx && activeHeroSwapTarget.candidateIndex === cIdx) {
-            activeHeroSwapTarget = null;
-          } else {
-            activeHeroSwapTarget = { step: stepIdx, candidateIndex: cIdx };
-          }
+          activeHeroSwapTarget = { stepIdx, candidateIdx: cIdx };
           render();
         });
-        cardTop.append(swapCandidateBtn);
+        cardTop.append(swapBtn);
         card.append(cardTop);
 
-        // Hero Avatar & Meta
-        const avatarPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${cHeroId}.webp` : null);
-        const glow = starGlowClass(snap?.star, false);
-        if (avatarPath) {
-          const img = document.createElement('img');
-          img.src = avatarPath;
-          img.alt = meta.name || `#${cHeroId}`;
-          img.className = `size-11 rounded-full object-cover shrink-0 ${glow}`;
-          card.append(img);
+        // Avatar + Name + Role
+        const avWrap = document.createElement('div');
+        avWrap.className = 'relative cursor-pointer my-0.5';
+        const aPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${cHeroId}.webp` : null);
+        const cardGlow = starGlowClass(snap?.star, false);
+        if (aPath) {
+          const aImg = document.createElement('img');
+          aImg.src = aPath;
+          aImg.className = `size-9 rounded-full object-cover shrink-0 ${cardGlow}`;
+          avWrap.append(aImg);
         } else {
-          card.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, false));
+          avWrap.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, false));
         }
+        card.append(avWrap);
 
-        const nameEl = document.createElement('div');
-        nameEl.className = 'text-xs font-bold text-slate-900 mt-1 text-center truncate max-w-[110px]';
-        nameEl.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
-        card.append(nameEl);
+        const nameLabel = document.createElement('div');
+        nameLabel.className = 'text-xs font-bold text-slate-800 truncate max-w-[90px] mt-0.5';
+        nameLabel.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
+        card.append(nameLabel);
 
-        const badgesRow = document.createElement('div');
-        badgesRow.className = 'flex items-center gap-1 flex-wrap justify-center text-[9px] my-1';
         if (meta.role) {
-          const roleSpan = document.createElement('span');
-          roleSpan.className = 'px-1 py-0.2 rounded bg-blue-100 text-blue-800 font-semibold';
-          roleSpan.textContent = meta.role;
-          badgesRow.append(roleSpan);
+          const rBadge = document.createElement('span');
+          rBadge.className = 'text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium my-0.5';
+          rBadge.textContent = meta.role;
+          card.append(rBadge);
         }
-        if (snap?.power) {
-          const pwrSpan = document.createElement('span');
-          pwrSpan.className = 'px-1 py-0.2 rounded bg-amber-100 text-amber-900 font-medium tabular-nums';
-          pwrSpan.textContent = `⚡${formatNumber(snap.power)}`;
-          badgesRow.append(pwrSpan);
-        }
-        card.append(badgesRow);
 
-        // Selection indicator button
-        const selectBtn = document.createElement('button');
-        selectBtn.type = 'button';
-        if (isChosen) {
-          selectBtn.className = 'w-full py-1 rounded bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center gap-1 cursor-default mt-1';
-          selectBtn.textContent = '✓ Selected';
-        } else {
-          selectBtn.className = 'w-full py-1 rounded bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-[10px] font-semibold flex items-center justify-center cursor-pointer mt-1 transition-colors';
-          selectBtn.textContent = 'Select';
-        }
-        card.append(selectBtn);
-
-        card.addEventListener('click', () => {
+        // Pick / Picked button
+        const pickCardBtn = document.createElement('button');
+        pickCardBtn.type = 'button';
+        pickCardBtn.className = `mt-1.5 w-full py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+          isChosen ?
+            'bg-emerald-600 text-white shadow-xs' :
+            'bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200'
+        }`;
+        pickCardBtn.textContent = isChosen ? '✓ Selected' : 'Pick';
+        pickCardBtn.addEventListener('click', () => {
           currentPicks[stepIdx] = cHeroId;
+          const nextEmpty = currentPicks.findIndex((p, idx) => idx > stepIdx && !p);
+          if (nextEmpty !== -1) {
+            activeDraftStep = nextEmpty;
+          }
           activeHeroSwapTarget = null;
           render();
         });
+        card.append(pickCardBtn);
 
         colBox.append(card);
       }
-
       fullGrid.append(colBox);
     }
     chooserSection.append(fullGrid);
 
-    // If candidate substitution drawer is open
+    // Swap drawer if active
     if (activeHeroSwapTarget) {
-      const { step: sIdx, candidateIndex: cIdx } = activeHeroSwapTarget;
+      const { stepIdx: sIdx, candidateIdx: cIdx } = activeHeroSwapTarget;
       const swapWrap = document.createElement('div');
-      swapWrap.className = 'p-3 rounded-xl border border-blue-200 bg-blue-50/50 space-y-2 mt-2';
+      swapWrap.className = 'rounded-xl border border-blue-200 bg-blue-50/70 p-3 space-y-2';
 
       const swapHeader = document.createElement('div');
       swapHeader.className = 'flex items-center justify-between';
@@ -1494,10 +1610,10 @@ function renderDraft(cache) {
         itemBtn.append(sName);
 
         itemBtn.addEventListener('click', () => {
-          if (!draftStepCandidates[sIdx]) {
-            draftStepCandidates[sIdx] = [24, 4, 38];
+          if (!currentCandidates[sIdx]) {
+            currentCandidates[sIdx] = [78, 49, 44];
           }
-          draftStepCandidates[sIdx][cIdx] = hId;
+          currentCandidates[sIdx][cIdx] = hId;
           activeHeroSwapTarget = null;
           render();
         });
@@ -1508,21 +1624,34 @@ function renderDraft(cache) {
     }
 
     container.append(chooserSection);
-  } else {
-    // Locked notice
+  } else if (!draft.matchId && !draft.defenceHeroes?.length && !draft.attackHeroes?.length) {
+    // Idle state when not in draft and no previous draft exists
+    const idleCard = document.createElement('div');
+    idleCard.className = 'rounded-xl border border-slate-200 bg-slate-50/70 p-6 text-center space-y-2';
+    idleCard.innerHTML = `
+      <div class="text-sm font-bold text-slate-800">Legend Draft: Not in match</div>
+      <div class="text-xs text-slate-500 max-w-md mx-auto">Start a Legend Draft match in Hero Wars to activate live assistance. Once a match begins, you can pick heroes, review enemy defense, and optimize counter-lineups.</div>
+    `;
+    container.append(idleCard);
+  } else if (isModeLocked && (isDefenseStage || isAttackStage)) {
+    // Mode locked notice during active match
     const lockedCard = document.createElement('div');
-    lockedCard.className = 'rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-center space-y-1.5';
+    lockedCard.className = 'rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-center space-y-1';
     lockedCard.innerHTML = `
-      <div class="text-base font-bold text-emerald-900 flex items-center justify-center gap-2">
-        <span>✓</span> <span>5-Hero Lineup successfully locked!</span>
+      <div class="text-sm font-bold text-emerald-900 flex items-center justify-center gap-1.5">
+        <span>✓</span> <span>${isViewingAttack ? 'Attack' : 'Defense'} Lineup locked!</span>
       </div>
-      <div class="text-xs text-emerald-700">The system recorded 5 heroes for ${isDefense ? 'Defense Lineup' : 'Attack Lineup'}. The match will proceed to the next stage.</div>
+      <div class="text-xs text-emerald-700">The 5 heroes for this stage are locked. The match will proceed to the next stage.</div>
     `;
     container.append(lockedCard);
   }
 
-  view.append(container);
-  status.textContent = `${draft.matchId ? `Match #${draft.matchId} • ` : ''}${globalThis.hwaHelperPopupData.draftStageDescription(stageId)} • Selected ${val.count}/5 steps`;
+  view.replaceChildren(container);
+  const stageDesc = globalThis.hwaHelperPopupData.draftStageDescription(stageId);
+  const matchPrefix = draft.matchId ? `Match #${draft.matchId} • ` : '';
+  const pickInfo = isActivelyDrafting ? ` • Selected ${val.count}/5 steps` :
+    (val.count === 5 ? ` • ${isViewingAttack ? 'Attack' : 'Defense'} lineup locked (5 heroes)` : '');
+  status.textContent = `${matchPrefix}${stageDesc}${pickInfo}`;
 }
 
 function openGuildVersusModal(vsStatus) {

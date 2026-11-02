@@ -130,6 +130,7 @@
     if (stageId === 2 || stageId === 3) return 'Defense Draft';
     if (stageId === 4) return 'Attack Draft';
     if (stageId === 5) return 'Ready for Battle';
+    if (stageId === 7) return 'Match Completed';
     return 'Not in match';
   }
 
@@ -179,13 +180,22 @@
     return lines.join('\n');
   }
 
-  function defaultDraftCandidates() {
+  function defaultDraftCandidates(mode = 'defense') {
+    if (mode === 'attack') {
+      return [
+        [8, 49, 28],   // Step 1: Chabba, Satori, Qing Mao
+        [73, 56, 12],  // Step 2: Drayne, Fafnir, Arachne
+        [17, 34, 14],  // Step 3: Mojo, Rufus, Heidi
+        [4, 55, 10],   // Step 4: Astaroth, Mushy and Shroom, Dante
+        [29, 25, 78]   // Step 5: Lars, Ishmael, Wodryn
+      ];
+    }
     return [
-      [24, 4, 38],    // Round 1: Cleaver, Astaroth, Corvus
-      [12, 16, 49],   // Round 2: Arachne, Dante, Yasmine
-      [51, 55, 10],   // Round 3: Xe'Sha, Mushy and Shroom, Orion
-      [502, 39, 503], // Round 4: Morrigan, Martha, Alvanor
-      [68, 56, 36]    // Round 5: Peech, Fafnir, Jorgen
+      [78, 49, 44],  // Step 1: Wodryn, Satori, Astrid and Lucas
+      [76, 20, 38],  // Step 2: Crow, Markus, Ziri
+      [75, 2, 25],   // Step 3: Oya, Ginger, Ishmael
+      [37, 73, 28],  // Step 4: Jhu, Drayne, Qing Mao
+      [5, 35, 69]    // Step 5: Artemis, Faceless, Guus
     ];
   }
 

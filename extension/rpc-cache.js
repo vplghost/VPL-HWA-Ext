@@ -786,6 +786,15 @@
           }];
         }
         if (call.name === 'randomDraft_result') {
+          const resp = result?.response;
+          const attackHeroes = resp?.attackReplay?.attackers ?
+            Object.keys(resp.attackReplay.attackers).map(Number) : [];
+          const enemyDefenceHeroes = Array.isArray(resp?.attackReplay?.defenders) && resp.attackReplay.defenders[0] ?
+            Object.keys(resp.attackReplay.defenders[0]).map(Number) : [];
+          const defenceHeroes = Array.isArray(resp?.defenceReplay?.defenders) && resp.defenceReplay.defenders[0] ?
+            Object.keys(resp.defenceReplay.defenders[0]).map(Number) : [];
+          const enemyAttackHeroes = resp?.defenceReplay?.attackers ?
+            Object.keys(resp.defenceReplay.attackers).map(Number) : [];
           return [{
             key: 'legendDraftAction',
             method: call.name,
@@ -793,10 +802,15 @@
             group: 'internal',
             data: {
               action: 'result',
-              matchId: call.args?.matchId,
-              result: result?.response?.result ?? null,
-              rating: result?.response?.rating ?? null,
-              reward: result?.response?.reward ?? null
+              matchId: call.args?.matchId ?? resp?.matchId ?? null,
+              result: resp?.result ?? null,
+              resultDetails: resp?.resultDetails ?? null,
+              rating: resp?.rating ?? null,
+              reward: resp?.reward ?? null,
+              attackHeroes,
+              enemyDefenceHeroes,
+              defenceHeroes,
+              enemyAttackHeroes
             },
             updatedAt: record.timestamp
           }];
@@ -1050,7 +1064,9 @@
               ...previous,
               ...entry.data,
               defenceHeroes: previous.defenceHeroes || [],
-              attackHeroes: previous.attackHeroes || []
+              attackHeroes: previous.attackHeroes || [],
+              enemyDefenceHeroes: previous.enemyDefenceHeroes || [],
+              enemyAttackHeroes: previous.enemyAttackHeroes || []
             },
             updatedAt: entry.updatedAt
           };
@@ -1077,6 +1093,10 @@
             draft.inBattle = false;
             draft.stageId = 0;
             draft.lastResult = entry.data;
+            if (entry.data.attackHeroes?.length) draft.attackHeroes = entry.data.attackHeroes;
+            if (entry.data.defenceHeroes?.length) draft.defenceHeroes = entry.data.defenceHeroes;
+            if (entry.data.enemyDefenceHeroes?.length) draft.enemyDefenceHeroes = entry.data.enemyDefenceHeroes;
+            if (entry.data.enemyAttackHeroes?.length) draft.enemyAttackHeroes = entry.data.enemyAttackHeroes;
           }
           next.legendDraftStatus = {
             key: 'legendDraftStatus',
