@@ -122,6 +122,7 @@ test('createHeroInline wraps both avatar and text inside .hero-hover-trigger', (
 
   const card = container.querySelector('.hero-hover-card');
   assert.ok(card, 'Card should be inside container');
+  assert.ok(card.textContent.includes('#1'), 'Card should display hero ID badge');
 
   const bigImg = card.children[0].children.find(c => c.tagName === 'IMG');
   assert.ok(bigImg, 'Card should contain large avatar img');
@@ -232,6 +233,7 @@ test('createTitanInline creates hover trigger, avatar, star-glow, and card for t
 
   const card = container.querySelector('.hero-hover-card');
   assert.ok(card, 'Card should be inside container');
+  assert.ok(card.textContent.includes('#4000'), 'Card should display titan ID badge');
 
   const bigImg = card.children[0].children.find(c => c.tagName === 'IMG');
   assert.ok(bigImg, 'Card should contain large avatar img');
@@ -291,13 +293,16 @@ test('table defaults to Power descending sort on Heroes tab', () => {
   const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
 
   // Sorted by Power descending: Keira (180k), Galahad (160k), Aurora (150k), Astaroth (140k)
-  assert.equal(dataRows[0].children[0].textContent, '3');
-  assert.equal(dataRows[1].children[0].textContent, '2');
-  assert.equal(dataRows[2].children[0].textContent, '1');
-  assert.equal(dataRows[3].children[0].textContent, '4');
+  // ID is hidden from row cell and kept in button dataset
+  assert.equal(dataRows[0].children[0].textContent, '');
+  assert.equal(dataRows[0].children[0].querySelector('button').dataset.heroId, '3');
+  assert.equal(dataRows[1].children[0].querySelector('button').dataset.heroId, '2');
+  assert.equal(dataRows[2].children[0].querySelector('button').dataset.heroId, '1');
+  assert.equal(dataRows[3].children[0].querySelector('button').dataset.heroId, '4');
 
-  // Power header has descending sort mark
+  // Header has 'Fav' instead of 'Hero ID', and Power header has descending sort mark
   const headerCells = tableEl.children.find(c => c.tagName === 'TR').children;
+  assert.ok(headerCells[0].textContent.includes('Fav'));
   const powerHeader = headerCells[5];
   assert.equal(powerHeader.getAttribute('aria-sort'), 'descending');
   assert.ok(powerHeader.textContent.includes('Power ↓'));
@@ -318,10 +323,11 @@ test('favorite hero icon toggles favorite state and prioritizes favorite heroes 
   const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
 
   // Favorites at top (Aurora 150k, Astaroth 140k), then non-favorites (Keira 180k, Galahad 160k)
-  assert.equal(dataRows[0].children[0].textContent, '1');
-  assert.equal(dataRows[1].children[0].textContent, '4');
-  assert.equal(dataRows[2].children[0].textContent, '3');
-  assert.equal(dataRows[3].children[0].textContent, '2');
+  assert.equal(dataRows[0].children[0].textContent, '');
+  assert.equal(dataRows[0].children[0].querySelector('button').dataset.heroId, '1');
+  assert.equal(dataRows[1].children[0].querySelector('button').dataset.heroId, '4');
+  assert.equal(dataRows[2].children[0].querySelector('button').dataset.heroId, '3');
+  assert.equal(dataRows[3].children[0].querySelector('button').dataset.heroId, '2');
 
   assert.equal(dataRows[0].dataset.favorite, 'true');
   assert.equal(dataRows[1].dataset.favorite, 'true');
@@ -382,6 +388,7 @@ test('createTitanInline renders enriched hover card with skills, skins, and arti
   const container = createTitanInline('4000', 'Sigurd', sigurdSnapshot);
   const card = container.querySelector('.hero-hover-card');
   assert.ok(card, 'Card should exist');
+  assert.ok(card.textContent.includes('#4000'), 'Should display titan ID badge');
   assert.ok(card.textContent.includes('Tank'), 'Should mention Tank');
   assert.ok(card.textContent.includes('Water'), 'Should mention Water');
   assert.ok(card.textContent.includes('S1: 45'), 'Should display skill level');
@@ -408,10 +415,15 @@ test('table supports favorite titans toggle and prioritizes favorites at the top
   const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
 
   // Favorites at top (Sigurd 7358, Angus 7100), then non-favorites (Araji 12500, Nova 8200)
-  assert.equal(dataRows[0].children[0].textContent, '4000');
-  assert.equal(dataRows[1].children[0].textContent, '4020');
-  assert.equal(dataRows[2].children[0].textContent, '4013');
-  assert.equal(dataRows[3].children[0].textContent, '4001');
+  assert.equal(dataRows[0].children[0].textContent, '');
+  assert.equal(dataRows[0].children[0].querySelector('button').dataset.titanId, '4000');
+  assert.equal(dataRows[1].children[0].querySelector('button').dataset.titanId, '4020');
+  assert.equal(dataRows[2].children[0].querySelector('button').dataset.titanId, '4013');
+  assert.equal(dataRows[3].children[0].querySelector('button').dataset.titanId, '4001');
+
+  // Header has 'Fav' instead of 'Titan ID'
+  const titanHeaderCells = tableEl.children.find(c => c.tagName === 'TR').children;
+  assert.ok(titanHeaderCells[0].textContent.includes('Fav'));
 
   assert.equal(dataRows[0].dataset.favorite, 'true');
   assert.equal(dataRows[1].dataset.favorite, 'true');
@@ -475,13 +487,13 @@ test('table renders Artifacts column with bold level when upgradable', () => {
   const tableEl = table(headings, rows);
   const dataRows = tableEl.children.filter(c => c.tagName === 'TR').slice(1);
 
-  const sigurdRow = dataRows.find(r => r.children[0].textContent.includes('4000'));
+  const sigurdRow = dataRows.find(r => r.children[0].querySelector('button')?.dataset.titanId === '4000');
   const sigurdArtCell = sigurdRow.children[5];
   assert.equal(sigurdArtCell.textContent, '20 - 15 - 20');
   const boldNodes = sigurdArtCell.children.filter(c => c.tagName === 'STRONG');
   assert.equal(boldNodes.length, 3, 'All 3 upgradable artifact levels should be strong/bolded');
 
-  const novaRow = dataRows.find(r => r.children[0].textContent.includes('4001'));
+  const novaRow = dataRows.find(r => r.children[0].querySelector('button')?.dataset.titanId === '4001');
   const novaArtCell = novaRow.children[5];
   assert.equal(novaArtCell.textContent, '45 - 45 - 45');
   const novaBoldNodes = novaArtCell.children.filter(c => c.tagName === 'STRONG');
@@ -489,4 +501,38 @@ test('table renders Artifacts column with bold level when upgradable', () => {
 
   context.activeTab = 'heroes';
   context.currentCache = {};
+});
+
+test('popup header displays extension version formatted as v.#.#.#', () => {
+  const versionEl = new MockElement('strong');
+  versionEl.attributes.id = 'version';
+  const headerVersionEl = new MockElement('span');
+  headerVersionEl.attributes.id = 'extension-header-version';
+
+  const doc = {
+    ...mockDoc,
+    querySelector: (sel) => {
+      if (sel === '#version') return versionEl;
+      if (sel === '#extension-header-version') return headerVersionEl;
+      return mockDoc.createElement('div');
+    }
+  };
+
+  const vContext = {
+    document: doc,
+    chrome: {
+      runtime: {
+        getManifest: () => ({ version: '0.9.28' })
+      }
+    }
+  };
+
+  const verSnippet = popupJs.slice(
+    popupJs.indexOf('const extManifestVer = chrome.runtime?.getManifest'),
+    popupJs.indexOf('const openTabButton = document.querySelector')
+  );
+  vm.runInNewContext(verSnippet, vContext);
+
+  assert.equal(versionEl.textContent, '0.9.28');
+  assert.equal(headerVersionEl.textContent, 'v.0.9.28');
 });

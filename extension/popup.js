@@ -239,7 +239,13 @@ async function toggleFavoriteTitan(titanId) {
   render();
 }
 
-document.querySelector('#version').textContent = chrome.runtime.getManifest().version;
+const extManifestVer = chrome.runtime?.getManifest?.()?.version;
+if (extManifestVer) {
+  const vEl = document.querySelector('#version');
+  if (vEl) vEl.textContent = extManifestVer;
+  const headerVEl = document.querySelector('#extension-header-version');
+  if (headerVEl) headerVEl.textContent = `v.${extManifestVer}`;
+}
 const openTabButton = document.querySelector('#open-tab');
 if (new URLSearchParams(location.search).get('view') === 'tab') {
   openTabButton.hidden = true;
@@ -803,10 +809,22 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
   const infoCol = document.createElement('div');
   infoCol.className = 'min-w-0 flex-1 space-y-0.5';
 
+  const nameRow = document.createElement('div');
+  nameRow.className = 'flex items-center justify-between gap-1';
+
   const nameEl = document.createElement('div');
   nameEl.className = 'font-bold text-sm text-white truncate';
   nameEl.textContent = displayName;
-  infoCol.append(nameEl);
+  nameRow.append(nameEl);
+
+  if (heroId) {
+    const idBadge = document.createElement('span');
+    idBadge.className = 'text-[10px] font-mono px-1 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0';
+    idBadge.textContent = `#${heroId}`;
+    nameRow.append(idBadge);
+  }
+
+  infoCol.append(nameRow);
 
   const starsEl = document.createElement('div');
   starsEl.className = 'flex items-center gap-1 text-xs';
@@ -1057,10 +1075,22 @@ function createTitanInline(titanId, displayName, titanSnapshot) {
   const infoCol = document.createElement('div');
   infoCol.className = 'min-w-0 flex-1 space-y-0.5';
 
+  const nameRow = document.createElement('div');
+  nameRow.className = 'flex items-center justify-between gap-1';
+
   const nameEl = document.createElement('div');
   nameEl.className = 'font-bold text-sm text-white truncate';
   nameEl.textContent = displayName;
-  infoCol.append(nameEl);
+  nameRow.append(nameEl);
+
+  if (titanId) {
+    const idBadge = document.createElement('span');
+    idBadge.className = 'text-[10px] font-mono px-1 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0';
+    idBadge.textContent = `#${titanId}`;
+    nameRow.append(idBadge);
+  }
+
+  infoCol.append(nameRow);
 
   const starsEl = document.createElement('div');
   starsEl.className = 'flex items-center gap-1 text-xs';
@@ -1252,7 +1282,8 @@ function table(headings, rows) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `flex w-full cursor-pointer items-center gap-1 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600 ${isNumericColumn(heading) ? 'justify-end text-right' : 'text-left'}`;
-    button.textContent = `${heading} ${selectedSort?.column === index ?
+    const displayHeading = ((heading === 'Hero ID' && activeTab === 'heroes') || (heading === 'Titan ID' && activeTab === 'titans')) ? 'Fav' : heading;
+    button.textContent = `${displayHeading} ${selectedSort?.column === index ?
       (selectedSort.direction === 'asc' ? '↑' : '↓') : '↕'}`;
     button.addEventListener('click', () => {
       sortState[activeTab] = { column: index,
@@ -1299,6 +1330,7 @@ function table(headings, rows) {
 
         const favBtn = document.createElement('button');
         favBtn.type = 'button';
+        favBtn.dataset.heroId = heroId;
         favBtn.className = `cursor-pointer rounded p-0.5 transition-colors ${
           isThisFav ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400'
         }`;
@@ -1327,9 +1359,7 @@ function table(headings, rows) {
           await toggleFavoriteHero(heroId);
         });
 
-        const idSpan = document.createElement('span');
-        idSpan.textContent = heroId;
-        wrap.append(favBtn, idSpan);
+        wrap.append(favBtn);
         cell.append(wrap);
       } else if (heading === 'Titan ID' && activeTab === 'titans') {
         const titanId = String(value);
@@ -1339,6 +1369,7 @@ function table(headings, rows) {
 
         const favBtn = document.createElement('button');
         favBtn.type = 'button';
+        favBtn.dataset.titanId = titanId;
         favBtn.className = `cursor-pointer rounded p-0.5 transition-colors ${
           isThisFav ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400'
         }`;
@@ -1367,9 +1398,7 @@ function table(headings, rows) {
           await toggleFavoriteTitan(titanId);
         });
 
-        const idSpan = document.createElement('span');
-        idSpan.textContent = titanId;
-        wrap.append(favBtn, idSpan);
+        wrap.append(favBtn);
         cell.append(wrap);
       } else if (heading === 'Name' && activeTab === 'heroes') {
         const heroId = values[0];
