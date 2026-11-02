@@ -524,3 +524,72 @@ test("unityFramework hook captures Module and SendMessage on postRun", async () 
   assert.equal(postRunStatus.hasSendMessage, true);
 });
 
+test("syncRequestId rewrites stale x-request-id in xhr.setRequestHeader to prevent server rejection", async () => {
+  const { window, sessionStorage } = setup(async () => new Response("ok"), true);
+
+  // Set current highest request ID (e.g. extension dispatched request #50)
+  sessionStorage.setItem("hwa_highest_request_id", "50");
+
+  const req = new window.XMLHttpRequest();
+  req.open("POST", "https://api.hero-wars-alliance.com/api/rpc");
+
+  // Unity tries to send a request with an internal counter that fell behind (e.g. 26)
+  req.setRequestHeader("X-Request-Id", "26");
+
+  // Header should be rewritten to strictly > 50 (i.e. 51)
+  assert.equal(req["X-Request-Id"], "51");
+  assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "51");
+
+  // Next Unity request with 27 is also rewritten to 52
+  const req2 = new window.XMLHttpRequest();
+  req2.open("POST", "https://api.hero-wars-alliance.com/api/rpc");
+  req2.setRequestHeader("x-request-id", "27");
+  assert.equal(req2["x-request-id"], "52");
+  assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "52");
+
+  // Unity request with a genuinely higher counter (e.g. 100) is accepted and advances the tracker
+  const req3 = new window.XMLHttpRequest();
+  req3.open("POST", "https://api.hero-wars-alliance.com/api/rpc");
+  req3.setRequestHeader("x-request-id", "100");
+  assert.equal(req3["x-request-id"], "100");
+  assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "100");
+});
+
+test("refresh-rpc dispatch emits api-record with response body to update rpcCache", async () => {
+  const messages = [];
+  const fakeResponse = JSON.stringify({
+    results: [
+      { ident: "claim1", result: { response: { ok: true } } }
+    ]
+  });
+
+  const { window } = setup(async (url, opts) => {
+    return new Response(fakeResponse, {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  }, false); // Even with captureEnabled = false!
+
+  window.addEventListener("message", (ev) => {
+    if (ev.data?.source === "hwa-helper-api") {
+      messages.push(ev.data);
+    }
+  });
+
+  window.postMessage({
+    source: "hwa-helper-control",
+    kind: "refresh-rpc",
+    calls: [{ name: "mailFarm", args: { letterIds: [1] } }]
+  }, "https://www.hero-wars-alliance.com");
+
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  const resultMsg = messages.find((m) => m.kind === "refresh-rpc-result");
+  assert.ok(resultMsg, "Should emit refresh-rpc-result");
+  assert.equal(resultMsg.ok, true);
+
+  const apiRecordMsg = messages.find((m) => m.kind === "api-record");
+  assert.ok(apiRecordMsg, "Should emit api-record so rpcCache gets merged");
+  assert.equal(apiRecordMsg.record.responseBody, fakeResponse);
+});
+

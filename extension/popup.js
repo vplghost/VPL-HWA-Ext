@@ -48,6 +48,49 @@ let currentTabConfig = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true 
 let currentAutoClaimSettings = { mail: true, reports: true, quests: true, onOpen: false };
 let hasAutoClaimedThisSession = false;
 
+let itemsViewMode = 'grid'; // 'grid' | 'list'
+try {
+  chrome.storage?.local?.get?.('itemsViewMode')?.then?.((stored) => {
+    if (stored?.itemsViewMode) {
+      itemsViewMode = stored.itemsViewMode;
+      updateItemsViewButtons();
+    }
+  });
+} catch (_) {}
+
+function updateItemsViewButtons() {
+  const btnGrid = document.querySelector('#items-view-grid');
+  const btnList = document.querySelector('#items-view-list');
+  if (!btnGrid || !btnList) return;
+  if (itemsViewMode === 'grid') {
+    btnGrid.className = 'cursor-pointer rounded-md px-2.5 py-1.5 transition-all bg-white text-blue-700 shadow-xs font-semibold';
+    btnList.className = 'cursor-pointer rounded-md px-2.5 py-1.5 transition-all text-slate-600 hover:text-slate-900 font-normal';
+  } else {
+    btnList.className = 'cursor-pointer rounded-md px-2.5 py-1.5 transition-all bg-white text-blue-700 shadow-xs font-semibold';
+    btnGrid.className = 'cursor-pointer rounded-md px-2.5 py-1.5 transition-all text-slate-600 hover:text-slate-900 font-normal';
+  }
+}
+
+document.querySelector('#items-view-grid')?.addEventListener('click', async () => {
+  if (itemsViewMode === 'grid') return;
+  itemsViewMode = 'grid';
+  updateItemsViewButtons();
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    await chrome.storage.local.set({ itemsViewMode: 'grid' });
+  }
+  render();
+});
+
+document.querySelector('#items-view-list')?.addEventListener('click', async () => {
+  if (itemsViewMode === 'list') return;
+  itemsViewMode = 'list';
+  updateItemsViewButtons();
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    await chrome.storage.local.set({ itemsViewMode: 'list' });
+  }
+  render();
+});
+
 function normalizeTabConfig(storedConfig) {
   if (!Array.isArray(storedConfig) || storedConfig.length === 0) {
     return DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
@@ -1542,14 +1585,157 @@ async function recordedEntries() {
 function updateItemGroups(data) {
   const selected = itemGroup.value;
   itemGroup.replaceChildren();
+  const getLabel = (group) => {
+    const meta = globalThis.hwaHelperPopupData?.getItemCategoryMeta?.(group);
+    return meta ? `${meta.label} (${group})` : group;
+  };
   for (const [value, label] of [['', 'All groups'],
-    ...Object.keys(data ?? {}).sort().map((group) => [group, group])]) {
+    ...Object.keys(data ?? {}).sort().map((group) => [group, getLabel(group)])]) {
     const option = document.createElement('option');
     option.value = value;
     option.textContent = label;
     itemGroup.append(option);
   }
   itemGroup.value = [...itemGroup.options].some((option) => option.value === selected) ? selected : '';
+}
+
+function renderInventoryGrid(cache) {
+  const entry = cache.inventoryGet;
+  if (!entry?.data) {
+    if (tableExportBtn) tableExportBtn.hidden = true;
+    status.textContent = 'No cached data yet. Use the game to observe RPCs.';
+    showEmpty('No matching RPC observed yet.');
+    return;
+  }
+
+  const selectedGroup = itemGroup.value;
+  const groups = Object.entries(entry.data)
+    .filter(([category]) => !selectedGroup || category === selectedGroup)
+    .map(([category, items]) => {
+      const meta = globalThis.hwaHelperPopupData?.getItemCategoryMeta?.(category) || {
+        order: 100,
+        label: category,
+        icon: '📦'
+      };
+      const itemList = Object.entries(items ?? {})
+        .map(([id, quantity]) => {
+          const name = globalThis.hwaHelperNameMap?.item?.(category, id) || '—';
+          return {
+            id,
+            category,
+            name,
+            amount: Number(quantity) || 0
+          };
+        })
+        .filter((it) => matches([category, it.id, it.name, it.amount]))
+        .sort((a, b) => Number(a.id) - Number(b.id));
+
+      return {
+        category,
+        order: meta.order,
+        label: meta.label,
+        icon: meta.icon,
+        items: itemList
+      };
+    })
+    .filter((g) => g.items.length > 0)
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
+
+  const totalItems = groups.reduce((acc, g) => acc + g.items.length, 0);
+  status.textContent = `${totalItems} items across ${groups.length} groups · Updated ${formatTime(entry.updatedAt)}`;
+  if (tableExportBtn) tableExportBtn.hidden = totalItems === 0;
+
+  if (totalItems === 0) {
+    showEmpty('No rows match the filter.');
+    return;
+  }
+
+  const getItemAbbr = globalThis.hwaHelperPopupData?.getItemAbbr || ((name, id) => id ? `#${id}` : '');
+
+  const container = document.createElement('div');
+  container.className = 'space-y-4 p-2';
+
+  for (const group of groups) {
+    const groupSection = document.createElement('section');
+    groupSection.className = 'space-y-2';
+
+    // Group Divider Header
+    const header = document.createElement('div');
+    header.className = 'flex items-center gap-2 border-b border-slate-200 pb-1.5 pt-1';
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'text-sm select-none';
+    iconSpan.textContent = group.icon;
+
+    const title = document.createElement('h3');
+    title.className = 'text-xs font-bold text-slate-800 uppercase tracking-wide';
+    title.textContent = group.label;
+
+    const countBadge = document.createElement('span');
+    countBadge.className = 'rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 tabular-nums';
+    countBadge.textContent = String(group.items.length);
+
+    header.append(iconSpan, title, countBadge);
+    groupSection.append(header);
+
+    // Borderless Inventory Grid
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2';
+
+    for (const item of group.items) {
+      const tile = document.createElement('div');
+      tile.className = 'relative aspect-square rounded-xl bg-slate-800 flex items-center justify-center p-1 select-none overflow-hidden ring-1 ring-slate-700/60 hover:ring-2 hover:ring-blue-400 hover:scale-105 transition-all shadow-xs cursor-default';
+      tile.setAttribute('title', `${item.name} (${group.label} #${item.id})\nQuantity: ${formatNumber(item.amount)}`);
+
+      // Visual Content
+      if (item.category === 'fragmentHero') {
+        const img = document.createElement('img');
+        img.src = `assets/heroes/${item.id}.webp`;
+        img.alt = item.name;
+        img.className = 'size-full object-cover rounded-lg pointer-events-none';
+        img.onerror = () => {
+          img.src = `assets/heroes/${item.id}.png`;
+          img.onerror = () => {
+            img.style.display = 'none';
+          };
+        };
+        tile.append(img);
+      } else if (item.category === 'fragmentTitan') {
+        const img = document.createElement('img');
+        img.src = `assets/titans/${item.id}.png`;
+        img.alt = item.name;
+        img.className = 'size-full object-cover rounded-lg pointer-events-none';
+        img.onerror = () => {
+          img.style.display = 'none';
+        };
+        tile.append(img);
+      } else {
+        const icon = document.createElement('span');
+        icon.className = 'text-2xl select-none drop-shadow-sm opacity-85 pointer-events-none';
+        icon.textContent = group.icon;
+        tile.append(icon);
+      }
+
+      // Small abbreviated name at top-left
+      const abbrSpan = document.createElement('span');
+      abbrSpan.className = 'absolute top-1 left-1.5 text-[9px] font-black uppercase text-amber-300 drop-shadow-md tracking-tight leading-none truncate max-w-[80%] pointer-events-none';
+      abbrSpan.textContent = getItemAbbr(item.name, item.id);
+      tile.append(abbrSpan);
+
+      // Small quantity at bottom-right
+      const qtySpan = document.createElement('span');
+      qtySpan.className = 'absolute bottom-1 right-1 text-[10px] font-bold text-white tabular-nums bg-slate-950/85 rounded px-1 leading-tight shadow-xs border border-white/10 pointer-events-none';
+      qtySpan.textContent = formatNumber(item.amount);
+      tile.append(qtySpan);
+
+      grid.append(tile);
+    }
+
+    groupSection.append(grid);
+    container.append(groupSection);
+  }
+
+  view.append(container);
 }
 
 let localDraftDefencePicks = [null, null, null, null, null];
@@ -4191,6 +4377,8 @@ async function render() {
   }
   document.querySelector('#clear').hidden = activeTab !== 'log';
   document.querySelector('#item-group-filter').hidden = activeTab !== 'items';
+  const itemsViewToggle = document.querySelector('#items-view-toggle');
+  if (itemsViewToggle) itemsViewToggle.hidden = activeTab !== 'items';
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
   document.querySelector('#resource-sort-wrap').hidden = activeTab !== 'resources';
   if (resourceFilterToggle) resourceFilterToggle.hidden = activeTab !== 'resources';
@@ -4225,10 +4413,15 @@ async function render() {
       }));
   } else if (activeTab === 'items') {
     updateItemGroups(cache.inventoryGet?.data);
-    showSnapshot(cache.inventoryGet, ['Group', 'Item ID', 'Name', 'Amount'], (data) =>
-      Object.entries(data).filter(([category]) => !itemGroup.value || category === itemGroup.value).flatMap(([category, items]) =>
-        Object.entries(items ?? {}).sort(byId).map(([id, quantity]) =>
-          [category, id, globalThis.hwaHelperNameMap.item(category, id) || '—', formatNumber(quantity)])));
+    updateItemsViewButtons();
+    if (itemsViewMode === 'grid') {
+      renderInventoryGrid(cache);
+    } else {
+      showSnapshot(cache.inventoryGet, ['Group', 'Item ID', 'Name', 'Amount'], (data) =>
+        Object.entries(data).filter(([category]) => !itemGroup.value || category === itemGroup.value).flatMap(([category, items]) =>
+          Object.entries(items ?? {}).sort(byId).map(([id, quantity]) =>
+            [category, id, globalThis.hwaHelperNameMap.item(category, id) || '—', formatNumber(quantity)])));
+    }
   } else if (activeTab === 'resources') {
     renderResources(resources, selectedResources);
   } else if (activeTab === 'titans') {
@@ -4480,6 +4673,55 @@ function executeAutoClaim(cache = currentCache, settings = currentAutoClaimSetti
         }
         if (claimBtn) claimBtn.disabled = false;
       } else {
+        // Optimistically update cache and UI
+        try {
+          if (settings.mail && cache.mailStatus?.data) {
+            cache.mailStatus.data.lettersCount = 0;
+            if (Array.isArray(cache.mailStatus.data.letters)) {
+              for (const l of cache.mailStatus.data.letters) {
+                if (pending.letterIds.includes(l.id ?? l.letterId)) {
+                  l.claimed = true;
+                  l.rewardReceived = true;
+                  l.rewardClaimed = true;
+                }
+              }
+            }
+          }
+          if (settings.mail && cache.mailGetAll?.data) {
+            const list = Array.isArray(cache.mailGetAll.data) ? cache.mailGetAll.data : cache.mailGetAll.data.letters;
+            if (Array.isArray(list)) {
+              for (const l of list) {
+                if (pending.letterIds.includes(l.id ?? l.letterId)) {
+                  l.claimed = true;
+                  l.rewardReceived = true;
+                  l.rewardClaimed = true;
+                }
+              }
+            }
+          }
+          if (settings.reports && cache.mailStatus?.data) {
+            cache.mailStatus.data.hasUnclaimed = false;
+            cache.mailStatus.data.totalUnclaimed = 0;
+            cache.mailStatus.data.unclaimedReportsCount = 0;
+          }
+          if (settings.quests && cache.questGetAll?.data) {
+            const qList = Array.isArray(cache.questGetAll.data) ? cache.questGetAll.data : [];
+            for (const q of qList) {
+              if (pending.questIds.includes(q.id)) {
+                q.state = 3;
+              }
+            }
+          }
+          if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+            chrome.storage.local.set({ [CACHE_KEY]: cache });
+          }
+        } catch (_) {}
+
+        renderAutoClaim(cache, settings);
+        try {
+          if (typeof renderMailBadge === 'function') renderMailBadge(cache);
+        } catch (_) {}
+
         if (statusEl) {
           const totalClaimed = (settings.mail ? pending.letterIds.length : 0) +
             (settings.reports && pending.hasReports ? 1 : 0) +

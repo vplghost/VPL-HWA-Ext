@@ -14,7 +14,70 @@
     }
   } catch (_) {}
 
-  let rpcRequestSequence = 1000;
+  let highestRequestId = 0;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      const stored = sessionStorage.getItem('hwa_highest_request_id');
+      if (stored) highestRequestId = parseInt(stored, 10) || 0;
+    }
+  } catch (_) {}
+
+  function syncRequestId(candidate) {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        const stored = parseInt(sessionStorage.getItem('hwa_highest_request_id'), 10);
+        if (!isNaN(stored) && stored > highestRequestId) {
+          highestRequestId = stored;
+        }
+      }
+    } catch (_) {}
+
+    const parsed = parseInt(candidate, 10);
+    if (!isNaN(parsed)) {
+      if (parsed > highestRequestId) {
+        highestRequestId = parsed;
+      } else {
+        // Game client's sequence fell behind our dispatch counter (or cached session ID).
+        // Rewrite to strictly monotonic value so server doesn't reject with "Request id less then cached request id".
+        highestRequestId++;
+        candidate = String(highestRequestId);
+      }
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('hwa_highest_request_id', String(highestRequestId));
+        }
+      } catch (_) {}
+    }
+    return candidate;
+  }
+
+  function getNextRequestId(baseHeaders) {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        const stored = parseInt(sessionStorage.getItem('hwa_highest_request_id'), 10);
+        if (!isNaN(stored) && stored > highestRequestId) {
+          highestRequestId = stored;
+        }
+      }
+    } catch (_) {}
+
+    if (baseHeaders && typeof baseHeaders === 'object') {
+      const raw = baseHeaders['x-request-id'] || baseHeaders['X-Request-Id'];
+      if (raw) {
+        const parsed = parseInt(raw, 10);
+        if (!isNaN(parsed) && parsed > highestRequestId) {
+          highestRequestId = parsed;
+        }
+      }
+    }
+    highestRequestId++;
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('hwa_highest_request_id', String(highestRequestId));
+      }
+    } catch (_) {}
+    return String(highestRequestId);
+  }
 
   function buildDispatchHeaders(baseHeaders) {
     const headers = {};
@@ -41,15 +104,8 @@
     headers['accept'] = '*/*';
     headers['x-requested-with'] = 'XMLHttpRequest';
 
-    // Sequence ID: must be monotonic and greater than previous request IDs
-    if (baseHeaders && (baseHeaders['x-request-id'] || baseHeaders['X-Request-Id'])) {
-      const parsed = parseInt(baseHeaders['x-request-id'] || baseHeaders['X-Request-Id'], 10);
-      if (!isNaN(parsed) && parsed >= rpcRequestSequence) {
-        rpcRequestSequence = parsed + 10;
-      }
-    }
-    rpcRequestSequence++;
-    headers['x-request-id'] = String(rpcRequestSequence);
+    // Monotonic request ID synchronized with game client
+    headers['x-request-id'] = getNextRequestId(baseHeaders);
     headers['x-env-timestamp'] = String(Math.floor(Date.now() / 1000));
 
     // If webglAuth accessToken is available on window, attach Authorization
@@ -97,7 +153,34 @@
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
-        }).then((res) => {
+        }).then(async (res) => {
+          let responseText = null;
+          try {
+            responseText = await res.clone().text();
+          } catch (_) {}
+
+          // Unconditionally emit api-record so rpcCache gets updated even if logging/capture is disabled
+          if (responseText) {
+            try {
+              const u = new URL(String(url), location.href);
+              window.postMessage({
+                source: 'hwa-helper-api',
+                kind: 'api-record',
+                record: {
+                  transport: 'fetch',
+                  method: 'POST',
+                  endpoint: `${u.origin}${u.pathname}`,
+                  status: res.status,
+                  durationMs: 0,
+                  outcome: res.ok ? 'completed' : 'failed',
+                  timestamp: new Date().toISOString(),
+                  requestBody: JSON.stringify(payload),
+                  responseBody: responseText
+                }
+              }, location.origin);
+            } catch (_) {}
+          }
+
           window.postMessage({
             source: 'hwa-helper-api',
             kind: 'refresh-rpc-result',
@@ -147,6 +230,28 @@
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
+        }).then(async (res) => {
+          try {
+            const responseText = await res.clone().text();
+            if (responseText) {
+              const u = new URL(String(lastRpcUrl), location.href);
+              window.postMessage({
+                source: 'hwa-helper-api',
+                kind: 'api-record',
+                record: {
+                  transport: 'fetch',
+                  method: 'POST',
+                  endpoint: `${u.origin}${u.pathname}`,
+                  status: res.status,
+                  durationMs: 0,
+                  outcome: res.ok ? 'completed' : 'failed',
+                  timestamp: new Date().toISOString(),
+                  requestBody: JSON.stringify(payload),
+                  responseBody: responseText
+                }
+              }, location.origin);
+            }
+          } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
     }
@@ -586,8 +691,20 @@
             } else if (typeof rawHeaders === 'object') {
               lastRpcHeaders = { ...rawHeaders };
             }
-            if (lastRpcHeaders && typeof sessionStorage !== 'undefined') {
-              sessionStorage.setItem('hwa_last_rpc_headers', JSON.stringify(lastRpcHeaders));
+            if (lastRpcHeaders) {
+              const reqId = lastRpcHeaders['x-request-id'] || lastRpcHeaders['X-Request-Id'];
+              if (reqId) {
+                const parsed = parseInt(reqId, 10);
+                if (!isNaN(parsed) && parsed > highestRequestId) {
+                  highestRequestId = parsed;
+                  if (typeof sessionStorage !== 'undefined') {
+                    sessionStorage.setItem('hwa_highest_request_id', String(highestRequestId));
+                  }
+                }
+              }
+              if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.setItem('hwa_last_rpc_headers', JSON.stringify(lastRpcHeaders));
+              }
             }
             reportEngineStatus('rpc-traffic');
           } catch (_) {}
@@ -661,6 +778,10 @@
     if (typeof originalSetRequestHeader === 'function') {
       xhr.setRequestHeader = function (name, value) {
         try {
+          if (name && String(name).toLowerCase() === 'x-request-id') {
+            value = syncRequestId(value);
+            arguments[1] = value;
+          }
           let headers = xhrHeaders.get(this);
           if (!headers) {
             headers = {};
@@ -668,7 +789,7 @@
           }
           if (name) headers[String(name).toLowerCase()] = String(value);
         } catch (_) {}
-        return originalSetRequestHeader.apply(this, arguments);
+        return originalSetRequestHeader.call(this, name, value);
       };
     }
 

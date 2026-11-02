@@ -1296,11 +1296,53 @@
     return { calls, pending };
   }
 
+  const ITEM_GROUP_META = {
+    consumable: { order: 10, label: 'Consumables', icon: '🧪' },
+    lootboxChanced: { order: 15, label: 'Chests & Boxes', icon: '🎁' },
+    gear: { order: 20, label: 'Equipment', icon: '🛡️' },
+    fragmentGear: { order: 30, label: 'Gear Recipes', icon: '📜' },
+    scroll: { order: 32, label: 'Scrolls', icon: '📜' },
+    fragmentScroll: { order: 34, label: 'Scroll Recipes', icon: '📜' },
+    fragmentHero: { order: 40, label: 'Hero Soul Stones', icon: '👤' },
+    fragmentTitan: { order: 42, label: 'Titan Soul Stones', icon: '🗿' },
+    fragmentArtifact: { order: 44, label: 'Artifact Fragments', icon: '💍' },
+    fragmentSkin: { order: 46, label: 'Skin Fragments', icon: '✨' },
+    coin: { order: 50, label: 'Coins & Currency', icon: '🪙' },
+    material: { order: 52, label: 'Materials', icon: '⚙️' }
+  };
+
+  function getItemCategoryMeta(category) {
+    if (!category || typeof category !== 'string') {
+      return { order: 100, label: 'Other Items', icon: '📦' };
+    }
+    return ITEM_GROUP_META[category] || {
+      order: 100,
+      label: category.charAt(0).toUpperCase() + category.slice(1).replace(/([A-Z])/g, ' $1'),
+      icon: '📦'
+    };
+  }
+
+  function getItemAbbr(name, id) {
+    if (!name || name === '—') return id ? `#${id}` : '';
+    const clean = String(name).replace(/[^\w\s]/g, ' ').trim();
+    const words = clean.split(/\s+/).filter(Boolean);
+    if (words.length >= 2) {
+      return words.slice(0, 4).map((w) => w[0]).join('').toUpperCase();
+    }
+    if (words.length === 1) {
+      const w = words[0];
+      if (w.length <= 4) return w.toUpperCase();
+      return w.slice(0, 3).toUpperCase();
+    }
+    return String(id || '');
+  }
+
   globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans, formatTitanArtifactLevels, isTitanArtifactUpgradable, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
     buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, exportTableData,
     getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount, isTowerCleared,
-    isResourceSelectableForHeader, isDebugOrEventResource, BATTLE_REPORT_CLAIM_TYPES, getPendingClaims, buildAutoClaimCalls };
+    isResourceSelectableForHeader, isDebugOrEventResource, BATTLE_REPORT_CLAIM_TYPES, getPendingClaims, buildAutoClaimCalls,
+    ITEM_GROUP_META, getItemCategoryMeta, getItemAbbr };
 })();

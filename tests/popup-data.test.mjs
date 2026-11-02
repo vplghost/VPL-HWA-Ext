@@ -951,3 +951,53 @@ test('getChallengeResourceStock resolves 0 for missing inventory items instead o
   assert.equal(getChallengeResourceStock(noInvCache, 'Summon 1 Titan in Circle'), 5);
   assert.equal(getChallengeResourceStock(noInvCache, 'Open 1 Elemental Sphere'), 20);
 });
+
+test('getItemCategoryMeta orders groups matching in-game inventory priority and returns metadata', () => {
+  const { getItemCategoryMeta } = context.hwaHelperPopupData;
+  const consumable = getItemCategoryMeta('consumable');
+  const gear = getItemCategoryMeta('gear');
+  const fragmentGear = getItemCategoryMeta('fragmentGear');
+  const scroll = getItemCategoryMeta('scroll');
+  const fragmentHero = getItemCategoryMeta('fragmentHero');
+  const fragmentTitan = getItemCategoryMeta('fragmentTitan');
+  const coin = getItemCategoryMeta('coin');
+  const material = getItemCategoryMeta('material');
+  const unknown = getItemCategoryMeta('customGroup');
+
+  // Verify priority order: consumable < gear < recipes (fragmentGear/scroll) < soul stones < resources (coin/material) < unknown
+  assert.ok(consumable.order < gear.order, 'consumable should precede gear');
+  assert.ok(gear.order < fragmentGear.order, 'gear should precede fragmentGear');
+  assert.ok(fragmentGear.order <= scroll.order, 'recipes should precede soul stones');
+  assert.ok(scroll.order < fragmentHero.order, 'scroll should precede fragmentHero');
+  assert.ok(fragmentHero.order <= fragmentTitan.order, 'fragmentHero should be with fragments');
+  assert.ok(fragmentTitan.order < coin.order, 'fragments should precede resources');
+  assert.ok(coin.order <= material.order, 'coin should be with resources');
+  assert.ok(material.order < unknown.order, 'known categories should precede custom ones');
+
+  // Verify labels
+  assert.equal(consumable.label, 'Consumables');
+  assert.equal(gear.label, 'Equipment');
+  assert.equal(fragmentGear.label, 'Gear Recipes');
+  assert.equal(fragmentHero.label, 'Hero Soul Stones');
+  assert.equal(coin.label, 'Coins & Currency');
+  assert.equal(unknown.label, 'Custom Group');
+});
+
+test('getItemAbbr generates concise uppercase abbreviations for inventory grid view', () => {
+  const { getItemAbbr } = context.hwaHelperPopupData;
+  // Multi-word names: first letters
+  assert.equal(getItemAbbr('Energy Potion', 1), 'EP');
+  assert.equal(getItemAbbr('Large EXP Potion', 2), 'LEP');
+  assert.equal(getItemAbbr('Flawless Artifact Chest', 3), 'FAC');
+  assert.equal(getItemAbbr('Hero Soul Stone', 4), 'HSS');
+  assert.equal(getItemAbbr('Chaos Core', 5), 'CC');
+
+  // Single-word names: first 3-4 letters
+  assert.equal(getItemAbbr('Gold', 10), 'GOLD');
+  assert.equal(getItemAbbr('Iron', 11), 'IRON');
+  assert.equal(getItemAbbr('Emerald', 12), 'EME');
+
+  // Fallback for missing/empty
+  assert.equal(getItemAbbr('', 99), '#99');
+  assert.equal(getItemAbbr('—', 105), '#105');
+});

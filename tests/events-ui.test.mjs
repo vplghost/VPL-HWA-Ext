@@ -245,6 +245,15 @@ const resourceFilterToggle = new MockElement('button');
 resourceFilterToggle.setAttribute('id', 'resource-filter-toggle');
 const resourceFilterToggleText = new MockElement('span');
 resourceFilterToggleText.setAttribute('id', 'resource-filter-toggle-text');
+const itemGroupSelect = new MockElement('select');
+itemGroupSelect.setAttribute('id', 'item-group');
+const itemsViewToggle = new MockElement('div');
+itemsViewToggle.setAttribute('id', 'items-view-toggle');
+itemsViewToggle.hidden = true;
+const itemsViewGrid = new MockElement('button');
+itemsViewGrid.setAttribute('id', 'items-view-grid');
+const itemsViewList = new MockElement('button');
+itemsViewList.setAttribute('id', 'items-view-list');
 
 const mockDoc = {
   createElement: (tag) => new MockElement(tag),
@@ -253,6 +262,10 @@ const mockDoc = {
     ['table-export-btn', tableExportBtn],
     ['resource-filter-toggle', resourceFilterToggle],
     ['resource-filter-toggle-text', resourceFilterToggleText],
+    ['item-group', itemGroupSelect],
+    ['items-view-toggle', itemsViewToggle],
+    ['items-view-grid', itemsViewGrid],
+    ['items-view-list', itemsViewList],
     ['view', view],
     ['status', status],
     ['search', search],
@@ -396,6 +409,15 @@ context.resourceFilterToggleText = resourceFilterToggleText;
 context.showAllResources = false;
 context.chrome = { storage: { local: { get: async () => ({ resourceSelection: [] }), set: async () => {} } } };
 vm.runInContext(popupJs.slice(resStart, resEnd), context);
+
+// Extract renderInventoryGrid
+const gridStart = popupJs.indexOf('function renderInventoryGrid(');
+const gridEnd = popupJs.indexOf('let localDraftDefencePicks =');
+if (gridStart !== -1 && gridEnd !== -1) {
+  context.itemGroup = itemGroupSelect;
+  context.formatNumber = (n) => String(n);
+  vm.runInContext(popupJs.slice(gridStart, gridEnd), context);
+}
 
 test('renderEvents renders Guild Versus and active event cards', () => {
   const cache = {
@@ -1286,4 +1308,60 @@ test('renderAutoClaim updates badges, counts, and executeAutoClaim dispatches re
   assert.equal(sentRpcMessage.calls.some((c) => c.name === 'mailFarm'), true);
   assert.equal(sentRpcMessage.calls.some((c) => c.name === 'quest_multiFarm'), true);
   assert.ok(autoclaimStatus.textContent.includes('Claimed 2 rewards! Syncing...'));
+});
+
+test('renderInventoryGrid renders grouped items with dividers, abbreviations, quantities, and tooltips', () => {
+  const sampleCache = {
+    inventoryGet: {
+      updatedAt: '2026-11-03T01:00:00Z',
+      data: {
+        coin: { '1': 50000 },
+        gear: { '10': 2 },
+        consumable: { '20': 15 },
+        fragmentHero: { '1': 100 }
+      }
+    }
+  };
+
+  context.globalThis.hwaHelperNameMap = {
+    hero: (id) => id === '1' ? 'Aurora' : null,
+    item: (cat, id) => id === '1' ? 'Aurora fragment' : null
+  };
+
+  view.replaceChildren();
+  context.renderInventoryGrid(sampleCache);
+
+  // Status text should summarize total items
+  assert.ok(status.textContent.includes('4 items across 4 groups'));
+
+  // Should have container with section dividers
+  const sections = view.querySelectorAll('section');
+  assert.equal(sections.length, 4);
+
+  // Group headers should follow priority: Consumables (10) -> Equipment (20) -> Hero Soul Stones (40) -> Coins & Currency (50)
+  const headers = view.querySelectorAll('h3');
+  const headerTexts = headers.map((h) => h.textContent);
+  assert.deepEqual(headerTexts, ['Consumables', 'Equipment', 'Hero Soul Stones', 'Coins & Currency']);
+
+  // Tiles should have tooltips with quantity and ID
+  const tiles = view.querySelectorAll('div').filter((d) => d.getAttribute('title'));
+  assert.equal(tiles.length, 4);
+
+  // First tile is consumable (item 20, qty 15)
+  const consumableTile = tiles[0];
+  assert.ok(consumableTile.getAttribute('title').includes('Consumables #20'));
+  assert.ok(consumableTile.getAttribute('title').includes('Quantity: 15'));
+
+  // Hero fragment tile should have avatar img
+  const heroTile = tiles.find((t) => t.getAttribute('title').includes('Hero Soul Stones #1'));
+  assert.ok(heroTile, 'Hero soul stone tile must exist');
+  const img = heroTile.querySelector('img');
+  assert.ok(img, 'Hero soul stone tile must have avatar image');
+  assert.equal(img.src, 'assets/heroes/1.webp');
+
+  // Hero tile abbreviation at top-left
+  const spans = heroTile.querySelectorAll('span');
+  assert.ok(spans.length >= 2, 'Must have abbreviation and quantity spans');
+  assert.equal(spans[0].textContent, 'AF'); // Aurora fragment -> AF
+  assert.equal(spans[1].textContent, '100'); // Quantity 100
 });
