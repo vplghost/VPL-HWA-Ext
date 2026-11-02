@@ -8,10 +8,12 @@ const refillRules = await readFile(new URL('../extension/refillable-rules.js', i
 const missionCosts = await readFile(new URL('../extension/mission-costs.js', import.meta.url), 'utf8');
 const marchRules = await readFile(new URL('../extension/march-rules.js', import.meta.url), 'utf8');
 const resourceDataSource = await readFile(new URL('../extension/resource-data.js', import.meta.url), 'utf8');
+const clanVersusRules = await readFile(new URL('../extension/clan-versus-rules.js', import.meta.url), 'utf8');
 const context = { TextEncoder };
 runInNewContext(refillRules, context);
 runInNewContext(missionCosts, context);
 runInNewContext(marchRules, context);
+runInNewContext(clanVersusRules, context);
 runInNewContext(resourceDataSource, context);
 runInNewContext(source, context);
 const cache = context.hwaHelperRpcCache;
@@ -545,4 +547,399 @@ test('chatGetAll extracts clan and announcement messages and merges deduplicated
   assert.equal(state2.guildChat.data.messages[1].id, '102');
   assert.equal(state2.guildChat.data.users.u3.name, 'OfficerCharlie');
   assert.equal(state2.guildChat.data.users.u1.name, 'MemberBob');
+});
+
+test('claimChest in clanVersus extracts rewards and updates energy, resources, and chest status', () => {
+  const at = '2026-11-02T04:16:11.131Z';
+  const baseline = record([
+    { name: 'userGetInfo', ident: 1 },
+    { name: 'getInventory', feature: 'inventory', ident: 2 }
+  ], [
+    { ident: 1, result: { response: { level: 80, gold: 50000, refillable: [{ id: 1, amount: 80, lastRefill: Date.parse('2026-11-02T04:15:00.000Z') / 1000 }] } } },
+    { ident: 2, result: { response: { inventory: { items: [
+      { type: 'consumable', id: 20, quantity: 1000 },
+      { type: 'consumable', id: 40228, quantity: 10 },
+      { type: 'consumable', id: 40230, quantity: 5 }
+    ] } } } }
+  ], '2026-11-02T04:10:00.000Z');
+
+  // Record from actual user log: claimChest 2 (doubles chest 1: energy +100, gold +60000, titan potion +500, hero trove +2, titan trove +2)
+  const chest2Record = record([
+    { name: 'claimChest', feature: 'clanVersus', ident: 'claim-2', args: { chestNumber: 2 } }
+  ], [
+    { ident: 'claim-2', result: { response: {} } }
+  ], at);
+
+  const extracted = cache.extract(chest2Record);
+  assert.equal(extracted.some((e) => e.key === 'resourceAction' && e.data.resourceKey === 'resource:energy' && e.data.delta === 100), true);
+  assert.equal(extracted.some((e) => e.key === 'resourceAction' && e.data.resourceKey === 'resource:gold' && e.data.delta === 60000), true);
+  assert.equal(extracted.some((e) => e.key === 'resourceAction' && e.data.resourceKey === 'resource:consumable:20' && e.data.delta === 500), true);
+  assert.equal(extracted.some((e) => e.key === 'resourceAction' && e.data.resourceKey === 'resource:consumable:40228' && e.data.delta === 2), true);
+  assert.equal(extracted.some((e) => e.key === 'resourceAction' && e.data.resourceKey === 'resource:consumable:40230' && e.data.delta === 2), true);
+  assert.equal(extracted.some((e) => e.key === 'clanVersusChestAction' && e.data.chestNumber === 2), true);
+
+  // Merge with baseline
+  const merged = cache.merge({}, [baseline, chest2Record]).cache;
+  assert.equal(merged['resource:energy'].data.amount, 180);
+  assert.equal(merged.energyStatus.data.energy, 180);
+  assert.equal(merged['resource:gold'].data.amount, 110000);
+  assert.equal(merged['resource:consumable:20'].data.amount, 1500);
+  assert.equal(merged['resource:consumable:40228'].data.amount, 12);
+  assert.equal(merged['resource:consumable:40230'].data.amount, 7);
+  assert.deepEqual([...merged.clanVersusStatus.data.chestNumbers], [2]);
+
+  // Idempotency: re-merging does not duplicate rewards
+  const remerged = cache.merge(merged, [chest2Record]).cache;
+  assert.equal(remerged['resource:energy'].data.amount, 180);
+  assert.equal(remerged['resource:gold'].data.amount, 110000);
+
+  // Test chest 3 (relic shard +1, energy +200, titan potion +1250, hero trove +3, titan trove +3, Honor marks +50)
+  const chest3Record = record([
+    { name: 'claimChest', feature: 'clanVersus', ident: 'claim-3', args: { chestNumber: 3 } }
+  ], [
+    { ident: 'claim-3', result: { response: {} } }
+  ], '2026-11-02T04:17:00.000Z');
+
+  const afterChest3 = cache.merge(merged, [chest3Record]).cache;
+  assert.equal(afterChest3['resource:energy'].data.amount, 380);
+  assert.equal(afterChest3['resource:patron:1'].data.amount, 1);
+  assert.equal(afterChest3['resource:material:12'].data.amount, 50);
+  assert.deepEqual([...afterChest3.clanVersusStatus.data.chestNumbers], [2, 3]);
+
+  // Test getUserProgress merge with claimChest
+  const progressRecord = record([
+    { name: 'getUserProgress', feature: 'clanVersus', ident: 'prog-1' }
+  ], [
+    { ident: 'prog-1', result: { response: { progress: 45000, chestNumbers: [1] } } }
+  ], '2026-11-02T04:00:00.000Z');
+
+  const withProgress = cache.merge({}, [progressRecord, chest2Record]).cache;
+  assert.deepEqual([...withProgress.clanVersusStatus.data.chestNumbers], [1, 2]);
+  assert.equal(withProgress.clanVersusStatus.data.progress, 45000);
+});
+
+test('clanVersus multi-call extracts and merges info, battle, rewards, and progress into clanVersusStatus', () => {
+  const at = '2026-11-02T04:37:00.000Z';
+  const getInfoRecord = record([
+    { name: 'getInfo', feature: 'clanVersus', ident: 'info-1', args: { clanId: 305081 } }
+  ], [
+    { ident: 'info-1', result: { response: {
+      eventId: 18,
+      battleId: 52,
+      battleNumber: 4,
+      roundNumber: 1,
+      league: 58,
+      numActiveUsers: 5,
+      currentNumActiveUsers: 28,
+      weeklyUserActivity: 2450,
+      personalRequirementsIsSatisfied: true,
+      guildRequirementsIsSatisfied: true,
+      challenges: [{ id: 27, progress: 0 }, { id: 31, progress: 11 }]
+    } } }
+  ], at);
+
+  const battleRecord = record([
+    { name: 'getCurrentBattle', feature: 'clanVersus', ident: 'battle-1', args: { clanId: 305081 } },
+    { name: 'getUserProgress', feature: 'clanVersus', ident: 'prog-1', args: {} },
+    { name: 'getRewardList', feature: 'clanVersus', ident: 'reward-1', args: {} }
+  ], [
+    { ident: 'battle-1', result: { response: {
+      league: 'bronze',
+      clan: { id: 305081, name: '4-LEAF CLOVER', server: '1431' },
+      enemyClan: { id: 100752873, name: 'Black', server: '1410' },
+      clanBattleScore: 0,
+      enemyClanBattleScore: 0,
+      clanRoundPoints: 10145150,
+      enemyClanRoundPoints: 657950,
+      rounds: [
+        { index: 1, theme: 'Radar Training', score: 1, points: 10145150, enemyPoints: 657950, status: 'inProgress' },
+        { index: 2, theme: 'Radar Training', score: 2, points: 0, enemyPoints: 0, status: 'soon' }
+      ]
+    } } },
+    { ident: 'prog-1', result: { response: {
+      progress: { score: 123700 },
+      chestNumbers: [1, 2]
+    } } },
+    { ident: 'reward-1', result: { response: {
+      userRoundPoints: 123700,
+      userBattlePoints: 123700,
+      userSeasonPoints: 15345899,
+      userClanRank: 14,
+      seasonClanRank: 1
+    } } }
+  ], at);
+
+  const merged = cache.merge({}, [getInfoRecord, battleRecord]).cache;
+  const vs = merged.clanVersusStatus?.data;
+  assert.ok(vs);
+  assert.equal(vs.battle.clan.name, '4-LEAF CLOVER');
+  assert.equal(vs.battle.enemyClan.name, 'Black');
+  assert.equal(vs.info.battleNumber, 4);
+  assert.equal(vs.info.currentNumActiveUsers, 28);
+  assert.equal(vs.score, 123700);
+  assert.deepEqual([...vs.chestNumbers], [1, 2]);
+  assert.equal(vs.rewards.userClanRank, 14);
+  assert.equal(vs.rewards.seasonClanRank, 1);
+});
+
+test('event RPCs extract questEvents, clanWarChampStatus, fortressEventStatus, clanClashStatus, and brawlStatus', () => {
+  const at = '2026-11-02T04:37:00.000Z';
+  const rec = record([
+    { name: 'questGetEvents', ident: 'q-1', args: {} },
+    { name: 'clanWarChampInfo_getBriefInfo', ident: 'cw-1', args: {} },
+    { name: 'getEventInfo', feature: 'fortress', ident: 'f-1', args: {} },
+    { name: 'clanClash_getCurrentState', ident: 'cc-1', args: {} },
+    { name: 'brawl_getAll', ident: 'b-1', args: {} }
+  ], [
+    { ident: 'q-1', result: { response: [{ id: 90249, name_localeKey: 'ADVENTURE_HERO62_TITLE_EVENT_UPGRADE' }] } },
+    { ident: 'cw-1', result: { response: { seasonId: 58, tries: 0, hasActiveWar: false } } },
+    { ident: 'f-1', result: { response: { id: 12, startDate: 1793005200, endDate: 1797732000 } } },
+    { ident: 'cc-1', result: { response: { clashEvent: { id: 17, cycleId: 1, lanes: [] } } } },
+    { ident: 'b-1', result: { response: [{ brawlId: '72', wins: '0', power: '1105464' }] } }
+  ], at);
+
+  const merged = cache.merge({}, [rec]).cache;
+  assert.equal(merged.questEvents?.data?.events?.length, 1);
+  assert.equal(merged.clanWarChampStatus?.data?.seasonId, 58);
+  assert.equal(merged.fortressEventStatus?.data?.id, 12);
+  assert.equal(merged.clanClashStatus?.data?.clashEvent?.id, 17);
+  assert.equal(merged.brawlStatus?.data?.brawls?.length, 1);
+});
+
+test('heroEvolve upgrades hero star and deducts fragments from inventory and resources', () => {
+  const at = '2026-11-02T05:00:00.000Z';
+  const heroGetAll = record([
+    { name: 'heroGetAll', ident: 'heroes-1' },
+    { name: 'inventoryGet', ident: 'inv-1' }
+  ], [
+    { ident: 'heroes-1', result: { response: {
+      '76': { id: 76, star: 1, level: 30 },
+      '55': { id: 55, star: 2, level: 50 }
+    } } },
+    { ident: 'inv-1', result: { response: {
+      fragmentHero: { '76': 50, '55': 100 }
+    } } }
+  ], '2026-11-02T04:59:00.000Z');
+
+  // Evolve Crow (hero 76) to 2 stars: requires 20 fragments
+  const evolve76 = record([
+    { name: 'heroEvolve', args: { heroId: 76 }, ident: 'evolve-76' }
+  ], [
+    { ident: 'evolve-76', result: { response: null } }
+  ], at);
+
+  const extracted = cache.extract(evolve76);
+  assert.equal(extracted.some(e => e.key === 'heroEvolveAction' && e.data.heroId === 76), true);
+
+  const baseWithRes = {
+    ...cache.merge({}, [heroGetAll]).cache,
+    'resource:fragmentHero:76': { data: { amount: 50 }, updatedAt: '2026-11-02T04:59:00.000Z' }
+  };
+  const state1 = cache.merge(baseWithRes, [evolve76]).cache;
+  assert.equal(state1.heroGetAll.data['76'].star, 2);
+  assert.equal(state1.inventoryGet.data.fragmentHero['76'], 30);
+  assert.equal(state1['resource:fragmentHero:76'].data.amount, 30);
+
+  // Evolve Mushy and Shroom (hero 55) to 3 stars: requires 50 fragments
+  const evolve55 = record([
+    { name: 'heroEvolve', args: { heroId: 55 }, ident: 'evolve-55' }
+  ], [
+    { ident: 'evolve-55', result: { response: null } }
+  ], '2026-11-02T05:01:00.000Z');
+
+  const state2 = cache.merge(state1, [evolve55]).cache;
+  assert.equal(state2.heroGetAll.data['55'].star, 3);
+  assert.equal(state2.inventoryGet.data.fragmentHero['55'], 50);
+
+  // Re-applying same evolve action token is deduplicated
+  const stateDuplicate = cache.merge(state2, [evolve55]);
+  assert.equal(stateDuplicate.changed, false);
+});
+
+test('rally march transitions to returnToOutpost from battleReport and returnRoute RPCs', () => {
+  const at = '2026-11-02T05:03:00.000Z';
+  const waitUntil = 1793595700000;
+  const initial = {
+    marchStatus: {
+      key: 'marchStatus',
+      method: 'createRally',
+      feature: 'mob',
+      group: 'header',
+      data: {
+        marches: [{
+          squadId: 'squad-1',
+          kind: 'raid',
+          stage: 'waitingForRallyStart',
+          endsAt: waitUntil,
+          rally: { id: 'rally-1', waitUntil, outboundMs: 30000, returnMs: 40000 }
+        }]
+      },
+      updatedAt: at
+    }
+  };
+  const marchBefore = initial.marchStatus.data.marches[0];
+  assert.equal(marchBefore.stage, 'waitingForRallyStart');
+
+  // Battle completes: getPage:report with rallyMobAttackResult
+  const battleReportTime = waitUntil + 30000;
+  const reportRecord = record([
+    { name: 'getPage', feature: 'report', ident: 'rep-1' }
+  ], [
+    { ident: 'rep-1', result: { response: { reports: [
+      { type: 'rallyMobAttackResult', createdAt: battleReportTime, payload: { mobConfigId: 10 } }
+    ] } } }
+  ], '2026-11-02T05:03:30.000Z');
+
+  const battleExtracted = cache.extract(reportRecord);
+  assert.equal(battleExtracted.some(e => e.key === 'rallyAction' && e.data.action === 'battleReport'), true);
+
+  const afterReport = cache.merge(initial, [reportRecord]).cache;
+  const marchAfterReport = afterReport.marchStatus.data.marches[0];
+  assert.equal(marchAfterReport.stage, 'returnToOutpost');
+  assert.equal(marchAfterReport.rally.arrivalAt, battleReportTime);
+  assert.equal(marchAfterReport.rally.returnAt, battleReportTime + 40000);
+  assert.equal(marchAfterReport.endsAt, battleReportTime + 40000);
+
+  // Return route observed: getRoutesByIds:globalMap
+  const returnRouteTime = battleReportTime + 100;
+  const routeRecord = record([
+    { name: 'getRoutesByIds', feature: 'globalMap', ident: 'route-1' }
+  ], [
+    { ident: 'route-1', result: { response: { routes: [
+      { type: 'returnToOutpost', startedAt: returnRouteTime, durationMs: 38000 }
+    ] } } }
+  ], '2026-11-02T05:03:31.000Z');
+
+  const routeExtracted = cache.extract(routeRecord);
+  assert.equal(routeExtracted.some(e => e.key === 'rallyAction' && e.data.action === 'returnRoute'), true);
+
+  const afterRoute = cache.merge(afterReport, [routeRecord]).cache;
+  const marchAfterRoute = afterRoute.marchStatus.data.marches[0];
+  assert.equal(marchAfterRoute.stage, 'returnToOutpost');
+  assert.equal(marchAfterRoute.rally.returnAt, returnRouteTime + 38000);
+  assert.equal(marchAfterRoute.endsAt, returnRouteTime + 38000);
+});
+
+test('dungeonEndBattle and dungeonSaveProgress extract status and merge rewards', () => {
+  const battleRecord = record([
+    { name: 'dungeonEndBattle', ident: 'd-battle-1' }
+  ], [
+    {
+      ident: 'd-battle-1',
+      result: {
+        response: {
+          dungeonActivity: 738,
+          reward: {
+            dungeonActivity: 12,
+            consumable: { '20': 50 },
+            fragmentTitan: { '4011': 2 }
+          },
+          dungeon: {
+            floorNumber: 581,
+            maxFloorPassed: 580,
+            respawnFloor: 576,
+            elements: { prime: 'earth', nonprime: ['water', 'fire'] },
+            states: {
+              titans: {
+                '4000': { isDead: false, hp: 856926, maxHp: 856926, energy: 600 }
+              }
+            },
+            floor: {
+              userData: [
+                { attackerType: 'fire', defenderType: 'earth', power: 10861, team: [{ id: 4024, level: 58, star: 2 }] }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ], '2026-11-02T05:27:00.000Z');
+
+  const extracted = cache.extract(battleRecord);
+  assert.equal(extracted.some((e) => e.key === 'dungeonStatus'), true);
+  assert.equal(extracted.some((e) => e.key === 'dungeonRewardAction'), true);
+
+  const initial = {
+    'resource:consumable:20': { data: { amount: 100 } },
+    'resource:fragmentTitan:4011': { data: { amount: 10 } },
+    inventoryGet: {
+      data: {
+        consumable: { '20': 100 },
+        fragmentTitan: { '4011': 10 }
+      }
+    }
+  };
+
+  const { cache: afterBattle } = cache.merge(initial, [battleRecord]);
+  assert.equal(afterBattle.dungeonStatus.data.floorNumber, 581);
+  assert.equal(afterBattle.dungeonStatus.data.maxFloorPassed, 580);
+  assert.equal(afterBattle.dungeonStatus.data.dungeonActivity, 738);
+  assert.equal(afterBattle['resource:consumable:20'].data.amount, 150);
+  assert.equal(afterBattle.inventoryGet.data.consumable['20'], 150);
+  assert.equal(afterBattle['resource:fragmentTitan:4011'].data.amount, 12);
+  assert.equal(afterBattle.inventoryGet.data.fragmentTitan['4011'], 12);
+  assert.equal(afterBattle.dungeonStatus.data.states.titans['4000'].hp, 856926);
+
+  // Save progress checkpoint with gold reward
+  const saveRecord = record([
+    { name: 'dungeonSaveProgress', ident: 'd-save-1' }
+  ], [
+    {
+      ident: 'd-save-1',
+      result: {
+        response: {
+          reward: { gold: 49900 },
+          dungeon: {
+            respawnFloor: 581,
+            maxFloorPassed: 580
+          }
+        }
+      }
+    }
+  ], '2026-11-02T05:27:30.000Z');
+
+  const saveExtracted = cache.extract(saveRecord);
+  assert.equal(saveExtracted.some((e) => e.key === 'dungeonStatus'), true);
+  assert.equal(saveExtracted.some((e) => e.key === 'dungeonRewardAction'), true);
+
+  const { cache: afterSave } = cache.merge(afterBattle, [saveRecord]);
+  assert.equal(afterSave.dungeonStatus.data.respawnFloor, 581);
+  assert.equal(afterSave['resource:gold']?.data?.amount, 49900);
+});
+
+test('inventory_use spends titan potions and updates titan xp', () => {
+  const useRecord = record([
+    { name: 'inventory_use', ident: 'use-potions-1', args: { libId: 20, amount: 590, params: { unitId: 4052 } } }
+  ], [
+    {
+      ident: 'use-potions-1',
+      result: {
+        response: {
+          titanXp: { '4052': 590 }
+        }
+      }
+    }
+  ], '2026-11-02T05:28:00.000Z');
+
+  const extracted = cache.extract(useRecord);
+  assert.equal(extracted.some((e) => e.key === 'inventoryUseAction'), true);
+
+  const initial = {
+    'resource:consumable:20': { data: { amount: 800 } },
+    inventoryGet: {
+      data: {
+        consumable: { '20': 800 }
+      }
+    },
+    titanGetAll: {
+      data: {
+        '4052': { id: 4052, level: 30, xp: 100 }
+      }
+    }
+  };
+
+  const { cache: afterUse } = cache.merge(initial, [useRecord]);
+  assert.equal(afterUse['resource:consumable:20'].data.amount, 210);
+  assert.equal(afterUse.inventoryGet.data.consumable['20'], 210);
+  assert.equal(afterUse.titanGetAll.data['4052'].xp, 690);
 });

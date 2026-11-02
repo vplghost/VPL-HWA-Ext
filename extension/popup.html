@@ -51,6 +51,7 @@
     <button type="button" role="tab" data-tab="titans" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Titans</button>
     <button type="button" role="tab" data-tab="teams" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Teams</button>
     <button type="button" role="tab" data-tab="chat" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Guild Chat</button>
+    <button type="button" role="tab" data-tab="events" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Events <span id="events-tab-badge" class="ml-1 hidden rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white uppercase">Live</span></button>
     <button type="button" role="tab" data-tab="other" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Other</button>
     <button type="button" role="tab" data-tab="log" aria-selected="false" class="cursor-pointer whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3 py-2 font-medium text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">Log</button>
     <button type="button" role="tab" data-tab="config" aria-selected="false" title="Settings" aria-label="Settings" class="ml-auto inline-flex cursor-pointer items-center rounded-t-lg border-b-2 border-transparent px-3 py-2 text-slate-600 hover:bg-white aria-selected:border-blue-600 aria-selected:bg-white aria-selected:text-blue-700">
@@ -79,7 +80,12 @@
     <button id="clear" type="button" hidden class="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-100 hover:text-red-700">Clear log</button>
     <button id="export" type="button" hidden class="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-100">Export JSON</button>
   </div>
-  <p id="status" role="status" class="my-2 min-h-5 text-xs text-slate-500"></p>
+  <div id="status-bar" class="my-2 flex items-center gap-1.5 min-h-5">
+    <button id="table-export-btn" type="button" hidden title="Export table data as JSON" aria-label="Export table data as JSON" class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-slate-500 hover:bg-slate-200 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    </button>
+    <p id="status" role="status" class="text-xs text-slate-500"></p>
+  </div>
 
   <section id="settings-panel" hidden class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Settings">
     <h2 class="text-base font-semibold">Settings</h2>
@@ -93,6 +99,38 @@
   </section>
 
   <div id="view" role="tabpanel" aria-live="polite" class="min-h-[420px] max-h-[500px] overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm min-[800px]:max-h-none"></div>
+    <div id="guild-versus-modal" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs">
+    <div class="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+      <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3.5">
+        <div class="flex items-center gap-2">
+          <span class="inline-flex size-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <h2 class="text-base font-bold text-slate-900">Guild Versus</h2>
+          <span id="gvs-league-badge" class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Bronze League</span>
+        </div>
+        <button id="gvs-modal-close" type="button" class="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 focus:outline-none" aria-label="Close dialog">
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="gvs-modal-body" class="flex-1 overflow-y-auto p-5 space-y-5">
+      </div>
+    </div>
+  </div>
+    <div id="dungeon-modal" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs">
+    <div class="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+      <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3.5">
+        <div class="flex items-center gap-2">
+          <span class="inline-flex size-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+          <h2 class="text-base font-bold text-slate-900">Titan Dungeon</h2>
+          <span id="dungeon-floor-badge" class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">Floor 1</span>
+        </div>
+        <button id="dungeon-modal-close" type="button" class="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 focus:outline-none" aria-label="Close dialog">
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="dungeon-modal-body" class="flex-1 overflow-y-auto p-5 space-y-5">
+      </div>
+    </div>
+  </div>
   <script src="tracking-filter.js"></script>
   <script src="export-name.js"></script>
   <script src="data-names.js"></script>
@@ -102,6 +140,7 @@
   <script src="name-map.js"></script>
   <script src="popup-data.js"></script>
   <script src="refillable-rules.js"></script>
+  <script src="clan-versus-rules.js"></script>
   <script src="resource-data.js"></script>
   <script src="production-rules.js"></script>
   <script src="production-data.js"></script>

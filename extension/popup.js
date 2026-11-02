@@ -1,6 +1,23 @@
 const CACHE_KEY = 'rpcCache';
 const view = document.querySelector('#view');
 const status = document.querySelector('#status');
+const tableExportBtn = document.querySelector('#table-export-btn');
+tableExportBtn?.addEventListener('click', () => {
+  const data = globalThis.hwaHelperPopupData?.exportTableData?.(
+    activeTab, currentCache, search?.value, itemGroup?.value
+  );
+  if (!data || !data.length) return;
+  const filename = globalThis.hwaHelperPopupData?.tableExportFilename?.(activeTab) || `hwa-${activeTab}.json`;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
 const search = document.querySelector('#search');
 const itemGroup = document.querySelector('#item-group');
 const logSort = document.querySelector('#log-sort');
@@ -145,6 +162,24 @@ function marchTooltip(march, now) {
   return `${action}\n${time}`;
 }
 
+function isMarchExpired(march, now = Date.now()) {
+  if (!march) return true;
+  if (march.rally) {
+    const rally = march.rally;
+    const arrivalAt = Number.isFinite(rally.arrivalAt) ? rally.arrivalAt :
+      (Number.isFinite(rally.waitUntil) && Number.isFinite(rally.outboundMs) ?
+        rally.waitUntil + rally.outboundMs : null);
+    const returnAt = Number.isFinite(rally.returnAt) ? rally.returnAt :
+      (Number.isFinite(march.endsAt) && march.stage === 'returnToOutpost' ? march.endsAt :
+        (Number.isFinite(arrivalAt) && Number.isFinite(rally.returnMs) ?
+          arrivalAt + rally.returnMs : null));
+    if (Number.isFinite(returnAt)) return now >= returnAt;
+    if (march.stage === 'returnToOutpost' && Number.isFinite(march.endsAt)) return now >= march.endsAt;
+    return Number.isFinite(rally.waitUntil) && now > rally.waitUntil + 30 * 60000;
+  }
+  return Number.isFinite(march.endsAt) && march.endsAt <= now;
+}
+
 function refreshTimed() {
   const now = Date.now();
   const marches = currentCache.marchStatus?.data?.marches || [];
@@ -152,11 +187,7 @@ function refreshTimed() {
   for (const badge of marchesWrap.querySelectorAll('[data-march-index]')) {
     const march = marches[Number(badge.dataset.marchIndex)];
     if (!march) continue;
-    const expired = Number.isFinite(march.endsAt) && march.endsAt <= now;
-    const rallyStale = Number.isFinite(march.rally?.waitUntil) &&
-      now > march.rally.waitUntil + 30 * 60000;
-    badge.hidden = march.rally ?
-      (march.stage === 'returnToOutpost' ? expired : rallyStale) : expired;
+    badge.hidden = isMarchExpired(march, now);
     if (!badge.hidden) {
       const tooltip = marchTooltip(march, now);
       setResourceTooltip(badge, tooltip);
@@ -175,6 +206,32 @@ function refreshTimed() {
   const worldEnergy = currentCache['resource:world-energy'];
   if (worldEnergy) setResourceTooltip(document.querySelector('#world-energy-badge'),
     resourceTooltip(worldEnergy));
+
+  const energyVal = resourceData.amountAt(energy) ?? currentCache.energyStatus?.data?.energy;
+  const energyCap = energy?.data?.cap;
+  const isEnergyCapped = Number.isFinite(energyVal) && Number.isFinite(energyCap) && energyVal >= energyCap;
+  document.querySelector('#energy-badge')?.classList?.toggle('resource-capped-amber', isEnergyCapped);
+
+  const worldVal = resourceData.amountAt(worldEnergy) ?? currentCache.worldEnergyStatus?.data?.energy;
+  const worldCap = worldEnergy?.data?.cap ?? 200;
+  const isWorldCapped = Number.isFinite(worldVal) && Number.isFinite(worldCap) && worldVal >= worldCap;
+  document.querySelector('#world-energy-badge')?.classList?.toggle('resource-capped-sky', isWorldCapped);
+
+  for (const node of document.querySelectorAll('[data-resource-header="true"]')) {
+    const entry = currentCache[node.dataset.resourceAmount];
+    const pill = node.parentElement;
+    if (!entry || !pill) continue;
+    const amt = resourceData.amountAt(entry);
+    const cap = entry.data?.cap;
+    const isCapped = Number.isFinite(amt) && Number.isFinite(cap) && amt >= cap;
+    pill?.classList?.toggle('resource-capped', isCapped);
+  }
+
+  const eventsBadge = document.querySelector('#events-tab-badge');
+  if (eventsBadge) {
+    const hasActiveEvents = Boolean(currentCache.clanVersusStatus || currentCache.clanWarChampStatus || currentCache.clanClashStatus || currentCache.brawlStatus || currentCache.questEvents);
+    eventsBadge.hidden = !hasActiveEvents;
+  }
   document.querySelector('#building-time').textContent = resourceData.hoursMinutes(
     resourceData.remainingMinutes(currentCache.buildingStatus, now));
   document.querySelector('#research-time').textContent = resourceData.hoursMinutes(
@@ -206,6 +263,7 @@ function renderResources(entries, selection) {
   rows.sort((a, b) => sort === 'name' ? resourceLabel(a).localeCompare(resourceLabel(b)) :
     (resourceData.amountAt(a) - resourceData.amountAt(b)) * (sort === 'amount-desc' ? -1 : 1));
   status.textContent = `${rows.length} resources · select renewable resources for the header`;
+  if (tableExportBtn) tableExportBtn.hidden = !rows.length;
   if (!rows.length) return showEmpty('No matching resources observed yet.');
   const list = document.createElement('div');
   list.className = 'divide-y divide-slate-100';
@@ -1467,6 +1525,911 @@ function renderDraft(cache) {
   status.textContent = `${draft.matchId ? `Match #${draft.matchId} • ` : ''}${globalThis.hwaHelperPopupData.draftStageDescription(stageId)} • Selected ${val.count}/5 steps`;
 }
 
+function openGuildVersusModal(vsStatus) {
+  const modal = document.querySelector('#guild-versus-modal');
+  const body = document.querySelector('#gvs-modal-body');
+  if (!modal || !body) return;
+
+  const battle = vsStatus?.battle || {};
+  const info = vsStatus?.info || {};
+  const rewards = vsStatus?.rewards || {};
+  const clan = battle.clan || { name: '4-LEAF CLOVER', server: '1431' };
+  const enemyClan = battle.enemyClan || { name: 'Black', server: '1410' };
+  const league = battle.league || (info.league ? `League #${info.league}` : 'Bronze');
+  const leagueLabel = league.charAt(0).toUpperCase() + league.slice(1);
+  const leagueBadge = document.querySelector('#gvs-league-badge');
+  if (leagueBadge) leagueBadge.textContent = `${leagueLabel} League`;
+
+  body.replaceChildren();
+
+  function formatRewardItem(key, amount) {
+    if (key === 'energy') return `+${amount.toLocaleString()} Energy`;
+    if (key === 'gold') return `+${amount.toLocaleString()} Gold`;
+    if (key === 'patron:1') return `+${amount} Relic Shard${amount > 1 ? 's' : ''}`;
+    if (key === 'consumable:20') return `+${amount.toLocaleString()} Titan Potion`;
+    if (key === 'consumable:40228') return `+${amount} Heroes Trove${amount > 1 ? 's' : ''}`;
+    if (key === 'consumable:40230') return `+${amount} Titans Trove${amount > 1 ? 's' : ''}`;
+    if (key === 'consumable:40232') return `+${amount} Relic Casket${amount > 1 ? 's' : ''}`;
+    if (key === 'consumable:40229') return `+${amount} Large Heroes Trove${amount > 1 ? 's' : ''}`;
+    if (key === 'consumable:40231') return `+${amount} Large Titans Trove${amount > 1 ? 's' : ''}`;
+    if (key === 'material:12') return `+${amount} Honor Marks`;
+    if (key === 'coin:40077') return `+${amount.toLocaleString()} Rune Stone`;
+    if (key === 'speedUpResearch:2') return `+${amount}x 5m Research Speedup`;
+    return `+${amount} ${key}`;
+  }
+
+  // --- SECTION 1: MATCHUP BANNER ---
+  const matchupSec = document.createElement('div');
+  matchupSec.className = 'rounded-xl border border-slate-200 bg-slate-50/80 p-4';
+  const clanRoundPoints = battle.clanRoundPoints ?? 10145150;
+  const enemyRoundPoints = battle.enemyClanRoundPoints ?? 657950;
+  const totalPoints = clanRoundPoints + enemyRoundPoints || 1;
+  const clanPct = Math.round((clanRoundPoints / totalPoints) * 100);
+  const enemyPct = 100 - clanPct;
+  const battleNumber = info.battleNumber ?? 4;
+  const roundNumber = info.roundNumber ?? 1;
+
+  matchupSec.innerHTML = `
+    <div class="flex items-center justify-between text-xs text-slate-500 mb-3">
+      <span>Battle #${battleNumber} • Round ${roundNumber} of 6</span>
+      <span class="font-semibold text-emerald-700">Theme: Radar Training</span>
+    </div>
+    <div class="grid grid-cols-5 items-center gap-2 mb-3">
+      <div class="col-span-2 min-w-0">
+        <div class="font-bold text-slate-900 text-sm sm:text-base truncate">${clan.name}</div>
+        <div class="text-xs text-slate-500">Server ${clan.server || '—'}</div>
+        <div class="text-emerald-700 font-black text-base sm:text-lg tabular-nums mt-0.5">${clanRoundPoints.toLocaleString()}</div>
+        <div class="text-[11px] text-slate-500">Score: <strong class="text-slate-800">${battle.clanBattleScore ?? 0}</strong></div>
+      </div>
+      <div class="col-span-1 text-center">
+        <span class="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-xs font-black text-slate-700">VS</span>
+      </div>
+      <div class="col-span-2 min-w-0 text-right">
+        <div class="font-bold text-slate-900 text-sm sm:text-base truncate">${enemyClan.name}</div>
+        <div class="text-xs text-slate-500">Server ${enemyClan.server || '—'}</div>
+        <div class="text-rose-700 font-black text-base sm:text-lg tabular-nums mt-0.5">${enemyRoundPoints.toLocaleString()}</div>
+        <div class="text-[11px] text-slate-500">Score: <strong class="text-slate-800">${battle.enemyClanBattleScore ?? 0}</strong></div>
+      </div>
+    </div>
+    <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden flex">
+      <div class="bg-emerald-500 h-2.5" style="width: ${clanPct}%"></div>
+      <div class="bg-rose-500 h-2.5" style="width: ${enemyPct}%"></div>
+    </div>
+    <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-medium">
+      <span>${clanPct}%</span>
+      <span>${enemyPct}%</span>
+    </div>
+  `;
+  body.append(matchupSec);
+
+  // --- SECTION 2: PERSONAL POINTS & STANDINGS ---
+  const personalSec = document.createElement('div');
+  personalSec.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2.5';
+  const pScore = vsStatus?.score ?? rewards.userRoundPoints ?? 0;
+  const bScore = rewards.userBattlePoints ?? pScore;
+  const sScore = rewards.userSeasonPoints ?? 0;
+  const cRank = rewards.userClanRank ? `#${rewards.userClanRank}` : '—';
+  const sRank = rewards.seasonClanRank ? `#${rewards.seasonClanRank}` : '—';
+
+  const stats = [
+    { label: 'Round Points', val: pScore.toLocaleString(), sub: 'Current round' },
+    { label: 'Battle Points', val: bScore.toLocaleString(), sub: 'This battle' },
+    { label: 'Season Points', val: resourceData.formatAmount(sScore), sub: `Season Rank ${sRank}` },
+    { label: 'Clan Rank', val: cRank, sub: 'Among guild members' }
+  ];
+  for (const s of stats) {
+    const tile = document.createElement('div');
+    tile.className = 'rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs';
+    tile.innerHTML = `
+      <div class="text-[11px] font-medium text-slate-500">${s.label}</div>
+      <div class="text-base font-bold text-slate-900 tabular-nums my-0.5">${s.val}</div>
+      <div class="text-[10px] text-slate-400">${s.sub}</div>
+    `;
+    personalSec.append(tile);
+  }
+  body.append(personalSec);
+
+  // --- SECTION 3: MILESTONE CHESTS (1 - 9) ---
+  const thresholds = globalThis.hwaHelperClanVersusChestThresholds || {
+    1: 25000, 2: 100000, 3: 400000, 4: 600000, 5: 1000000, 6: 1500000, 7: 2000000, 8: 3000000, 9: 4500000
+  };
+  const rewardMap = globalThis.hwaHelperClanVersusRewards || {};
+  const claimedSet = new Set(vsStatus?.chestNumbers || []);
+
+  const chestsSec = document.createElement('div');
+  chestsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+  chestsSec.innerHTML = `
+    <div class="flex items-center justify-between">
+      <h3 class="text-sm font-bold text-slate-900">🎁 Milestone Chests</h3>
+      <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">${claimedSet.size} / 9 Claimed</span>
+    </div>
+  `;
+
+  let nextTarget = null;
+  for (let c = 1; c <= 9; c++) {
+    if (!claimedSet.has(c)) {
+      nextTarget = { num: c, pts: thresholds[c] };
+      break;
+    }
+  }
+  if (nextTarget) {
+    const pct = Math.min(100, Math.round((pScore / nextTarget.pts) * 100));
+    const progBox = document.createElement('div');
+    progBox.className = 'rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5';
+    progBox.innerHTML = `
+      <div class="flex justify-between font-medium text-slate-700">
+        <span>Next: <strong>Chest ${nextTarget.num}</strong> (${nextTarget.pts.toLocaleString()} pts)</span>
+        <span class="font-bold text-slate-900">${pct}% (${pScore.toLocaleString()} / ${nextTarget.pts.toLocaleString()})</span>
+      </div>
+      <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+        <div class="bg-amber-500 h-2 rounded-full transition-all" style="width: ${pct}%"></div>
+      </div>
+    `;
+    chestsSec.append(progBox);
+  }
+
+  const chestGrid = document.createElement('div');
+  chestGrid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5';
+  for (let c = 1; c <= 9; c++) {
+    const pts = thresholds[c] || 0;
+    const isClaimed = claimedSet.has(c);
+    const isReady = !isClaimed && pScore >= pts;
+    const chestCard = document.createElement('div');
+    chestCard.className = `rounded-lg border p-3 flex flex-col justify-between text-xs transition-colors ${
+      isClaimed
+        ? 'border-emerald-200 bg-emerald-50/50'
+        : isReady
+          ? 'border-amber-300 bg-amber-50/70 shadow-sm resource-capped-amber'
+          : 'border-slate-200 bg-slate-50/50 text-slate-600'
+    }`;
+
+    const top = document.createElement('div');
+    top.className = 'flex items-center justify-between mb-2';
+    top.innerHTML = `
+      <span class="font-bold text-slate-900">Chest ${c}</span>
+      <span class="tabular-nums font-semibold ${isClaimed ? 'text-emerald-700' : isReady ? 'text-amber-700' : 'text-slate-500'}">${pts.toLocaleString()} pts</span>
+    `;
+
+    const statusBadge = document.createElement('div');
+    statusBadge.className = 'mb-2';
+    statusBadge.innerHTML = isClaimed
+      ? '<span class="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">✓ Claimed</span>'
+      : isReady
+        ? '<span class="inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">★ Ready to Claim</span>'
+        : '<span class="inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">🔒 Locked</span>';
+
+    const rewardList = document.createElement('div');
+    rewardList.className = 'space-y-1 text-[11px] text-slate-700 mt-auto pt-2 border-t border-slate-200/60';
+    const rItems = rewardMap[c];
+    if (rItems) {
+      for (const [rKey, rAmt] of Object.entries(rItems)) {
+        const itemRow = document.createElement('div');
+        itemRow.className = 'flex items-center gap-1 truncate';
+        itemRow.textContent = formatRewardItem(rKey, rAmt);
+        rewardList.append(itemRow);
+      }
+    } else {
+      rewardList.innerHTML = '<span class="text-slate-400 italic">Bonus milestone reward</span>';
+    }
+
+    chestCard.append(top, statusBadge, rewardList);
+    chestGrid.append(chestCard);
+  }
+  chestsSec.append(chestGrid);
+  body.append(chestsSec);
+
+  // --- SECTION 4: 6-ROUND SCHEDULE & QUESTS ---
+  const roundsSec = document.createElement('div');
+  roundsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+  roundsSec.innerHTML = `
+    <div class="flex items-center justify-between">
+      <h3 class="text-sm font-bold text-slate-900">🗓️ 6-Round Battle Schedule & Quests</h3>
+      <span class="text-xs text-slate-500">Click round to view point-earning quests</span>
+    </div>
+  `;
+
+  const roundQuestsMap = globalThis.hwaHelperClanVersusRoundQuests || {};
+  const roundsList = battle.rounds || [
+    { index: 1, theme: 'Radar Training & Titan Power', score: 1, points: clanRoundPoints, enemyPoints: enemyRoundPoints, status: 'inProgress' },
+    { index: 2, theme: 'City Development & Gathering', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
+    { index: 3, theme: 'Research & Wilderness', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
+    { index: 4, theme: 'Hero Advancement & Equipment', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
+    { index: 5, theme: 'Military Training & Outland', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
+    { index: 6, theme: 'Grand Finale & PvP Clash', score: 4, points: 0, enemyPoints: 0, status: 'soon' }
+  ];
+
+  const roundGrid = document.createElement('div');
+  roundGrid.className = 'space-y-2';
+  for (const r of roundsList) {
+    const isLive = r.status === 'inProgress';
+    const isDone = r.status === 'finished';
+    const roundConfig = roundQuestsMap[r.index] || {};
+    const themeName = roundConfig.theme || r.theme || ('Round ' + r.index);
+    const quests = roundConfig.quests || [];
+
+    const rCard = document.createElement('details');
+    rCard.className = `group rounded-lg border text-xs overflow-hidden transition-colors ${
+      isLive ? 'border-emerald-300 bg-emerald-50/60' : 'border-slate-200 bg-slate-50/50'
+    }`;
+    if (isLive) rCard.open = true;
+
+    const summary = document.createElement('summary');
+    summary.className = 'flex items-center justify-between p-2.5 cursor-pointer select-none hover:bg-slate-100/60 list-none';
+
+    summary.innerHTML = `
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="size-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+          isLive ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+        }">${r.index}</span>
+        <div class="min-w-0">
+          <div class="font-bold text-slate-900 truncate">${themeName}</div>
+          <div class="text-[10px] text-slate-500">Reward: ${r.score || roundConfig.battlePoints || 1} Battle Point${(r.score || roundConfig.battlePoints || 1) > 1 ? 's' : ''} • ${quests.length} Quests</div>
+        </div>
+      </div>
+      <div class="text-right shrink-0 ml-2">
+        ${
+          isLive
+            ? `<div class="font-black text-emerald-800 tabular-nums">${resourceData.formatAmount(r.points || 0)} vs ${resourceData.formatAmount(r.enemyPoints || 0)}</div>
+               <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><span class="size-1.5 rounded-full bg-emerald-500 animate-ping"></span>In Progress</span>`
+            : isDone
+              ? `<div class="font-bold text-slate-700">${resourceData.formatAmount(r.points || 0)} vs ${resourceData.formatAmount(r.enemyPoints || 0)}</div>
+                 <span class="text-[10px] font-semibold text-slate-500">Finished</span>`
+              : '<span class="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600">Upcoming</span>'
+        }
+      </div>
+    `;
+
+    const questBody = document.createElement('div');
+    questBody.className = 'p-3 border-t border-slate-200/80 bg-white/70 space-y-2';
+    questBody.innerHTML = `
+      <div class="flex items-center justify-between text-[11px] font-bold text-slate-700">
+        <span>🎯 Quests to Earn Points:</span>
+        <span class="text-[10px] text-slate-400 font-normal">Day ${r.index}</span>
+      </div>
+    `;
+
+    const qList = document.createElement('div');
+    qList.className = 'grid grid-cols-1 sm:grid-cols-2 gap-1.5';
+    for (const q of quests) {
+      const qItem = document.createElement('div');
+      qItem.className = 'flex items-center justify-between rounded bg-white border border-slate-200/80 px-2 py-1 text-[11px]';
+      qItem.innerHTML = `
+        <span class="text-slate-800 font-medium truncate mr-1.5">${q.label}</span>
+        <span class="rounded bg-emerald-50 text-emerald-700 px-1.5 py-0.2 font-bold tabular-nums shrink-0 border border-emerald-100">+${q.points.toLocaleString()} pts</span>
+      `;
+      qList.append(qItem);
+    }
+    questBody.append(qList);
+
+    rCard.append(summary, questBody);
+    roundGrid.append(rCard);
+  }
+  roundsSec.append(roundGrid);
+  body.append(roundsSec);
+
+  // --- SECTION 5: GUILD REQUIREMENTS ---
+  const reqSec = document.createElement('div');
+  reqSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+  const curUsers = info.currentNumActiveUsers ?? 28;
+  const minUsers = info.numActiveUsers ?? 5;
+  const weeklyAct = info.weeklyUserActivity ?? 2450;
+  const personalSat = info.personalRequirementsIsSatisfied ?? true;
+  const guildSat = info.guildRequirementsIsSatisfied ?? true;
+
+  reqSec.innerHTML = `
+    <h3 class="text-sm font-bold text-slate-900">👥 Guild Participation & Requirements</h3>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
+        <div class="text-slate-500 text-[11px]">Active Members</div>
+        <div class="font-bold text-slate-900 text-sm mt-0.5">${curUsers} / ${minUsers} req</div>
+        <span class="text-[10px] font-semibold text-emerald-600">✓ Satisfied</span>
+      </div>
+      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
+        <div class="text-slate-500 text-[11px]">Weekly Activity</div>
+        <div class="font-bold text-slate-900 text-sm mt-0.5">${weeklyAct.toLocaleString()}</div>
+        <span class="text-[10px] text-slate-400">Total guild score</span>
+      </div>
+      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
+        <div class="text-slate-500 text-[11px]">Personal Status</div>
+        <div class="font-bold text-sm mt-0.5 ${personalSat ? 'text-emerald-700' : 'text-amber-700'}">${personalSat ? 'Eligible' : 'Pending'}</div>
+        <span class="text-[10px] font-semibold text-emerald-600">${personalSat ? '✓ Qualified' : 'Action needed'}</span>
+      </div>
+      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
+        <div class="text-slate-500 text-[11px]">Guild Status</div>
+        <div class="font-bold text-sm mt-0.5 ${guildSat ? 'text-emerald-700' : 'text-amber-700'}">${guildSat ? 'Eligible' : 'Pending'}</div>
+        <span class="text-[10px] font-semibold text-emerald-600">${guildSat ? '✓ Qualified' : 'Action needed'}</span>
+      </div>
+    </div>
+  `;
+  body.append(reqSec);
+
+  // --- SECTION 6: DAILY CHALLENGES ---
+  const challenges = Array.isArray(info.challenges) ? info.challenges : [];
+  if (challenges.length > 0) {
+    const chSec = document.createElement('div');
+    chSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+    chSec.innerHTML = `<h3 class="text-sm font-bold text-slate-900">🎯 Daily Challenges (${challenges.length})</h3>`;
+
+    const challengeNames = globalThis.hwaHelperClanVersusChallengeNames || {};
+    const chGrid = document.createElement('div');
+    chGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2';
+
+    for (const ch of challenges) {
+      const name = challengeNames[ch.id] || `Daily Challenge #${ch.id}`;
+      const item = document.createElement('div');
+      item.className = 'flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs';
+      item.innerHTML = `
+        <span class="font-medium text-slate-800 truncate mr-2">${name}</span>
+        <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums shrink-0">${ch.progress ?? 0}</span>
+      `;
+      chGrid.append(item);
+    }
+    chSec.append(chGrid);
+    body.append(chSec);
+  }
+
+  modal.hidden = false;
+}
+
+function openDungeonModal(dungeonStatus) {
+  const modal = document.querySelector('#dungeon-modal');
+  const body = document.querySelector('#dungeon-modal-body');
+  if (!modal || !body) return;
+
+  const data = dungeonStatus || {};
+  const floorNumber = data.floorNumber || (data.maxFloorPassed ? data.maxFloorPassed + 1 : 1);
+  const floorBadge = document.querySelector('#dungeon-floor-badge');
+  if (floorBadge) floorBadge.textContent = `Floor ${floorNumber}`;
+
+  body.replaceChildren();
+
+  // --- SECTION 1: OVERVIEW STATS ---
+  const overviewSec = document.createElement('div');
+  overviewSec.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2.5';
+  const stats = [
+    { label: 'Current Floor', val: `Floor ${floorNumber}`, sub: 'In progress' },
+    { label: 'Cleared Floors', val: String(data.maxFloorPassed ?? 0), sub: 'Total passed' },
+    { label: 'Checkpoint', val: `Floor ${data.respawnFloor || 0}`, sub: 'Respawn point' },
+    { label: 'Guild Activity', val: `${(data.dungeonActivity ?? 0).toLocaleString()} pts`, sub: 'Dungeon score' }
+  ];
+  for (const s of stats) {
+    const tile = document.createElement('div');
+    tile.className = 'rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs';
+    tile.innerHTML = `
+      <div class="text-[11px] font-medium text-slate-500">${s.label}</div>
+      <div class="text-base font-bold text-slate-900 tabular-nums my-0.5">${s.val}</div>
+      <div class="text-[10px] text-slate-400">${s.sub}</div>
+    `;
+    overviewSec.append(tile);
+  }
+  body.append(overviewSec);
+
+  // --- SECTION 2: ELEMENT AFFINITIES ---
+  const elements = data.elements || {};
+  const prime = elements.prime ? elements.prime.charAt(0).toUpperCase() + elements.prime.slice(1) : 'None';
+  const nonprime = Array.isArray(elements.nonprime)
+    ? elements.nonprime.map((e) => e.charAt(0).toUpperCase() + e.slice(1)).join(', ')
+    : 'None';
+
+  const elemSec = document.createElement('div');
+  elemSec.className = 'rounded-xl border border-slate-200 bg-slate-50/70 p-4';
+  elemSec.innerHTML = `
+    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">Element Affinities</h3>
+    <div class="flex items-center gap-4 flex-wrap text-sm">
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs font-medium text-slate-500">Prime Element:</span>
+        <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">🌟 ${prime}</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs font-medium text-slate-500">Non-Prime Elements:</span>
+        <span class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">${nonprime}</span>
+      </div>
+    </div>
+  `;
+  body.append(elemSec);
+
+  // --- SECTION 3: CURRENT FLOOR DOORS ---
+  const doors = Array.isArray(data.currentFloorDoors) ? data.currentFloorDoors : [];
+  if (doors.length > 0) {
+    const doorsSec = document.createElement('div');
+    doorsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+    doorsSec.innerHTML = `
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900">🚪 Floor ${floorNumber} Doors</h3>
+        <span class="text-xs text-slate-500">${doors.length} battle choices</span>
+      </div>
+    `;
+
+    const doorsGrid = document.createElement('div');
+    doorsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
+
+    doors.forEach((door, idx) => {
+      const doorCard = document.createElement('div');
+      doorCard.className = 'rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5';
+
+      const attackerType = door.attackerType ? door.attackerType.charAt(0).toUpperCase() + door.attackerType.slice(1) : 'Any';
+      const defenderType = door.defenderType ? door.defenderType.charAt(0).toUpperCase() + door.defenderType.slice(1) : 'Unknown';
+      const powerStr = door.power ? Number(door.power).toLocaleString() : '—';
+
+      doorCard.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-white">Door ${idx + 1}</span>
+          <span class="text-xs font-bold text-slate-700">⚔️ Power: ${powerStr}</span>
+        </div>
+        <div class="flex items-center justify-between text-xs text-slate-600">
+          <div>Attacker: <strong class="text-slate-900">${attackerType} Titans</strong></div>
+          <div>Defender: <strong class="text-slate-900">${defenderType}</strong></div>
+        </div>
+      `;
+
+      if (Array.isArray(door.team) && door.team.length > 0) {
+        const teamBox = document.createElement('div');
+        teamBox.className = 'flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200';
+        for (const unit of door.team) {
+          const titanId = String(unit.id);
+          const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
+          const name = meta?.name || `Titan ${titanId}`;
+          const starStr = unit.star ? '★'.repeat(unit.star) : '';
+          const unitTag = document.createElement('span');
+          unitTag.className = 'inline-flex items-center gap-1 rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700';
+          unitTag.textContent = `${name} (Lv.${unit.level || '?'}${starStr ? ` ${starStr}` : ''})`;
+          teamBox.append(unitTag);
+        }
+        doorCard.append(teamBox);
+      }
+
+      doorsGrid.append(doorCard);
+    });
+
+    doorsSec.append(doorsGrid);
+    body.append(doorsSec);
+  }
+
+  // --- SECTION 4: TITANS HEALTH & ENERGY STATUS ---
+  const titansState = data.states?.titans || {};
+  const titanEntries = Object.entries(titansState);
+  if (titanEntries.length > 0) {
+    const titansSec = document.createElement('div');
+    titansSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+    titansSec.innerHTML = `
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900">🛡️ Titan Health & Energy</h3>
+        <span class="text-xs text-slate-500">${titanEntries.length} deployed titans</span>
+      </div>
+    `;
+
+    const titansList = document.createElement('div');
+    titansList.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5';
+
+    for (const [tId, state] of titanEntries) {
+      const meta = globalThis.hwaHelperTitanMetadata?.[tId];
+      const name = meta?.name || `Titan ${tId}`;
+      const elem = meta?.element || '';
+      const isDead = state.isDead === true || (state.hp <= 0);
+      const maxHp = state.maxHp || 1;
+      const hp = Math.max(0, state.hp || 0);
+      const hpPct = Math.min(100, Math.round((hp / maxHp) * 100));
+      const energy = Math.max(0, state.energy || 0);
+      const energyPct = Math.min(100, Math.round((energy / 1000) * 100));
+
+      const row = document.createElement('div');
+      row.className = `rounded-xl border p-3 ${isDead ? 'border-rose-200 bg-rose-50/40 opacity-70' : 'border-slate-200 bg-slate-50/50'}`;
+
+      row.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="font-bold text-xs sm:text-sm text-slate-900 truncate">${name}</span>
+            ${elem ? `<span class="rounded bg-slate-200 px-1.5 py-0.2 text-[10px] font-semibold text-slate-600">${elem}</span>` : ''}
+          </div>
+          <span class="rounded-full px-2 py-0.5 text-[10px] font-bold ${isDead ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}">
+            ${isDead ? 'Fallen' : 'Alive'}
+          </span>
+        </div>
+        <div class="space-y-1.5">
+          <div>
+            <div class="flex justify-between text-[10px] text-slate-500 mb-0.5">
+              <span>HP</span>
+              <span class="tabular-nums font-semibold">${hp.toLocaleString()} / ${maxHp.toLocaleString()} (${hpPct}%)</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+              <div class="${isDead ? 'bg-rose-500' : 'bg-emerald-500'} h-1.5 rounded-full" style="width: ${hpPct}%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-[10px] text-slate-500 mb-0.5">
+              <span>Energy</span>
+              <span class="tabular-nums font-semibold">${energy.toLocaleString()} / 1,000 (${energyPct}%)</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+              <div class="bg-amber-400 h-1.5 rounded-full" style="width: ${energyPct}%"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      titansList.append(row);
+    }
+
+    titansSec.append(titansList);
+    body.append(titansSec);
+  }
+
+  modal.hidden = false;
+}
+
+function renderEvents(cache) {
+  const query = search.value.trim().toLowerCase();
+  const eventCards = [];
+
+  // 1. Guild Versus (clanVersus)
+  const vsStatus = cache.clanVersusStatus?.data;
+  if (vsStatus && (vsStatus.battle || vsStatus.info || vsStatus.rewards || vsStatus.chestNumbers || vsStatus.score)) {
+    const battle = vsStatus.battle || {};
+    const info = vsStatus.info || {};
+    const rewards = vsStatus.rewards || {};
+    const clanName = battle.clan?.name || 'Our Guild';
+    const enemyClanName = battle.enemyClan?.name || 'Opponent Guild';
+    const clanServer = battle.clan?.server ? `S${battle.clan.server}` : '';
+    const enemyServer = battle.enemyClan?.server ? `S${battle.enemyClan.server}` : '';
+    const league = battle.league || (info.league ? `League #${info.league}` : 'Bronze');
+    const leagueLabel = league.charAt(0).toUpperCase() + league.slice(1);
+    const roundNumber = info.roundNumber || 1;
+    const currentRound = (battle.rounds || []).find((r) => r.status === 'inProgress') || battle.rounds?.[0] || {};
+    const theme = currentRound.theme || 'Radar Training';
+    const roundPoints = resourceData.formatAmount(battle.clanRoundPoints ?? currentRound.points ?? 0);
+    const enemyRoundPoints = resourceData.formatAmount(battle.enemyClanRoundPoints ?? currentRound.enemyPoints ?? 0);
+    const personalScore = vsStatus.score ?? rewards.userRoundPoints ?? 0;
+    const claimedCount = (vsStatus.chestNumbers || []).length;
+
+    eventCards.push({
+      id: 'clanVersus',
+      type: 'guild_versus',
+      title: '⚔️ Guild Versus',
+      searchStr: `guild versus gvs ${clanName} ${enemyClanName} ${theme} ${league}`.toLowerCase(),
+      featured: true,
+      render: () => {
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-emerald-300 bg-emerald-50/50 p-4 shadow-sm hover:border-emerald-400 transition-colors cursor-pointer';
+        card.addEventListener('click', () => openGuildVersusModal(vsStatus));
+
+        const topRow = document.createElement('div');
+        topRow.className = 'flex items-center justify-between gap-2 flex-wrap mb-2.5';
+        topRow.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="inline-flex size-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="font-bold text-slate-900 text-sm">Guild Versus</span>
+            <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">${leagueLabel} League</span>
+          </div>
+          <span class="text-xs font-semibold text-emerald-800">Round ${roundNumber} of 6 • ${theme}</span>
+        `;
+
+        const matchupBox = document.createElement('div');
+        matchupBox.className = 'flex items-center justify-between rounded-lg bg-white border border-emerald-100 p-3 text-xs mb-2.5';
+        matchupBox.innerHTML = `
+          <div class="min-w-0">
+            <div class="font-bold text-slate-900 truncate">${clanName} <span class="text-slate-400 font-normal">${clanServer}</span></div>
+            <div class="text-emerald-700 font-bold text-sm">${roundPoints} <span class="text-[10px] font-normal text-slate-500">pts</span></div>
+          </div>
+          <div class="shrink-0 px-2 text-center">
+            <span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">VS</span>
+            <div class="text-[10px] text-slate-400 mt-0.5">${battle.clanBattleScore ?? 0} : ${battle.enemyClanBattleScore ?? 0}</div>
+          </div>
+          <div class="min-w-0 text-right">
+            <div class="font-bold text-slate-900 truncate">${enemyClanName} <span class="text-slate-400 font-normal">${enemyServer}</span></div>
+            <div class="text-rose-700 font-bold text-sm">${enemyRoundPoints} <span class="text-[10px] font-normal text-slate-500">pts</span></div>
+          </div>
+        `;
+
+        const footerRow = document.createElement('div');
+        footerRow.className = 'flex items-center justify-between gap-2 flex-wrap text-xs text-slate-600';
+        footerRow.innerHTML = `
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-medium">Personal: <strong class="text-slate-900">${resourceData.formatAmount(personalScore)}</strong> pts</span>
+            <span class="text-slate-300">•</span>
+            <span class="font-medium">Chests: <strong class="text-slate-900">${claimedCount}/9</strong> claimed</span>
+          </div>
+          <button type="button" class="cursor-pointer font-semibold text-emerald-700 hover:text-emerald-800 inline-flex items-center gap-1">
+            View Details <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        `;
+
+        card.append(topRow, matchupBox, footerRow);
+        return card;
+      }
+    });
+  }
+
+  // 1.5 Titan Dungeon
+  const dungeonStatus = cache.dungeonStatus?.data;
+  if (dungeonStatus && (dungeonStatus.floorNumber || dungeonStatus.maxFloorPassed)) {
+    const floor = dungeonStatus.floorNumber || (dungeonStatus.maxFloorPassed + 1);
+    const activity = dungeonStatus.dungeonActivity ?? 0;
+    const prime = dungeonStatus.elements?.prime ? dungeonStatus.elements.prime.charAt(0).toUpperCase() + dungeonStatus.elements.prime.slice(1) : 'Earth';
+    const respawn = dungeonStatus.respawnFloor || 0;
+
+    eventCards.push({
+      id: 'titanDungeon',
+      type: 'dungeon',
+      title: '🏰 Titan Dungeon',
+      searchStr: `titan dungeon floor ${floor} checkpoint ${respawn} ${prime}`.toLowerCase(),
+      featured: true,
+      render: () => {
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-blue-300 bg-blue-50/50 p-4 shadow-sm hover:border-blue-400 transition-colors cursor-pointer';
+        card.addEventListener('click', () => openDungeonModal(dungeonStatus));
+
+        const topRow = document.createElement('div');
+        topRow.className = 'flex items-center justify-between gap-2 flex-wrap mb-2.5';
+        topRow.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="inline-flex size-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+            <span class="font-bold text-slate-900 text-sm">Titan Dungeon</span>
+            <span class="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">Floor ${floor}</span>
+          </div>
+          <span class="text-xs font-semibold text-blue-800">Prime Element: ${prime}</span>
+        `;
+
+        const detailsBox = document.createElement('div');
+        detailsBox.className = 'flex items-center justify-between rounded-lg bg-white border border-blue-100 p-3 text-xs mb-2.5';
+        detailsBox.innerHTML = `
+          <div class="min-w-0">
+            <div class="text-slate-500">Progress</div>
+            <div class="text-blue-900 font-bold text-sm">Cleared ${dungeonStatus.maxFloorPassed || 0} Floors</div>
+          </div>
+          <div class="text-center">
+            <div class="text-slate-500">Checkpoint</div>
+            <div class="text-slate-800 font-bold text-sm">Floor ${respawn}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-slate-500">Guild Activity</div>
+            <div class="text-emerald-700 font-bold text-sm">${activity.toLocaleString()} pts</div>
+          </div>
+        `;
+
+        const footerRow = document.createElement('div');
+        footerRow.className = 'flex items-center justify-between gap-2 flex-wrap text-xs text-slate-600';
+        footerRow.innerHTML = `
+          <div class="text-xs text-slate-500">
+            Click to view floor doors & titan health status
+          </div>
+          <button type="button" class="cursor-pointer font-semibold text-blue-700 hover:text-blue-800 inline-flex items-center gap-1">
+            View Details <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        `;
+
+        card.append(topRow, detailsBox, footerRow);
+        return card;
+      }
+    });
+  }
+
+  // 2. Guild War Championship
+  const gwStatus = cache.clanWarChampStatus?.data;
+  if (gwStatus) {
+    const current = gwStatus.seasonStatus?.current;
+    eventCards.push({
+      id: 'clanWarChamp',
+      type: 'guild_war',
+      title: '🏆 Guild War Championship',
+      searchStr: `guild war championship season ${gwStatus.seasonId || ''} ${current?.stageType || ''}`.toLowerCase(),
+      render: () => {
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs';
+        const stageLabel = (current?.stageType || 'REGULAR_STAGE').replace(/_/g, ' ');
+        const hours = current?.startHour != null && current?.endHour != null
+          ? `${String(current.startHour).padStart(2, '0')}:00 - ${String(current.endHour).padStart(2, '0')}:00`
+          : 'Active';
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-900 text-sm">🏆 Guild War Championship</span>
+              <span class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800">Season ${gwStatus.seasonId || '58'}</span>
+            </div>
+            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">${stageLabel}</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-600 mt-2">
+            <span>Daily War Window: <strong class="text-slate-800">${hours}</strong></span>
+            <span>Tries: <strong class="text-slate-800">${gwStatus.tries ?? 0}</strong></span>
+          </div>
+        `;
+        return card;
+      }
+    });
+  }
+
+  // 3. Guild Clash
+  const clashStatus = cache.clanClashStatus?.data?.clashEvent;
+  if (clashStatus) {
+    eventCards.push({
+      id: 'clanClash',
+      type: 'clash',
+      title: '🛡️ Guild Clash',
+      searchStr: `guild clash cycle ${clashStatus.cycleId || ''}`.toLowerCase(),
+      render: () => {
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs';
+        const lanesCount = clashStatus.lanes?.length || 0;
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-900 text-sm">🛡️ Guild Clash</span>
+              <span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-800">Cycle ${clashStatus.cycleId || 1}</span>
+            </div>
+            <span class="text-xs text-slate-500">${lanesCount} Lanes Contested</span>
+          </div>
+          <div class="text-xs text-slate-600">
+            Current stage in progress with lane attacks & defense stationed.
+          </div>
+        `;
+        return card;
+      }
+    });
+  }
+
+  // 4. Hero Brawl
+  const brawls = cache.brawlStatus?.data?.brawls;
+  if (Array.isArray(brawls) && brawls.length > 0) {
+    const brawl = brawls[0];
+    eventCards.push({
+      id: 'brawl',
+      type: 'brawl',
+      title: '🥊 Hero Brawl',
+      searchStr: `hero brawl #${brawl.brawlId || ''}`.toLowerCase(),
+      render: () => {
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs';
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <span class="font-bold text-slate-900 text-sm">🥊 Hero Brawl</span>
+            <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Brawl #${brawl.brawlId}</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-600">
+            <span>Wins: <strong class="text-slate-800">${brawl.wins ?? 0}</strong></span>
+            <span>Defense Power: <strong class="text-slate-800">${resourceData.formatAmount(Number(brawl.power) || 0)}</strong></span>
+          </div>
+        `;
+        return card;
+      }
+    });
+  }
+
+  // 5. Special Quest Events
+  const questEvents = cache.questEvents?.data?.events;
+  if (Array.isArray(questEvents)) {
+    for (const qe of questEvents) {
+      const titleMap = {
+        ADVENTURE_HERO62_TITLE_EVENT_UPGRADE: 'Soleil Upgrade Event',
+        DAEMONSKIN22_UI_TITLE: 'Demon Skin Festival'
+      };
+      const title = titleMap[qe.name_localeKey] || qe.name_localeKey?.replace(/_/g, ' ') || `Special Event #${qe.id}`;
+      eventCards.push({
+        id: `questEvent:${qe.id}`,
+        type: 'special_event',
+        title: `✨ ${title}`,
+        searchStr: `special quest event ${title}`.toLowerCase(),
+        render: () => {
+          const card = document.createElement('div');
+          card.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs';
+          card.innerHTML = `
+            <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+              <span class="font-bold text-slate-900 text-sm">✨ ${title}</span>
+              <span class="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-800">Special Quest</span>
+            </div>
+            <div class="text-xs text-slate-500">Event ID: ${qe.id} • Active Special Quests & Rewards</div>
+          `;
+          return card;
+        }
+      });
+    }
+  }
+
+  // 6. Fortress Event
+  const fortress = cache.fortressEventStatus?.data;
+  if (fortress?.id) {
+    eventCards.push({
+      id: 'fortress',
+      type: 'fortress',
+      title: '🏰 Fortress Event',
+      searchStr: `fortress event #${fortress.id}`.toLowerCase(),
+      render: () => {
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs';
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+            <span class="font-bold text-slate-900 text-sm">🏰 Fortress Event</span>
+            <span class="rounded bg-cyan-100 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-800">Event #${fortress.id}</span>
+          </div>
+          <div class="text-xs text-slate-500">World Map Fortress conquests active</div>
+        `;
+        return card;
+      }
+    });
+  }
+
+  // 7. Hydra Boss
+  const clanBoss = cache.clanBoss_getAll?.data;
+  if (clanBoss && Array.isArray(clanBoss.heads)) {
+    const deadCount = clanBoss.heads.filter((h) => h.state?.isDead).length;
+    const totalCount = clanBoss.heads.length;
+    eventCards.push({
+      id: 'clanBoss',
+      type: 'boss',
+      title: '🐉 Hydra Boss',
+      searchStr: 'hydra clan boss heads'.toLowerCase(),
+      render: () => {
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs';
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <span class="font-bold text-slate-900 text-sm">🐉 Hydra Boss</span>
+            <span class="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-800">Daily Clan Boss</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-600">
+            <span>Heads Defeated: <strong class="text-slate-800">${deadCount} / ${totalCount}</strong></span>
+            <span>Tries: <strong class="text-slate-800">${clanBoss.tries ?? 0} regular, ${clanBoss.superTries ?? 0} super</strong></span>
+          </div>
+        `;
+        return card;
+      }
+    });
+  }
+
+  const filtered = eventCards.filter((card) => !query || card.searchStr.includes(query) || card.title.toLowerCase().includes(query));
+  status.textContent = `${filtered.length} active event${filtered.length === 1 ? '' : 's'}`;
+
+  if (!filtered.length) {
+    if (eventCards.length > 0 && query) {
+      showEmpty(`No events matching "${search.value}".`);
+    } else {
+      showEmpty('No event data observed yet. Open Events or Guild Versus in the game to sync.');
+    }
+    return;
+  }
+
+  const listContainer = document.createElement('div');
+  listContainer.className = 'p-4 space-y-3';
+  for (const item of filtered) {
+    listContainer.append(item.render());
+  }
+  view.append(listContainer);
+}
+
+function setupGuildVersusModal() {
+  const modal = document.querySelector('#guild-versus-modal');
+  const closeBtn = document.querySelector('#gvs-modal-close');
+  if (!modal) return;
+
+  function closeModal() {
+    modal.hidden = true;
+  }
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
+  });
+}
+
+function setupDungeonModal() {
+  const modal = document.querySelector('#dungeon-modal');
+  const closeBtn = document.querySelector('#dungeon-modal-close');
+  if (!modal) return;
+
+  function closeModal() {
+    modal.hidden = true;
+  }
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
+  });
+}
+
 function renderGuildChat(cache) {
   const chatData = cache.guildChat?.data;
   const messages = Array.isArray(chatData?.messages) ? chatData.messages : [];
@@ -1642,10 +2605,12 @@ async function render() {
   document.querySelector('#resource-sort-wrap').hidden = activeTab !== 'resources';
   document.querySelector('#search-label').textContent = activeTab === 'log' ? 'Filter endpoint' :
     activeTab === 'draft' ? 'Search hero by name, role, or ID' :
-    activeTab === 'chat' ? 'Search message or sender' : 'Search ID, name, or group';
+    activeTab === 'chat' ? 'Search message or sender' :
+    activeTab === 'events' ? 'Search event name or type' : 'Search ID, name, or group';
   search.placeholder = activeTab === 'log' ? 'Filter endpoint' :
     activeTab === 'draft' ? 'Search hero by name, role, or ID' :
-    activeTab === 'chat' ? 'Search message or sender' : 'Search ID, name, or group';
+    activeTab === 'chat' ? 'Search message or sender' :
+    activeTab === 'events' ? 'Search event name or type' : 'Search ID, name, or group';
 
   if (activeTab === 'config') {
     status.textContent = 'Settings and data stored in this browser.';
@@ -1680,13 +2645,15 @@ async function render() {
       globalThis.hwaHelperPopupData.teamRows(data, globalThis.hwaHelperNameMap));
   } else if (activeTab === 'chat') {
     renderGuildChat(cache);
+  } else if (activeTab === 'events') {
+    renderEvents(cache);
   } else if (activeTab === 'other') {
     const entries = Object.values(cache).filter((entry) =>
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
         'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
         'accountStatus', 'buildingStatus', 'marchStatus',
         'researchStatus', 'productionConfigStatus', 'productionStatus',
-        'productionBonusStatus', 'missionProgressStatus'].includes(entry.key)
+        'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents', 'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry.key)
       && !entry.key.startsWith('resource:')
       && matches([entry.method, entry.feature || entry.group]));
     const rows = entries.map((entry) => [entry.method, entry.feature || entry.group,
@@ -1811,4 +2778,6 @@ render().then(async () => {
     await render();
   }
 });
+setupGuildVersusModal();
+setupDungeonModal();
 setInterval(refreshTimed, 1000);

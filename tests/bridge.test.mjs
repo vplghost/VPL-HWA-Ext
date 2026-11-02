@@ -81,3 +81,59 @@ test('bridge injects helper button when document is available and sends open-tab
   btn.click();
   assert.equal(sentMessages[0]?.kind, 'open-tab');
 });
+
+test('bridge helper button click safely handles extension context invalidated error', async () => {
+  let alertedMessage = null;
+  const elements = new Map();
+  const document = {
+    readyState: 'complete',
+    getElementById: (id) => elements.get(id) || null,
+    createElement: (tag) => {
+      const el = {
+        tagName: tag.toUpperCase(),
+        attributes: {},
+        listeners: {},
+        setAttribute: (k, v) => { el.attributes[k] = v; },
+        addEventListener: (event, handler) => { el.listeners[event] = handler; },
+        click: () => { el.listeners.click?.(); }
+      };
+      return el;
+    },
+    body: {
+      appendChild: (child) => {
+        if (child.id) elements.set(child.id, child);
+      }
+    }
+  };
+  const chrome = {
+    runtime: {
+      sendMessage: () => {
+        throw new Error('Extension context invalidated.');
+      }
+    },
+    storage: {
+      local: { get: async () => ({}) },
+      onChanged: { addListener: () => {} }
+    }
+  };
+  const window = {
+    addEventListener: () => {},
+    postMessage: () => {},
+    alert: (msg) => { alertedMessage = msg; }
+  };
+
+  runInNewContext(source, {
+    window,
+    document,
+    chrome,
+    alert: (msg) => { alertedMessage = msg; },
+    location: { origin: 'https://www.hero-wars-alliance.com' }
+  });
+
+  const btn = elements.get('hwa-helper-btn');
+  assert.ok(btn);
+  assert.doesNotThrow(() => {
+    btn.click();
+  });
+  assert.match(alertedMessage, /reloaded|updated|refresh/);
+});

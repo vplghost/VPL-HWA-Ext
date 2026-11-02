@@ -53,7 +53,22 @@ function injectHelperButton() {
   btn.title = 'Open HWA Helper in new tab';
   btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6-9 9M20 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h6"/></svg><span>HWA Helper</span>';
   btn.addEventListener('click', () => {
-    chrome.runtime?.sendMessage?.({ kind: 'open-tab' });
+    try {
+      const p = chrome.runtime?.sendMessage?.({ kind: 'open-tab' });
+      if (p && typeof p.catch === 'function') {
+        p.catch((err) => {
+          if (err?.message?.includes('Extension context invalidated')) {
+            const notify = typeof alert === 'function' ? alert : (typeof window !== 'undefined' && window.alert ? window.alert : console.warn);
+            notify('HWA Helper extension was updated or reloaded. Please refresh this game page to reconnect.');
+          }
+        });
+      }
+    } catch (err) {
+      if (err?.message?.includes('Extension context invalidated')) {
+        const notify = typeof alert === 'function' ? alert : (typeof window !== 'undefined' && window.alert ? window.alert : console.warn);
+        notify('HWA Helper extension was updated or reloaded. Please refresh this game page to reconnect.');
+      }
+    }
   });
 
   const parent = document.body || document.documentElement;

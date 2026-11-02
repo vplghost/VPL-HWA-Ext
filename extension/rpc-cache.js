@@ -18,19 +18,52 @@
     missionGetAll: 'other',
     'getDailyQuests:quest': 'other',
     clanBoss_getAll: 'other',
-    clanWarGetBriefInfo: 'other'
+    clanWarGetBriefInfo: 'other',
+    'getInfo:clanVersus': 'events',
+    'getCurrentBattle:clanVersus': 'events',
+    'getUserProgress:clanVersus': 'events',
+    'getRewardList:clanVersus': 'events',
+    questGetEvents: 'events',
+    clanWarChampInfo_getBriefInfo: 'events',
+    'getEventInfo:fortress': 'events',
+    clanClash_getCurrentState: 'events',
+    brawl_getAll: 'events',
+    heroEvolve: 'heroes',
+    'getRoutesByIds:globalMap': 'other',
+    'getPage:report': 'other',
+    dungeonEndBattle: 'events',
+    dungeonSaveProgress: 'events',
+    dungeonStartBattle: 'events',
+    inventory_use: 'items'
   };
 
   const resourceTypes = new Set(['material', 'coin', 'scroll', 'consumable',
     'speedUpUnitTraining', 'speedUpUniversal', 'speedUpUnitHealing',
-    'speedUpConstruction', 'speedUpResearch', 'teleporter', 'lootboxChanced']);
+    'speedUpConstruction', 'speedUpResearch', 'teleporter', 'lootboxChanced', 'patron']);
   const worldMaterialNames = { 1: 'Elarite Shards', 2: 'Iron', 3: 'Stone',
     4: 'Wood', 5: 'Food', 12: 'Honor Marks' };
   const producedMaterialIds = new Set([1, 2, 3, 4, 5]);
   const typeNames = { speedUpUnitTraining: 'Training Speedup',
     speedUpUniversal: 'Universal Speedup', speedUpUnitHealing: 'Healing Speedup',
     speedUpConstruction: 'Construction Speedup', speedUpResearch: 'Research Speedup',
-    teleporter: 'Teleporter', lootboxChanced: 'Chance Lootbox' };
+    teleporter: 'Teleporter', lootboxChanced: 'Chance Lootbox', patron: 'Relic Shard' };
+
+  function resolveResourceLabel(key) {
+    if (key === 'energy') return 'Energy';
+    if (key === 'gold') return 'Gold';
+    if (key === 'starMoney') return 'Emeralds';
+    const [type, idStr] = key.split(':');
+    const id = Number(idStr);
+    if (type === 'material' && worldMaterialNames[id]) return worldMaterialNames[id];
+    if (type === 'speedUpResearch' && id === 2) return '5m Research Speedup';
+    if (type === 'patron' && id === 1) return 'Relic Shard';
+    const nameMap = globalThis.hwaHelperNameMap;
+    if (nameMap && typeof nameMap.item === 'function') {
+      const found = nameMap.item(type, id);
+      if (found) return found;
+    }
+    return `${typeNames[type] || type} #${id}`;
+  }
 
   function resource(key, amount, record, method, label, extra = {}) {
     if (!Number.isFinite(amount) || amount < 0) return [];
@@ -48,10 +81,10 @@
     });
   }
 
-  function resourceAction(record, call, key, delta) {
+  function resourceAction(record, call, key, delta, label) {
     if (!Number.isFinite(delta) || delta === 0 || !call.ident) return [];
     return [{ key: 'resourceAction', method: call.name, feature: call.feature || null,
-      group: 'internal', data: { resourceKey: `resource:${key}`, delta,
+      group: 'internal', data: { resourceKey: `resource:${key}`, delta, label,
         token: `${call.ident}:${key}` }, updatedAt: record.timestamp }];
   }
 
@@ -140,6 +173,52 @@
                 rally.leaderCoordinates, 'returnToOutpost') },
             updatedAt: record.timestamp }];
         }
+        if (key === 'getRoutesByIds:globalMap' && Array.isArray(result?.response?.routes)) {
+          const actions = [];
+          for (const route of result.response.routes) {
+            if (route?.type === 'returnToOutpost') {
+              const startedAt = route.startedAt;
+              const duration = route.durationMs ?? route.duration;
+              if (Number.isFinite(startedAt) && Number.isFinite(duration)) {
+                actions.push({
+                  key: 'rallyAction',
+                  method: call.name,
+                  feature: call.feature,
+                  group: 'internal',
+                  data: {
+                    action: 'returnRoute',
+                    routeId: route.routeId,
+                    returnAt: startedAt + duration,
+                    startedAt,
+                    durationMs: duration
+                  },
+                  updatedAt: record.timestamp
+                });
+              }
+            }
+          }
+          if (actions.length) return actions;
+        }
+        if (key === 'getPage:report' && Array.isArray(result?.response?.reports)) {
+          const actions = [];
+          for (const rep of result.response.reports) {
+            if (rep?.type === 'rallyMobAttackResult' && Number.isFinite(rep.createdAt)) {
+              actions.push({
+                key: 'rallyAction',
+                method: call.name,
+                feature: call.feature,
+                group: 'internal',
+                data: {
+                  action: 'battleReport',
+                  createdAt: rep.createdAt,
+                  mobConfigId: rep.payload?.mobConfigId
+                },
+                updatedAt: record.timestamp
+              });
+            }
+          }
+          if (actions.length) return actions;
+        }
         if (result && Object.hasOwn(result, 'response') && !result.error) {
           if (call.name === 'heroUpgradeSkill') {
             const actions = resourceAction(record, call, 'refillable:2', -1);
@@ -158,6 +237,140 @@
               });
             }
             return actions;
+          }
+                    if (call.name === 'dungeonEndBattle' && result?.response) {
+            const actions = [];
+            const rep = result.response;
+            const dungeon = rep.dungeon || {};
+            const floor = Number.isFinite(dungeon.floorNumber) ? dungeon.floorNumber :
+              (Number.isFinite(Number(dungeon.maxFloorPassed)) ? Number(dungeon.maxFloorPassed) + 1 : null);
+            actions.push({
+              key: 'dungeonStatus',
+              method: call.name,
+              feature: null,
+              group: 'events',
+              data: {
+                floorNumber: floor,
+                maxFloorPassed: Number(dungeon.maxFloorPassed) || 0,
+                maxFloorReached: dungeon.maxFloorReached || 0,
+                respawnFloor: Number(dungeon.respawnFloor) || 0,
+                elements: dungeon.elements || { prime: 'earth', nonprime: ['water', 'fire'] },
+                states: dungeon.states || rep.states || {},
+                dungeonActivity: rep.dungeonActivity ?? dungeon.dungeonActivity ?? 0,
+                currentFloorDoors: dungeon.floor?.userData || []
+              },
+              updatedAt: record.timestamp
+            });
+            if (rep.reward) {
+              actions.push({
+                key: 'dungeonRewardAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  token: `${call.ident}:dungeonReward`,
+                  reward: rep.reward
+                },
+                updatedAt: record.timestamp
+              });
+            }
+            return actions;
+          }
+          if (call.name === 'dungeonSaveProgress' && result?.response) {
+            const actions = [];
+            const rep = result.response;
+            const dungeon = rep.dungeon || {};
+            const floor = Number.isFinite(dungeon.floorNumber) ? dungeon.floorNumber :
+              (Number.isFinite(Number(dungeon.maxFloorPassed)) ? Number(dungeon.maxFloorPassed) + 1 : null);
+            actions.push({
+              key: 'dungeonStatus',
+              method: call.name,
+              feature: null,
+              group: 'events',
+              data: {
+                floorNumber: floor,
+                maxFloorPassed: Number(dungeon.maxFloorPassed) || 0,
+                maxFloorReached: dungeon.maxFloorReached || 0,
+                respawnFloor: Number(dungeon.respawnFloor) || 0,
+                elements: dungeon.elements || { prime: 'earth', nonprime: ['water', 'fire'] },
+                states: dungeon.states || rep.states || {},
+                dungeonActivity: rep.dungeonActivity ?? dungeon.dungeonActivity ?? 0,
+                currentFloorDoors: dungeon.floor?.userData || []
+              },
+              updatedAt: record.timestamp
+            });
+            if (rep.reward) {
+              actions.push({
+                key: 'dungeonRewardAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  token: `${call.ident}:dungeonReward`,
+                  reward: rep.reward
+                },
+                updatedAt: record.timestamp
+              });
+            }
+            if (Array.isArray(rep.quests)) {
+              const coins = {};
+              for (const q of rep.quests) {
+                if ((q.state === 3 || q.state === 1) && q.reward?.coin) {
+                  for (const [coinId, amt] of Object.entries(q.reward.coin)) {
+                    coins[coinId] = (coins[coinId] || 0) + Number(amt);
+                  }
+                }
+              }
+              if (Object.keys(coins).length) {
+                actions.push({
+                  key: 'dungeonRewardAction',
+                  method: call.name,
+                  feature: null,
+                  group: 'internal',
+                  data: {
+                    token: `${call.ident}:dungeonQuests`,
+                    reward: { coin: coins }
+                  },
+                  updatedAt: record.timestamp
+                });
+              }
+            }
+            return actions;
+          }
+          if (call.name === 'inventory_use' && result && !result.error) {
+            const actions = [];
+            const libId = call.args?.libId;
+            const amount = Number(call.args?.amount);
+            const unitId = call.args?.params?.unitId;
+            if (libId === 20 && Number.isFinite(amount) && amount > 0) {
+              actions.push({
+                key: 'inventoryUseAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  token: `${call.ident}:inventoryUse:${libId}`,
+                  libId: 20,
+                  amount,
+                  unitId: unitId ? String(unitId) : null
+                },
+                updatedAt: record.timestamp
+              });
+            }
+            return actions;
+          }
+          if (call.name === 'heroEvolve' && Number.isInteger(call.args?.heroId)) {
+            return [{
+              key: 'heroEvolveAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                heroId: call.args.heroId,
+                token: `${call.ident}:heroEvolve:${call.args.heroId}`
+              },
+              updatedAt: record.timestamp
+            }];
           }
           if (['missionRaid', 'missionStart', 'missionEnd'].includes(call.name)) {
             let delta = 0;
@@ -215,6 +428,124 @@
             return [...rewards].flatMap(([rewardKey, amount]) =>
               resourceAction(record, call, rewardKey, amount));
           }
+          if (call.name === 'claimChest' && call.feature === 'clanVersus') {
+            const chestNumber = call.args?.chestNumber;
+            const rewards = globalThis.hwaHelperClanVersusRewards?.[chestNumber];
+            const actions = [];
+            if (rewards) {
+              for (const [resKey, amount] of Object.entries(rewards)) {
+                if (Number.isFinite(amount) && amount > 0) {
+                  const label = resolveResourceLabel(resKey);
+                  actions.push(...resourceAction(record, call, resKey, amount, label));
+                }
+              }
+            }
+            actions.push({
+              key: 'clanVersusChestAction',
+              method: call.name,
+              feature: call.feature,
+              group: 'internal',
+              data: { chestNumber, token: `${call.ident}:chest:${chestNumber}` },
+              updatedAt: record.timestamp
+            });
+            return actions;
+          }
+        }
+        if (call.name === 'getInfo' && call.feature === 'clanVersus' && result?.response) {
+          return [{
+            key: 'clanVersusStatus',
+            method: call.name,
+            feature: call.feature,
+            group: 'events',
+            data: { info: result.response },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'getCurrentBattle' && call.feature === 'clanVersus' && result?.response) {
+          return [{
+            key: 'clanVersusStatus',
+            method: call.name,
+            feature: call.feature,
+            group: 'events',
+            data: { battle: result.response },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'getRewardList' && call.feature === 'clanVersus' && result?.response) {
+          return [{
+            key: 'clanVersusStatus',
+            method: call.name,
+            feature: call.feature,
+            group: 'events',
+            data: { rewards: result.response },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'getUserProgress' && call.feature === 'clanVersus' && result?.response) {
+          const score = typeof result.response.progress === 'object' && result.response.progress !== null ?
+            (result.response.progress.score ?? 0) : (result.response.progress ?? 0);
+          return [{
+            key: 'clanVersusStatus',
+            method: call.name,
+            feature: call.feature,
+            group: 'events',
+            data: {
+              progress: result.response.progress ?? 0,
+              score,
+              chestNumbers: Array.isArray(result.response.chestNumbers) ? result.response.chestNumbers : []
+            },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'questGetEvents' && Array.isArray(result?.response)) {
+          return [{
+            key: 'questEvents',
+            method: call.name,
+            feature: null,
+            group: 'events',
+            data: { events: result.response },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'clanWarChampInfo_getBriefInfo' && result?.response) {
+          return [{
+            key: 'clanWarChampStatus',
+            method: call.name,
+            feature: null,
+            group: 'events',
+            data: result.response,
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'getEventInfo' && call.feature === 'fortress' && result?.response) {
+          return [{
+            key: 'fortressEventStatus',
+            method: call.name,
+            feature: call.feature,
+            group: 'events',
+            data: result.response,
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'clanClash_getCurrentState' && result?.response) {
+          return [{
+            key: 'clanClashStatus',
+            method: call.name,
+            feature: null,
+            group: 'events',
+            data: result.response,
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'brawl_getAll' && Array.isArray(result?.response)) {
+          return [{
+            key: 'brawlStatus',
+            method: call.name,
+            feature: null,
+            group: 'events',
+            data: { brawls: result.response },
+            updatedAt: record.timestamp
+          }];
         }
         if (call.name === 'remoteConfigInit' && result?.response?.index?.configs) {
           const configs = result.response.index.configs;
@@ -521,6 +852,43 @@
           } else if (entry.data.action === 'cancel') {
             if (index < 0) continue;
             marches.splice(index, 1);
+          } else if (entry.data.action === 'returnRoute') {
+            let updated = false;
+            for (let i = 0; i < marches.length; i++) {
+              if (marches[i].rally) {
+                marches[i] = {
+                  ...marches[i],
+                  stage: 'returnToOutpost',
+                  endsAt: entry.data.returnAt,
+                  rally: {
+                    ...marches[i].rally,
+                    returnAt: entry.data.returnAt
+                  }
+                };
+                updated = true;
+              }
+            }
+            if (!updated) continue;
+          } else if (entry.data.action === 'battleReport') {
+            let updated = false;
+            for (let i = 0; i < marches.length; i++) {
+              if (marches[i].rally) {
+                const returnMs = marches[i].rally.returnMs || marches[i].rally.outboundMs || 60000;
+                const returnAt = entry.data.createdAt + returnMs;
+                marches[i] = {
+                  ...marches[i],
+                  stage: 'returnToOutpost',
+                  endsAt: marches[i].rally.returnAt || returnAt,
+                  rally: {
+                    ...marches[i].rally,
+                    arrivalAt: entry.data.createdAt,
+                    returnAt: marches[i].rally.returnAt || returnAt
+                  }
+                };
+                updated = true;
+              }
+            }
+            if (!updated) continue;
           }
           next.marchStatus = { key: 'marchStatus', method: entry.method,
             feature: entry.feature, group: 'header', data: { marches },
@@ -528,14 +896,74 @@
           changed = true;
           continue;
         }
+        if (entry.key === 'clanVersusStatus') {
+          const existing = next.clanVersusStatus?.data || {};
+          const incoming = entry.data || {};
+          const chestSet = new Set([
+            ...(existing.chestNumbers || []),
+            ...(incoming.chestNumbers || [])
+          ]);
+          const mergedData = {
+            ...existing,
+            ...incoming,
+            info: incoming.info ? { ...existing.info, ...incoming.info } : existing.info,
+            battle: incoming.battle ? { ...existing.battle, ...incoming.battle } : existing.battle,
+            rewards: incoming.rewards ? { ...existing.rewards, ...incoming.rewards } : existing.rewards,
+            chestNumbers: Array.from(chestSet).sort((a, b) => a - b)
+          };
+          if (incoming.score !== undefined) {
+            mergedData.score = incoming.score;
+          } else if (incoming.rewards?.userRoundPoints !== undefined) {
+            mergedData.score = incoming.rewards.userRoundPoints;
+          } else if (existing.score !== undefined) {
+            mergedData.score = existing.score;
+          }
+          if (incoming.progress !== undefined) {
+            mergedData.progress = incoming.progress;
+          }
+          const latestTime = entry.updatedAt > (next.clanVersusStatus?.updatedAt || '') ?
+            entry.updatedAt : (next.clanVersusStatus?.updatedAt || entry.updatedAt);
+          next.clanVersusStatus = {
+            key: 'clanVersusStatus',
+            method: entry.method,
+            feature: entry.feature,
+            group: 'events',
+            data: mergedData,
+            updatedAt: latestTime
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'clanVersusChestAction') {
+          const status = next.clanVersusStatus ? { ...next.clanVersusStatus.data } : { progress: 0, chestNumbers: [] };
+          const chests = new Set(status.chestNumbers || []);
+          if (entry.data.chestNumber && !chests.has(entry.data.chestNumber)) {
+            chests.add(entry.data.chestNumber);
+            status.chestNumbers = Array.from(chests).sort((a, b) => a - b);
+            next.clanVersusStatus = {
+              key: 'clanVersusStatus',
+              method: entry.method,
+              feature: entry.feature,
+              group: 'internal',
+              data: status,
+              updatedAt: entry.updatedAt
+            };
+            changed = true;
+          }
+          continue;
+        }
         if (entry.key === 'resourceAction') {
           const resourceEntry = next[entry.data.resourceKey];
           const seen = next.resourceActionHistory?.data || {};
-          if (!resourceEntry || !Number.isFinite(resourceEntry.data?.amount) ||
-              seen[entry.data.token] || resourceEntry.updatedAt > entry.updatedAt) continue;
+          if (seen[entry.data.token]) continue;
+          if (resourceEntry && resourceEntry.updatedAt > entry.updatedAt) continue;
           const actionAt = Date.parse(entry.updatedAt);
           if (!Number.isFinite(actionAt)) continue;
-          const data = { ...resourceEntry.data };
+          const data = resourceEntry ? { ...resourceEntry.data } : {
+            amount: 0,
+            label: entry.data.label || resolveResourceLabel(entry.data.resourceKey.replace(/^resource:/, ''))
+          };
+          if (!Number.isFinite(data.amount)) data.amount = 0;
           const timed = Number.isFinite(data.lastRefillAt) &&
             Number.isFinite(data.refillEveryMs) && data.refillEveryMs > 0 &&
             Number.isFinite(data.refillAmount) && data.refillAmount > 0 &&
@@ -551,7 +979,7 @@
           if (wasFull && entry.data.delta < 0 && data.amount < data.cap) {
             data.lastRefillAt = actionAt;
           }
-          next[entry.data.resourceKey] = { ...resourceEntry, method: entry.method,
+          next[entry.data.resourceKey] = { key: entry.data.resourceKey, method: entry.method, feature: null, group: 'resources',
             data, updatedAt: entry.updatedAt };
           if (entry.data.resourceKey === 'resource:energy') {
             next.energyStatus = { key: 'energyStatus', method: entry.method,
@@ -661,6 +1089,69 @@
           changed = true;
           continue;
         }
+        if (entry.key === 'heroEvolveAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.heroId) continue;
+          const heroId = String(entry.data.heroId);
+          const heroSnap = next.heroGetAll?.data?.[heroId];
+          if (heroSnap) {
+            const currentStar = Number(heroSnap.star) || 1;
+            const nextStar = Math.min(6, currentStar + 1);
+            const evolveCost = { 2: 20, 3: 50, 4: 100, 5: 150, 6: 300 }[nextStar] || 0;
+
+            next.heroGetAll = {
+              ...next.heroGetAll,
+              data: {
+                ...next.heroGetAll.data,
+                [heroId]: {
+                  ...heroSnap,
+                  star: nextStar
+                }
+              }
+            };
+
+            if (next.inventoryGet?.data?.fragmentHero) {
+              const frags = { ...next.inventoryGet.data.fragmentHero };
+              const currentFrags = frags[heroId] ?? 0;
+              frags[heroId] = Math.max(0, currentFrags - evolveCost);
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  fragmentHero: frags
+                }
+              };
+            }
+
+            const fragResKey = `resource:fragmentHero:${heroId}`;
+            if (next[fragResKey]?.data) {
+              const curAmt = next[fragResKey].data.amount ?? 0;
+              next[fragResKey] = {
+                ...next[fragResKey],
+                data: {
+                  ...next[fragResKey].data,
+                  amount: Math.max(0, curAmt - evolveCost)
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+
+            const history = { ...seen, [entry.data.token]: entry.updatedAt };
+            const tokens = Object.keys(history).sort((a, b) =>
+              history[b].localeCompare(history[a]));
+            for (const token of tokens.slice(500)) delete history[token];
+            next.resourceActionHistory = {
+              key: 'resourceActionHistory',
+              method: entry.method,
+              feature: null,
+              group: 'internal',
+              data: history,
+              updatedAt: entry.updatedAt
+            };
+            changed = true;
+          }
+          continue;
+        }
         if (entry.key === 'heroSkillAction') {
           const seen = next.resourceActionHistory?.data || {};
           if (seen[entry.data.token] || !entry.data.heroId) continue;
@@ -699,6 +1190,221 @@
           }
           continue;
         }
+        if (entry.key === 'dungeonRewardAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.reward) continue;
+          const reward = entry.data.reward;
+          
+          if (reward.consumable) {
+            for (const [id, amt] of Object.entries(reward.consumable)) {
+              const numAmt = Number(amt) || 0;
+              if (next.inventoryGet) {
+                const cur = next.inventoryGet.data?.consumable?.[id] ?? 0;
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    consumable: { ...(next.inventoryGet.data?.consumable || {}), [id]: cur + numAmt }
+                  }
+                };
+              }
+              const resKey = `resource:consumable:${id}`;
+              next[resKey] = {
+                key: resKey,
+                method: entry.method,
+                feature: null,
+                group: 'resources',
+                data: {
+                  ...(next[resKey]?.data || {}),
+                  amount: (next[resKey]?.data?.amount ?? 0) + numAmt,
+                  label: next[resKey]?.data?.label || (id === '20' ? 'Titan potion' : `Consumable #${id}`)
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+          }
+
+          if (reward.fragmentTitan) {
+            for (const [id, amt] of Object.entries(reward.fragmentTitan)) {
+              const numAmt = Number(amt) || 0;
+              if (next.inventoryGet) {
+                const cur = next.inventoryGet.data?.fragmentTitan?.[id] ?? 0;
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    fragmentTitan: { ...(next.inventoryGet.data?.fragmentTitan || {}), [id]: cur + numAmt }
+                  }
+                };
+              }
+              const resKey = `resource:fragmentTitan:${id}`;
+              next[resKey] = {
+                key: resKey,
+                method: entry.method,
+                feature: null,
+                group: 'resources',
+                data: {
+                  ...(next[resKey]?.data || {}),
+                  amount: (next[resKey]?.data?.amount ?? 0) + numAmt,
+                  label: next[resKey]?.data?.label || `Titan Soul #${id}`
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+          }
+
+          if (reward.gold) {
+            const numAmt = Number(reward.gold) || 0;
+            if (next.inventoryGet) {
+              const cur = next.inventoryGet.data?.coin?.['1'] ?? 0;
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  coin: { ...(next.inventoryGet.data?.coin || {}), '1': cur + numAmt }
+                }
+              };
+            }
+            const resKey = 'resource:gold';
+            next[resKey] = {
+              key: resKey,
+              method: entry.method,
+              feature: null,
+              group: 'resources',
+              data: {
+                ...(next[resKey]?.data || {}),
+                amount: (next[resKey]?.data?.amount ?? 0) + numAmt,
+                label: next[resKey]?.data?.label || 'Gold'
+              },
+              updatedAt: entry.updatedAt
+            };
+          }
+
+          if (reward.coin) {
+            for (const [id, amt] of Object.entries(reward.coin)) {
+              const numAmt = Number(amt) || 0;
+              if (next.inventoryGet) {
+                const cur = next.inventoryGet.data?.coin?.[id] ?? 0;
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    coin: { ...(next.inventoryGet.data?.coin || {}), [id]: cur + numAmt }
+                  }
+                };
+              }
+              const resKey = `resource:coin:${id}`;
+              next[resKey] = {
+                key: resKey,
+                method: entry.method,
+                feature: null,
+                group: 'resources',
+                data: {
+                  ...(next[resKey]?.data || {}),
+                  amount: (next[resKey]?.data?.amount ?? 0) + numAmt,
+                  label: next[resKey]?.data?.label || `Coin #${id}`
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+          }
+
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) => history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = {
+            key: 'resourceActionHistory',
+            method: entry.method,
+            feature: null,
+            group: 'internal',
+            data: history,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+
+        if (entry.key === 'inventoryUseAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token]) continue;
+          const { libId, amount, unitId } = entry.data;
+
+          if (libId === 20 && amount > 0) {
+            if (next.inventoryGet?.data?.consumable) {
+              const cur = next.inventoryGet.data.consumable['20'] ?? 0;
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  consumable: { ...next.inventoryGet.data.consumable, '20': Math.max(0, cur - amount) }
+                }
+              };
+            }
+            const resKey = 'resource:consumable:20';
+            if (next[resKey]?.data) {
+              next[resKey] = {
+                ...next[resKey],
+                data: { ...next[resKey].data, amount: Math.max(0, (next[resKey].data.amount ?? 0) - amount) },
+                updatedAt: entry.updatedAt
+              };
+            }
+
+            if (unitId && next.titanGetAll?.data?.[unitId]) {
+              const titan = next.titanGetAll.data[unitId];
+              const curXp = Number(titan.xp) || 0;
+              next.titanGetAll = {
+                ...next.titanGetAll,
+                data: {
+                  ...next.titanGetAll.data,
+                  [unitId]: {
+                    ...titan,
+                    xp: curXp + amount
+                  }
+                }
+              };
+            }
+          }
+
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) => history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = {
+            key: 'resourceActionHistory',
+            method: entry.method,
+            feature: null,
+            group: 'internal',
+            data: history,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+
+        if (entry.key === 'dungeonStatus') {
+          const previous = next.dungeonStatus?.data || {};
+          next.dungeonStatus = {
+            key: 'dungeonStatus',
+            method: entry.method,
+            feature: entry.feature,
+            group: 'events',
+            data: {
+              ...previous,
+              ...entry.data,
+              states: {
+                ...previous.states,
+                ...entry.data.states,
+                titans: {
+                  ...(previous.states?.titans || {}),
+                  ...(entry.data.states?.titans || {})
+                }
+              }
+            },
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+
         if (entry.key === 'guildChat') {
           const existing = next.guildChat?.data || { messages: [], users: {} };
           const incomingMessages = entry.data.messages || [];
