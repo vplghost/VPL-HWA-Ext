@@ -31,6 +31,10 @@
     brawl_getAll: 'events',
     heroEvolve: 'heroes',
     titanEvolve: 'titans',
+    'attackMine:mine': 'header',
+    'stopMineGathering:mine': 'header',
+    'searchMine:mine': 'other',
+    'getChunks:globalMap': 'other',
     'getRoutesByIds:globalMap': 'other',
     'getPage:report': 'other',
     dungeonEndBattle: 'events',
@@ -223,6 +227,96 @@
             }
           }
           if (actions.length) return actions;
+        }
+        if (key === 'searchMine:mine' && Array.isArray(result?.response?.mines) && Array.isArray(call.args?.mineConfigIds)) {
+          const mineConfigId = call.args.mineConfigIds[0];
+          const mineType = globalThis.hwaHelperMineTypes?.[mineConfigId] || 'mine';
+          const mines = {};
+          for (const m of result.response.mines) {
+            if (m?.mineId) mines[m.mineId] = { mineConfigId, mineType };
+          }
+          if (Object.keys(mines).length) {
+            return [{
+              key: 'mineMapAction',
+              method: call.name,
+              feature: call.feature,
+              group: 'internal',
+              data: { mines },
+              updatedAt: record.timestamp
+            }];
+          }
+        }
+        if (key === 'getChunks:globalMap' && Array.isArray(result?.response?.chunks)) {
+          const mines = {};
+          for (const chunk of result.response.chunks) {
+            if (Array.isArray(chunk?.mines)) {
+              for (const m of chunk.mines) {
+                if (m?.mineId && m?.mineConfigId) {
+                  const mineType = globalThis.hwaHelperMineTypes?.[m.mineConfigId] || 'mine';
+                  mines[m.mineId] = {
+                    mineConfigId: m.mineConfigId,
+                    mineType,
+                    resourceAmount: m.resourceAmount
+                  };
+                }
+              }
+            }
+          }
+          if (Object.keys(mines).length) {
+            return [{
+              key: 'mineMapAction',
+              method: call.name,
+              feature: call.feature,
+              group: 'internal',
+              data: { mines },
+              updatedAt: record.timestamp
+            }];
+          }
+        }
+        if (key === 'attackMine:mine' && result?.response?.squadId && result?.response?.route) {
+          const route = result.response.route;
+          const startedAt = route.startedAt;
+          const duration = route.durationMs ?? route.duration;
+          const targetArrivalAt = Number.isFinite(startedAt) && Number.isFinite(duration) ?
+            startedAt + duration : null;
+          return [{
+            key: 'gatherAction',
+            method: call.name,
+            feature: call.feature,
+            group: 'header',
+            data: {
+              action: 'startGather',
+              squadId: result.response.squadId,
+              mineId: call.args?.mineId || null,
+              startedAt,
+              durationMs: duration,
+              targetArrivalAt,
+              team: rallyTeam(call.args?.squad)
+            },
+            updatedAt: record.timestamp
+          }];
+        }
+        if (key === 'stopMineGathering:mine' && result?.response?.squadId && result?.response?.route) {
+          const route = result.response.route;
+          const startedAt = route.startedAt;
+          const duration = route.durationMs ?? route.duration;
+          const returnAt = Number.isFinite(startedAt) && Number.isFinite(duration) ?
+            startedAt + duration : null;
+          return [{
+            key: 'gatherAction',
+            method: call.name,
+            feature: call.feature,
+            group: 'header',
+            data: {
+              action: 'stopGather',
+              squadId: result.response.squadId,
+              remainingResourceAmount: result.response.remainingResourceAmount,
+              startedAt,
+              durationMs: duration,
+              returnAt
+            },
+            updatedAt: record.timestamp
+          }];
         }
         if (result && Object.hasOwn(result, 'response') && !result.error) {
           if (call.name === 'heroUpgradeSkill') {
@@ -1014,6 +1108,73 @@
           next.marchStatus = { key: 'marchStatus', method: entry.method,
             feature: entry.feature, group: 'header', data: { marches },
             updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'mineMapAction') {
+          const existing = next.mineMap || {};
+          const merged = { ...existing, ...entry.data.mines };
+          const keys = Object.keys(merged);
+          if (keys.length > 500) {
+            for (const k of keys.slice(0, keys.length - 500)) delete merged[k];
+          }
+          next.mineMap = merged;
+          continue;
+        }
+        if (entry.key === 'gatherAction') {
+          const current = next.marchStatus;
+          if (current?.updatedAt > entry.updatedAt) continue;
+          const marches = [...(current?.data?.marches || [])];
+          const squadId = entry.data.squadId;
+          const index = marches.findIndex((m) => m.squadId === squadId);
+          if (entry.data.action === 'startGather') {
+            const mineInfo = next.mineMap?.[entry.data.mineId];
+            const kind = mineInfo?.mineType || 'mine';
+            const gatherMarch = {
+              squadId,
+              mineId: entry.data.mineId,
+              mineConfigId: mineInfo?.mineConfigId,
+              kind,
+              stage: 'moveToTargetInSolo',
+              startedAt: entry.data.startedAt,
+              durationMs: entry.data.durationMs,
+              targetArrivalAt: entry.data.targetArrivalAt,
+              endsAt: entry.data.targetArrivalAt,
+              team: entry.data.team
+            };
+            if (index >= 0) marches[index] = { ...marches[index], ...gatherMarch };
+            else marches.push(gatherMarch);
+          } else if (entry.data.action === 'stopGather') {
+            if (index >= 0) {
+              const prev = marches[index];
+              marches[index] = {
+                ...prev,
+                kind: 'return',
+                stage: 'returnToOutpost',
+                previousKind: prev.kind,
+                endsAt: entry.data.returnAt,
+                returnAt: entry.data.returnAt,
+                remainingResourceAmount: entry.data.remainingResourceAmount
+              };
+            } else {
+              marches.push({
+                squadId,
+                kind: 'return',
+                stage: 'returnToOutpost',
+                endsAt: entry.data.returnAt,
+                returnAt: entry.data.returnAt,
+                remainingResourceAmount: entry.data.remainingResourceAmount
+              });
+            }
+          }
+          next.marchStatus = {
+            key: 'marchStatus',
+            method: entry.method,
+            feature: entry.feature,
+            group: 'header',
+            data: { marches },
+            updatedAt: entry.updatedAt
+          };
           changed = true;
           continue;
         }
@@ -1839,16 +2000,29 @@
           const previous = next.marchStatus?.data?.marches || [];
           entry.data.marches = entry.data.marches.map((march) => {
             const prior = previous.find((item) => item.squadId &&
-              item.squadId === march.squadId && item.rally);
+              item.squadId === march.squadId);
             if (!prior) return march;
-            const rally = { ...prior.rally };
+            if (prior.rally) {
+              const rally = { ...prior.rally };
             if (march.stage === 'moveToTargetInRally' && Number.isFinite(march.endsAt)) {
               rally.arrivalAt = march.endsAt;
             }
             if (march.stage === 'returnToOutpost' && Number.isFinite(march.endsAt)) {
               rally.returnAt = march.endsAt;
             }
-            return { ...march, kind: 'raid', rally };
+              return { ...march, kind: 'raid', rally };
+            }
+            const enriched = { ...march };
+            if (prior.mineId && !enriched.mineId) enriched.mineId = prior.mineId;
+            if (prior.mineConfigId && !enriched.mineConfigId) enriched.mineConfigId = prior.mineConfigId;
+            if (prior.team && !enriched.team) enriched.team = prior.team;
+            if (prior.targetArrivalAt && !enriched.targetArrivalAt) enriched.targetArrivalAt = prior.targetArrivalAt;
+            if (prior.returnAt) {
+              enriched.returnAt = prior.returnAt;
+              if (enriched.stage === 'returnToOutpost') enriched.endsAt = prior.returnAt;
+            }
+            if (prior.previousKind && !enriched.previousKind) enriched.previousKind = prior.previousKind;
+            return enriched;
           });
         }
         if (entry.key === 'buildingStatus' && entry.data.action &&

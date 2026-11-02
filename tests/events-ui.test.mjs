@@ -104,10 +104,12 @@ class MockElement {
         const attr = sel.slice(1, -1);
         if (attr.includes('=')) {
           const [k, v] = attr.split('=').map(s => s.replace(/["']/g, ''));
-          if (node.getAttribute(k) === v || node.dataset?.[k.replace('data-', '')] === v) match = true;
+          const camelK = k.replace(/^data-/, '').replace(/-([a-z])/g, (_, g) => g.toUpperCase());
+          if (node.getAttribute(k) === v || node.dataset?.[k.replace('data-', '')] === v || node.dataset?.[camelK] === v) match = true;
         } else {
           const k = attr.replace('data-', '');
-          if (node.attributes[attr] !== undefined || node.dataset?.[k] !== undefined) match = true;
+          const camelK = k.replace(/-([a-z])/g, (_, g) => g.toUpperCase());
+          if (node.attributes[attr] !== undefined || node.dataset?.[k] !== undefined || node.dataset?.[camelK] !== undefined) match = true;
         }
       } else if (node.tagName?.toLowerCase() === sel.toLowerCase()) match = true;
       if (match) results.push(node);
@@ -237,6 +239,7 @@ const context = {
   },
   setResourceTooltip: () => {},
   resourceTooltip: () => '',
+  isMarchExpired: (march, now) => context.hwaHelperPopupData.isMarchExpired(march, now),
   marchTooltip: () => ''
 };
 context.globalThis = context;
@@ -245,6 +248,7 @@ vm.runInContext(clanVersusRulesJs, context);
 vm.runInContext(resourceDataJs, context);
 vm.runInContext(titanMetadataJs, context);
 vm.runInContext(popupDataJs, context);
+context.Date = Date;
 context.resourceData = context.globalThis.hwaHelperResourceData;
 context.globalThis.hwaHelperNameMap = { building: () => '', research: () => '', item: () => null, hero: () => null };
 
@@ -254,7 +258,7 @@ const eventsEnd = popupJs.indexOf('function renderGuildChat(');
 vm.runInContext(popupJs.slice(eventsStart, eventsEnd), context);
 
 // Extract refreshTimed
-const refreshStart = popupJs.indexOf('function refreshTimed(');
+const refreshStart = popupJs.indexOf('function isMarchExpired(');
 const refreshEnd = popupJs.indexOf('function renderResources(');
 vm.runInContext(popupJs.slice(refreshStart, refreshEnd), context);
 
@@ -846,4 +850,82 @@ test('renderResources splits items into renewable and other groups and filters i
   assert.ok(allText.includes('Refillable #10'));
   assert.ok(status.textContent.includes('7 resources'));
   assert.ok(resourceFilterToggleText.textContent.includes('Hide Inactive (2)'));
+});
+
+test("header march icon renders gathering and return badges and hides upon returnAt", () => {
+  const marchesWrap = context.document.querySelector("#marches");
+  const now = 1000000;
+
+  const marchStyles = {
+    wood: { icon: "🌲", classes: "bg-green-100 text-green-800" },
+    return: { icon: "↩", classes: "bg-slate-100 text-slate-600" }
+  };
+
+  context.currentCache = {
+    accountStatus: { data: { name: "Player1" } },
+    marchStatus: {
+      data: {
+        marches: [
+          {
+            squadId: "squad-gather",
+            kind: "wood",
+            stage: "moveToTargetInSolo",
+            targetArrivalAt: now + 30000,
+            endsAt: now + 30000
+          },
+          {
+            squadId: "squad-return",
+            kind: "return",
+            stage: "returnToOutpost",
+            previousKind: "stone",
+            returnAt: now + 45000,
+            endsAt: now + 45000
+          }
+        ]
+      }
+    }
+  };
+
+  marchesWrap.replaceChildren();
+  for (const [index, march] of context.currentCache.marchStatus.data.marches.entries()) {
+    const style = marchStyles[march.kind] || { icon: "⚔", classes: "" };
+    const badge = context.document.createElement("span");
+    badge.className = `inline-flex size-6 shrink-0 items-center justify-center rounded-full ${style.classes}`;
+    badge.dataset.marchIndex = String(index);
+    badge.dataset.resourceTooltip = "";
+    badge.tabIndex = 0;
+    badge.textContent = style.icon;
+    marchesWrap.append(badge);
+  }
+
+  assert.equal(marchesWrap.children.length, 2);
+  const gatherBadge = marchesWrap.children[0];
+  const returnBadge = marchesWrap.children[1];
+
+  assert.equal(gatherBadge.textContent, "🌲");
+  assert.equal(returnBadge.textContent, "↩");
+
+  // Verify expiration evaluation via isMarchExpired
+  assert.equal(context.isMarchExpired(context.currentCache.marchStatus.data.marches[0], now), false);
+  assert.equal(context.isMarchExpired(context.currentCache.marchStatus.data.marches[0], now + 35000), false);
+  assert.equal(context.isMarchExpired(context.currentCache.marchStatus.data.marches[1], now), false);
+  assert.equal(context.isMarchExpired(context.currentCache.marchStatus.data.marches[1], now + 45000), true);
+
+  // At now: both badges visible
+  const origNow = Date.now;
+  try {
+    Date.now = () => now;
+    context.refreshTimed();
+    assert.equal(gatherBadge.hidden, false);
+    assert.equal(returnBadge.hidden, false);
+    assert.equal(marchesWrap.hidden, false);
+
+    // At now + 50000: return march expired (returnAt 45000 reached)
+    Date.now = () => now + 50000;
+    context.refreshTimed();
+    assert.equal(gatherBadge.hidden, false); // gathering march does not expire
+    assert.equal(returnBadge.hidden, true);  // return march hidden immediately!
+  } finally {
+    Date.now = origNow;
+  }
 });

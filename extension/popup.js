@@ -185,34 +185,24 @@ function marchTooltip(march, now) {
   if (march.rally) return globalThis.hwaHelperPopupData.rallyTooltip(march, now,
     globalThis.hwaHelperNameMap.hero);
   const style = marchStyles[march.kind] || marchStyles.attack;
-  const isMine = ['food', 'wood', 'stone', 'iron', 'mine'].includes(march.kind);
-  const action = isMine ?
-    `${march.stage === 'interactionWithTarget' ? 'Gathering' : 'Traveling to'} ${style.label}` :
+  const isMine = ['food', 'wood', 'stone', 'iron', 'mine'].includes(march.kind) || Boolean(march.mineId);
+  const isTraveling = march.stage === 'moveToTargetInSolo' && Number.isFinite(march.targetArrivalAt) && now < march.targetArrivalAt;
+  const prevLabel = march.previousKind && marchStyles[march.previousKind] ? marchStyles[march.previousKind].label : null;
+  const isReturning = march.kind === 'return' || march.stage === 'returnToOutpost';
+  const action = isReturning ? (prevLabel ? `${prevLabel} returning` : 'Returning') : isMine ?
+    `${isTraveling ? 'Traveling to' : 'Gathering'} ${style.label}` :
     march.kind === 'return' ? 'Returning' :
     march.stage === 'waitingForRallyStart' ? 'Preparing raid' : `${style.label} march`;
   const remaining = Number.isFinite(march.endsAt) ?
     Math.ceil((march.endsAt - now) / 1000) : null;
-  const time = remaining === null ? 'Time unavailable' :
+  const isGatheringActive = isMine && !isTraveling && !isReturning && !march.returnAt && (!Number.isFinite(march.endsAt) || march.endsAt <= now);
+  const time = isGatheringActive ? 'In progress' : remaining === null ? 'Time unavailable' :
     remaining <= 0 ? 'Due now' : `${resourceData.tooltipTime(remaining)} remaining`;
   return `${action}\n${time}`;
 }
 
 function isMarchExpired(march, now = Date.now()) {
-  if (!march) return true;
-  if (march.rally) {
-    const rally = march.rally;
-    const arrivalAt = Number.isFinite(rally.arrivalAt) ? rally.arrivalAt :
-      (Number.isFinite(rally.waitUntil) && Number.isFinite(rally.outboundMs) ?
-        rally.waitUntil + rally.outboundMs : null);
-    const returnAt = Number.isFinite(rally.returnAt) ? rally.returnAt :
-      (Number.isFinite(march.endsAt) && march.stage === 'returnToOutpost' ? march.endsAt :
-        (Number.isFinite(arrivalAt) && Number.isFinite(rally.returnMs) ?
-          arrivalAt + rally.returnMs : null));
-    if (Number.isFinite(returnAt)) return now >= returnAt;
-    if (march.stage === 'returnToOutpost' && Number.isFinite(march.endsAt)) return now >= march.endsAt;
-    return Number.isFinite(rally.waitUntil) && now > rally.waitUntil + 30 * 60000;
-  }
-  return Number.isFinite(march.endsAt) && march.endsAt <= now;
+  return globalThis.hwaHelperPopupData.isMarchExpired(march, now);
 }
 
 function refreshTimed() {

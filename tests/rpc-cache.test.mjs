@@ -1128,3 +1128,133 @@ test('inventory_use with chest opening deducts spent consumable chests and merge
   assert.equal(afterUse.inventoryGet.data.fragmentGear['61'], 4);
   assert.equal(afterUse.inventoryGet.data.gear['21'], 1);
 });
+
+test('attackMine registers active gathering march and stopMineGathering transitions to returnToOutpost with route ETA', () => {
+  const at = '2026-11-02T12:03:45.000Z';
+  const searchRecord = record([
+    {
+      name: 'searchMine',
+      feature: 'mine',
+      ident: 'search-1',
+      args: { mineConfigIds: [23] }
+    }
+  ], [
+    {
+      ident: 'search-1',
+      result: {
+        response: {
+          mines: [{ mineId: 'mine-wood-1', coordinates: { x: 527, y: 214 } }]
+        }
+      }
+    }
+  ], at);
+
+  const attackRecord = record([
+    {
+      name: 'attackMine',
+      feature: 'mine',
+      ident: 'attack-1',
+      args: {
+        mineId: 'mine-wood-1',
+        battleType: 'pve',
+        squad: {
+          heroes: [{ heroId: 8 }],
+          units: [{ unitId: 7, count: 500 }]
+        }
+      }
+    }
+  ], [
+    {
+      ident: 'attack-1',
+      result: {
+        response: {
+          squadId: 'squad-gather-1',
+          route: {
+            startedAt: 1793621039000,
+            durationMs: 50000
+          }
+        }
+      }
+    }
+  ], '2026-11-02T12:03:59.000Z');
+
+  const stopRecord = record([
+    {
+      name: 'stopMineGathering',
+      feature: 'mine',
+      ident: 'stop-1',
+      args: { squadId: 'squad-gather-1' }
+    }
+  ], [
+    {
+      ident: 'stop-1',
+      result: {
+        response: {
+          squadId: 'squad-gather-1',
+          remainingResourceAmount: 500000,
+          route: {
+            startedAt: 1793621071000,
+            durationMs: 120000
+          }
+        }
+      }
+    }
+  ], '2026-11-02T12:04:31.000Z');
+
+  // Step 1: extract searchMine
+  const searchExtracted = cache.extract(searchRecord);
+  assert.equal(searchExtracted.length, 1);
+  assert.equal(searchExtracted[0].key, 'mineMapAction');
+  assert.equal(searchExtracted[0].data.mines['mine-wood-1'].mineType, 'wood');
+
+  // Step 2: merge searchMine and attackMine
+  const afterAttack = cache.merge({}, [searchRecord, attackRecord]).cache;
+  assert.ok(afterAttack.marchStatus);
+  const marches = afterAttack.marchStatus.data.marches;
+  assert.equal(marches.length, 1);
+  const march = marches[0];
+  assert.equal(march.squadId, 'squad-gather-1');
+  assert.equal(march.mineId, 'mine-wood-1');
+  assert.equal(march.kind, 'wood');
+  assert.equal(march.stage, 'moveToTargetInSolo');
+  assert.equal(march.endsAt, 1793621039000 + 50000);
+  assert.equal(march.targetArrivalAt, 1793621039000 + 50000);
+  assert.deepEqual(Array.from(march.team.heroIds), [8]);
+
+  // Step 3: merge stopMineGathering
+  const afterStop = cache.merge(afterAttack, [stopRecord]).cache;
+  const marchesAfterStop = afterStop.marchStatus.data.marches;
+  assert.equal(marchesAfterStop.length, 1);
+  const returning = marchesAfterStop[0];
+  assert.equal(returning.squadId, 'squad-gather-1');
+  assert.equal(returning.kind, 'return');
+  assert.equal(returning.stage, 'returnToOutpost');
+  assert.equal(returning.previousKind, 'wood');
+  assert.equal(returning.endsAt, 1793621071000 + 120000);
+  assert.equal(returning.returnAt, 1793621071000 + 120000);
+  assert.equal(returning.remainingResourceAmount, 500000);
+});
+
+test('replaying captured gathering and return traces produces coherent marchStatus transitions', async () => {
+  const gatherTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611021904_gathering.json', import.meta.url), 'utf8'));
+  const returnTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611021904_gathering_return.json', import.meta.url), 'utf8'));
+
+  const afterGather = cache.merge({}, gatherTrace).cache;
+  assert.ok(afterGather.marchStatus?.data?.marches);
+  assert.equal(afterGather.marchStatus.data.marches.length, 1);
+  const gatherMarch = afterGather.marchStatus.data.marches[0];
+  assert.equal(gatherMarch.squadId, '9252f22b-f3b6-4156-9d78-4dcf72e7d14c');
+  assert.equal(gatherMarch.kind, 'wood');
+  assert.equal(gatherMarch.stage, 'moveToTargetInSolo');
+  assert.equal(gatherMarch.targetArrivalAt, 1793621039068 + 51030);
+
+  const afterReturn = cache.merge(afterGather, returnTrace).cache;
+  const marches = afterReturn.marchStatus.data.marches;
+  assert.equal(marches.length, 2);
+  const returningMarch = marches.find((m) => m.squadId === 'f6b8b5ef-3147-462e-b524-b8a279831d57');
+  assert.ok(returningMarch);
+  assert.equal(returningMarch.kind, 'return');
+  assert.equal(returningMarch.stage, 'returnToOutpost');
+  assert.equal(returningMarch.returnAt, 1793621071226 + 126008);
+  assert.equal(returningMarch.endsAt, 1793621071226 + 126008);
+});

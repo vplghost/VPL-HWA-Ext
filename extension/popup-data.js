@@ -103,6 +103,22 @@
       if (march.stage === 'returnToOutpost' && Number.isFinite(march.endsAt)) return now >= march.endsAt;
       return Number.isFinite(rally.waitUntil) && now > rally.waitUntil + 30 * 60000;
     }
+    if (march.stage === 'returnToOutpost' || march.kind === 'return') {
+      const returnAt = Number.isFinite(march.returnAt) ? march.returnAt : march.endsAt;
+      return Number.isFinite(returnAt) && now >= returnAt;
+    }
+    const isMine = ['food', 'wood', 'stone', 'iron', 'mine'].includes(march.kind) || Boolean(march.mineId);
+    if (isMine) {
+      if (march.stage === 'moveToTargetInSolo' && Number.isFinite(march.targetArrivalAt)) {
+        return false;
+      }
+      if (march.stage === 'interactionWithTarget') {
+        if (Number.isFinite(march.endsAt) && (!march.targetArrivalAt || march.endsAt > march.targetArrivalAt + 60000)) {
+          return march.endsAt <= now;
+        }
+        return false;
+      }
+    }
     return Number.isFinite(march.endsAt) && march.endsAt <= now;
   }
 

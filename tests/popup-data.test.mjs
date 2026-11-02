@@ -223,6 +223,37 @@ test('isMarchExpired accurately evaluates expiration for standard marches and ra
   assert.equal(isMarchExpired(rallyNoRoutes, now), false);
   assert.equal(isMarchExpired(rallyNoRoutes, now + 29 * 60000), false);
   assert.equal(isMarchExpired(rallyNoRoutes, now + 31 * 60000), true);
+
+  // gathering march traveling to mine and gathering at mine
+  const gatherTraveling = {
+    kind: "wood",
+    stage: "moveToTargetInSolo",
+    targetArrivalAt: now + 50000,
+    endsAt: now + 50000
+  };
+  assert.equal(isMarchExpired(gatherTraveling, now), false);
+  assert.equal(isMarchExpired(gatherTraveling, now + 50001), false); // once arrived, gathering begins and does not expire
+
+  const gatherAtMine = {
+    kind: "wood",
+    stage: "interactionWithTarget",
+    targetArrivalAt: now - 10000,
+    endsAt: now - 10000
+  };
+  assert.equal(isMarchExpired(gatherAtMine, now), false);
+
+  // returning march from gathering spot expires exactly at returnAt
+  const returningMarch = {
+    kind: "return",
+    stage: "returnToOutpost",
+    previousKind: "wood",
+    returnAt: now + 60000,
+    endsAt: now + 60000
+  };
+  assert.equal(isMarchExpired(returningMarch, now), false);
+  assert.equal(isMarchExpired(returningMarch, now + 59999), false);
+  assert.equal(isMarchExpired(returningMarch, now + 60000), true);
+  assert.equal(isMarchExpired(returningMarch, now + 70000), true);
 });
 
 test('tableExportFilename generates standardized filename with timestamp', () => {
