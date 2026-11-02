@@ -42,6 +42,8 @@ test('bridge injects helper button when document is available and sends open-tab
         tagName: tag.toUpperCase(),
         attributes: {},
         listeners: {},
+        style: {},
+        hidden: false,
         setAttribute: (k, v) => { el.attributes[k] = v; },
         addEventListener: (event, handler) => { el.listeners[event] = handler; },
         click: () => { el.listeners.click?.(); }
@@ -85,8 +87,10 @@ test('bridge injects helper button when document is available and sends open-tab
   assert.ok(recordBtn, 'Record button should be injected');
   const exportBtn = elements.get('hwa-export-btn');
   assert.ok(exportBtn, 'Export button should be injected');
+  assert.equal(exportBtn.hidden, true, 'Export button should be hidden when empty');
   const clearBtn = elements.get('hwa-clear-btn');
   assert.ok(clearBtn, 'Clear button should be injected');
+  assert.equal(clearBtn.hidden, true, 'Clear button should be hidden when empty');
 });
 
 test('bridge helper button click safely handles extension context invalidated error', async () => {
@@ -100,6 +104,8 @@ test('bridge helper button click safely handles extension context invalidated er
         tagName: tag.toUpperCase(),
         attributes: {},
         listeners: {},
+        style: {},
+        hidden: false,
         setAttribute: (k, v) => { el.attributes[k] = v; },
         addEventListener: (event, handler) => { el.listeners[event] = handler; },
         click: () => { el.listeners.click?.(); }

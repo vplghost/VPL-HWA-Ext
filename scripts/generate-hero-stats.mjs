@@ -75,6 +75,7 @@ for (let i = 0; i < skinBuf.length - 15; i++) {
     }
   }
 }
+skinStats[58] = 'Dodge'; // Dante Romantic skin (active skin in recent logs)
 
 const content = `// Generated hero glyph & skin stat mapping
 (() => {

@@ -86,6 +86,7 @@ function injectHelperButton() {
   exportBtn.className = 'hwa-icon-btn';
   exportBtn.setAttribute('aria-label', 'Export API log JSON');
   exportBtn.title = 'Export API log JSON';
+  exportBtn.hidden = true;
   if (exportBtn.style) exportBtn.style.display = 'none';
   exportBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
 
@@ -95,6 +96,7 @@ function injectHelperButton() {
   clearBtn.className = 'hwa-icon-btn';
   clearBtn.setAttribute('aria-label', 'Clear API log');
   clearBtn.title = 'Clear API log';
+  clearBtn.hidden = true;
   if (clearBtn.style) clearBtn.style.display = 'none';
   clearBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>';
 
@@ -116,12 +118,15 @@ function injectHelperButton() {
       recordBtn.title = recTitle;
       recordBtn.setAttribute('aria-label', recTitle);
 
-      if (exportBtn.style) exportBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+      const hasRecords = count > 0;
+      exportBtn.hidden = !hasRecords;
+      clearBtn.hidden = !hasRecords;
+      if (exportBtn.style) exportBtn.style.display = hasRecords ? 'inline-flex' : 'none';
+      if (clearBtn.style) clearBtn.style.display = hasRecords ? 'inline-flex' : 'none';
       const expTitle = `Export ${count} API log record${count === 1 ? '' : 's'}`;
       exportBtn.title = expTitle;
       exportBtn.setAttribute('aria-label', expTitle);
 
-      if (clearBtn.style) clearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
       const clrTitle = `Clear ${count} API log record${count === 1 ? '' : 's'}`;
       clearBtn.title = clrTitle;
       clearBtn.setAttribute('aria-label', clrTitle);
@@ -168,6 +173,10 @@ function injectHelperButton() {
 
   clearBtn.addEventListener('click', () => {
     try {
+      exportBtn.hidden = true;
+      clearBtn.hidden = true;
+      if (exportBtn.style) exportBtn.style.display = 'none';
+      if (clearBtn.style) clearBtn.style.display = 'none';
       const p = chrome.runtime?.sendMessage?.({ kind: 'record-clear' });
       if (p && typeof p.then === 'function') {
         p.then(syncRecordingState).catch(handleContextInvalidated);

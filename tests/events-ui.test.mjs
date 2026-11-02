@@ -356,7 +356,7 @@ test('openGuildVersusModal populates all 6 sections and displays modal', () => {
       personalRequirementsIsSatisfied: true,
       guildRequirementsIsSatisfied: true,
       challenges: [
-        { id: 27, progress: 0 },
+        { id: 27, progress: 7 }, // step: 3, pts: 100 -> Math.floor(7/3)*100 = 200 pts
         { id: 31, progress: 11 },
         { id: 32, progress: 24 }
       ]
@@ -411,9 +411,10 @@ test('openGuildVersusModal populates all 6 sections and displays modal', () => {
   assert.ok(bodyText.includes('28 / 5 req'));
   assert.ok(bodyText.includes('2,450'));
 
-  // Challenges (with converted points)
+  // Challenges (with converted points and denominator steps)
   assert.ok(bodyText.includes('Daily Challenges'));
-  assert.ok(bodyText.includes('Total: 92,000 pts'));
+  assert.ok(bodyText.includes('Total: 92,200 pts'));
+  assert.ok(bodyText.includes('200 pts'));
   assert.ok(bodyText.includes('44,000 pts'));
   assert.ok(bodyText.includes('48,000 pts'));
   assert.ok(bodyText.includes('Titan Power'));

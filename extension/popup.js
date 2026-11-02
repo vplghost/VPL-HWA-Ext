@@ -2184,12 +2184,14 @@ function openGuildVersusModal(vsStatus) {
 
     const challengeNames = globalThis.hwaHelperClanVersusChallengeNames || {};
     const challengePoints = globalThis.hwaHelperClanVersusChallengePoints || {};
+    const challengeSteps = globalThis.hwaHelperClanVersusChallengeSteps || {};
 
     let totalChallengePts = 0;
     for (const ch of challenges) {
       const progress = Number(ch.progress || 0);
-      const ptsPerUnit = challengePoints[ch.id] || 0;
-      totalChallengePts += progress * ptsPerUnit;
+      const step = Number(challengeSteps[ch.id] || 1);
+      const ptsPerStep = Number(challengePoints[ch.id] || 0);
+      totalChallengePts += Math.floor(progress / step) * ptsPerStep;
     }
 
     chSec.innerHTML = `
@@ -2205,8 +2207,9 @@ function openGuildVersusModal(vsStatus) {
     for (const ch of challenges) {
       const name = challengeNames[ch.id] || `Daily Challenge #${ch.id}`;
       const progress = Number(ch.progress || 0);
-      const ptsPerUnit = challengePoints[ch.id] || 0;
-      const convertedPts = progress * ptsPerUnit;
+      const step = Number(challengeSteps[ch.id] || 1);
+      const ptsPerStep = Number(challengePoints[ch.id] || 0);
+      const convertedPts = Math.floor(progress / step) * ptsPerStep;
 
       const item = document.createElement('div');
       item.className = 'flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs';
@@ -2218,7 +2221,7 @@ function openGuildVersusModal(vsStatus) {
             convertedPts > 0
               ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold'
               : 'bg-slate-100 text-slate-500 border border-slate-200'
-          }" title="${ptsPerUnit > 0 ? `${ptsPerUnit.toLocaleString()} pts per completion` : ''}">${convertedPts.toLocaleString()} pts</span>
+          }" title="${ptsPerStep > 0 ? `${ptsPerStep.toLocaleString()} pts per ${step === 1 ? 'completion' : `${step} units`}` : ''}">${convertedPts.toLocaleString()} pts</span>
         </div>
       `;
       chGrid.append(item);

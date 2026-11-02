@@ -234,3 +234,21 @@ test('table highlights rows when soul stones meet or exceed upgrade threshold', 
   assert.notEqual(dataRows[3].dataset.canEvolve, 'true');
   assert.ok(!dataRows[3].className.includes('bg-emerald-50/70'));
 });
+
+test('createHeroInline renders Dante skin stats accurately with Dodge for skin 58', () => {
+  const { createHeroInline } = context;
+  const danteSnapshot = {
+    star: 3,
+    power: 26461,
+    baseSkinId: 16,
+    currentSkin: 58,
+    skins: { '16': 32, '58': 21 }
+  };
+
+  const container = createHeroInline('16', 'Dante', danteSnapshot);
+  const card = container.querySelector('.hero-hover-card');
+  assert.ok(card, 'Card should exist');
+  assert.ok(card.textContent.includes('Agi: 32'), 'Base skin should show Agi');
+  assert.ok(card.textContent.includes('Dodge: 21'), 'Active skin 58 should show Dodge');
+  assert.ok(!card.textContent.includes('PA: 21'), 'Skin 58 should NOT show PA');
+});
