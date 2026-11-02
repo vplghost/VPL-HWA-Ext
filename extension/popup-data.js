@@ -398,7 +398,7 @@
         const rawRunes = hero?.hero_runes || hero?.runes;
         const heroRunes = Array.isArray(rawRunes) ? rawRunes :
           (rawRunes && typeof rawRunes === 'object' ? Object.values(rawRunes) : []);
-        const glyphStats = globalThis.hwaHelperHeroGlyphs?.[id] || ['PA', 'HP', 'Arm', 'Crit', 'Str'];
+        const glyphStats = globalThis.hwaHelperHeroGlyphs?.[id] || ['PA', 'Arm', 'HP', 'MD', 'Str'];
         const glyphs = heroRunes.map((lvl, idx) => ({
           slot: idx + 1,
           stat: glyphStats[idx] || `G${idx + 1}`,

@@ -1296,3 +1296,30 @@ test('replaying rally success trace captures unclaimed battle reports', async ()
   assert.equal(merged.mailStatus.data.hasUnclaimed, true);
   assert.equal(merged.mailStatus.data.unclaimedReportsCount, 2);
 });
+
+test('replaying quest claim trace updates Energy and World Energy', async () => {
+  const questTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611022008_claim_quests_rewards.json', import.meta.url), 'utf8'));
+  const merged = cache.merge({}, questTrace).cache;
+  assert.ok(merged['resource:energy']);
+  assert.equal(merged.energyStatus.data.energy, 89);
+  assert.equal(merged['resource:energy'].data.amount, 89);
+  assert.ok(merged['resource:world-energy']);
+  assert.equal(merged.worldEnergyStatus.data.energy, 106);
+  assert.equal(merged['resource:world-energy'].data.amount, 106);
+});
+
+test('replaying mail claim trace clears unclaimed reports and updates resources', async () => {
+  const rallyTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611021947_rally_success.json', import.meta.url), 'utf8'));
+  const initCache = cache.merge({}, rallyTrace).cache;
+  assert.equal(initCache.mailStatus.data.hasUnclaimed, true);
+  assert.equal(initCache.mailStatus.data.unclaimedReportsCount, 2);
+
+  const mailClaimTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611022011_mail_claim.json', import.meta.url), 'utf8'));
+  const afterClaim = cache.merge(initCache, mailClaimTrace).cache;
+  assert.equal(afterClaim.mailStatus.data.hasUnclaimed, false);
+  assert.equal(afterClaim.mailStatus.data.unclaimedReportsCount, 0);
+  assert.equal(afterClaim.mailStatus.data.reports.every(r => r.claimedReward === true), true);
+  assert.ok(afterClaim['resource:gold']);
+  assert.ok(afterClaim['resource:material:5']);
+  assert.ok(afterClaim['resource:consumable:11']);
+});

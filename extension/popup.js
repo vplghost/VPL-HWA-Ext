@@ -735,7 +735,13 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
     glyphsLabel.textContent = 'Glyphs';
     const glyphsList = document.createElement('div');
     glyphsList.className = 'flex items-center gap-1.5 mt-0.5 flex-wrap';
-    const glyphStats = globalThis.hwaHelperHeroGlyphs?.[heroId] || ['PA', 'HP', 'Arm', 'Crit', 'Str'];
+    const glyphStats = globalThis.hwaHelperHeroGlyphs?.[heroId] || ['PA', 'Arm', 'HP', 'MD', 'Str'];
+    const statFullName = {
+      PA: 'Physical Attack', MA: 'Magic Attack', HP: 'Health', Arm: 'Armor',
+      MD: 'Magic Defense', Crit: 'Crit Hit Chance', MCrit: 'Magic Crit Chance',
+      Dodge: 'Dodge', AP: 'Armor Penetration', MP: 'Magic Penetration',
+      Agi: 'Agility', Str: 'Strength', Int: 'Intelligence', Tough: 'Toughness', Crush: 'Crush'
+    };
     heroRunes.forEach((lvl, idx) => {
       const stat = glyphStats[idx] || `G${idx + 1}`;
       const badge = document.createElement('span');
@@ -743,6 +749,7 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
         lvl > 0 ? 'bg-slate-700/80 text-emerald-300' : 'bg-slate-800 text-slate-500'
       }`;
       badge.textContent = `${stat}: ${lvl}`;
+      badge.title = `${statFullName[stat] || stat}: ${lvl}/40`;
       glyphsList.append(badge);
     });
     glyphsBox.append(glyphsLabel, glyphsList);

@@ -16,8 +16,21 @@ function readVarint(buf, offset) {
 }
 
 const runeStatIdToAbbr = {
-  1: 'MAIN', 2: 'HP', 3: 'MAIN', 4: 'Arm', 5: 'PA', 6: 'MD', 7: 'HP',
-  8: 'Crit', 9: 'AP', 10: 'MA', 11: 'MP', 12: 'Dodge', 13: 'MCrit', 14: 'MAIN', 15: 'Crit'
+  1: 'Str',
+  2: 'Int',
+  3: 'Agi',
+  4: 'HP',
+  5: 'PA',
+  6: 'MA',
+  7: 'Arm',
+  8: 'MD',
+  9: 'Crit',
+  10: 'Dodge',
+  11: 'MP',
+  12: 'AP',
+  13: 'MCrit',
+  14: 'Tough',
+  15: 'Crush'
 };
 
 const skinStatIdToAbbr = {
@@ -49,8 +62,8 @@ while (p < runeBuf.length) {
       const h = heroes[heroId] || Object.values(heroes).find(x => x.id === heroId);
       const mainStatAbbr = h?.mainStat === 'agility' ? 'Agi' : (h?.mainStat === 'intelligence' ? 'Int' : 'Str');
       heroGlyphs[heroId] = runes.map(rId => {
-        let stat = runeStatIdToAbbr[rId] || 'HP';
-        if (stat === 'MAIN' || rId === 1 || rId === 3 || rId === 14) stat = mainStatAbbr;
+        let stat = runeStatIdToAbbr[rId];
+        if (!stat) stat = (rId === 1 || rId === 2 || rId === 3) ? mainStatAbbr : 'HP';
         return stat;
       });
     }

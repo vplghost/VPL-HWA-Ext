@@ -37,7 +37,14 @@
     'getChunks:globalMap': 'other',
     'getRoutesByIds:globalMap': 'other',
     'getPage:report': 'header',
+    'readAndClaimAll:report': 'header',
+    'claimReward:report': 'header',
     mailGetAll: 'header',
+    mailFarm: 'header',
+    quest_multiFarm: 'other',
+    quest_farm: 'other',
+    questFarm: 'other',
+    dailyQuestFarm: 'other',
     dungeonEndBattle: 'events',
     dungeonSaveProgress: 'events',
     dungeonStartBattle: 'events',
@@ -60,6 +67,7 @@
 
   function resolveResourceLabel(key) {
     if (key === 'energy') return 'Energy';
+    if (key === 'world-energy') return 'World Energy';
     if (key === 'gold') return 'Gold';
     if (key === 'starMoney') return 'Emeralds';
     const [type, idStr] = key.split(':');
@@ -91,11 +99,74 @@
     });
   }
 
-  function resourceAction(record, call, key, delta, label) {
+  function resourceAction(record, call, key, delta, label, tokenSuffix = '') {
     if (!Number.isFinite(delta) || delta === 0 || !call.ident) return [];
+    const token = tokenSuffix ? `${call.ident}:${tokenSuffix}:${key}` : `${call.ident}:${key}`;
     return [{ key: 'resourceAction', method: call.name, feature: call.feature || null,
       group: 'internal', data: { resourceKey: `resource:${key}`, delta, label,
-        token: `${call.ident}:${key}` }, updatedAt: record.timestamp }];
+        token }, updatedAt: record.timestamp }];
+  }
+
+  function extractRewardActions(record, call, rewardObj, tokenPrefix = '') {
+    if (!rewardObj || typeof rewardObj !== 'object') return [];
+    const aggregated = new Map();
+    const addReward = (key, delta) => {
+      if (!key || !Number.isFinite(delta) || delta <= 0) return;
+      aggregated.set(key, (aggregated.get(key) || 0) + delta);
+    };
+
+    if (Number.isFinite(rewardObj.stamina) && rewardObj.stamina > 0) {
+      addReward('energy', rewardObj.stamina);
+    }
+    if (Number.isFinite(rewardObj.gold) && rewardObj.gold > 0) {
+      addReward('gold', rewardObj.gold);
+    }
+    if (Number.isFinite(rewardObj.starMoney) && rewardObj.starMoney > 0) {
+      addReward('starMoney', rewardObj.starMoney);
+    }
+    if (rewardObj.refillableResource && typeof rewardObj.refillableResource === 'object') {
+      for (const [rId, amt] of Object.entries(rewardObj.refillableResource)) {
+        const numAmt = Number(amt);
+        if (Number.isFinite(numAmt) && numAmt > 0) {
+          const resKey = rId === '1' ? 'energy' : (rId === '2' ? 'world-energy' : `refillable:${rId}`);
+          addReward(resKey, numAmt);
+        }
+      }
+    }
+    for (const groupType of ['consumable', 'material', 'coin', 'lootboxChanced', 'patron', 'scroll', 'teleporter']) {
+      if (rewardObj[groupType] && typeof rewardObj[groupType] === 'object') {
+        for (const [id, amt] of Object.entries(rewardObj[groupType])) {
+          const numAmt = Number(amt);
+          if (Number.isFinite(numAmt) && numAmt > 0) {
+            addReward(`${groupType}:${id}`, numAmt);
+          }
+        }
+      }
+    }
+    const arrayRewards = Array.isArray(rewardObj.reward) ? rewardObj.reward :
+      (Array.isArray(rewardObj.rewards) ? rewardObj.rewards :
+      (Array.isArray(rewardObj.claimedRewards) ? rewardObj.claimedRewards : []));
+    for (const r of arrayRewards) {
+      const numAmt = Number(r?.amount);
+      if (Number.isFinite(numAmt) && numAmt > 0 && r?.type) {
+        const type = r.type;
+        const id = r.id;
+        const key = type === 'gold' || type === 'starMoney' ? type :
+          (type === 'stamina' || (type === 'refillable' && String(id) === '1')) ? 'energy' :
+          (type === 'refillable' && String(id) === '2') ? 'world-energy' :
+          resourceTypes.has(type) && (id !== undefined && id !== null) ? `${type}:${id}` : null;
+        if (key) {
+          addReward(key, numAmt);
+        }
+      }
+    }
+
+    const actions = [];
+    for (const [key, totalAmt] of aggregated) {
+      const label = resolveResourceLabel(key);
+      actions.push(...resourceAction(record, call, key, totalAmt, label, tokenPrefix));
+    }
+    return actions;
   }
 
   function extractMarches(response) {
@@ -610,24 +681,13 @@
           }
           if (call.name === 'readAndClaimAll') {
             const actions = [];
-            if (Array.isArray(result.response?.claimedRewards)) {
-              const rewards = new Map();
-              for (const reward of result.response.claimedRewards) {
-                const type = reward?.type;
-                const id = reward?.id;
-                const key = type === 'gold' || type === 'starMoney' ? type :
-                  resourceTypes.has(type) && Number.isInteger(id) ? `${type}:${id}` : null;
-                if (key && Number.isFinite(reward.amount) && reward.amount > 0) {
-                  rewards.set(key, (rewards.get(key) || 0) + reward.amount);
-                }
-              }
-              actions.push(...[...rewards].flatMap(([rewardKey, amount]) =>
-                resourceAction(record, call, rewardKey, amount)));
+            if (result.response) {
+              actions.push(...extractRewardActions(record, call, result.response, 'readAndClaimAll'));
             }
             actions.push({
               key: 'mailStatus',
               method: call.name,
-              feature: call.feature,
+              feature: call.feature || null,
               group: 'header',
               data: {
                 action: 'claimAll'
@@ -635,6 +695,50 @@
               updatedAt: record.timestamp
             });
             return actions;
+          }
+          if (call.name === 'mailFarm' && result?.response && typeof result.response === 'object') {
+            const actions = [];
+            const letterIds = Object.keys(result.response);
+            for (const letterId of letterIds) {
+              const letterReward = result.response[letterId];
+              if (letterReward && typeof letterReward === 'object') {
+                actions.push(...extractRewardActions(record, call, letterReward, `mail:${letterId}`));
+              }
+            }
+            actions.push({
+              key: 'mailStatus',
+              method: call.name,
+              feature: call.feature || null,
+              group: 'header',
+              data: {
+                action: 'claimMail',
+                letterIds
+              },
+              updatedAt: record.timestamp
+            });
+            return actions;
+          }
+          if (call.name === 'claimReward' && call.feature === 'report') {
+            const actions = [];
+            if (call.args?.id) {
+              actions.push({
+                key: 'mailStatus',
+                method: call.name,
+                feature: call.feature,
+                group: 'header',
+                data: {
+                  action: 'claimReport',
+                  reportId: call.args.id
+                },
+                updatedAt: record.timestamp
+              });
+            }
+            return actions;
+          }
+          if ((call.name === 'quest_multiFarm' || call.name === 'quest_farm' ||
+               call.name === 'questFarm' || call.name === 'dailyQuestFarm') &&
+              result?.response) {
+            return extractRewardActions(record, call, result.response, 'quest');
           }
           if (call.name === 'claimChest' && call.feature === 'clanVersus') {
             const chestNumber = call.args?.chestNumber;
@@ -1320,6 +1424,41 @@
             next.energyStatus = { key: 'energyStatus', method: entry.method,
               feature: null, group: 'header', data: { energy: data.amount },
               updatedAt: entry.updatedAt };
+          } else if (entry.data.resourceKey === 'resource:world-energy') {
+            next.worldEnergyStatus = { key: 'worldEnergyStatus', method: entry.method,
+              feature: null, group: 'header', data: { energy: data.amount },
+              updatedAt: entry.updatedAt };
+          }
+          const rawResKey = entry.data.resourceKey.replace(/^resource:/, '');
+          if (rawResKey === 'gold') {
+            if (next.inventoryGet?.data?.coin) {
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: { ...next.inventoryGet.data, coin: { ...next.inventoryGet.data.coin, '1': data.amount } }
+              };
+            }
+            if (next.userGetInfo?.data) {
+              next.userGetInfo = {
+                ...next.userGetInfo,
+                data: { ...next.userGetInfo.data, gold: data.amount }
+              };
+            }
+          } else if (rawResKey === 'starMoney' && next.userGetInfo?.data) {
+            next.userGetInfo = {
+              ...next.userGetInfo,
+              data: { ...next.userGetInfo.data, starMoney: data.amount }
+            };
+          } else if (rawResKey.includes(':')) {
+            const [rType, rId] = rawResKey.split(':');
+            if (next.inventoryGet?.data?.[rType]) {
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  [rType]: { ...next.inventoryGet.data[rType], [rId]: data.amount }
+                }
+              };
+            }
           }
           const history = { ...seen, [entry.data.token]: entry.updatedAt };
           const tokens = Object.keys(history).sort((a, b) =>
@@ -2052,15 +2191,69 @@
           if (next.mailStatus && next.mailStatus.updatedAt === entry.updatedAt) continue;
           const existing = next.mailStatus?.data || {};
           if (entry.data?.action === 'claimAll') {
+            const isReportOnly = entry.feature === 'report';
+            const unclaimedReportsCount = 0;
+            const unclaimedLettersCount = isReportOnly ? (existing.unclaimedLettersCount || 0) : 0;
+            const totalUnclaimed = unclaimedReportsCount + unclaimedLettersCount;
             next.mailStatus = {
               ...entry,
               data: {
                 ...existing,
-                unclaimedReportsCount: 0,
-                unclaimedLettersCount: 0,
-                totalUnclaimed: 0,
-                hasUnclaimed: false,
-                reports: (existing.reports || []).map((r) => ({ ...r, claimedReward: true }))
+                unclaimedReportsCount,
+                unclaimedLettersCount,
+                totalUnclaimed,
+                hasUnclaimed: totalUnclaimed > 0,
+                reports: (existing.reports || []).map((r) => ({ ...r, claimedReward: true })),
+                letters: isReportOnly ? existing.letters : (existing.letters || []).map((l) => ({ ...l, claimed: true }))
+              }
+            };
+          } else if (entry.data?.action === 'claimMail') {
+            const claimedIds = new Set((entry.data.letterIds || []).map(String));
+            const updatedLetters = (existing.letters || []).map((l) => {
+              if (claimedIds.has(String(l.id)) || claimedIds.has(String(l.letterId))) {
+                return { ...l, claimed: true, rewardReceived: true, rewardClaimed: true };
+              }
+              return l;
+            });
+            const remainingLetters = updatedLetters.filter((l) =>
+              l && !l.deleted && (l.reward || l.q_reward || l.items) &&
+              !l.claimed && !l.rewardReceived && !l.rewardClaimed
+            );
+            const unclaimedLettersCount = remainingLetters.length;
+            const unclaimedReportsCount = existing.unclaimedReportsCount || 0;
+            const totalUnclaimed = unclaimedReportsCount + unclaimedLettersCount;
+            next.mailStatus = {
+              ...entry,
+              data: {
+                ...existing,
+                letters: updatedLetters,
+                unclaimedLettersCount,
+                unclaimedReportsCount,
+                totalUnclaimed,
+                hasUnclaimed: totalUnclaimed > 0
+              }
+            };
+          } else if (entry.data?.action === 'claimReport') {
+            const reportId = String(entry.data.reportId);
+            const updatedReports = (existing.reports || []).map((r) => {
+              if (String(r.id) === reportId) {
+                return { ...r, claimedReward: true };
+              }
+              return r;
+            });
+            const remainingReports = updatedReports.filter((r) => r && r.claimedReward === false);
+            const unclaimedReportsCount = remainingReports.length;
+            const unclaimedLettersCount = existing.unclaimedLettersCount || 0;
+            const totalUnclaimed = unclaimedReportsCount + unclaimedLettersCount;
+            next.mailStatus = {
+              ...entry,
+              data: {
+                ...existing,
+                reports: updatedReports,
+                unclaimedReportsCount,
+                unclaimedLettersCount,
+                totalUnclaimed,
+                hasUnclaimed: totalUnclaimed > 0
               }
             };
           } else {

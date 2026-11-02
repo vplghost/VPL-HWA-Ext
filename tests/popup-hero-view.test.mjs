@@ -162,11 +162,38 @@ test('createHeroInline renders skills, skins, glyphs, artifacts, and spark of po
   // Skins (skin 2 is default PA, skin 307 is PA)
   assert.ok(text.includes('PA: 54') && text.includes('PA: 20'), 'Should render Skins with stat name and level');
 
-  // Glyphs (Hero 2 Galahad glyphs: PA, HP, Arm, Crit, Str)
-  assert.ok(text.includes('PA: 40') && text.includes('HP: 20') && text.includes('Arm: 20') && text.includes('Crit: 20') && text.includes('Str: 0'), 'Should render Glyphs with stat name and level');
+  // Glyphs (Hero 2 Galahad glyphs: PA, Arm, HP, MD, Str)
+  assert.ok(text.includes('PA: 40') && text.includes('Arm: 20') && text.includes('HP: 20') && text.includes('MD: 20') && text.includes('Str: 0'), 'Should render Glyphs with stat name and level');
 
   // Artifacts
   assert.ok(text.includes('Wpn: 3★ Lv.40') && text.includes('Book: 2★ Lv.24') && text.includes('Ring: 2★ Lv.23'), 'Should render Artifacts with stars and level');
+});
+
+test('createHeroInline renders accurate glyph stats and titles for Dante and Somna', () => {
+  const { createHeroInline } = context;
+  // Dante (Hero 16): PA: 30, Arm: 15, HP: 6, Dodge: 23, Agi: 15
+  const danteCard = createHeroInline('16', 'Dante', {
+    star: 5,
+    hero_runes: [30, 15, 6, 23, 15]
+  });
+  const danteText = danteCard.textContent;
+  assert.ok(danteText.includes('PA: 30'), 'Dante should have PA glyph');
+  assert.ok(danteText.includes('Arm: 15'), 'Dante should have Arm glyph');
+  assert.ok(danteText.includes('HP: 6'), 'Dante should have HP glyph');
+  assert.ok(danteText.includes('Dodge: 23'), 'Dante should have Dodge glyph');
+  assert.ok(danteText.includes('Agi: 15'), 'Dante should have Agi glyph');
+
+  // Somna (Hero 70): PA: 15, HP: 10, Tough: 10, Arm: 0, Agi: 0
+  const somnaCard = createHeroInline('70', 'Somna', {
+    star: 4,
+    hero_runes: [15, 10, 10, 0, 0]
+  });
+  const somnaText = somnaCard.textContent;
+  assert.ok(somnaText.includes('PA: 15'), 'Somna should have PA glyph');
+  assert.ok(somnaText.includes('HP: 10'), 'Somna should have HP glyph');
+  assert.ok(somnaText.includes('Tough: 10'), 'Somna should have Tough glyph');
+  assert.ok(somnaText.includes('Arm: 0'), 'Somna should have Arm glyph');
+  assert.ok(somnaText.includes('Agi: 0'), 'Somna should have Agi glyph');
 });
 
 test('createHeroInline supports converted PNG avatars (e.g. Hero 65 Tempus)', () => {
