@@ -29,6 +29,7 @@
     clanClash_getCurrentState: 'events',
     brawl_getAll: 'events',
     heroEvolve: 'heroes',
+    titanEvolve: 'titans',
     'getRoutesByIds:globalMap': 'other',
     'getPage:report': 'other',
     dungeonEndBattle: 'events',
@@ -368,6 +369,20 @@
               data: {
                 heroId: call.args.heroId,
                 token: `${call.ident}:heroEvolve:${call.args.heroId}`
+              },
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'titanEvolve' && Number.isInteger(call.args?.titanId)) {
+            return [{
+              key: 'titanEvolveAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                titanId: call.args.titanId,
+                consumable: result?.response?.consumable || null,
+                token: `${call.ident}:titanEvolve:${call.args.titanId}`
               },
               updatedAt: record.timestamp
             }];
@@ -1170,6 +1185,94 @@
             };
             changed = true;
           }
+          continue;
+        }
+        if (entry.key === 'titanEvolveAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.titanId) continue;
+          const titanId = String(entry.data.titanId);
+          const titanSnap = next.titanGetAll?.data?.[titanId];
+          const currentStar = Number(titanSnap?.star) || 1;
+          const nextStar = Math.min(6, currentStar + 1);
+          const evolveTitanFragmentCost = { 2: 50, 3: 150, 4: 500, 5: 900, 6: 1500 };
+          const evolveCost = evolveTitanFragmentCost[nextStar] || 0;
+
+          if (next.titanGetAll?.data) {
+            next.titanGetAll = {
+              ...next.titanGetAll,
+              data: {
+                ...next.titanGetAll.data,
+                [titanId]: {
+                  ...(titanSnap || { id: Number(titanId) }),
+                  star: nextStar
+                }
+              }
+            };
+          }
+
+          if (next.inventoryGet?.data?.fragmentTitan) {
+            const frags = { ...next.inventoryGet.data.fragmentTitan };
+            const currentFrags = frags[titanId] ?? 0;
+            frags[titanId] = Math.max(0, currentFrags - evolveCost);
+            next.inventoryGet = {
+              ...next.inventoryGet,
+              data: {
+                ...next.inventoryGet.data,
+                fragmentTitan: frags
+              }
+            };
+          }
+
+          const fragResKey = `resource:fragmentTitan:${titanId}`;
+          if (next[fragResKey]?.data) {
+            const curAmt = next[fragResKey].data.amount ?? 0;
+            next[fragResKey] = {
+              ...next[fragResKey],
+              data: {
+                ...next[fragResKey].data,
+                amount: Math.max(0, curAmt - evolveCost)
+              },
+              updatedAt: entry.updatedAt
+            };
+          }
+
+          if (entry.data.consumable && typeof entry.data.consumable === 'object') {
+            for (const [cId, amt] of Object.entries(entry.data.consumable)) {
+              const numAmt = Number(amt);
+              if (!Number.isFinite(numAmt)) continue;
+              if (next.inventoryGet?.data) {
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    consumable: { ...(next.inventoryGet.data.consumable || {}), [cId]: numAmt }
+                  }
+                };
+              }
+              const resKey = `resource:consumable:${cId}`;
+              if (next[resKey]?.data) {
+                next[resKey] = {
+                  ...next[resKey],
+                  data: { ...next[resKey].data, amount: numAmt },
+                  updatedAt: entry.updatedAt
+                };
+              }
+            }
+          }
+
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) =>
+            history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = {
+            key: 'resourceActionHistory',
+            method: entry.method,
+            feature: null,
+            group: 'internal',
+            data: history,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
           continue;
         }
         if (entry.key === 'heroSkillAction') {

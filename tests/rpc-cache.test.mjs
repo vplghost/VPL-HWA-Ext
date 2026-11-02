@@ -756,6 +756,49 @@ test('heroEvolve upgrades hero star and deducts fragments from inventory and res
   assert.equal(stateDuplicate.changed, false);
 });
 
+test('titanEvolve upgrades titan star, deducts fragments, and syncs consumable balance', () => {
+  const at = '2026-11-02T06:09:00.000Z';
+  const titanGetAll = record([
+    { name: 'titanGetAll', ident: 'titans-1' },
+    { name: 'inventoryGet', ident: 'inv-1' }
+  ], [
+    { ident: 'titans-1', result: { response: {
+      '4004': { id: 4004, star: 1, level: 30 }
+    } } },
+    { ident: 'inv-1', result: { response: {
+      fragmentTitan: { '4004': 80 },
+      consumable: { '24': 1100 }
+    } } }
+  ], '2026-11-02T06:08:00.000Z');
+
+  // Evolve Tydus (titan 4004) to 2 stars: requires 50 fragments, returns consumable 24 balance 1078
+  const evolve4004 = record([
+    { name: 'titanEvolve', args: { titanId: 4004 }, ident: 'evolve-4004' }
+  ], [
+    { ident: 'evolve-4004', result: { response: { consumable: { '24': 1078 } } } }
+  ], at);
+
+  const extracted = cache.extract(evolve4004);
+  assert.equal(extracted.some(e => e.key === 'titanEvolveAction' && e.data.titanId === 4004), true);
+
+  const baseWithRes = {
+    ...cache.merge({}, [titanGetAll]).cache,
+    'resource:fragmentTitan:4004': { data: { amount: 80 }, updatedAt: '2026-11-02T06:08:00.000Z' },
+    'resource:consumable:24': { data: { amount: 1100 }, updatedAt: '2026-11-02T06:08:00.000Z' }
+  };
+
+  const state1 = cache.merge(baseWithRes, [evolve4004]).cache;
+  assert.equal(state1.titanGetAll.data['4004'].star, 2);
+  assert.equal(state1.inventoryGet.data.fragmentTitan['4004'], 30); // 80 - 50 = 30
+  assert.equal(state1['resource:fragmentTitan:4004'].data.amount, 30);
+  assert.equal(state1.inventoryGet.data.consumable['24'], 1078);
+  assert.equal(state1['resource:consumable:24'].data.amount, 1078);
+
+  // Deduplication check
+  const stateDuplicate = cache.merge(state1, [evolve4004]);
+  assert.equal(stateDuplicate.changed, false);
+});
+
 test('rally march transitions to returnToOutpost from battleReport and returnRoute RPCs', () => {
   const at = '2026-11-02T05:03:00.000Z';
   const waitUntil = 1793595700000;
