@@ -1205,11 +1205,102 @@
     return false;
   }
 
+  const BATTLE_REPORT_CLAIM_TYPES = [
+    'soloMobAttackResult',
+    'rallyMobAttackResult',
+    'rallyCancelled',
+    'mineGatheringResult',
+    'outpostScoutResult',
+    'outpostAttackResult',
+    'outpostScoutDenied',
+    'mineAttackResult',
+    'mineDefendResult',
+    'rallyMemberKicked',
+    'mineScoutResult',
+    'presidentAssign',
+    'outpostAttackDenied'
+  ];
+
+  function getPendingClaims(cache) {
+    if (!cache || typeof cache !== 'object') {
+      return { letterIds: [], hasReports: false, questIds: [], totalCount: 0 };
+    }
+
+    // 1. Mail letters with rewards
+    const letters = Array.isArray(cache.mailStatus?.data?.letters)
+      ? cache.mailStatus.data.letters
+      : (Array.isArray(cache.mailGetAll?.data?.letters)
+        ? cache.mailGetAll.data.letters
+        : (Array.isArray(cache.mailGetAll?.letters) ? cache.mailGetAll.letters : []));
+
+    const unclaimedLetters = letters.filter((l) =>
+      l && !l.deleted && (l.reward || l.q_reward || l.items) &&
+      !l.claimed && !l.rewardReceived && !l.rewardClaimed
+    );
+    const letterIds = unclaimedLetters.map((l) => l.id ?? l.letterId).filter((id) => id != null);
+
+    // 2. Battle Reports with unclaimed rewards
+    const mailData = cache.mailStatus?.data || {};
+    const hasReports = Boolean(
+      mailData.hasUnclaimed ||
+      (Number(mailData.totalUnclaimed) > 0) ||
+      (Number(mailData.unclaimedReportsCount) > 0)
+    );
+
+    // 3. Completed Quests (state === 2)
+    const quests = Array.isArray(cache.questGetAll?.data)
+      ? cache.questGetAll.data
+      : (Array.isArray(cache.questGetAll) ? cache.questGetAll : []);
+    const readyQuests = quests.filter((q) => q && q.state === 2);
+    const questIds = readyQuests.map((q) => q.id).filter((id) => id != null);
+
+    const totalCount = letterIds.length + (hasReports ? 1 : 0) + questIds.length;
+
+    return { letterIds, hasReports, questIds, totalCount };
+  }
+
+  function buildAutoClaimCalls(cache, options = {}) {
+    const opt = { mail: true, reports: true, quests: true, ...options };
+    const pending = getPendingClaims(cache);
+    const calls = [];
+
+    if (opt.mail && pending.letterIds.length > 0) {
+      calls.push({
+        name: 'mailFarm',
+        args: { letterIds: pending.letterIds }
+      });
+    }
+
+    if (opt.reports && pending.hasReports) {
+      calls.push({
+        name: 'readAndClaimAll',
+        args: { types: BATTLE_REPORT_CLAIM_TYPES },
+        feature: 'report'
+      });
+    }
+
+    if (opt.quests && pending.questIds.length > 0) {
+      calls.push({
+        name: 'quest_multiFarm',
+        args: { questIds: pending.questIds }
+      });
+    }
+
+    if (calls.length > 0) {
+      calls.push(
+        { name: 'mailGetAll', args: {} },
+        { name: 'questGetAll', args: {} }
+      );
+    }
+
+    return { calls, pending };
+  }
+
   globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans, formatTitanArtifactLevels, isTitanArtifactUpgradable, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
     buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, exportTableData,
     getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount, isTowerCleared,
-    isResourceSelectableForHeader, isDebugOrEventResource };
+    isResourceSelectableForHeader, isDebugOrEventResource, BATTLE_REPORT_CLAIM_TYPES, getPendingClaims, buildAutoClaimCalls };
 })();

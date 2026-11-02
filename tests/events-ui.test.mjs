@@ -43,6 +43,9 @@ class MockElement {
     this.parentElement = null;
     this.listeners = {};
   }
+  get firstElementChild() {
+    return this.children[0] || null;
+  }
   get innerHTML() {
     return this._innerHTML;
   }
@@ -193,6 +196,39 @@ const configRefreshStatus = new MockElement('span');
 configRefreshStatus.setAttribute('id', 'config-refresh-status');
 const clearCacheBtn = new MockElement('button');
 clearCacheBtn.setAttribute('id', 'clear-cache');
+const autoclaimCountMail = new MockElement('span');
+autoclaimCountMail.setAttribute('id', 'autoclaim-count-mail');
+const autoclaimCountReports = new MockElement('span');
+autoclaimCountReports.setAttribute('id', 'autoclaim-count-reports');
+const autoclaimCountQuests = new MockElement('span');
+autoclaimCountQuests.setAttribute('id', 'autoclaim-count-quests');
+const autoclaimPendingBadge = new MockElement('span');
+autoclaimPendingBadge.setAttribute('id', 'autoclaim-pending-badge');
+const btnClaimAll = new MockElement('button');
+btnClaimAll.setAttribute('id', 'btn-claim-all');
+const btnClaimIcon = new MockElement('span');
+btnClaimAll.append(btnClaimIcon);
+const btnClaimCount = new MockElement('span');
+btnClaimCount.setAttribute('id', 'btn-claim-count');
+btnClaimAll.append(btnClaimCount);
+const autoclaimOptMail = new MockElement('input');
+autoclaimOptMail.setAttribute('id', 'autoclaim-opt-mail');
+autoclaimOptMail.type = 'checkbox';
+autoclaimOptMail.checked = true;
+const autoclaimOptReports = new MockElement('input');
+autoclaimOptReports.setAttribute('id', 'autoclaim-opt-reports');
+autoclaimOptReports.type = 'checkbox';
+autoclaimOptReports.checked = true;
+const autoclaimOptQuests = new MockElement('input');
+autoclaimOptQuests.setAttribute('id', 'autoclaim-opt-quests');
+autoclaimOptQuests.type = 'checkbox';
+autoclaimOptQuests.checked = true;
+const autoclaimOptOnOpen = new MockElement('input');
+autoclaimOptOnOpen.setAttribute('id', 'autoclaim-opt-on-open');
+autoclaimOptOnOpen.type = 'checkbox';
+autoclaimOptOnOpen.checked = false;
+const autoclaimStatus = new MockElement('span');
+autoclaimStatus.setAttribute('id', 'autoclaim-status');
 const dungeonModal = new MockElement('div');
 dungeonModal.setAttribute('id', 'dungeon-modal');
 dungeonModal.hidden = true;
@@ -256,7 +292,18 @@ const mockDoc = {
     ['btn-refresh-quests', btnRefreshQuests],
     ['btn-refresh-mail', btnRefreshMail],
     ['config-refresh-status', configRefreshStatus],
-    ['clear-cache', clearCacheBtn]
+    ['clear-cache', clearCacheBtn],
+    ['autoclaim-count-mail', autoclaimCountMail],
+    ['autoclaim-count-reports', autoclaimCountReports],
+    ['autoclaim-count-quests', autoclaimCountQuests],
+    ['autoclaim-pending-badge', autoclaimPendingBadge],
+    ['btn-claim-all', btnClaimAll],
+    ['btn-claim-count', btnClaimCount],
+    ['autoclaim-opt-mail', autoclaimOptMail],
+    ['autoclaim-opt-reports', autoclaimOptReports],
+    ['autoclaim-opt-quests', autoclaimOptQuests],
+    ['autoclaim-opt-on-open', autoclaimOptOnOpen],
+    ['autoclaim-status', autoclaimStatus]
   ]),
   querySelector(sel) {
     if (sel.startsWith('#')) return this.elementsById.get(sel.slice(1)) || null;
@@ -322,6 +369,7 @@ vm.runInContext(popupJs.slice(refreshStart, refreshEnd), context);
 // Extract showSnapshot
 const snapStart = popupJs.indexOf('function showSnapshot(');
 const snapEnd = popupJs.indexOf('function renderLog(');
+context.setTimeout = setTimeout;
 context.tableExportBtn = tableExportBtn;
 context.formatTime = (t) => t;
 context.matches = () => true;
@@ -1148,4 +1196,94 @@ test('header march icon renders raid rally badges with pulse animation for both 
   assert.ok(marchesWrap.children[1].className.includes('animate-pulse'));
   assert.equal(marchesWrap.children[2].className.includes('march-raid-pulse'), false);
   assert.equal(marchesWrap.children[2].className.includes('animate-pulse'), false);
+});
+
+
+test('getPendingClaims and buildAutoClaimCalls identify claimable items and assemble RPC calls', () => {
+  const sampleCache = {
+    mailStatus: {
+      data: {
+        hasUnclaimed: true,
+        unclaimedReportsCount: 2,
+        letters: [
+          { id: 101, reward: { gold: 5000 }, claimed: false },
+          { id: 102, q_reward: { stamina: 60 }, rewardReceived: false },
+          { id: 103, reward: { gold: 1000 }, claimed: true },
+          { id: 104, deleted: true, items: { 1: 5 } }
+        ]
+      }
+    },
+    questGetAll: {
+      data: [
+        { id: 201, state: 2, name: 'Win 3 Arena Battles' },
+        { id: 202, state: 1, name: 'Spend 100 Energy' },
+        { id: 203, state: 3, name: 'Complete Daily' }
+      ]
+    }
+  };
+
+  const pending = context.globalThis.hwaHelperPopupData.getPendingClaims(sampleCache);
+  assert.equal(pending.letterIds.length, 2);
+  assert.deepEqual(Array.from(pending.letterIds), [101, 102]);
+  assert.equal(pending.hasReports, true);
+  assert.equal(pending.questIds.length, 1);
+  assert.deepEqual(Array.from(pending.questIds), [201]);
+  assert.equal(pending.totalCount, 4); // 2 letters + 1 report + 1 quest
+
+  // Test full buildAutoClaimCalls
+  const fullCalls = context.globalThis.hwaHelperPopupData.buildAutoClaimCalls(sampleCache, { mail: true, reports: true, quests: true });
+  assert.equal(fullCalls.calls.length, 5); // mailFarm, readAndClaimAll, quest_multiFarm, mailGetAll, questGetAll
+  assert.equal(fullCalls.calls[0].name, 'mailFarm');
+  assert.deepEqual(Array.from(fullCalls.calls[0].args.letterIds), [101, 102]);
+  assert.equal(fullCalls.calls[1].name, 'readAndClaimAll');
+  assert.equal(fullCalls.calls[1].feature, 'report');
+  assert.equal(fullCalls.calls[2].name, 'quest_multiFarm');
+  assert.deepEqual(Array.from(fullCalls.calls[2].args.questIds), [201]);
+  assert.equal(fullCalls.calls[3].name, 'mailGetAll');
+  assert.equal(fullCalls.calls[4].name, 'questGetAll');
+
+  // Test partial selection (quests only)
+  const questsOnly = context.globalThis.hwaHelperPopupData.buildAutoClaimCalls(sampleCache, { mail: false, reports: false, quests: true });
+  assert.equal(questsOnly.calls.length, 3); // quest_multiFarm, mailGetAll, questGetAll
+  assert.equal(questsOnly.calls[0].name, 'quest_multiFarm');
+});
+
+test('renderAutoClaim updates badges, counts, and executeAutoClaim dispatches refresh-rpc', () => {
+  const sampleCache = {
+    mailStatus: {
+      data: {
+        hasUnclaimed: false,
+        letters: [
+          { id: 501, reward: { gold: 1000 }, claimed: false }
+        ]
+      }
+    },
+    questGetAll: {
+      data: [
+        { id: 99, state: 2 }
+      ]
+    }
+  };
+
+  context.renderAutoClaim(sampleCache, { mail: true, reports: true, quests: true, onOpen: false });
+  assert.equal(autoclaimCountMail.textContent, '1');
+  assert.equal(autoclaimCountReports.textContent, '0');
+  assert.equal(autoclaimCountQuests.textContent, '1');
+  assert.equal(autoclaimPendingBadge.textContent, '2 Ready');
+  assert.equal(btnClaimCount.textContent, '2');
+  assert.equal(btnClaimAll.disabled, false);
+
+  // Dispatch click
+  let sentRpcMessage = null;
+  context.chrome.runtime.sendMessage = (msg, cb) => {
+    sentRpcMessage = msg;
+    cb({ ok: true });
+  };
+
+  context.executeAutoClaim(sampleCache, { mail: true, reports: false, quests: true });
+  assert.ok(sentRpcMessage);
+  assert.equal(sentRpcMessage.kind, 'refresh-rpc');
+  assert.equal(sentRpcMessage.calls.some((c) => c.name === 'mailFarm'), true);
+  assert.equal(sentRpcMessage.calls.some((c) => c.name === 'quest_multiFarm'), true);
+  assert.ok(autoclaimStatus.textContent.includes('Claimed 2 rewards! Syncing...'));
 });

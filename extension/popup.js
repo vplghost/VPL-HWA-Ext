@@ -45,6 +45,8 @@ const DEFAULT_TAB_CONFIG = [
 ];
 
 let currentTabConfig = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
+let currentAutoClaimSettings = { mail: true, reports: true, quests: true, onOpen: false };
+let hasAutoClaimedThisSession = false;
 
 function normalizeTabConfig(storedConfig) {
   if (!Array.isArray(storedConfig) || storedConfig.length === 0) {
@@ -4018,7 +4020,7 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
@@ -4027,12 +4029,26 @@ async function render() {
   favoriteTitans = new Set(Array.isArray(stored.favoriteTitans) ? stored.favoriteTitans.map(String) : []);
   currentTabConfig = normalizeTabConfig(stored.tabConfig);
   applyTabConfig(currentTabConfig);
+  currentAutoClaimSettings = {
+    mail: stored.autoClaimSettings?.mail !== false,
+    reports: stored.autoClaimSettings?.reports !== false,
+    quests: stored.autoClaimSettings?.quests !== false,
+    onOpen: Boolean(stored.autoClaimSettings?.onOpen)
+  };
   currentProductionRates = Object.fromEntries([1, 2, 3, 4, 5].map((id) =>
     [id, globalThis.hwaHelperProductionData.ratePerMinute(cache, id)]));
   const resources = resourceEntries(cache);
   const selectedResources = stored.resourceSelection || [];
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
   renderMarches(cache);
+  renderAutoClaim(cache, currentAutoClaimSettings);
+  if (currentAutoClaimSettings.onOpen && !hasAutoClaimedThisSession) {
+    const pending = globalThis.hwaHelperPopupData?.getPendingClaims?.(cache);
+    if (pending && pending.totalCount > 0) {
+      hasAutoClaimedThisSession = true;
+      executeAutoClaim(cache, currentAutoClaimSettings);
+    }
+  }
   const headerResources = document.querySelector('#header-resources');
   headerResources.replaceChildren();
   for (const entry of resources.filter((item) => isSelectableForHeader(item) && selectedResources.includes(item.key))) {
@@ -4107,6 +4123,7 @@ async function render() {
     status.textContent = 'Settings and data stored in this browser.';
     renderConfigTabs();
     renderConfigOther(cache);
+    renderAutoClaim(cache, currentAutoClaimSettings);
     chrome.storage?.local?.get?.('gameEngineStatus')?.then?.((stored) => {
       renderEngineStatus(stored?.gameEngineStatus);
     });
@@ -4307,6 +4324,126 @@ document.querySelector('#btn-refresh-quests')?.addEventListener('click', () => t
 document.querySelector('#btn-refresh-mail')?.addEventListener('click', () => triggerRefresh('mail'));
 document.querySelector('#mail-badge')?.addEventListener('click', () => triggerRefresh('mail'));
 
+function renderAutoClaim(cache, settings = currentAutoClaimSettings) {
+  const pending = globalThis.hwaHelperPopupData?.getPendingClaims?.(cache) || { letterIds: [], hasReports: false, questIds: [], totalCount: 0 };
+
+  const mailCountEl = document.querySelector('#autoclaim-count-mail');
+  const reportsCountEl = document.querySelector('#autoclaim-count-reports');
+  const questsCountEl = document.querySelector('#autoclaim-count-quests');
+  const pendingBadgeEl = document.querySelector('#autoclaim-pending-badge');
+  const claimBtn = document.querySelector('#btn-claim-all');
+  const claimCountEl = document.querySelector('#btn-claim-count');
+  const optMail = document.querySelector('#autoclaim-opt-mail');
+  const optReports = document.querySelector('#autoclaim-opt-reports');
+  const optQuests = document.querySelector('#autoclaim-opt-quests');
+  const optOnOpen = document.querySelector('#autoclaim-opt-on-open');
+
+  if (mailCountEl) mailCountEl.textContent = String(pending.letterIds.length);
+  if (reportsCountEl) reportsCountEl.textContent = String(pending.hasReports ? 1 : 0);
+  if (questsCountEl) questsCountEl.textContent = String(pending.questIds.length);
+
+  const selectedCount = (settings.mail ? pending.letterIds.length : 0) +
+    (settings.reports && pending.hasReports ? 1 : 0) +
+    (settings.quests ? pending.questIds.length : 0);
+
+  if (pendingBadgeEl) {
+    pendingBadgeEl.textContent = `${pending.totalCount} Ready`;
+    if (pending.totalCount > 0) {
+      pendingBadgeEl.className = 'rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800';
+    } else {
+      pendingBadgeEl.className = 'rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500';
+    }
+  }
+
+  if (claimCountEl) claimCountEl.textContent = String(selectedCount);
+  if (claimBtn) {
+    claimBtn.disabled = selectedCount === 0;
+  }
+
+  if (optMail && optMail.checked !== Boolean(settings.mail)) optMail.checked = Boolean(settings.mail);
+  if (optReports && optReports.checked !== Boolean(settings.reports)) optReports.checked = Boolean(settings.reports);
+  if (optQuests && optQuests.checked !== Boolean(settings.quests)) optQuests.checked = Boolean(settings.quests);
+  if (optOnOpen && optOnOpen.checked !== Boolean(settings.onOpen)) optOnOpen.checked = Boolean(settings.onOpen);
+}
+
+function executeAutoClaim(cache = currentCache, settings = currentAutoClaimSettings) {
+  const { calls, pending } = globalThis.hwaHelperPopupData?.buildAutoClaimCalls?.(cache, settings) || { calls: [], pending: { totalCount: 0 } };
+  if (!calls || calls.length === 0) return;
+
+  const claimBtn = document.querySelector('#btn-claim-all');
+  const statusEl = document.querySelector('#autoclaim-status');
+  const labelEl = claimBtn?.querySelector('span') || claimBtn?.firstElementChild || claimBtn;
+  if (claimBtn) {
+    claimBtn.disabled = true;
+    if (labelEl) labelEl.textContent = '⏳ Claiming...';
+  }
+  if (statusEl) {
+    statusEl.textContent = 'Dispatching claims...';
+    statusEl.className = 'text-xs text-blue-600 font-medium';
+  }
+
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+      if (claimBtn && labelEl) {
+        labelEl.textContent = '🎁 Claim Selected Rewards';
+      }
+      if (chrome.runtime.lastError || !response?.ok) {
+        if (statusEl) {
+          statusEl.textContent = response?.error || 'Game tab not reachable.';
+          statusEl.className = 'text-xs text-rose-600 font-medium';
+        }
+        if (claimBtn) claimBtn.disabled = false;
+      } else {
+        if (statusEl) {
+          const totalClaimed = (settings.mail ? pending.letterIds.length : 0) +
+            (settings.reports && pending.hasReports ? 1 : 0) +
+            (settings.quests ? pending.questIds.length : 0);
+          statusEl.textContent = `Claimed ${totalClaimed} rewards! Syncing...`;
+          statusEl.className = 'text-xs text-emerald-600 font-medium';
+          if (typeof setTimeout === 'function') {
+            setTimeout(() => {
+              if (statusEl && statusEl.textContent.includes('Syncing')) {
+                statusEl.textContent = 'Idle';
+                statusEl.className = 'text-slate-500 italic';
+              }
+            }, 3500);
+          }
+        }
+      }
+    });
+  }
+}
+
+function setupAutoClaimListeners() {
+  const saveSettings = async () => {
+    const optMail = document.querySelector('#autoclaim-opt-mail');
+    const optReports = document.querySelector('#autoclaim-opt-reports');
+    const optQuests = document.querySelector('#autoclaim-opt-quests');
+    const optOnOpen = document.querySelector('#autoclaim-opt-on-open');
+
+    currentAutoClaimSettings = {
+      mail: optMail ? optMail.checked : true,
+      reports: optReports ? optReports.checked : true,
+      quests: optQuests ? optQuests.checked : true,
+      onOpen: optOnOpen ? optOnOpen.checked : false
+    };
+
+    renderAutoClaim(currentCache, currentAutoClaimSettings);
+    if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+      await chrome.storage.local.set({ autoClaimSettings: currentAutoClaimSettings });
+    }
+  };
+
+  document.querySelector('#autoclaim-opt-mail')?.addEventListener('change', saveSettings);
+  document.querySelector('#autoclaim-opt-reports')?.addEventListener('change', saveSettings);
+  document.querySelector('#autoclaim-opt-quests')?.addEventListener('change', saveSettings);
+  document.querySelector('#autoclaim-opt-on-open')?.addEventListener('change', saveSettings);
+
+  document.querySelector('#btn-claim-all')?.addEventListener('click', () => {
+    executeAutoClaim(currentCache, currentAutoClaimSettings);
+  });
+}
+
 function renderEngineStatus(status) {
   const badgeEl = document.querySelector('#engine-status-badge');
   const instanceEl = document.querySelector('#engine-unity-instance');
@@ -4495,6 +4632,7 @@ render().then(async () => {
 });
 setupGuildVersusModal();
 setupDungeonModal();
+setupAutoClaimListeners();
 setInterval(refreshTimed, 1000);
 
 
