@@ -992,6 +992,19 @@ test('renderGoals displays Cleared Today badge on Tower Chest card when tower is
   assert.ok(!text.includes('Daily Limited'));
 });
 
+test('renderResources sorts resources even when cached labels are missing', () => {
+  view.replaceChildren();
+  context.showAllResources = true;
+  context.search.value = '';
+  context.resourceSort.value = 'name';
+  context.renderResources([
+    { key: 'resource:gold', data: { amount: 100 } },
+    { key: 'resource:coin:99999', data: { amount: 5 } }
+  ], []);
+  assert.match(view.textContent, /Gold/);
+  assert.match(view.textContent, /coin #99999/);
+});
+
 test('renderResources splits items into renewable and other groups and filters inactive items by default', () => {
   view.replaceChildren();
   context.showAllResources = false;

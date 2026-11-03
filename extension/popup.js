@@ -322,15 +322,18 @@ const byId = ([a], [b]) => Number(a) - Number(b);
 const resourceData = globalThis.hwaHelperResourceData;
 
 function resourceLabel(entry) {
-  const id = entry.key.slice('resource:'.length);
+  const id = String(entry?.key || '').replace(/^resource:/, '');
   const [type, itemId] = id.split(':');
+  const fallback = { gold: 'Gold', starMoney: 'Emeralds', energy: 'Energy',
+    'world-energy': 'World Energy' }[id] || (itemId ? type + ' #' + itemId : id || 'Resource');
+  let name = null;
   if (type === 'refillable') {
-    return globalThis.hwaHelperRefillableRules?.[itemId]?.label || entry.data.label;
+    name = globalThis.hwaHelperRefillableRules?.[itemId]?.label;
+  } else if (type && itemId && !id.startsWith('world-refillable:')) {
+    name = globalThis.hwaHelperNameMap?.item?.(type, itemId);
   }
-  if (type && itemId && !id.startsWith('refillable:') && !id.startsWith('world-refillable:')) {
-    return globalThis.hwaHelperNameMap.item(type, itemId) || entry.data.label;
-  }
-  return entry.data.label;
+  const label = typeof name === 'string' && name.trim() ? name : entry?.data?.label;
+  return typeof label === 'string' && label.trim() ? label : fallback;
 }
 
 function isRenewable(entry) {
