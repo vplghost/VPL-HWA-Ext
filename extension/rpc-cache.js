@@ -884,6 +884,30 @@
             updatedAt: record.timestamp
           }];
         }
+        if (call.name?.startsWith('magicTower_') && !['magicTower_briefInfo', 'magicTower_getAll'].includes(call.name) && result && !result.error) {
+          const action = call.name.slice('magicTower_'.length);
+          if (['enterNextFloor', 'enterRoom', 'startBattle', 'endBattle', 'activateBuff', 'openChest'].includes(action)) {
+            const response = result.response || {};
+            return [{
+              key: 'towerAction', method: call.name, feature: null, group: 'internal',
+              data: {
+                token: call.ident, action,
+                number: Number(call.args?.number) || null,
+                buffId: Number(call.args?.id) || null,
+                heroes: Array.isArray(call.args?.heroes) ? call.args.heroes : null,
+                win: call.args?.result?.win === true,
+                stars: call.args?.result?.stars ?? null,
+                floorNumber: Number(response.floorNumber) || null,
+                roomNumber: response.currentRoomNumber == null ? null : Number(response.currentRoomNumber),
+                rooms: response.rooms || null,
+                reward: response.reward || null,
+                rewardIndex: response.rewardIndex ?? null,
+                completion: result.magicTower_completion || null,
+                briefInfo: result.magicTower_briefInfo || null
+              }, updatedAt: record.timestamp
+            }];
+          }
+        }
         if ((call.name === 'magicTower_briefInfo' || call.name === 'magicTower_getAll') && result?.response) {
           const resp = result.response;
           const isCleared = resp.state === 'win' || resp.state === 'completed' || (Number(resp.floorData?.floorNumber) > 25);
@@ -896,7 +920,12 @@
               state: resp.state || (resp.floorData ? 'inProgress' : 'unknown'),
               isCleared,
               deadHeroesCount: resp.deadHeroesCount ?? 0,
-              floorNumber: resp.floorData?.floorNumber ?? (isCleared ? 26 : 0)
+              floorNumber: resp.floorData?.floorNumber ?? (isCleared ? 26 : 0),
+              floorData: resp.floorData ? {
+                floorNumber: resp.floorData.floorNumber,
+                currentRoomNumber: resp.floorData.currentRoomNumber,
+                rooms: resp.floorData.rooms || {}
+              } : null
             },
             updatedAt: record.timestamp
           }];
@@ -2440,7 +2469,97 @@
           changed = true;
           continue;
         }
+        if (entry.key === 'towerAction') {
+          const action = entry.data;
+          const previous = next.towerSession?.data || {};
+          if (previous.updatedAt > entry.updatedAt || previous.tokens?.includes(action.token)) continue;
+          const fresh = (action.action === 'enterNextFloor' && action.floorNumber === 1) ||
+            (previous.completed && action.action === 'enterRoom' && action.number === 1);
+          const session = fresh ? { floorNumber: 1, roomNumber: 0, rooms: {}, history: [], tokens: [], completed: false, team: [] } : {
+            floorNumber: previous.floorNumber || 1,
+            roomNumber: previous.roomNumber || 0,
+            rooms: previous.rooms || {},
+            history: [...(previous.history || [])],
+            tokens: [...(previous.tokens || [])],
+            completed: Boolean(previous.completed),
+            completion: previous.completion || null,
+            team: previous.team || []
+          };
+          const floor = session.floorNumber;
+          const room = session.rooms?.[session.roomNumber];
+          const event = { action: action.action, floor, room: session.roomNumber, at: entry.updatedAt };
+          if (action.action === 'enterNextFloor') {
+            if (action.floorNumber) session.floorNumber = action.floorNumber;
+            session.roomNumber = action.roomNumber || 0;
+            session.rooms = action.rooms || {};
+            session.completed = false;
+          } else if (action.action === 'enterRoom') {
+            session.roomNumber = action.roomNumber || action.number || session.roomNumber;
+          } else if (action.action === 'startBattle') {
+            session.team = action.heroes || [];
+          } else if (action.action === 'endBattle') {
+            event.room = session.roomNumber;
+            event.win = action.win;
+            event.stars = action.stars;
+            event.reward = action.reward;
+            event.enemyIds = room?.defenders?.units?.map((unit) => unit.id) || [];
+            event.team = session.team;
+            session.history.push(event);
+            session.roomNumber = action.roomNumber ?? session.roomNumber;
+            if (action.completion || action.briefInfo?.state === 'win') {
+              session.completed = true;
+              session.completion = action.completion;
+              next.towerStatus = {
+                key: 'towerStatus', method: entry.method, feature: null, group: 'other',
+                data: { state: 'win', isCleared: true, floorNumber: floor,
+                  deadHeroesCount: action.briefInfo?.deadHeroesCount ?? 0 },
+                updatedAt: entry.updatedAt
+              };
+            }
+          } else if (action.action === 'activateBuff') {
+            event.buffId = action.buffId;
+            event.options = Array.isArray(room?.buffs) ? room.buffs : [];
+            session.history.push(event);
+          } else if (action.action === 'openChest') {
+            event.number = action.number;
+            event.reward = action.reward;
+            event.rewardIndex = action.rewardIndex;
+            event.options = room?.openCosts || {};
+            event.possibleRewards = room?.rewards?.map((item) => item.reward) || [];
+            session.history.push(event);
+          }
+          session.history = session.history.slice(-100);
+          session.tokens = [...session.tokens, action.token].slice(-150);
+          session.updatedAt = entry.updatedAt;
+          if (fresh) next.towerStatus = {
+            key: 'towerStatus', method: entry.method, feature: null, group: 'other',
+            data: { state: 'inProgress', isCleared: false, floorNumber: session.floorNumber },
+            updatedAt: entry.updatedAt
+          };
+          next.towerSession = { key: 'towerSession', method: entry.method, feature: null,
+            group: 'other', data: session, updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
         if (entry.key === 'towerStatus') {
+          if (next.towerStatus?.updatedAt > entry.updatedAt) continue;
+          const incomingFloor = entry.data?.floorData;
+          if (incomingFloor) {
+            const previous = next.towerSession?.data || {};
+            const floorNumber = Number(incomingFloor.floorNumber) || previous.floorNumber || 0;
+            const fresh = previous.completed && !entry.data.isCleared;
+            const session = fresh ? { history: [], tokens: [] } : previous;
+            next.towerSession = {
+              key: 'towerSession', method: entry.method, feature: null, group: 'other',
+              data: { ...session, floorNumber,
+                roomNumber: Number(incomingFloor.currentRoomNumber) || 0,
+                rooms: incomingFloor.rooms || {}, completed: Boolean(entry.data.isCleared),
+                updatedAt: entry.updatedAt }, updatedAt: entry.updatedAt
+            };
+          } else if (entry.data?.isCleared && next.towerSession) {
+            next.towerSession = { ...next.towerSession,
+              data: { ...next.towerSession.data, completed: true }, updatedAt: entry.updatedAt };
+          }
           const existing = next.towerStatus?.data || {};
           const incoming = entry.data || {};
           next.towerStatus = {
@@ -2448,7 +2567,7 @@
             data: {
               ...existing,
               ...incoming,
-              isCleared: Boolean(incoming.isCleared || existing.isCleared || incoming.state === 'win' || existing.state === 'win')
+              isCleared: Boolean(incoming.isCleared || incoming.state === 'win')
             }
           };
           changed = true;

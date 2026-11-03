@@ -3758,6 +3758,135 @@ function renderEvents(cache) {
   view.append(listContainer);
 }
 
+function towerRewardText(reward) {
+  if (!reward || typeof reward !== 'object') return '—';
+  const parts = [];
+  for (const [kind, value] of Object.entries(reward)) {
+    if (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)))) {
+      const label = { gold: 'Gold', starmoney: 'Emeralds', experience: 'XP' }[kind] || kind;
+      parts.push(`${Number(value).toLocaleString()} ${label}`);
+    } else if (value && typeof value === 'object') {
+      for (const [id, amount] of Object.entries(value)) {
+        const label = globalThis.hwaHelperNameMap?.item?.(kind, id) || `${kind} #${id}`;
+        parts.push(`${Number(amount).toLocaleString()} × ${label}`);
+      }
+    }
+  }
+  return parts.join(', ') || '—';
+}
+
+function renderTowerModal(cache = currentCache) {
+  const body = document.querySelector('#tower-modal-body');
+  const badge = document.querySelector('#tower-modal-badge');
+  if (!body || !badge) return;
+  const session = cache?.towerSession?.data || {};
+  const status = cache?.towerStatus?.data || {};
+  const complete = Boolean(session.completed || status.isCleared || status.state === 'win');
+  const floor = session.floorNumber || (complete ? 0 : status.floorNumber) || 0;
+  badge.textContent = complete ? 'Completed' : floor ? `Floor ${floor}` : 'Waiting for data';
+  badge.className = complete
+    ? 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800'
+    : 'rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800';
+  body.replaceChildren();
+
+  function section(title) {
+    const card = document.createElement('section');
+    card.className = 'space-y-2 rounded-xl border border-slate-200 bg-white p-4';
+    const heading = document.createElement('h3');
+    heading.className = 'text-sm font-bold text-slate-900';
+    heading.textContent = title;
+    card.append(heading);
+    body.append(card);
+    return card;
+  }
+  function line(parent, value, emphasis = false) {
+    const row = document.createElement('p');
+    row.className = emphasis ? 'text-sm font-semibold text-slate-800' : 'text-xs leading-5 text-slate-600';
+    row.textContent = value;
+    parent.append(row);
+  }
+  function heroList(ids) {
+    return (ids || []).map((id) => globalThis.hwaHelperNameMap?.hero?.(id) || `Hero #${id}`).join(', ');
+  }
+  if (!floor && !complete) {
+    line(section('Tower status'), 'No Tower data captured yet. Open the Tower in the game to sync.');
+    return;
+  }
+  const summary = section('Progress');
+  line(summary, complete ? `Tower completed at floor ${floor || 'unknown'}.` : `Current floor: ${floor} · room ${session.roomNumber ?? 'unknown'}.`, true);
+  if (session.team?.length) line(summary, `Team: ${heroList(session.team)}`);
+  if (complete && session.completion) {
+    const result = session.completion;
+    line(summary, `Total clears: ${result.totalClears ?? '—'} · streak: ${result.streak ?? '—'}`);
+    if (result.reward?.battleWins) line(summary, `Battle rewards: ${towerRewardText(result.reward.battleWins)}`);
+    if (result.reward?.chests) line(summary, `Chest rewards: ${towerRewardText(result.reward.chests)}`);
+  }
+
+  if (!complete) {
+    const current = section('Current choices');
+    const rooms = Object.values(session.rooms || {}).sort((a, b) => Number(a.roomNumber) - Number(b.roomNumber));
+    if (!rooms.length) line(current, 'Current room options have not been captured.');
+    for (const room of rooms) {
+      const number = room.roomNumber;
+      const marker = Number(number) === Number(session.roomNumber) ? ' (current)' : '';
+      if (room.type === 'buffs') {
+        line(current, `Room ${number}${marker} · Buff choices: ${(room.buffs || []).map((id) => `Buff #${id}`).join(' / ') || 'unknown'}`, true);
+      } else if (room.type === 'chests') {
+        line(current, `Room ${number}${marker} · Chests`, true);
+        for (const [choice, cost] of Object.entries(room.openCosts || {})) {
+          const opened = room.openChests?.[choice] != null;
+          line(current, `Chest ${choice}: ${cost ? towerRewardText(cost) : 'free'}${opened ? ' · opened' : ''}`);
+        }
+        if (room.rewards?.length) {
+          line(current, `Possible rewards (positions not confirmed): ${room.rewards.map((x) => towerRewardText(x.reward)).join(' / ')}`);
+        }
+      } else if (room.type === 'hero_battle' || room.type === 'boss_battle') {
+        const units = room.defenders?.units || [];
+        line(current, `Room ${number}${marker} · ${room.type === 'boss_battle' ? 'Boss' : 'Battle'}: ${heroList(units.map((x) => x.id)) || 'opponents unknown'}`, true);
+        if (room.reward) line(current, `Win reward: ${towerRewardText(room.reward)}`);
+      } else {
+        line(current, `Room ${number}${marker} · ${room.type || 'unknown'}`);
+      }
+    }
+  }
+
+  const history = section('Route and decisions');
+  const entries = session.history || [];
+  if (!entries.length) line(history, 'No Tower actions recorded in this session.');
+  for (const event of entries) {
+    if (event.action === 'endBattle') {
+      line(history, `Floor ${event.floor}, room ${event.room}: ${event.win ? 'Victory' : 'Defeat'}${event.stars != null ? ` · ${event.stars} stars` : ''}${event.enemyIds?.length ? ` vs ${heroList(event.enemyIds)}` : ''} · ${towerRewardText(event.reward)}`);
+    } else if (event.action === 'activateBuff') {
+      line(history, `Floor ${event.floor}, room ${event.room}: selected Buff #${event.buffId}${event.options?.length ? ` (offered: ${event.options.map((id) => `#${id}`).join(', ')})` : ''}`);
+    } else if (event.action === 'openChest') {
+      line(history, `Floor ${event.floor}, room ${event.room}: opened chest ${event.number} · ${towerRewardText(event.reward)}`);
+      const offered = Object.entries(event.options || {}).map(([number, cost]) =>
+        `#${number} ${cost ? towerRewardText(cost) : 'free'}`);
+      if (offered.length) line(history, `Offered chests: ${offered.join(' / ')}`);
+      if (event.possibleRewards?.length) line(history,
+        `Possible rewards (positions not confirmed): ${event.possibleRewards.map(towerRewardText).join(' / ')}`);
+    }
+  }
+}
+
+function setupTowerModal() {
+  const modal = document.querySelector('#tower-modal');
+  const trigger = document.querySelector('#tower-fab');
+  const close = document.querySelector('#tower-modal-close');
+  if (!modal || !trigger) return;
+  const dismiss = () => { modal.hidden = true; trigger.focus(); };
+  trigger.addEventListener('click', () => {
+    renderTowerModal(currentCache);
+    modal.hidden = false;
+    close?.focus();
+  });
+  close?.addEventListener('click', dismiss);
+  modal.addEventListener('click', (event) => { if (event.target === modal) dismiss(); });
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !modal.hidden) dismiss();
+  });
+}
+
 function setupGuildVersusModal() {
   const modal = document.querySelector('#guild-versus-modal');
   const closeBtn = document.querySelector('#gvs-modal-close');
@@ -4445,6 +4574,8 @@ async function render() {
       draftBadge.hidden = true;
     }
   }
+  const towerModal = document.querySelector('#tower-modal');
+  if (towerModal && !towerModal.hidden) renderTowerModal(cache);
   const draftModal = document.querySelector('#draft-modal');
   if (draftModal && !draftModal.hidden) {
     const modalBody = document.querySelector('#draft-modal-body');
@@ -5057,6 +5188,7 @@ render().then(async () => {
 setupGuildVersusModal();
 setupDungeonModal();
 setupDraftModal();
+setupTowerModal();
 setupAutoClaimListeners();
 setInterval(refreshTimed, 1000);
 

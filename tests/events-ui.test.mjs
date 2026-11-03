@@ -434,6 +434,35 @@ if (gridStart !== -1 && gridEnd !== -1) {
   vm.runInContext(popupJs.slice(gridStart, gridEnd), context);
 }
 
+test('Tower dialog shows current choices, past decisions, and completion', () => {
+  const body = new MockElement('div');
+  const badge = new MockElement('span');
+  mockDoc.elementsById.set('tower-modal-body', body);
+  mockDoc.elementsById.set('tower-modal-badge', badge);
+  const session = {
+    floorNumber: 2, roomNumber: 1, completed: false,
+    rooms: { 1: { roomNumber: 1, type: 'chests',
+      openCosts: { 1: null, 2: { starmoney: '70' } },
+      rewards: [{ reward: { gold: 100000 } }] } },
+    history: [{ action: 'activateBuff', floor: 1, room: 2, buffId: 17,
+      options: [17, 18, 19] }, { action: 'openChest', floor: 2, room: 1,
+      number: 2, reward: { gold: 100000 }, options: { 1: null, 2: { starmoney: '70' } },
+      possibleRewards: [{ gold: 100000 }] }]
+  };
+  context.renderTowerModal({ towerSession: { data: session } });
+  assert.match(body.textContent, /Chest 2: 70 Emeralds/);
+  assert.match(body.textContent, /selected Buff #17/);
+  assert.match(body.textContent, /Possible rewards/);
+  assert.match(body.textContent, /Offered chests: #1 free \/ #2 70 Emeralds/);
+  context.renderTowerModal({ towerSession: { data: { ...session, floorNumber: 23,
+    completed: true, completion: { totalClears: 30, streak: 15 } } } });
+  assert.match(badge.textContent, /Completed/);
+  assert.match(body.textContent, /Tower completed at floor 23/);
+  assert.doesNotMatch(body.textContent, /Current choices/);
+  context.renderTowerModal({ towerStatus: { data: { state: 'win', isCleared: true, floorNumber: 26 } } });
+  assert.match(body.textContent, /Tower completed at floor unknown/);
+});
+
 test('renderEvents renders Guild Versus and active event cards', () => {
   const cache = {
     clanVersusStatus: {
