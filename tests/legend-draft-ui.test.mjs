@@ -181,14 +181,11 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   assert.match(statusEl.textContent, /Selected 0\/5 steps/);
 
   // Check that all 15 heroes across 5 columns x 3 rows are rendered at once
-  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /Manual Candidate Planner/);
   assert.match(viewEl.textContent, /Step 1/);
   assert.match(viewEl.textContent, /Step 5/);
-  assert.match(viewEl.textContent, /Wodryn/);  // Step 1 choice
-  assert.match(viewEl.textContent, /Crow/);    // Step 2 choice
-  assert.match(viewEl.textContent, /Lian/);    // Step 3 choice
-  assert.match(viewEl.textContent, /Jhu/);     // Step 4 choice
-  assert.match(viewEl.textContent, /Qing Mao/); // Step 5 choice
+  assert.match(viewEl.textContent, /Choice not recorded/);
+  assert.doesNotMatch(viewEl.textContent, /Wodryn|Qing Mao/);
 
   // Check candidates helper returns 5 steps of 3 choices
   const defaultCandidates = context.hwaHelperPopupData.defaultDraftCandidates('defense');
@@ -201,7 +198,7 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   context.renderDraft(sampleCache);
   assert.match(statusEl.textContent, /Defense lineup locked/);
   assert.match(viewEl.textContent, /Lineup successfully locked/);
-  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /Manual Candidate Planner/);
 });
 
 test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => {
@@ -237,7 +234,7 @@ test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => 
   assert.match(viewEl.textContent, /Cleaver/);
   assert.match(viewEl.textContent, /Attack Draft/);
   // While actively drafting attack, candidate matrix is shown
-  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /Manual Candidate Planner/);
 });
 
 test('Legend Draft UI supports defense/attack review and hides pick slots after match completion', async () => {
@@ -287,7 +284,7 @@ test('Legend Draft UI supports defense/attack review and hides pick slots after 
   assert.match(statusEl.textContent, /Match Completed/);
 
   // 15 candidate matrix must NOT be rendered when draft is not active
-  assert.doesNotMatch(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
 
   // Match result banner must be visible
   assert.match(viewEl.textContent, /Defeat/);
@@ -317,10 +314,10 @@ test('Legend Draft UI supports defense/attack review and hides pick slots after 
   assert.match(viewEl.textContent, /Drayne/);
   assert.match(viewEl.textContent, /Opponent Defense Lineup/);
   // Pick slots matrix must still be omitted
-  assert.doesNotMatch(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
 });
 
-test('Legend Draft UI displays candidate stats, team power calculation, and swap search', async () => {
+test('Legend Draft UI shows confirmed stars without account hero power', async () => {
   const viewEl = new MockElement('div');
   const statusEl = new MockElement('div');
   const searchEl = new MockElement('input');
@@ -331,13 +328,14 @@ test('Legend Draft UI displays candidate stats, team power calculation, and swap
       data: {
         active: true,
         stageId: 2,
-        matchId: 99887766,
-        defenceHeroes: []
+        matchId: 358789279,
+        defenceHeroes: [],
+        defenceStars: { 4: 5 }
       }
     },
     heroGetAll: {
       data: {
-        4: { star: 5, power: 120500 },
+        4: { star: 2, power: 120500 },
         78: { star: 5, power: 120500 },
         49: { star: 4, power: 95000 },
         44: { star: 3, power: 80000 }
@@ -347,9 +345,9 @@ test('Legend Draft UI displays candidate stats, team power calculation, and swap
 
   context.renderDraft(activeCache);
 
-  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /Recorded Draft Choices/);
   assert.match(viewEl.textContent, /★5/);
-  assert.match(viewEl.textContent, /120,500 pwr/);
+  assert.doesNotMatch(viewEl.textContent, /120,500 pwr|Team Power/);
 
   const buttons = viewEl.querySelectorAll('button');
   const pickBtn = buttons.find(b => b.textContent === 'Pick');
@@ -357,7 +355,7 @@ test('Legend Draft UI displays candidate stats, team power calculation, and swap
   pickBtn.dispatchEvent('click');
 
   context.renderDraft(activeCache);
-  assert.match(viewEl.textContent, /Team Power: 120,500/);
+  assert.doesNotMatch(viewEl.textContent, /120,500 pwr|Team Power/);
 });
 
 test('Legend Draft UI does NOT lock defense at match start and renders 15 candidate matrix even if old match data previously existed', async () => {
@@ -392,7 +390,7 @@ test('Legend Draft UI does NOT lock defense at match start and renders 15 candid
   assert.doesNotMatch(statusEl.textContent, /Defense lineup locked/);
 
   // 15 Candidate Heroes Matrix MUST be rendered
-  assert.match(viewEl.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(viewEl.textContent, /Manual Candidate Planner/);
   assert.match(viewEl.textContent, /Step 1/);
   assert.match(viewEl.textContent, /Step 5/);
 });
@@ -424,11 +422,44 @@ test('Legend Draft modal dialog opens on banner click and setupDraftModal wires 
 
   const draftModalBody = context.document.querySelector('#draft-modal-body');
   assert.ok(draftModalBody.children.length > 0, 'Modal body should contain rendered draft');
-  assert.match(draftModalBody.textContent, /15 Candidate Heroes Matrix/);
+  assert.match(draftModalBody.textContent, /Manual Candidate Planner/);
 
   // Close button click hides modal
   const closeBtn = context.document.querySelector('#draft-modal-close');
   assert.ok(closeBtn, 'Close button should exist');
   closeBtn.dispatchEvent('click');
   assert.equal(draftModal.hidden, true, 'Modal should be hidden after clicking close');
+});
+
+test('recorded match review shows exact defense, attack, and opponent pick positions', async () => {
+  const viewEl = new MockElement('div');
+  const statusEl = new MockElement('div');
+  const searchEl = new MockElement('input');
+  const context = await createDraftContext(viewEl, statusEl, searchEl);
+  const cache = { legendDraftStatus: { data: {
+    matchId: 358789279, stageId: 0, active: false,
+    defenceHeroes: [4, 19, 25, 70, 67],
+    attackHeroes: [11, 24, 33, 57, 73],
+    enemyDefenceHeroes: [10, 53, 69, 71, 75],
+    defenceStars: { 4: 3 },
+    lastResult: { result: 0, defenceHeroes: [4, 19, 25, 70, 67],
+      attackHeroes: [11, 24, 33, 57, 73] }
+  } } };
+  context.renderDraft(cache);
+  assert.match(viewEl.textContent, /Recorded Draft Choices/);
+  assert.match(viewEl.textContent, /Sebastian/);
+  assert.match(viewEl.textContent, /Polaris/);
+  assert.match(viewEl.textContent, /★3/);
+  const choices = context.hwaHelperPopupData.observedDraftChoices(358789279);
+  assert.deepEqual(Array.from(choices.defense, (row) => row.length), [3, 3, 3, 3, 3]);
+  assert.deepEqual(Array.from(choices.attack, (row) => row.length), [3, 3, 3, 3, 3]);
+
+  const attackBtn = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Attack Draft'));
+  assert.ok(attackBtn);
+  attackBtn.dispatchEvent('click');
+  context.renderDraft(cache);
+  assert.match(viewEl.textContent, /Julius/);
+  assert.match(viewEl.textContent, /Isaac/);
+  assert.match(viewEl.textContent, /Step 1, choice 2: Guus/);
+  assert.match(viewEl.textContent, /Step 5, choice 3: Electra von Grave/);
 });

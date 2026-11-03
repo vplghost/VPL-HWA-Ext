@@ -337,22 +337,26 @@
   }
 
   function defaultDraftCandidates(mode = 'defense') {
-    if (mode === 'attack') {
-      return [
-        [24, 8, 49],   // Step 1: Cleaver (verified trace pick), Chabba, Satori
-        [54, 73, 56],  // Step 2: Iris (verified trace pick), Drayne, Fafnir
-        [503, 17, 34], // Step 3: Alvanor (verified trace pick), Mojo, Rufus
-        [59, 4, 55],   // Step 4: Cascade (verified trace pick), Astaroth, Mushy and Shroom
-        [64, 29, 25]   // Step 5: Folio (verified trace pick), Lars, Ishmael
-      ];
-    }
-    return [
-      [4, 78, 49],   // Step 1: Astaroth (verified trace pick), Wodryn, Satori
-      [57, 76, 20],  // Step 2: Kayla (verified trace pick), Crow, Markus
-      [23, 75, 2],   // Step 3: Lian (verified trace pick), Oya, Ginger
-      [503, 37, 73], // Step 4: Alvanor (verified trace pick), Jhu, Drayne
-      [28, 5, 35]    // Step 5: Qing Mao (verified trace pick), Artemis, Faceless
-    ];
+    return Array.from({ length: 5 }, () => [null, null, null]);
+  }
+
+  // Candidate positions transcribed from the recorded match; RPC draft fields are XOR encoded.
+  function observedDraftChoices(matchId) {
+    if (Number(matchId) !== 358789279) return null;
+    return {
+      defense: [
+        [4, 500, 8], [62, 19, 55], [501, 52, 25],
+        [70, 22, 10], [12, 26, 67]
+      ],
+      attack: [
+        [11, 1, 5], [24, 502, 70], [56, 33, 45],
+        [57, 62, 23], [3, 50, 73]
+      ],
+      enemyDefence: [
+        [null, 69, null], [10, null, null], [null, null, 53],
+        [75, null, null], [null, null, 71]
+      ]
+    };
   }
 
   function validateDraftPicks(picks) {
@@ -1391,7 +1395,7 @@
   globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans, formatTitanArtifactLevels, isTitanArtifactUpgradable, getHeroArtifactTier, getHeroArtifactTierStyle, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
-    defaultDraftCandidates, validateDraftPicks, getDraftActiveStep,
+    defaultDraftCandidates, observedDraftChoices, validateDraftPicks, getDraftActiveStep,
     buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, exportTableData,
     getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount, isTowerCleared,
     isResourceSelectableForHeader, isDebugOrEventResource, BATTLE_REPORT_CLAIM_TYPES, getPendingClaims, buildAutoClaimCalls,

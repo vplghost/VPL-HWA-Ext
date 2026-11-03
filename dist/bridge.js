@@ -1,11 +1,13 @@
 let currentSettings = null;
+let popupRpcEnabled = false;
 
 function sendControl() {
   if (!currentSettings) return;
   window.postMessage({
     source: 'hwa-helper-config',
     kind: 'control',
-    interceptEnabled: currentSettings.interceptEnabled !== false
+    interceptEnabled: currentSettings.interceptEnabled !== false,
+    popupRpcEnabled
   }, location.origin);
 }
 
@@ -45,8 +47,9 @@ window.addEventListener('message', (event) => {
 });
 
 try {
-  chrome.storage?.local?.get?.('captureSettings')?.then?.((stored) => {
+  chrome.storage?.local?.get?.(['captureSettings', 'popupRpcEnabled'])?.then?.((stored) => {
     currentSettings = stored?.captureSettings || {};
+    popupRpcEnabled = stored?.popupRpcEnabled === true;
     sendControl();
   })?.catch?.(() => {
     currentSettings = {};
@@ -59,8 +62,10 @@ try {
 
 try {
   chrome.storage?.onChanged?.addListener?.((changes, area) => {
-    if (area !== 'local' || !('captureSettings' in changes)) return;
-    currentSettings = changes.captureSettings.newValue || {};
+    if (area !== 'local') return;
+    if ('captureSettings' in changes) currentSettings = changes.captureSettings.newValue || {};
+    if ('popupRpcEnabled' in changes) popupRpcEnabled = changes.popupRpcEnabled.newValue === true;
+    if (!('captureSettings' in changes) && !('popupRpcEnabled' in changes)) return;
     sendControl();
   });
 } catch {}

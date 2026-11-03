@@ -492,6 +492,45 @@ test('heroUpgradeSkill upgrades hero skill in heroGetAll and decrements skill po
   assert.equal(state.heroGetAll.data['60'].skills['350'], 74);
 });
 
+test('skin upgrade trace advances known skin levels once and accepts later hero and stone snapshots', async () => {
+  const trace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611032318_hero_skin_stone.json', import.meta.url), 'utf8'));
+  const initial = record([
+    { name: 'heroGetAll', ident: 'heroes' }, { name: 'inventoryGet', ident: 'items' }
+  ], [
+    { ident: 'heroes', result: { response: {
+      501: { id: 501, power: 1000, skins: { 1002: 20 } },
+      60: { id: 60, power: 900, skins: { 303: 4 } }
+    } } },
+    { ident: 'items', result: { response: { coin: { 8: 500, 9: 300, 10: 200 } } } }
+  ], '2026-11-03T16:17:00.000Z');
+  const actions = cache.extract(trace[0]);
+  assert.equal(actions.length, 1);
+  assert.equal(actions[0].key, 'skinUpgradeAction');
+  assert.equal(actions[0].data.heroId, 501);
+
+  const upgraded = cache.merge({}, [initial, ...trace, trace[0]]).cache;
+  assert.equal(upgraded.heroGetAll.data[501].skins[1002], 30);
+  assert.equal(upgraded.heroGetAll.data[60].skins[303], 5);
+  assert.equal(upgraded.inventoryGet.data.coin[8], 500);
+  assert.equal(upgraded.heroGetAll.data[501].power, 1000);
+  assert.equal(Object.keys(upgraded.resourceActionHistory.data).length, 11);
+
+  const fresh = record([
+    { name: 'heroGetAll', ident: 'heroes-new' }, { name: 'inventoryGet', ident: 'items-new' }
+  ], [
+    { ident: 'heroes-new', result: { response: {
+      501: { id: 501, power: 1150, skins: { 1002: 30 } },
+      60: { id: 60, power: 930, skins: { 303: 5 } }
+    } } },
+    { ident: 'items-new', result: { response: { coin: { 8: 250, 9: 300, 10: 180 } } } }
+  ], '2026-11-03T16:18:10.000Z');
+  const reconciled = cache.merge(upgraded, [fresh, ...trace]).cache;
+  assert.equal(reconciled.heroGetAll.data[501].power, 1150);
+  assert.equal(reconciled.heroGetAll.data[501].skins[1002], 30);
+  assert.equal(reconciled.inventoryGet.data.coin[8], 250);
+  assert.equal(reconciled['resource:coin:8'].data.amount, 250);
+});
+
 test('chatGetAll extracts clan and announcement messages and merges deduplicated messages', () => {
   const at1 = '2026-11-01T13:00:00.000Z';
   const chatClan1 = record([
@@ -1306,6 +1345,54 @@ test('replaying quest claim trace updates Energy and World Energy', async () => 
   assert.ok(merged['resource:world-energy']);
   assert.equal(merged.worldEnergyStatus.data.energy, 106);
   assert.equal(merged['resource:world-energy'].data.amount, 106);
+});
+
+test('completeQuest records an event claim and only applies a known reward', async () => {
+  const eventTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611032155_event_claim.json', import.meta.url), 'utf8'));
+  const unknown = cache.merge({}, eventTrace).cache;
+  assert.equal(unknown.questClaimStatus.data.claims[0].id, 14360);
+  assert.equal(unknown.questClaimStatus.data.claims[0].needsSync, true);
+  assert.equal(Object.keys(unknown).some((key) => key.startsWith('resource:')), false);
+
+  const withQuest = {
+    questGetAll: { key: 'questGetAll', data: [{ id: 14360, reward: { consumable: { 100: 2 } } }],
+      updatedAt: '2026-11-03T14:54:00.000Z' },
+    'resource:consumable:100': { key: 'resource:consumable:100',
+      data: { amount: 3, label: 'Consumable #100' }, updatedAt: '2026-11-03T14:54:00.000Z' }
+  };
+  const claimed = cache.merge(withQuest, eventTrace).cache;
+  assert.equal(claimed['resource:consumable:100'].data.amount, 5);
+  assert.equal(cache.merge(claimed, eventTrace).cache['resource:consumable:100'].data.amount, 5);
+});
+
+test('event claim trace refreshes Balance Sigils and retains every inventory group', async () => {
+  const trace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611032321_claim_event.json', import.meta.url), 'utf8'));
+  const merged = cache.merge({}, trace).cache;
+  const inventory = JSON.parse(trace[1].responseBody).results[1].result.response;
+  assert.equal(merged.questClaimStatus.data.claims[0].id, 14066);
+  assert.equal(merged.inventoryGet.data.coin['40216'], 11050);
+  assert.equal(merged['resource:coin:40216'].data.amount, 11050);
+  assert.deepEqual(Object.keys(merged.inventoryGet.data).sort(), Object.keys(inventory).sort());
+  assert.equal(merged.inventoryGet.data.fragmentSkin['1004'], 1);
+  assert.equal(merged.inventoryGet.data.patron['57'], 30);
+});
+
+test('rally details enrich an existing squad without adding a duplicate march', () => {
+  const at = '2026-11-03T14:17:51.731Z';
+  const squadId = 'same-squad';
+  const initial = { marchStatus: { key: 'marchStatus', updatedAt: at,
+    data: { marches: [{ squadId, kind: 'raid', stage: 'moveToRallyLeader', endsAt: Date.parse(at) + 30000 }] } },
+    accountStatus: { data: { id: '123' } } };
+  const details = record([{ name: 'getRallyById', feature: 'rally', ident: 'details' }],
+    [{ ident: 'details', result: { response: { rally: {
+      rallyId: 'rally-1', plannedStartTime: Date.parse(at) + 60000,
+      leader: { userId: '999', user: { name: 'Leader' } },
+      members: [{ userId: '123', squad: { squadId, heroes: [{ heroId: 4 }] } }],
+      target: { objectConfigId: 79 }
+    } } } }], '2026-11-03T14:17:52.000Z');
+  const merged = cache.merge(initial, [details]).cache;
+  assert.equal(merged.marchStatus.data.marches.length, 1);
+  assert.equal(merged.marchStatus.data.marches[0].rally.id, 'rally-1');
 });
 
 test('replaying mail claim trace clears unclaimed reports and updates resources', async () => {

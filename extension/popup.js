@@ -46,6 +46,7 @@ const DEFAULT_TAB_CONFIG = [
 
 let currentTabConfig = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
 let currentAutoClaimSettings = { mail: true, reports: true, quests: true, onOpen: false };
+let popupRpcEnabled = false;
 let hasAutoClaimedThisSession = false;
 
 let itemsViewMode = 'grid'; // 'grid' | 'list'
@@ -451,7 +452,18 @@ function isMarchExpired(march, now = Date.now()) {
 function renderMarches(cache, wrap = document.querySelector('#marches')) {
   if (!wrap) return;
   wrap.replaceChildren();
-  for (const [index, march] of (cache?.marchStatus?.data?.marches || []).entries()) {
+  const seen = new Set();
+  const now = Date.now();
+  const marches = cache?.marchStatus?.data?.marches || [];
+  const identities = (march) => [march.squadId && `squad:${march.squadId}`,
+    march.rally?.id && `rally:${march.rally.id}`].filter(Boolean);
+  const expired = new Set(marches.filter((march) => isMarchExpired(march, now))
+    .flatMap(identities));
+  for (const [index, march] of marches.entries()) {
+    if (isMarchExpired(march, now)) continue;
+    const keys = identities(march);
+    if (keys.some((key) => seen.has(key) || expired.has(key))) continue;
+    keys.forEach((key) => seen.add(key));
     const isAutoJoin = Boolean(march.rally?.isAutoJoin);
     const isRaid = march.kind === 'raid' || isAutoJoin || Boolean(march.rally);
     const style = isAutoJoin ?
@@ -467,6 +479,7 @@ function renderMarches(cache, wrap = document.querySelector('#marches')) {
     badge.textContent = style.icon;
     wrap.append(badge);
   }
+  wrap.hidden = wrap.children.length === 0;
 }
 
 function refreshTimed() {
@@ -855,7 +868,7 @@ function createInitialsBadge(name, theme, isLarge = false, glowClass = '') {
   return badge;
 }
 
-function createHeroInline(heroId, displayName, heroSnapshot) {
+function createHeroInline(heroId, displayName, heroSnapshot, draftMode = false) {
   const meta = globalThis.hwaHelperHeroMetadata?.[heroId];
   if (!meta) {
     const textNode = document.createElement('span');
@@ -941,11 +954,13 @@ function createHeroInline(heroId, displayName, heroSnapshot) {
   }
   infoCol.append(starsEl);
 
-  const powerEl = document.createElement('div');
-  powerEl.className = 'text-xs text-amber-300 font-medium tabular-nums';
-  powerEl.textContent = Number.isFinite(heroSnapshot?.power) ?
-    `⚡ Power: ${formatNumber(heroSnapshot.power)}` : 'Power: —';
-  infoCol.append(powerEl);
+  if (!draftMode) {
+    const powerEl = document.createElement('div');
+    powerEl.className = 'text-xs text-amber-300 font-medium tabular-nums';
+    powerEl.textContent = Number.isFinite(heroSnapshot?.power) ?
+      `⚡ Power: ${formatNumber(heroSnapshot.power)}` : 'Power: —';
+    infoCol.append(powerEl);
+  }
 
   header.append(infoCol);
   card.append(header);
@@ -1830,67 +1845,35 @@ let activeDraftStep = 0;
 let draftViewMode = null; // 'defense' or 'attack'
 let lastRenderedMatchId = null;
 let draftStepCandidates = {
-  defense: globalThis.hwaHelperPopupData?.defaultDraftCandidates?.('defense') || [
-    [4, 78, 49],
-    [57, 76, 20],
-    [23, 75, 2],
-    [503, 37, 73],
-    [28, 5, 35]
-  ],
-  attack: globalThis.hwaHelperPopupData?.defaultDraftCandidates?.('attack') || [
-    [24, 8, 49],
-    [54, 73, 56],
-    [503, 17, 34],
-    [59, 4, 55],
-    [64, 29, 25]
-  ]
+  matchId: null,
+  defense: globalThis.hwaHelperPopupData.defaultDraftCandidates('defense'),
+  attack: globalThis.hwaHelperPopupData.defaultDraftCandidates('attack')
 };
+let storedDraftStepCandidates = null;
 
 try {
   chrome.storage?.local?.get?.('draftStepCandidates')?.then?.((res) => {
-    if (res?.draftStepCandidates) {
-      if (Array.isArray(res.draftStepCandidates.defense)) draftStepCandidates.defense = res.draftStepCandidates.defense;
-      if (Array.isArray(res.draftStepCandidates.attack)) draftStepCandidates.attack = res.draftStepCandidates.attack;
+    storedDraftStepCandidates = res?.draftStepCandidates || null;
+    if (storedDraftStepCandidates?.matchId === lastRenderedMatchId && lastRenderedMatchId) {
+      if (Array.isArray(storedDraftStepCandidates.defense)) draftStepCandidates.defense = storedDraftStepCandidates.defense;
+      if (Array.isArray(storedDraftStepCandidates.attack)) draftStepCandidates.attack = storedDraftStepCandidates.attack;
+      draftStepCandidates.matchId = lastRenderedMatchId;
     }
   });
 } catch (_) {}
-
-function ensureCandidateHasHero(mode, stepIdx, heroId) {
-  if (!heroId || !mode || stepIdx < 0 || stepIdx > 4) return;
-  if (!draftStepCandidates[mode]) {
-    draftStepCandidates[mode] = globalThis.hwaHelperPopupData?.defaultDraftCandidates?.(mode) || [];
-  }
-  while (draftStepCandidates[mode].length <= stepIdx) {
-    draftStepCandidates[mode].push([78, 49, 44]);
-  }
-  const col = draftStepCandidates[mode][stepIdx];
-  if (Array.isArray(col) && !col.includes(heroId)) {
-    col[0] = heroId;
-    try {
-      chrome.storage?.local?.set?.({ draftStepCandidates });
-    } catch (_) {}
-  }
-}
 
 let activeHeroSwapTarget = null;
 let selectedRoleFilter = 'all';
 
 function renderDraft(cache) {
   const draft = cache.legendDraftStatus?.data || {};
+  const observedMatchId = draft.matchId ?? draft.lastResult?.matchId;
+  const observedChoices = globalThis.hwaHelperPopupData.observedDraftChoices(observedMatchId);
+  const draftSnapshot = (mode, heroId) => {
+    const star = draft[`${mode}Stars`]?.[heroId];
+    return Number.isInteger(star) ? { star } : null;
+  };
 
-  // Auto-inject any picked heroes from game state into the 15 candidate matrix slots
-  if (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length) {
-    draft.defenceHeroes.forEach((hId, idx) => ensureCandidateHasHero('defense', idx, hId));
-  }
-  if (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length) {
-    draft.attackHeroes.forEach((hId, idx) => ensureCandidateHasHero('attack', idx, hId));
-  }
-  if (Array.isArray(draft.lastResult?.defenceHeroes) && draft.lastResult.defenceHeroes.length) {
-    draft.lastResult.defenceHeroes.forEach((hId, idx) => ensureCandidateHasHero('defense', idx, hId));
-  }
-  if (Array.isArray(draft.lastResult?.attackHeroes) && draft.lastResult.attackHeroes.length) {
-    draft.lastResult.attackHeroes.forEach((hId, idx) => ensureCandidateHasHero('attack', idx, hId));
-  }
   const stageId = Number.isInteger(draft.stageId) ? draft.stageId : 0;
   const isDefenseStage = stageId === 2 || stageId === 3;
   const isAttackStage = stageId === 4;
@@ -1908,6 +1891,15 @@ function renderDraft(cache) {
     localDraftDefencePicks = [null, null, null, null, null];
     localDraftAttackPicks = [null, null, null, null, null];
     activeHeroSwapTarget = null;
+  }
+  if (draft.matchId && draftStepCandidates.matchId !== draft.matchId) {
+    draftStepCandidates = {
+      matchId: draft.matchId,
+      defense: storedDraftStepCandidates?.matchId === draft.matchId && Array.isArray(storedDraftStepCandidates.defense) ?
+        storedDraftStepCandidates.defense : globalThis.hwaHelperPopupData.defaultDraftCandidates('defense'),
+      attack: storedDraftStepCandidates?.matchId === draft.matchId && Array.isArray(storedDraftStepCandidates.attack) ?
+        storedDraftStepCandidates.attack : globalThis.hwaHelperPopupData.defaultDraftCandidates('attack')
+    };
   }
 
   // A mode is only locked if it was explicitly submitted in this match, or the server advanced past it
@@ -2113,13 +2105,27 @@ function renderDraft(cache) {
     enemySlotRow.className = 'flex flex-wrap gap-2';
     for (const heroId of draft.enemyDefenceHeroes) {
       const heroMeta = globalThis.hwaHelperHeroMetadata?.[heroId] || {};
-      const heroSnap = cache.heroGetAll?.data?.[heroId];
+      const heroSnap = draftSnapshot('enemyDefence', heroId);
       const slot = document.createElement('div');
       slot.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white shadow-xs';
-      slot.append(createHeroInline(heroId, heroMeta.name || globalThis.hwaHelperNameMap.hero(heroId) || `#${heroId}`, heroSnap));
+      slot.append(createHeroInline(heroId, heroMeta.name || globalThis.hwaHelperNameMap.hero(heroId) || `#${heroId}`, heroSnap, true));
       enemySlotRow.append(slot);
     }
     enemyLineupCard.append(enemySlotRow);
+    if (observedChoices?.enemyDefence) {
+      const observedPicks = document.createElement('div');
+      observedPicks.className = 'flex flex-wrap gap-2 text-[11px] text-amber-900';
+      observedChoices.enemyDefence.forEach((choices, step) => {
+        const position = choices.findIndex(Number.isInteger);
+        if (position < 0) return;
+        const heroId = choices[position];
+        const label = document.createElement('span');
+        label.className = 'rounded border border-amber-200 bg-white px-2 py-1';
+        label.textContent = `Step ${step + 1}, choice ${position + 1}: ${globalThis.hwaHelperHeroMetadata?.[heroId]?.name || `#${heroId}`}`;
+        observedPicks.append(label);
+      });
+      enemyLineupCard.append(observedPicks);
+    }
     container.append(enemyLineupCard);
   } else if (!isViewingAttack && draft.enemyAttackHeroes?.length) {
     const enemyLineupCard = document.createElement('div');
@@ -2134,10 +2140,10 @@ function renderDraft(cache) {
     enemySlotRow.className = 'flex flex-wrap gap-2';
     for (const heroId of draft.enemyAttackHeroes) {
       const heroMeta = globalThis.hwaHelperHeroMetadata?.[heroId] || {};
-      const heroSnap = cache.heroGetAll?.data?.[heroId];
+      const heroSnap = draftSnapshot('enemyAttack', heroId);
       const slot = document.createElement('div');
       slot.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-red-200 bg-white shadow-xs';
-      slot.append(createHeroInline(heroId, heroMeta.name || globalThis.hwaHelperNameMap.hero(heroId) || `#${heroId}`, heroSnap));
+      slot.append(createHeroInline(heroId, heroMeta.name || globalThis.hwaHelperNameMap.hero(heroId) || `#${heroId}`, heroSnap, true));
       enemySlotRow.append(slot);
     }
     enemyLineupCard.append(enemySlotRow);
@@ -2171,34 +2177,21 @@ function renderDraft(cache) {
   teamTitleCol.append(teamSub);
   teamHeader.append(teamTitleCol);
 
-  // Total team power calculation
-  let totalLineupPower = 0;
-  for (const hId of currentPicks) {
-    if (hId && cache.heroGetAll?.data?.[hId]?.power) {
-      totalLineupPower += cache.heroGetAll.data[hId].power;
-    }
-  }
-
   const teamHeaderActions = document.createElement('div');
   teamHeaderActions.className = 'flex items-center gap-2';
-
-  if (totalLineupPower > 0) {
-    const powerBadge = document.createElement('span');
-    powerBadge.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-900 border border-amber-300 flex items-center gap-1';
-    powerBadge.innerHTML = `<span>⚡</span> <span>Team Power: ${formatNumber(totalLineupPower)}</span>`;
-    teamHeaderActions.append(powerBadge);
-  }
 
   // Lock action button or locked badge
   if (isActivelyDrafting) {
     const lockBtn = document.createElement('button');
     lockBtn.type = 'button';
-    lockBtn.className = val.valid ?
+    lockBtn.className = val.valid && popupRpcEnabled ?
       'cursor-pointer px-4 py-1.5 rounded-lg bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all' :
       'px-4 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-400 cursor-not-allowed border border-slate-200';
-    lockBtn.disabled = !val.valid;
-    lockBtn.textContent = isViewingAttack ? 'Lock Attack Lineup (5 Heroes)' : 'Lock Defense Lineup (5 Heroes)';
-    if (val.valid) {
+    lockBtn.disabled = !val.valid || !popupRpcEnabled;
+    lockBtn.textContent = popupRpcEnabled ?
+      (isViewingAttack ? 'Lock Attack Lineup (5 Heroes)' : 'Lock Defense Lineup (5 Heroes)') :
+      'Enable popup RPC calls to submit';
+    if (val.valid && popupRpcEnabled) {
       lockBtn.addEventListener('click', () => {
         lockBtn.disabled = true;
         lockBtn.textContent = 'Submitting...';
@@ -2228,7 +2221,7 @@ function renderDraft(cache) {
 
     if (heroId) {
       const heroMeta = globalThis.hwaHelperHeroMetadata?.[heroId] || {};
-      const heroSnap = cache.heroGetAll?.data?.[heroId];
+      const heroSnap = draftSnapshot(isViewingAttack ? 'attack' : 'defence', heroId);
       slotCard.className = `flex flex-col items-center justify-between p-2.5 rounded-xl border transition-all text-center min-h-[110px] relative ${
         isActiveStep ? 'border-blue-500 bg-blue-50/70 shadow-sm ring-2 ring-blue-400 cursor-pointer' :
         isActivelyDrafting ? 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50/60 cursor-pointer' :
@@ -2280,6 +2273,12 @@ function renderDraft(cache) {
       nameSpan.className = 'text-xs font-bold text-slate-800 truncate max-w-[100px]';
       nameSpan.textContent = heroMeta.name || globalThis.hwaHelperNameMap.hero(heroId) || `#${heroId}`;
       heroWrapper.append(nameSpan);
+      if (Number.isInteger(heroSnap?.star)) {
+        const starLabel = document.createElement('span');
+        starLabel.className = 'text-[10px] font-bold text-amber-700';
+        starLabel.textContent = `★${heroSnap.star}`;
+        heroWrapper.append(starLabel);
+      }
 
       if (heroMeta.role) {
         const roleBadge = document.createElement('span');
@@ -2352,9 +2351,9 @@ function renderDraft(cache) {
 
   // 5. Full 15-Hero Draft Grid (5 Columns x 3 Rows)
   // Always rendered during active drafting and preparation to ensure all 15 heroes are available for calculation
-  if (!isMatchCompleted) {
+  if (!isMatchCompleted || observedChoices) {
     const candidatesMode = isViewingAttack ? 'attack' : 'defense';
-    const currentCandidates = draftStepCandidates[candidatesMode] ||
+    const currentCandidates = observedChoices?.[candidatesMode] || draftStepCandidates[candidatesMode] ||
       globalThis.hwaHelperPopupData.defaultDraftCandidates(candidatesMode);
 
     const chooserSection = document.createElement('div');
@@ -2367,12 +2366,14 @@ function renderDraft(cache) {
   chooserTitleCol.className = 'space-y-0.5';
   const chooserTitle = document.createElement('h3');
   chooserTitle.className = 'text-sm font-bold text-slate-900 flex items-center gap-2';
-  chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">15</span> <span>15 Candidate Heroes Matrix (5 Steps × 3 Choices)</span>`;
+  chooserTitle.innerHTML = `<span class="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">15</span> <span>${observedChoices ? 'Recorded Draft Choices' : 'Manual Candidate Planner'} (5 Steps × 3 Choices)</span>`;
   chooserTitleCol.append(chooserTitle);
 
   const chooserSub = document.createElement('div');
   chooserSub.className = 'text-xs text-slate-500';
-  chooserSub.textContent = `Each column represents 1 pick step for ${isViewingAttack ? 'Attack' : 'Defense'} (choose 1 of 3 heroes). Review powers, stars, and roles for strategic calculations.`;
+  chooserSub.textContent = observedChoices ?
+    `Choices recorded for match #${observedMatchId}. Stars are shown when confirmed by battle data.` :
+    `Choices are unknown until you record them. Use ⇄ to enter the 3 heroes offered in each ${isViewingAttack ? 'Attack' : 'Defense'} step.`;
   chooserTitleCol.append(chooserSub);
   chooserHeader.append(chooserTitleCol);
 
@@ -2399,8 +2400,8 @@ function renderDraft(cache) {
   const restoreDefaultBtn = document.createElement('button');
   restoreDefaultBtn.type = 'button';
   restoreDefaultBtn.className = 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 cursor-pointer transition-colors';
-  restoreDefaultBtn.textContent = 'Default 15';
-  restoreDefaultBtn.title = 'Reset 15 candidates for this mode to default setup';
+  restoreDefaultBtn.textContent = 'Clear choices';
+  restoreDefaultBtn.title = 'Clear recorded choices for this mode';
   restoreDefaultBtn.addEventListener('click', () => {
     draftStepCandidates[candidatesMode] = globalThis.hwaHelperPopupData.defaultDraftCandidates(candidatesMode);
     try {
@@ -2408,7 +2409,7 @@ function renderDraft(cache) {
     } catch (_) {}
     render();
   });
-  chooserActions.append(restoreDefaultBtn);
+  if (!observedChoices) chooserActions.append(restoreDefaultBtn);
 
   chooserHeader.append(chooserActions);
   chooserSection.append(chooserHeader);
@@ -2419,7 +2420,7 @@ function renderDraft(cache) {
 
   for (let stepIdx = 0; stepIdx < 5; stepIdx++) {
     const colBox = document.createElement('div');
-    const stepCandidates = currentCandidates[stepIdx] || [78, 49, 44];
+    const stepCandidates = currentCandidates[stepIdx] || [null, null, null];
     const isColChosen = Number.isInteger(currentPicks[stepIdx]) && currentPicks[stepIdx] > 0;
 
     colBox.className = `flex flex-col space-y-2 rounded-xl p-2.5 transition-colors ${
@@ -2446,8 +2447,9 @@ function renderDraft(cache) {
     // 3 Candidate Hero Cards in this column
     for (let cIdx = 0; cIdx < stepCandidates.length; cIdx++) {
       const cHeroId = stepCandidates[cIdx];
+      const isKnownChoice = Number.isInteger(cHeroId) && cHeroId > 0;
       const meta = globalThis.hwaHelperHeroMetadata?.[cHeroId] || {};
-      const snap = cache.heroGetAll?.data?.[cHeroId];
+      const snap = draftSnapshot(isViewingAttack ? 'attack' : 'defence', cHeroId);
       const isChosen = currentPicks[stepIdx] === cHeroId;
 
       const card = document.createElement('div');
@@ -2475,7 +2477,7 @@ function renderDraft(cache) {
         activeHeroSwapTarget = { stepIdx, candidateIdx: cIdx };
         render();
       });
-      cardTop.append(swapBtn);
+      if (!observedChoices) cardTop.append(swapBtn);
       card.append(cardTop);
 
       // Avatar + Name + Role
@@ -2489,13 +2491,14 @@ function renderDraft(cache) {
         aImg.className = `size-9 rounded-full object-cover shrink-0 ${cardGlow}`;
         avWrap.append(aImg);
       } else {
-        avWrap.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, false));
+        avWrap.append(createInitialsBadge(meta.name || '?', meta.faction, false));
       }
       card.append(avWrap);
 
       const nameLabel = document.createElement('div');
       nameLabel.className = 'text-xs font-bold text-slate-800 truncate max-w-[90px] mt-0.5';
-      nameLabel.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
+      nameLabel.textContent = isKnownChoice ?
+        (meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`) : 'Choice not recorded';
       card.append(nameLabel);
 
       if (meta.role) {
@@ -2505,12 +2508,11 @@ function renderDraft(cache) {
         card.append(rBadge);
       }
 
-      // Stats row: Star count and Power
+      // Only confirmed draft stars affect hero selection.
       const statsRow = document.createElement('div');
       statsRow.className = 'text-[10px] text-slate-500 font-medium flex items-center justify-center gap-1.5 my-0.5';
-      const pwr = snap?.power ? formatNumber(snap.power) : '—';
-      const star = snap?.star ? `★${snap.star}` : '';
-      statsRow.innerHTML = `<span class="text-amber-700 font-bold">${star}</span> <span class="font-mono text-slate-700">${pwr} pwr</span>`;
+      statsRow.textContent = !isKnownChoice ? 'Select hero with ⇄' :
+        (snap?.star ? `★${snap.star}` : 'Stars: —');
       card.append(statsRow);
 
       // Pick button or Chosen indicator
@@ -2519,7 +2521,7 @@ function renderDraft(cache) {
         pickedTag.className = 'mt-1.5 w-full py-1 rounded-md text-[11px] font-bold bg-emerald-600 text-white shadow-xs';
         pickedTag.textContent = `✓ Picked (Step ${stepIdx + 1})`;
         card.append(pickedTag);
-      } else if (!isModeLocked) {
+      } else if (!isModeLocked && isKnownChoice) {
         const pickCardBtn = document.createElement('button');
         pickCardBtn.type = 'button';
         pickCardBtn.className = 'mt-1.5 w-full py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200';
@@ -2587,9 +2589,9 @@ function renderDraft(cache) {
     const allHeroEntries = Object.entries(globalThis.hwaHelperHeroMetadata || {}).map(([id, hMeta]) => ({
       id: Number(id),
       meta: hMeta,
-      snap: cache.heroGetAll?.data?.[id] || null
+      snap: draftSnapshot(isViewingAttack ? 'attack' : 'defence', id)
     })).filter((item) => Number.isInteger(item.id) && item.id < 1000)
-      .sort((a, b) => (b.snap?.power || 0) - (a.snap?.power || 0));
+      .sort((a, b) => (a.meta.name || '').localeCompare(b.meta.name || ''));
 
     const renderSwapList = (query = '') => {
       swapGrid.replaceChildren();
@@ -2621,7 +2623,7 @@ function renderDraft(cache) {
 
         itemBtn.addEventListener('click', () => {
           if (!currentCandidates[sIdx]) {
-            currentCandidates[sIdx] = [78, 49, 44];
+            currentCandidates[sIdx] = [null, null, null];
           }
           currentCandidates[sIdx][cIdx] = hId;
           try {
@@ -4527,10 +4529,11 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
+  popupRpcEnabled = stored.popupRpcEnabled === true;
   currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
   favoriteHeroes = new Set(Array.isArray(stored.favoriteHeroes) ? stored.favoriteHeroes.map(String) : []);
   favoriteTitans = new Set(Array.isArray(stored.favoriteTitans) ? stored.favoriteTitans.map(String) : []);
@@ -4549,7 +4552,7 @@ async function render() {
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
   renderMarches(cache);
   renderAutoClaim(cache, currentAutoClaimSettings);
-  if (currentAutoClaimSettings.onOpen && !hasAutoClaimedThisSession) {
+  if (popupRpcEnabled && currentAutoClaimSettings.onOpen && !hasAutoClaimedThisSession) {
     const pending = globalThis.hwaHelperPopupData?.getPendingClaims?.(cache);
     if (pending && pending.totalCount > 0) {
       hasAutoClaimedThisSession = true;
@@ -4799,6 +4802,10 @@ function triggerRefresh(groupKey) {
   const calls = refreshGroups[groupKey];
   if (!calls) return;
   const statusEl = document.querySelector('#config-refresh-status');
+  if (!popupRpcEnabled) {
+    if (statusEl) statusEl.textContent = 'Enable popup RPC calls in Settings to use quick refresh.';
+    return;
+  }
   if (statusEl) {
     statusEl.textContent = 'Requesting quick refresh...';
     statusEl.className = 'text-xs text-blue-600 font-medium';
@@ -4884,7 +4891,7 @@ function renderAutoClaim(cache, settings = currentAutoClaimSettings) {
 
   if (claimCountEl) claimCountEl.textContent = String(selectedCount);
   if (claimBtn) {
-    claimBtn.disabled = selectedCount === 0;
+    claimBtn.disabled = selectedCount === 0 || !popupRpcEnabled;
   }
 
   if (optMail && optMail.checked !== Boolean(settings.mail)) optMail.checked = Boolean(settings.mail);
@@ -4894,6 +4901,11 @@ function renderAutoClaim(cache, settings = currentAutoClaimSettings) {
 }
 
 function executeAutoClaim(cache = currentCache, settings = currentAutoClaimSettings) {
+  if (!popupRpcEnabled) {
+    const statusEl = document.querySelector('#autoclaim-status');
+    if (statusEl) statusEl.textContent = 'Enable popup RPC calls in Settings to claim rewards.';
+    return;
+  }
   const { calls, pending } = globalThis.hwaHelperPopupData?.buildAutoClaimCalls?.(cache, settings) || { calls: [], pending: { totalCount: 0 } };
   if (!calls || calls.length === 0) return;
 
@@ -5128,9 +5140,15 @@ document.querySelector('#clear-cache').addEventListener('click', async () => {
 });
 
 async function renderSettings() {
-  const stored = await chrome.storage.local.get('captureSettings');
+  const stored = await chrome.storage.local.get(['captureSettings', 'popupRpcEnabled']);
   document.querySelector('#intercept-enabled').checked = stored.captureSettings?.interceptEnabled !== false;
+  document.querySelector('#popup-rpc-enabled').checked = stored.popupRpcEnabled === true;
 }
+
+document.querySelector('#popup-rpc-enabled').addEventListener('change', async (event) => {
+  await chrome.storage.local.set({ popupRpcEnabled: event.currentTarget.checked });
+  await render();
+});
 
 for (const [id, field] of [['intercept-enabled', 'interceptEnabled']]) {
   document.querySelector(`#${id}`).addEventListener('change', (event) => {
@@ -5185,9 +5203,9 @@ document.querySelector('#clear').addEventListener('click', async () => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
-    if ('captureSettings' in changes) renderSettings();
+    if ('captureSettings' in changes || 'popupRpcEnabled' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
-    if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes) queueRender();
+    if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes || 'popupRpcEnabled' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
     queueRender();
   }

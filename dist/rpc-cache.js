@@ -464,6 +464,13 @@
           }];
         }
         if (result && Object.hasOwn(result, 'response') && !result.error) {
+          if (call.name === 'skin_upgrade' && Number.isInteger(call.args?.unitId) &&
+              Number.isInteger(call.args?.skinId) && call.ident) {
+            return [{ key: 'skinUpgradeAction', method: call.name, feature: null,
+              group: 'internal', data: { heroId: call.args.unitId,
+                skinId: call.args.skinId, token: `${call.ident}:skinUpgrade` },
+              updatedAt: record.timestamp }];
+          }
           if (call.name === 'heroUpgradeSkill') {
             const actions = resourceAction(record, call, 'refillable:2', -1);
             if (Number.isInteger(call.args?.heroId) && Number.isInteger(call.args?.skill)) {
@@ -795,6 +802,11 @@
               result?.response) {
             return extractRewardActions(record, call, result.response, 'quest');
           }
+          if (call.name === 'completeQuest' && Number.isInteger(call.args?.questId)) {
+            return [{ key: 'questClaimAction', method: call.name, feature: call.feature || null,
+              group: 'internal', data: { questId: call.args.questId, token: call.ident,
+                reward: result.response?.reward || null }, updatedAt: record.timestamp }];
+          }
           if (call.name === 'claimChest' && call.feature === 'clanVersus') {
             const chestNumber = call.args?.chestNumber;
             const rewards = globalThis.hwaHelperClanVersusRewards?.[chestNumber];
@@ -884,6 +896,30 @@
             updatedAt: record.timestamp
           }];
         }
+        if (call.name?.startsWith('magicTower_') && !['magicTower_briefInfo', 'magicTower_getAll'].includes(call.name) && result && !result.error) {
+          const action = call.name.slice('magicTower_'.length);
+          if (['enterNextFloor', 'enterRoom', 'startBattle', 'endBattle', 'activateBuff', 'openChest'].includes(action)) {
+            const response = result.response || {};
+            return [{
+              key: 'towerAction', method: call.name, feature: null, group: 'internal',
+              data: {
+                token: call.ident, action,
+                number: Number(call.args?.number) || null,
+                buffId: Number(call.args?.id) || null,
+                heroes: Array.isArray(call.args?.heroes) ? call.args.heroes : null,
+                win: call.args?.result?.win === true,
+                stars: call.args?.result?.stars ?? null,
+                floorNumber: Number(response.floorNumber) || null,
+                roomNumber: response.currentRoomNumber == null ? null : Number(response.currentRoomNumber),
+                rooms: response.rooms || null,
+                reward: response.reward || null,
+                rewardIndex: response.rewardIndex ?? null,
+                completion: result.magicTower_completion || null,
+                briefInfo: result.magicTower_briefInfo || null
+              }, updatedAt: record.timestamp
+            }];
+          }
+        }
         if ((call.name === 'magicTower_briefInfo' || call.name === 'magicTower_getAll') && result?.response) {
           const resp = result.response;
           const isCleared = resp.state === 'win' || resp.state === 'completed' || (Number(resp.floorData?.floorNumber) > 25);
@@ -896,7 +932,12 @@
               state: resp.state || (resp.floorData ? 'inProgress' : 'unknown'),
               isCleared,
               deadHeroesCount: resp.deadHeroesCount ?? 0,
-              floorNumber: resp.floorData?.floorNumber ?? (isCleared ? 26 : 0)
+              floorNumber: resp.floorData?.floorNumber ?? (isCleared ? 26 : 0),
+              floorData: resp.floorData ? {
+                floorNumber: resp.floorData.floorNumber,
+                currentRoomNumber: resp.floorData.currentRoomNumber,
+                rooms: resp.floorData.rooms || {}
+              } : null
             },
             updatedAt: record.timestamp
           }];
@@ -1030,7 +1071,7 @@
           if (Array.isArray(info.refillable)) {
             const ref62 = info.refillable.find(r => r.id === 62);
             if (ref62) {
-              const hasFree = (ref62.amount ?? 0) > 0 || ref62.boughtToday === 0;
+              const hasFree = Number(ref62.amount) > 0;
               entries.push({
                 key: 'wheelFortuneStatus', method: call.name, feature: null, group: 'header',
                 data: {
@@ -1163,9 +1204,16 @@
           }
           return actions;
         }
-        if (call.name === 'alchemyUseFree') {
+        if ((call.name === 'alchemyUseFree' ||
+          (call.name === 'refillable_alchemyUseVideo' && call.args?.type === 'alchemy')) &&
+          result?.response != null) {
+          // The wheel grants another free spin eight hours after a successful roll.
+          // The API response has the reward but no cooldown, so derive the next
+          // availability from the captured request timestamp.
+          const rolledAt = Date.parse(record.timestamp);
+          const nextResetTs = Number.isFinite(rolledAt) ? Math.floor(rolledAt / 1000) + 8 * 60 * 60 : null;
           return [
-            ...resourceAction(record, call, 'refillable:62', -1, 'Wheel of Fortune', 'alchemyUseFree'),
+            ...resourceAction(record, call, 'refillable:62', -1, 'Wheel of Fortune', call.name),
             {
               key: 'wheelFortuneStatus',
               method: call.name,
@@ -1174,8 +1222,7 @@
               data: {
                 hasFree: false,
                 amount: 0,
-                boughtToday: 1,
-                nextResetTs: null
+                nextResetTs
               },
               updatedAt: record.timestamp
             }
@@ -1257,6 +1304,9 @@
         }
         if (call.name === 'randomDraft_startBattle' && result?.response?.battleReplay) {
           const replay = result.response.battleReplay;
+          const stars = (heroes) => Object.fromEntries(Object.entries(heroes || {})
+            .filter(([, hero]) => Number.isInteger(hero?.star))
+            .map(([id, hero]) => [id, hero.star]));
           return [{
             key: 'legendDraftAction',
             method: call.name,
@@ -1266,13 +1316,18 @@
               action: 'startBattle',
               attackers: replay.attackers ? Object.keys(replay.attackers).map(Number) : [],
               defenders: Array.isArray(replay.defenders) && replay.defenders[0] ?
-                Object.keys(replay.defenders[0]).map(Number) : []
+                Object.keys(replay.defenders[0]).map(Number) : [],
+              attackStars: stars(replay.attackers),
+              enemyDefenceStars: stars(replay.defenders?.[0])
             },
             updatedAt: record.timestamp
           }];
         }
         if (call.name === 'randomDraft_result') {
           const resp = result?.response;
+          const stars = (heroes) => Object.fromEntries(Object.entries(heroes || {})
+            .filter(([, hero]) => Number.isInteger(hero?.star))
+            .map(([id, hero]) => [id, hero.star]));
           const attackHeroes = resp?.attackReplay?.attackers ?
             Object.keys(resp.attackReplay.attackers).map(Number) : [];
           const enemyDefenceHeroes = Array.isArray(resp?.attackReplay?.defenders) && resp.attackReplay.defenders[0] ?
@@ -1296,7 +1351,11 @@
               attackHeroes,
               enemyDefenceHeroes,
               defenceHeroes,
-              enemyAttackHeroes
+              enemyAttackHeroes,
+              attackStars: stars(resp?.attackReplay?.attackers),
+              enemyDefenceStars: stars(resp?.attackReplay?.defenders?.[0]),
+              defenceStars: stars(resp?.defenceReplay?.defenders?.[0]),
+              enemyAttackStars: stars(resp?.defenceReplay?.attackers)
             },
             updatedAt: record.timestamp
           }];
@@ -1326,19 +1385,47 @@
     const next = { ...(cache && typeof cache === 'object' ? cache : {}) };
     let changed = false;
     for (const record of records) {
-      for (const entry of extract(record)) {
+      const entries = extract(record);
+      for (const entry of entries) {
+        if (entry.key === 'questClaimAction') {
+          const previous = next.questClaimStatus?.data || { claims: [] };
+          if (previous.claims?.some((claim) => claim.token === entry.data.token)) continue;
+          const quest = Array.isArray(next.questGetAll?.data) ?
+            next.questGetAll.data.find((item) => item.id === entry.data.questId) : null;
+          const reward = entry.data.reward || quest?.reward || null;
+          if (reward) {
+            entries.push(...extractRewardActions(record,
+              { name: 'completeQuest', feature: entry.feature, ident: entry.data.token },
+              reward, `quest:${entry.data.questId}`));
+          }
+          const claim = { id: entry.data.questId, token: entry.data.token,
+            needsSync: !reward, at: entry.updatedAt };
+          next.questClaimStatus = { key: 'questClaimStatus', method: entry.method,
+            feature: entry.feature, group: 'internal',
+            data: { claims: [...(previous.claims || []), claim].slice(-50) },
+            updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
         if (entry.key === 'rallyAction') {
           const current = next.marchStatus;
           if (current?.updatedAt > entry.updatedAt) continue;
           const marches = [...(current?.data?.marches || [])];
-          const index = marches.findIndex((march) => march.rally?.id === entry.data.rallyId);
+          let index = marches.findIndex((march) => march.rally?.id === entry.data.rallyId);
           if (entry.data.action === 'create') {
-            if (index >= 0 || !entry.data.squadId ||
+            if (!entry.data.squadId ||
                 !Number.isFinite(entry.data.waitUntil)) continue;
-            marches.push({ squadId: entry.data.squadId, kind: 'raid',
+            if (index < 0) index = marches.findIndex((march) => march.squadId === entry.data.squadId);
+            const created = { squadId: entry.data.squadId, kind: 'raid',
               stage: 'waitingForRallyStart', endsAt: entry.data.waitUntil,
               rally: { id: entry.data.rallyId, waitUntil: entry.data.waitUntil,
-                team: entry.data.team } });
+                team: entry.data.team } };
+            if (index >= 0) {
+              if (marches[index].rally?.id === entry.data.rallyId) continue;
+              marches[index] = { ...marches[index], kind: 'raid', rally: created.rally };
+            } else {
+              marches.push(created);
+            }
           } else if (entry.data.action === 'details') {
             if (current?.updatedAt === entry.updatedAt) continue;
             const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id ?? 1216438103;
@@ -1351,6 +1438,10 @@
               (accountId && Number(m.userId) === Number(accountId)) ||
               (accountName && m.user?.name && m.user.name === accountName)
             );
+            const ownSquadId = myMember?.squad?.squadId || (isLeader ? entry.data.squadId : null);
+            if (index < 0 && ownSquadId) {
+              index = marches.findIndex((march) => march.squadId === ownSquadId);
+            }
 
             if (index >= 0) {
               const previous = marches[index];
@@ -1363,6 +1454,7 @@
                 endsAt: myMember && Number.isFinite(myMember.eta) && Date.now() < myMember.eta ? myMember.eta : previous.endsAt,
                 rally: {
                   ...previous.rally,
+                  id: entry.data.rallyId,
                   target: entry.data.target,
                   waitUntil: Number.isFinite(entry.data.waitUntil) ? entry.data.waitUntil : previous.rally.waitUntil,
                   team,
@@ -1691,6 +1783,7 @@
           continue;
         }
         if (entry.key === 'wheelFortuneStatus') {
+          if (next.wheelFortuneStatus?.updatedAt > entry.updatedAt) continue;
           const prev = next.wheelFortuneStatus?.data || {};
           next.wheelFortuneStatus = {
             key: 'wheelFortuneStatus',
@@ -1726,6 +1819,10 @@
           const attackHeroes = isNewMatch ? [] : (previous.attackHeroes || []);
           const enemyDefenceHeroes = isNewMatch ? [] : (previous.enemyDefenceHeroes || []);
           const enemyAttackHeroes = isNewMatch ? [] : (previous.enemyAttackHeroes || []);
+          const defenceStars = isNewMatch ? {} : (previous.defenceStars || {});
+          const attackStars = isNewMatch ? {} : (previous.attackStars || {});
+          const enemyDefenceStars = isNewMatch ? {} : (previous.enemyDefenceStars || {});
+          const enemyAttackStars = isNewMatch ? {} : (previous.enemyAttackStars || {});
           const lastResult = isNewMatch ? null : (previous.lastResult || null);
           const lastPickAction = isNewMatch ? null : (previous.lastPickAction || null);
 
@@ -1741,6 +1838,10 @@
               attackHeroes,
               enemyDefenceHeroes,
               enemyAttackHeroes,
+              defenceStars,
+              attackStars,
+              enemyDefenceStars,
+              enemyAttackStars,
               lastResult,
               lastPickAction,
               inBattle: isNewMatch ? false : Boolean(previous.inBattle)
@@ -1765,15 +1866,21 @@
             draft.inBattle = true;
             if (entry.data.attackers?.length) draft.attackHeroes = entry.data.attackers;
             if (entry.data.defenders?.length) draft.enemyDefenceHeroes = entry.data.defenders;
+            draft.attackStars = entry.data.attackStars;
+            draft.enemyDefenceStars = entry.data.enemyDefenceStars;
           } else if (entry.data.action === 'result') {
             draft.active = false;
             draft.inBattle = false;
             draft.stageId = 0;
             draft.lastResult = entry.data;
-            if (entry.data.attackHeroes?.length) draft.attackHeroes = entry.data.attackHeroes;
-            if (entry.data.defenceHeroes?.length) draft.defenceHeroes = entry.data.defenceHeroes;
+            if (entry.data.attackHeroes?.length && !draft.attackHeroes?.length) draft.attackHeroes = entry.data.attackHeroes;
+            if (entry.data.defenceHeroes?.length && !draft.defenceHeroes?.length) draft.defenceHeroes = entry.data.defenceHeroes;
             if (entry.data.enemyDefenceHeroes?.length) draft.enemyDefenceHeroes = entry.data.enemyDefenceHeroes;
             if (entry.data.enemyAttackHeroes?.length) draft.enemyAttackHeroes = entry.data.enemyAttackHeroes;
+            draft.attackStars = entry.data.attackStars;
+            draft.defenceStars = entry.data.defenceStars;
+            draft.enemyDefenceStars = entry.data.enemyDefenceStars;
+            draft.enemyAttackStars = entry.data.enemyAttackStars;
           }
           next.legendDraftStatus = {
             key: 'legendDraftStatus',
@@ -1783,6 +1890,29 @@
             data: draft,
             updatedAt: entry.updatedAt
           };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'skinUpgradeAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token]) continue;
+          const heroId = String(entry.data.heroId);
+          const skinId = String(entry.data.skinId);
+          const heroSnap = next.heroGetAll?.data?.[heroId];
+          const level = Number(heroSnap?.skins?.[skinId]);
+          if (Number.isInteger(level) && next.heroGetAll.updatedAt <= entry.updatedAt) {
+            next.heroGetAll = { ...next.heroGetAll, updatedAt: entry.updatedAt,
+              data: { ...next.heroGetAll.data,
+                [heroId]: { ...heroSnap, skins: { ...heroSnap.skins,
+                  [skinId]: level + 1 } } } };
+          }
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) =>
+            history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = { key: 'resourceActionHistory',
+            method: entry.method, feature: null, group: 'internal',
+            data: history, updatedAt: entry.updatedAt };
           changed = true;
           continue;
         }
@@ -2440,7 +2570,97 @@
           changed = true;
           continue;
         }
+        if (entry.key === 'towerAction') {
+          const action = entry.data;
+          const previous = next.towerSession?.data || {};
+          if (previous.updatedAt > entry.updatedAt || previous.tokens?.includes(action.token)) continue;
+          const fresh = (action.action === 'enterNextFloor' && action.floorNumber === 1) ||
+            (previous.completed && action.action === 'enterRoom' && action.number === 1);
+          const session = fresh ? { floorNumber: 1, roomNumber: 0, rooms: {}, history: [], tokens: [], completed: false, team: [] } : {
+            floorNumber: previous.floorNumber || 1,
+            roomNumber: previous.roomNumber || 0,
+            rooms: previous.rooms || {},
+            history: [...(previous.history || [])],
+            tokens: [...(previous.tokens || [])],
+            completed: Boolean(previous.completed),
+            completion: previous.completion || null,
+            team: previous.team || []
+          };
+          const floor = session.floorNumber;
+          const room = session.rooms?.[session.roomNumber];
+          const event = { action: action.action, floor, room: session.roomNumber, at: entry.updatedAt };
+          if (action.action === 'enterNextFloor') {
+            if (action.floorNumber) session.floorNumber = action.floorNumber;
+            session.roomNumber = action.roomNumber || 0;
+            session.rooms = action.rooms || {};
+            session.completed = false;
+          } else if (action.action === 'enterRoom') {
+            session.roomNumber = action.roomNumber || action.number || session.roomNumber;
+          } else if (action.action === 'startBattle') {
+            session.team = action.heroes || [];
+          } else if (action.action === 'endBattle') {
+            event.room = session.roomNumber;
+            event.win = action.win;
+            event.stars = action.stars;
+            event.reward = action.reward;
+            event.enemyIds = room?.defenders?.units?.map((unit) => unit.id) || [];
+            event.team = session.team;
+            session.history.push(event);
+            session.roomNumber = action.roomNumber ?? session.roomNumber;
+            if (action.completion || action.briefInfo?.state === 'win') {
+              session.completed = true;
+              session.completion = action.completion;
+              next.towerStatus = {
+                key: 'towerStatus', method: entry.method, feature: null, group: 'other',
+                data: { state: 'win', isCleared: true, floorNumber: floor,
+                  deadHeroesCount: action.briefInfo?.deadHeroesCount ?? 0 },
+                updatedAt: entry.updatedAt
+              };
+            }
+          } else if (action.action === 'activateBuff') {
+            event.buffId = action.buffId;
+            event.options = Array.isArray(room?.buffs) ? room.buffs : [];
+            session.history.push(event);
+          } else if (action.action === 'openChest') {
+            event.number = action.number;
+            event.reward = action.reward;
+            event.rewardIndex = action.rewardIndex;
+            event.options = room?.openCosts || {};
+            event.possibleRewards = room?.rewards?.map((item) => item.reward) || [];
+            session.history.push(event);
+          }
+          session.history = session.history.slice(-100);
+          session.tokens = [...session.tokens, action.token].slice(-150);
+          session.updatedAt = entry.updatedAt;
+          if (fresh) next.towerStatus = {
+            key: 'towerStatus', method: entry.method, feature: null, group: 'other',
+            data: { state: 'inProgress', isCleared: false, floorNumber: session.floorNumber },
+            updatedAt: entry.updatedAt
+          };
+          next.towerSession = { key: 'towerSession', method: entry.method, feature: null,
+            group: 'other', data: session, updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
         if (entry.key === 'towerStatus') {
+          if (next.towerStatus?.updatedAt > entry.updatedAt) continue;
+          const incomingFloor = entry.data?.floorData;
+          if (incomingFloor) {
+            const previous = next.towerSession?.data || {};
+            const floorNumber = Number(incomingFloor.floorNumber) || previous.floorNumber || 0;
+            const fresh = previous.completed && !entry.data.isCleared;
+            const session = fresh ? { history: [], tokens: [] } : previous;
+            next.towerSession = {
+              key: 'towerSession', method: entry.method, feature: null, group: 'other',
+              data: { ...session, floorNumber,
+                roomNumber: Number(incomingFloor.currentRoomNumber) || 0,
+                rooms: incomingFloor.rooms || {}, completed: Boolean(entry.data.isCleared),
+                updatedAt: entry.updatedAt }, updatedAt: entry.updatedAt
+            };
+          } else if (entry.data?.isCleared && next.towerSession) {
+            next.towerSession = { ...next.towerSession,
+              data: { ...next.towerSession.data, completed: true }, updatedAt: entry.updatedAt };
+          }
           const existing = next.towerStatus?.data || {};
           const incoming = entry.data || {};
           next.towerStatus = {
@@ -2448,7 +2668,7 @@
             data: {
               ...existing,
               ...incoming,
-              isCleared: Boolean(incoming.isCleared || existing.isCleared || incoming.state === 'win' || existing.state === 'win')
+              isCleared: Boolean(incoming.isCleared || incoming.state === 'win')
             }
           };
           changed = true;

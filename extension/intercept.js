@@ -5,6 +5,7 @@
   const MAX_BODY_CHARS = 512 * 1024;
   const isTrackingUrl = globalThis.hwaHelperIsTrackingUrl;
   let captureEnabled = false;
+  let popupRpcEnabled = false;
   let lastRpcUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null;
   let lastRpcHeaders = null;
   try {
@@ -36,7 +37,7 @@
     if (!isNaN(parsed)) {
       if (parsed > highestRequestId) {
         highestRequestId = parsed;
-      } else {
+      } else if (popupRpcEnabled) {
         // Game client's sequence fell behind our dispatch counter (or cached session ID).
         // Rewrite to strictly monotonic value so server doesn't reject with "Request id less then cached request id".
         highestRequestId++;
@@ -126,8 +127,10 @@
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled === true;
+      popupRpcEnabled = event.data.popupRpcEnabled === true;
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
+      if (!popupRpcEnabled) return;
       const calls = event.data.calls;
       const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null) || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
@@ -205,6 +208,7 @@
       }
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'draft-action') {
+      if (!popupRpcEnabled) return;
       const { action, heroes } = event.data;
       if (!lastRpcUrl || !Array.isArray(heroes) || heroes.length === 0) return;
       const callName = action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack';
@@ -259,6 +263,7 @@
       reportEngineStatus('ping');
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'engine-send-message') {
+      if (!popupRpcEnabled) return;
       const { objectName, methodName, param } = event.data;
       let ok = false;
       let error = null;

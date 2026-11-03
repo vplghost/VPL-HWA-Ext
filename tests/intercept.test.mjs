@@ -50,7 +50,8 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
   };
   context.window = window;
   runInNewContext(`${filterSource}\n${source}`, context);
-  if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true },
+  if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true,
+    popupRpcEnabled: true },
     'https://www.hero-wars-alliance.com');
   return { window, messages, sessionStorage };
 }
@@ -555,6 +556,21 @@ test("syncRequestId rewrites stale x-request-id in xhr.setRequestHeader to preve
   assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "100");
 });
 
+test('disabled popup RPC leaves game request ids untouched and ignores direct dispatch', () => {
+  let calls = 0;
+  const { window, sessionStorage } = setup(async () => { calls++; return new Response('ok'); });
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+    interceptEnabled: true, popupRpcEnabled: false }, 'https://www.hero-wars-alliance.com');
+  sessionStorage.setItem('hwa_highest_request_id', '50');
+  const request = new window.XMLHttpRequest();
+  request.open('POST', 'https://api.hero-wars-alliance.com/api/rpc');
+  request.setRequestHeader('X-Request-Id', '26');
+  assert.equal(request['X-Request-Id'], '26');
+  window.postMessage({ source: 'hwa-helper-control', kind: 'refresh-rpc',
+    calls: [{ name: 'inventoryGet' }] }, 'https://www.hero-wars-alliance.com');
+  assert.equal(calls, 0);
+});
+
 test("refresh-rpc dispatch emits api-record with response body to update rpcCache", async () => {
   const messages = [];
   const fakeResponse = JSON.stringify({
@@ -569,6 +585,9 @@ test("refresh-rpc dispatch emits api-record with response body to update rpcCach
       headers: { "content-type": "application/json" }
     });
   }, false); // Even with captureEnabled = false!
+
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+    interceptEnabled: false, popupRpcEnabled: true }, 'https://www.hero-wars-alliance.com');
 
   window.addEventListener("message", (ev) => {
     if (ev.data?.source === "hwa-helper-api") {

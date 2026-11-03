@@ -172,6 +172,24 @@ test('legend draft 5-step picking process and validation work correctly', () => 
   assert.equal(popupData.getDraftActiveStep(complete), 4);
 });
 
+test('battle replay stores draft stars without storing hero power', () => {
+  const record = {
+    method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-03T14:45:20.656Z',
+    requestBody: JSON.stringify({ calls: [{ name: 'randomDraft_startBattle', ident: 'battle' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'battle', result: { response: {
+      battleReplay: {
+        attackers: { 24: { star: 6, power: 188853 } },
+        defenders: [{ 72: { star: 4, power: 170000 } }]
+      }
+    } } }] })
+  };
+  const cache = rpcCache.merge({}, [record]).cache;
+  assert.deepEqual(cache.legendDraftStatus.data.attackStars, { 24: 6 });
+  assert.deepEqual(cache.legendDraftStatus.data.enemyDefenceStars, { 72: 4 });
+  assert.equal(JSON.stringify(cache.legendDraftStatus.data).includes('power'), false);
+});
+
 test('rpc-cache resets defense and attack picks when a new match begins so defense is not falsely locked', () => {
   const previousMatchState = {
     legendDraftStatus: {

@@ -140,8 +140,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc' || message?.kind === 'engine-ping' || message?.kind === 'engine-send-message') && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
-    const queryPatterns = GAME_ORIGINS.map((o) => `${o}/*`);
-    chrome.tabs?.query({ url: queryPatterns }, (tabs) => {
+    const forward = () => chrome.tabs?.query({ url: GAME_ORIGINS.map((o) => `${o}/*`) }, (tabs) => {
       let forwarded = false;
       for (const tab of tabs || []) {
         if (tab.id) {
@@ -163,6 +162,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       sendResponse({ ok: forwarded, error: null });
     });
+    if (message.kind === 'engine-ping') forward();
+    else chrome.storage.local.get('popupRpcEnabled').then((stored) => {
+      if (stored.popupRpcEnabled === true) forward();
+      else sendResponse({ ok: false, error: 'Popup RPC calls are disabled in Settings.' });
+    }).catch((error) => sendResponse({ ok: false, error: String(error) }));
     return true;
   }
   if (message?.kind === 'reload-game-tab' && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
@@ -200,10 +204,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const record = normalize(message.record);
   if (!record) return;
   pending = pending.then(async () => {
-    const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings']);
+    const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings', 'popupRpcEnabled']);
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
     if (cacheResult.changed) await chrome.storage.local.set({ rpcCache: cacheResult.cache });
+    const latestClaim = cacheResult.cache.questClaimStatus?.data?.claims?.at(-1);
+    if (stored.popupRpcEnabled === true && cacheResult.changed && latestClaim?.needsSync &&
+        latestClaim.at === record.timestamp && sender.tab?.id) {
+      chrome.tabs?.sendMessage?.(sender.tab.id, { kind: 'refresh-rpc', calls: [
+        { name: 'userGetInfo' },
+        { name: 'inventoryGet' },
+        { name: 'refillableGetAll', feature: 'refillable' }
+      ] })?.catch?.(() => {});
+    }
+    if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
+        globalThis.hwaHelperRpcCache.extract(record).some((entry) => entry.key === 'skinUpgradeAction')) {
+      chrome.tabs?.sendMessage?.(sender.tab.id, { kind: 'refresh-rpc', calls: [
+        { name: 'heroGetAll' }, { name: 'inventoryGet' }
+      ] })?.catch?.(() => {});
+    }
     const state = (await chrome.storage.session.get(RECORD_STATE_KEY))[RECORD_STATE_KEY];
     if (!state?.active) return { saved: false, cached: cacheResult.changed };
     try {

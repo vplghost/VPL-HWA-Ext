@@ -94,6 +94,64 @@ test('passive cache updates Energy and World Energy without recording or account
   assert.equal(Object.keys(session).length, 0);
 });
 
+test('empty event quest claim requests authoritative resource and item snapshots once', async () => {
+  const { local, send, forwardedMessages } = setup();
+  local.popupRpcEnabled = true;
+  const claim = rpc([{ name: 'completeQuest', feature: 'quest', ident: 'claim', args: { questId: 14360 } }],
+    [{ ident: 'claim', result: { response: {} } }], '2026-11-03T14:55:01.620Z');
+  const sender = { ...gameSender, tab: { id: 42 } };
+  await send('api-record', claim, sender);
+  assert.equal(local.rpcCache.questClaimStatus.data.claims[0].needsSync, true);
+  assert.equal(forwardedMessages.length, 1);
+  assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, (call) => call.name),
+    ['userGetInfo', 'inventoryGet', 'refillableGetAll']);
+  await send('api-record', claim, sender);
+  assert.equal(forwardedMessages.length, 1);
+});
+
+test('skin upgrade requests fresh hero stats and stone balances once', async () => {
+  const { local, send, forwardedMessages } = setup();
+  local.popupRpcEnabled = true;
+  const upgrade = rpc([{ name: 'skin_upgrade', ident: 'skin-1',
+    args: { unitId: 501, skinId: 1002 } }],
+  [{ ident: 'skin-1', result: { response: { reward: [] } } }],
+  '2026-11-03T16:17:52.563Z');
+  const sender = { ...gameSender, tab: { id: 42 } };
+  await send('api-record', upgrade, sender);
+  assert.equal(Object.keys(local.rpcCache.resourceActionHistory.data).length, 1);
+  assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, (call) => call.name),
+    ['heroGetAll', 'inventoryGet']);
+  await send('api-record', upgrade, sender);
+  assert.equal(forwardedMessages.length, 1);
+});
+
+test('popup RPC calls and automatic follow-up refreshes are disabled by default', async () => {
+  const { local, send, listener, tabsList, forwardedMessages } = setup();
+  tabsList.push({ id: 42, url: gameSender.url });
+  for (const message of [
+    { kind: 'refresh-rpc', calls: [{ name: 'inventoryGet' }] },
+    { kind: 'draft-action', action: 'saveDefence', heroes: [1, 2, 3, 4, 5] },
+    { kind: 'engine-send-message', method: 'test' }
+  ]) {
+    const reply = await new Promise((resolve) => listener(message, popupSender, resolve));
+    assert.equal(reply.ok, false);
+  }
+  assert.equal(forwardedMessages.length, 0);
+
+  const claim = rpc([{ name: 'completeQuest', feature: 'quest', ident: 'claim-off',
+    args: { questId: 14360 } }],
+  [{ ident: 'claim-off', result: { response: {} } }], '2026-11-03T14:55:01.620Z');
+  await send('api-record', claim, { ...gameSender, tab: { id: 42 } });
+  assert.equal(local.rpcCache.questClaimStatus.data.claims[0].id, 14360);
+  assert.equal(forwardedMessages.length, 0);
+
+  local.popupRpcEnabled = true;
+  const allowed = await new Promise((resolve) => listener({ kind: 'refresh-rpc',
+    calls: [{ name: 'inventoryGet' }] }, popupSender, resolve));
+  assert.equal(allowed.ok, true);
+  assert.equal(forwardedMessages.length, 1);
+});
+
 test('Record and Stop keep an uncapped session log and never write raw records locally', async () => {
   const { local, session, send } = setup();
   local.apiRecords = [{ legacy: true }];

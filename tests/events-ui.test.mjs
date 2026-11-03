@@ -360,6 +360,7 @@ const context = {
   status,
   search,
   currentCache: {},
+  popupRpcEnabled: true,
   globalThis: {},
   showEmpty: (msg) => {
     const p = new MockElement('p');
@@ -1051,7 +1052,7 @@ test('renderResources splits items into renewable and other groups and filters i
 
 test("header march icon renders gathering and return badges and hides upon returnAt", () => {
   const marchesWrap = context.document.querySelector("#marches");
-  const now = 1000000;
+  const now = Date.now();
 
   const marchStyles = {
     wood: { icon: "🌲", classes: "bg-green-100 text-green-800" },
@@ -1215,7 +1216,7 @@ test('header mail badge, heroes/titans soul evolve badges, and config refresh bu
 
 
 test('header march icon renders auto-join raid badge with ⚡ icon and detailed tooltip', () => {
-  const now = 1793631912000;
+  const now = Date.now();
   context.currentCache.marchStatus = {
     key: 'marchStatus',
     data: {
@@ -1257,6 +1258,30 @@ test('header march icon renders auto-join raid badge with ⚡ icon and detailed 
     assert.ok(tooltip.includes('[PvP] Boss, level 17'));
   } finally {
     Date.now = origNow;
+  }
+});
+
+test('header renders one rally badge per squad and removes it at return time', () => {
+  const marchesWrap = context.document.querySelector('#marches');
+  const now = Date.now();
+  const rally = { squadId: 'same-squad', kind: 'raid', stage: 'returnToOutpost',
+    endsAt: now + 1000, rally: { id: 'same-rally', returnAt: now + 1000 } };
+  const cache = { marchStatus: { data: { marches: [rally,
+    { ...rally, squadId: 'other-squad' }] } } };
+  context.renderMarches(cache, marchesWrap);
+  assert.equal(marchesWrap.children.length, 1);
+  const originalNow = Date.now;
+  try {
+    Date.now = () => now + 1000;
+    context.renderMarches(cache, marchesWrap);
+    assert.equal(marchesWrap.children.length, 0);
+    assert.equal(marchesWrap.hidden, true);
+    const stale = { ...rally, squadId: 'stale-squad', stage: 'waitingForRallyStart',
+      endsAt: now + 60000, rally: { id: 'same-rally', waitUntil: now + 60000 } };
+    context.renderMarches({ marchStatus: { data: { marches: [stale, rally] } } }, marchesWrap);
+    assert.equal(marchesWrap.children.length, 0);
+  } finally {
+    Date.now = originalNow;
   }
 });
 
@@ -1371,6 +1396,28 @@ test('renderAutoClaim updates badges, counts, and executeAutoClaim dispatches re
   assert.equal(sentRpcMessage.calls.some((c) => c.name === 'mailFarm'), true);
   assert.equal(sentRpcMessage.calls.some((c) => c.name === 'quest_multiFarm'), true);
   assert.ok(autoclaimStatus.textContent.includes('Claimed 2 rewards! Syncing...'));
+});
+
+test('popup RPC switch blocks quick refresh and reward claims', () => {
+  const previous = context.popupRpcEnabled;
+  const previousRuntime = context.chrome.runtime;
+  const sent = [];
+  context.popupRpcEnabled = false;
+  context.chrome.runtime = { sendMessage: (message, reply) => {
+    sent.push(message);
+    reply?.({ ok: true });
+  } };
+  const sampleCache = { mailStatus: { data: { letters: [
+    { id: 12, reward: { gold: 100 }, claimed: false }
+  ] } } };
+  context.renderAutoClaim(sampleCache, { mail: true, reports: false, quests: false });
+  assert.equal(btnClaimAll.disabled, true);
+  context.triggerRefresh('core');
+  context.executeAutoClaim(sampleCache, { mail: true, reports: false, quests: false });
+  assert.equal(sent.length, 0);
+  assert.ok(configRefreshStatus.textContent.includes('Enable popup RPC calls'));
+  context.popupRpcEnabled = previous;
+  context.chrome.runtime = previousRuntime;
 });
 
 test('renderInventoryGrid renders grouped items with dividers, abbreviations, quantities, and tooltips', () => {

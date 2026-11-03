@@ -39,11 +39,11 @@
         </span>
       </div>
     </div>
-    <div class="mt-2 flex flex-wrap items-center justify-end gap-1.5">
-      <div id="header-resources" class="flex flex-wrap justify-end gap-1.5" aria-label="Selected resources"></div>
+    <div class="mt-2 flex flex-wrap items-center justify-between gap-1.5">
       <span id="wheel-fortune-badge" hidden data-resource-tooltip="" data-tooltip-below tabindex="0" title="Wheel of Fortune / Emerald Exchange" class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer">
         <span class="text-sm">🎡</span><span id="wheel-fortune-label">—</span>
       </span>
+      <div id="header-resources" class="flex flex-wrap justify-end gap-1.5" aria-label="Selected resources"></div>
     </div>
   </header>
 
@@ -116,6 +116,8 @@
     <p class="mt-1 text-xs text-slate-500">API monitoring updates the cache. Record, Clear, and Export are in the Log tab.</p>
     <div class="mt-4 space-y-3">
       <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2"><input id="intercept-enabled" type="checkbox" checked class="size-4 accent-blue-600"> Monitor API</label>
+      <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2"><input id="popup-rpc-enabled" type="checkbox" class="size-4 accent-blue-600"> Allow popup RPC calls</label>
+      <p class="text-xs text-slate-500">Off by default. Quick refresh, reward claims, draft submission, and automatic follow-up requests stay disabled. API monitoring and Reload Game Tab still work.</p>
     </div>
     <div id="config-tabs-section" class="mt-5 border-t border-slate-200 pt-4">
       <div class="flex items-center justify-between mb-1">

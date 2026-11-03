@@ -27,8 +27,11 @@ test('bridge sends persisted intercept setting and applies changes without page 
   window.postMessage({ source: 'hwa-helper-api', kind: 'ready' },
     'https://www.hero-wars-alliance.com');
   assert.equal(messages.at(-1).interceptEnabled, false);
+  assert.equal(messages.at(-1).popupRpcEnabled, false);
   onChanged({ captureSettings: { newValue: { interceptEnabled: true } } }, 'local');
   assert.equal(messages.at(-1).interceptEnabled, true);
+  onChanged({ popupRpcEnabled: { newValue: true } }, 'local');
+  assert.equal(messages.at(-1).popupRpcEnabled, true);
 });
 
 test('bridge injects helper button when document is available and sends open-tab message on click', async () => {
