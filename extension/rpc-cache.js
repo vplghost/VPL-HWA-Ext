@@ -489,21 +489,46 @@
             }
             return actions;
           }
-                    if (call.name === 'dungeonEndBattle' && result?.response) {
+          if (call.name === 'dungeonGetInfo' && result?.response &&
+              typeof result.response === 'object' && !Array.isArray(result.response)) {
+            const snapshot = result.response;
+            return [{
+              key: 'dungeonStatus',
+              method: call.name,
+              feature: null,
+              group: 'events',
+              data: {
+                floorNumber: Number(snapshot.floorNumber) ||
+                  (Number(snapshot.maxFloorPassed) ? Number(snapshot.maxFloorPassed) + 1 : null),
+                floorType: snapshot.floorType || null,
+                maxFloorPassed: Number(snapshot.maxFloorPassed) || 0,
+                maxFloorReached: Number(snapshot.maxFloorReached) || 0,
+                respawnFloor: Number(snapshot.respawnFloor) || 0,
+                elements: snapshot.elements || {},
+                states: snapshot.states || {},
+                ...(snapshot.dungeonActivity != null ?
+                  { dungeonActivity: Number(snapshot.dungeonActivity) || 0 } : {}),
+                currentFloorDoors: Array.isArray(snapshot.floor?.userData) ? snapshot.floor.userData : []
+              },
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'dungeonEndBattle' && result?.response) {
             const actions = [];
             const rep = result.response;
             const dungeon = rep.dungeon || {};
-            const floor = Number.isFinite(dungeon.floorNumber) ? dungeon.floorNumber :
+            const floor = Number.isFinite(Number(dungeon.floorNumber)) ? Number(dungeon.floorNumber) :
               (Number.isFinite(Number(dungeon.maxFloorPassed)) ? Number(dungeon.maxFloorPassed) + 1 : null);
-            actions.push({
+            if (Object.keys(dungeon).length) actions.push({
               key: 'dungeonStatus',
               method: call.name,
               feature: null,
               group: 'events',
               data: {
                 floorNumber: floor,
+                floorType: dungeon.floorType || null,
                 maxFloorPassed: Number(dungeon.maxFloorPassed) || 0,
-                maxFloorReached: dungeon.maxFloorReached || 0,
+                maxFloorReached: Number(dungeon.maxFloorReached) || 0,
                 respawnFloor: Number(dungeon.respawnFloor) || 0,
                 elements: dungeon.elements || { prime: 'earth', nonprime: ['water', 'fire'] },
                 states: dungeon.states || rep.states || {},
@@ -531,17 +556,18 @@
             const actions = [];
             const rep = result.response;
             const dungeon = rep.dungeon || {};
-            const floor = Number.isFinite(dungeon.floorNumber) ? dungeon.floorNumber :
+            const floor = Number.isFinite(Number(dungeon.floorNumber)) ? Number(dungeon.floorNumber) :
               (Number.isFinite(Number(dungeon.maxFloorPassed)) ? Number(dungeon.maxFloorPassed) + 1 : null);
-            actions.push({
+            if (Object.keys(dungeon).length) actions.push({
               key: 'dungeonStatus',
               method: call.name,
               feature: null,
               group: 'events',
               data: {
                 floorNumber: floor,
+                floorType: dungeon.floorType || null,
                 maxFloorPassed: Number(dungeon.maxFloorPassed) || 0,
-                maxFloorReached: dungeon.maxFloorReached || 0,
+                maxFloorReached: Number(dungeon.maxFloorReached) || 0,
                 respawnFloor: Number(dungeon.respawnFloor) || 0,
                 elements: dungeon.elements || { prime: 'earth', nonprime: ['water', 'fire'] },
                 states: dungeon.states || rep.states || {},

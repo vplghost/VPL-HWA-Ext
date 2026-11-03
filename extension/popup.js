@@ -3243,15 +3243,18 @@ function openGuildVersusModal(vsStatus, cache) {
   modal.hidden = false;
 }
 
-function openDungeonModal(dungeonStatus) {
+let dungeonModalReturnFocus = null;
+
+function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   const modal = document.querySelector('#dungeon-modal');
   const body = document.querySelector('#dungeon-modal-body');
   if (!modal || !body) return;
 
+  dungeonModalReturnFocus = returnFocusTarget;
   const data = dungeonStatus || {};
   const floorNumber = data.floorNumber || (data.maxFloorPassed ? data.maxFloorPassed + 1 : 1);
   const floorBadge = document.querySelector('#dungeon-floor-badge');
-  if (floorBadge) floorBadge.textContent = `Floor ${floorNumber}`;
+  if (floorBadge) floorBadge.textContent = `Floor ${floorNumber}${data.floorType ? ` · ${data.floorType}` : ''}`;
 
   body.replaceChildren();
 
@@ -3442,6 +3445,7 @@ function openDungeonModal(dungeonStatus) {
   }
 
   modal.hidden = false;
+  document.querySelector('#dungeon-modal-close')?.focus?.();
 }
 
 function renderEvents(cache) {
@@ -3543,7 +3547,7 @@ function renderEvents(cache) {
       render: () => {
         const card = document.createElement('div');
         card.className = 'rounded-xl border border-blue-300 bg-blue-50/50 p-4 shadow-sm hover:border-blue-400 transition-colors cursor-pointer';
-        card.addEventListener('click', () => openDungeonModal(dungeonStatus));
+        card.addEventListener('click', () => openDungeonModal(dungeonStatus, card));
 
         const topRow = document.createElement('div');
         topRow.className = 'flex items-center justify-between gap-2 flex-wrap mb-2.5';
@@ -3930,13 +3934,18 @@ function setupGuildVersusModal() {
 
 function setupDungeonModal() {
   const modal = document.querySelector('#dungeon-modal');
+  const trigger = document.querySelector('#dungeon-fab');
   const closeBtn = document.querySelector('#dungeon-modal-close');
   if (!modal) return;
 
   function closeModal() {
     modal.hidden = true;
+    dungeonModalReturnFocus?.focus?.();
+    dungeonModalReturnFocus = null;
   }
 
+  trigger?.addEventListener('click', () =>
+    openDungeonModal(currentCache.dungeonStatus?.data, trigger));
   if (closeBtn) closeBtn.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeModal();
