@@ -21,6 +21,8 @@ Xem [hướng dẫn cài đặt và sử dụng](HUONG-DAN.md) để build, nạ
 
 Xem [phân tích log API mẫu](PHAN-TICH-API-LOG.md) để biết các nhóm dữ liệu game đã quan sát được và giới hạn của bản ghi.
 
+Xem [báo cáo RPC làm thay đổi số liệu](RPC-NUMERIC-CHANGE-REPORT.md) để tra các sự kiện được extension nhận diện có thể làm thay đổi items, resources, heroes, titans và các số liệu liên quan.
+
 Các bảng snapshot từ log: [heroes](HEROES.md), [items](ITEMS.md), [titans, đội hình và nhóm khác](DATA-CATALOG.md).
 
 Nguồn và cách xác minh tên hiển thị: [locale CDN](CDN-NAMES.md).
