@@ -1,12 +1,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const root = resolve(import.meta.dirname, '..');
 const packageJsonPath = join(root, 'package.json');
 const manifestPath = join(root, 'extension', 'manifest.json');
 const packageLockPath = join(root, 'package-lock.json');
 
-async function bumpVersion() {
+export async function bumpVersion(targetType = 'patch') {
   const pkgContent = await readFile(packageJsonPath, 'utf8');
   const pkg = JSON.parse(pkgContent);
   const currentVersion = pkg.version || '0.9.0';
@@ -16,7 +17,6 @@ async function bumpVersion() {
     throw new Error(`Invalid SemVer in package.json: ${currentVersion}`);
   }
 
-  const targetType = process.argv[2] || 'patch';
   let nextVersion;
 
   if (targetType === 'major') {
@@ -31,34 +31,34 @@ async function bumpVersion() {
     throw new Error(`Unknown bump target: "${targetType}". Use "patch", "minor", "major", or explicit "X.Y.Z"`);
   }
 
-  // Update package.json
-  pkg.version = nextVersion;
-  await writeFile(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
-
-  // Update extension/manifest.json
-  const manifestContent = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(manifestContent);
-  manifest.version = nextVersion;
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
-
-  // Update package-lock.json if it exists
-  try {
-    const lockContent = await readFile(packageLockPath, 'utf8');
-    const lock = JSON.parse(lockContent);
-    lock.version = nextVersion;
-    if (lock.packages && lock.packages['']) {
-      lock.packages[''].version = nextVersion;
-    }
-    await writeFile(packageLockPath, JSON.stringify(lock, null, 2) + '\n', 'utf8');
-  } catch (_) {
-    // optional lockfile
+  const nextParts = nextVersion.split('.').map(Number);
+  const changedPart = nextParts.findIndex((part, index) => part !== parts[index]);
+  if (changedPart < 0 || nextParts[changedPart] < parts[changedPart]) {
+    throw new Error('Build version must be greater than ' + currentVersion);
   }
+
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  const lock = JSON.parse(await readFile(packageLockPath, 'utf8'));
+  if (manifest.version !== currentVersion || lock.version !== currentVersion ||
+      lock.packages?.['']?.version !== currentVersion) {
+    throw new Error('Version mismatch between package.json, package-lock.json, and extension/manifest.json');
+  }
+
+  pkg.version = nextVersion;
+  manifest.version = nextVersion;
+  lock.version = nextVersion;
+  lock.packages[''].version = nextVersion;
+  await writeFile(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+  await writeFile(packageLockPath, JSON.stringify(lock, null, 2) + '\n', 'utf8');
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
   console.log(`✓ Bumped extension version: ${currentVersion} -> ${nextVersion}`);
   return nextVersion;
 }
 
-bumpVersion().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  bumpVersion(process.argv[2] || 'patch').catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}
