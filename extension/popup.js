@@ -549,10 +549,18 @@ function refreshTimed() {
   const wheelBadge = document.querySelector('#wheel-fortune-badge');
   const wheelLabel = document.querySelector('#wheel-fortune-label');
   if (wheelBadge && wheelLabel) {
-    const wheelStatus = currentCache.wheelFortuneStatus?.data;
-    const ref62 = currentCache['resource:refillable:62']?.data;
+    const wheelEntry = currentCache.wheelFortuneStatus;
+    const refEntry = currentCache['resource:refillable:62'];
+    const wheelStatus = wheelEntry?.data;
+    const ref62 = refEntry?.data;
     const nextDayTs = wheelStatus?.nextResetTs || currentCache.userGetInfo?.data?.nextDayTs;
-    const hasFree = wheelStatus ? Boolean(wheelStatus.hasFree) : (ref62 ? (Number(ref62.amount) > 0 || ref62.boughtToday === 0) : null);
+    const resourceIsNewer = refEntry?.updatedAt &&
+      (!wheelEntry?.updatedAt || refEntry.updatedAt > wheelEntry.updatedAt);
+    const firstAmount = resourceIsNewer ? ref62?.amount : wheelStatus?.amount;
+    const secondAmount = resourceIsNewer ? wheelStatus?.amount : ref62?.amount;
+    const amount = firstAmount == null ? secondAmount : firstAmount;
+    const hasFree = amount != null && Number.isFinite(Number(amount)) ? Number(amount) > 0 :
+      (typeof wheelStatus?.hasFree === 'boolean' ? wheelStatus.hasFree : null);
 
     if (hasFree === true) {
       wheelBadge.hidden = false;
@@ -561,12 +569,22 @@ function refreshTimed() {
       wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Free spin ready!';
       setResourceTooltip(wheelBadge, 'Wheel of Fortune (Emerald Exchange): Free spin ready!');
     } else if (hasFree === false && Number.isFinite(nextDayTs)) {
-      const countdown = globalThis.hwaHelperPopupData?.formatCountdown ? globalThis.hwaHelperPopupData.formatCountdown(nextDayTs) : '00:00:00';
       wheelBadge.hidden = false;
       wheelBadge.className = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer bg-slate-50 text-slate-700 ring-1 ring-slate-200 font-mono';
-      wheelLabel.textContent = countdown;
-      wheelBadge.title = `Wheel of Fortune (Emerald Exchange): Next free spin in ${countdown}`;
-      setResourceTooltip(wheelBadge, `Wheel of Fortune (Emerald Exchange): Next free spin in ${countdown}`);
+      if (nextDayTs <= now / 1000) {
+        wheelLabel.textContent = 'Check Wheel';
+        wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Daily reset passed; open the game to refresh.';
+        setResourceTooltip(wheelBadge, wheelBadge.title);
+      } else {
+        const remaining = Math.max(0, Math.ceil(nextDayTs - now / 1000));
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        const seconds = remaining % 60;
+        const countdown = [hours, minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
+        wheelLabel.textContent = countdown;
+        wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Next free spin in ' + countdown;
+        setResourceTooltip(wheelBadge, wheelBadge.title);
+      }
     } else {
       wheelBadge.hidden = true;
     }

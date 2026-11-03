@@ -1536,6 +1536,28 @@ test('randomDraft_register deducts 1 draft chip and resets legendDraftStatus', (
   assert.equal(merged.legendDraftStatus.data.lastResult, null);
 });
 
+test('zero wheel spins stay unavailable even when boughtToday is zero', () => {
+  const snapshot = record([{ name: 'userGetInfo', ident: 'wheel-zero' }], [
+    { ident: 'wheel-zero', result: { response: { nextDayTs: 1793656800,
+      refillable: [{ id: 62, amount: 0, boughtToday: 0 }] } } }
+  ]);
+  const state = cache.merge({}, [snapshot]).cache;
+  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
+});
+
+test('older wheel snapshot cannot restore a consumed free spin', () => {
+  const earlier = record([{ name: 'userGetInfo', ident: 'wheel-before' }], [
+    { ident: 'wheel-before', result: { response: { nextDayTs: 1793656800,
+      refillable: [{ id: 62, amount: 1, boughtToday: 0 }] } } }
+  ], '2026-11-02T04:00:00.000Z');
+  const used = record([{ name: 'alchemyUseFree', ident: 'wheel-used' }], [
+    { ident: 'wheel-used', result: { response: { gold: 1000 } } }
+  ], '2026-11-02T04:01:00.000Z');
+  const state = cache.merge({}, [earlier, used, earlier]).cache;
+  assert.equal(state['resource:refillable:62'].data.amount, 0);
+  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
+});
+
 test('userGetInfo extracts wheelFortuneStatus and alchemyUseFree marks free spin used', () => {
   const infoTrace = record([
     { name: 'userGetInfo', ident: 'info1' }
@@ -1565,6 +1587,11 @@ test('userGetInfo extracts wheelFortuneStatus and alchemyUseFree marks free spin
   assert.equal(state1['resource:refillable:62'].data.amount, 1);
 
   // Use free spin
+  const failedUse = record([{ name: 'alchemyUseFree', ident: 'spin-failed' }], [
+    { ident: 'spin-failed', result: { error: { code: 'unavailable' } } }
+  ]);
+  assert.equal(cache.merge(state1, [failedUse]).cache.wheelFortuneStatus.data.hasFree, true);
+
   const useFreeTrace = record([
     { name: 'alchemyUseFree', ident: 'spin1' }
   ], [
@@ -1574,5 +1601,5 @@ test('userGetInfo extracts wheelFortuneStatus and alchemyUseFree marks free spin
   const state2 = cache.merge(state1, [useFreeTrace]).cache;
   assert.equal(state2.wheelFortuneStatus.data.hasFree, false);
   assert.equal(state2['resource:refillable:62'].data.amount, 0);
-  assert.equal(state2['resource:refillable:62'].data.boughtToday, 1);
+  assert.equal(state2['resource:refillable:62'].data.boughtToday, 0);
 });

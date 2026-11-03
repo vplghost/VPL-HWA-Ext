@@ -1059,7 +1059,7 @@
           if (Array.isArray(info.refillable)) {
             const ref62 = info.refillable.find(r => r.id === 62);
             if (ref62) {
-              const hasFree = (ref62.amount ?? 0) > 0 || ref62.boughtToday === 0;
+              const hasFree = Number(ref62.amount) > 0;
               entries.push({
                 key: 'wheelFortuneStatus', method: call.name, feature: null, group: 'header',
                 data: {
@@ -1192,7 +1192,7 @@
           }
           return actions;
         }
-        if (call.name === 'alchemyUseFree') {
+        if (call.name === 'alchemyUseFree' && result?.response != null) {
           return [
             ...resourceAction(record, call, 'refillable:62', -1, 'Wheel of Fortune', 'alchemyUseFree'),
             {
@@ -1203,7 +1203,6 @@
               data: {
                 hasFree: false,
                 amount: 0,
-                boughtToday: 1,
                 nextResetTs: null
               },
               updatedAt: record.timestamp
@@ -1720,6 +1719,7 @@
           continue;
         }
         if (entry.key === 'wheelFortuneStatus') {
+          if (next.wheelFortuneStatus?.updatedAt > entry.updatedAt) continue;
           const prev = next.wheelFortuneStatus?.data || {};
           next.wheelFortuneStatus = {
             key: 'wheelFortuneStatus',

@@ -1445,6 +1445,28 @@ test('renderInventoryGrid renders grouped items with dividers, abbreviations, qu
   assert.equal(spans[1].textContent, '100'); // Quantity 100
 });
 
+test('wheel badge ignores stale free flag when no spins remain', () => {
+  const futureTs = Math.floor(Date.now() / 1000) + 3600;
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: true, amount: 0, nextResetTs: futureTs } },
+    'resource:refillable:62': { data: { amount: 0, boughtToday: 0 } }
+  };
+  context.refreshTimed();
+  assert.equal(wheelFortuneBadge.hidden, false);
+  assert.notEqual(wheelFortuneLabel.textContent, 'Free Spin');
+  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
+});
+
+test('wheel badge asks for fresh game data after the reset timestamp passes', () => {
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: false, amount: 0,
+      nextResetTs: Math.floor(Date.now() / 1000) - 60 } }
+  };
+  context.refreshTimed();
+  assert.equal(wheelFortuneLabel.textContent, 'Check Wheel');
+  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
+});
+
 test('header wheel fortune badge displays Free Spin when available and countdown timer when cooling down', () => {
   // 1. Free spin available
   context.currentCache = {
@@ -1465,7 +1487,7 @@ test('header wheel fortune badge displays Free Spin when available and countdown
   assert.equal(wheelFortuneBadge.hidden, false);
   assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
   assert.ok(wheelFortuneBadge.className.includes('font-mono'));
-  assert.match(wheelFortuneLabel.textContent, /\d+:\d{2}/);
+  assert.match(wheelFortuneLabel.textContent, /^\d{2}:\d{2}:\d{2}$/);
 
   // 3. No wheel fortune data hides badge
   context.currentCache = {};
