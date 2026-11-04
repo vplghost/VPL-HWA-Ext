@@ -392,6 +392,56 @@ const eventsStart = popupJs.indexOf('function openGuildVersusModal(');
 const eventsEnd = popupJs.indexOf('function renderGuildChat(');
 vm.runInContext(popupJs.slice(eventsStart, eventsEnd), context);
 
+const fabStart = popupJs.indexOf('function setupFabDial()');
+const fabEnd = popupJs.indexOf('function setupTowerModal()');
+vm.runInContext(popupJs.slice(fabStart, fabEnd), context);
+
+test('shortcut dial reveals actions only while open and closes on backdrop or Escape', () => {
+  const dial = new MockElement('div');
+  const trigger = new MockElement('button');
+  const actions = new MockElement('nav');
+  const backdrop = new MockElement('div');
+  const chat = new MockElement('button');
+  const tower = new MockElement('button');
+  const dungeon = new MockElement('button');
+  actions.append(chat, tower, dungeon);
+  for (const [id, element] of Object.entries({
+    'fab-dial': dial, 'fab-trigger': trigger, 'fab-actions': actions,
+    'fab-backdrop': backdrop
+  })) mockDoc.elementsById.set(id, element);
+  let focused = 0;
+  trigger.focus = () => { focused += 1; };
+  const keyListeners = [];
+  const originalAddListener = context.window.addEventListener;
+  context.window.addEventListener = (name, listener) => {
+    if (name === 'keydown') keyListeners.push(listener);
+  };
+
+  context.setupFabDial();
+  assert.equal(dial.dataset.open, 'false');
+  assert.equal(actions.inert, true);
+  assert.ok([chat, tower, dungeon].every((button) => button.tabIndex === -1));
+
+  trigger.dispatch('click');
+  assert.equal(dial.dataset.open, 'true');
+  assert.equal(backdrop.dataset.open, 'true');
+  assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+  assert.ok([chat, tower, dungeon].every((button) => button.tabIndex === 0));
+  tower.dispatch('click');
+  assert.equal(dial.dataset.open, 'false');
+  assert.equal(focused, 0);
+
+  trigger.dispatch('click');
+  backdrop.dispatch('click');
+  assert.equal(dial.dataset.open, 'false');
+  assert.equal(focused, 1);
+  trigger.dispatch('click');
+  keyListeners[0]({ key: 'Escape' });
+  assert.equal(dial.dataset.open, 'false');
+  assert.equal(focused, 2);
+  context.window.addEventListener = originalAddListener;
+});
+
 // Extract marches and refreshTimed
 const refreshStart = popupJs.indexOf('const marchStyles =');
 const refreshEnd = popupJs.indexOf('function renderResources(');

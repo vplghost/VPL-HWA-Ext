@@ -7,6 +7,92 @@
 }
 
 @layer components {
+  .fab-dial__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 44;
+    background: rgba(15, 23, 42, 0.42);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 180ms ease, visibility 180ms ease;
+  }
+  .fab-dial__backdrop[data-open="true"] {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .fab-dial {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 45;
+    width: 3rem;
+    height: 3rem;
+  }
+  .fab-dial__trigger,
+  .fab-dial__action {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 9999px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24);
+  }
+  .fab-dial__trigger {
+    inset: 0;
+    background: #2563eb;
+    transition: background 180ms ease, transform 180ms ease;
+  }
+  .fab-dial__trigger:hover { background: #1d4ed8; }
+  .fab-dial__trigger svg { transition: transform 180ms ease; }
+  .fab-dial[data-open="true"] .fab-dial__trigger svg { transform: rotate(45deg); }
+  .fab-dial__action {
+    top: 0.125rem;
+    left: 0.125rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.25rem;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(0, 0) scale(0.4);
+    transition: transform 230ms cubic-bezier(.2, 1.2, .35, 1), opacity 180ms ease, visibility 180ms ease;
+  }
+  .fab-dial__action--chat { --fab-x: -0.25rem; --fab-y: -5.25rem; background: #2563eb; }
+  .fab-dial__action--tower { --fab-x: -4rem; --fab-y: -4rem; background: #7c3aed; }
+  .fab-dial__action--dungeon { --fab-x: -5.25rem; --fab-y: -0.25rem; background: #2563eb; }
+  .fab-dial[data-open="true"] .fab-dial__action {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(var(--fab-x), var(--fab-y)) scale(1);
+  }
+  .fab-dial__action:hover { filter: brightness(1.1); }
+  .fab-dial__action:focus-visible,
+  .fab-dial__trigger:focus-visible { outline: 3px solid #fbbf24; outline-offset: 3px; }
+  .fab-dial__action::before {
+    content: attr(data-label);
+    position: absolute;
+    right: calc(100% + 0.5rem);
+    top: 50%;
+    transform: translateY(-50%);
+    width: max-content;
+    max-width: 8rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    background: #0f172a;
+    color: white;
+    font-size: 0.6875rem;
+    line-height: 1.25;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .fab-dial__action:hover::before,
+  .fab-dial__action:focus-visible::before { opacity: 1; }
+
   [data-resource-tooltip] { position: relative; }
   [data-resource-tooltip]::after {
     content: attr(data-resource-tooltip);
@@ -261,6 +347,12 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
+    .fab-dial__backdrop,
+    .fab-dial__trigger,
+    .fab-dial__trigger svg,
+    .fab-dial__action {
+      transition: none !important;
+    }
     .hwa-mail-dot-ping {
       animation: none !important;
     }

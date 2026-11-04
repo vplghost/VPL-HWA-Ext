@@ -3907,12 +3907,41 @@ function renderTowerModal(cache = currentCache) {
   }
 }
 
+function setupFabDial() {
+  const dial = document.querySelector('#fab-dial');
+  const trigger = document.querySelector('#fab-trigger');
+  const actions = document.querySelector('#fab-actions');
+  const backdrop = document.querySelector('#fab-backdrop');
+  if (!dial || !trigger || !actions || !backdrop) return;
+
+  function setOpen(open, restoreFocus = false) {
+    dial.dataset.open = String(open);
+    backdrop.dataset.open = String(open);
+    trigger.setAttribute('aria-expanded', String(open));
+    trigger.setAttribute('aria-label', open ? 'Close shortcuts' : 'Open shortcuts');
+    actions.setAttribute('aria-hidden', String(!open));
+    actions.inert = !open;
+    for (const action of actions.querySelectorAll('button')) action.tabIndex = open ? 0 : -1;
+    if (!open && restoreFocus) trigger.focus();
+  }
+
+  setOpen(false);
+  trigger.addEventListener('click', () => setOpen(dial.dataset.open !== 'true'));
+  backdrop.addEventListener('click', () => setOpen(false, true));
+  for (const action of actions.querySelectorAll('button')) {
+    action.addEventListener('click', () => setOpen(false));
+  }
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && dial.dataset.open === 'true') setOpen(false, true);
+  });
+}
+
 function setupTowerModal() {
   const modal = document.querySelector('#tower-modal');
   const trigger = document.querySelector('#tower-fab');
   const close = document.querySelector('#tower-modal-close');
   if (!modal || !trigger) return;
-  const dismiss = () => { modal.hidden = true; trigger.focus(); };
+  const dismiss = () => { modal.hidden = true; (document.querySelector('#fab-trigger') || trigger).focus(); };
   trigger.addEventListener('click', () => {
     renderTowerModal(currentCache);
     modal.hidden = false;
@@ -3956,7 +3985,7 @@ function setupDungeonModal() {
   }
 
   trigger?.addEventListener('click', () =>
-    openDungeonModal(currentCache.dungeonStatus?.data, trigger));
+    openDungeonModal(currentCache.dungeonStatus?.data, document.querySelector('#fab-trigger') || trigger));
   if (closeBtn) closeBtn.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeModal();
@@ -4349,6 +4378,7 @@ function renderConfigOther(cache) {
 
 function updateGuildChatBadge(cache, lastReadTime) {
   const chatBadgeEl = document.querySelector?.('#guild-chat-badge');
+  const fabBadgeEl = document.querySelector?.('#fab-unread-badge');
   const chatCountEl = document.querySelector?.('#guild-chat-count');
   const messages = cache?.guildChat?.data?.messages || [];
   const unreadCount = globalThis.hwaHelperPopupData?.getUnreadChatCount
@@ -4369,6 +4399,11 @@ function updateGuildChatBadge(cache, lastReadTime) {
       chatBadgeEl.title = '';
       chatBadgeEl.removeAttribute?.('title');
     }
+  }
+  if (fabBadgeEl) {
+    fabBadgeEl.hidden = unreadCount <= 0;
+    fabBadgeEl.textContent = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : '';
+    fabBadgeEl.title = unreadCount > 0 ? `${unreadCount} unread guild message${unreadCount === 1 ? '' : 's'}` : '';
   }
   return unreadCount;
 }
@@ -4415,6 +4450,7 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   const chatMessagesEl = document.querySelector?.('#guild-chat-messages');
   const chatCountEl = document.querySelector?.('#guild-chat-count');
   const chatBadgeEl = document.querySelector?.('#guild-chat-badge');
+  const fabBadgeEl = document.querySelector?.('#fab-unread-badge');
 
   if (chatCountEl) chatCountEl.textContent = String(rawMessages.length);
   if (chatBadgeEl) {
@@ -4422,6 +4458,11 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
     chatBadgeEl.textContent = '';
     chatBadgeEl.title = '';
     chatBadgeEl.removeAttribute?.('title');
+  }
+  if (fabBadgeEl) {
+    fabBadgeEl.hidden = true;
+    fabBadgeEl.textContent = '';
+    fabBadgeEl.title = '';
   }
 
   const targetEl = chatMessagesEl || view;
@@ -5248,6 +5289,7 @@ setupGuildVersusModal();
 setupDungeonModal();
 setupDraftModal();
 setupTowerModal();
+setupFabDial();
 setupAutoClaimListeners();
 setInterval(refreshTimed, 1000);
 
@@ -5263,6 +5305,7 @@ if (chatFab && chatPanel) {
       const prevRead = currentGuildChatLastReadTime;
       renderGuildChat(currentCache, false, prevRead);
       await markGuildChatAsRead(currentCache);
+      chatClose?.focus?.();
     } else {
       updateGuildChatBadge(currentCache, currentGuildChatLastReadTime);
     }
@@ -5272,5 +5315,6 @@ if (chatClose && chatPanel) {
   chatClose.addEventListener('click', () => {
     chatPanel.hidden = true;
     updateGuildChatBadge(currentCache, currentGuildChatLastReadTime);
+    document.querySelector('#fab-trigger')?.focus?.();
   });
 }

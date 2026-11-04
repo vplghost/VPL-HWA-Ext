@@ -232,15 +232,21 @@
 
   <div id="view" role="tabpanel" aria-live="polite" class="min-h-[420px] max-h-[500px] overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm min-[800px]:max-h-none"></div>
 
-  <!-- Game shortcut FABs above the Guild Chat FAB -->
-  <button id="dungeon-fab" type="button" title="Titan Dungeon" aria-label="Open Titan Dungeon dialog" aria-haspopup="dialog" aria-controls="dungeon-modal" class="fixed bottom-32 right-5 z-40 flex size-10 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-lg text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">🏰</button>
-  <button id="tower-fab" type="button" title="Tower" aria-label="Open Tower dialog" aria-haspopup="dialog" aria-controls="tower-modal" class="fixed bottom-18 right-5 z-40 flex size-10 cursor-pointer items-center justify-center rounded-full bg-violet-600 text-lg text-white shadow-lg transition-transform hover:scale-105 hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600">🗼</button>
-
-  <!-- Floating Action Button (FAB) for Guild Chat -->
-  <button id="guild-chat-fab" type="button" title="Guild Chat" aria-label="Guild Chat" class="fixed bottom-4 right-4 z-40 flex size-12 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-    <span id="guild-chat-badge" hidden class="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-xs"></span>
-  </button>
+  <div id="fab-backdrop" class="fab-dial__backdrop" aria-hidden="true"></div>
+  <div id="fab-dial" class="fab-dial" data-open="false">
+    <nav id="fab-actions" aria-label="Game shortcuts" aria-hidden="true" inert>
+      <button id="guild-chat-fab" type="button" title="Guild Chat" data-label="Guild Chat" aria-label="Open Guild Chat" class="fab-dial__action fab-dial__action--chat">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span id="guild-chat-badge" hidden class="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-xs"></span>
+      </button>
+      <button id="tower-fab" type="button" title="Tower" data-label="Tower" aria-label="Open Tower dialog" aria-haspopup="dialog" aria-controls="tower-modal" class="fab-dial__action fab-dial__action--tower">🗼</button>
+      <button id="dungeon-fab" type="button" title="Titan Dungeon" data-label="Titan Dungeon" aria-label="Open Titan Dungeon dialog" aria-haspopup="dialog" aria-controls="dungeon-modal" class="fab-dial__action fab-dial__action--dungeon">🏰</button>
+    </nav>
+    <button id="fab-trigger" type="button" aria-label="Open shortcuts" aria-expanded="false" aria-controls="fab-actions" class="fab-dial__trigger">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <span id="fab-unread-badge" hidden class="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-xs"></span>
+    </button>
+  </div>
 
   <!-- Floating Guild Chat Panel (Reverse scroll container) -->
   <div id="guild-chat-panel" hidden class="fixed bottom-18 right-4 z-40 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden flex flex-col transition-all">
