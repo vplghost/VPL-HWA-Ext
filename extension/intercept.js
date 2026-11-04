@@ -6,6 +6,7 @@
   const isTrackingUrl = globalThis.hwaHelperIsTrackingUrl;
   let captureEnabled = false;
   let popupRpcEnabled = false;
+  let recordingActive = false;
   let lastRpcUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null;
   let lastRpcHeaders = null;
   try {
@@ -128,6 +129,7 @@
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled === true;
       popupRpcEnabled = event.data.popupRpcEnabled === true;
+      recordingActive = event.data.recordingActive === true;
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
       if (!popupRpcEnabled) return;
@@ -422,6 +424,7 @@
 
   function setUnityInstance(instance, source = 'detected') {
     if (!instance) return;
+    instrumentEngineMethod(instance, 'SendMessage', source);
     if (activeUnityInstance === instance) return;
     if (activeUnityInstance && typeof activeUnityInstance.SendMessage === 'function' && typeof instance.SendMessage !== 'function') {
       return;
@@ -429,6 +432,32 @@
     activeUnityInstance = instance;
     window.__hwaUnityInstance = instance;
     reportEngineStatus(`instance-${source}`);
+  }
+
+  function instrumentEngineMethod(instance, methodName, source) {
+    try {
+      const original = instance?.[methodName];
+      if (typeof original !== 'function' || original.__hwaRecordWrapped) return;
+      const wrapped = function (...args) {
+        if (recordingActive) {
+          const param = args[2];
+          window.postMessage({
+            source: 'hwa-helper-api', kind: 'interaction-record',
+            entry: {
+              category: 'engine', action: 'call', timestamp: new Date().toISOString(),
+              target: String(source).slice(0, 80), objectName: String(args[0] ?? '').slice(0, 160),
+              methodName: String(args[1] ?? methodName).slice(0, 160),
+              paramType: typeof param, paramLength: typeof param === 'string' ? param.length : 0
+            }
+          }, location.origin);
+        }
+        return original.apply(this, args);
+      };
+      wrapped.__hwaRecordWrapped = true;
+      instance[methodName] = wrapped;
+    } catch (_) {
+      // Some Unity exports are read-only. Keep the game method unchanged.
+    }
   }
 
   function hookCreateUnityInstance(original) {

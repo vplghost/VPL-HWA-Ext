@@ -295,6 +295,31 @@ test('createUnityInstance hook captures instance and reports engine status', asy
   assert.deepEqual(fakeInstance.lastCall, { obj: 'GameController', method: 'ClaimReward', val: '123' });
 });
 
+test('recording observes exposed SendMessage calls without changing arguments or capturing payload', async () => {
+  const events = [];
+  const { window } = setup(async () => new Response('ok'));
+  window.addEventListener('message', (ev) => {
+    if (ev.data?.kind === 'interaction-record') events.push(ev.data.entry);
+  });
+  const calls = [];
+  window.createUnityInstance = async () => ({
+    SendMessage(...args) { calls.push(args); return 'game-result'; }
+  });
+  const engine = await window.createUnityInstance({}, {});
+  engine.SendMessage('Hero', 'Open', 'secret-before-record');
+  assert.equal(events.length, 0);
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+    interceptEnabled: true, popupRpcEnabled: false, recordingActive: true },
+  'https://www.hero-wars-alliance.com');
+  assert.equal(engine.SendMessage('Hero', 'LevelUp', 'sensitive-payload'), 'game-result');
+  assert.equal(calls.length, 2);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].objectName, 'Hero');
+  assert.equal(events[0].methodName, 'LevelUp');
+  assert.equal(events[0].paramLength, 17);
+  assert.equal(JSON.stringify(events).includes('sensitive-payload'), false);
+});
+
 test('property setter for unityInstance captures instance and responds to engine-ping', async () => {
   const engineMessages = [];
   const { window } = setup(async () => new Response('ok'));

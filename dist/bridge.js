@@ -1,5 +1,7 @@
 let currentSettings = null;
 let popupRpcEnabled = false;
+let recordingActive = false;
+let recordingStateObserved = false;
 
 function sendControl() {
   if (!currentSettings) return;
@@ -7,7 +9,8 @@ function sendControl() {
     source: 'hwa-helper-config',
     kind: 'control',
     interceptEnabled: currentSettings.interceptEnabled !== false,
-    popupRpcEnabled
+    popupRpcEnabled,
+    recordingActive
   }, location.origin);
 }
 
@@ -34,6 +37,10 @@ window.addEventListener('message', (event) => {
     } catch (_) {}
     return;
   }
+  if (event.data.kind === 'interaction-record') {
+    if (recordingActive && event.data.entry) saveInteraction(event.data.entry);
+    return;
+  }
   if (event.data.kind !== 'api-record') return;
   if (!chrome.runtime?.id) return;
   try {
@@ -45,6 +52,57 @@ window.addEventListener('message', (event) => {
     // Extension context was invalidated; ignore safely
   }
 });
+
+function saveInteraction(entry) {
+  try {
+    const p = chrome.runtime?.sendMessage?.({ kind: 'record-interaction', entry });
+    p?.catch?.(() => {});
+  } catch (_) {}
+}
+
+function interactionTarget(target) {
+  if (!target || typeof target !== 'object') return 'unknown';
+  const tag = String(target.tagName || 'canvas').toLowerCase();
+  const id = typeof target.id === 'string' ? target.id.slice(0, 80) : '';
+  return `${tag}${id ? `#${id}` : ''}`;
+}
+
+function recordUiEvent(event) {
+  if (!recordingActive || event.target?.closest?.('#hwa-helper-btn, #hwa-record-btn, #hwa-export-btn, #hwa-clear-btn')) return;
+  const target = event.target;
+  const entry = { timestamp: new Date().toISOString(), target: interactionTarget(target) };
+  if (event.type === 'pointerdown') {
+    Object.assign(entry, { category: 'pointer', action: 'pointerdown', x: event.clientX, y: event.clientY, button: event.button });
+    const canvas = target?.closest?.('canvas') || (target?.tagName?.toLowerCase() === 'canvas' ? target : null);
+    const rect = canvas?.getBoundingClientRect?.();
+    if (rect?.width && rect?.height) {
+      entry.canvasX = Math.round((event.clientX - rect.left) / rect.width * (canvas.width || rect.width));
+      entry.canvasY = Math.round((event.clientY - rect.top) / rect.height * (canvas.height || rect.height));
+    }
+  } else if (event.type === 'wheel') {
+    Object.assign(entry, { category: 'wheel', action: 'wheel', x: event.clientX, y: event.clientY, deltaY: event.deltaY });
+  } else {
+    if (target?.closest?.('input, textarea, [contenteditable]') || target?.isContentEditable) return;
+    const key = String(event.key || '');
+    if (key.length === 1) return;
+    Object.assign(entry, { category: 'keyboard', action: 'keydown', key: key.slice(0, 40) });
+  }
+  saveInteraction(entry);
+}
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('pointerdown', recordUiEvent, true);
+  document.addEventListener('keydown', recordUiEvent, true);
+  document.addEventListener('wheel', recordUiEvent, { capture: true, passive: true });
+}
+
+try {
+  chrome.runtime?.sendMessage?.({ kind: 'record-status' })?.then?.((state) => {
+    if (recordingStateObserved) return;
+    recordingActive = state?.active === true;
+    sendControl();
+  })?.catch?.(() => {});
+} catch (_) {}
 
 try {
   chrome.storage?.local?.get?.(['captureSettings', 'popupRpcEnabled'])?.then?.((stored) => {
@@ -62,6 +120,14 @@ try {
 
 try {
   chrome.storage?.onChanged?.addListener?.((changes, area) => {
+    if (area === 'local' && 'gameRecordingActive' in changes) {
+      recordingStateObserved = true;
+      const nextActive = changes.gameRecordingActive.newValue === true;
+      if (recordingActive !== nextActive) {
+        recordingActive = nextActive;
+        sendControl();
+      }
+    }
     if (area !== 'local') return;
     if ('captureSettings' in changes) currentSettings = changes.captureSettings.newValue || {};
     if ('popupRpcEnabled' in changes) popupRpcEnabled = changes.popupRpcEnabled.newValue === true;
@@ -145,16 +211,16 @@ function injectHelperButton() {
   recordBtn.id = 'hwa-record-btn';
   recordBtn.type = 'button';
   recordBtn.className = 'hwa-icon-btn';
-  recordBtn.setAttribute('aria-label', 'Record API log');
-  recordBtn.title = 'Record API log';
+  recordBtn.setAttribute('aria-label', 'Record game activity');
+  recordBtn.title = 'Record game activity';
   recordBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><circle cx="12" cy="12" r="9"/></svg>';
 
   const exportBtn = document.createElement('button');
   exportBtn.id = 'hwa-export-btn';
   exportBtn.type = 'button';
   exportBtn.className = 'hwa-icon-btn';
-  exportBtn.setAttribute('aria-label', 'Export API log JSON');
-  exportBtn.title = 'Export API log JSON';
+  exportBtn.setAttribute('aria-label', 'Export game activity JSON');
+  exportBtn.title = 'Export game activity JSON';
   exportBtn.hidden = true;
   if (exportBtn.style) exportBtn.style.display = 'none';
   exportBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
@@ -163,8 +229,8 @@ function injectHelperButton() {
   clearBtn.id = 'hwa-clear-btn';
   clearBtn.type = 'button';
   clearBtn.className = 'hwa-icon-btn';
-  clearBtn.setAttribute('aria-label', 'Clear API log');
-  clearBtn.title = 'Clear API log';
+  clearBtn.setAttribute('aria-label', 'Clear game activity log');
+  clearBtn.title = 'Clear game activity log';
   clearBtn.hidden = true;
   if (clearBtn.style) clearBtn.style.display = 'none';
   clearBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>';
@@ -179,25 +245,31 @@ function injectHelperButton() {
       const res = typeof p.then === 'function' ? await p : null;
       if (!res) return;
       isRecording = Boolean(res.active);
+      if (recordingActive !== isRecording) {
+        recordingActive = isRecording;
+        sendControl();
+      }
       const count = Number(res.count || 0);
+      const interactionCount = Number(res.interactionCount || 0);
 
       recordBtn.innerHTML = isRecording
         ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="hwa-rec-dot"></span>'
         : '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><circle cx="12" cy="12" r="9"/></svg>';
-      const recTitle = isRecording ? `Stop Recording (${count} records)` : 'Start Recording Log';
+      const recTitle = res.error || (isRecording
+        ? `Stop Recording (${count} API, ${interactionCount} interactions)` : 'Start Recording Log');
       recordBtn.title = recTitle;
       recordBtn.setAttribute('aria-label', recTitle);
 
-      const hasRecords = count > 0;
+      const hasRecords = count + interactionCount > 0;
       exportBtn.hidden = !hasRecords;
       clearBtn.hidden = !hasRecords;
       if (exportBtn.style) exportBtn.style.display = hasRecords ? 'inline-flex' : 'none';
       if (clearBtn.style) clearBtn.style.display = hasRecords ? 'inline-flex' : 'none';
-      const expTitle = `Export ${count} API log record${count === 1 ? '' : 's'}`;
+      const expTitle = `Export ${count} API and ${interactionCount} interaction records`;
       exportBtn.title = expTitle;
       exportBtn.setAttribute('aria-label', expTitle);
 
-      const clrTitle = `Clear ${count} API log record${count === 1 ? '' : 's'}`;
+      const clrTitle = `Clear ${count} API and ${interactionCount} interaction records`;
       clearBtn.title = clrTitle;
       clearBtn.setAttribute('aria-label', clrTitle);
     } catch {
@@ -223,15 +295,20 @@ function injectHelperButton() {
       if (p && typeof p.then === 'function') {
         p.then((res) => {
           const records = res?.records || [];
-          if (!records.length || typeof Blob === 'undefined' || typeof URL === 'undefined') return;
-          const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+          const interactions = res?.interactions || [];
+          if ((!records.length && !interactions.length) || typeof Blob === 'undefined' || typeof URL === 'undefined') return;
+          const timeline = [
+            ...records.map((record) => ({ kind: 'api', ...record })),
+            ...interactions.map((entry) => ({ kind: 'interaction', ...entry }))
+          ].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+          const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), timeline }, null, 2)], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
           const now = new Date();
           const pad = (n) => String(n).padStart(2, '0');
           const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
-          a.download = `hwa-api-${ts}.json`;
+          a.download = `hwa-game-record-${ts}.json`;
           a.click();
           URL.revokeObjectURL(url);
         }).catch(handleContextInvalidated);

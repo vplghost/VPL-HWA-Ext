@@ -5,6 +5,42 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/bridge.js', import.meta.url), 'utf8');
 
+test('bridge records canvas pointers while active and ignores typed keys and helper controls', async () => {
+  const listeners = {};
+  const sent = [];
+  let onChanged;
+  const document = {
+    readyState: 'loading',
+    addEventListener: (name, handler) => { listeners[name] = handler; },
+    getElementById: () => null
+  };
+  const chrome = {
+    runtime: { id: 'test', sendMessage: async (message) => { sent.push(message); return { saved: true }; } },
+    storage: {
+      local: { get: async () => ({ captureSettings: {} }) },
+      session: { get: async () => ({ recordingState: { active: false } }) },
+      onChanged: { addListener: (handler) => { onChanged = handler; } }
+    }
+  };
+  const window = { addEventListener: () => {}, postMessage: () => {} };
+  runInNewContext(source, { window, document, chrome, Date,
+    location: { origin: 'https://www.hero-wars-alliance.com' } });
+  await Promise.resolve();
+  onChanged({ gameRecordingActive: { newValue: true } }, 'local');
+  const canvas = { tagName: 'CANVAS', id: 'unity-canvas', width: 800, height: 600,
+    closest: () => null, getBoundingClientRect: () => ({ left: 10, top: 20, width: 400, height: 300 }) };
+  listeners.pointerdown({ type: 'pointerdown', target: canvas, clientX: 210, clientY: 170, button: 0 });
+  listeners.keydown({ type: 'keydown', target: canvas, key: 's' });
+  listeners.keydown({ type: 'keydown', target: { closest: () => true }, key: 'Enter' });
+  const interactions = () => sent.filter((message) => message.kind === 'record-interaction');
+  assert.equal(interactions().length, 1);
+  assert.equal(interactions()[0].entry.canvasX, 400);
+  assert.equal(interactions()[0].entry.canvasY, 300);
+  onChanged({ gameRecordingActive: { newValue: false } }, 'local');
+  listeners.pointerdown({ type: 'pointerdown', target: canvas, clientX: 210, clientY: 170, button: 0 });
+  assert.equal(interactions().length, 1);
+});
+
 test('bridge sends persisted intercept setting and applies changes without page reload', async () => {
   const listeners = [];
   const messages = [];

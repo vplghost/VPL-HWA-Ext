@@ -94,6 +94,29 @@ test('passive cache updates Energy and World Energy without recording or account
   assert.equal(Object.keys(session).length, 0);
 });
 
+test('game interactions persist locally only while recording and export beside API records', async () => {
+  const { local, session, send, listener } = setup();
+  const entry = { category: 'pointer', action: 'pointerdown', timestamp: '2026-11-04T07:00:00.000Z',
+    target: 'canvas#unity-canvas', x: 42, y: 60, privateValue: 'must not persist' };
+  const sendInteraction = () => new Promise((resolve) =>
+    listener({ kind: 'record-interaction', entry }, gameSender, resolve));
+  assert.equal((await sendInteraction()).saved, false);
+  await send('record-start');
+  assert.equal(local.gameRecordingActive, true);
+  assert.equal((await sendInteraction()).saved, true);
+  assert.equal(local['interaction:0'].target, 'canvas#unity-canvas');
+  assert.equal(JSON.stringify(local).includes('must not persist'), false);
+  assert.equal(session.recordingState.nextInteractionIndex, 1);
+  const exported = await send('record-export');
+  assert.equal(exported.interactions.length, 1);
+  await send('record-stop');
+  assert.equal(local.gameRecordingActive, false);
+  assert.equal((await sendInteraction()).saved, false);
+  assert.equal((await send('record-export')).interactions.length, 1);
+  await send('record-clear');
+  assert.equal(Object.hasOwn(local, 'interaction:0'), false);
+});
+
 test('empty event quest claim requests authoritative resource and item snapshots once', async () => {
   const { local, send, forwardedMessages } = setup();
   local.popupRpcEnabled = true;

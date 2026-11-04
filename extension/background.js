@@ -7,6 +7,8 @@ importScripts('rpc-cache.js');
 
 const RECORD_STATE_KEY = 'recordingState';
 const RECORD_PREFIX = 'record:';
+const INTERACTION_PREFIX = 'interaction:';
+const MAX_INTERACTIONS = 3000;
 const MAX_BODY_CHARS = 512 * 1024;
 const GAME_ORIGIN = 'https://www.hero-wars-alliance.com';
 const GAME_ORIGINS = ['https://www.hero-wars-alliance.com', 'https://hero-wars-alliance.com'];
@@ -63,11 +65,36 @@ async function clearRecorded() {
   if (keys.length) await chrome.storage.session.remove(keys);
 }
 
+async function interactionEntries() {
+  const stored = await chrome.storage.local.get(null);
+  return Object.entries(stored).filter(([key]) => key.startsWith(INTERACTION_PREFIX))
+    .sort(([a], [b]) => Number(a.slice(INTERACTION_PREFIX.length)) - Number(b.slice(INTERACTION_PREFIX.length)));
+}
+
+async function clearInteractions() {
+  const keys = (await interactionEntries()).map(([key]) => key);
+  if (keys.length) await chrome.storage.local.remove(keys);
+}
+
+function normalizeInteraction(entry) {
+  if (!entry || !['pointer', 'keyboard', 'wheel', 'engine'].includes(entry.category) ||
+      typeof entry.timestamp !== 'string' || !Number.isFinite(Date.parse(entry.timestamp))) return null;
+  const clean = { category: entry.category, timestamp: entry.timestamp };
+  for (const key of ['action', 'target', 'objectName', 'methodName', 'paramType', 'key']) {
+    if (typeof entry[key] === 'string') clean[key] = entry[key].slice(0, 160);
+  }
+  for (const key of ['x', 'y', 'canvasX', 'canvasY', 'button', 'deltaY', 'paramLength']) {
+    if (Number.isFinite(entry[key])) clean[key] = Math.round(entry[key]);
+  }
+  return clean;
+}
+
 async function handleControl(kind) {
   const stored = await chrome.storage.session.get(RECORD_STATE_KEY);
   const state = stored[RECORD_STATE_KEY] || { active: false, nextIndex: 0 };
   if (kind === 'record-start') {
     await clearRecorded();
+    await clearInteractions();
     await chrome.storage.local.remove('apiRecords');
     const settings = await chrome.storage.local.get('captureSettings');
     if (settings.captureSettings?.interceptEnabled === false) {
@@ -75,19 +102,23 @@ async function handleControl(kind) {
         ...settings.captureSettings, interceptEnabled: true
       } });
     }
-    const next = { active: true, nextIndex: 0, error: null };
+    const next = { active: true, nextIndex: 0, nextInteractionIndex: 0, error: null };
     await chrome.storage.session.set({ [RECORD_STATE_KEY]: next });
+    await chrome.storage.local.set({ gameRecordingActive: true });
     return next;
   }
   if (kind === 'record-stop') {
     const next = { ...state, active: false };
     await chrome.storage.session.set({ [RECORD_STATE_KEY]: next });
+    await chrome.storage.local.set({ gameRecordingActive: false });
     return next;
   }
   if (kind === 'record-clear') {
     await clearRecorded();
-    const next = { active: false, nextIndex: 0, error: null };
+    await clearInteractions();
+    const next = { active: false, nextIndex: 0, nextInteractionIndex: 0, error: null };
     await chrome.storage.session.set({ [RECORD_STATE_KEY]: next });
+    await chrome.storage.local.set({ gameRecordingActive: false });
     return next;
   }
   return state;
@@ -109,7 +140,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.then(async () => {
       const state = (await chrome.storage.session.get(RECORD_STATE_KEY))[RECORD_STATE_KEY] || { active: false };
       const entries = await recordedEntries();
-      return { active: Boolean(state.active), count: entries.length };
+      const interactions = await interactionEntries();
+      return { active: Boolean(state.active), count: entries.length,
+        interactionCount: interactions.length, error: state.error || null };
     });
     pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
     pending = pending.catch(() => {});
@@ -118,9 +151,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.kind === 'record-export' && isAllowedOrigin) {
     pending = pending.then(async () => {
       const entries = await recordedEntries();
-      return { records: entries.map(([, r]) => r) };
+      const interactions = await interactionEntries();
+      return { records: entries.map(([, r]) => r), interactions: interactions.map(([, r]) => r) };
     });
     pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'record-interaction' && isGameUrl(sender.url)) {
+    const entry = normalizeInteraction(message.entry);
+    if (!entry) return;
+    pending = pending.then(async () => {
+      const state = (await chrome.storage.session.get(RECORD_STATE_KEY))[RECORD_STATE_KEY];
+      if (!state?.active) return { saved: false };
+      const index = state.nextInteractionIndex || 0;
+      if (index >= MAX_INTERACTIONS) {
+        await chrome.storage.session.set({ [RECORD_STATE_KEY]: { ...state, active: false,
+          error: 'Interaction log reached 3,000 entries. Export before recording again.' } });
+        return { saved: false, limitReached: true };
+      }
+      try {
+        await chrome.storage.local.set({ [`${INTERACTION_PREFIX}${index}`]: entry });
+      } catch (error) {
+        await chrome.storage.session.set({ [RECORD_STATE_KEY]: { ...state, active: false,
+          error: 'Local interaction storage is full. Export the current log.' } });
+        return { saved: false, error: String(error) };
+      }
+      await chrome.storage.session.set({ [RECORD_STATE_KEY]: { ...state, nextInteractionIndex: index + 1 } });
+      return { saved: true };
+    });
+    pending.then(sendResponse, (error) => sendResponse({ saved: false, error: String(error) }));
     pending = pending.catch(() => {});
     return true;
   }
