@@ -1656,7 +1656,7 @@ test('userGetInfo extracts wheelFortuneStatus and alchemyUseFree marks free spin
           getTime: 1793642304,
           nextDayTs: 1793656800,
           refillable: [
-            { id: 62, amount: 1, lastRefill: 1793642306, boughtToday: 0 }
+            { id: 62, amount: 1, boughtToday: 0 }
           ]
         }
       }
@@ -1689,4 +1689,19 @@ test('userGetInfo extracts wheelFortuneStatus and alchemyUseFree marks free spin
   assert.equal(state2.wheelFortuneStatus.data.hasFree, false);
   assert.equal(state2['resource:refillable:62'].data.amount, 0);
   assert.equal(state2['resource:refillable:62'].data.boughtToday, 0);
+});
+
+test('wheel snapshot respects cooldown even when refillable 62 amount is one', () => {
+  const capturedAt = '2026-11-04T13:00:27.100Z';
+  const lastRefill = 1793797226;
+  const snapshot = record([{ name: 'userGetInfo', ident: 'wheel-cooldown' }], [
+    { ident: 'wheel-cooldown', result: { response: {
+      nextDayTs: 1793829600,
+      refillable: [{ id: 62, amount: 1, lastRefill, boughtToday: 0 }]
+    } } }
+  ], capturedAt);
+  const state = cache.merge({}, [snapshot]).cache;
+  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
+  assert.equal(state.wheelFortuneStatus.data.nextResetTs, lastRefill + 8 * 3600);
+  assert.equal(state['resource:refillable:62'].data.amount, 1);
 });

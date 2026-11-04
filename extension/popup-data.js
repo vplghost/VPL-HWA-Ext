@@ -741,7 +741,7 @@
 
     // 16. Honor Marks (ID: 92)
     if (tId === 92 || tStr.includes('honor mark')) {
-      return getCoin('1');
+      return cache['resource:material:12']?.data?.amount ?? 0;
     }
 
     // 17. Outland Chests (ID: 114)

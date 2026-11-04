@@ -1,6 +1,6 @@
 {
   "name": "hwa-helper",
-  "version": "0.9.49",
+  "version": "0.9.50",
   "private": true,
   "description": "Personal Chrome extension for Hero Wars: Alliance",
   "scripts": {
@@ -11,6 +11,7 @@
     "heroes:metadata": "node scripts/generate-hero-metadata.mjs",
     "items:assets": "node scripts/generate-item-assets.mjs",
     "names:update": "node scripts/generate-name-map.mjs",
+    "tower:buffs": "node scripts/generate-tower-buffs.mjs",
     "rules:production": "node scripts/generate-production-rules.mjs",
     "titans:metadata": "node scripts/generate-titan-metadata.mjs",
     "version:bump": "node scripts/bump-version.mjs"

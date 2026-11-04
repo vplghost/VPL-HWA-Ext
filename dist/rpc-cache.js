@@ -1097,14 +1097,21 @@
           if (Array.isArray(info.refillable)) {
             const ref62 = info.refillable.find(r => r.id === 62);
             if (ref62) {
-              const hasFree = Number(ref62.amount) > 0;
+              // The captured Wheel screen was cooling down with amount 1; use
+              // lastRefill as the cooldown anchor before treating it as ready.
+              const lastRefill = Number(ref62.lastRefill);
+              const cooldownEndTs = Number.isFinite(lastRefill) && lastRefill > 0
+                ? lastRefill + 8 * 60 * 60 : null;
+              const snapshotTs = Date.parse(record.timestamp) / 1000;
+              const hasFree = Number(ref62.amount) > 0 &&
+                (!cooldownEndTs || (Number.isFinite(snapshotTs) && snapshotTs >= cooldownEndTs));
               entries.push({
                 key: 'wheelFortuneStatus', method: call.name, feature: null, group: 'header',
                 data: {
                   hasFree,
                   amount: ref62.amount ?? 0,
                   boughtToday: ref62.boughtToday ?? 0,
-                  nextResetTs: info.nextDayTs || null
+                  nextResetTs: cooldownEndTs || info.nextDayTs || null
                 },
                 updatedAt: record.timestamp
               });

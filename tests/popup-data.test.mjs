@@ -952,6 +952,16 @@ test('getChallengeResourceStock resolves 0 for missing inventory items instead o
   assert.equal(getChallengeResourceStock(noInvCache, 'Open 1 Elemental Sphere'), 20);
 });
 
+test('Honor Marks stock uses material 12 rather than Gold coin 1', () => {
+  const cache = {
+    inventoryGet: { data: { coin: { '1': 2106 } } },
+    'resource:gold': { data: { amount: 58476691 } },
+    'resource:material:12': { data: { amount: 730 } }
+  };
+  assert.equal(getChallengeResourceStock(cache, 92), 730);
+  assert.equal(getChallengeResourceStock(cache, 'Spend 1 Honor Mark'), 730);
+});
+
 test('getItemCategoryMeta orders groups matching in-game inventory priority and returns metadata', () => {
   const { getItemCategoryMeta } = context.hwaHelperPopupData;
   const consumable = getItemCategoryMeta('consumable');

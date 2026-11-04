@@ -572,7 +572,9 @@ function refreshTimed() {
     const firstAmount = resourceIsNewer ? ref62?.amount : wheelStatus?.amount;
     const secondAmount = resourceIsNewer ? wheelStatus?.amount : ref62?.amount;
     const amount = firstAmount == null ? secondAmount : firstAmount;
-    const hasFree = amount != null && Number.isFinite(Number(amount)) ? Number(amount) > 0 :
+    const hasFree = amount != null && Number.isFinite(Number(amount)) ?
+      (Number(amount) > 0 && wheelStatus?.hasFree !== false &&
+        (!Number.isFinite(nextDayTs) || nextDayTs <= now / 1000)) :
       (typeof wheelStatus?.hasFree === 'boolean' ? wheelStatus.hasFree : null);
 
     if (hasFree === true) {
@@ -3347,8 +3349,9 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
           const starStr = unit.star ? '★'.repeat(unit.star) : '';
           const unitTag = document.createElement('span');
           unitTag.className = 'inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 shadow-2xs';
-          const avatarImg = `<img src="assets/titans/${titanId}.png" class="size-4 rounded-full object-cover shrink-0 border border-slate-200" onerror="this.style.display='none'">`;
+          const avatarImg = `<img src="assets/titans/${titanId}.png" class="size-4 rounded-full object-cover shrink-0 border border-slate-200">`;
           unitTag.innerHTML = `${avatarImg}<span>${name}</span> <span class="text-slate-400 font-normal">(Lv.${unit.level || '?'}${starStr ? ` ${starStr}` : ''})</span>`;
+          unitTag.querySelector('img')?.addEventListener('error', (event) => { event.currentTarget.hidden = true; });
           teamBox.append(unitTag);
         }
         doorCard.append(teamBox);
@@ -3396,7 +3399,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       const row = document.createElement('div');
       row.className = `rounded-xl border p-3 ${isDead ? 'border-rose-200 bg-rose-50/40 opacity-70' : 'border-slate-200 bg-slate-50/50'}`;
 
-      const avatarImg = `<img src="assets/titans/${tId}.png" class="size-8 rounded-full object-cover shrink-0 border border-slate-200" onerror="this.style.display='none'">`;
+      const avatarImg = `<img src="assets/titans/${tId}.png" class="size-8 rounded-full object-cover shrink-0 border border-slate-200">`;
       row.innerHTML = `
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2 min-w-0">
@@ -3431,6 +3434,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
           </div>
         </div>
       `;
+      row.querySelector('img')?.addEventListener('error', (event) => { event.currentTarget.hidden = true; });
 
       titansList.append(row);
     }
@@ -3835,6 +3839,10 @@ function renderTowerModal(cache = currentCache) {
   function heroList(ids) {
     return (ids || []).map((id) => globalThis.hwaHelperNameMap?.hero?.(id) || `Hero #${id}`).join(', ');
   }
+  function buffText(id) {
+    const buff = globalThis.hwaHelperTowerBuffs?.[id];
+    return buff ? `${buff.name} (#${id}) — ${buff.description}` : `Buff #${id}`;
+  }
   if (!floor && !complete) {
     line(section('Tower status'), 'No Tower data captured yet. Open the Tower in the game to sync.');
     return;
@@ -3857,7 +3865,9 @@ function renderTowerModal(cache = currentCache) {
       const number = room.roomNumber;
       const marker = Number(number) === Number(session.roomNumber) ? ' (current)' : '';
       if (room.type === 'buffs') {
-        line(current, `Room ${number}${marker} · Buff choices: ${(room.buffs || []).map((id) => `Buff #${id}`).join(' / ') || 'unknown'}`, true);
+        line(current, `Room ${number}${marker} · Buff choices`, true);
+        for (const id of room.buffs || []) line(current, buffText(id));
+        if (!room.buffs?.length) line(current, 'Unknown');
       } else if (room.type === 'chests') {
         line(current, `Room ${number}${marker} · Chests`, true);
         for (const [choice, cost] of Object.entries(room.openCosts || {})) {
@@ -3884,7 +3894,8 @@ function renderTowerModal(cache = currentCache) {
     if (event.action === 'endBattle') {
       line(history, `Floor ${event.floor}, room ${event.room}: ${event.win ? 'Victory' : 'Defeat'}${event.stars != null ? ` · ${event.stars} stars` : ''}${event.enemyIds?.length ? ` vs ${heroList(event.enemyIds)}` : ''} · ${towerRewardText(event.reward)}`);
     } else if (event.action === 'activateBuff') {
-      line(history, `Floor ${event.floor}, room ${event.room}: selected Buff #${event.buffId}${event.options?.length ? ` (offered: ${event.options.map((id) => `#${id}`).join(', ')})` : ''}`);
+      line(history, `Floor ${event.floor}, room ${event.room}: selected ${buffText(event.buffId)}`);
+      if (event.options?.length) line(history, `Offered buffs: ${event.options.map(buffText).join(' / ')}`);
     } else if (event.action === 'openChest') {
       line(history, `Floor ${event.floor}, room ${event.room}: opened chest ${event.number} · ${towerRewardText(event.reward)}`);
       const offered = Object.entries(event.options || {}).map(([number, cost]) =>

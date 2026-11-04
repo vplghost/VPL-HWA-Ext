@@ -350,6 +350,7 @@ const resourceDataJs = await readFile(new URL('../extension/resource-data.js', i
 const titanMetadataJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
 const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const towerBuffsJs = await readFile(new URL('../extension/tower-buffs.js', import.meta.url), 'utf8');
 const popupCss = await readFile(new URL('../extension/popup.css', import.meta.url), 'utf8');
 
 const context = {
@@ -377,6 +378,7 @@ const context = {
 };
 context.globalThis = context;
 vm.createContext(context);
+vm.runInContext(towerBuffsJs, context);
 vm.runInContext(clanVersusRulesJs, context);
 vm.runInContext(resourceDataJs, context);
 vm.runInContext(titanMetadataJs, context);
@@ -452,7 +454,8 @@ test('Tower dialog shows current choices, past decisions, and completion', () =>
   };
   context.renderTowerModal({ towerSession: { data: session } });
   assert.match(body.textContent, /Chest 2: 70 Emeralds/);
-  assert.match(body.textContent, /selected Buff #17/);
+  assert.match(body.textContent, /selected Siphoning Gauntlet \(#17\) — Restores Health when applying Control Effects/);
+  assert.match(body.textContent, /Offered buffs: Siphoning Gauntlet/);
   assert.match(body.textContent, /Possible rewards/);
   assert.match(body.textContent, /Offered chests: #1 free \/ #2 70 Emeralds/);
   context.renderTowerModal({ towerSession: { data: { ...session, floorNumber: 23,
@@ -462,6 +465,20 @@ test('Tower dialog shows current choices, past decisions, and completion', () =>
   assert.doesNotMatch(body.textContent, /Current choices/);
   context.renderTowerModal({ towerStatus: { data: { state: 'win', isCleared: true, floorNumber: 26 } } });
   assert.match(body.textContent, /Tower completed at floor unknown/);
+});
+
+test('Tower dialog resolves current relic choices and falls back for an unknown ID', () => {
+  const body = new MockElement('div');
+  const badge = new MockElement('span');
+  mockDoc.elementsById.set('tower-modal-body', body);
+  mockDoc.elementsById.set('tower-modal-badge', badge);
+  context.renderTowerModal({ towerSession: { data: {
+    floorNumber: 3, roomNumber: 2,
+    rooms: { 2: { roomNumber: 2, type: 'buffs', buffs: [3, 999] } },
+    history: []
+  } } });
+  assert.match(body.textContent, /Hypno-Staff \(#3\) — Stuns enemies at the start of the battle/);
+  assert.match(body.textContent, /Buff #999/);
 });
 
 test('renderEvents renders Guild Versus and active event cards', () => {
@@ -1540,4 +1557,18 @@ test('header wheel fortune badge displays Free Spin when available and countdown
   context.currentCache = {};
   context.refreshTimed();
   assert.equal(wheelFortuneBadge.hidden, true);
+});
+
+test('wheel badge does not offer a spin while refillable 62 is cooling down', () => {
+  const futureTs = Math.floor(Date.now() / 1000) + 7200;
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: false, amount: 1, nextResetTs: futureTs } },
+    'resource:refillable:62': { data: { amount: 1 } }
+  };
+  context.refreshTimed();
+  assert.match(wheelFortuneLabel.textContent, /^\d{2}:\d{2}:\d{2}$/);
+  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
+  context.currentCache.wheelFortuneStatus.data.nextResetTs = Math.floor(Date.now() / 1000) - 60;
+  context.refreshTimed();
+  assert.equal(wheelFortuneLabel.textContent, 'Check Wheel');
 });
