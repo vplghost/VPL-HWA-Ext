@@ -37,8 +37,35 @@
 
   const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
   const numericHeadings = new Set(['Level', 'Star', 'Soul stones / needed', 'Soul stone', 'Soul stones',
-    'Power', 'Amount', 'Members', 'Size']);
+    'Equipment rank', 'Power', 'Amount', 'Members', 'Size']);
   const isNumericColumn = (heading) => numericHeadings.has(heading);
+
+  // IDs and names follow enum_heroColor.json from the game assets.
+  const heroEquipmentRanks = [
+    null, 'White', 'Green', 'Green+', 'Blue', 'Blue+', 'Blue++',
+    'Purple', 'Purple+', 'Purple++', 'Purple+++',
+    'Orange', 'Orange+', 'Orange++', 'Orange+++', 'Orange++++', 'Red'
+  ];
+  const heroEquipmentRankColors = [
+    '#B7B0B3', '#74CE5B', '#719FFF', '#E46DFE', '#E58E04', '#FD6C6C'
+  ];
+  function heroEquipmentRank(color) {
+    const rank = Number(color);
+    if (!Number.isInteger(rank) || rank < 1 || rank >= heroEquipmentRanks.length) return null;
+    const tier = rank === 1 ? 0 : rank <= 3 ? 1 : rank <= 6 ? 2 :
+      rank <= 10 ? 3 : rank <= 15 ? 4 : 5;
+    const colorHex = heroEquipmentRankColors[tier];
+    const red = parseInt(colorHex.slice(1, 3), 16);
+    const green = parseInt(colorHex.slice(3, 5), 16);
+    const blue = parseInt(colorHex.slice(5, 7), 16);
+    const glow = `rgba(${red}, ${green}, ${blue}, ${(0.14 + rank * 0.035).toFixed(3)})`;
+    const radius = (2 + rank * 0.8).toFixed(1);
+    return {
+      label: heroEquipmentRanks[rank],
+      color: colorHex,
+      textShadow: `1px 0 1px rgba(15, 23, 42, 0.9), -1px 0 1px rgba(15, 23, 42, 0.9), 0 1px 1px rgba(15, 23, 42, 0.9), 0 -1px 1px rgba(15, 23, 42, 0.9), 0 0 ${radius}px ${glow}, 0 0 ${(Number(radius) * 1.8).toFixed(1)}px ${glow}`
+    };
+  }
 
   function isSoulUpgradeReady(soulStringOrOwned, needed) {
     if (typeof soulStringOrOwned === 'string' && soulStringOrOwned.includes('/')) {
@@ -1396,7 +1423,7 @@
     return String(id || '');
   }
 
-  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans, formatTitanArtifactLevels, isTitanArtifactUpgradable, getHeroArtifactTier, getHeroArtifactTierStyle, teamRows, sortRows,
+  globalThis.hwaHelperPopupData = { heroSoulProgress, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans, formatTitanArtifactLevels, isTitanArtifactUpgradable, getHeroEquipmentRank: heroEquipmentRank, getHeroArtifactTier, getHeroArtifactTierStyle, teamRows, sortRows,
     isNumericColumn, rallyTooltip, isMarchExpired, marchDuration,
     draftStageDescription, formatCountdown, isDraftActive,
     defaultDraftCandidates, observedDraftChoices, validateDraftPicks, getDraftActiveStep,

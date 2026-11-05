@@ -10,6 +10,7 @@ class MockElement {
     this.attributes = {};
     this.dataset = {};
     this.className = '';
+    this.style = {};
     this._textContent = '';
   }
   get textContent() {
@@ -130,6 +131,48 @@ test('createHeroInline wraps both avatar and text inside .hero-hover-trigger', (
 
   // Verify no parentheses star text like (5★)
   assert.ok(!card.textContent.includes('(5★)'), 'Card should not contain (5★) text');
+});
+
+test('hero equipment rank uses game color IDs in the list and hover card', () => {
+  const { getHeroEquipmentRank } = context.globalThis.hwaHelperPopupData;
+  assert.equal(getHeroEquipmentRank(1).label, 'White');
+  assert.equal(getHeroEquipmentRank(8).label, 'Purple+');
+  assert.equal(getHeroEquipmentRank(15).label, 'Orange++++');
+  assert.equal(getHeroEquipmentRank(16).label, 'Red');
+  assert.equal(getHeroEquipmentRank(1).color, '#B7B0B3');
+  assert.equal(getHeroEquipmentRank(2).color, '#74CE5B');
+  assert.equal(getHeroEquipmentRank(4).color, '#719FFF');
+  assert.equal(getHeroEquipmentRank(7).color, '#E46DFE');
+  assert.equal(getHeroEquipmentRank(11).color, '#E58E04');
+  assert.equal(getHeroEquipmentRank(16).color, '#FD6C6C');
+  const glowRadius = (rank) => Number(getHeroEquipmentRank(rank).textShadow.match(/0 0 ([\d.]+)px/)[1]);
+  for (let rank = 2; rank <= 16; rank++) {
+    assert.ok(glowRadius(rank) > glowRadius(rank - 1), `rank ${rank} should glow more than rank ${rank - 1}`);
+  }
+  assert.equal(getHeroEquipmentRank(0), null);
+
+  const hero = context.createHeroInline('2', 'Galahad', { star: 5, color: 8 });
+  const card = hero.querySelector('.hero-hover-card');
+  assert.ok(card.textContent.includes('Equipment rank'));
+  assert.ok(card.textContent.includes('Purple+'));
+  const cardRankValue = card.children[2].children[2].children[1];
+  assert.ok(card.children[2].children[2].className.includes('bg-slate-800/80'));
+  assert.equal(cardRankValue.style.color, '#E46DFE');
+  assert.equal(cardRankValue.style.textShadow, getHeroEquipmentRank(8).textShadow);
+  assert.ok(!context.createHeroInline('2', 'Galahad', { star: 5 })
+    .querySelector('.hero-hover-card').textContent.includes('Equipment rank'));
+
+  const headings = ['Hero ID', 'Name', 'Equipment rank', 'Power'];
+  const rows = [['1', 'Aurora', 7, 100], ['2', 'Galahad', 8, 200], ['3', 'Keira', null, 50]];
+  const tableEl = context.table(headings, rows);
+  const dataRows = tableEl.children.slice(1);
+  assert.equal(dataRows[0].children[2].textContent, 'Purple+');
+  const listRankValue = dataRows[0].children[2].children[0];
+  assert.ok(!listRankValue.className.includes('bg-'));
+  assert.equal(listRankValue.style.color, '#E46DFE');
+  assert.equal(listRankValue.style.textShadow, cardRankValue.style.textShadow);
+  assert.equal(dataRows[2].children[2].textContent, '—');
+  assert.equal(tableEl.children[0].children[2].className.includes('text-right'), true);
 });
 
 test('createHeroInline renders skills, skins, glyphs, artifacts, and spark of power', () => {

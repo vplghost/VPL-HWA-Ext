@@ -1014,6 +1014,22 @@ function createHeroInline(heroId, displayName, heroSnapshot, draftMode = false) 
 
   details.append(roleBox, factionBox);
 
+  const equipmentRank = globalThis.hwaHelperPopupData?.getHeroEquipmentRank?.(heroSnapshot?.color);
+  if (equipmentRank) {
+    const rankBox = document.createElement('div');
+    rankBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between';
+    const rankLabel = document.createElement('span');
+    rankLabel.className = 'text-slate-400 text-[10px] uppercase tracking-wider font-semibold';
+    rankLabel.textContent = 'Equipment rank';
+    const rankValue = document.createElement('span');
+    rankValue.className = 'font-semibold text-xs';
+    rankValue.style.color = equipmentRank.color;
+    rankValue.style.textShadow = equipmentRank.textShadow;
+    rankValue.textContent = equipmentRank.label;
+    rankBox.append(rankLabel, rankValue);
+    details.append(rankBox);
+  }
+
   if (Number.isInteger(heroSnapshot?.titanGiftLevel) && heroSnapshot.titanGiftLevel > 0) {
     const sparkBox = document.createElement('div');
     sparkBox.className = 'col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between';
@@ -1541,6 +1557,18 @@ function table(headings, rows) {
         const heroId = values[0];
         const heroSnapshot = currentCache.heroGetAll?.data?.[heroId];
         cell.append(createHeroInline(heroId, String(value ?? '—'), heroSnapshot));
+      } else if (heading === 'Equipment rank' && activeTab === 'heroes') {
+        const equipmentRank = globalThis.hwaHelperPopupData?.getHeroEquipmentRank?.(value);
+        if (equipmentRank) {
+          const badge = document.createElement('span');
+          badge.className = 'inline-block font-semibold';
+          badge.textContent = equipmentRank.label;
+          badge.style.color = equipmentRank.color;
+          badge.style.textShadow = equipmentRank.textShadow;
+          cell.append(badge);
+        } else {
+          cell.textContent = '—';
+        }
       } else if (heading === 'Name' && activeTab === 'titans') {
         const titanId = values[0];
         const titanSnapshot = currentCache.titanGetAll?.data?.[titanId];
@@ -4725,12 +4753,12 @@ async function render() {
   } else if (activeTab === 'draft') {
     renderDraft(cache);
   } else if (activeTab === 'heroes') {
-    showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Soul stones', 'Power'], (data) =>
+    showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Equipment rank', 'Soul stones', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, hero]) => {
         const { owned, needed } = globalThis.hwaHelperPopupData.heroSoulProgress(id, hero, cache.inventoryGet?.data);
         const soulStones = `${formatNumber(owned)} / ${typeof needed === 'number' ? formatNumber(needed) : needed ?? '—'}`;
         return [id, globalThis.hwaHelperNameMap.hero(id) || '—', formatNumber(hero?.level),
-          hero?.star, soulStones, formatNumber(hero?.power)];
+          hero?.star, hero?.color, soulStones, formatNumber(hero?.power)];
       }));
   } else if (activeTab === 'items') {
     updateItemGroups(cache.inventoryGet?.data);
