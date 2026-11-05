@@ -242,6 +242,10 @@
       const returnAt = Number.isFinite(march.returnAt) ? march.returnAt : march.endsAt;
       return Number.isFinite(returnAt) && now >= returnAt;
     }
+    if (march.kind === 'attack' && march.stage === 'moveToTargetInSolo') {
+      return Number.isFinite(march.targetArrivalAt) && Number.isFinite(march.durationMs) &&
+        now >= march.targetArrivalAt + march.durationMs + 5 * 60000;
+    }
     const isMine = ['food', 'wood', 'stone', 'iron', 'mine'].includes(march.kind) || Boolean(march.mineId);
     if (isMine) {
       if (march.stage === 'moveToTargetInSolo' && Number.isFinite(march.targetArrivalAt)) {

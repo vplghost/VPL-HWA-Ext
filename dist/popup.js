@@ -432,6 +432,15 @@ function marchTooltip(march, now) {
   const isTraveling = march.stage === 'moveToTargetInSolo' && Number.isFinite(march.targetArrivalAt) && now < march.targetArrivalAt;
   const prevLabel = march.previousKind && marchStyles[march.previousKind] ? marchStyles[march.previousKind].label : null;
   const isReturning = march.kind === 'return' || march.stage === 'returnToOutpost';
+  if (march.kind === 'attack') {
+    const target = Number.isInteger(march.mobConfigId) ? `Monster #${march.mobConfigId}` : 'Monster';
+    const heroes = (march.team?.heroIds || []).map((id) =>
+      globalThis.hwaHelperNameMap?.hero?.(id) || `Hero #${id}`).join(', ');
+    const state = isReturning ? `${march.result === 'win' ? 'Victory' : march.result ? `Result: ${march.result}` : 'Battle complete'} · Returning` :
+      Number.isFinite(march.targetArrivalAt) && now >= march.targetArrivalAt ? 'Battle in progress' : 'Traveling to target';
+    const remaining = Number.isFinite(march.endsAt) ? Math.max(0, Math.ceil((march.endsAt - now) / 1000)) : null;
+    return `${target} · ${state}${heroes ? `\nHeroes: ${heroes}` : ''}${remaining !== null ? `\n${resourceData.tooltipTime(remaining)} remaining` : ''}${march.returnEstimated && isReturning ? '\nReturn time estimated' : ''}`;
+  }
   const action = isReturning ? (prevLabel ? `${prevLabel} returning` : 'Returning') : isMine ?
     `${isTraveling ? 'Traveling to' : 'Gathering'} ${style.label}` :
     march.kind === 'return' ? 'Returning' :
@@ -4340,7 +4349,7 @@ function renderConfigOther(cache) {
   const entries = Object.values(cache || {}).filter((entry) =>
     !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
       'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
-      'accountStatus', 'buildingStatus', 'marchStatus',
+      'accountStatus', 'buildingStatus', 'marchStatus', 'soloMobMap',
       'researchStatus', 'productionConfigStatus', 'productionStatus',
       'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents',
       'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry?.key)

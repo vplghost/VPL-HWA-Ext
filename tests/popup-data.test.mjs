@@ -11,6 +11,18 @@ const { heroSoulProgress, formatTitanArtifactLevels, isTitanArtifactUpgradable, 
   rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount, isTowerCleared,
   isResourceSelectableForHeader, isDebugOrEventResource } = context.hwaHelperPopupData;
 
+test('solo attack stays visible through battle and expires after its return ETA', () => {
+  const { isMarchExpired } = context.hwaHelperPopupData;
+  const arrival = 100000;
+  const outbound = { kind: 'attack', stage: 'moveToTargetInSolo',
+    targetArrivalAt: arrival, durationMs: 45000, endsAt: arrival };
+  assert.equal(isMarchExpired(outbound, arrival + 1000), false);
+  const returning = { ...outbound, stage: 'returnToOutpost', returnAt: arrival + 45500,
+    endsAt: arrival + 45500, result: 'lose' };
+  assert.equal(isMarchExpired(returning, arrival + 45499), false);
+  assert.equal(isMarchExpired(returning, arrival + 45500), true);
+});
+
 test('hero soul progress uses inventory fragments and next-star cost', () => {
   assert.deepEqual({ ...heroSoulProgress('1', { star: 3 }, { fragmentHero: { 1: 73 } }) },
     { owned: 73, needed: 100 });

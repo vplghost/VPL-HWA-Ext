@@ -315,6 +315,14 @@
               const startedAt = route.startedAt;
               const duration = route.durationMs ?? route.duration;
               if (Number.isFinite(startedAt) && Number.isFinite(duration)) {
+                if (route.from?.object?.objectType === 'soloMob') {
+                  actions.push({ key: 'soloAttackReturnAction', method: call.name,
+                    feature: call.feature, group: 'internal', data: {
+                      mobId: route.from.object.objectId,
+                      returnAt: startedAt + duration
+                    }, updatedAt: record.timestamp });
+                  continue;
+                }
                 actions.push({
                   key: 'rallyAction',
                   method: call.name,
@@ -337,6 +345,15 @@
         if (key === 'getPage:report' && Array.isArray(result?.response?.reports)) {
           const actions = [];
           for (const rep of result.response.reports) {
+            if (rep?.type === 'soloMobAttackResult' && rep.id &&
+                Number.isFinite(rep.createdAt) && typeof rep.payload?.result === 'string') {
+              actions.push({ key: 'soloAttackResultAction', method: call.name,
+                feature: call.feature, group: 'internal', data: {
+                  reportId: rep.id, createdAt: rep.createdAt,
+                  mobConfigId: rep.payload.mobConfigId,
+                  result: rep.payload.result
+                }, updatedAt: record.timestamp });
+            }
             if (rep?.type === 'rallyMobAttackResult' && Number.isFinite(rep.createdAt)) {
               actions.push({
                 key: 'rallyAction',
@@ -393,7 +410,13 @@
         }
         if (key === 'getChunks:globalMap' && Array.isArray(result?.response?.chunks)) {
           const mines = {};
+          const monsters = {};
           for (const chunk of result.response.chunks) {
+            for (const mob of (Array.isArray(chunk?.mobs) ? chunk.mobs : [])) {
+              if (mob?.mobId && Number.isInteger(mob.mobConfigId) && mob.mobType === 'solo') {
+                monsters[mob.mobId] = { mobConfigId: mob.mobConfigId };
+              }
+            }
             if (Array.isArray(chunk?.mines)) {
               for (const m of chunk.mines) {
                 if (m?.mineId && m?.mineConfigId) {
@@ -407,16 +430,45 @@
               }
             }
           }
+          const actions = [];
+          if (Object.keys(monsters).length) actions.push({
+            key: 'soloMobMapAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { monsters }, updatedAt: record.timestamp
+          });
           if (Object.keys(mines).length) {
-            return [{
+            actions.push({
               key: 'mineMapAction',
               method: call.name,
               feature: call.feature,
               group: 'internal',
               data: { mines },
               updatedAt: record.timestamp
-            }];
+            });
           }
+          if (actions.length) return actions;
+        }
+        if (key === 'attackMob:mob' && result?.response?.squadId && result.response.route) {
+          const route = result.response.route;
+          const durationMs = route.durationMs ?? route.duration;
+          if (!Number.isFinite(route.startedAt) || !Number.isFinite(durationMs) || durationMs < 0) return [];
+          const energy = resourceAction(record, call, 'world-energy', -10,
+            'World Energy', 'soloMonsterAttack').map((action) => ({
+            ...action, data: { ...action.data, requireSnapshot: true }
+          }));
+          // The captured globalMapMobSolo configuration charges 10 World Energy per attack.
+          return [{ key: 'soloAttackAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { squadId: result.response.squadId,
+              routeId: route.routeId, mobId: call.args?.mobId,
+              team: rallyTeam(call.args?.squad), startedAt: route.startedAt,
+              durationMs, targetArrivalAt: route.startedAt + durationMs },
+            updatedAt: record.timestamp }, ...energy];
+        }
+        if (key === 'attackMob:mob' && result?.error && call.ident) {
+          return [{ key: 'soloAttackResultAction', method: call.name,
+            feature: call.feature, group: 'internal', data: {
+              reportId: `rpc:${call.ident}`, createdAt: Date.parse(record.timestamp),
+              result: 'request_failed', mobId: call.args?.mobId
+            }, updatedAt: record.timestamp }];
         }
         if (key === 'attackMine:mine' && result?.response?.squadId && result?.response?.route) {
           const route = result.response.route;
@@ -1440,6 +1492,101 @@
           changed = true;
           continue;
         }
+        if (entry.key === 'soloMobMapAction') {
+          const monsters = { ...(next.soloMobMap?.data || {}), ...entry.data.monsters };
+          const ids = Object.keys(monsters);
+          for (const id of ids.slice(0, Math.max(0, ids.length - 300))) delete monsters[id];
+          next.soloMobMap = { key: 'soloMobMap', method: entry.method,
+            feature: entry.feature, group: 'internal', data: monsters,
+            updatedAt: entry.updatedAt };
+          if (next.marchStatus?.data?.marches?.some((march) =>
+              march.kind === 'attack' && !Number.isInteger(march.mobConfigId) &&
+              Number.isInteger(monsters[march.mobId]?.mobConfigId))) {
+            next.marchStatus = { ...next.marchStatus, data: {
+              marches: next.marchStatus.data.marches.map((march) =>
+                march.kind === 'attack' && !Number.isInteger(march.mobConfigId) &&
+                Number.isInteger(monsters[march.mobId]?.mobConfigId) ?
+                  { ...march, mobConfigId: monsters[march.mobId].mobConfigId } : march)
+            } };
+          }
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'soloAttackAction') {
+          const current = next.marchStatus;
+          if (current?.updatedAt > entry.updatedAt) continue;
+          const marches = [...(current?.data?.marches || [])];
+          const target = next.soloMobMap?.data?.[entry.data.mobId];
+          const march = { squadId: entry.data.squadId, kind: 'attack',
+            stage: 'moveToTargetInSolo', routeId: entry.data.routeId,
+            mobId: entry.data.mobId, mobConfigId: target?.mobConfigId,
+            team: entry.data.team, startedAt: entry.data.startedAt,
+            durationMs: entry.data.durationMs,
+            targetArrivalAt: entry.data.targetArrivalAt,
+            endsAt: entry.data.targetArrivalAt };
+          const index = marches.findIndex((item) => item.squadId === march.squadId);
+          if (index >= 0) {
+            if (marches[index].routeId === march.routeId) continue;
+            marches[index] = march;
+          } else marches.push(march);
+          next.marchStatus = { key: 'marchStatus', method: entry.method,
+            feature: entry.feature, group: 'header', data: { marches },
+            updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'soloAttackReturnAction') {
+          const current = next.marchStatus;
+          const marches = [...(current?.data?.marches || [])];
+          const matches = marches.map((march, index) => ({ march, index }))
+            .filter(({ march }) => march.kind === 'attack' &&
+              march.mobId === entry.data.mobId &&
+              (!Number.isFinite(march.startedAt) || entry.data.returnAt > march.startedAt));
+          if (matches.length !== 1) continue;
+          const { march, index } = matches[0];
+          marches[index] = { ...march, stage: 'returnToOutpost',
+            returnAt: entry.data.returnAt, endsAt: entry.data.returnAt,
+            returnEstimated: false };
+          next.marchStatus = { key: 'marchStatus', method: entry.method,
+            feature: entry.feature, group: 'header', data: { marches },
+            updatedAt: current?.updatedAt > entry.updatedAt ? current.updatedAt : entry.updatedAt };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'soloAttackResultAction') {
+          const previous = next.soloAttackResults?.data || [];
+          if (previous.some((report) => report.reportId === entry.data.reportId)) continue;
+          const report = { ...entry.data };
+          next.soloAttackResults = { key: 'soloAttackResults', method: entry.method,
+            feature: entry.feature, group: 'other',
+            data: [...previous, report].sort((a, b) => b.createdAt - a.createdAt).slice(0, 50),
+            updatedAt: entry.updatedAt };
+          const current = next.marchStatus;
+          const marches = [...(current?.data?.marches || [])];
+          const candidates = marches.map((march, index) => ({ march, index }))
+            .filter(({ march }) => march.kind === 'attack' && !march.result &&
+              Number.isFinite(march.startedAt) && report.createdAt >= march.startedAt &&
+              (!Number.isInteger(march.mobConfigId) || march.mobConfigId === report.mobConfigId) &&
+              Math.abs(report.createdAt - march.targetArrivalAt) <= 120000)
+            .sort((a, b) => Math.abs(report.createdAt - a.march.targetArrivalAt) -
+              Math.abs(report.createdAt - b.march.targetArrivalAt));
+          if (candidates.length === 1 || (candidates.length > 1 &&
+              Math.abs(report.createdAt - candidates[0].march.targetArrivalAt) <
+              Math.abs(report.createdAt - candidates[1].march.targetArrivalAt))) {
+            const { march, index } = candidates[0];
+            const actualReturn = march.stage === 'returnToOutpost' &&
+              Number.isFinite(march.endsAt);
+            const returnAt = actualReturn ? march.endsAt : report.createdAt + march.durationMs;
+            marches[index] = { ...march, result: report.result,
+              reportId: report.reportId, stage: 'returnToOutpost',
+              returnAt, endsAt: returnAt, returnEstimated: !actualReturn };
+            next.marchStatus = { key: 'marchStatus', method: entry.method,
+              feature: entry.feature, group: 'header', data: { marches },
+              updatedAt: current?.updatedAt > entry.updatedAt ? current.updatedAt : entry.updatedAt };
+          }
+          changed = true;
+          continue;
+        }
         if (entry.key === 'rallyAction') {
           const current = next.marchStatus;
           if (current?.updatedAt > entry.updatedAt) continue;
@@ -1696,6 +1843,7 @@
         }
         if (entry.key === 'resourceAction') {
           const resourceEntry = next[entry.data.resourceKey];
+          if (entry.data.requireSnapshot && !resourceEntry) continue;
           const seen = next.resourceActionHistory?.data || {};
           if (seen[entry.data.token]) continue;
           if (resourceEntry && resourceEntry.updatedAt > entry.updatedAt) continue;
@@ -2843,6 +2991,17 @@
               rally.returnAt = march.endsAt;
             }
               return { ...march, kind: 'raid', rally };
+            }
+            if (prior.kind === 'attack') {
+              const returning = march.stage === 'returnToOutpost';
+              const returnAt = returning && Number.isFinite(march.endsAt) ?
+                march.endsAt : prior.returnAt;
+              return { ...march, kind: 'attack', routeId: march.routeId || prior.routeId,
+                mobId: prior.mobId, mobConfigId: prior.mobConfigId,
+                team: prior.team, startedAt: prior.startedAt,
+                durationMs: prior.durationMs, targetArrivalAt: prior.targetArrivalAt,
+                result: prior.result, reportId: prior.reportId,
+                returnAt, returnEstimated: returning ? false : prior.returnEstimated };
             }
             const enriched = { ...march };
             if (prior.mineId && !enriched.mineId) enriched.mineId = prior.mineId;

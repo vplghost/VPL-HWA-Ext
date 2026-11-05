@@ -26,6 +26,83 @@ function record(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
   };
 }
 
+test('solo monster attack tracks team, cost, loss report, and estimated return without touching other marches', () => {
+  const startedAt = Date.parse('2026-11-05T05:00:08.000Z');
+  const chunk = record([{ name: 'getChunks', feature: 'globalMap', ident: 'map' }],
+    [{ ident: 'map', result: { response: { chunks: [{ mobs: [
+      { mobId: 'target', mobType: 'solo', mobConfigId: 67 }
+    ], mines: [] }] } } }], '2026-11-05T05:00:02.000Z');
+  const attack = record([{ name: 'attackMob', feature: 'mob', ident: 'attack', args: {
+    mobId: 'target', squad: { heroes: [{ heroId: 16 }, { heroId: 79 }],
+      units: [{ unitId: 7, count: 100 }] }
+  } }], [{ ident: 'attack', result: { response: { squadId: 'solo-squad',
+    route: { routeId: 'outbound', startedAt, durationMs: 45000 } } } }],
+  '2026-11-05T05:00:08.100Z');
+  const base = { 'resource:world-energy': { key: 'resource:world-energy',
+    updatedAt: '2026-11-05T05:00:00.000Z', data: { amount: 100, cap: 200 } },
+  marchStatus: { key: 'marchStatus', updatedAt: '2026-11-05T05:00:00.000Z',
+    data: { marches: [{ squadId: 'unrelated', kind: 'raid', stage: 'waitingForRallyStart' }] } } };
+  const started = cache.merge(base, [chunk, attack, attack]).cache;
+  assert.equal(started['resource:world-energy'].data.amount, 90);
+  assert.equal(started.marchStatus.data.marches.length, 2);
+  const solo = started.marchStatus.data.marches.find((march) => march.squadId === 'solo-squad');
+  assert.equal(solo.mobConfigId, 67);
+  assert.equal(solo.targetArrivalAt, startedAt + 45000);
+  assert.deepEqual(Array.from(solo.team.heroIds), [16, 79]);
+  const reportAt = startedAt + 45500;
+  const report = record([{ name: 'getPage', feature: 'report', ident: 'report' }],
+    [{ ident: 'report', result: { response: { reports: [
+      { id: 'old', type: 'soloMobAttackResult', createdAt: startedAt - 60000,
+        payload: { mobConfigId: 67, result: 'win' } },
+      { id: 'loss', type: 'soloMobAttackResult', createdAt: reportAt,
+        payload: { mobConfigId: 67, result: 'lose' } }
+    ] } } }], '2026-11-05T05:00:55.000Z');
+  const finished = cache.merge(started, [report, report]).cache;
+  assert.equal(finished.soloAttackResults.data.length, 2);
+  const returning = finished.marchStatus.data.marches.find((march) => march.squadId === 'solo-squad');
+  assert.equal(returning.result, 'lose');
+  assert.equal(returning.stage, 'returnToOutpost');
+  assert.equal(returning.returnAt, reportAt + 45000);
+  assert.equal(finished.marchStatus.data.marches.find((march) => march.squadId === 'unrelated').kind, 'raid');
+  assert.equal(finished['resource:world-energy'].data.amount, 90);
+  const actualReturnAt = reportAt + 41000;
+  const route = record([{ name: 'getRoutesByIds', feature: 'globalMap', ident: 'route' }],
+    [{ ident: 'route', result: { response: { routes: [{ type: 'returnToOutpost',
+      from: { object: { objectType: 'soloMob', objectId: 'target' } },
+      startedAt: reportAt, durationMs: 41000 }] } } }], '2026-11-05T05:00:56.000Z');
+  const actual = cache.merge(finished, [route]).cache;
+  assert.equal(actual.marchStatus.data.marches.find((march) => march.squadId === 'solo-squad').returnAt, actualReturnAt);
+  assert.equal(actual.marchStatus.data.marches.find((march) => march.squadId === 'solo-squad').returnEstimated, false);
+  const fresh = record([{ name: 'refillableGetAll', feature: 'refillable', ident: 'fresh' }],
+    [{ ident: 'fresh', result: { response: { refillables: [
+      { refillableId: 2, amount: 95, lastRefillAt: Date.parse('2026-11-05T05:01:00.000Z') }
+    ] } } }], '2026-11-05T05:01:00.000Z');
+  assert.equal(cache.merge(actual, [fresh, attack]).cache['resource:world-energy'].data.amount, 95);
+});
+
+test('solo attack without World Energy baseline does not invent a zero balance', () => {
+  const at = '2026-11-05T05:00:08.100Z';
+  const attack = record([{ name: 'attackMob', feature: 'mob', ident: 'attack', args: {
+    mobId: 'target', squad: { heroes: [{ heroId: 16 }] }
+  } }], [{ ident: 'attack', result: { response: { squadId: 'squad',
+    route: { routeId: 'outbound', startedAt: Date.parse(at), durationMs: 45000 } } } }], at);
+  const result = cache.merge({}, [attack]).cache;
+  assert.equal(result['resource:world-energy'], undefined);
+  assert.equal(result.marchStatus.data.marches.length, 1);
+});
+
+test('failed solo attack RPC is logged without creating a march or spending energy', () => {
+  const failed = record([{ name: 'attackMob', feature: 'mob', ident: 'bad', args: {
+    mobId: 'target'
+  } }], [{ ident: 'bad', result: { error: { code: 'NO_ENERGY' } } }],
+  '2026-11-05T05:00:08.100Z');
+  const result = cache.merge({}, [failed, failed]).cache;
+  assert.equal(result.soloAttackResults.data.length, 1);
+  assert.equal(result.soloAttackResults.data[0].result, 'request_failed');
+  assert.equal(result.marchStatus, undefined);
+  assert.equal(result['resource:world-energy'], undefined);
+});
+
 test('extracts selected RPC results by ident and excludes login and chat methods', () => {
   const input = record([
     { name: 'heroGetAll', ident: 'a' },
