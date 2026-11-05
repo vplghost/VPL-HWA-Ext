@@ -47,6 +47,7 @@ const DEFAULT_TAB_CONFIG = [
 let currentTabConfig = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
 let currentAutoClaimSettings = { mail: true, reports: true, quests: true, onOpen: false };
 let popupRpcEnabled = false;
+let claimRpcStatus = null;
 let hasAutoClaimedThisSession = false;
 
 let itemsViewMode = 'grid'; // 'grid' | 'list'
@@ -1641,14 +1642,15 @@ function showSnapshot(entry, headings, makeRows) {
 }
 
 function renderLog(records, recordingState) {
-  const recent = records.filter((record) => matches([record.endpoint, record.method]));
+  const recent = records.filter((record) => matches([record.endpoint, record.method, record.topic,
+    record.direction, record.eventMethod, record.eventType]));
   if (logSort.value === 'oldest') recent.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   else if (logSort.value === 'duration-desc') recent.sort((a, b) => b.durationMs - a.durationMs);
   else if (logSort.value === 'duration-asc') recent.sort((a, b) => a.durationMs - b.durationMs);
   else recent.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   status.textContent = recordingState?.error ||
-    `${records.length} requests this browser session · ${recordingState?.active ? 'Recording' : 'Stopped'}`;
-  if (!recent.length) return showEmpty('No matching requests.');
+    `${records.length} entries this browser session · ${recordingState?.active ? 'Recording' : 'Stopped'}`;
+  if (!recent.length) return showEmpty('No matching entries.');
   for (const record of recent) {
     const row = document.createElement('article');
     row.className = 'border-b border-slate-100 px-4 py-3 last:border-b-0';
@@ -1659,16 +1661,31 @@ function renderLog(records, recordingState) {
     method.textContent = record.method;
     const code = document.createElement('span');
     code.className = record.outcome === 'failed' ? 'font-semibold text-red-700' : 'text-slate-600';
-    code.textContent = record.status === null ? record.outcome : String(record.status);
+    code.textContent = record.transport === 'websocket' ? record.direction :
+      record.status === null ? record.outcome : String(record.status);
     const meta = document.createElement('span');
     meta.className = 'text-xs text-slate-500';
-    meta.textContent = `${record.transport} · ${record.durationMs} ms · ${formatTime(record.timestamp)}`;
+    meta.textContent = record.transport === 'websocket' ?
+      `MQTT · QoS ${record.qos} · ${formatTime(record.timestamp)}` :
+      `${record.transport} · ${record.durationMs} ms · ${formatTime(record.timestamp)}`;
     summary.append(method, code, meta);
     const endpoint = document.createElement('div');
     endpoint.className = 'mt-1 break-all text-xs text-slate-600';
-    endpoint.textContent = record.endpoint;
+    endpoint.textContent = record.transport === 'websocket' ?
+      `${record.endpoint} · ${record.topic || '(topic alias)'}${record.eventType ? ` · ${record.eventType}` : ''}` : record.endpoint;
     row.append(summary, endpoint);
-    if (record.method === 'POST') {
+    if (record.transport === 'websocket') {
+      const details = document.createElement('details');
+      details.className = 'mt-2';
+      const title = document.createElement('summary');
+      title.className = 'cursor-pointer text-blue-700';
+      title.textContent = `MQTT payload (${record.encoding}${record.payloadTruncated ? ', truncated' : ''}; ${record.payloadBytes} bytes)`;
+      const body = document.createElement('pre');
+      body.className = 'mt-2 max-h-44 overflow-auto rounded-lg bg-slate-100 p-2 whitespace-pre-wrap break-all text-xs';
+      body.textContent = record.payload || '(empty payload)';
+      details.append(title, body);
+      row.append(details);
+    } else if (record.method === 'POST') {
       const details = document.createElement('details');
       details.className = 'mt-2';
       const title = document.createElement('summary');
@@ -4627,11 +4644,12 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
   popupRpcEnabled = stored.popupRpcEnabled === true;
+  claimRpcStatus = stored.claimRpcStatus || null;
   currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
   favoriteHeroes = new Set(Array.isArray(stored.favoriteHeroes) ? stored.favoriteHeroes.map(String) : []);
   favoriteTitans = new Set(Array.isArray(stored.favoriteTitans) ? stored.favoriteTitans.map(String) : []);
@@ -4650,7 +4668,8 @@ async function render() {
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
   renderMarches(cache);
   renderAutoClaim(cache, currentAutoClaimSettings);
-  if (popupRpcEnabled && currentAutoClaimSettings.onOpen && !hasAutoClaimedThisSession) {
+  if (popupRpcEnabled && currentAutoClaimSettings.onOpen && !hasAutoClaimedThisSession &&
+      !isClaimQueued()) {
     const pending = globalThis.hwaHelperPopupData?.getPendingClaims?.(cache);
     if (pending && pending.totalCount > 0) {
       hasAutoClaimedThisSession = true;
@@ -4690,6 +4709,8 @@ async function render() {
       if (draftStatus.stageFinishTs) {
         document.querySelector('#draft-banner-timer').textContent =
           globalThis.hwaHelperPopupData.formatCountdown(draftStatus.stageFinishTs);
+      } else {
+        document.querySelector('#draft-banner-timer').textContent = '—';
       }
     } else {
       draftBanner.hidden = true;
@@ -4989,7 +5010,23 @@ function renderAutoClaim(cache, settings = currentAutoClaimSettings) {
 
   if (claimCountEl) claimCountEl.textContent = String(selectedCount);
   if (claimBtn) {
-    claimBtn.disabled = selectedCount === 0 || !popupRpcEnabled;
+    claimBtn.disabled = selectedCount === 0 || !popupRpcEnabled || isClaimQueued();
+  }
+
+  const statusEl = document.querySelector('#autoclaim-status');
+  const statusAge = Date.now() - Date.parse(claimRpcStatus?.updatedAt || '');
+  if (statusEl && claimRpcStatus?.state === 'queued' && isClaimQueued()) {
+    statusEl.textContent = 'Queued for the next game RPC.';
+    statusEl.className = 'text-xs text-blue-600 font-medium';
+  } else if (statusEl && claimRpcStatus?.state === 'queued' && statusAge >= 120000) {
+    statusEl.textContent = 'Queued claim expired. Retry the claim.';
+    statusEl.className = 'text-xs text-rose-600 font-medium';
+  } else if (statusEl && claimRpcStatus?.state === 'complete' && statusAge < 10000) {
+    statusEl.textContent = 'Claim RPC completed. Rewards are syncing.';
+    statusEl.className = 'text-xs text-emerald-600 font-medium';
+  } else if (statusEl && claimRpcStatus?.state === 'failed' && statusAge < 120000) {
+    statusEl.textContent = claimRpcStatus.error || 'Reward claim RPC failed.';
+    statusEl.className = 'text-xs text-rose-600 font-medium';
   }
 
   if (optMail && optMail.checked !== Boolean(settings.mail)) optMail.checked = Boolean(settings.mail);
@@ -4998,12 +5035,18 @@ function renderAutoClaim(cache, settings = currentAutoClaimSettings) {
   if (optOnOpen && optOnOpen.checked !== Boolean(settings.onOpen)) optOnOpen.checked = Boolean(settings.onOpen);
 }
 
+function isClaimQueued() {
+  return claimRpcStatus?.state === 'queued' &&
+    Date.now() - Date.parse(claimRpcStatus.updatedAt || '') < 120000;
+}
+
 function executeAutoClaim(cache = currentCache, settings = currentAutoClaimSettings) {
   if (!popupRpcEnabled) {
     const statusEl = document.querySelector('#autoclaim-status');
     if (statusEl) statusEl.textContent = 'Enable popup RPC calls in Settings to claim rewards.';
     return;
   }
+  if (isClaimQueued()) return;
   const { calls, pending } = globalThis.hwaHelperPopupData?.buildAutoClaimCalls?.(cache, settings) || { calls: [], pending: { totalCount: 0 } };
   if (!calls || calls.length === 0) return;
 
@@ -5020,7 +5063,7 @@ function executeAutoClaim(cache = currentCache, settings = currentAutoClaimSetti
   }
 
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+    chrome.runtime.sendMessage({ kind: 'claim-rewards', calls }, (response) => {
       if (claimBtn && labelEl) {
         labelEl.textContent = '🎁 Claim Selected Rewards';
       }
@@ -5030,7 +5073,15 @@ function executeAutoClaim(cache = currentCache, settings = currentAutoClaimSetti
           statusEl.className = 'text-xs text-rose-600 font-medium';
         }
         if (claimBtn) claimBtn.disabled = false;
+      } else if (response.queued) {
+        claimRpcStatus = { state: 'queued', updatedAt: new Date().toISOString() };
+        if (statusEl) {
+          statusEl.textContent = 'Queued for the next game RPC.';
+          statusEl.className = 'text-xs text-blue-600 font-medium';
+        }
+        if (claimBtn) claimBtn.disabled = true;
       } else {
+        claimRpcStatus = null;
         // Optimistically update cache and UI
         try {
           if (settings.mail && cache.mailStatus?.data) {
@@ -5238,10 +5289,18 @@ document.querySelector('#clear-cache').addEventListener('click', async () => {
 });
 
 async function renderSettings() {
-  const stored = await chrome.storage.local.get(['captureSettings', 'popupRpcEnabled']);
+  const stored = await chrome.storage.local.get(['captureSettings', 'popupRpcEnabled',
+    'socketRefreshMode']);
   document.querySelector('#intercept-enabled').checked = stored.captureSettings?.interceptEnabled !== false;
   document.querySelector('#popup-rpc-enabled').checked = stored.popupRpcEnabled === true;
+  document.querySelector('#socket-refresh-mode').value =
+    stored.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
 }
+
+document.querySelector('#socket-refresh-mode').addEventListener('change', async (event) => {
+  await chrome.storage.local.set({ socketRefreshMode:
+    event.currentTarget.value === 'direct' ? 'direct' : 'piggyback' });
+});
 
 document.querySelector('#popup-rpc-enabled').addEventListener('change', async (event) => {
   await chrome.storage.local.set({ popupRpcEnabled: event.currentTarget.checked });
@@ -5301,9 +5360,11 @@ document.querySelector('#clear').addEventListener('click', async () => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
-    if ('captureSettings' in changes || 'popupRpcEnabled' in changes) renderSettings();
+    if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
+        'socketRefreshMode' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
-    if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes || 'popupRpcEnabled' in changes) queueRender();
+    if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+        'popupRpcEnabled' in changes || 'claimRpcStatus' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
     queueRender();
   }

@@ -29,7 +29,7 @@ function bodyFields(record) {
 }
 
 function normalize(record) {
-  if (!record || !['fetch', 'xhr'].includes(record.transport)) return null;
+  if (!record || !['fetch', 'xhr', 'websocket'].includes(record.transport)) return null;
   if (!['completed', 'failed'].includes(record.outcome)) return null;
   if (typeof record.method !== 'string' || !/^[A-Z]+$/.test(record.method)) return null;
   if (!Number.isInteger(record.status) && record.status !== null) return null;
@@ -37,6 +37,24 @@ function normalize(record) {
   if (typeof record.timestamp !== 'string' || !Number.isFinite(Date.parse(record.timestamp))) return null;
   try {
     const url = new URL(record.endpoint);
+    if (record.transport === 'websocket') {
+      if (`${url.origin}${url.pathname}` !== 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt' ||
+          record.method !== 'PUBLISH' || record.outcome !== 'completed' || record.status !== null ||
+          !['sent', 'received'].includes(record.direction) || typeof record.topic !== 'string' ||
+          ![0, 1, 2].includes(record.qos) || !['utf8', 'base64'].includes(record.encoding) ||
+          typeof record.payload !== 'string' || !Number.isInteger(record.payloadBytes) ||
+          record.payloadBytes < 0) return null;
+      return {
+        transport: 'websocket', method: 'PUBLISH', endpoint: `${url.origin}${url.pathname}`,
+        status: null, durationMs: 0, outcome: 'completed', timestamp: record.timestamp,
+        direction: record.direction, topic: record.topic.slice(0, 512), qos: record.qos,
+        payload: record.payload.slice(0, MAX_BODY_CHARS), encoding: record.encoding,
+        payloadBytes: record.payloadBytes,
+        payloadTruncated: record.payloadTruncated === true || record.payload.length > MAX_BODY_CHARS,
+        ...(typeof record.eventMethod === 'string' ? { eventMethod: record.eventMethod.slice(0, 100) } : {}),
+        ...(typeof record.eventType === 'string' ? { eventType: record.eventType.slice(0, 100) } : {})
+      };
+    }
     if (!['http:', 'https:'].includes(url.protocol)) return null;
     if (globalThis.hwaHelperIsTrackingUrl(url.href)) return null;
     return {
@@ -52,6 +70,34 @@ function normalize(record) {
   } catch (_) {
     return null;
   }
+}
+
+function socketRefreshCalls(record, cache) {
+  if (record.transport !== 'websocket' || record.direction !== 'received' ||
+      record.encoding !== 'utf8' || record.payloadTruncated) return [];
+  let type;
+  let body;
+  try {
+    const event = JSON.parse(record.payload)?.result;
+    type = event?.type;
+    body = event?.body;
+  } catch (_) { return []; }
+  if (type === 'randomDraft_statusChanged') return [{ name: 'randomDraft_getInfo' }];
+  if (type === 'newReport') return [{ name: 'getPage', feature: 'report',
+    args: { limit: 10, cursor: null } }];
+  if (type === 'questUpdateAll') return [{ name: 'questGetAll' }, { name: 'questGetEvents' }];
+  if (type === 'rallyUserAutojoined' && typeof body?.rallyId === 'string') {
+    return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } },
+      { name: 'getMarches', feature: 'march' }];
+  }
+  if (type === 'rallyMembersUpdated' && typeof body?.rallyId === 'string' &&
+      cache?.marchStatus?.data?.marches?.some((march) => march.rally?.id === body.rallyId)) {
+    return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } }];
+  }
+  if (['rallyCreated', 'rallyCompleted', 'returnToOutpostFromMob'].includes(type)) {
+    return [{ name: 'getMarches', feature: 'march' }];
+  }
+  return [];
 }
 
 async function recordedEntries() {
@@ -77,7 +123,7 @@ async function clearInteractions() {
 }
 
 function normalizeInteraction(entry) {
-  if (!entry || !['pointer', 'keyboard', 'wheel', 'engine'].includes(entry.category) ||
+  if (!entry || !['pointer', 'keyboard', 'wheel', 'engine', 'rpc'].includes(entry.category) ||
       typeof entry.timestamp !== 'string' || !Number.isFinite(Date.parse(entry.timestamp))) return null;
   const clean = { category: entry.category, timestamp: entry.timestamp };
   for (const key of ['action', 'target', 'objectName', 'methodName', 'paramType', 'key']) {
@@ -199,32 +245,72 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.catch(() => {});
     return true;
   }
-  if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc' || message?.kind === 'engine-ping' || message?.kind === 'engine-send-message') && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
-    const forward = () => chrome.tabs?.query({ url: GAME_ORIGINS.map((o) => `${o}/*`) }, (tabs) => {
+  if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc' ||
+      message?.kind === 'claim-rewards' || message?.kind === 'engine-ping' ||
+      message?.kind === 'engine-send-message') &&
+      sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+    const forward = (forwardedMessage = message, queued = false) =>
+      chrome.tabs?.query({ url: GAME_ORIGINS.map((o) => `${o}/*`) }, async (tabs) => {
       let forwarded = false;
       for (const tab of tabs || []) {
         if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+          if (queued && !forwarded) await chrome.storage.local.set({ claimRpcStatus: {
+            state: 'queued', updatedAt: new Date().toISOString()
+          } }).catch(() => {});
+          chrome.tabs.sendMessage(tab.id, forwardedMessage).catch(() => {});
           forwarded = true;
+          if (message.kind === 'claim-rewards') break;
         }
       }
       if (!forwarded) {
-        chrome.tabs?.query({}, (allTabs) => {
+        chrome.tabs?.query({}, async (allTabs) => {
           for (const tab of allTabs || []) {
             if (tab.id && isGameUrl(tab.url)) {
-              chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+              if (queued && !forwarded) await chrome.storage.local.set({ claimRpcStatus: {
+                state: 'queued', updatedAt: new Date().toISOString()
+              } }).catch(() => {});
+              chrome.tabs.sendMessage(tab.id, forwardedMessage).catch(() => {});
               forwarded = true;
+              if (message.kind === 'claim-rewards') break;
             }
           }
-          sendResponse({ ok: forwarded, error: forwarded ? null : 'No active Hero Wars tab found.' });
+          sendResponse({ ok: forwarded, queued: forwarded && queued,
+            error: forwarded ? null : 'No active Hero Wars tab found.' });
         });
         return;
       }
-      sendResponse({ ok: forwarded, error: null });
+      sendResponse({ ok: forwarded, queued: forwarded && queued, error: null });
     });
     if (message.kind === 'engine-ping') forward();
-    else chrome.storage.local.get('popupRpcEnabled').then((stored) => {
-      if (stored.popupRpcEnabled === true) forward();
+    else chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode',
+      'captureSettings', 'claimRpcStatus']).then((stored) => {
+      if (stored.popupRpcEnabled === true) {
+        if (message.kind === 'claim-rewards') {
+          const allowed = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm',
+            'mailGetAll', 'questGetAll']);
+          if (!Array.isArray(message.calls) || !message.calls.length ||
+              message.calls.some((call) => !allowed.has(call?.name)) ||
+              !message.calls.some((call) => ['mailFarm', 'readAndClaimAll',
+                'quest_multiFarm'].includes(call.name))) {
+            sendResponse({ ok: false, error: 'Invalid reward claim calls.' });
+            return;
+          }
+          const queued = stored.socketRefreshMode !== 'direct';
+          if (queued && stored.captureSettings?.interceptEnabled === false) {
+            sendResponse({ ok: false,
+              error: 'Enable Monitor API or choose Direct for reward claims.' });
+            return;
+          }
+          if (queued && stored.claimRpcStatus?.state === 'queued' &&
+              Date.now() - Date.parse(stored.claimRpcStatus.updatedAt || '') < 120000) {
+            sendResponse({ ok: false, error: 'Reward claims are already queued.' });
+            return;
+          }
+          if (!queued) chrome.storage.local.remove('claimRpcStatus').catch(() => {});
+          forward({ kind: queued ? 'queue-claim' : 'refresh-rpc',
+            calls: message.calls }, queued);
+        } else forward();
+      }
       else sendResponse({ ok: false, error: 'Popup RPC calls are disabled in Settings.' });
     }).catch((error) => sendResponse({ ok: false, error: String(error) }));
     return true;
@@ -264,10 +350,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const record = normalize(message.record);
   if (!record) return;
   pending = pending.then(async () => {
-    const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings', 'popupRpcEnabled']);
+    const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings',
+      'popupRpcEnabled', 'socketRefreshMode']);
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
     if (cacheResult.changed) await chrome.storage.local.set({ rpcCache: cacheResult.cache });
+    if (stored.popupRpcEnabled === true && sender.tab?.id) {
+      const calls = socketRefreshCalls(record, cacheResult.cache);
+      if (calls.length) chrome.tabs?.sendMessage?.(sender.tab.id,
+        { kind: stored.socketRefreshMode === 'direct' ? 'refresh-rpc' : 'queue-rpc',
+          calls })?.catch?.(() => {});
+    }
     const latestClaim = cacheResult.cache.questClaimStatus?.data?.claims?.at(-1);
     if (stored.popupRpcEnabled === true && cacheResult.changed && latestClaim?.needsSync &&
         latestClaim.at === record.timestamp && sender.tab?.id) {

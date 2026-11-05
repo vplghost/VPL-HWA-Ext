@@ -7,6 +7,23 @@
   let captureEnabled = false;
   let popupRpcEnabled = false;
   let recordingActive = false;
+  const queuedRpcCalls = new Map();
+  const queuedClaimKeys = new Set();
+  let claimQueueTimer = null;
+  const piggybackMethods = new Set(['randomDraft_getInfo', 'getPage',
+    'questGetAll', 'questGetEvents', 'getMarches', 'getRallyById']);
+  const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
+  const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
+  const reportClaimResult = (ok, error = null) => window.postMessage({
+    source: 'hwa-helper-api', kind: 'claim-rpc-result', ok, error
+  }, location.origin);
+  const tracePiggyback = (action, detail = '') => {
+    if (!recordingActive) return;
+    window.postMessage({ source: 'hwa-helper-api', kind: 'interaction-record',
+      entry: { category: 'rpc', action, target: 'api/rpc', methodName: detail,
+        timestamp: new Date().toISOString() }
+    }, location.origin);
+  };
   let lastRpcUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null;
   let lastRpcHeaders = null;
   try {
@@ -130,6 +147,46 @@
       captureEnabled = event.data.interceptEnabled === true;
       popupRpcEnabled = event.data.popupRpcEnabled === true;
       recordingActive = event.data.recordingActive === true;
+      if (!captureEnabled || !popupRpcEnabled || event.data.socketRefreshMode === 'direct') {
+        if (queuedClaimKeys.size) reportClaimResult(false, 'Queued claims were cancelled by Settings.');
+        queuedRpcCalls.clear();
+        queuedClaimKeys.clear();
+        if (claimQueueTimer !== null) clearTimeout(claimQueueTimer);
+        claimQueueTimer = null;
+      }
+    }
+    if (event.data?.source === 'hwa-helper-control' &&
+        ['queue-rpc', 'queue-claim'].includes(event.data.kind)) {
+      if (!captureEnabled || !popupRpcEnabled || !Array.isArray(event.data.calls)) return;
+      const isClaim = event.data.kind === 'queue-claim';
+      for (const call of event.data.calls) {
+        if (!(isClaim ? claimQueueMethods : piggybackMethods).has(call?.name)) continue;
+        const safe = { name: call.name, args: call.args || {},
+          ...(call.feature ? { feature: call.feature } : {}) };
+        const key = JSON.stringify(safe);
+        if (!queuedRpcCalls.has(key)) {
+          if (queuedRpcCalls.size >= 16) {
+            const oldest = [...queuedRpcCalls.keys()].find((item) =>
+              !queuedClaimKeys.has(item));
+            if (!oldest) continue;
+            queuedRpcCalls.delete(oldest);
+            queuedClaimKeys.delete(oldest);
+          }
+          queuedRpcCalls.set(key, safe);
+        }
+        if (isClaim) queuedClaimKeys.add(key);
+      }
+      if (isClaim && queuedClaimKeys.size && typeof setTimeout === 'function') {
+        if (claimQueueTimer !== null) clearTimeout(claimQueueTimer);
+        claimQueueTimer = setTimeout(() => {
+          for (const key of queuedClaimKeys) queuedRpcCalls.delete(key);
+          queuedClaimKeys.clear();
+          claimQueueTimer = null;
+          tracePiggyback('piggyback-expired', 'claim');
+          reportClaimResult(false, 'No game RPC arrived within two minutes. Retry the claim.');
+        }, 120000);
+      }
+      tracePiggyback('piggyback-queued', `${isClaim ? 'claim' : 'refresh'}:${event.data.calls.length}`);
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
       if (!popupRpcEnabled) return;
@@ -705,6 +762,76 @@
     }
   }
 
+  function preparePiggyback(url, method, options, source = 'init') {
+    if (!captureEnabled || !popupRpcEnabled || !queuedRpcCalls.size ||
+        String(method).toUpperCase() !== 'POST' || typeof options?.body !== 'string' ||
+        typeof Response !== 'function') return null;
+    try {
+      const target = new URL(String(url), location.href);
+      if (`${target.origin}${target.pathname}` !== 'https://api.hero-wars-alliance.com/api/rpc') return null;
+      const request = JSON.parse(options.body);
+      if (!Array.isArray(request.calls)) return null;
+      const existing = new Map(request.calls.map((call) => [
+        JSON.stringify({ name: call.name, args: call.args || {},
+          ...(call.feature ? { feature: call.feature } : {}) }), call.ident
+      ]));
+      const appended = [];
+      const consumed = [];
+      const claimIds = [];
+      for (const [key, call] of queuedRpcCalls) {
+        if (!existing.has(key)) {
+          const ident = Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16) +
+            Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16);
+          appended.push({ ...call, ident });
+          if (queuedClaimKeys.has(key) && claimActionMethods.has(call.name)) claimIds.push(ident);
+        } else if (queuedClaimKeys.has(key) && claimActionMethods.has(call.name)) {
+          claimIds.push(existing.get(key));
+        }
+        consumed.push(key);
+      }
+      if (!appended.length) {
+        for (const key of consumed) {
+          queuedRpcCalls.delete(key);
+          queuedClaimKeys.delete(key);
+        }
+        if (!queuedClaimKeys.size && claimQueueTimer !== null) {
+          clearTimeout(claimQueueTimer);
+          claimQueueTimer = null;
+        }
+        if (claimIds.length) tracePiggyback('piggyback-covered', source);
+        return claimIds.length ? { appended, claimIds, options } : null;
+      }
+      const headers = typeof Headers === 'function' ? new Headers(options.headers || {}) :
+        { ...(options.headers || {}) };
+      if (typeof headers.delete === 'function') headers.delete('x-auth-signature');
+      else for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === 'x-auth-signature') delete headers[key];
+      }
+      const prepared = { appended, claimIds, options: { ...options,
+        headers, body: JSON.stringify({ ...request, calls: [...request.calls, ...appended] }) } };
+      for (const key of consumed) {
+        queuedRpcCalls.delete(key);
+        queuedClaimKeys.delete(key);
+      }
+      if (!queuedClaimKeys.size && claimQueueTimer !== null) {
+        clearTimeout(claimQueueTimer);
+        claimQueueTimer = null;
+      }
+      tracePiggyback('piggyback-attached', `${source}:${appended.length}`);
+      return prepared;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function restorePiggyback(appended) {
+    for (const { ident, ...call } of appended || []) {
+      if (!piggybackMethods.has(call.name)) continue;
+      const key = JSON.stringify(call);
+      if (!queuedRpcCalls.has(key)) queuedRpcCalls.set(key, call);
+    }
+  }
+
   if (typeof window.fetch === 'function') {
     const originalFetch = window.fetch;
     window.fetch = function (...args) {
@@ -747,13 +874,65 @@
       if (!captureEnabled || isTrackingUrl(url, location.href)) return originalFetch.apply(this, args);
       const method = options?.method || input?.method || 'GET';
       const isPost = String(method).toUpperCase() === 'POST';
-      const requestBody = isPost ? readRequestBody(input, options) : Promise.resolve(null);
+      const dispatch = (piggyback) => {
+      if (piggyback) args[1] = piggyback.options;
+      const requestBody = isPost ? readRequestBody(input, args[1]) : Promise.resolve(null);
       const started = performance.now();
       try {
         return Promise.resolve(originalFetch.apply(this, args)).then(
-          (response) => {
-            if (!captureEnabled) return response;
+          async (response) => {
+            if (!captureEnabled && !piggyback) return response;
             const duration = performance.now() - started;
+            if (piggyback) {
+              try {
+                const fullText = await response.clone().text();
+                const full = JSON.parse(fullText);
+                if (!response.ok || !Array.isArray(full.results)) throw Error('Piggyback RPC failed');
+                const appendedIds = new Set(piggyback.appended.map((call) => call.ident));
+                const extraResults = full.results.filter((item) => appendedIds.has(item.ident));
+                if (extraResults.length < piggyback.appended.length) {
+                  const receivedIds = new Set(extraResults.map((item) => item.ident));
+                  restorePiggyback(piggyback.appended.filter((call) => !receivedIds.has(call.ident)));
+                }
+                const gameResponse = { ...full,
+                  results: full.results.filter((item) => !appendedIds.has(item.ident)) };
+                const headers = new Headers(response.headers);
+                headers.delete('content-length');
+                headers.delete('content-encoding');
+                const filtered = new Response(JSON.stringify(gameResponse), {
+                  status: response.status, statusText: response.statusText, headers
+                });
+                for (const property of ['url', 'redirected', 'type']) {
+                  try { Object.defineProperty(filtered, property, { value: response[property] }); } catch (_) {}
+                }
+                record('fetch', method, url, response.status, duration, 'completed', {
+                  requestBody: piggyback.options.body, responseBody: fullText
+                });
+                if (fullText.length > MAX_BODY_CHARS && extraResults.length) {
+                  record('fetch', method, url, response.status, duration, 'completed', {
+                    requestBody: JSON.stringify({ calls: piggyback.appended }),
+                    responseBody: JSON.stringify({ results: extraResults })
+                  });
+                }
+                if (piggyback.claimIds.length) {
+                  const ok = piggyback.claimIds.every((ident) => {
+                    const result = full.results.find((item) => item.ident === ident);
+                    return result?.result && Object.hasOwn(result.result, 'response');
+                  });
+                  reportClaimResult(Boolean(ok), ok ? null : 'One or more reward claims failed.');
+                  tracePiggyback(ok ? 'piggyback-claim-ok' : 'piggyback-claim-failed');
+                }
+                return filtered;
+              } catch (_) {
+                restorePiggyback(piggyback.appended);
+                if (piggyback.claimIds.length) reportClaimResult(false, 'Reward claim RPC failed.');
+                record('fetch', method, url, response.status, duration, 'completed', {
+                  requestBody: piggyback.options.body,
+                  responseBody: (await readFetchResponse(response))?.text ?? null
+                });
+                return response;
+              }
+            }
             if (isPost) {
               Promise.all([requestBody, readFetchResponse(response)]).then(([request, received]) => {
                 record('fetch', method, url, response.status, duration, 'completed', {
@@ -769,6 +948,8 @@
             return response;
           },
           (error) => {
+            if (piggyback) restorePiggyback(piggyback.appended);
+            if (piggyback?.claimIds.length) reportClaimResult(false, 'Reward claim RPC failed.');
             const duration = performance.now() - started;
             if (isPost) {
               requestBody.then((request) => record('fetch', method, url, null, duration, 'failed', {
@@ -784,6 +965,8 @@
           }
         );
       } catch (error) {
+        if (piggyback) restorePiggyback(piggyback.appended);
+        if (piggyback?.claimIds.length) reportClaimResult(false, 'Reward claim RPC failed.');
         const duration = performance.now() - started;
         if (isPost) {
           requestBody.then((request) => record('fetch', method, url, null, duration, 'failed', {
@@ -797,6 +980,26 @@
         }
         throw error;
       }
+      };
+      if (isPost && queuedRpcCalls.size && typeof options?.body !== 'string') {
+        const body = options?.body;
+        const bodyText = typeof Blob !== 'undefined' && body instanceof Blob ?
+          body.text() : input?.body && typeof input.clone === 'function' ?
+            input.clone().text() : null;
+        if (bodyText) return bodyText.then((text) => {
+          const extra = text.length <= MAX_BODY_CHARS ? preparePiggyback(url, method, {
+            ...(options || {}), body: text,
+            headers: options?.headers || input?.headers || {}
+          }, 'request') : null;
+          return dispatch(extra);
+        }, () => {
+          tracePiggyback('piggyback-skipped', 'request-body-unreadable');
+          return dispatch(null);
+        });
+      }
+      const sourceOptions = options?.body && !options.headers && input?.headers ?
+        { ...options, headers: input.headers } : options;
+      return dispatch(preparePiggyback(url, method, sourceOptions));
     };
   }
 

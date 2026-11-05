@@ -100,6 +100,9 @@ Build pipeline script that:
 2. Maps roles (Tank, Marksman, Support, Supertitan, Summoner) and elements (Water, Fire, Earth, Darkness, Light, Spirit).
 3. Generates `extension/titan-metadata.js` for titan hover cards and avatars.
 
+### 4. `scripts/generate-item-assets.mjs`
+Run `node scripts/generate-item-assets.mjs --refresh` to download and decode inventory icons again. It covers observed consumables, gear, and scrolls, plus any icons already stored in `extension/assets/items/`. The script tries the icon filename from splitlib metadata first, writes a replacement only after PNG conversion succeeds, and keeps the existing icon when the CDN asset is unavailable.
+
 ---
 
 ## 4. Extraction & Conversion Inventory

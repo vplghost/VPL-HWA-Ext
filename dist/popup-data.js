@@ -317,6 +317,7 @@
     if (stageId === 2 || stageId === 3) return 'Defense Draft';
     if (stageId === 4) return 'Attack Draft';
     if (stageId === 5) return 'Ready for Battle';
+    if (stageId === 6) return 'Battle in Progress';
     if (stageId === 7) return 'Match Completed';
     return 'Not in match';
   }
@@ -330,7 +331,7 @@
   }
 
   function isDraftActive(stageId) {
-    return Number.isInteger(stageId) && stageId >= 1 && stageId <= 4;
+    return Number.isInteger(stageId) && stageId >= 1 && stageId <= 6;
   }
 
   function buildingTooltip(status, now, buildingName) {

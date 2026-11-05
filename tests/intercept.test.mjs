@@ -8,6 +8,8 @@ const filterSource = await readFile(new URL('../extension/tracking-filter.js', i
 
 function setup(fetchImplementation, enable = true, extraContext = {}) {
   const messages = [];
+  const claimResults = [];
+  const interactions = [];
   const listeners = [];
   let now = 0;
   class FakeXHR {
@@ -38,6 +40,8 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
     addEventListener: (name, handler) => { if (name === 'message') listeners.push(handler); },
     postMessage: (data, targetOrigin) => {
       if (data.kind === 'api-record') messages.push({ data, targetOrigin });
+      if (data.kind === 'claim-rpc-result') claimResults.push(data);
+      if (data.kind === 'interaction-record') interactions.push(data.entry);
       for (const handler of listeners) handler({ source: window, origin: targetOrigin, data });
     },
     ...extraContext.window
@@ -53,7 +57,7 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
   if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true,
     popupRpcEnabled: true },
     'https://www.hero-wars-alliance.com');
-  return { window, messages, sessionStorage };
+  return { window, messages, claimResults, interactions, sessionStorage };
 }
 
 async function waitForMessage(messages) {
@@ -245,6 +249,195 @@ test('fetch captures RPC url and headers into sessionStorage and refresh-rpc sen
   assert.ok(refreshSent);
   assert.equal(refreshSent.opts.headers['x-auth-user-id'], '12345');
   assert.equal(refreshSent.opts.headers['x-auth-session-id'], 'abc-session');
+});
+
+test('piggyback queues read-only calls for the next game RPC and hides their results from game', async () => {
+  const sent = [];
+  const { window, messages } = setup(async (url, options) => {
+    const request = JSON.parse(options.body);
+    sent.push({ url, options, request });
+    return new Response(JSON.stringify({ results: request.calls.map((call) => ({
+      ident: call.ident, result: { response: { name: call.name } }
+    })) }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, true, { Response, Headers });
+
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [
+    { name: 'randomDraft_getInfo' },
+    { name: 'getMarches', feature: 'march' },
+    { name: 'randomDraft_getInfo' }
+  ] }, 'https://www.hero-wars-alliance.com');
+  assert.equal(sent.length, 0);
+  const gameRequest = { calls: [{ name: 'userGetInfo', ident: 'game-1', args: {} }] };
+  const response = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', headers: { 'x-request-id': '42', 'x-auth-signature': 'old' },
+    body: JSON.stringify(gameRequest)
+  });
+  assert.deepEqual(JSON.parse(await response.text()).results.map((item) => item.ident),
+    ['game-1']);
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0].request.calls.map((call) => call.name),
+    ['userGetInfo', 'randomDraft_getInfo', 'getMarches']);
+  assert.equal(sent[0].options.headers.get('x-request-id'), '42');
+  assert.equal(sent[0].options.headers.has('x-auth-signature'), false);
+  assert.equal(messages.length, 1);
+  const captured = messages[0].data.record;
+  assert.equal(JSON.parse(captured.requestBody).calls.length, 3);
+  assert.equal(JSON.parse(captured.responseBody).results.length, 3);
+
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify(gameRequest)
+  });
+  assert.equal(sent[1].request.calls.length, 1, 'queued refresh is consumed once');
+});
+
+test('piggyback retries after a failed RPC and records added results from a large response', async () => {
+  let attempts = 0;
+  const { window, messages } = setup(async (_url, options) => {
+    attempts++;
+    if (attempts === 1) return new Response('{"error":"temporary"}', { status: 503 });
+    const request = JSON.parse(options.body);
+    return new Response(JSON.stringify({ results: request.calls.map((call) => ({
+      ident: call.ident, result: { response: { name: call.name } }
+    })), padding: 'x'.repeat(530000) }), { status: 200,
+      headers: { 'content-type': 'application/json' } });
+  }, true, { Response, Headers });
+  const original = { calls: [{ name: 'userGetInfo', ident: 'game-1', args: {} }] };
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc',
+    calls: [{ name: 'randomDraft_getInfo' }] }, 'https://www.hero-wars-alliance.com');
+  const first = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify(original)
+  });
+  assert.equal(first.status, 503);
+  const second = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify(original)
+  });
+  assert.equal(JSON.parse(await second.text()).results.length, 1);
+  assert.equal(attempts, 2);
+  assert.equal(messages.length, 3);
+  const targeted = messages.at(-1).data.record;
+  assert.deepEqual(JSON.parse(targeted.requestBody).calls.map((call) => call.name),
+    ['randomDraft_getInfo']);
+  assert.equal(JSON.parse(targeted.responseBody).results.length, 1);
+});
+
+test('queued reward claim runs once in game RPC and reports actual result', async () => {
+  let networkCalls = 0;
+  const { window, claimResults, messages } = setup(async (_url, options) => {
+    networkCalls++;
+    const request = JSON.parse(options.body);
+    return new Response(JSON.stringify({ results: request.calls.map((call) => ({
+      ident: call.ident, result: { response: [] }
+    })) }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, true, { Response, Headers });
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-claim', calls: [
+    { name: 'mailFarm', args: { letterIds: [501] } },
+    { name: 'mailGetAll', args: {} }
+  ] }, 'https://www.hero-wars-alliance.com');
+  assert.equal(networkCalls, 0);
+  assert.equal(claimResults.length, 0);
+  const gameRequest = { calls: [{ name: 'userGetInfo', args: {}, ident: 'game-1' }] };
+  const response = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify(gameRequest)
+  });
+  assert.equal(networkCalls, 1);
+  assert.equal(JSON.parse(await response.text()).results.length, 1);
+  assert.deepEqual(JSON.parse(messages[0].data.record.requestBody).calls.map((call) => call.name),
+    ['userGetInfo', 'mailFarm', 'mailGetAll']);
+  assert.equal(claimResults.length, 1);
+  assert.equal(claimResults[0].ok, true);
+});
+
+test('piggyback appends claims when game fetch uses a Request object', async () => {
+  let sentCalls;
+  const { window, claimResults, messages, interactions } = setup(async (input, options) => {
+    const request = new Request(input, options);
+    const payload = JSON.parse(await request.text());
+    sentCalls = payload.calls;
+    return new Response(JSON.stringify({ results: payload.calls.map((call) => ({
+      ident: call.ident, result: { response: [] }
+    })) }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, true, { Request, Response, Headers });
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+    interceptEnabled: true, popupRpcEnabled: true, recordingActive: true,
+    socketRefreshMode: 'piggyback' }, 'https://www.hero-wars-alliance.com');
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-claim', calls: [
+    { name: 'mailFarm', args: { letterIds: [501] } }
+  ] }, 'https://www.hero-wars-alliance.com');
+  const request = new Request('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', headers: { 'content-type': 'application/json',
+      'x-auth-signature': 'body-bound' },
+    body: '{"calls":[{"name":"userGetInfo","ident":"game-1"}]}'
+  });
+  const response = await window.fetch(request);
+  assert.deepEqual(sentCalls.map((call) => call.name), ['userGetInfo', 'mailFarm']);
+  assert.equal(JSON.parse(await response.text()).results.length, 1);
+  assert.equal(claimResults[0].ok, true);
+  assert.equal(JSON.parse(messages[0].data.record.requestBody).calls.length, 2);
+  assert.deepEqual(interactions.map((item) => item.action),
+    ['piggyback-queued', 'piggyback-attached', 'piggyback-claim-ok']);
+});
+
+test('piggyback appends refresh when game sends JSON in a Blob body', async () => {
+  let names;
+  const { window } = setup(async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    names = payload.calls.map((call) => call.name);
+    return new Response(JSON.stringify({ results: payload.calls.map((call) => ({
+      ident: call.ident, result: { response: {} }
+    })) }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, true, { Response, Headers });
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc',
+    calls: [{ name: 'randomDraft_getInfo' }] }, 'https://www.hero-wars-alliance.com');
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: new Blob([
+      '{"calls":[{"name":"userGetInfo","ident":"game-1"}]}'
+    ], { type: 'application/json' })
+  });
+  assert.deepEqual(names, ['userGetInfo', 'randomDraft_getInfo']);
+});
+
+test('failed piggyback claim reports failure without retrying action', async () => {
+  const sent = [];
+  const { window, claimResults } = setup(async (_url, options) => {
+    const request = JSON.parse(options.body);
+    sent.push(request.calls.map((call) => call.name));
+    return new Response(JSON.stringify({ results: request.calls.map((call) => ({
+      ident: call.ident, result: call.name === 'mailFarm' ?
+        { error: 'claim failed' } : { response: [] }
+    })) }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, true, { Response, Headers });
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-claim', calls: [
+    { name: 'mailFarm', args: { letterIds: [501] } }
+  ] }, 'https://www.hero-wars-alliance.com');
+  const original = { calls: [{ name: 'userGetInfo', args: {}, ident: 'game-1' }] };
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify(original)
+  });
+  assert.equal(claimResults[0].ok, false);
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify(original)
+  });
+  assert.deepEqual(sent[1], ['userGetInfo']);
+});
+
+test('queued claim expires when no game RPC arrives', async () => {
+  let expire;
+  const sent = [];
+  const { window, claimResults } = setup(async (_url, options) => {
+    sent.push(JSON.parse(options.body).calls.map((call) => call.name));
+    return new Response('{"results":[]}', { status: 200,
+      headers: { 'content-type': 'application/json' } });
+  }, true, { Response, Headers,
+    setTimeout: (fn) => { expire = fn; return 1; }, clearTimeout: () => {} });
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-claim', calls: [
+    { name: 'mailFarm', args: { letterIds: [501] } }
+  ] }, 'https://www.hero-wars-alliance.com');
+  expire();
+  assert.equal(claimResults[0].ok, false);
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: '{"calls":[{"name":"userGetInfo","ident":"game-1"}]}'
+  });
+  assert.deepEqual(sent[0], ['userGetInfo']);
 });
 
 test('XHR captures RPC url and headers via setRequestHeader into sessionStorage', async () => {

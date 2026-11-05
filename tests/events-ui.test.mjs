@@ -362,6 +362,7 @@ const context = {
   search,
   currentCache: {},
   popupRpcEnabled: true,
+  claimRpcStatus: null,
   globalThis: {},
   showEmpty: (msg) => {
     const p = new MockElement('p');
@@ -1425,7 +1426,7 @@ test('getPendingClaims and buildAutoClaimCalls identify claimable items and asse
   assert.equal(questsOnly.calls[0].name, 'quest_multiFarm');
 });
 
-test('renderAutoClaim updates badges, counts, and executeAutoClaim dispatches refresh-rpc', () => {
+test('renderAutoClaim updates badges, counts, and dispatches reward claims', () => {
   const sampleCache = {
     mailStatus: {
       data: {
@@ -1459,10 +1460,26 @@ test('renderAutoClaim updates badges, counts, and executeAutoClaim dispatches re
 
   context.executeAutoClaim(sampleCache, { mail: true, reports: false, quests: true });
   assert.ok(sentRpcMessage);
-  assert.equal(sentRpcMessage.kind, 'refresh-rpc');
+  assert.equal(sentRpcMessage.kind, 'claim-rewards');
   assert.equal(sentRpcMessage.calls.some((c) => c.name === 'mailFarm'), true);
   assert.equal(sentRpcMessage.calls.some((c) => c.name === 'quest_multiFarm'), true);
   assert.ok(autoclaimStatus.textContent.includes('Claimed 2 rewards! Syncing...'));
+});
+
+test('piggyback claim stays queued without changing rewards before RPC completes', () => {
+  const sampleCache = { mailStatus: { data: { letters: [
+    { id: 701, reward: { gold: 100 }, claimed: false }
+  ] } } };
+  const previousRuntime = context.chrome.runtime;
+  context.claimRpcStatus = null;
+  context.chrome.runtime = { sendMessage: (_msg, cb) => cb({ ok: true, queued: true }) };
+  context.executeAutoClaim(sampleCache, { mail: true, reports: false, quests: false });
+  assert.equal(sampleCache.mailStatus.data.letters[0].claimed, false);
+  assert.equal(context.claimRpcStatus.state, 'queued');
+  assert.equal(btnClaimAll.disabled, true);
+  assert.ok(autoclaimStatus.textContent.includes('Queued'));
+  context.claimRpcStatus = null;
+  context.chrome.runtime = previousRuntime;
 });
 
 test('popup RPC switch blocks quick refresh and reward claims', () => {

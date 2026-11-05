@@ -26,12 +26,15 @@ test('legend draft stage descriptions and countdown helpers work as expected', (
   assert.equal(popupData.draftStageDescription(2), 'Defense Draft');
   assert.equal(popupData.draftStageDescription(4), 'Attack Draft');
   assert.equal(popupData.draftStageDescription(5), 'Ready for Battle');
+  assert.equal(popupData.draftStageDescription(6), 'Battle in Progress');
 
   assert.equal(popupData.isDraftActive(0), false);
   assert.equal(popupData.isDraftActive(1), true);
   assert.equal(popupData.isDraftActive(2), true);
   assert.equal(popupData.isDraftActive(4), true);
-  assert.equal(popupData.isDraftActive(5), false);
+  assert.equal(popupData.isDraftActive(5), true);
+  assert.equal(popupData.isDraftActive(6), true);
+  assert.equal(popupData.isDraftActive(7), false);
 
   const futureTs = 1000 + 95; // 95s in future
   assert.equal(popupData.formatCountdown(futureTs, 1000), '01:35');
@@ -51,6 +54,19 @@ test('rpc-cache extracts legendDraftStatus from randomDraft_getInfo', () => {
   assert.equal(draftStatus7.data.stageFinishTs, 1793550458);
   assert.equal(draftStatus7.data.enemyUser.name, 'Ieon1973');
   assert.equal(draftStatus7.data.enemyUser.level, 72);
+});
+
+test('battle stage remains active and preserves its countdown', () => {
+  const record = { transport: 'fetch', method: 'POST',
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc', status: 200,
+    timestamp: '2026-11-05T14:59:43.767Z', requestBody: JSON.stringify({ calls: [
+      { name: 'randomDraft_getInfo', ident: 'battle' }
+    ] }), responseBody: JSON.stringify({ results: [{ ident: 'battle',
+      result: { response: { stageId: 6, matchId: 123, stageFinishTs: 1793890856 } }
+    }] }) };
+  const { cache } = rpcCache.merge({}, [record]);
+  assert.equal(cache.legendDraftStatus.data.active, true);
+  assert.equal(cache.legendDraftStatus.data.stageFinishTs, 1793890856);
 });
 
 test('rpc-cache extracts and merges defense pick (randomDraft_saveDefence)', () => {

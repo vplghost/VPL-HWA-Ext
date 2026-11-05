@@ -74,6 +74,16 @@ function getRecord(index) {
   };
 }
 
+function socket(type, body, timestamp = '2026-11-05T14:56:24.426Z') {
+  const payload = JSON.stringify({ method: 'msg', result: { type, body } });
+  return { transport: 'websocket', method: 'PUBLISH',
+    endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt',
+    status: null, durationMs: 0, outcome: 'completed', timestamp,
+    direction: 'received', topic: 'hwm/user/example', qos: 0,
+    payload, payloadBytes: new TextEncoder().encode(payload).length,
+    encoding: 'utf8', payloadTruncated: false, eventType: type };
+}
+
 test('passive cache updates Energy and World Energy without recording or account data', async () => {
   const { local, session, send } = setup();
   const record = rpc([
@@ -175,6 +185,34 @@ test('popup RPC calls and automatic follow-up refreshes are disabled by default'
   assert.equal(forwardedMessages.length, 1);
 });
 
+test('reward claims follow dispatch mode and target one game tab', async () => {
+  const { local, listener, tabsList, forwardedMessages } = setup();
+  tabsList.push({ id: 42, url: gameSender.url }, { id: 43, url: gameSender.url });
+  const claim = { kind: 'claim-rewards', calls: [
+    { name: 'mailFarm', args: { letterIds: [501] } }, { name: 'mailGetAll', args: {} }
+  ] };
+  const sendClaim = () => new Promise((resolve) => listener(claim, popupSender, resolve));
+  assert.equal((await sendClaim()).ok, false);
+  local.popupRpcEnabled = true;
+  const queued = await sendClaim();
+  assert.equal(queued.ok, true);
+  assert.equal(queued.queued, true);
+  assert.equal(forwardedMessages.length, 1);
+  assert.equal(forwardedMessages[0].msg.kind, 'queue-claim');
+  assert.equal(local.claimRpcStatus.state, 'queued');
+  local.socketRefreshMode = 'direct';
+  const direct = await sendClaim();
+  assert.equal(direct.ok, true);
+  assert.equal(direct.queued, false);
+  assert.equal(forwardedMessages.length, 2);
+  assert.equal(forwardedMessages[1].msg.kind, 'refresh-rpc');
+  assert.equal(forwardedMessages[1].tabId, 42);
+  local.socketRefreshMode = 'piggyback';
+  local.captureSettings = { interceptEnabled: false };
+  assert.equal((await sendClaim()).ok, false);
+  assert.equal(forwardedMessages.length, 2);
+});
+
 test('Record and Stop keep an uncapped session log and never write raw records locally', async () => {
   const { local, session, send } = setup();
   local.apiRecords = [{ legacy: true }];
@@ -196,6 +234,126 @@ test('Record and Stop keep an uncapped session log and never write raw records l
   assert.equal(session.recordingState.nextIndex, 501);
   await send('record-clear');
   assert.equal(Object.keys(session).filter((key) => key.startsWith('record:')).length, 0);
+});
+
+test('unrecognized MQTT PUBLISH is recorded only during Record', async () => {
+  const { local, session, send, listener } = setup();
+  const frame = { transport: 'websocket', method: 'PUBLISH',
+    endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt?secret=hidden',
+    status: null, durationMs: 0, outcome: 'completed', timestamp: '2026-11-05T00:00:00.000Z',
+    direction: 'received', topic: 'hero/update', qos: 1, payload: '{"id":1}',
+    encoding: 'utf8', payloadBytes: 8, payloadTruncated: false,
+    eventMethod: 'msg', eventType: 'rallyCreated' };
+  assert.equal((await send('api-record', frame)).saved, false);
+  await send('record-start');
+  assert.equal((await send('api-record', frame)).saved, true);
+  assert.equal(session['record:0'].endpoint, 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt');
+  assert.equal(session['record:0'].topic, 'hero/update');
+  assert.equal(session['record:0'].payload, '{"id":1}');
+  assert.equal(session['record:0'].eventType, 'rallyCreated');
+  assert.equal('rpcCache' in local, false);
+  assert.equal(listener({ kind: 'api-record', record: { ...frame, endpoint: 'wss://other.example/mqtt' } },
+    gameSender, () => {}), undefined);
+  assert.equal(session.recordingState.nextIndex, 1);
+});
+
+test('MQTT pushes update rally return, report, quest, and guild chat without recording', async () => {
+  const { local, session, send } = setup();
+  await send('api-record', rpc([{ name: 'getMarches', feature: 'march', ident: 'march' }],
+    [{ ident: 'march', result: { response: { marches: {
+      moveToTargetInRally: [{ squadId: 'squad-1', targetType: 'mob',
+        route: { startedAt: 1793890538294, durationMs: 45721 } }]
+    } } } }], '2026-11-05T14:56:04.085Z'));
+  const result = await send('api-record', socket('mobRallyAttackResult', {
+    rallyId: 'rally-1', squadId: 'squad-1', mobConfigId: 75,
+    battleResult: { battleResult: 'win' },
+    routeToOutpost: { startedAt: 1793890584360, durationMs: 68380 }
+  }));
+  assert.equal(result.saved, false);
+  assert.equal(result.cached, true);
+  const march = local.rpcCache.marchStatus.data.marches[0];
+  assert.equal(march.stage, 'returnToOutpost');
+  assert.equal(march.endsAt, 1793890652740);
+  assert.equal(march.rally.id, 'rally-1');
+  assert.equal(march.result, 'win');
+
+  await send('api-record', socket('newReport', {
+    reportId: 'report-1', type: 'rallyMobAttackResult'
+  }, '2026-11-05T14:56:24.488Z'));
+  assert.equal(local.rpcCache.mailStatus.data.unclaimedReportsCount, 1);
+  assert.equal(local.rpcCache.mailStatus.data.reports[0].id, 'report-1');
+
+  await send('api-record', socket('specialQuestEvents', {
+    events: [{ id: 100, groups: [{ id: 1, quests: [{ id: 2, state: 'completed' }] }] }]
+  }, '2026-11-05T14:56:25.000Z'));
+  assert.equal(local.rpcCache.specialQuestStatus.data.events[0].groups[0].quests[0].state,
+    'completed');
+
+  await send('api-record', socket('chatMessage', { id: 42, userId: 7,
+    chatType: 'clan', messageType: 'text', ctime: 1793890585,
+    data: { text: 'hello' }, user: { id: '7', name: 'Member' }
+  }, '2026-11-05T14:56:25.001Z'));
+  assert.equal(local.rpcCache.guildChat.data.messages[0].data.text, 'hello');
+  assert.equal(local.rpcCache.guildChat.data.users['7'].name, 'Member');
+
+  await send('api-record', socket('returnFromMobCompleted', { squadId: 'squad-1' },
+    '2026-11-05T14:57:33.027Z'));
+  assert.equal(local.rpcCache.marchStatus.data.marches.length, 0);
+  assert.equal(Object.keys(session).length, 0);
+});
+
+test('metadata-only MQTT pushes request authoritative RPC only when enabled', async () => {
+  const { local, send, forwardedMessages } = setup();
+  const sender = { ...gameSender, tab: { id: 42 } };
+  await send('api-record', socket('randomDraft_statusChanged', {}), sender);
+  assert.equal(forwardedMessages.length, 0);
+  local.popupRpcEnabled = true;
+  for (const type of ['randomDraft_statusChanged', 'newReport', 'questUpdateAll',
+    'rallyCompleted']) {
+    await send('api-record', socket(type, type === 'newReport' ?
+      { reportId: 'report-1' } : {}), sender);
+  }
+  assert.deepEqual(forwardedMessages.map((item) =>
+    Array.from(item.msg.calls, (call) => call.name)),
+    [['randomDraft_getInfo'], ['getPage'], ['questGetAll', 'questGetEvents'], ['getMarches']]);
+  assert.ok(forwardedMessages.every((item) => item.msg.kind === 'queue-rpc'));
+  local.socketRefreshMode = 'direct';
+  await send('api-record', socket('randomDraft_statusChanged', {},
+    '2026-11-05T14:57:40.389Z'), sender);
+  assert.equal(forwardedMessages.at(-1).msg.kind, 'refresh-rpc');
+});
+
+test('rally result push can create a return march and ignores sent or binary data', async () => {
+  const { local, send } = setup();
+  const result = socket('mobRallyAttackResult', { rallyId: 'rally-2',
+    squadId: 'squad-2', routeToOutpost: { startedAt: 1000, durationMs: 8000 }
+  });
+  await send('api-record', { ...result, direction: 'sent' });
+  await send('api-record', { ...result, encoding: 'base64', payload: 'AA==' });
+  assert.equal('rpcCache' in local, false);
+  await send('api-record', result);
+  assert.equal(local.rpcCache.marchStatus.data.marches[0].endsAt, 9000);
+});
+
+test('auto-join push starts a rally march and refreshes its details', async () => {
+  const { local, send, forwardedMessages } = setup();
+  local.popupRpcEnabled = true;
+  const sender = { ...gameSender, tab: { id: 42 } };
+  await send('api-record', socket('rallyUserAutojoined', {
+    rallyId: 'rally-3', squad: { squadId: 'squad-3',
+      heroes: [{ heroId: 16 }], units: [{ unitId: 7, count: 100 }] },
+    route: { startedAt: 1000, durationMs: 3000 }
+  }), sender);
+  const march = local.rpcCache.marchStatus.data.marches[0];
+  assert.equal(march.stage, 'moveToRallyLeader');
+  assert.equal(march.endsAt, 4000);
+  assert.equal(march.rally.team.heroIds[0], 16);
+  assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, (call) => call.name),
+    ['getRallyById', 'getMarches']);
+  await send('api-record', socket('rallyMembersUpdated', { rallyId: 'rally-3' },
+    '2026-11-05T14:56:25.000Z'), sender);
+  assert.deepEqual(Array.from(forwardedMessages[1].msg.calls, (call) => call.name),
+    ['getRallyById']);
 });
 
 test('recorded POST bodies remain bounded and tracking endpoints stay excluded', async () => {

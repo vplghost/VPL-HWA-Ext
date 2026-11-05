@@ -1,5 +1,6 @@
 let currentSettings = null;
 let popupRpcEnabled = false;
+let socketRefreshMode = 'piggyback';
 let recordingActive = false;
 let recordingStateObserved = false;
 
@@ -10,6 +11,7 @@ function sendControl() {
     kind: 'control',
     interceptEnabled: currentSettings.interceptEnabled !== false,
     popupRpcEnabled,
+    socketRefreshMode,
     recordingActive
   }, location.origin);
 }
@@ -34,6 +36,16 @@ window.addEventListener('message', (event) => {
           updatedAt: new Date().toISOString()
         }
       });
+    } catch (_) {}
+    return;
+  }
+  if (event.data.kind === 'claim-rpc-result') {
+    try {
+      chrome.storage?.local?.set?.({ claimRpcStatus: {
+        state: event.data.ok === true ? 'complete' : 'failed',
+        error: event.data.error || null,
+        updatedAt: new Date().toISOString()
+      } });
     } catch (_) {}
     return;
   }
@@ -105,9 +117,10 @@ try {
 } catch (_) {}
 
 try {
-  chrome.storage?.local?.get?.(['captureSettings', 'popupRpcEnabled'])?.then?.((stored) => {
+  chrome.storage?.local?.get?.(['captureSettings', 'popupRpcEnabled', 'socketRefreshMode'])?.then?.((stored) => {
     currentSettings = stored?.captureSettings || {};
     popupRpcEnabled = stored?.popupRpcEnabled === true;
+    socketRefreshMode = stored?.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
     sendControl();
   })?.catch?.(() => {
     currentSettings = {};
@@ -131,7 +144,10 @@ try {
     if (area !== 'local') return;
     if ('captureSettings' in changes) currentSettings = changes.captureSettings.newValue || {};
     if ('popupRpcEnabled' in changes) popupRpcEnabled = changes.popupRpcEnabled.newValue === true;
-    if (!('captureSettings' in changes) && !('popupRpcEnabled' in changes)) return;
+    if ('socketRefreshMode' in changes) socketRefreshMode =
+      changes.socketRefreshMode.newValue === 'direct' ? 'direct' : 'piggyback';
+    if (!('captureSettings' in changes) && !('popupRpcEnabled' in changes) &&
+        !('socketRefreshMode' in changes)) return;
     sendControl();
   });
 } catch {}
@@ -147,10 +163,11 @@ chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
     sendResponse?.({ ok: true });
     return true;
   }
-  if (message?.kind === 'refresh-rpc') {
+  if (message?.kind === 'refresh-rpc' || message?.kind === 'queue-rpc' ||
+      message?.kind === 'queue-claim') {
     window.postMessage({
       source: 'hwa-helper-control',
-      kind: 'refresh-rpc',
+      kind: message.kind,
       calls: message.calls
     }, location.origin);
     sendResponse?.({ ok: true });

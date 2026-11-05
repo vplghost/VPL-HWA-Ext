@@ -280,12 +280,19 @@ test('bridge handles engine-status message and forwards engine commands', async 
   }, 'https://www.hero-wars-alliance.com');
 
   assert.deepEqual(storedData.gameEngineStatus, { ready: true, hasSendMessage: true });
+  window.postMessage({ source: 'hwa-helper-api', kind: 'claim-rpc-result', ok: true },
+    'https://www.hero-wars-alliance.com');
+  assert.equal(storedData.claimRpcStatus.state, 'complete');
 
   assert.ok(runtimeListener);
   let reply = null;
   runtimeListener({ kind: 'engine-ping' }, {}, (r) => { reply = r; });
   assert.equal(reply.ok, true);
   assert.ok(windowMessages.some((m) => m.kind === 'engine-ping'));
+  runtimeListener({ kind: 'queue-claim', calls: [{ name: 'mailFarm' }] }, {},
+    (r) => { reply = r; });
+  assert.equal(reply.ok, true);
+  assert.ok(windowMessages.some((m) => m.kind === 'queue-claim'));
 
   runtimeListener({
     kind: 'engine-send-message',

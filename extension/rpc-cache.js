@@ -271,7 +271,72 @@
     return Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) * 10000 / speed);
   }
 
+  function extractSocket(record) {
+    if (record?.transport !== 'websocket' || record.direction !== 'received' ||
+        record.encoding !== 'utf8' || record.payloadTruncated ||
+        record.endpoint !== 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt') return [];
+    try {
+      const message = JSON.parse(record.payload);
+      const type = message?.result?.type;
+      const body = message?.result?.body;
+      if (!body || typeof body !== 'object') return [];
+      const entry = (key, group, data, feature = null) => ({
+        key, method: type, feature, group, data, updatedAt: record.timestamp
+      });
+      if (type === 'specialQuestEvents' && Array.isArray(body.events)) {
+        return [entry('specialQuestStatus', 'events', { events: body.events })];
+      }
+      if (type === 'chatMessage' && body.chatType === 'clan' && body.id && body.userId) {
+        const { id, userId, messageType, chatType, ctime, data, user } = body;
+        return [entry('guildChat', 'chat', {
+          messages: [{ id: String(id), userId: String(userId), messageType,
+            chatType, ctime: String(ctime), data }],
+          users: user ? { [String(userId)]: user } : {}
+        }, 'clan')];
+      }
+      if (type === 'newReport' && typeof body.reportId === 'string') {
+        return [entry('mailStatus', 'header', { reports: [{
+          id: body.reportId, type: body.type || null, read: false,
+          claimedReward: false,
+          createdAt: Number.isFinite(body.pushTs) ? body.pushTs * 1000 :
+            Date.parse(record.timestamp)
+        }] }, 'report')];
+      }
+      if (type === 'mobRallyAttackResult' && typeof body.squadId === 'string' &&
+          typeof body.rallyId === 'string') {
+        const route = body.routeToOutpost;
+        const duration = route?.durationMs ?? route?.duration;
+        return [entry('rallyAction', 'internal', {
+          action: 'socketResult', squadId: body.squadId, rallyId: body.rallyId,
+          mobConfigId: body.mobConfigId,
+          result: body.battleResult?.battleResult,
+          returnAt: Number.isFinite(route?.startedAt) && Number.isFinite(duration) ?
+            route.startedAt + duration : null
+        })];
+      }
+      if (type === 'rallyUserAutojoined' && typeof body.rallyId === 'string' &&
+          typeof body.squad?.squadId === 'string') {
+        const route = body.route;
+        const duration = route?.durationMs ?? route?.duration;
+        return [entry('rallyAction', 'internal', {
+          action: 'socketAutojoined', rallyId: body.rallyId,
+          squadId: body.squad.squadId, team: rallyTeam(body.squad),
+          endsAt: Number.isFinite(route?.startedAt) && Number.isFinite(duration) ?
+            route.startedAt + duration : null
+        })];
+      }
+      if (type === 'returnFromMobCompleted' && typeof body.squadId === 'string') {
+        return [entry('rallyAction', 'internal', { action: 'socketReturnCompleted',
+          squadId: body.squadId })];
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   function extract(record) {
+    if (record?.transport === 'websocket') return extractSocket(record);
     if (record?.method !== 'POST' || record.status !== 200 ||
         record.endpoint !== 'https://api.hero-wars-alliance.com/api/rpc' ||
         record.requestBodyTruncated || record.responseBodyTruncated ||
@@ -1356,7 +1421,7 @@
             feature: null,
             group: 'draft',
             data: {
-              active: stageId > 0 && stageId < 5,
+              active: stageId > 0 && stageId < 7,
               stageId,
               matchId,
               stageFinishTs,
@@ -1592,7 +1657,42 @@
           if (current?.updatedAt > entry.updatedAt) continue;
           const marches = [...(current?.data?.marches || [])];
           let index = marches.findIndex((march) => march.rally?.id === entry.data.rallyId);
-          if (entry.data.action === 'create') {
+          if (entry.data.action === 'socketAutojoined') {
+            if (index < 0) index = marches.findIndex((march) =>
+              march.squadId === entry.data.squadId);
+            const previous = index >= 0 ? marches[index] : null;
+            const joined = { ...previous, squadId: entry.data.squadId,
+              kind: 'raid', stage: 'moveToRallyLeader', endsAt: entry.data.endsAt,
+              rally: { ...previous?.rally, id: entry.data.rallyId,
+                isAutoJoin: true, team: entry.data.team,
+                memberEta: entry.data.endsAt } };
+            if (index >= 0) marches[index] = joined;
+            else marches.push(joined);
+          } else if (entry.data.action === 'socketResult') {
+            if (index < 0) index = marches.findIndex((march) =>
+              march.kind === 'raid' && march.squadId === entry.data.squadId);
+            if (index < 0) {
+              if (!Number.isFinite(entry.data.returnAt)) continue;
+              marches.push({ squadId: entry.data.squadId, kind: 'raid',
+                stage: 'returnToOutpost', endsAt: entry.data.returnAt,
+                result: entry.data.result,
+                rally: { id: entry.data.rallyId, returnAt: entry.data.returnAt,
+                  mobConfigId: entry.data.mobConfigId } });
+              index = marches.length - 1;
+            }
+            const previous = marches[index];
+            const returnAt = Number.isFinite(entry.data.returnAt) ? entry.data.returnAt :
+              previous.rally?.returnAt ?? previous.endsAt;
+            marches[index] = { ...previous, stage: 'returnToOutpost', endsAt: returnAt,
+              result: entry.data.result || previous.result,
+              rally: { ...previous.rally, id: entry.data.rallyId,
+                returnAt, mobConfigId: entry.data.mobConfigId ?? previous.rally?.mobConfigId } };
+          } else if (entry.data.action === 'socketReturnCompleted') {
+            index = marches.findIndex((march) => march.kind === 'raid' &&
+              march.squadId === entry.data.squadId);
+            if (index < 0) continue;
+            marches.splice(index, 1);
+          } else if (entry.data.action === 'create') {
             if (!entry.data.squadId ||
                 !Number.isFinite(entry.data.waitUntil)) continue;
             if (index < 0) index = marches.findIndex((march) => march.squadId === entry.data.squadId);

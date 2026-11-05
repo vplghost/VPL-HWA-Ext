@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HWA Helper",
-  "version": "0.9.58",
+  "version": "0.9.69",
   "description": "Personal page tweaks and API profiling for Hero Wars: Alliance",
   "permissions": [
     "storage",
@@ -39,7 +39,8 @@
       ],
       "js": [
         "tracking-filter.js",
-        "intercept.js"
+        "intercept.js",
+        "mqtt-capture.js"
       ],
       "run_at": "document_start",
       "world": "MAIN"

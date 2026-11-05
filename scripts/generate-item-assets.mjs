@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { convertImgBuffer } from './convert-img-asset.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const assetsBase = join(root, 'extension/assets/items');
+const refresh = process.argv.includes('--refresh');
 await mkdir(join(assetsBase, 'consumable'), { recursive: true });
 await mkdir(join(assetsBase, 'gear'), { recursive: true });
 await mkdir(join(assetsBase, 'scroll'), { recursive: true });
@@ -35,7 +36,7 @@ const observedScrolls = [
 
 async function downloadAndConvert(category, id, candidateUrls) {
   const targetPath = join(assetsBase, category, `${id}.png`);
-  if (existsSync(targetPath)) return true;
+  if (!refresh && existsSync(targetPath)) return 'skipped';
 
   for (const url of candidateUrls) {
     try {
@@ -43,11 +44,24 @@ async function downloadAndConvert(category, id, candidateUrls) {
       if (!res.ok) continue;
       const buf = Buffer.from(await res.arrayBuffer());
       const { png } = convertImgBuffer(buf);
-      await writeFile(targetPath, png);
-      return true;
+      const tempPath = `${targetPath}.tmp`;
+      try {
+        await writeFile(tempPath, png);
+        await rename(tempPath, targetPath);
+      } finally {
+        await rm(tempPath, { force: true });
+      }
+      return 'updated';
     } catch (_) {}
   }
-  return false;
+  return existsSync(targetPath) ? 'retained' : 'missing';
+}
+
+async function itemIds(category, observed) {
+  if (!refresh) return observed;
+  const existing = (await readdir(join(assetsBase, category)))
+    .filter((name) => /^\d+\.png$/.test(name)).map((name) => name.slice(0, -4));
+  return [...new Set([...observed, ...existing])].sort((a, b) => Number(a) - Number(b));
 }
 
 // Process in parallel with concurrency limit
@@ -68,63 +82,66 @@ async function processPool(tasks, limit = 8) {
 console.log('Extracting inventory item icons...');
 
 const tasks = [];
+const results = { updated: 0, skipped: 0, retained: 0, missing: 0 };
+function report(category, id, result) {
+  results[result]++;
+  if (result === 'updated' || result === 'skipped') console.log(`✓ ${category} #${id} (${result})`);
+  else if (result === 'retained') console.warn(`~ ${category} #${id}: CDN unavailable, kept existing icon`);
+  else console.warn(`✗ ${category} #${id}: no icon available`);
+}
 
 // 1. Consumables
-for (const id of observedConsumables) {
+for (const id of await itemIds('consumable', observedConsumables)) {
   const c = consumableMeta[id];
   if (!c) continue;
   tasks.push(async () => {
     const names = new Set();
-    if (c.assetTexture) {
-      names.add(c.assetTexture);
-      names.add(c.assetTexture.toLowerCase());
-    }
     if (c.icon?.imagePath) {
       const baseName = c.icon.imagePath.replace(/\.png$/i, '');
       names.add(baseName);
       names.add(baseName.toLowerCase());
+    }
+    if (c.assetTexture) {
+      names.add(c.assetTexture);
+      names.add(c.assetTexture.toLowerCase());
     }
     const urls = [];
     for (const name of names) {
       urls.push(`${CDN_BASE}/consumable/${name}.img`);
       urls.push(`${CDN_BASE}/inventory/${name}.img`);
     }
-    const ok = await downloadAndConvert('consumable', id, urls);
-    if (ok) console.log(`✓ Consumable #${id} (${c.assetTexture})`);
-    else console.warn(`✗ Consumable #${id} not found`);
+    report('Consumable', id, await downloadAndConvert('consumable', id, urls));
   });
 }
 
 // 2. Gear
-for (const id of observedGear) {
+for (const id of await itemIds('gear', observedGear)) {
   const g = gearMeta[id];
-  if (!g?.assetTexture) continue;
+  if (!g?.assetTexture && !g?.icon?.imagePath) continue;
   tasks.push(async () => {
-    const urls = [
-      `${CDN_BASE}/inventory/${g.assetTexture}.img`,
-      `${CDN_BASE}/inventory/${g.assetTexture}_new.img`,
-      `${CDN_BASE}/gear/${g.assetTexture}.img`
-    ];
-    const ok = await downloadAndConvert('gear', id, urls);
-    if (ok) console.log(`✓ Gear #${id} (${g.assetTexture})`);
-    else console.warn(`✗ Gear #${id} not found`);
+    const iconName = g.icon?.imagePath?.replace(/\.png$/i, '');
+    const names = [...new Set([iconName, g.assetTexture && `${g.assetTexture}_new`, g.assetTexture].filter(Boolean))];
+    const urls = names.flatMap((name) => [
+      `${CDN_BASE}/inventory/${name}.img`, `${CDN_BASE}/gear/${name}.img`
+    ]);
+    report('Gear', id, await downloadAndConvert('gear', id, urls));
   });
 }
 
 // 3. Scrolls
-for (const id of observedScrolls) {
+for (const id of await itemIds('scroll', observedScrolls)) {
   const s = scrollMeta[id];
-  if (!s?.assetTexture) continue;
+  if (!s?.assetTexture && !s?.icon?.imagePath) continue;
   tasks.push(async () => {
-    const urls = [
-      `${CDN_BASE}/scroll/${s.assetTexture}.img`,
-      `${CDN_BASE}/inventory/${s.assetTexture}.img`
-    ];
-    const ok = await downloadAndConvert('scroll', id, urls);
-    if (ok) console.log(`✓ Scroll #${id} (${s.assetTexture})`);
-    else console.warn(`✗ Scroll #${id} not found`);
+    const iconName = s.icon?.imagePath?.replace(/\.png$/i, '');
+    const names = [...new Set([iconName, s.assetTexture].filter(Boolean))];
+    const urls = names.flatMap((name) => [
+      `${CDN_BASE}/scroll/${name}.img`, `${CDN_BASE}/inventory/${name}.img`
+    ]);
+    report('Scroll', id, await downloadAndConvert('scroll', id, urls));
   });
 }
 
-await processPool(tasks, 10);
+await processPool(tasks, 3);
 console.log('Done extracting inventory item assets.');
+console.log(`Updated: ${results.updated}, skipped: ${results.skipped}, retained: ${results.retained}, missing: ${results.missing}`);
