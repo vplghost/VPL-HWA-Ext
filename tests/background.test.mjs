@@ -79,30 +79,30 @@ test('managed raid queue uses shared policy, pins one game tab and waits for ret
     const env = setup();
     const { local, tabsList, forwardedMessages, listener } = env;
     local.popupRpcEnabled = true; local.socketRefreshMode = mode;
-    local.rpcCache = { accountStatus: { data: { id: 10 } } };
     tabsList.push({ id: 1, url: gameSender.url }, { id: 2, url: gameSender.url });
     const heroes = Object.fromEntries([1, 2, 3, 4, 5].map((id) => [id, { level: 30, star: 2, power: 100 }]));
     const capacities = Object.fromEntries(Object.keys(heroes).map((id) => [id, { count: 600, signature: JSON.stringify([30, 2, 100]) }]));
+    local.troopCapacitySettings = { defaultHero: 700, base: 1000 };
+    local.rpcCache = { accountStatus: { data: { id: 10 } }, heroGetAll: { data: heroes },
+      'getUnitSummary:unit': { data: { squads: [], available: [7, 17, 27].map((unitId) => ({ unitId, count: 5000 })) } },
+      experimentalRallySearch: { data: { mapId: 'map', mobConfigIds: [60], mobs: [{ mobId: 'boss' }] } } };
     const invoke = (message, sender = popupSender) => new Promise((resolve) => listener(message, sender, resolve));
     const response = await invoke({ kind: 'raid-queue-start', options: {
       mapId: 'map', center: { x: 1, y: 2 }, level: 1, heroIds: [1, 2, 3, 4, 5], capacities,
-      baseTroops: 200, waitSeconds: 60, minMembers: 4, count: 2
+      baseTroops: 200, waitSeconds: 60, minMembers: 4, autoCancel: true, count: 2, firstMobId: 'boss'
     } });
     assert.equal(response.ok, true);
     assert.equal(forwardedMessages[0].tabId, 1);
     assert.equal(forwardedMessages[0].msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
-    local.troopCapacitySettings = { defaultHero: 700, base: 1000 };
+    assert.equal(forwardedMessages[0].msg.calls[0].name, 'createRally');
+    assert.equal(forwardedMessages[0].msg.calls[0].args.mobId, 'boss');
+    assert.equal(forwardedMessages[0].msg.calls[0].args.squad.units.reduce((sum, unit) => sum + unit.count, 0), 4500);
     let clock = Date.now() + 1000;
     const answer = async (bodies) => {
       const calls = forwardedMessages.at(-1).msg.calls.map((call, ident) => ({ ...call, ident: String(ident) }));
       await env.send('api-record', rpc(calls, bodies.map((body, ident) => ({ ident: String(ident), result: { response: body } })),
         new Date(clock++).toISOString()), { ...gameSender, tab: { id: 1 } });
     };
-    await answer([heroes, { squads: [], available: [7, 17, 27].map((unitId) => ({ unitId, count: 5000 })) }]);
-    assert.equal(local.raidQueue.phase, 'searching');
-    await answer([{ mobs: [{ mobId: 'boss' }] }]);
-    assert.equal(local.raidQueue.phase, 'creating');
-    assert.equal(forwardedMessages.at(-1).msg.calls[0].args.squad.units.reduce((sum, unit) => sum + unit.count, 0), 4500);
     await answer([{ squadId: 'squad', rally: { rallyId: 'rally', plannedStartTime: clock + 60000 } }]);
     assert.equal(local.raidQueue.phase, 'active');
     await env.send('api-record', socket('mobRallyAttackResult', { rallyId: 'rally', squadId: 'squad',

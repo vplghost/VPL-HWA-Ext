@@ -88,6 +88,9 @@ test('loss stops queue immediately without a retry', () => {
 
 test('ten-second member check cancels once, counts leader and imposes a predeparture deadline', () => {
   let state = members(active(), 3);
+  const early = queue.advance(state, null, {}, 11000);
+  assert.equal(early.state.phase, 'active', 'ten seconds after creation is too early to cancel');
+  assert.equal(early.calls, undefined);
   let step = queue.advance(state, null, {}, 45000);
   assert.equal(step.calls[1].name, 'getRallyById');
   step = queue.advance(step.state, null, {}, 55000);
@@ -99,6 +102,30 @@ test('ten-second member check cancels once, counts leader and imposes a predepar
   const enough = queue.advance(members(active(), 4), null, {}, 55000);
   assert.equal(enough.state.phase, 'active');
   assert.ok(!enough.calls.some((call) => call.name === 'cancelRally'));
+});
+
+test('disabled auto-cancel never dispatches a cancellation during the final ten seconds', () => {
+  const state = members(active(), 2);
+  state.options.autoCancel = false;
+  const step = queue.advance(state, null, {}, 55000);
+  assert.equal(step.state.phase, 'active');
+  assert.ok(!step.calls?.some((call) => call.name === 'cancelRally'));
+});
+
+test('first rally uses selected boss and current troops without repeating search', () => {
+  const snapshot = { heroGetAll: { data: heroes }, 'getUnitSummary:unit': { data: inventory },
+    experimentalRallySearch: { data: { mapId: 'map', mobConfigIds: [64], mobs: [{ mobId: 'boss' }] } } };
+  const step = queue.start({ ...options, firstMobId: 'boss', autoCancel: false }, 1, 10, 1000, snapshot);
+  assert.equal(step.state.phase, 'creating');
+  assert.deepEqual(Array.from(step.calls, (call) => call.name), ['createRally']);
+  assert.equal(step.calls[0].args.mobId, 'boss');
+  const created = queue.advance(step.state, rpc(step.calls, [
+    { squadId: 'squad', rally: { rallyId: 'rally', plannedStartTime: 65000 } }
+  ], 1100), snapshot, 1200);
+  assert.equal(created.state.phase, 'active');
+  assert.equal(created.state.current.memberChecked, true);
+  assert.equal(created.state.wakeAt, 80000);
+  assert.equal(queue.start({ ...options, firstMobId: 'wrong' }, 1, 10, 1000, snapshot), null);
 });
 
 test('unknown or stale membership cancels conservatively; late wake never dispatches cancellation', () => {

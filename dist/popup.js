@@ -51,7 +51,7 @@ let popupRpcEnabled = false;
 let claimRpcStatus = null;
 let hasAutoClaimedThisSession = false;
 const experimentalSelection = { rallyTeam: '', gatherTeam: 'weakest', bossLevel: 1, searchedBossLevel: 1,
-  waitSeconds: 300, minMembers: 4, raidCount: 1, mineType: 'food', mineLevel: 1, mineId: '', units: '' };
+  waitSeconds: 300, minMembers: 4, autoCancel: true, raidCount: 2, targetMobId: '', mineType: 'food', mineLevel: 1, mineId: '', units: '' };
 let raidPreferencesLoaded = false;
 let raidQueueState = null;
 let troopCapacitySettings = { defaultHero: 600, base: 950 };
@@ -61,6 +61,7 @@ function saveRaidPreferences() {
   return chrome.storage.local.set({ raidPreferences: { accountId: currentCache.accountStatus?.data?.id,
     rallyTeam: experimentalSelection.rallyTeam, bossLevel: experimentalSelection.searchedBossLevel ?? experimentalSelection.bossLevel,
     waitSeconds: experimentalSelection.waitSeconds, minMembers: experimentalSelection.minMembers,
+    autoCancel: experimentalSelection.autoCancel,
     raidCount: experimentalSelection.raidCount } });
 }
 let experimentalPending = null;
@@ -4821,14 +4822,49 @@ function renderExperimental(cache) {
   wait.value = String(experimentalSelection.waitSeconds);
   wait.addEventListener('change', () => { experimentalSelection.waitSeconds = Number(wait.value); saveRaidPreferences(); });
   field(rally, 'Rally wait', wait);
-  for (const [key, label, min, max] of [['minMembers', 'Minimum members at 10 seconds (leader included, normally /6)', 1, 6],
-      ['raidCount', 'Number of raids', 1, 100]]) {
-    const input = document.createElement('input'); input.type = 'number'; input.min = String(min); input.max = String(max); input.step = '1';
-    input.value = String(experimentalSelection[key]);
-    input.addEventListener('change', () => { experimentalSelection[key] = Number(input.value); saveRaidPreferences(); });
-    field(rally, label, input);
-  }
-  note(rally, 'At 10 seconds, an underfilled rally or missing fresh member data triggers cancellation and stops the queue. Piggyback needs a game RPC before departure; late cancellations expire. Keep the game tab open.');
+  const memberField = document.createElement('div');
+  const memberLabel = document.createElement('label');
+  memberLabel.className = 'block text-xs font-medium text-slate-600';
+  memberLabel.htmlFor = 'raid-min-members';
+  memberLabel.textContent = 'Minimum members (leader included, usually /6)';
+  const memberControl = document.createElement('div');
+  memberControl.className = 'mt-1 flex w-full items-stretch overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100';
+  const cancelLabel = document.createElement('label');
+  cancelLabel.className = 'inline-flex shrink-0 cursor-pointer items-center gap-2 border-r border-slate-300 bg-slate-50 px-3 text-xs font-medium text-slate-700';
+  const autoCancel = document.createElement('input');
+  autoCancel.type = 'checkbox';
+  autoCancel.checked = experimentalSelection.autoCancel;
+  autoCancel.className = 'size-4 accent-blue-600';
+  autoCancel.addEventListener('change', () => {
+    experimentalSelection.autoCancel = autoCancel.checked;
+    memberInput.disabled = !autoCancel.checked;
+    saveRaidPreferences();
+  });
+  const cancelText = document.createElement('span');
+  cancelText.textContent = 'Auto-cancel';
+  cancelLabel.append(autoCancel, cancelText);
+  const memberInput = document.createElement('input');
+  memberInput.id = 'raid-min-members';
+  memberInput.type = 'number'; memberInput.min = '1'; memberInput.max = '6'; memberInput.step = '1';
+  memberInput.value = String(experimentalSelection.minMembers);
+  memberInput.disabled = !autoCancel.checked;
+  memberInput.className = 'min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm text-slate-900 outline-none disabled:bg-slate-100 disabled:text-slate-400';
+  memberInput.addEventListener('change', () => {
+    experimentalSelection.minMembers = Number(memberInput.value);
+    saveRaidPreferences();
+  });
+  memberControl.append(cancelLabel, memberInput);
+  memberField.append(memberLabel, memberControl);
+  rally.append(memberField);
+  const raidCountInput = document.createElement('input');
+  raidCountInput.type = 'number'; raidCountInput.min = '1'; raidCountInput.max = '100'; raidCountInput.step = '1';
+  raidCountInput.value = String(experimentalSelection.raidCount);
+  raidCountInput.addEventListener('input', () => {
+    experimentalSelection.raidCount = Number(raidCountInput.value);
+    saveRaidPreferences();
+  });
+  field(rally, 'Number of raids', raidCountInput);
+  note(rally, 'When enabled, auto-cancel checks members during the final 10 seconds before departure. Missing fresh member data or too few members triggers one cancellation attempt. Keep the game tab open.');
 
   note(rally, context.mapId ? `Map ready · ${context.mapId}` : 'Open the world map in game once to capture its map ID.');
   const searchResult = cache.experimentalRallySearch?.data;
@@ -4850,20 +4886,38 @@ function renderExperimental(cache) {
     option.textContent = `Boss ${index + 1} · (${target.coordinates?.x ?? '?'}, ${target.coordinates?.y ?? '?'})`;
     targetSelect.append(option);
   });
+  targetSelect.value = targets.some((target) => target.mobId === experimentalSelection.targetMobId) ?
+    experimentalSelection.targetMobId : targets[0]?.mobId || '';
+  targetSelect.addEventListener('change', () => { experimentalSelection.targetMobId = targetSelect.value; });
   field(rally, 'Target', targetSelect);
   const queueRunning = raidQueueState && !['stopped', 'complete'].includes(raidQueueState.phase);
-  const startRaid = async (count) => {
+  const startRaid = async (count, single = false) => {
     const response = await chrome.runtime.sendMessage({ kind: 'raid-queue-start', options: {
       mapId: context.mapId, center: mapCenter, firstMobId: targetSelect.value,
       level: experimentalSelection.bossLevel, heroIds: rallyTeam.heroIds,
-      waitSeconds: experimentalSelection.waitSeconds, minMembers: experimentalSelection.minMembers, count
+      waitSeconds: experimentalSelection.waitSeconds, minMembers: experimentalSelection.minMembers,
+      autoCancel: experimentalSelection.autoCancel, count
     } }).catch((error) => ({ error: String(error) }));
-    experimentalMessage = response?.ok ? 'Raid queue started. Next raid waits for a confirmed win and return to base.' : response?.error || 'Could not start queue.';
+    experimentalMessage = response?.ok ?
+      (single ? (response.queued ? 'Rally creation queued for the next game RPC.' : 'Rally creation sent. Waiting for game confirmation.') :
+        (response.queued ? 'First raid queued. Later raids wait for a confirmed win and return.' :
+          'First raid sent. Later raids wait for a confirmed win and return.')) :
+      response?.error || 'Could not start rally.';
     render();
   };
   const cannotStart = !popupRpcEnabled || !!experimentalPending || queueRunning || !targets.length || !rallySquad;
-  button(rally, 'Start rally', () => startRaid(1), cannotStart);
-  button(rally, 'Start raid queue', () => startRaid(experimentalSelection.raidCount), cannotStart);
+  button(rally, 'Start rally', () => startRaid(1, true), cannotStart);
+  button(rally, 'Start raid queue', () => {
+    const count = Number(raidCountInput.value);
+    if (!Number.isInteger(count) || count < 2 || count > 100) {
+      experimentalMessage = 'Raid queue needs 2–100 raids. Use Start rally for one raid.';
+      render();
+      return;
+    }
+    experimentalSelection.raidCount = count;
+    saveRaidPreferences();
+    startRaid(count);
+  }, cannotStart);
   if (raidQueueState) {
     const members = raidQueueState.current?.members;
     note(rally, `Queue: ${raidQueueState.phase} · ${raidQueueState.completed}/${raidQueueState.options.count} returned · ${raidQueueState.started} started${members ? ` · members ${members.count}/${members.total}` : ''}${raidQueueState.reason ? ` · ${raidQueueState.reason}` : ''}`);
@@ -4983,9 +5037,11 @@ async function render() {
   if (!raidPreferencesLoaded && cache.accountStatus?.data?.id) {
     const saved = stored.raidPreferences;
     if (saved && String(saved.accountId) === String(cache.accountStatus.data.id)) {
-      for (const key of ['rallyTeam', 'bossLevel', 'waitSeconds', 'minMembers', 'raidCount']) {
+      for (const key of ['rallyTeam', 'bossLevel', 'waitSeconds', 'minMembers', 'autoCancel', 'raidCount']) {
         if (saved[key] !== undefined) experimentalSelection[key] = saved[key];
       }
+      if (!Number.isInteger(experimentalSelection.raidCount) || experimentalSelection.raidCount < 2 ||
+          experimentalSelection.raidCount > 100) experimentalSelection.raidCount = 2;
       experimentalSelection.searchedBossLevel = experimentalSelection.bossLevel;
     }
     raidPreferencesLoaded = true;

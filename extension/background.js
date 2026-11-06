@@ -108,8 +108,7 @@ function rpcMessageForSettings(stored, calls, claim = false) {
 
 async function saveRaidTransition(transition, stored) {
   let state = transition.state;
-  if (!globalThis.hwaHelperRaidQueue.terminal(state) &&
-      (!rpcMessageForSettings(stored, []) || stored.captureSettings?.interceptEnabled === false)) {
+  if (!globalThis.hwaHelperRaidQueue.terminal(state) && !rpcMessageForSettings(stored, [])) {
     state = globalThis.hwaHelperRaidQueue.stop(state, 'RPC settings disabled. Queue stopped.');
   }
   // Persist the intent before sending; restarting the worker must never resend a mutation.
@@ -254,7 +253,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (['raid-queue-start', 'raid-queue-stop'].includes(message?.kind) &&
       sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     pending = pending.then(async () => {
-      const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+      const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
       const controller = globalThis.hwaHelperRaidQueue;
       if (message.kind === 'raid-queue-stop') {
         if (!controller.terminal(stored.raidQueue)) await saveRaidTransition({ state: controller.stop(stored.raidQueue,
@@ -262,16 +261,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return { ok: true };
       }
       if (!controller.terminal(stored.raidQueue)) return { ok: false, error: 'A raid queue is already running.' };
-      if (!rpcMessageForSettings(stored, []) || stored.captureSettings?.interceptEnabled === false) {
-        return { ok: false, error: 'Enable RPC and Monitor API in Settings.' };
+      if (!rpcMessageForSettings(stored, [])) {
+        return { ok: false, error: 'Enable RPC, and enable Monitor API for Piggyback mode.' };
       }
       const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
       const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
       if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
-      const transition = controller.start(message.options, tab.id, stored.rpcCache?.accountStatus?.data?.id, Date.now());
-      if (!transition) return { ok: false, error: 'Invalid raid options or missing account snapshot.' };
+      const transition = controller.start(message.options, tab.id, stored.rpcCache?.accountStatus?.data?.id,
+        Date.now(), stored.rpcCache || {}, globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
+      if (!transition) return { ok: false, error: 'Refresh troops and search for this boss before starting. Check the selected lineup and target.' };
       const state = await saveRaidTransition(transition, stored);
-      return { ok: state.phase !== 'stopped', error: state.reason };
+      return { ok: state.phase !== 'stopped', queued: stored.socketRefreshMode !== 'direct', error: state.reason };
     });
     pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
     pending = pending.catch(() => {});

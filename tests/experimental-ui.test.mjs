@@ -56,7 +56,7 @@ test('rally form persists chosen lineup and last searched level, updates troop a
       runtime: { sendMessage: async (message) => { sent.push(message); return { ok: true }; } } },
     experimentalRpc: async (calls) => sent.push({ calls }),
     experimentalSelection: { rallyTeam: 'weakest', gatherTeam: 'weakest', bossLevel: 1, searchedBossLevel: 1,
-      waitSeconds: 300, minMembers: 4, raidCount: 2, baseTroops: 200, capacities: {}, units: '', mineType: 'food', mineLevel: 1 } });
+      waitSeconds: 300, minMembers: 4, autoCancel: true, raidCount: 2, baseTroops: 200, capacities: {}, units: '', mineType: 'food', mineLevel: 1 } });
   vm.runInContext(dataSource, context);
   context.render = () => { context.view.children = []; context.renderExperimental(cache); };
   vm.runInContext(save + '\n' + renderer, context);
@@ -67,7 +67,7 @@ test('rally form persists chosen lineup and last searched level, updates troop a
   assert.match(text(rally()), /Marksmen: 1155/);
   assert.match(text(rally()), /Spearmen: 1155/);
   assert.match(text(rally()), /Infantry: 1155/);
-  assert.equal(rally().all('input').length, 2, 'rally only needs member threshold and raid count inputs');
+  assert.equal(rally().all('input').length, 3, 'rally has auto-cancel, member threshold and raid count inputs');
   let team = rally().all('select')[0]; team.value = 'raid:0'; await team.fire('change');
   assert.equal(stored.raidPreferences.rallyTeam, 'raid:0');
   assert.match(text(rally()), /Troops: 3470 \/ 3470/);
@@ -80,4 +80,30 @@ test('rally form persists chosen lineup and last searched level, updates troop a
   assert.equal(stored.raidPreferences.bossLevel, 3);
   assert.equal(sent.at(-1).calls[0].args.mobConfigIds[0], 62);
   assert.equal(stored.raidPreferences.accountId, 10);
+  context.experimentalSelection.bossLevel = 1;
+  context.render();
+  const cancel = rally().all('input')[0];
+  assert.equal(cancel.type, 'checkbox');
+  assert.equal(cancel.checked, true);
+  cancel.checked = false;
+  await cancel.fire('change');
+  assert.equal(stored.raidPreferences.autoCancel, false);
+  assert.equal(rally().all('input')[1].disabled, true);
+  await rally().all('button').find((button) => button.textContent === 'Start rally').fire('click');
+  assert.equal(sent.at(-1).kind, 'raid-queue-start');
+  assert.equal(sent.at(-1).options.count, 1);
+  assert.equal(sent.at(-1).options.autoCancel, false);
+  assert.equal(sent.at(-1).options.firstMobId, 'boss');
+  let raidCount = rally().all('input')[2];
+  raidCount.value = '3';
+  await rally().all('button').find((button) => button.textContent === 'Start raid queue').fire('click');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent.at(-1).options.count, 3, 'queue reads the current input even before its change event');
+  assert.equal(stored.raidPreferences.raidCount, 3);
+  raidCount = rally().all('input')[2];
+  raidCount.value = '1';
+  const sentBeforeInvalid = sent.length;
+  await rally().all('button').find((button) => button.textContent === 'Start raid queue').fire('click');
+  assert.equal(sent.length, sentBeforeInvalid);
+  assert.match(context.experimentalMessage, /needs 2–100 raids/);
 });

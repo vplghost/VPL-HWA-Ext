@@ -6,15 +6,36 @@
   function issue(state, phase, calls, now, expiresAt = now + 120000) {
     return { state: { ...state, phase, sentAt: now, wakeAt: expiresAt, expected: calls }, calls, expiresAt };
   }
-  function start(options, tabId, accountId, now) {
+  function start(options, tabId, accountId, now, cache, settings) {
     if (!accountId || !Number.isInteger(tabId) || !options?.mapId ||
         !Number.isFinite(options.center?.x) || !Number.isFinite(options.center?.y) ||
         !data.bossConfigId(options.level) || !data.rallyWaitOptions.includes(options.waitSeconds) ||
         !Number.isInteger(options.count) || options.count < 1 || options.count > 100 ||
         !Number.isInteger(options.minMembers) || options.minMembers < 1 || options.minMembers > 6 ||
+        (options.autoCancel != null && typeof options.autoCancel !== 'boolean') ||
         options.heroIds?.length !== 5 || new Set(options.heroIds).size !== 5) return null;
-    return issue({ id: `${now}:${tabId}`, tabId, accountId, options, started: 0, completed: 0,
-      phase: 'refreshing', current: null }, 'refreshing', rosterCalls(), now);
+    const state = { id: `${now}:${tabId}`, tabId, accountId, options: { ...options, autoCancel: options.autoCancel !== false }, started: 0, completed: 0,
+      phase: 'refreshing', current: null };
+    if (!cache) return issue(state, 'refreshing', rosterCalls(), now);
+    const search = cache.experimentalRallySearch?.data;
+    const heroes = cache.heroGetAll?.data;
+    const summary = cache['getUnitSummary:unit']?.data;
+    if (search?.mapId !== options.mapId ||
+        !search.mobConfigIds?.includes(data.bossConfigId(options.level)) ||
+        !search.mobs?.some((mob) => mob.mobId === options.firstMobId) ||
+        cache.experimentalDefeatedBosses?.data?.some((boss) =>
+          boss.mapId === options.mapId && boss.mobId === options.firstMobId) ||
+        !heroes || !summary ||
+        options.heroIds.some((id) => !heroes[id]) ||
+        summary.squads?.some((squad) => squad.heroes?.some((hero) =>
+          options.heroIds.includes(hero.id ?? hero.heroId)))) return null;
+    const cap = data.capacityModel(options.heroIds, heroes, cache.troopCapacityEvidence?.data,
+      settings, accountId).total;
+    const squad = data.buildSquad(options.heroIds, data.allocateTroops(summary, cap));
+    const call = data.buildRallyCall(options.mapId, options.firstMobId, squad, options.waitSeconds);
+    if (!call) return null;
+    return issue({ ...state, squad, current: { mobId: options.firstMobId, mapId: options.mapId } },
+      'creating', [call], now);
   }
   function responses(record) {
     if (record?.method !== 'POST' || record.status !== 200 || record.requestBodyTruncated ||
@@ -37,7 +58,9 @@
     const replies = fresh ? responses(record) : [];
     for (const { call, result } of replies) {
       if (result?.error && state.expected?.some((expected) => sameCall(call, expected))) {
-        return { state: stop(state, `${call.name} failed. No automatic retry.`) };
+        const detail = typeof result.error === 'string' ? result.error :
+          result.error.message || result.error.description || result.error.code || 'Game rejected the request';
+        return { state: stop(state, `${call.name} failed: ${String(detail).slice(0, 160)}. No automatic retry.`) };
       }
     }
     if (state.phase === 'refreshing') {
@@ -84,7 +107,8 @@
         Object.assign(state.current, { rallyId: response.rally.rallyId, squadId: response.squadId,
           waitUntil: response.rally.plannedStartTime, members: data.rallyMembers(response.rally),
           membersAt: Date.parse(record.timestamp) });
-        state.wakeAt = Math.max(now, state.current.waitUntil - 20000);
+        state.current.memberChecked = !state.options.autoCancel;
+        state.wakeAt = Math.max(now, state.current.waitUntil + (state.options.autoCancel ? -20000 : 15000));
         return { state, calls: [{ name: 'getRallyById', feature: 'rally', args: { rallyId: state.current.rallyId } }] };
       }
     }
@@ -129,7 +153,7 @@
       if (!record && now >= state.wakeAt) {
         if (now > current.waitUntil + 3600000) return { state: stop(state, 'No confirmed battle result and return within one hour. Check the game.') };
         if (state.phase === 'cancelling') return { state: stop(state, 'Cancellation was not confirmed before departure. Check the game.') };
-        if (!current.memberChecked && now >= current.waitUntil - 10000) {
+        if (state.options.autoCancel && !current.memberChecked && now >= current.waitUntil - 10000) {
           current.memberChecked = true;
           if (now >= current.waitUntil - 1000) return { state: stop(state, 'Member check deadline missed. Check the game.') };
           if (!current.members || current.membersAt < current.waitUntil - 25000 || current.members.count < state.options.minMembers) {
