@@ -1,7 +1,7 @@
 ---
 id: 20261101-1724-dong-goi-ten-asset-cdn-khong-tai-trong-popup
 title: Dong goi ten asset CDN, khong tai trong popup
-status: draft
+status: accepted
 supersedes: []
 supersededBy: []
 tags: []
@@ -10,17 +10,12 @@ sources:
 relatedDocs: []
 relatedTasks:
   - VHE-0CMY12
-verification: []
-reviewState: ready_for_review
-reviewBlockers: []
-reviewMatches: []
-reviewAllowedResolutions:
-  - accept_new
-  - reject_new
-reviewEvaluatedHash: '5d4e7efd48c47ccb62e04cec799e30fb6d30e1cd5de01e8993a9094c2f088812'
-reviewEvaluatedAt: '2026-11-01T10:24:38.758Z'
+verification:
+  - 'source:@task-VHE-0CMY12'
+  - 'task:@task-VHE-0CMY12:done'
+verifiedAt: '2026-11-06T10:57:44.893Z'
 createdAt: '2026-11-01T10:24:38.758Z'
-updatedAt: '2026-11-01T10:24:38.758Z'
+updatedAt: '2026-11-06T10:57:44.893Z'
 ---
 
 ## Context
