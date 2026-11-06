@@ -1,5 +1,13 @@
 # Asset CDN và bảng tên hiển thị
 
+## Cập nhật 1.293 ngày 2026-11-06
+
+Log gamestart mới xác nhận client `1.293.101`, static CDN `1.293.0`. Manifest hiện tại có 17.360 entry; gói splitlib và từng member được đối chiếu size/MD5. Đã rà 961 ID thuộc các nhóm asset đang lưu trong extension và đóng gói 959 icon xác minh; consumable 103/104 không có texture độc lập trong manifest. Locale tiếng Anh và bảng tên/Tower buffs đã tái tạo từ nguồn 1.293.
+
+Xem [quy trình trích xuất](ASSET-EXTRACTION.md), [báo cáo từng asset](assets-1.293.0-audit.json) và [catalog theo phiên bản](assets-1.293.0-catalog.json). Lệnh chính: `npm run assets:sync -- --version 1.293.0 --index <log-gamestart.json>`. Không thay số phiên bản trên đường dẫn đoán sẵn: ID item có thể khác ID texture và mỗi entry có revision riêng.
+
+Các mục 1.292 dưới đây là bằng chứng lịch sử.
+
 ## Nguồn đã kiểm tra
 
 Log `temp/tracking-data/hwa-api-2026-11-01_latest.json` chứa response `indexGet`. Response này cung cấp `staticVersionUrl`, phiên bản, kích thước và MD5 của các asset tĩnh. Với bản game `1.292.0`, đường dẫn tìm được là:

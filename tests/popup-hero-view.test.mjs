@@ -115,7 +115,7 @@ test('createHeroInline wraps both avatar and text inside .hero-hover-trigger', (
 
   const smallImg = container.children.find(c => c.tagName === 'IMG');
   assert.ok(smallImg, 'Container should include small avatar img');
-  assert.equal(smallImg.src, 'assets/heroes/1.webp');
+  assert.equal(smallImg.src, 'assets/heroes/1.png');
   assert.ok(smallImg.className.includes('avatar-star-5'), 'Avatar should have 5-star glow');
 
   const nameSpan = container.children.find(c => c.textContent === 'Aurora');
@@ -278,13 +278,22 @@ test('createHeroInline supports converted PNG avatars (e.g. Hero 65 Tempus)', ()
   assert.ok(smallImg.className.includes('avatar-star-4'));
 });
 
-test('createHeroInline renders fallback badge with star glow when avatar is absent (Hero 78)', () => {
+test('createHeroInline renders the new game 1.293 Wodryn avatar with star glow', () => {
   const { createHeroInline } = context;
   const container = createHeroInline('78', 'Wodryn', { star: 6 });
+  const avatar = container.children.find(c => c.tagName === 'IMG');
+  assert.equal(avatar?.src, 'assets/heroes/78.png');
+  assert.ok(avatar.className.includes('avatar-star-6'));
+});
 
-  const badge = container.children.find(c => c.tagName === 'SPAN' && c.textContent === 'W');
-  assert.ok(badge, 'Should render initials badge W for Wodryn');
-  assert.ok(badge.className.includes('avatar-star-6'), 'Badge should have 6-star glow');
+test('createHeroInline keeps its initials fallback for metadata without an avatar', () => {
+  const hero = context.globalThis.hwaHelperHeroMetadata['78'];
+  context.globalThis.hwaHelperHeroMetadata['78'] = { ...hero, hasAvatar: false, avatarFile: undefined };
+  try {
+    const container = context.createHeroInline('78', 'Wodryn', { star: 6 });
+    const badge = container.children.find(c => c.tagName === 'SPAN' && c.textContent === 'W');
+    assert.ok(badge); assert.ok(badge.className.includes('avatar-star-6'));
+  } finally { context.globalThis.hwaHelperHeroMetadata['78'] = hero; }
 });
 
 test('createTitanInline creates hover trigger, avatar, star-glow, and card for titans', () => {

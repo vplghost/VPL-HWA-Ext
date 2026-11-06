@@ -1,8 +1,7 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import vm from 'node:vm';
-import { convertImgBuffer } from './convert-img-asset.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const assetsDir = join(root, 'extension/assets/heroes');
@@ -93,95 +92,15 @@ const playableHeroes = Object.entries(splitlibHeroes)
 
 console.log(`Found ${playableHeroes.length} playable heroes.`);
 
-// Fetch avatars from Fandom wiki
-const titles = [];
-const idMap = {};
-for (const [id] of playableHeroes) {
-  const name = heroNames[id];
-  if (name) {
-    titles.push(`File:Mobile ${name} Avatar.png`);
-    titles.push(`File:Browser ${name} Avatar.png`);
-    titles.push(`File:${name} Avatar.png`);
-    idMap[name] = id;
-  }
-}
-
-const avatarUrls = {};
-for (let i = 0; i < titles.length; i += 50) {
-  const batch = titles.slice(i, i + 50).join('|');
-  const url = `https://hero-wars.fandom.com/api.php?action=query&titles=${encodeURIComponent(batch)}&prop=imageinfo&iiprop=url&format=json`;
-  try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'HWAHelper/1.0' } });
-    const data = await res.json();
-    for (const p of Object.values(data.query?.pages || {})) {
-      if (p.imageinfo?.[0]?.url) {
-        const m = p.title.match(/File:(?:Mobile |Browser )?(.+?) Avatar\.png/);
-        if (m && idMap[m[1]]) {
-          const hid = idMap[m[1]];
-          if (!avatarUrls[hid]) avatarUrls[hid] = p.imageinfo[0].url;
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error querying Fandom:', err.message);
-  }
-}
-
-console.log(`Found ${Object.keys(avatarUrls).length} hero avatar URLs on Fandom.`);
-
-// Ensure avatar images exist on disk (check local .webp or .png first, then Fandom webp, then CDN .img)
-for (const [id, originalUrl] of Object.entries(avatarUrls)) {
-  const targetWebp = join(assetsDir, `${id}.webp`);
-  const targetPng = join(assetsDir, `${id}.png`);
-  if (existsSync(targetWebp) || existsSync(targetPng)) continue;
-
-  try {
-    const scaledUrl = originalUrl.replace(/\/revision\/latest(\/scale-to-width-down\/\d+)?/, '/revision/latest/scale-to-width-down/120');
-    const res = await fetch(scaledUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (res.ok) {
-      const buffer = Buffer.from(await res.arrayBuffer());
-      await writeFile(targetWebp, buffer);
-    }
-  } catch (err) {
-    console.warn(`Failed downloading avatar for hero ${id}:`, err.message);
-  }
-}
-
-// For playable heroes still missing an avatar, try game CDN .img asset
-for (const [id] of playableHeroes) {
-  const targetWebp = join(assetsDir, `${id}.webp`);
-  const targetPng = join(assetsDir, `${id}.png`);
-  if (existsSync(targetWebp) || existsSync(targetPng)) continue;
-
-  const pad = String(id).padStart(4, '0');
-  const candidateUrls = [
-    `https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.292.0/v0001/extends/icons/hero/hero_${pad}_new.img`,
-    `https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.292.0/v0001/extends/icons/hero/hero_${pad}.img`
-  ];
-
-  for (const url of candidateUrls) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        const { png } = convertImgBuffer(Buffer.from(await res.arrayBuffer()));
-        await writeFile(targetPng, png);
-        console.log(`Extracted & converted hero ${id} avatar from CDN .img -> ${id}.png`);
-        break;
-      }
-    } catch {
-      // try next candidate
-    }
-  }
-}
-
+// Download/convert avatars with assets:sync first; metadata generation stays local.
 const metadata = {};
 for (const [id, h] of playableHeroes) {
   const factionId = h.special?.[0];
   let avatarFile = null;
-  if (existsSync(join(assetsDir, `${id}.webp`))) {
-    avatarFile = `assets/heroes/${id}.webp`;
-  } else if (existsSync(join(assetsDir, `${id}.png`))) {
+  if (existsSync(join(assetsDir, `${id}.png`))) {
     avatarFile = `assets/heroes/${id}.png`;
+  } else if (existsSync(join(assetsDir, `${id}.webp`))) {
+    avatarFile = `assets/heroes/${id}.webp`;
   }
 
   metadata[id] = {

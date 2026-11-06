@@ -1,4 +1,4 @@
-// Generated from https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.292.0/v0092/f11aa6e51569c59486b30f2d3a4415e4/locale/en.json.gz
+// Generated from https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0034/d973530195826f1575a002f97a3f30e9/locale/en.json.gz
 globalThis.hwaHelperTowerBuffs = {
   "1": {
     "name": "Exploding Morningstar",

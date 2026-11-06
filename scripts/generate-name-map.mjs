@@ -5,8 +5,9 @@ import { gunzipSync } from 'node:zlib';
 
 const root = resolve(import.meta.dirname, '..');
 const input = resolve(process.argv[2] ?? join(root, 'temp/tracking-data/hwa-api-2026-11-01_latest.json'));
-const records = JSON.parse(await readFile(input, 'utf8'));
-if (!Array.isArray(records)) throw new Error('Expected an exported API log array');
+const exported = JSON.parse(await readFile(input, 'utf8'));
+const records = Array.isArray(exported) ? exported : (exported.timeline || exported.records);
+if (!Array.isArray(records)) throw new Error('Expected exported API records or a game timeline');
 
 let index = null;
 for (const record of records) {
@@ -97,6 +98,6 @@ for (const [group, corrections] of Object.entries(englishCorrections)) {
   Object.assign(names[group], corrections);
 }
 const output = `// Generated from ${assetUrl}\n` +
-  `globalThis.hwaHelperNameData = ${JSON.stringify({ assetUrl, names })};\n`;
+  `globalThis.hwaHelperNameData = ${JSON.stringify({ assetUrl, assetMd5: entry.md5, assetSize: entry.size, names })};\n`;
 await writeFile(join(root, 'extension/data-names.js'), output);
 console.log(`Generated name map from ${assetUrl}: ${Object.entries(names).map(([k, v]) => `${k}=${Object.keys(v).length}`).join(', ')}`);

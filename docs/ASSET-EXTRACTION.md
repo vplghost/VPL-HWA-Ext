@@ -2,6 +2,18 @@
 
 This document records the discovery, file format specifications, conversion process, and inventory results for hero and titan avatar assets in **Hero Wars: Alliance**.
 
+## Current audit: client 1.293.101 / CDN 1.293.0
+
+The 2026-11-06 refresh uses the startup `indexGet` manifest and splitlib catalog. It checks 17,360 manifest entries and maps all 961 IDs in the extension's asset categories: 83 heroes, 29 titans, 477 consumables, 239 gear and 133 scrolls. **959 icons are available and converted**; consumables 103 (`Robbers4_box`) and 104 (`BFbox`) have no standalone texture in the current manifest. All 83 heroes now use verified PNGs, including Wodryn (78); obsolete WebP mirrors were removed after successful conversion.
+
+Run `npm run assets:sync -- --version 1.293.0 --index temp/tracking-data/hwa-game-record-202611061625_gamestart.json` for initial discovery, then `npm run assets:sync -- --version 1.293.0` to repeat using the saved verified catalog. New versions require a matching startup log. Use `npm run names:update -- <log>`, `npm run tower:buffs`, `npm run heroes:metadata` and `npm run titans:metadata` to regenerate associated metadata, then `npm run check`.
+
+The sync verifies source size/MD5 **before** decoding, resolves actual asset revision paths from the manifest, records PNG SHA256 and preserves existing images on failure. Item IDs must not be used as texture IDs: gear item 1 uses `gear_6_new.img`. No image is substituted for a missing mapping. Hero metadata generation is now local; image acquisition uses the shared CDN sync rather than Fandom.
+
+Machine-readable results: [audit](assets-1.293.0-audit.json), [catalog and verified manifest subset](assets-1.293.0-catalog.json). Canonical workflow: `.knowns/docs/workflows/versioned-cdn-asset-synchronization.md`.
+
+The sections below retain the original **1.292 extraction history** and texture format details. Their old endpoint/inventory examples are historical; use the versioned sync above for current updates.
+
 ---
 
 ## 1. CDN Asset Overview & Endpoints

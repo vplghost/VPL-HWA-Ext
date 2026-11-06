@@ -6,7 +6,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/1.webp"
+    "avatarFile": "assets/heroes/1.png"
   },
   "2": {
     "name": "Galahad",
@@ -14,7 +14,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/2.webp"
+    "avatarFile": "assets/heroes/2.png"
   },
   "3": {
     "name": "Keira",
@@ -22,7 +22,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/3.webp"
+    "avatarFile": "assets/heroes/3.png"
   },
   "4": {
     "name": "Astaroth",
@@ -30,7 +30,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/4.webp"
+    "avatarFile": "assets/heroes/4.png"
   },
   "5": {
     "name": "Kai",
@@ -38,7 +38,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/5.webp"
+    "avatarFile": "assets/heroes/5.png"
   },
   "6": {
     "name": "Phobos",
@@ -46,7 +46,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/6.webp"
+    "avatarFile": "assets/heroes/6.png"
   },
   "7": {
     "name": "Thea",
@@ -54,7 +54,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Healer",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/7.webp"
+    "avatarFile": "assets/heroes/7.png"
   },
   "8": {
     "name": "Daredevil",
@@ -62,7 +62,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/8.webp"
+    "avatarFile": "assets/heroes/8.png"
   },
   "9": {
     "name": "Heidi",
@@ -70,7 +70,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/9.webp"
+    "avatarFile": "assets/heroes/9.png"
   },
   "10": {
     "name": "Faceless",
@@ -78,7 +78,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/10.webp"
+    "avatarFile": "assets/heroes/10.png"
   },
   "11": {
     "name": "Chabba",
@@ -86,7 +86,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/11.webp"
+    "avatarFile": "assets/heroes/11.png"
   },
   "12": {
     "name": "Arachne",
@@ -94,7 +94,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/12.webp"
+    "avatarFile": "assets/heroes/12.png"
   },
   "13": {
     "name": "Orion",
@@ -102,7 +102,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/13.webp"
+    "avatarFile": "assets/heroes/13.png"
   },
   "14": {
     "name": "Fox",
@@ -110,7 +110,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/14.webp"
+    "avatarFile": "assets/heroes/14.png"
   },
   "15": {
     "name": "Ginger",
@@ -118,7 +118,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/15.webp"
+    "avatarFile": "assets/heroes/15.png"
   },
   "16": {
     "name": "Dante",
@@ -126,7 +126,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/16.webp"
+    "avatarFile": "assets/heroes/16.png"
   },
   "17": {
     "name": "Mojo",
@@ -134,7 +134,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/17.webp"
+    "avatarFile": "assets/heroes/17.png"
   },
   "18": {
     "name": "Judge",
@@ -142,7 +142,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/18.webp"
+    "avatarFile": "assets/heroes/18.png"
   },
   "19": {
     "name": "Dark Star",
@@ -150,7 +150,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/19.webp"
+    "avatarFile": "assets/heroes/19.png"
   },
   "20": {
     "name": "Artemis",
@@ -158,7 +158,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/20.webp"
+    "avatarFile": "assets/heroes/20.png"
   },
   "21": {
     "name": "Markus",
@@ -166,7 +166,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/21.webp"
+    "avatarFile": "assets/heroes/21.png"
   },
   "22": {
     "name": "Peppy",
@@ -174,7 +174,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/22.webp"
+    "avatarFile": "assets/heroes/22.png"
   },
   "23": {
     "name": "Lian",
@@ -182,7 +182,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/23.webp"
+    "avatarFile": "assets/heroes/23.png"
   },
   "24": {
     "name": "Cleaver",
@@ -190,7 +190,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/24.webp"
+    "avatarFile": "assets/heroes/24.png"
   },
   "25": {
     "name": "Ishmael",
@@ -198,7 +198,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/25.webp"
+    "avatarFile": "assets/heroes/25.png"
   },
   "26": {
     "name": "Lilith",
@@ -206,7 +206,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/26.webp"
+    "avatarFile": "assets/heroes/26.png"
   },
   "27": {
     "name": "Luther",
@@ -214,7 +214,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/27.webp"
+    "avatarFile": "assets/heroes/27.png"
   },
   "28": {
     "name": "Qing Mao",
@@ -222,7 +222,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/28.webp"
+    "avatarFile": "assets/heroes/28.png"
   },
   "29": {
     "name": "Dorian",
@@ -230,7 +230,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Healer",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/29.webp"
+    "avatarFile": "assets/heroes/29.png"
   },
   "30": {
     "name": "Cornelius",
@@ -238,7 +238,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/30.webp"
+    "avatarFile": "assets/heroes/30.png"
   },
   "31": {
     "name": "Jet",
@@ -246,7 +246,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/31.webp"
+    "avatarFile": "assets/heroes/31.png"
   },
   "32": {
     "name": "Helios",
@@ -254,7 +254,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/32.webp"
+    "avatarFile": "assets/heroes/32.png"
   },
   "33": {
     "name": "Lars",
@@ -262,7 +262,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/33.webp"
+    "avatarFile": "assets/heroes/33.png"
   },
   "34": {
     "name": "Krista",
@@ -270,7 +270,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/34.webp"
+    "avatarFile": "assets/heroes/34.png"
   },
   "35": {
     "name": "Jorgen",
@@ -278,7 +278,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/35.webp"
+    "avatarFile": "assets/heroes/35.png"
   },
   "36": {
     "name": "Maya",
@@ -286,7 +286,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Healer",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/36.webp"
+    "avatarFile": "assets/heroes/36.png"
   },
   "37": {
     "name": "Jhu",
@@ -294,7 +294,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/37.webp"
+    "avatarFile": "assets/heroes/37.png"
   },
   "38": {
     "name": "Elmir",
@@ -302,7 +302,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/38.webp"
+    "avatarFile": "assets/heroes/38.png"
   },
   "39": {
     "name": "Ziri",
@@ -310,7 +310,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/39.webp"
+    "avatarFile": "assets/heroes/39.png"
   },
   "40": {
     "name": "Nebula",
@@ -318,7 +318,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/40.webp"
+    "avatarFile": "assets/heroes/40.png"
   },
   "41": {
     "name": "K'arkh",
@@ -326,7 +326,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/41.webp"
+    "avatarFile": "assets/heroes/41.png"
   },
   "42": {
     "name": "Rufus",
@@ -334,7 +334,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/42.webp"
+    "avatarFile": "assets/heroes/42.png"
   },
   "43": {
     "name": "Celeste",
@@ -342,7 +342,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/43.webp"
+    "avatarFile": "assets/heroes/43.png"
   },
   "44": {
     "name": "Astrid and Lucas",
@@ -350,7 +350,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/44.webp"
+    "avatarFile": "assets/heroes/44.png"
   },
   "45": {
     "name": "Satori",
@@ -358,7 +358,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/45.webp"
+    "avatarFile": "assets/heroes/45.png"
   },
   "46": {
     "name": "Martha",
@@ -366,7 +366,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Healer",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/46.webp"
+    "avatarFile": "assets/heroes/46.png"
   },
   "47": {
     "name": "Andvari",
@@ -374,7 +374,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/47.webp"
+    "avatarFile": "assets/heroes/47.png"
   },
   "49": {
     "name": "Yasmine",
@@ -382,7 +382,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/49.webp"
+    "avatarFile": "assets/heroes/49.png"
   },
   "50": {
     "name": "Isaac",
@@ -390,7 +390,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/50.webp"
+    "avatarFile": "assets/heroes/50.png"
   },
   "51": {
     "name": "Xe'Sha",
@@ -398,7 +398,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/51.webp"
+    "avatarFile": "assets/heroes/51.png"
   },
   "52": {
     "name": "Amira",
@@ -406,7 +406,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/52.webp"
+    "avatarFile": "assets/heroes/52.png"
   },
   "53": {
     "name": "Fafnir",
@@ -414,7 +414,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/53.webp"
+    "avatarFile": "assets/heroes/53.png"
   },
   "54": {
     "name": "Iris",
@@ -422,7 +422,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/54.webp"
+    "avatarFile": "assets/heroes/54.png"
   },
   "55": {
     "name": "Mushy and Shroom",
@@ -430,7 +430,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/55.webp"
+    "avatarFile": "assets/heroes/55.png"
   },
   "56": {
     "name": "Julius",
@@ -438,7 +438,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/56.webp"
+    "avatarFile": "assets/heroes/56.png"
   },
   "57": {
     "name": "Kayla",
@@ -446,7 +446,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/57.webp"
+    "avatarFile": "assets/heroes/57.png"
   },
   "58": {
     "name": "Aidan",
@@ -454,7 +454,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Healer",
     "faction": "Way of Chaos",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/58.webp"
+    "avatarFile": "assets/heroes/58.png"
   },
   "59": {
     "name": "Cascade",
@@ -462,7 +462,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/59.webp"
+    "avatarFile": "assets/heroes/59.png"
   },
   "60": {
     "name": "Octavia",
@@ -470,7 +470,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/60.webp"
+    "avatarFile": "assets/heroes/60.png"
   },
   "61": {
     "name": "Oya",
@@ -478,7 +478,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/61.webp"
+    "avatarFile": "assets/heroes/61.png"
   },
   "62": {
     "name": "Soleil",
@@ -486,7 +486,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/62.webp"
+    "avatarFile": "assets/heroes/62.png"
   },
   "63": {
     "name": "Lara Croft",
@@ -494,7 +494,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Marksman",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/63.webp"
+    "avatarFile": "assets/heroes/63.png"
   },
   "64": {
     "name": "Folio",
@@ -502,7 +502,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Mage",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/64.webp"
+    "avatarFile": "assets/heroes/64.png"
   },
   "65": {
     "name": "Tempus",
@@ -518,7 +518,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/66.webp"
+    "avatarFile": "assets/heroes/66.png"
   },
   "67": {
     "name": "Polaris",
@@ -526,7 +526,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/67.webp"
+    "avatarFile": "assets/heroes/67.png"
   },
   "68": {
     "name": "Peech",
@@ -542,7 +542,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Healer",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/69.webp"
+    "avatarFile": "assets/heroes/69.png"
   },
   "70": {
     "name": "Somna",
@@ -550,7 +550,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Control",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/70.webp"
+    "avatarFile": "assets/heroes/70.png"
   },
   "71": {
     "name": "Electra von Grave",
@@ -558,7 +558,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/71.webp"
+    "avatarFile": "assets/heroes/71.png"
   },
   "72": {
     "name": "Byrna",
@@ -582,7 +582,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Mystery",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/74.webp"
+    "avatarFile": "assets/heroes/74.png"
   },
   "75": {
     "name": "Kendle",
@@ -613,7 +613,8 @@ globalThis.hwaHelperHeroMetadata = {
     "role": "Front",
     "class": "Tank",
     "faction": "Way of Nature",
-    "hasAvatar": false
+    "hasAvatar": true,
+    "avatarFile": "assets/heroes/78.png"
   },
   "79": {
     "name": "Leonel",
@@ -629,7 +630,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Progress",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/500.webp"
+    "avatarFile": "assets/heroes/500.png"
   },
   "501": {
     "name": "Corvus",
@@ -637,7 +638,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Tank",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/501.webp"
+    "avatarFile": "assets/heroes/501.png"
   },
   "502": {
     "name": "Morrigan",
@@ -645,7 +646,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Healer",
     "faction": "Way of Eternity",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/502.webp"
+    "avatarFile": "assets/heroes/502.png"
   },
   "503": {
     "name": "Alvanor",
@@ -653,7 +654,7 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Support",
     "faction": "Way of Nature",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/503.webp"
+    "avatarFile": "assets/heroes/503.png"
   },
   "504": {
     "name": "Tristan",
@@ -661,6 +662,6 @@ globalThis.hwaHelperHeroMetadata = {
     "class": "Warrior",
     "faction": "Way of Honor",
     "hasAvatar": true,
-    "avatarFile": "assets/heroes/504.webp"
+    "avatarFile": "assets/heroes/504.png"
   }
 };

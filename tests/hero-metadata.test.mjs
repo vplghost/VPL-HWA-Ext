@@ -69,8 +69,9 @@ test('all heroes flagged with hasAvatar have a non-empty image file on disk', as
       verifiedCount++;
     }
   }
-  assert.equal(verifiedCount, 82);
-  assert.equal(metadata['78'].hasAvatar, false, 'Hero 78 (Wodryn) has no standalone avatar');
+  assert.equal(verifiedCount, 83);
+  assert.equal(metadata['78'].hasAvatar, true, 'Game 1.293 supplies Wodryn as a standalone icon');
+  assert.equal(metadata['78'].avatarFile, 'assets/heroes/78.png');
   assert.equal(metadata['65'].hasAvatar, true, 'Hero 65 (Tempus) has converted PNG avatar');
   assert.equal(metadata['65'].avatarFile, 'assets/heroes/65.png');
 });
