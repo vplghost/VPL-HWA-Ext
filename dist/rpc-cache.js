@@ -246,6 +246,7 @@
             mineType || (targetType === 'mine' ? 'mine' :
               stage.toLowerCase().includes('rally') ? 'raid' : 'attack');
           marches.push({ squadId: typeof march.squadId === 'string' ? march.squadId : null,
+            ...(typeof (route?.routeId ?? march.routeId) === 'string' ? { routeId: route?.routeId ?? march.routeId } : {}),
             kind, stage, endsAt: Number.isFinite(endsAt) ? endsAt : null });
         }
       }
@@ -309,6 +310,7 @@
         const duration = route?.durationMs ?? route?.duration;
         return [entry('rallyAction', 'internal', {
           action: 'socketResult', squadId: body.squadId, rallyId: body.rallyId,
+          returnRouteId: route?.routeId,
           mobConfigId: body.mobConfigId,
           result: body.battleResult?.battleResult,
           returnAt: Number.isFinite(route?.startedAt) && Number.isFinite(duration) ?
@@ -377,6 +379,7 @@
           return [{ key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'details', rallyId: rally.rallyId,
               mapId: rally.mapId, mobId: rally.mob?.mobId || rally.target?.objectId,
+              mobConfigId: targetConfigId,
               leader: rally.leader,
               members: rally.members || [],
               squadId: rally.leader?.squad?.squadId,
@@ -413,6 +416,10 @@
                   data: {
                     action: 'returnRoute',
                     routeId: route.routeId,
+                    squadId: route.squadId,
+                    rallyId: route.rallyId,
+                    mobId: route.from?.object?.objectType === 'rallyMob' ? route.from.object.objectId : null,
+                    ownerId: route.leader?.userId,
                     returnAt: startedAt + duration,
                     startedAt,
                     durationMs: duration
@@ -444,6 +451,10 @@
                 group: 'internal',
                 data: {
                   action: 'battleReport',
+                  rallyId: rep.payload?.rallyId,
+                  squadId: rep.payload?.squadId,
+                  mobId: rep.payload?.mobId,
+                  result: rep.payload?.result,
                   createdAt: rep.createdAt,
                   mobConfigId: rep.payload?.mobConfigId
                 },
@@ -1545,6 +1556,25 @@
     }
   }
 
+  function matchRallyMarch(marches, data, accountId) {
+    if (data.ownerId != null && accountId != null && String(data.ownerId) !== String(accountId)) return -1;
+    let matches = marches.map((march, index) => ({ march, index })).filter(({ march }) => march.rally);
+    if (data.rallyId || data.squadId) {
+      matches = matches.filter(({ march }) => (!data.rallyId || march.rally.id === data.rallyId) &&
+        (!data.squadId || march.squadId === data.squadId));
+    } else {
+      const routes = data.routeId ? matches.filter(({ march }) =>
+        march.routeId === data.routeId || march.rally.returnRouteId === data.routeId) : [];
+      if (routes.length) matches = routes;
+      else if (data.mobId && (data.action === 'battleReport' ||
+          (data.ownerId != null && accountId != null && String(data.ownerId) === String(accountId)))) {
+        matches = matches.filter(({ march }) => march.rally.mobId === data.mobId &&
+          (data.action !== 'returnRoute' || !Number.isFinite(march.rally.waitUntil) || data.startedAt >= march.rally.waitUntil));
+      } else return -1;
+    }
+    return matches.length === 1 ? matches[0].index : -1;
+  }
+
   function observeSquad(cache, team, source, at) {
     const accountId = cache.accountStatus?.data?.id;
     const heroes = cache.heroGetAll?.data || {};
@@ -1729,9 +1759,11 @@
             const alreadyReturned = next.experimentalRallyReturns?.data?.some((item) => item.squadId === entry.data.squadId);
             if (index < 0 && !alreadyReturned && Number.isFinite(entry.data.returnAt) && !(current?.updatedAt > entry.updatedAt)) {
               marches.push({ squadId: entry.data.squadId, kind: 'raid',
+                ...(entry.data.returnRouteId ? { routeId: entry.data.returnRouteId } : {}),
                 stage: 'returnToOutpost', endsAt: entry.data.returnAt,
                 result: entry.data.result,
                 rally: { id: entry.data.rallyId, returnAt: entry.data.returnAt,
+                  returnRouteId: entry.data.returnRouteId,
                   mobConfigId: entry.data.mobConfigId } });
               index = marches.length - 1;
             }
@@ -1740,8 +1772,10 @@
               const returnAt = Number.isFinite(entry.data.returnAt) ? entry.data.returnAt :
                 previous.rally?.returnAt ?? previous.endsAt;
               marches[index] = { ...previous, stage: 'returnToOutpost', endsAt: returnAt,
+                ...(entry.data.returnRouteId ? { routeId: entry.data.returnRouteId } : {}),
                 result: entry.data.result || previous.result,
                 rally: { ...previous.rally, id: entry.data.rallyId,
+                  returnRouteId: entry.data.returnRouteId || previous.rally?.returnRouteId,
                   returnAt, mobConfigId: entry.data.mobConfigId ?? previous.rally?.mobConfigId } };
             }
           } else if (entry.data.action === 'socketReturnCompleted') {
@@ -1765,17 +1799,11 @@
               marches.push(created);
             }
           } else if (entry.data.action === 'details') {
-            if (current?.updatedAt === entry.updatedAt) continue;
-            const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id ?? 1216438103;
-            const accountName = next.accountStatus?.data?.name ?? next.userGetInfo?.data?.name ?? 'VplGhost';
-            const isLeader = Boolean(
-              (accountId && Number(entry.data.leader?.userId) === Number(accountId)) ||
-              (accountName && entry.data.leader?.user?.name && entry.data.leader.user.name === accountName)
-            );
-            const myMember = (entry.data.members || []).find((m) =>
-              (accountId && Number(m.userId) === Number(accountId)) ||
-              (accountName && m.user?.name && m.user.name === accountName)
-            );
+            const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id;
+            const ownSquads = new Set(marches.map((march) => march.squadId).filter(Boolean));
+            const isOwn = (member) => accountId != null ? String(member?.userId) === String(accountId) : ownSquads.has(member?.squad?.squadId);
+            const isLeader = isOwn(entry.data.leader);
+            const myMember = (entry.data.members || []).find(isOwn);
             const ownSquadId = myMember?.squad?.squadId || (isLeader ? entry.data.squadId : null);
             if (index < 0 && ownSquadId) {
               index = marches.findIndex((march) => march.squadId === ownSquadId);
@@ -1784,7 +1812,7 @@
             if (index >= 0) {
               const previous = marches[index];
               const squadId = myMember?.squad?.squadId || previous.squadId || entry.data.squadId;
-              const team = myMember ? rallyTeam(myMember.squad) : (entry.data.team?.heroIds?.length ? entry.data.team : previous.rally.team);
+              const team = myMember ? rallyTeam(myMember.squad) : (isLeader && entry.data.team?.heroIds?.length ? entry.data.team : previous.rally?.team);
               marches[index] = {
                 ...previous,
                 squadId,
@@ -1793,11 +1821,14 @@
                 rally: {
                   ...previous.rally,
                   id: entry.data.rallyId,
+                  mobId: entry.data.mobId || previous.rally?.mobId,
+                  mapId: entry.data.mapId || previous.rally?.mapId,
+                  mobConfigId: entry.data.mobConfigId ?? previous.rally?.mobConfigId,
                   target: entry.data.target,
-                  waitUntil: Number.isFinite(entry.data.waitUntil) ? entry.data.waitUntil : previous.rally.waitUntil,
+                  waitUntil: Number.isFinite(entry.data.waitUntil) ? entry.data.waitUntil : previous.rally?.waitUntil,
                   team,
                   leaderName: entry.data.leader?.user?.name || previous.rally?.leaderName,
-                  isAutoJoin: Boolean(myMember && !isLeader),
+                  isAutoJoin: isLeader ? false : myMember ? true : previous.rally?.isAutoJoin || false,
                   memberEta: myMember?.eta,
                   outboundMs: entry.data.outboundMs,
                   returnMs: entry.data.returnMs
@@ -1818,6 +1849,7 @@
                 endsAt,
                 rally: {
                   id: entry.data.rallyId,
+                  mobId: entry.data.mobId, mapId: entry.data.mapId, mobConfigId: entry.data.mobConfigId,
                   target: entry.data.target,
                   waitUntil: entry.data.waitUntil,
                   team,
@@ -1832,43 +1864,23 @@
           } else if (entry.data.action === 'cancel') {
             if (index < 0) continue;
             marches.splice(index, 1);
-          } else if (entry.data.action === 'returnRoute') {
-            let updated = false;
-            for (let i = 0; i < marches.length; i++) {
-              if (marches[i].rally) {
-                marches[i] = {
-                  ...marches[i],
-                  stage: 'returnToOutpost',
-                  endsAt: entry.data.returnAt,
-                  rally: {
-                    ...marches[i].rally,
-                    returnAt: entry.data.returnAt
-                  }
-                };
-                updated = true;
-              }
+          } else if (['returnRoute', 'battleReport'].includes(entry.data.action)) {
+            index = matchRallyMarch(marches, entry.data, next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id);
+            if (index < 0) continue;
+            const march = marches[index];
+            if (entry.data.action === 'returnRoute') {
+              marches[index] = { ...march, stage: 'returnToOutpost', endsAt: entry.data.returnAt,
+                routeId: entry.data.routeId || march.routeId,
+                rally: { ...march.rally, returnAt: entry.data.returnAt,
+                  returnRouteId: entry.data.routeId || march.rally.returnRouteId } };
+            } else {
+              if (Number.isFinite(march.rally.waitUntil) && entry.data.createdAt < march.rally.waitUntil) continue;
+              const returnMs = march.rally.returnMs || march.rally.outboundMs || 60000;
+              const returnAt = march.rally.returnAt || entry.data.createdAt + returnMs;
+              marches[index] = { ...march, stage: 'returnToOutpost', endsAt: returnAt,
+                result: march.result || entry.data.result || null,
+                rally: { ...march.rally, arrivalAt: march.rally.arrivalAt || entry.data.createdAt, returnAt } };
             }
-            if (!updated) continue;
-          } else if (entry.data.action === 'battleReport') {
-            let updated = false;
-            for (let i = 0; i < marches.length; i++) {
-              if (marches[i].rally) {
-                const returnMs = marches[i].rally.returnMs || marches[i].rally.outboundMs || 60000;
-                const returnAt = entry.data.createdAt + returnMs;
-                marches[i] = {
-                  ...marches[i],
-                  stage: 'returnToOutpost',
-                  endsAt: marches[i].rally.returnAt || returnAt,
-                  rally: {
-                    ...marches[i].rally,
-                    arrivalAt: entry.data.createdAt,
-                    returnAt: marches[i].rally.returnAt || returnAt
-                  }
-                };
-                updated = true;
-              }
-            }
-            if (!updated) continue;
           }
           if (entry.data.action === 'socketResult') {
             const march = marches.find((item) => item.rally?.id === entry.data.rallyId);

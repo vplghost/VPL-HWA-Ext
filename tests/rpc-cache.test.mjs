@@ -1047,6 +1047,7 @@ test('rally march transitions to returnToOutpost from battleReport and returnRou
   const at = '2026-11-02T05:03:00.000Z';
   const waitUntil = 1793595700000;
   const initial = {
+    accountStatus: { data: { id: 10 } },
     marchStatus: {
       key: 'marchStatus',
       method: 'createRally',
@@ -1058,7 +1059,7 @@ test('rally march transitions to returnToOutpost from battleReport and returnRou
           kind: 'raid',
           stage: 'waitingForRallyStart',
           endsAt: waitUntil,
-          rally: { id: 'rally-1', waitUntil, outboundMs: 30000, returnMs: 40000 }
+          rally: { id: 'rally-1', mobId: 'mob-1', waitUntil, outboundMs: 30000, returnMs: 40000 }
         }]
       },
       updatedAt: at
@@ -1073,7 +1074,7 @@ test('rally march transitions to returnToOutpost from battleReport and returnRou
     { name: 'getPage', feature: 'report', ident: 'rep-1' }
   ], [
     { ident: 'rep-1', result: { response: { reports: [
-      { type: 'rallyMobAttackResult', createdAt: battleReportTime, payload: { mobConfigId: 10 } }
+      { type: 'rallyMobAttackResult', createdAt: battleReportTime, payload: { rallyId: 'rally-1', mobConfigId: 10 } }
     ] } } }
   ], '2026-11-02T05:03:30.000Z');
 
@@ -1093,7 +1094,8 @@ test('rally march transitions to returnToOutpost from battleReport and returnRou
     { name: 'getRoutesByIds', feature: 'globalMap', ident: 'route-1' }
   ], [
     { ident: 'route-1', result: { response: { routes: [
-      { type: 'returnToOutpost', startedAt: returnRouteTime, durationMs: 38000 }
+      { type: 'returnToOutpost', routeId: 'route-own', leader: { userId: 10 },
+        from: { object: { objectType: 'rallyMob', objectId: 'mob-1' } }, startedAt: returnRouteTime, durationMs: 38000 }
     ] } } }
   ], '2026-11-02T05:03:31.000Z');
 
@@ -1105,6 +1107,76 @@ test('rally march transitions to returnToOutpost from battleReport and returnRou
   assert.equal(marchAfterRoute.stage, 'returnToOutpost');
   assert.equal(marchAfterRoute.rally.returnAt, returnRouteTime + 38000);
   assert.equal(marchAfterRoute.endsAt, returnRouteTime + 38000);
+});
+
+test('rally routes and reports leave simultaneous unrelated rallies unchanged', () => {
+  const initial = { accountStatus: { data: { id: 10 } }, marchStatus: { updatedAt: '2026-11-06T10:00:00.000Z',
+    data: { marches: ['a', 'b'].map((id) => ({ squadId: `squad-${id}`, routeId: `route-${id}`, kind: 'raid',
+      stage: 'moveToTargetInRally', endsAt: 900, rally: { id: `rally-${id}`, mobId: `boss-${id}`, returnMs: 100 } })) } } };
+  const routes = record([{ name: 'getRoutesByIds', feature: 'globalMap', ident: 'routes' }], [{ ident: 'routes', result: { response: { routes: [
+    { routeId: 'route-foreign', type: 'returnToOutpost', leader: { userId: 11 },
+      from: { object: { objectType: 'rallyMob', objectId: 'boss-b' } }, startedAt: 1000, durationMs: 9999 },
+    { routeId: 'return-own', type: 'returnToOutpost', leader: { userId: 10 },
+      from: { object: { objectType: 'rallyMob', objectId: 'boss-a' } }, startedAt: 1000, durationMs: 50 }
+  ] } } }], '2026-11-06T10:01:00.000Z');
+  const next = cache.merge(initial, [routes]).cache;
+  assert.equal(next.marchStatus.data.marches[0].endsAt, 1050);
+  assert.deepEqual(next.marchStatus.data.marches[1], initial.marchStatus.data.marches[1]);
+  const laterRally = JSON.parse(JSON.stringify(initial));
+  laterRally.marchStatus.data.marches[0].rally.waitUntil = 2000;
+  assert.deepEqual(cache.merge(laterRally, [routes]).cache.marchStatus, laterRally.marchStatus,
+    'old returns from the same boss must not attach to a newer waiting rally');
+  const report = (payload) => record([{ name: 'getPage', feature: 'report', ident: 'rep' }], [{ ident: 'rep', result: { response: {
+    reports: [{ id: 'report', type: 'rallyMobAttackResult', createdAt: 2000, payload }]
+  } } }], '2026-11-06T10:02:00.000Z');
+  const unknown = cache.merge(next, [report({ mobConfigId: 79, result: 'win' })]).cache;
+  assert.deepEqual(unknown.marchStatus, next.marchStatus, 'boss level alone is not instance identity');
+  const matched = cache.merge(next, [report({ squadId: 'squad-b', result: 'win' })]).cache;
+  assert.equal(matched.marchStatus.data.marches[1].rally.arrivalAt, 2000);
+  assert.deepEqual(matched.marchStatus.data.marches[0], next.marchStatus.data.marches[0]);
+  const anonymous = { ...initial, marchStatus: { ...initial.marchStatus, data: { marches: [initial.marchStatus.data.marches[0]] } } };
+  assert.deepEqual(cache.merge(anonymous, [report({ mobConfigId: 79 })]).cache.marchStatus, anonymous.marchStatus);
+});
+
+test('rally route identity survives snapshots and ambiguous shared target routes are ignored', () => {
+  const at = '2026-11-06T10:00:00.000Z';
+  const initial = { marchStatus: { updatedAt: at, data: { marches: [{ squadId: 'squad', kind: 'raid',
+    rally: { id: 'rally', mobId: 'boss' }, stage: 'moveToTargetInRally' }] } } };
+  const snapshot = record([{ name: 'getMarches', feature: 'march', ident: 'march' }], [{ ident: 'march', result: { response: {
+    marches: { returnToOutpost: [{ squadId: 'squad', route: { routeId: 'return-route', startedAt: 1000, durationMs: 100 } }] }
+  } } }], at);
+  const stored = cache.merge(initial, [snapshot]).cache;
+  assert.equal(stored.marchStatus.data.marches[0].routeId, 'return-route');
+  const route = record([{ name: 'getRoutesByIds', feature: 'globalMap', ident: 'route' }], [{ ident: 'route', result: { response: {
+    routes: [{ routeId: 'return-route', type: 'returnToOutpost', startedAt: 1000, durationMs: 200 }]
+  } } }], '2026-11-06T10:01:00.000Z');
+  assert.equal(cache.merge(stored, [route]).cache.marchStatus.data.marches[0].endsAt, 1200);
+  const ambiguous = { accountStatus: { data: { id: 10 } }, marchStatus: { updatedAt: at, data: { marches: [
+    { squadId: 'a', rally: { id: 'a', mobId: 'boss' } }, { squadId: 'b', rally: { id: 'b', mobId: 'boss' } }
+  ] } } };
+  const shared = JSON.parse(JSON.stringify(route));
+  shared.responseBody = JSON.stringify({ results: [{ ident: 'route', result: { response: { routes: [{ routeId: 'new', type: 'returnToOutpost',
+    leader: { userId: 10 }, from: { object: { objectType: 'rallyMob', objectId: 'boss' } }, startedAt: 1000, durationMs: 200 }] } } }] });
+  assert.deepEqual(cache.merge(ambiguous, [shared]).cache.marchStatus, ambiguous.marchStatus);
+});
+
+test('rally ownership never relies on a hardcoded account or a matching display name', () => {
+  const details = (leader, members = []) => record([{ name: 'getRallyById', feature: 'rally', ident: 'r' }], [{ ident: 'r', result: { response: {
+    rally: { rallyId: 'rally', leader, members, plannedStartTime: 9999999999999 }
+  } } }], '2026-11-06T10:00:00.000Z');
+  const leader = { userId: 1216438103, user: { name: 'VplGhost' }, squad: { squadId: 'leader', heroes: [{ heroId: 1 }], units: [] } };
+  assert.equal(cache.merge({}, [details(leader)]).cache.marchStatus?.data?.marches?.length || 0, 0);
+  assert.equal(cache.merge({ accountStatus: { data: { id: 10, name: 'VplGhost' } } }, [details(leader)]).cache.marchStatus?.data?.marches?.length || 0, 0);
+  const own = { squadId: 'own', rally: { id: 'rally', isAutoJoin: true, team: { heroIds: [2], units: [] } } };
+  const existing = { marchStatus: { updatedAt: '2026-11-06T09:59:00.000Z', data: { marches: [own] } } };
+  const enriched = cache.merge(existing, [details(leader)]).cache.marchStatus.data.marches[0];
+  assert.deepEqual(Array.from(enriched.rally.team.heroIds), [2]);
+  assert.equal(enriched.rally.isAutoJoin, true);
+  const joined = cache.merge(existing, [details(leader, [{ userId: 20, squad: { squadId: 'own', heroes: [{ heroId: 3 }], units: [] } }])]).cache;
+  assert.deepEqual(Array.from(joined.marchStatus.data.marches[0].rally.team.heroIds), [3], 'known own squad is positive evidence when account snapshot is absent');
+  const sameTime = { marchStatus: { updatedAt: '2026-11-06T10:00:00.000Z', data: { marches: [{ squadId: 'leader', kind: 'raid' }] } } };
+  const sameBatch = cache.merge(sameTime, [details(leader)]).cache;
+  assert.equal(sameBatch.marchStatus.data.marches[0].rally.id, 'rally', 'same-timestamp details must enrich a preceding march snapshot');
 });
 
 test('dungeonEndBattle and dungeonSaveProgress extract status and merge rewards', () => {
