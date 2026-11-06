@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-06T10:09:54.377Z'
+updatedAt: '2026-11-06T10:31:30.538Z'
 tags:
   - api
   - rpc
@@ -155,6 +155,12 @@ Request `{"squadId":"GATHERING_SQUAD_ID"}`. S13 records two successful recalls. 
 `getChunks:globalMap` requests `mapId`, `lod`, `chunkCoordinates[] {x,y}`. Responses contain `chunks[]` with mobs, mines, outposts and update time, plus routes. Map tile coordinates and chunk coordinates are different domains; do not use tile center as chunk coordinates.
 
 `getMarches:march` uses an empty args object in bootstrap captures. It supplies own squad stages and routes. `getRoutesByIds:globalMap` resolves route details; see the inventory for exact observed argument shape. Do not infer squad ownership from a global `routeCreated` notification.
+
+Rally correlation was corrected under @task-VHE-MACK1D during the backlog audit. Return routes update only a unique match by squad/rally/known route ID, or by exact boss instance plus matching route leader/current account. Routes for another player's return and ambiguous shared-boss routes are ignored. Route IDs survive march snapshots and MQTT return results.
+
+Legacy `rallyMobAttackResult` reports containing only `mobConfigId` (boss level/config) do not prove a rally instance and must not change any ETA, even if only one rally is cached. They still update mail/report rewards. A report with an actual matching squad/rally/mob instance identifier may enrich that march; prior authoritative return times remain intact.
+
+`getRallyById` uses current account ID or a squad ID already established by own march data. Hardcoded player IDs, display-name matching and leader-team substitution for an unknown own member are removed. Same-timestamp snapshot/details batches may enrich an existing squad.
 
 ## End-to-end timeline
 

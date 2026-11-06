@@ -1,0 +1,43 @@
+---
+id: VHE-MDNR3V
+title: Compact resource values and show renewable tooltip rate
+status: done
+priority: medium
+labels: []
+createdAt: '2026-11-01T13:05:39.061Z'
+updatedAt: '2026-11-06T10:31:35.422Z'
+completedAt: '2026-11-01T13:19:47.498Z'
+timeSpent: 0
+archivedAt: '2026-11-06T10:31:35.422Z'
+---
+# Compact resource values and show renewable tooltip rate
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 Resource balances at least one million and one billion use compact M and B notation
+- [x] #2 Resources with a known refill rate show amount per minute when at least one per minute
+- [x] #3 Slower renewable resources show the time until the next refill in the Resources list and header
+- [x] #4 Produced materials without API rate data show an explicit unavailable message
+<!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Inspect existing resource data and tooltip rendering; add shared formatting/refill description; apply to list and header; add focused tests and run validation
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented compact formatting and live tooltip descriptions for timed refillables. Produced materials have no rate in captured inventory or resourceProduction summaries, so the UI marks rate unavailable. npm run check passed: 39 tests and build. System Decision Impact: none; this is a local display change.
+
+Reopened: fix compact display when rounding crosses from M to B while investigating produced-material rates.
+
+Follow-up: fixed 999.95M rounding to 1.0B and grouped billion values; 39 tests/build pass. Material rate remains unavailable until a producer-rate source or validated formula is observed. System Decision Impact: none.
+<!-- SECTION:NOTES:END -->
+
