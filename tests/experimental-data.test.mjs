@@ -56,3 +56,43 @@ test('mine search uses captured type, level and full-only arguments', () => {
   assert.equal(data.mineConfigId('stone', 7), 75);
   assert.equal(data.mineConfigId('wood', 8), 56);
 });
+
+test('rally waits match game config and reject arbitrary seconds', () => {
+  const squad = data.buildSquad([1, 2, 3, 4, 5], [{ unitId: 7, count: 5 }]);
+  for (const wait of [60, 300, 900, 1800]) assert.equal(data.buildRallyCall('map', 'boss', squad, wait).args.startDelay, wait * 1000);
+  for (const wait of [1, 59, 61, 600, 3600]) assert.equal(data.buildRallyCall('map', 'boss', squad, wait), null);
+});
+
+test('troop allocator maximizes capacity, uses highest tier first and redistributes shortages', () => {
+  const summary = { available: [{ unitId: 7, count: 80 }, { unitId: 6, count: 1000 },
+    { unitId: 17, count: 20 }, { unitId: 27, count: 2000 }], reserved: [{ unitId: 17, count: 9999 }] };
+  const units = JSON.parse(JSON.stringify(data.allocateTroops(summary, 302)));
+  assert.deepEqual(units, [{ unitId: 7, count: 80 }, { unitId: 6, count: 61 }, { unitId: 17, count: 20 }, { unitId: 27, count: 141 }]);
+  for (let cap = 1; cap < 4000; cap += 37) {
+    const allocated = data.allocateTroops(summary, cap);
+    assert.equal(allocated.reduce((sum, unit) => sum + unit.count, 0), Math.min(cap, 3100));
+    for (const unit of allocated) assert.ok(unit.count <= summary.available.find((item) => item.unitId === unit.unitId).count);
+  }
+  const balanced = data.allocateTroops({ available: [7, 17, 27].map((unitId) => ({ unitId, count: 1000 })) }, 1000);
+  assert.deepEqual(Array.from(balanced, (unit) => unit.count), [334, 333, 333]);
+  assert.equal(data.allocateTroops({ available: [{ unitId: 99, count: 10 }] }, 10).length, 0);
+});
+
+test('capacity uses each selected hero plus base and invalidates saved values after stats change', () => {
+  const heroes = { 16: { level: 80, star: 3, power: 1234 }, 67: { level: 70, star: 4 },
+    14: { level: 30, star: 2 }, 33: { level: 2, star: 1 }, 38: { level: 1, star: 1 } };
+  const ids = [16, 67, 14, 33, 38];
+  assert.equal(data.squadCapacity(ids, heroes, {}, 200), 3669);
+  const saved = { 16: { count: 799, signature: data.capacitySignature(heroes[16]) } };
+  assert.equal(data.squadCapacity(ids, heroes, saved, 200), 3669);
+  heroes[16].power++;
+  assert.equal(data.squadCapacity(ids, heroes, saved, 200), null);
+  assert.equal(data.squadCapacity([16, 67, 14, 33, 33], heroes, {}, 200), null);
+  assert.equal(data.squadCapacity(ids, heroes, {}, -1), null);
+});
+
+test('member threshold includes leader once and distinguishes unknown membership', () => {
+  const counts = data.rallyMembers({ leader: { userId: 1 }, members: [{ userId: 1 }, { userId: 2 }], membersCapacityLeft: 4 });
+  assert.equal(counts.count, 2); assert.equal(counts.total, 6);
+  assert.equal(data.rallyMembers({ members: [] }), null);
+});

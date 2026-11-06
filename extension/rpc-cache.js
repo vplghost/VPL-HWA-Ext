@@ -375,6 +375,7 @@
           const targetConfigId = rally.target?.objectConfigId ?? rally.mob?.mobConfigId;
           return [{ key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'details', rallyId: rally.rallyId,
+              mapId: rally.mapId, mobId: rally.mob?.mobId || rally.target?.objectId,
               leader: rally.leader,
               members: rally.members || [],
               squadId: rally.leader?.squad?.squadId,
@@ -1346,6 +1347,7 @@
             updatedAt: record.timestamp }] : []),
           { key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'create',
+              mobId: call.args?.mobId, mapId: call.args?.mapId,
               rallyId: result.response.rally.rallyId,
               squadId: result.response.squadId,
               waitUntil: result.response.rally.plannedStartTime,
@@ -1521,7 +1523,7 @@
         return [{ key, method: call.name, feature: call.feature || null,
           group, data: result.response, updatedAt: record.timestamp }];
       });
-      const experimentalCalls = new Set(['searchMob:mob', 'searchMine:mine', 'createRally:mob',
+      const experimentalCalls = new Set(['searchMob:mob', 'searchMine:mine', 'createRally:mob', 'cancelRally:rally',
         'attackMine:mine', 'stopMineGathering:mine']);
       for (const call of request.calls) {
         if (!experimentalCalls.has(`${call.name}:${call.feature}`)) continue;
@@ -1548,6 +1550,11 @@
     for (const record of records) {
       const entries = extract(record);
       for (const entry of entries) {
+        if (entry.key === 'experimentalRallySearch') {
+          const won = next.experimentalDefeatedBosses?.data || [];
+          entry.data = { ...entry.data, mobs: entry.data.mobs.filter((mob) =>
+            !won.some((item) => item.mapId === entry.data.mapId && item.mobId === mob.mobId)) };
+        }
         if (entry.key === 'questClaimAction') {
           const previous = next.questClaimStatus?.data || { claims: [] };
           if (previous.claims?.some((claim) => claim.token === entry.data.token)) continue;
@@ -1664,8 +1671,21 @@
           continue;
         }
         if (entry.key === 'rallyAction') {
+          if (entry.data.action === 'socketReturnCompleted') {
+            next.experimentalRallyReturns = { key: 'experimentalRallyReturns', group: 'internal',
+              method: entry.method, updatedAt: entry.updatedAt,
+              data: [{ squadId: entry.data.squadId, returnedAt: Date.parse(entry.updatedAt) },
+                ...(next.experimentalRallyReturns?.data || []).filter((item) => item.squadId !== entry.data.squadId)].slice(0, 200) };
+            changed = true;
+          }
+          if (['create', 'details'].includes(entry.data.action) && entry.data.mobId && entry.data.mapId) {
+            next.experimentalRallyTargets = { key: 'experimentalRallyTargets', group: 'internal',
+              method: entry.method, updatedAt: entry.updatedAt,
+              data: [{ rallyId: entry.data.rallyId, mobId: entry.data.mobId, mapId: entry.data.mapId },
+                ...(next.experimentalRallyTargets?.data || []).filter((item) => item.rallyId !== entry.data.rallyId)].slice(0, 200) };
+          }
           const current = next.marchStatus;
-          if (current?.updatedAt > entry.updatedAt) continue;
+          if (current?.updatedAt > entry.updatedAt && entry.data.action !== 'socketResult') continue;
           const marches = [...(current?.data?.marches || [])];
           let index = marches.findIndex((march) => march.rally?.id === entry.data.rallyId);
           if (entry.data.action === 'socketAutojoined') {
@@ -1682,8 +1702,8 @@
           } else if (entry.data.action === 'socketResult') {
             if (index < 0) index = marches.findIndex((march) =>
               march.kind === 'raid' && march.squadId === entry.data.squadId);
-            if (index < 0) {
-              if (!Number.isFinite(entry.data.returnAt)) continue;
+            const alreadyReturned = next.experimentalRallyReturns?.data?.some((item) => item.squadId === entry.data.squadId);
+            if (index < 0 && !alreadyReturned && Number.isFinite(entry.data.returnAt) && !(current?.updatedAt > entry.updatedAt)) {
               marches.push({ squadId: entry.data.squadId, kind: 'raid',
                 stage: 'returnToOutpost', endsAt: entry.data.returnAt,
                 result: entry.data.result,
@@ -1691,13 +1711,15 @@
                   mobConfigId: entry.data.mobConfigId } });
               index = marches.length - 1;
             }
-            const previous = marches[index];
-            const returnAt = Number.isFinite(entry.data.returnAt) ? entry.data.returnAt :
-              previous.rally?.returnAt ?? previous.endsAt;
-            marches[index] = { ...previous, stage: 'returnToOutpost', endsAt: returnAt,
-              result: entry.data.result || previous.result,
-              rally: { ...previous.rally, id: entry.data.rallyId,
-                returnAt, mobConfigId: entry.data.mobConfigId ?? previous.rally?.mobConfigId } };
+            if (index >= 0) {
+              const previous = marches[index];
+              const returnAt = Number.isFinite(entry.data.returnAt) ? entry.data.returnAt :
+                previous.rally?.returnAt ?? previous.endsAt;
+              marches[index] = { ...previous, stage: 'returnToOutpost', endsAt: returnAt,
+                result: entry.data.result || previous.result,
+                rally: { ...previous.rally, id: entry.data.rallyId,
+                  returnAt, mobConfigId: entry.data.mobConfigId ?? previous.rally?.mobConfigId } };
+            }
           } else if (entry.data.action === 'socketReturnCompleted') {
             index = marches.findIndex((march) => march.kind === 'raid' &&
               march.squadId === entry.data.squadId);
@@ -1710,6 +1732,7 @@
             const created = { squadId: entry.data.squadId, kind: 'raid',
               stage: 'waitingForRallyStart', endsAt: entry.data.waitUntil,
               rally: { id: entry.data.rallyId, waitUntil: entry.data.waitUntil,
+                mobId: entry.data.mobId, mapId: entry.data.mapId,
                 team: entry.data.team } };
             if (index >= 0) {
               if (marches[index].rally?.id === entry.data.rallyId) continue;
@@ -1825,8 +1848,11 @@
           }
           if (entry.data.action === 'socketResult') {
             const march = marches.find((item) => item.rally?.id === entry.data.rallyId);
+            const target = next.experimentalRallyTargets?.data?.find((item) => item.rallyId === entry.data.rallyId);
             const prior = next.experimentalRallyHistory?.data || [];
             const latest = { rallyId: entry.data.rallyId, squadId: entry.data.squadId,
+              returnedAt: next.experimentalRallyReturns?.data?.find((item) => item.squadId === entry.data.squadId)?.returnedAt || null,
+              mobId: march?.rally?.mobId || target?.mobId, mapId: march?.rally?.mapId || target?.mapId,
               result: entry.data.result || null, mobConfigId: entry.data.mobConfigId,
               waitUntil: march?.rally?.waitUntil || null,
               arrivalAt: march?.rally?.arrivalAt || null,
@@ -1836,8 +1862,18 @@
               method: entry.method, feature: entry.feature, group: 'internal',
               data: [latest, ...prior.filter((item) => item.rallyId !== latest.rallyId)].slice(0, 20),
               updatedAt: entry.updatedAt };
+            if (latest.result === 'win' && latest.mobId && latest.mapId) {
+              const previousWins = next.experimentalDefeatedBosses?.data || [];
+              next.experimentalDefeatedBosses = { key: 'experimentalDefeatedBosses',
+                method: entry.method, group: 'internal', updatedAt: entry.updatedAt,
+                data: [{ mapId: latest.mapId, mobId: latest.mobId }, ...previousWins.filter((item) =>
+                  item.mapId !== latest.mapId || item.mobId !== latest.mobId)].slice(0, 200) };
+              const search = next.experimentalRallySearch;
+              if (search?.data?.mapId === latest.mapId) next.experimentalRallySearch = {
+                ...search, data: { ...search.data, mobs: search.data.mobs.filter((mob) => mob.mobId !== latest.mobId) } };
+            }
           }
-          next.marchStatus = { key: 'marchStatus', method: entry.method,
+          next.marchStatus = current?.updatedAt > entry.updatedAt ? current : { key: 'marchStatus', method: entry.method,
             feature: entry.feature, group: 'header', data: { marches },
             updatedAt: entry.updatedAt };
           changed = true;

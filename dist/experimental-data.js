@@ -1,4 +1,65 @@
 (() => {
+  // Alliance 1.292.0 globalMapRallySettings f69b9fce.
+  const rallyWaitOptions = [60, 300, 900, 1800];
+  const capacitySignature = (hero) => JSON.stringify([hero?.level, hero?.star, hero?.power]);
+  const capacityExamples = { 16: [80, 3, 799], 67: [70, 4, 740],
+    14: [30, 2, 685], 33: [2, 1, 623], 38: [1, 1, 622] };
+
+  function heroCapacity(id, hero, saved) {
+    if (saved?.signature === capacitySignature(hero) && Number.isSafeInteger(saved.count) && saved.count > 0) return saved.count;
+    if (saved) return null;
+    // Observed in game by the user, 2026-11-06; never extrapolate to other levels/stars.
+    const example = capacityExamples[id];
+    return example && hero?.level === example[0] && hero?.star === example[1] ? example[2] : null;
+  }
+
+  function squadCapacity(ids, heroes, capacities, base) {
+    if (ids?.length !== 5 || new Set(ids).size !== 5 || !Number.isSafeInteger(base) || base < 0) return null;
+    const counts = ids.map((id) => heroCapacity(id, heroes[id], capacities?.[id]));
+    return counts.every((n) => Number.isSafeInteger(n) && n > 0) ? base + counts.reduce((a, b) => a + b, 0) : null;
+  }
+
+  function allocateTroops(summary, capacity) {
+    if (!Number.isSafeInteger(capacity) || capacity <= 0) return [];
+    // unit config fecf9b97: IDs 1–10 front, 11–20 middle, 21–30 back; tier ascends.
+    const stocks = new Map();
+    for (const item of summary?.available || []) {
+      const id = item.unitId;
+      if (Number.isInteger(id) && id >= 1 && id <= 30 && Number.isSafeInteger(item.count) && item.count > 0) {
+        stocks.set(id, Math.max(stocks.get(id) || 0, item.count));
+      }
+    }
+    const totals = [0, 1, 2].map((type) => [...stocks].filter(([id]) => Math.floor((id - 1) / 10) === type)
+      .reduce((sum, [, count]) => sum + count, 0));
+    const quotas = [0, 0, 0];
+    let left = Math.min(capacity, totals.reduce((a, b) => a + b, 0));
+    while (left > 0) {
+      const open = quotas.map((count, type) => ({ count, type })).filter(({ count, type }) => count < totals[type]);
+      const step = Math.max(1, Math.floor(left / open.length));
+      for (const { type } of open) {
+        const amount = Math.min(step, totals[type] - quotas[type], left);
+        quotas[type] += amount; left -= amount;
+      }
+    }
+    const units = [];
+    for (let type = 0; type < 3; type++) {
+      let remaining = quotas[type];
+      for (let tier = 10; tier >= 1 && remaining > 0; tier--) {
+        const unitId = type * 10 + tier;
+        const count = Math.min(remaining, stocks.get(unitId) || 0);
+        if (count) units.push({ unitId, count });
+        remaining -= count;
+      }
+    }
+    return units;
+  }
+
+  function rallyMembers(rally) {
+    if (!rally?.leader || !Array.isArray(rally.members) || !Number.isInteger(rally.membersCapacityLeft)) return null;
+    const ids = new Set([rally.leader, ...rally.members].map((member) => member?.userId).filter((id) => id != null).map(String));
+    if (!ids.size) return null;
+    return { count: ids.size, total: ids.size + rally.membersCapacityLeft };
+  }
   const bossConfigId = (level) => Number.isInteger(level) && level >= 1 && level <= 30 ? 59 + level : null;
   // Hero Wars: Alliance 1.292.0 globalMapMine remote config 8e714674: levels 1–10.
   const mineConfigs = {
@@ -48,7 +109,7 @@
 
   function buildRallyCall(mapId, mobId, squad, waitSeconds) {
     if (!mapId || !mobId || !squad || !Number.isInteger(waitSeconds) ||
-        waitSeconds < 1 || waitSeconds > 3600) return null;
+        !rallyWaitOptions.includes(waitSeconds)) return null;
     return { name: 'createRally', feature: 'mob', args: {
       mapId, mobId, squad, startDelay: waitSeconds * 1000
     } };
@@ -86,7 +147,8 @@
     return { phase: 'Battle / awaiting result', until: null, result: null };
   }
 
-  globalThis.hwaHelperExperimentalData = { bossConfigId, lowestPowerHeroes,
+  globalThis.hwaHelperExperimentalData = { rallyWaitOptions, capacitySignature, heroCapacity,
+    squadCapacity, allocateTroops, rallyMembers, bossConfigId, lowestPowerHeroes,
     mineConfigId, mineTypeLevel, teamOptions, buildSquad, buildRallyCall,
     buildGatherCall, buildMineSearchCall, rallyPhase };
 })();

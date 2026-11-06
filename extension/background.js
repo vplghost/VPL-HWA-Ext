@@ -4,6 +4,8 @@ importScripts('clan-versus-rules.js');
 importScripts('mission-costs.js');
 importScripts('march-rules.js');
 importScripts('rpc-cache.js');
+importScripts('experimental-data.js');
+importScripts('raid-queue.js');
 
 const RECORD_STATE_KEY = 'recordingState';
 const RECORD_PREFIX = 'record:';
@@ -33,7 +35,13 @@ async function updateRpcQueueCount(tabId, count) {
 }
 
 chrome.tabs?.onRemoved?.addListener?.((tabId) => {
-  pending = pending.then(() => updateRpcQueueCount(tabId, null)).catch(() => {});
+  pending = pending.then(async () => {
+    await updateRpcQueueCount(tabId, null);
+    const stored = await chrome.storage.local.get('raidQueue');
+    if (stored.raidQueue?.tabId === tabId && !globalThis.hwaHelperRaidQueue.terminal(stored.raidQueue)) {
+      await chrome.storage.local.set({ raidQueue: globalThis.hwaHelperRaidQueue.stop(stored.raidQueue, 'Game tab closed.') });
+    }
+  }).catch(() => {});
 });
 pending = pending.then(() => updateRpcQueueCount('__startup__', null)).catch(() => {});
 
@@ -97,6 +105,47 @@ function rpcMessageForSettings(stored, calls, claim = false) {
   if (queued && stored.captureSettings?.interceptEnabled === false) return null;
   return { kind: queued ? (claim ? 'queue-claim' : 'queue-rpc') : 'refresh-rpc', calls };
 }
+
+async function saveRaidTransition(transition, stored) {
+  let state = transition.state;
+  if (!globalThis.hwaHelperRaidQueue.terminal(state) &&
+      (!rpcMessageForSettings(stored, []) || stored.captureSettings?.interceptEnabled === false)) {
+    state = globalThis.hwaHelperRaidQueue.stop(state, 'RPC settings disabled. Queue stopped.');
+  }
+  // Persist the intent before sending; restarting the worker must never resend a mutation.
+  await chrome.storage.local.set({ raidQueue: state });
+  if (globalThis.hwaHelperRaidQueue.terminal(state)) {
+    await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: state.id }).catch(() => {});
+  } else if (transition.calls?.length) {
+    const dispatch = rpcMessageForSettings(stored, transition.calls);
+    try {
+      await chrome.tabs.sendMessage(state.tabId, { ...dispatch, group: state.id,
+        expiresAt: transition.expiresAt || Date.now() + 120000 });
+    } catch {
+      state = globalThis.hwaHelperRaidQueue.stop(state, 'Game tab disconnected. Queue stopped.');
+      await chrome.storage.local.set({ raidQueue: state });
+    }
+  }
+  return state;
+}
+
+async function updateRaidQueue(record, tabId) {
+  const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  const state = stored.raidQueue;
+  if (globalThis.hwaHelperRaidQueue.terminal(state) || state.tabId !== tabId) return state;
+  return saveRaidTransition(globalThis.hwaHelperRaidQueue.advance(state, record, stored.rpcCache, Date.now()), stored);
+}
+
+chrome.storage.onChanged?.addListener?.((changes, area) => {
+  if (area !== 'local' || !['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) return;
+  pending = pending.then(async () => {
+    const stored = await chrome.storage.local.get(['raidQueue', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+    if (globalThis.hwaHelperRaidQueue.terminal(stored.raidQueue)) return;
+    const modeChanged = changes.socketRefreshMode && changes.socketRefreshMode.oldValue !== changes.socketRefreshMode.newValue;
+    const state = modeChanged ? globalThis.hwaHelperRaidQueue.stop(stored.raidQueue, 'RPC mode changed. Queue stopped.') : stored.raidQueue;
+    await saveRaidTransition({ state }, stored);
+  }).catch(() => {});
+});
 
 function socketRefreshCalls(record, cache) {
   if (record.transport !== 'websocket' || record.direction !== 'received' ||
@@ -201,6 +250,39 @@ chrome.runtime.onInstalled?.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (['raid-queue-start', 'raid-queue-stop'].includes(message?.kind) &&
+      sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+    pending = pending.then(async () => {
+      const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+      const controller = globalThis.hwaHelperRaidQueue;
+      if (message.kind === 'raid-queue-stop') {
+        if (!controller.terminal(stored.raidQueue)) await saveRaidTransition({ state: controller.stop(stored.raidQueue,
+          'Stopped by user. Any rally already sent continues in game.') }, stored);
+        return { ok: true };
+      }
+      if (!controller.terminal(stored.raidQueue)) return { ok: false, error: 'A raid queue is already running.' };
+      if (!rpcMessageForSettings(stored, []) || stored.captureSettings?.interceptEnabled === false) {
+        return { ok: false, error: 'Enable RPC and Monitor API in Settings.' };
+      }
+      const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
+      const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
+      if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
+      const transition = controller.start(message.options, tab.id, stored.rpcCache?.accountStatus?.data?.id, Date.now());
+      if (!transition) return { ok: false, error: 'Invalid raid options or missing account snapshot.' };
+      const state = await saveRaidTransition(transition, stored);
+      return { ok: state.phase !== 'stopped', error: state.reason };
+    });
+    pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'raid-queue-tick' && isGameUrl(sender.url) && sender.tab?.id) {
+    pending = pending.then(() => updateRaidQueue(null, sender.tab.id));
+    pending.then((state) => sendResponse({ ok: true, watch: state?.tabId === sender.tab.id &&
+      !globalThis.hwaHelperRaidQueue.terminal(state) }), () => sendResponse({ ok: false }));
+    pending = pending.catch(() => {});
+    return true;
+  }
   if (message?.kind === 'rpc-queue-status' && isGameUrl(sender.url) && sender.tab?.id &&
       Number.isInteger(message.count) && message.count >= 0 && message.count <= 64) {
     pending = pending.then(() => updateRpcQueueCount(sender.tab.id, message.count));
@@ -432,6 +514,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
     if (cacheResult.changed) await chrome.storage.local.set({ rpcCache: cacheResult.cache });
+    if (sender.tab?.id) await updateRaidQueue(record, sender.tab.id);
     if (stored.popupRpcEnabled === true && sender.tab?.id) {
       const calls = socketRefreshCalls(record, cacheResult.cache);
       const dispatch = rpcMessageForSettings(stored, calls);

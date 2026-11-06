@@ -11,9 +11,11 @@
   const queuedRpcCalls = new Map();
   const queuedClaimKeys = new Set();
   const queuedActionExpiry = new Map();
+  const queuedRpcGroups = new Map();
   let claimQueueTimer = null;
   let actionQueueTimer = null;
   function reportQueueStatus() {
+    for (const key of queuedRpcGroups.keys()) if (!queuedRpcCalls.has(key)) queuedRpcGroups.delete(key);
     window.postMessage({ source: 'hwa-helper-api', kind: 'rpc-queue-status',
       count: queuedRpcCalls.size }, location.origin);
     if (actionQueueTimer !== null) clearTimeout(actionQueueTimer);
@@ -29,12 +31,12 @@
     }
   }
   const piggybackMethods = new Set(['randomDraft_getInfo', 'getPage',
-    'questGetAll', 'questGetEvents', 'getMarches', 'getRallyById',
+    'questGetAll', 'questGetEvents', 'getMarches', 'getRallyById', 'getUnitSummary',
     'userGetInfo', 'inventoryGet', 'heroGetAll', 'titanGetAll', 'teamGetAll',
     'refillableGetAll', 'missionGetAll', 'artifact_getAll', 'titan_artifactGetCounters',
     'skin_getAll', 'rune_getAll', 'arenaGetAll', 'clanWarGetBriefInfo', 'mailGetAll',
     'searchMob', 'searchMine']);
-  const helperActionMethods = new Set(['createRally', 'attackMine', 'stopMineGathering',
+  const helperActionMethods = new Set(['createRally', 'cancelRally', 'attackMine', 'stopMineGathering',
     'randomDraft_saveDefence', 'randomDraft_saveAttack']);
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
@@ -182,10 +184,20 @@
       }
       reportQueueStatus();
     }
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'drop-rpc-group') {
+      for (const [key, group] of queuedRpcGroups) {
+        if (!queuedRpcCalls.has(key) || group === event.data.group) {
+          if (group === event.data.group) { queuedRpcCalls.delete(key); queuedActionExpiry.delete(key); }
+          queuedRpcGroups.delete(key);
+        }
+      }
+      reportQueueStatus();
+    }
     if (event.data?.source === 'hwa-helper-control' &&
         ['queue-rpc', 'queue-claim'].includes(event.data.kind)) {
       if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode === 'direct' || !Array.isArray(event.data.calls)) return;
       const isClaim = event.data.kind === 'queue-claim';
+      if (Number.isFinite(event.data.expiresAt) && Date.now() >= event.data.expiresAt) return;
       for (const call of event.data.calls) {
         if (!(isClaim ? claimQueueMethods.has(call?.name) :
             piggybackMethods.has(call?.name) || helperActionMethods.has(call?.name))) continue;
@@ -203,7 +215,10 @@
             queuedClaimKeys.delete(oldest);
           }
           queuedRpcCalls.set(key, safe);
-          if (helperActionMethods.has(call.name)) queuedActionExpiry.set(key, Date.now() + 120000);
+          if (typeof event.data.group === 'string') queuedRpcGroups.set(key, event.data.group);
+          if (helperActionMethods.has(call.name) || Number.isFinite(event.data.expiresAt)) {
+            queuedActionExpiry.set(key, Math.min(Date.now() + 120000, event.data.expiresAt || Infinity));
+          }
         }
         if (isClaim) queuedClaimKeys.add(key);
       }
@@ -226,8 +241,9 @@
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
       if (!popupRpcEnabled) return;
+      if (Number.isFinite(event.data.expiresAt) && Date.now() >= event.data.expiresAt) return;
       if (rpcDispatchMode !== 'direct') {
-        window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: event.data.calls }, location.origin);
+        window.postMessage({ ...event.data, kind: 'queue-rpc' }, location.origin);
         return;
       }
       const calls = event.data.calls;

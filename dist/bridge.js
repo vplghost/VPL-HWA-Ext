@@ -157,6 +157,14 @@ try {
       }
     }
     if (area !== 'local') return;
+    if ('raidQueue' in changes) scheduleRaidWake(changes.raidQueue.newValue);
+    if (('captureSettings' in changes || 'popupRpcEnabled' in changes) && typeof raidWakeTimer !== 'undefined') {
+      chrome.storage.local.get('raidQueue').then((stored) => {
+        if (stored.raidQueue && !['stopped', 'complete'].includes(stored.raidQueue.phase)) {
+          chrome.runtime.sendMessage({ kind: 'raid-queue-tick' }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
     if ('captureSettings' in changes) currentSettings = changes.captureSettings.newValue || {};
     if ('popupRpcEnabled' in changes) popupRpcEnabled = changes.popupRpcEnabled.newValue === true;
     if ('socketRefreshMode' in changes) socketRefreshMode =
@@ -168,6 +176,11 @@ try {
 } catch {}
 
 chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
+  if (message?.kind === 'drop-rpc-group') {
+    window.postMessage({ source: 'hwa-helper-control', kind: message.kind, group: message.group }, location.origin);
+    sendResponse?.({ ok: true });
+    return true;
+  }
   if (message?.kind === 'draft-action') {
     window.postMessage({
       source: 'hwa-helper-control',
@@ -183,7 +196,9 @@ chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
     window.postMessage({
       source: 'hwa-helper-control',
       kind: message.kind,
-      calls: message.calls
+      calls: message.calls,
+      group: message.group,
+      expiresAt: message.expiresAt
     }, location.origin);
     sendResponse?.({ ok: true });
     return true;
@@ -208,6 +223,21 @@ chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+// Content-script timers wake the MV3 worker while the popup is closed. A late wake
+// is checked against the deadline again by the controller and MAIN-world queue.
+let raidWakeTimer;
+function scheduleRaidWake(state) {
+  if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
+  clearTimeout(raidWakeTimer);
+  if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
+  raidWakeTimer = setTimeout(() => {
+    chrome.runtime.sendMessage({ kind: 'raid-queue-tick' }).then((response) => {
+      if (response?.watch) return chrome.storage.local.get('raidQueue').then((stored) => scheduleRaidWake(stored.raidQueue));
+    }).catch(() => {});
+  }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+}
+try { chrome.storage?.local?.get?.('raidQueue')?.then?.((stored) => scheduleRaidWake(stored.raidQueue))?.catch?.(() => {}); } catch {}
 
 function handleContextInvalidated(err) {
   if (err?.message?.includes('Extension context invalidated')) {

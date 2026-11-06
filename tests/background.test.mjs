@@ -7,6 +7,8 @@ const source = await readFile(new URL('../extension/background.js', import.meta.
 const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
 const cacheSource = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
+const experimentalSource = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
+const raidSource = await readFile(new URL('../extension/raid-queue.js', import.meta.url), 'utf8');
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
 const popupSender = { url: 'chrome-extension://test-extension/popup.html' };
 
@@ -51,7 +53,7 @@ function setup(quota = Infinity) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
@@ -70,6 +72,53 @@ test('RPC queue totals aggregate live game tabs and remove closed tabs', async (
   removeTab(2);
   await report(1, 0);
   assert.equal(local.rpcQueueStatus.count, 0);
+});
+
+test('managed raid queue uses shared policy, pins one game tab and waits for return across popup closure', async () => {
+  for (const mode of ['piggyback', 'mqtt-piggyback', 'direct']) {
+    const env = setup();
+    const { local, tabsList, forwardedMessages, listener } = env;
+    local.popupRpcEnabled = true; local.socketRefreshMode = mode;
+    local.rpcCache = { accountStatus: { data: { id: 10 } } };
+    tabsList.push({ id: 1, url: gameSender.url }, { id: 2, url: gameSender.url });
+    const heroes = Object.fromEntries([1, 2, 3, 4, 5].map((id) => [id, { level: 30, star: 2, power: 100 }]));
+    const capacities = Object.fromEntries(Object.keys(heroes).map((id) => [id, { count: 600, signature: JSON.stringify([30, 2, 100]) }]));
+    const invoke = (message, sender = popupSender) => new Promise((resolve) => listener(message, sender, resolve));
+    const response = await invoke({ kind: 'raid-queue-start', options: {
+      mapId: 'map', center: { x: 1, y: 2 }, level: 1, heroIds: [1, 2, 3, 4, 5], capacities,
+      baseTroops: 200, waitSeconds: 60, minMembers: 4, count: 2
+    } });
+    assert.equal(response.ok, true);
+    assert.equal(forwardedMessages[0].tabId, 1);
+    assert.equal(forwardedMessages[0].msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+    let clock = Date.now() + 1000;
+    const answer = async (bodies) => {
+      const calls = forwardedMessages.at(-1).msg.calls.map((call, ident) => ({ ...call, ident: String(ident) }));
+      await env.send('api-record', rpc(calls, bodies.map((body, ident) => ({ ident: String(ident), result: { response: body } })),
+        new Date(clock++).toISOString()), { ...gameSender, tab: { id: 1 } });
+    };
+    await answer([heroes, { squads: [], available: [7, 17, 27].map((unitId) => ({ unitId, count: 5000 })) }]);
+    assert.equal(local.raidQueue.phase, 'searching');
+    await answer([{ mobs: [{ mobId: 'boss' }] }]);
+    assert.equal(local.raidQueue.phase, 'creating');
+    assert.equal(forwardedMessages.at(-1).msg.calls[0].args.squad.units.reduce((sum, unit) => sum + unit.count, 0), 3200);
+    await answer([{ squadId: 'squad', rally: { rallyId: 'rally', plannedStartTime: clock + 60000 } }]);
+    assert.equal(local.raidQueue.phase, 'active');
+    await env.send('api-record', socket('mobRallyAttackResult', { rallyId: 'rally', squadId: 'squad',
+      battleResult: { battleResult: 'win' } }, new Date(clock++).toISOString()), { ...gameSender, tab: { id: 2 } });
+    assert.equal(local.raidQueue.current.result, undefined, 'another game tab cannot advance the queue');
+    await env.send('api-record', socket('mobRallyAttackResult', { rallyId: 'rally', squadId: 'squad',
+      battleResult: { battleResult: 'win' } }, new Date(clock++).toISOString()), { ...gameSender, tab: { id: 1 } });
+    assert.equal(local.raidQueue.completed, 0);
+    await env.send('api-record', socket('returnFromMobCompleted', { squadId: 'squad' }, new Date(clock++).toISOString()),
+      { ...gameSender, tab: { id: 1 } });
+    assert.equal(local.raidQueue.completed, 1); assert.equal(local.raidQueue.phase, 'refreshing');
+    assert.equal(forwardedMessages.at(-1).msg.calls[0].name, 'heroGetAll');
+    local.popupRpcEnabled = false;
+    await invoke({ kind: 'raid-queue-tick' }, { ...gameSender, tab: { id: 1 } });
+    assert.equal(local.raidQueue.phase, 'stopped');
+    assert.equal(forwardedMessages.at(-1).msg.kind, 'drop-rpc-group');
+  }
 });
 
 function rpc(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {

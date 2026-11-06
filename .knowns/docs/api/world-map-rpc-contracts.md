@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-06T04:07:06.575Z'
+updatedAt: '2026-11-06T09:12:57.982Z'
 tags:
   - api
   - rpc
@@ -78,7 +78,7 @@ S12 requests `args: {"PredefinedSquadId":84}` and receives `response.defenders` 
 }
 ```
 
-S12 confirms `startDelay` is milliseconds (300000 = five minutes). The response contains `squadId` and `rally {rallyId, plannedStartTime, membersLimit, unitsLimit}`. `plannedStartTime` is Unix milliseconds. Use the returned time rather than local request time plus delay. The capture does not establish all allowed start delays; the UI's 1–3600-second validation is only a local bound.
+S12 confirms `startDelay` is milliseconds (300000 = five minutes). The response contains `squadId` and `rally {rallyId, plannedStartTime, membersLimit, unitsLimit}`. `plannedStartTime` is Unix milliseconds. Use the returned time rather than local request time plus delay. Game 1.292.0 `globalMapRallySettings` config `f69b9fce107369b9c8fb8e086ecdc7e4` verifies `startDelayOptions = [00:01:00, 00:05:00, 00:15:00, 00:30:00]`. Builders and UI accept exactly 60, 300, 900 or 1800 seconds; this supersedes the former arbitrary 1–3600-second local bound. The same config specifies five joiner slots (leader makes six) and 400000 units; use response membership fields for current counts.
 
 The implemented resource reducer charges 25 World Energy on creation and deduplicates by rally ID; cancellation refund handling is implemented. See `worldEnergyAction` in `hwaHelperRpcCache.merge`. A successful cancellation request is not present in this current raw capture corpus, so `cancelRally:rally` is implementation/test evidence, not an additional captured method.
 
@@ -181,3 +181,37 @@ For rally: waiting ends at `plannedStartTime`; outbound route ends at boss arriv
 Builders: `buildMineSearchCall`, `buildRallyCall`, `buildGatherCall`, `buildSquad` in `extension/experimental-data.js`. Reducers: `rallyAction`, `gatherAction`, `mineMapAction`, `experimentalActionStatus` in `extension/rpc-cache.js`. Tests: `tests/experimental-data.test.mjs`, `tests/rpc-cache.test.mjs`, `tests/background.test.mjs`.
 
 Related implementation tasks: @task-VHE-C0GGBR and @task-VHE-XTBH0Y. Documentation audit: @task-VHE-68C0H0.
+
+## Managed raid queue and troop allocation
+
+Implemented by @task-VHE-1K5J8J. `extension/raid-queue.js` owns a pure transition controller; background serializes transitions and persists `raidQueue` before dispatch. The popup persists account-scoped `raidPreferences`: last selected lineup, last **searched** boss level, wait, minimum members, raid count, extra base capacity and per-hero observed capacities. Editing a level without searching does not replace the saved search level.
+
+### Capacity and available units
+
+`getUnitSummary:unit {}` supplies `available[{unitId,unitConfigId,count}]`, `reserved` and deployed `squads`. Allocate only available stock; never add reserved or deployed troops. Refresh `heroGetAll` and `getUnitSummary:unit` before every raid and reject selected heroes still deployed. Config `unit/fecf9b97742bf5b29376c1ae8df0a211` maps IDs 1–10 to Front/infantry, 11–20 to Middle/lancer and 21–30 to Back/marksman; tier increases from 1 to 10 inside each range.
+
+`allocateTroops` maximizes the total up to selected capacity/inventory, gives the three types equal quotas, redistributes shortages among types with stock, then fills each type from highest tier down. Unknown unit IDs are excluded.
+
+**Capacity formula remains unverified.** `squadSetting/22d70185aacfb7a220a3b456f80889e1` exposes coefficients (`baseCapacity:200`, `deceleration:8000`, `growth:100000`, three phases), but their executable mapping to per-hero capacity has not been established. Do not use those coefficients, troop counts from a prior squad, or a fitted power/level formula as capacity.
+
+The user supplied in-game samples on 2026-11-06: Dante level 80/star 3 = 799; Polaris 70/4 = 740; Fox 30/2 = 685; Lars 2/1 = 623; Elmir 1/1 = 622. The form seeds matching profiles and permits explicit capacities for every hero plus **additional** base troops. Saved values bind to hero level/star/power; changes invalidate them and stop the queue before creating another rally. Default additional base is 0; the player must enter any verified extra capacity excluding hero contributions. This is an explicit observed-capacity workflow, not automatic derivation of unknown hero capacities.
+
+### Sequential lifecycle
+
+`refreshing → searching → creating → active → refreshing|complete`. Requested count is 1–100. A fresh search uses the chosen boss level each time. Create confirmation matches the expected map, mob, heroes, units and delay, and records server `rallyId`, `squadId`, `plannedStartTime`. The queue stays pinned to its game tab/account and selected options; a second popup cannot start a concurrent queue.
+
+Only a matching `mobRallyAttackResult` with `battleResult.battleResult:"win"` plus either matching `returnFromMobCompleted` or a newer well-formed `getMarches:march` snapshot lacking that squad permits another raid. Return can arrive before result. Return ETA/countdown expiry alone never advances the queue. Loss, RPC error/timeout, missing capacity, account switch, disconnection or explicit stop ends the queue. Mutating commands are never automatically retried. Stopping removes unsent RPCs owned by the queue; commands already sent continue in game.
+
+The cache retains bounded rally-to-mob mappings and defeated `{mapId,mobId}` tombstones (200 each), plus result history (20). A matching win removes that boss from current candidates and subsequent searches, including result delivery after the squad has returned. Other boss IDs and losses do not remove candidates.
+
+### Ten-second membership cancellation
+
+The leader counts once alongside unique member user IDs; total slots are current participants plus `membersCapacityLeft`. Threshold is 1–6 (default 4). The controller requests current details on creation and about 20 seconds before server departure, then evaluates at 10 seconds. Membership older than 25 seconds before departure or missing membership is treated conservatively as insufficient evidence to proceed, also triggering cancellation. Underfilled rallies issue **one** `cancelRally:rally {rallyId}`, then stop the queue; no replacement raid is started.
+
+Cancellation expires one second before departure. The background, content bridge and MAIN interceptor forward an absolute `expiresAt` deadline and queue owner `group`; expired mutations are discarded and stopping drops unsent calls in that group. A missed timer deadline stops with an explicit status instead of issuing a late cancel.
+
+All calls inherit @doc/architecture/shared-rpc-settings, including cancellation. Piggyback needs a native carrier RPC before the deadline; MQTT-assisted uses the existing local nudge. Neither forces Direct. Cancellation cannot be guaranteed if no carrier arrives or the browser suspends/throttles the game tab. The content-script timer wakes the MV3 worker with the popup closed; keep the game tab open. Persisted intent is resumed by processing events/ticks without replaying a create after worker restart. Turning off RPC/monitoring or changing dispatch mode stops the queue. Live in-game validation is still required; automated checks use synthetic RPC/MQTT and the available private captures.
+
+### Regression coverage
+
+`tests/experimental-ui.test.mjs` covers lineup persistence writes, troop changes, last searched level and game wait options. `tests/experimental-data.test.mjs` covers allocation/capacity/member counts. `tests/raid-queue.test.mjs` covers identity correlation, return confirmation, loss/timeout, unknown membership and one-shot deadline cancellation. Background tests cover all three shared modes, tab ownership and popup-independent progression; interceptor tests cover expired cancellation, group removal and no mutation retry. Cache tests cover won-boss filtering across fresh searches and delayed results.

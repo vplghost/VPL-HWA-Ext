@@ -69,6 +69,31 @@ async function waitForMessage(messages) {
   assert.ok(messages.length > 0, 'expected an API record');
 }
 
+test('raid cancellation expires before departure and stopping a group preserves unrelated requests', async () => {
+  let clock = 1000;
+  class Clock extends Date { static now() { return clock; } }
+  const sent = [];
+  const { window } = setup(async (_url, options) => {
+    const calls = JSON.parse(options.body).calls; sent.push(calls.map((call) => call.name));
+    return new Response(JSON.stringify({ results: calls.map((call) => ({ ident: call.ident, result: { response: {} } })) }),
+      { headers: { 'content-type': 'application/json' } });
+  }, true, { Date: Clock, Headers, Response });
+  const post = (payload) => window.postMessage({ source: 'hwa-helper-control', ...payload }, 'https://www.hero-wars-alliance.com');
+  post({ kind: 'queue-rpc', group: 'raid', expiresAt: 2000, calls: [{ name: 'cancelRally', feature: 'rally', args: { rallyId: 'rally' } }] });
+  clock = 2000;
+  const carrier = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] })
+  });
+  await carrier(); assert.deepEqual(sent[0], ['userGetInfo']);
+  post({ kind: 'queue-rpc', group: 'raid', calls: [{ name: 'createRally', feature: 'mob', args: { mobId: 'boss' } }] });
+  post({ kind: 'queue-rpc', calls: [{ name: 'inventoryGet' }] });
+  post({ kind: 'drop-rpc-group', group: 'raid' });
+  await carrier(); assert.deepEqual(sent[1], ['userGetInfo', 'inventoryGet']);
+  post({ kind: 'queue-rpc', group: 'raid', expiresAt: 3000, calls: [{ name: 'cancelRally', feature: 'rally', args: { rallyId: 'rally' } }] });
+  await carrier(); assert.deepEqual(sent[2], ['userGetInfo', 'cancelRally']);
+  await carrier(); assert.deepEqual(sent[3], ['userGetInfo'], 'mutation must never retry');
+});
+
 test('POST fetch preserves response and stores request/response text', async () => {
   const response = new Response('{"hero":1}', { status: 200, headers: { 'content-type': 'application/json' } });
   const { window, messages } = setup(async () => response);

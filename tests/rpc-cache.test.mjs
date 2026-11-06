@@ -93,6 +93,30 @@ test('rally result retains bounded history after the march returns', () => {
     Date.parse(timestamp) + 60000);
 });
 
+test('win removes only the correlated boss and a later search cannot restore it', () => {
+  const at = (seconds) => new Date(Date.UTC(2026, 10, 6, 3, 0, seconds)).toISOString();
+  const search = (time) => record([{ name: 'searchMob', feature: 'mob', ident: 'search', args: {
+    mapId: 'map', mobConfigIds: [60], mobType: 'rally', center: { x: 1, y: 2 }
+  } }], [{ ident: 'search', result: { response: { mobs: [{ mobId: 'won' }, { mobId: 'keep' }] } } }], time);
+  const create = record([{ name: 'createRally', feature: 'mob', ident: 'create', args: {
+    mapId: 'map', mobId: 'won', squad: { heroes: [], units: [] }
+  } }], [{ ident: 'create', result: { response: { squadId: 'squad', rally: { rallyId: 'rally', plannedStartTime: Date.parse(at(30)) } } } }], at(1));
+  const finish = (type, body, second) => ({ transport: 'websocket', direction: 'received', encoding: 'utf8',
+    endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt',
+    timestamp: at(second), payload: JSON.stringify({ result: { type, body } }) });
+  const returned = finish('returnFromMobCompleted', { squadId: 'squad' }, 40);
+  const win = finish('mobRallyAttackResult', { squadId: 'squad', rallyId: 'rally', battleResult: { battleResult: 'win' },
+    routeToOutpost: { startedAt: Date.parse(at(30)), durationMs: 60000 } }, 41);
+  const result = cache.merge({}, [search(at(0)), create, returned, win, search(at(42))]).cache;
+  assert.deepEqual(Array.from(result.experimentalRallySearch.data.mobs, (mob) => mob.mobId), ['keep']);
+  assert.equal(result.experimentalDefeatedBosses.data.length, 1);
+  assert.equal(result.experimentalRallyHistory.data[0].mobId, 'won');
+  assert.equal(result.marchStatus.data.marches.length, 0, 'late result must not resurrect a returned army');
+  const loss = finish('mobRallyAttackResult', { squadId: 'other', rallyId: 'unrelated', battleResult: { battleResult: 'lose' },
+    routeToOutpost: { startedAt: Date.parse(at(44)), durationMs: 60000 } }, 44);
+  assert.deepEqual(Array.from(cache.merge(result, [loss]).cache.experimentalRallySearch.data.mobs, (mob) => mob.mobId), ['keep']);
+});
+
 test('solo monster attack tracks team, cost, loss report, and estimated return without touching other marches', () => {
   const startedAt = Date.parse('2026-11-05T05:00:08.000Z');
   const chunk = record([{ name: 'getChunks', feature: 'globalMap', ident: 'map' }],

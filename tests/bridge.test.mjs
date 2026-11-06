@@ -5,6 +5,32 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/bridge.js', import.meta.url), 'utf8');
 
+test('persisted raid timer wakes worker without popup and forwards RPC deadlines and queue ownership', async () => {
+  const timers = new Map(); let timerId = 0; let onChanged; let onMessage;
+  const sent = [], posted = [];
+  let state = { phase: 'active', wakeAt: Date.now() + 5000 };
+  const window = { addEventListener: () => {}, postMessage: (message) => posted.push(message) };
+  const chrome = { runtime: { sendMessage: async (message) => { sent.push(message); return { watch: false }; },
+    onMessage: { addListener: (callback) => { onMessage = callback; } } },
+    storage: { local: { get: async () => ({ raidQueue: state }) },
+      onChanged: { addListener: (callback) => { onChanged = callback; } } } };
+  runInNewContext(source, { window, chrome, Date, location: { origin: 'https://www.hero-wars-alliance.com' },
+    setTimeout: (callback, delay) => { timers.set(++timerId, { callback, delay }); return timerId; },
+    clearTimeout: (id) => timers.delete(id) });
+  await Promise.resolve();
+  assert.equal(timers.size, 1); assert.ok([...timers.values()][0].delay <= 5000);
+  const timer = [...timers.values()][0]; timers.clear(); timer.callback();
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(sent.filter((message) => message.kind === 'raid-queue-tick').length, 1);
+  assert.equal(timers.size, 0, 'a non-owning tab must not enter a wake loop');
+  onMessage({ kind: 'queue-rpc', group: 'queue-id', expiresAt: 12345,
+    calls: [{ name: 'cancelRally', feature: 'rally', args: { rallyId: 'id' } }] }, {}, () => {});
+  assert.equal(posted.at(-1).group, 'queue-id'); assert.equal(posted.at(-1).expiresAt, 12345);
+  state = { phase: 'active', wakeAt: Date.now() + 1000 };
+  onChanged({ raidQueue: { newValue: state } }, 'local'); assert.equal(timers.size, 1);
+  onChanged({ raidQueue: { newValue: { phase: 'stopped' } } }, 'local'); assert.equal(timers.size, 0);
+});
+
 test('bridge forwards queue counts without RPC payloads and rejects invalid counts', async () => {
   const listeners = []; const sent = [];
   const window = { addEventListener: (name, handler) => { if (name === 'message') listeners.push(handler); }, postMessage: () => {} };

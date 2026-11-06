@@ -49,9 +49,19 @@ let currentAutoClaimSettings = { mail: true, reports: true, quests: true, onOpen
 let popupRpcEnabled = false;
 let claimRpcStatus = null;
 let hasAutoClaimedThisSession = false;
-const experimentalSelection = { rallyTeam: '', gatherTeam: 'weakest', bossLevel: 1,
-  waitSeconds: 300, mineType: 'food', mineLevel: 1, mineId: '', units: '' };
+const experimentalSelection = { rallyTeam: '', gatherTeam: 'weakest', bossLevel: 1, searchedBossLevel: 1,
+  waitSeconds: 300, minMembers: 4, raidCount: 1, baseTroops: 0, capacities: {}, mineType: 'food', mineLevel: 1, mineId: '', units: '' };
+let raidPreferencesLoaded = false;
+let raidQueueState = null;
 let experimentalMessage = '';
+
+function saveRaidPreferences() {
+  return chrome.storage.local.set({ raidPreferences: { accountId: currentCache.accountStatus?.data?.id,
+    rallyTeam: experimentalSelection.rallyTeam, bossLevel: experimentalSelection.searchedBossLevel ?? experimentalSelection.bossLevel,
+    waitSeconds: experimentalSelection.waitSeconds, minMembers: experimentalSelection.minMembers,
+    raidCount: experimentalSelection.raidCount, baseTroops: experimentalSelection.baseTroops,
+    capacities: experimentalSelection.capacities } });
+}
 let experimentalPending = null;
 let currentRpcPolicy = { mode: 'piggyback', monitor: true };
 
@@ -4687,7 +4697,11 @@ function renderExperimental(cache) {
       experimentalSelection[key] = teams.find((team) => team.heroIds.length === 5)?.id || teams[0]?.id || '';
     }
     select.value = experimentalSelection[key];
-    select.addEventListener('change', () => { experimentalSelection[key] = select.value; render(); });
+    select.addEventListener('change', () => {
+      experimentalSelection[key] = select.value;
+      if (key === 'rallyTeam') saveRaidPreferences();
+      render();
+    });
     field(section, 'Lineup', select);
     const selected = teams.find((team) => team.id === experimentalSelection[key]);
     note(section, selected?.heroIds.map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed.');
@@ -4709,7 +4723,37 @@ function renderExperimental(cache) {
   };
   const rally = card('Rally raid');
   const rallyTeam = makeTeamSelect(rally, 'rallyTeam');
-  makeUnitsInput(rally);
+  const capacityFields = document.createElement('div');
+  capacityFields.className = 'grid grid-cols-2 gap-2'; rally.append(capacityFields);
+  for (const id of rallyTeam?.heroIds || []) {
+    const hero = heroes[id];
+    const capacity = data.heroCapacity(id, hero, experimentalSelection.capacities[id]);
+    if (!experimentalSelection.capacities[id] && capacity) {
+      experimentalSelection.capacities[id] = { signature: data.capacitySignature(hero), count: capacity };
+      saveRaidPreferences();
+    }
+    const input = document.createElement('input'); input.type = 'number'; input.min = '1'; input.step = '1';
+    input.value = capacity == null ? '' : String(capacity);
+    input.placeholder = 'Capacity shown in game';
+    input.addEventListener('change', () => {
+      experimentalSelection.capacities[id] = { signature: data.capacitySignature(hero), count: Number(input.value) };
+      saveRaidPreferences(); render();
+    });
+    field(capacityFields, `${globalThis.hwaHelperNameMap.hero(id) || id} · troop capacity`, input);
+  }
+  const base = document.createElement('input'); base.type = 'number'; base.min = '0'; base.step = '1';
+  base.value = String(experimentalSelection.baseTroops);
+  base.addEventListener('change', () => { experimentalSelection.baseTroops = Number(base.value); saveRaidPreferences(); render(); });
+  field(rally, 'Additional base troops (excluding hero capacity)', base);
+  const capacity = data.squadCapacity(rallyTeam?.heroIds, heroes, experimentalSelection.capacities, experimentalSelection.baseTroops);
+  const optimized = data.allocateTroops(cache['getUnitSummary:unit']?.data, capacity);
+  const rallySquad = data.buildSquad(rallyTeam?.heroIds || [], optimized);
+  note(rally, capacity == null ? 'Enter each hero capacity shown in game. Re-enter after the hero changes.' :
+    `Troops: ${optimized.reduce((sum, unit) => sum + unit.count, 0)} / ${capacity} · ${optimized.map((unit) => `#${unit.unitId}: ${unit.count}`).join(' · ')}`);
+  note(rally, 'Available troops only. Highest tiers first, balanced across infantry, lancer and marksman. Capacity is refreshed against hero stats before each raid.');
+  button(rally, 'Refresh available troops', () => chrome.runtime.sendMessage({ kind: 'refresh-rpc',
+    calls: [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }] }), !popupRpcEnabled);
+
   const level = document.createElement('select');
   for (let n = 1; n <= 30; n++) {
     const option = document.createElement('option'); option.value = String(n); option.textContent = `Boss level ${n}`; level.append(option);
@@ -4717,11 +4761,23 @@ function renderExperimental(cache) {
   level.value = String(experimentalSelection.bossLevel);
   level.addEventListener('change', () => { experimentalSelection.bossLevel = Number(level.value); render(); });
   field(rally, 'Boss level', level);
-  const wait = document.createElement('input');
-  wait.type = 'number'; wait.min = '1'; wait.max = '3600'; wait.step = '1';
+  const wait = document.createElement('select');
+  for (const seconds of data.rallyWaitOptions) {
+    const option = document.createElement('option'); option.value = String(seconds);
+    option.textContent = `${seconds / 60} minute(s)`; wait.append(option);
+  }
   wait.value = String(experimentalSelection.waitSeconds);
-  wait.addEventListener('change', () => { experimentalSelection.waitSeconds = Number(wait.value); });
-  field(rally, 'Rally wait (seconds)', wait);
+  wait.addEventListener('change', () => { experimentalSelection.waitSeconds = Number(wait.value); saveRaidPreferences(); });
+  field(rally, 'Rally wait', wait);
+  for (const [key, label, min, max] of [['minMembers', 'Minimum members at 10 seconds (leader included, normally /6)', 1, 6],
+      ['raidCount', 'Number of raids', 1, 100]]) {
+    const input = document.createElement('input'); input.type = 'number'; input.min = String(min); input.max = String(max); input.step = '1';
+    input.value = String(experimentalSelection[key]);
+    input.addEventListener('change', () => { experimentalSelection[key] = Number(input.value); saveRaidPreferences(); });
+    field(rally, label, input);
+  }
+  note(rally, 'At 10 seconds, an underfilled rally or missing fresh member data triggers cancellation and stops the queue. Piggyback needs a game RPC before departure; late cancellations expire. Keep the game tab open.');
+
   note(rally, context.mapId ? `Map ready · ${context.mapId}` : 'Open the world map in game once to capture its map ID.');
   const searchResult = cache.experimentalRallySearch?.data;
   const matchingSearch = searchResult?.mobConfigIds?.includes(data.bossConfigId(experimentalSelection.bossLevel));
@@ -4729,6 +4785,8 @@ function renderExperimental(cache) {
   note(rally, matchingSearch ? `${targets.length} boss target(s) found for this level.` : 'Search for this level before starting a rally.');
   button(rally, 'Find boss', async () => {
     const configId = data.bossConfigId(experimentalSelection.bossLevel);
+    experimentalSelection.searchedBossLevel = experimentalSelection.bossLevel;
+    await saveRaidPreferences();
     await experimentalRpc([{ name: 'searchMob', feature: 'mob', args: {
       mapId: context.mapId, center: mapCenter,
       mobType: 'rally', mobConfigIds: [configId]
@@ -4741,13 +4799,27 @@ function renderExperimental(cache) {
     targetSelect.append(option);
   });
   field(rally, 'Target', targetSelect);
-  button(rally, 'Start rally', async () => {
-    const squad = selectedSquad(rallyTeam);
-    const call = data.buildRallyCall(searchResult?.mapId, targetSelect.value,
-      squad, experimentalSelection.waitSeconds);
-    if (!call) { experimentalMessage = 'Select five heroes, valid troops, a boss, and a wait time from 1 to 3600 seconds.'; render(); return; }
-    await experimentalRpc([call], 'Starting rally...');
-  }, !popupRpcEnabled || !!experimentalPending || !targets.length || !rallyTeam || rallyTeam.heroIds.length !== 5);
+  const queueRunning = raidQueueState && !['stopped', 'complete'].includes(raidQueueState.phase);
+  const startRaid = async (count) => {
+    const response = await chrome.runtime.sendMessage({ kind: 'raid-queue-start', options: {
+      mapId: context.mapId, center: mapCenter, firstMobId: targetSelect.value,
+      level: experimentalSelection.bossLevel, heroIds: rallyTeam.heroIds,
+      capacities: experimentalSelection.capacities, baseTroops: experimentalSelection.baseTroops,
+      waitSeconds: experimentalSelection.waitSeconds, minMembers: experimentalSelection.minMembers, count
+    } }).catch((error) => ({ error: String(error) }));
+    experimentalMessage = response?.ok ? 'Raid queue started. Next raid waits for a confirmed win and return to base.' : response?.error || 'Could not start queue.';
+    render();
+  };
+  const cannotStart = !popupRpcEnabled || !!experimentalPending || queueRunning || !targets.length || !rallySquad;
+  button(rally, 'Start rally', () => startRaid(1), cannotStart);
+  button(rally, 'Start raid queue', () => startRaid(experimentalSelection.raidCount), cannotStart);
+  if (raidQueueState) {
+    const members = raidQueueState.current?.members;
+    note(rally, `Queue: ${raidQueueState.phase} · ${raidQueueState.completed}/${raidQueueState.options.count} returned · ${raidQueueState.started} started${members ? ` · members ${members.count}/${members.total}` : ''}${raidQueueState.reason ? ` · ${raidQueueState.reason}` : ''}`);
+    if (queueRunning) button(rally, 'Stop queue', async () => {
+      await chrome.runtime.sendMessage({ kind: 'raid-queue-stop' }); render();
+    }, false);
+  }
   const activeRallies = (cache.marchStatus?.data?.marches || []).filter((march) => march.rally &&
     !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
   for (const march of activeRallies) {
@@ -4851,10 +4923,21 @@ async function experimentalRpc(calls, message) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'raidPreferences', 'raidQueue']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
+  raidQueueState = stored.raidQueue || null;
+  if (!raidPreferencesLoaded && cache.accountStatus?.data?.id) {
+    const saved = stored.raidPreferences;
+    if (saved && String(saved.accountId) === String(cache.accountStatus.data.id)) {
+      for (const key of ['rallyTeam', 'bossLevel', 'waitSeconds', 'minMembers', 'raidCount', 'baseTroops', 'capacities']) {
+        if (saved[key] !== undefined) experimentalSelection[key] = saved[key];
+      }
+      experimentalSelection.searchedBossLevel = experimentalSelection.bossLevel;
+    }
+    raidPreferencesLoaded = true;
+  }
   renderRpcQueue(stored.rpcQueueStatus?.count || 0);
   popupRpcEnabled = stored.popupRpcEnabled === true;
   currentRpcPolicy = { mode: ['direct', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'piggyback',
@@ -5573,7 +5656,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
         'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
-    if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('raidQueue' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
