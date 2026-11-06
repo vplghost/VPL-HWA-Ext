@@ -5,6 +5,22 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/bridge.js', import.meta.url), 'utf8');
 
+test('bridge forwards queue counts without RPC payloads and rejects invalid counts', async () => {
+  const listeners = []; const sent = [];
+  const window = { addEventListener: (name, handler) => { if (name === 'message') listeners.push(handler); }, postMessage: () => {} };
+  const chrome = { runtime: { id: 'test', sendMessage: async (message) => { sent.push(message); return {}; } },
+    storage: { local: { get: async () => ({}) }, onChanged: { addListener: () => {} } } };
+  runInNewContext(source, { window, chrome, location: { origin: 'https://www.hero-wars-alliance.com' } });
+  for (const count of [7, -1, 65, '4']) for (const listener of listeners) listener({
+    source: window, origin: 'https://www.hero-wars-alliance.com',
+    data: { source: 'hwa-helper-api', kind: 'rpc-queue-status', count, calls: [{ secret: 'ignored' }] }
+  });
+  const reports = sent.filter((message) => message.kind === 'rpc-queue-status');
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].count, 7);
+  assert.deepEqual(Object.keys(reports[0]), ['kind', 'count']);
+});
+
 test('bridge records canvas pointers while active and ignores typed keys and helper controls', async () => {
   const listeners = {};
   const sent = [];

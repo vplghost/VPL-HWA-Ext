@@ -86,6 +86,7 @@
   }
 
   function resource(key, amount, record, method, label, extra = {}) {
+    if (key === 'refillable:62' || key === 'world-refillable:62') return []; // Wheel feature is shelved.
     if (!Number.isFinite(amount) || amount < 0) return [];
     return [{ key: `resource:${key}`, method, feature: null, group: 'resources',
       data: { amount, label, ...extra }, updatedAt: record.timestamp }];
@@ -346,10 +347,24 @@
       const response = JSON.parse(record.responseBody);
       if (!Array.isArray(request.calls) || !Array.isArray(response.results)) return [];
       const results = new Map(response.results.map((result) => [result.ident, result.result]));
-      return request.calls.flatMap((call) => {
+      const actions = request.calls.flatMap((call) => {
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
         const result = results.get(call.ident);
+        if (key === 'searchMob:mob' && call.args?.mobType === 'rally' &&
+            Array.isArray(result?.response?.mobs)) {
+          return [{ key: 'experimentalRallySearch', method: call.name,
+            feature: call.feature, group: 'internal', data: {
+              mapId: call.args.mapId, mobConfigIds: call.args.mobConfigIds,
+              center: call.args.center, mobs: result.response.mobs
+            }, updatedAt: record.timestamp }];
+        }
+        if (key === 'searchMob:mob' && call.args?.mapId && call.args?.center) {
+          return [{ key: 'experimentalMapContext', method: call.name,
+            feature: call.feature, group: 'internal', data: {
+              mapId: call.args.mapId, center: call.args.center
+            }, updatedAt: record.timestamp }];
+        }
         if (key === 'getMarches:march' && result?.response?.marches) {
           return [{ key: 'marchStatus', method: call.name, feature: call.feature,
             group: 'header', data: { marches: extractMarches(result.response) },
@@ -462,21 +477,32 @@
           for (const m of result.response.mines) {
             if (m?.mineId) mines[m.mineId] = { mineConfigId, mineType };
           }
-          if (Object.keys(mines).length) {
-            return [{
-              key: 'mineMapAction',
-              method: call.name,
-              feature: call.feature,
-              group: 'internal',
-              data: { mines },
-              updatedAt: record.timestamp
-            }];
-          }
+          return [{ key: 'experimentalMineSearch', method: call.name,
+            feature: call.feature, group: 'internal', data: {
+              mapId: call.args.mapId, mineConfigId,
+              center: call.args.center, mines: result.response.mines
+            }, updatedAt: record.timestamp },
+          ...(call.args?.mapId && call.args?.center ? [{
+            key: 'experimentalMapContext', method: call.name,
+            feature: call.feature, group: 'internal', data: {
+              mapId: call.args.mapId, center: call.args.center
+            }, updatedAt: record.timestamp
+          }] : []),
+          ...(Object.keys(mines).length ? [{ key: 'mineMapAction', method: call.name,
+            feature: call.feature, group: 'internal', data: { mines },
+            updatedAt: record.timestamp }] : [])];
         }
         if (key === 'getChunks:globalMap' && Array.isArray(result?.response?.chunks)) {
           const mines = {};
           const monsters = {};
+          const outposts = {};
           for (const chunk of result.response.chunks) {
+            for (const outpost of (Array.isArray(chunk?.outposts) ? chunk.outposts : [])) {
+              if (outpost?.userId && Number.isFinite(outpost.coordinates?.x) &&
+                  Number.isFinite(outpost.coordinates?.y)) {
+                outposts[outpost.userId] = outpost.coordinates;
+              }
+            }
             for (const mob of (Array.isArray(chunk?.mobs) ? chunk.mobs : [])) {
               if (mob?.mobId && Number.isInteger(mob.mobConfigId) && mob.mobType === 'solo') {
                 monsters[mob.mobId] = { mobConfigId: mob.mobConfigId };
@@ -496,6 +522,11 @@
             }
           }
           const actions = [];
+          if (call.args?.mapId) actions.push({
+            key: 'experimentalMapContext', method: call.name,
+            feature: call.feature, group: 'internal',
+            data: { mapId: call.args.mapId, outposts }, updatedAt: record.timestamp
+          });
           if (Object.keys(monsters).length) actions.push({
             key: 'soloMobMapAction', method: call.name, feature: call.feature,
             group: 'internal', data: { monsters }, updatedAt: record.timestamp
@@ -556,7 +587,15 @@
               team: rallyTeam(call.args?.squad)
             },
             updatedAt: record.timestamp
-          }];
+          }, ...(call.args?.squad ? [{ key: 'experimentalLastSquad', method: call.name,
+            feature: call.feature, group: 'internal', data: call.args?.squad,
+            updatedAt: record.timestamp }] : []),
+          ...(call.args?.mapId && route.from?.coordinates ? [{
+            key: 'experimentalMapContext', method: call.name,
+            feature: call.feature, group: 'internal', data: {
+              mapId: call.args.mapId, center: route.from.coordinates
+            }, updatedAt: record.timestamp
+          }] : [])];
         }
         if (key === 'stopMineGathering:mine' && result?.response?.squadId && result?.response?.route) {
           const route = result.response.route;
@@ -1211,29 +1250,6 @@
               data: { energy: item.amount }, updatedAt: record.timestamp
             });
           }
-          if (Array.isArray(info.refillable)) {
-            const ref62 = info.refillable.find(r => r.id === 62);
-            if (ref62) {
-              // The captured Wheel screen was cooling down with amount 1; use
-              // lastRefill as the cooldown anchor before treating it as ready.
-              const lastRefill = Number(ref62.lastRefill);
-              const cooldownEndTs = Number.isFinite(lastRefill) && lastRefill > 0
-                ? lastRefill + 8 * 60 * 60 : null;
-              const snapshotTs = Date.parse(record.timestamp) / 1000;
-              const hasFree = Number(ref62.amount) > 0 &&
-                (!cooldownEndTs || (Number.isFinite(snapshotTs) && snapshotTs >= cooldownEndTs));
-              entries.push({
-                key: 'wheelFortuneStatus', method: call.name, feature: null, group: 'header',
-                data: {
-                  hasFree,
-                  amount: ref62.amount ?? 0,
-                  boughtToday: ref62.boughtToday ?? 0,
-                  nextResetTs: cooldownEndTs || info.nextDayTs || null
-                },
-                updatedAt: record.timestamp
-              });
-            }
-          }
           return entries;
         }
         if (key === 'refillableGetAll:refillable' && Array.isArray(result?.response?.refillables)) {
@@ -1325,6 +1341,9 @@
           return [{ key: 'worldEnergyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'create', rallyId: result.response.rally.rallyId },
             updatedAt: record.timestamp },
+          ...(call.args?.squad ? [{ key: 'experimentalLastSquad', method: call.name,
+            feature: call.feature, group: 'internal', data: call.args.squad,
+            updatedAt: record.timestamp }] : []),
           { key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'create',
               rallyId: result.response.rally.rallyId,
@@ -1353,30 +1372,6 @@
             actions.push(...extractRewardActions(record, call, reward, `shopBuy:reward:${slotId}`));
           }
           return actions;
-        }
-        if ((call.name === 'alchemyUseFree' ||
-          (call.name === 'refillable_alchemyUseVideo' && call.args?.type === 'alchemy')) &&
-          result?.response != null) {
-          // The wheel grants another free spin eight hours after a successful roll.
-          // The API response has the reward but no cooldown, so derive the next
-          // availability from the captured request timestamp.
-          const rolledAt = Date.parse(record.timestamp);
-          const nextResetTs = Number.isFinite(rolledAt) ? Math.floor(rolledAt / 1000) + 8 * 60 * 60 : null;
-          return [
-            ...resourceAction(record, call, 'refillable:62', -1, 'Wheel of Fortune', call.name),
-            {
-              key: 'wheelFortuneStatus',
-              method: call.name,
-              feature: null,
-              group: 'header',
-              data: {
-                hasFree: false,
-                amount: 0,
-                nextResetTs
-              },
-              updatedAt: record.timestamp
-            }
-          ];
         }
         if (call.name === 'randomDraft_register') {
           return [
@@ -1526,6 +1521,22 @@
         return [{ key, method: call.name, feature: call.feature || null,
           group, data: result.response, updatedAt: record.timestamp }];
       });
+      const experimentalCalls = new Set(['searchMob:mob', 'searchMine:mine', 'createRally:mob',
+        'attackMine:mine', 'stopMineGathering:mine']);
+      for (const call of request.calls) {
+        if (!experimentalCalls.has(`${call.name}:${call.feature}`)) continue;
+        const result = results.get(call.ident);
+        if (!result) continue;
+        const rawError = result.error;
+        const error = typeof rawError === 'string' ? rawError :
+          (rawError?.message || rawError?.description || null);
+        actions.push({ key: 'experimentalActionStatus', method: call.name,
+          feature: call.feature, group: 'internal', data: {
+            name: call.name, ok: Boolean(result.response && !rawError),
+            error: error ? String(error).slice(0, 200) : null
+          }, updatedAt: record.timestamp });
+      }
+      return actions;
     } catch (_) {
       return [];
     }
@@ -1812,6 +1823,20 @@
             }
             if (!updated) continue;
           }
+          if (entry.data.action === 'socketResult') {
+            const march = marches.find((item) => item.rally?.id === entry.data.rallyId);
+            const prior = next.experimentalRallyHistory?.data || [];
+            const latest = { rallyId: entry.data.rallyId, squadId: entry.data.squadId,
+              result: entry.data.result || null, mobConfigId: entry.data.mobConfigId,
+              waitUntil: march?.rally?.waitUntil || null,
+              arrivalAt: march?.rally?.arrivalAt || null,
+              returnAt: entry.data.returnAt || null,
+              updatedAt: entry.updatedAt };
+            next.experimentalRallyHistory = { key: 'experimentalRallyHistory',
+              method: entry.method, feature: entry.feature, group: 'internal',
+              data: [latest, ...prior.filter((item) => item.rallyId !== latest.rallyId)].slice(0, 20),
+              updatedAt: entry.updatedAt };
+          }
           next.marchStatus = { key: 'marchStatus', method: entry.method,
             feature: entry.feature, group: 'header', data: { marches },
             updatedAt: entry.updatedAt };
@@ -2060,27 +2085,6 @@
           for (const id of ids.slice(40)) delete states[id];
           next.worldEnergyRallies = { key: 'worldEnergyRallies', method: entry.method,
             feature: entry.feature, group: 'internal', data: states, updatedAt: entry.updatedAt };
-          changed = true;
-          continue;
-        }
-        if (entry.key === 'wheelFortuneStatus') {
-          if (next.wheelFortuneStatus?.updatedAt > entry.updatedAt) continue;
-          const prev = next.wheelFortuneStatus?.data || {};
-          next.wheelFortuneStatus = {
-            key: 'wheelFortuneStatus',
-            method: entry.method,
-            feature: null,
-            group: 'header',
-            data: {
-              ...prev,
-              ...entry.data,
-              nextResetTs: entry.data.nextResetTs || prev.nextResetTs || next.userGetInfo?.data?.nextDayTs || null
-            },
-            updatedAt: entry.updatedAt
-          };
-          if (next['resource:refillable:62']?.data && entry.data.boughtToday != null) {
-            next['resource:refillable:62'].data.boughtToday = entry.data.boughtToday;
-          }
           changed = true;
           continue;
         }
@@ -3075,7 +3079,19 @@
           changed = true;
           continue;
         }
+        if (entry.key.startsWith('experimental') && next[entry.key]?.updatedAt === entry.updatedAt &&
+            JSON.stringify(next[entry.key].data) === JSON.stringify(entry.data)) continue;
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
+        if (entry.key === 'experimentalMapContext' &&
+            next.experimentalMapContext?.data?.mapId === entry.data?.mapId) {
+          entry.data = { ...next.experimentalMapContext.data, ...entry.data,
+            outposts: { ...next.experimentalMapContext.data.outposts,
+              ...entry.data.outposts } };
+          const ids = Object.keys(entry.data.outposts);
+          for (const id of ids.slice(0, Math.max(0, ids.length - 100))) {
+            delete entry.data.outposts[id];
+          }
+        }
         if (entry.key === 'marchStatus') {
           const previous = next.marchStatus?.data?.marches || [];
           entry.data.marches = entry.data.marches.map((march) => {
@@ -3090,7 +3106,8 @@
             if (march.stage === 'returnToOutpost' && Number.isFinite(march.endsAt)) {
               rally.returnAt = march.endsAt;
             }
-              return { ...march, kind: 'raid', rally };
+              return { ...march, kind: 'raid', rally,
+                result: march.result || prior.result || null };
             }
             if (prior.kind === 'attack') {
               const returning = march.stage === 'returnToOutpost';

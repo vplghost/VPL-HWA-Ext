@@ -20,6 +20,12 @@ window.addEventListener('message', (event) => {
   if (event.source !== window || event.origin !== location.origin) return;
   if (event.data?.source !== 'hwa-helper-api') return;
   if (event.data.kind === 'ready') return sendControl();
+  if (event.data.kind === 'rpc-queue-status') {
+    if (Number.isInteger(event.data.count) && event.data.count >= 0 && event.data.count <= 64) {
+      try { chrome.runtime?.sendMessage?.({ kind: 'rpc-queue-status', count: event.data.count })?.catch?.(() => {}); } catch (_) {}
+    }
+    return;
+  }
   if (event.data.kind === 'engine-status' && event.data.status) {
     try {
       chrome.storage?.local?.set?.({ gameEngineStatus: event.data.status });

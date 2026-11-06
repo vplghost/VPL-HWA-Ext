@@ -149,7 +149,7 @@ test('normalizeTabConfig handles defaults, reordering, missing items, and visibi
   assert.equal(fromCustom[2].id, 'log');
   // Missing tabs are appended
   assert.equal(fromCustom.length, 9);
-  assert.ok(fromCustom.some((t) => t.id === 'draft' && t.visible === true));
+  assert.ok(fromCustom.some((t) => t.id === 'experimental' && t.visible === true));
 
   // 3. All hidden guard ensures at least one visible
   const allHidden = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: false }));
@@ -162,7 +162,7 @@ test('applyTabConfig reorders DOM tabs, hides disabled tabs, and updates activeT
   const nav = new MockElement('nav');
   nav.setAttribute('id', 'tabs');
 
-  ['heroes', 'draft', 'items', 'resources', 'titans', 'teams', 'events', 'goals', 'log'].forEach((id) => {
+  ['heroes', 'items', 'resources', 'titans', 'teams', 'events', 'goals', 'experimental', 'log'].forEach((id) => {
     const btn = new MockElement('button');
     btn.dataset.tab = id;
     btn.setAttribute('data-tab', id);
@@ -186,13 +186,13 @@ test('applyTabConfig reorders DOM tabs, hides disabled tabs, and updates activeT
   // Reorder so titans is first, and heroes is hidden
   const testConfig = [
     { id: 'titans', visible: true },
-    { id: 'draft', visible: true },
     { id: 'heroes', visible: false },
     { id: 'items', visible: true },
     { id: 'resources', visible: true },
     { id: 'teams', visible: true },
     { id: 'events', visible: true },
     { id: 'goals', visible: true },
+    { id: 'experimental', visible: true },
     { id: 'log', visible: true }
   ];
 
@@ -200,8 +200,7 @@ test('applyTabConfig reorders DOM tabs, hides disabled tabs, and updates activeT
 
   // Check DOM order of nav children
   assert.equal(nav.children[0].dataset.tab, 'titans');
-  assert.equal(nav.children[1].dataset.tab, 'draft');
-  assert.equal(nav.children[2].dataset.tab, 'heroes');
+  assert.equal(nav.children[1].dataset.tab, 'heroes');
   assert.equal(nav.children[nav.children.length - 1].dataset.tab, 'config');
 
   // Check heroes is hidden
@@ -219,7 +218,7 @@ test('renderConfigTabs renders rows with up/down buttons and visibility toggle',
   const nav = new MockElement('nav');
   nav.setAttribute('id', 'tabs');
 
-  ['heroes', 'draft', 'items', 'resources', 'titans', 'teams', 'events', 'goals', 'log'].forEach((id) => {
+  ['heroes', 'items', 'resources', 'titans', 'teams', 'events', 'goals', 'experimental', 'log'].forEach((id) => {
     const btn = new MockElement('button');
     btn.dataset.tab = id;
     nav.append(btn);
@@ -243,7 +242,7 @@ test('renderConfigTabs renders rows with up/down buttons and visibility toggle',
 
   helper.renderConfigTabs();
 
-  // 9 rows rendered
+  // 10 rows rendered
   assert.equal(tabsList.children.length, 9);
 
   // First row is Heroes
@@ -260,7 +259,7 @@ test('renderConfigTabs renders rows with up/down buttons and visibility toggle',
   // Click Move Down on first item (Heroes)
   await firstDownBtn.dispatch('click');
   // First item is now Draft, second is Heroes
-  assert.equal(helper.currentTabConfig[0].id, 'draft');
+  assert.equal(helper.currentTabConfig[0].id, 'items');
   assert.equal(helper.currentTabConfig[1].id, 'heroes');
   assert.ok(savedConfig);
 

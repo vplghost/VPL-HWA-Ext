@@ -395,7 +395,7 @@ test('Legend Draft UI does NOT lock defense at match start and renders 15 candid
   assert.match(viewEl.textContent, /Step 5/);
 });
 
-test('Legend Draft modal dialog opens on banner click and setupDraftModal wires close buttons', async () => {
+test('Legend Draft dialog preserves tab content and status on open and refresh', async () => {
   const viewEl = new MockElement('div');
   const statusEl = new MockElement('div');
   const searchEl = new MockElement('input');
@@ -414,8 +414,12 @@ test('Legend Draft modal dialog opens on banner click and setupDraftModal wires 
     heroGetAll: { data: {} }
   };
 
-  // Open modal via openDraftModal
+  const sentinel = new MockElement('p'); sentinel.textContent = 'Active tab content';
+  viewEl.replaceChildren(sentinel);
+  statusEl.textContent = 'Active tab status';
   context.openDraftModal(activeCache);
+  assert.equal(viewEl.children[0], sentinel);
+  assert.equal(statusEl.textContent, 'Active tab status');
 
   const draftModal = context.document.querySelector('#draft-modal');
   assert.equal(draftModal.hidden, false, 'Modal should be visible after openDraftModal');
@@ -423,6 +427,13 @@ test('Legend Draft modal dialog opens on banner click and setupDraftModal wires 
   const draftModalBody = context.document.querySelector('#draft-modal-body');
   assert.ok(draftModalBody.children.length > 0, 'Modal body should contain rendered draft');
   assert.match(draftModalBody.textContent, /Manual Candidate Planner/);
+  context.renderDraft(activeCache, draftModalBody);
+  assert.equal(viewEl.children[0], sentinel);
+  assert.equal(statusEl.textContent, 'Active tab status');
+  for (const stageId of [0, 1, 2, 3, 4, 5, 6, 7]) {
+    context.renderDraftAlert({ legendDraftStatus: { data: { stageId } } });
+    assert.equal(context.document.querySelector('#draft-alert').hidden, stageId === 0 || stageId === 7);
+  }
 
   // Close button click hides modal
   const closeBtn = context.document.querySelector('#draft-modal-close');

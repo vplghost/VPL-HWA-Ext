@@ -34,13 +34,13 @@ let activeTab = 'heroes';
 
 const DEFAULT_TAB_CONFIG = [
   { id: 'heroes', label: 'Heroes' },
-  { id: 'draft', label: 'Draft' },
   { id: 'items', label: 'Items' },
   { id: 'resources', label: 'Resources' },
   { id: 'titans', label: 'Titans' },
   { id: 'teams', label: 'Teams' },
   { id: 'events', label: 'Events' },
   { id: 'goals', label: 'Goals' },
+  { id: 'experimental', label: 'Experimental' },
   { id: 'log', label: 'Log' }
 ];
 
@@ -49,6 +49,11 @@ let currentAutoClaimSettings = { mail: true, reports: true, quests: true, onOpen
 let popupRpcEnabled = false;
 let claimRpcStatus = null;
 let hasAutoClaimedThisSession = false;
+const experimentalSelection = { rallyTeam: '', gatherTeam: 'weakest', bossLevel: 1,
+  waitSeconds: 300, mineType: 'food', mineLevel: 1, mineId: '', units: '' };
+let experimentalMessage = '';
+let experimentalPending = null;
+let currentRpcPolicy = { mode: 'piggyback', monitor: true };
 
 let itemsViewMode = 'grid'; // 'grid' | 'list'
 try {
@@ -304,19 +309,7 @@ openTabButton.addEventListener('click', () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?view=tab') });
 });
 
-const draftBanner = document.querySelector('#draft-banner');
-const draftBannerBtn = document.querySelector('#draft-banner-btn');
-if (draftBanner) {
-  draftBanner.addEventListener('click', () => {
-    openDraftModal(currentCache);
-  });
-}
-if (draftBannerBtn) {
-  draftBannerBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openDraftModal(currentCache);
-  });
-}
+document.querySelector('#draft-alert')?.addEventListener('click', () => openDraftModal(currentCache));
 
 const formatNumber = (value) => typeof value === 'number' ? value.toLocaleString('en-US') : '—';
 const formatTime = (value) => value ? new Date(value).toLocaleString('en-US') : 'not available';
@@ -494,6 +487,9 @@ function renderMarches(cache, wrap = document.querySelector('#marches')) {
 
 function refreshTimed() {
   const now = Date.now();
+  for (const countdown of document.querySelectorAll('[data-experimental-until]')) {
+    countdown.textContent = ` · ${Math.max(0, Math.ceil((Number(countdown.dataset.experimentalUntil) - now) / 1000))}s`;
+  }
   const marches = currentCache.marchStatus?.data?.marches || [];
   const marchesWrap = document.querySelector('#marches');
   for (const badge of marchesWrap.querySelectorAll('[data-march-index]')) {
@@ -569,52 +565,6 @@ function refreshTimed() {
     }
   }
 
-  const wheelBadge = document.querySelector('#wheel-fortune-badge');
-  const wheelLabel = document.querySelector('#wheel-fortune-label');
-  if (wheelBadge && wheelLabel) {
-    const wheelEntry = currentCache.wheelFortuneStatus;
-    const refEntry = currentCache['resource:refillable:62'];
-    const wheelStatus = wheelEntry?.data;
-    const ref62 = refEntry?.data;
-    const nextDayTs = wheelStatus?.nextResetTs || currentCache.userGetInfo?.data?.nextDayTs;
-    const resourceIsNewer = refEntry?.updatedAt &&
-      (!wheelEntry?.updatedAt || refEntry.updatedAt > wheelEntry.updatedAt);
-    const firstAmount = resourceIsNewer ? ref62?.amount : wheelStatus?.amount;
-    const secondAmount = resourceIsNewer ? wheelStatus?.amount : ref62?.amount;
-    const amount = firstAmount == null ? secondAmount : firstAmount;
-    const hasFree = amount != null && Number.isFinite(Number(amount)) ?
-      (Number(amount) > 0 && wheelStatus?.hasFree !== false &&
-        (!Number.isFinite(nextDayTs) || nextDayTs <= now / 1000)) :
-      (typeof wheelStatus?.hasFree === 'boolean' ? wheelStatus.hasFree : null);
-
-    if (hasFree === true) {
-      wheelBadge.hidden = false;
-      wheelBadge.className = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer bg-emerald-50 text-emerald-800 ring-1 ring-emerald-300 animate-pulse';
-      wheelLabel.textContent = 'Free Spin';
-      wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Free spin ready!';
-      setResourceTooltip(wheelBadge, 'Wheel of Fortune (Emerald Exchange): Free spin ready!');
-    } else if (hasFree === false && Number.isFinite(nextDayTs)) {
-      wheelBadge.hidden = false;
-      wheelBadge.className = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer bg-slate-50 text-slate-700 ring-1 ring-slate-200 font-mono';
-      if (nextDayTs <= now / 1000) {
-        wheelLabel.textContent = 'Check Wheel';
-        wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Daily reset passed; open the game to refresh.';
-        setResourceTooltip(wheelBadge, wheelBadge.title);
-      } else {
-        const remaining = Math.max(0, Math.ceil(nextDayTs - now / 1000));
-        const hours = Math.floor(remaining / 3600);
-        const minutes = Math.floor((remaining % 3600) / 60);
-        const seconds = remaining % 60;
-        const countdown = [hours, minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
-        wheelLabel.textContent = countdown;
-        wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Next free spin in ' + countdown;
-        setResourceTooltip(wheelBadge, wheelBadge.title);
-      }
-    } else {
-      wheelBadge.hidden = true;
-    }
-  }
-
   const eventsBadge = document.querySelector('#events-tab-badge');
   if (eventsBadge) {
     const hasActiveEvents = Boolean(currentCache.clanVersusStatus || currentCache.clanWarChampStatus || currentCache.clanClashStatus || currentCache.brawlStatus || currentCache.questEvents);
@@ -664,11 +614,11 @@ function refreshTimed() {
     node.textContent = resourceData.formatAmount(resourceData.amountAt(entry));
     setResourceTooltip(node.parentElement, resourceTooltip(entry));
   }
+  renderDraftAlert(currentCache);
   const draftStatus = currentCache.legendDraftStatus?.data;
   if (draftStatus?.stageFinishTs) {
     const formatted = globalThis.hwaHelperPopupData.formatCountdown(draftStatus.stageFinishTs);
-    const bannerTimer = document.querySelector('#draft-banner-timer');
-    if (bannerTimer) bannerTimer.textContent = formatted;
+
     const pageTimer = document.querySelector('#draft-countdown');
     if (pageTimer) pageTimer.textContent = formatted;
   }
@@ -1921,7 +1871,7 @@ try {
 let activeHeroSwapTarget = null;
 let selectedRoleFilter = 'all';
 
-function renderDraft(cache) {
+function renderDraft(cache, target = view) {
   const draft = cache.legendDraftStatus?.data || {};
   const observedMatchId = draft.matchId ?? draft.lastResult?.matchId;
   const observedChoices = globalThis.hwaHelperPopupData.observedDraftChoices(observedMatchId);
@@ -2252,8 +2202,12 @@ function renderDraft(cache) {
         lockBtn.disabled = true;
         lockBtn.textContent = 'Submitting...';
         const action = isViewingAttack ? 'saveAttack' : 'saveDefence';
-        chrome.runtime?.sendMessage?.({ kind: 'draft-action', action, heroes: val.heroes }, () => {
-          setTimeout(render, 500);
+        chrome.runtime?.sendMessage?.({ kind: 'draft-action', action, heroes: val.heroes }, (response) => {
+          if (!response?.ok) {
+            lockBtn.disabled = false;
+            lockBtn.textContent = response?.error || 'Could not submit lineup';
+          } else if (response.queued) lockBtn.textContent = 'Queued for next game RPC...';
+          else setTimeout(render, 500);
         });
       });
     }
@@ -2702,12 +2656,12 @@ function renderDraft(cache) {
   container.append(chooserSection);
   }
 
-  view.replaceChildren(container);
+  target.replaceChildren(container);
   const stageDesc = globalThis.hwaHelperPopupData.draftStageDescription(stageId);
   const matchPrefix = draft.matchId ? `Match #${draft.matchId} • ` : '';
   const pickInfo = isActivelyDrafting ? ` • Selected ${val.count}/5 steps` :
     (val.count === 5 ? ` • ${isViewingAttack ? 'Attack' : 'Defense'} lineup locked (5 heroes)` : '');
-  status.textContent = `${matchPrefix}${stageDesc}${pickInfo}`;
+  if (target === view) status.textContent = `${matchPrefix}${stageDesc}${pickInfo}`;
   return container;
 }
 
@@ -4062,7 +4016,7 @@ function openDraftModal(cache) {
     stageBadge.textContent = globalThis.hwaHelperPopupData?.draftStageDescription?.(stageId) || 'Draft Active';
   }
 
-  body.replaceChildren(renderDraft(activeCache));
+  renderDraft(activeCache, body);
   modal.hidden = false;
 }
 
@@ -4395,6 +4349,8 @@ function renderConfigOther(cache) {
     !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
       'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
       'accountStatus', 'buildingStatus', 'marchStatus', 'soloMobMap',
+      'experimentalMapContext', 'experimentalRallySearch', 'experimentalRallyHistory',
+      'experimentalActionStatus', 'experimentalLastSquad', 'wheelFortuneStatus',
       'researchStatus', 'productionConfigStatus', 'productionStatus',
       'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents',
       'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry?.key)
@@ -4642,13 +4598,267 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   }
 }
 
+function renderRpcQueue(count) {
+  const label = document.querySelector('#rpc-queue-count');
+  if (label) label.textContent = String(Number.isInteger(count) && count >= 0 ? count : 0);
+}
+
+function renderDraftAlert(cache) {
+  const button = document.querySelector('#draft-alert');
+  if (!button) return;
+  const draft = cache.legendDraftStatus?.data;
+  const active = globalThis.hwaHelperPopupData.isDraftActive(draft?.stageId);
+  button.hidden = !active;
+  for (const dot of button.querySelectorAll('.hwa-mail-dot, .hwa-mail-dot-ping')) dot.hidden = !active;
+  setResourceTooltip(button, `Legend Draft · ${globalThis.hwaHelperPopupData.draftStageDescription(draft?.stageId)}${active && draft?.stageFinishTs ? ` · ${globalThis.hwaHelperPopupData.formatCountdown(draft.stageFinishTs)}` : ''}`);
+}
+
+function renderExperimental(cache) {
+  const data = globalThis.hwaHelperExperimentalData;
+  if (experimentalPending && (!popupRpcEnabled ||
+      (experimentalPending.queued && (currentRpcPolicy.mode === 'direct' || !currentRpcPolicy.monitor)))) {
+    experimentalPending = null;
+    experimentalMessage = 'Pending RPC cancelled by Settings.';
+  }
+  const actionStatus = cache.experimentalActionStatus;
+  if (experimentalPending && actionStatus?.data?.name === experimentalPending.name &&
+      Date.parse(actionStatus.updatedAt) >= experimentalPending.sentAt) {
+    experimentalMessage = actionStatus.data.ok ? `${experimentalPending.name} completed.` :
+      `${experimentalPending.name} failed: ${actionStatus.data.error || 'Game rejected the request.'}`;
+    experimentalPending = null;
+  } else if (experimentalPending && Date.now() - experimentalPending.sentAt > (experimentalPending.queued ? 120000 : 30000)) {
+    experimentalMessage = `${experimentalPending.name}: no game result received before the request timeout.`;
+    experimentalPending = null;
+  }
+  const heroes = cache.heroGetAll?.data || {};
+  const teams = data.teamOptions(cache.teamGetAll?.data, heroes);
+  const context = { ...cache.experimentalMineSearch?.data,
+    ...cache.experimentalRallySearch?.data,
+    ...cache.experimentalMapContext?.data };
+  const mapCenter = context.center || context.outposts?.[cache.accountStatus?.data?.id];
+  if (!experimentalSelection.units && cache.experimentalLastSquad?.data?.units?.length) {
+    experimentalSelection.units = cache.experimentalLastSquad.data.units
+      .map((unit) => `${unit.unitId}:${unit.count}`).join(', ');
+  }
+  const card = (title) => {
+    const section = document.createElement('section');
+    section.className = 'm-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3';
+    const heading = document.createElement('h2');
+    heading.className = 'font-semibold text-slate-900';
+    heading.textContent = title;
+    section.append(heading);
+    view.append(section);
+    return section;
+  };
+  const field = (section, label, element) => {
+    const wrap = document.createElement('label');
+    wrap.className = 'block text-xs font-medium text-slate-600';
+    wrap.textContent = label;
+    element.className = 'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900';
+    wrap.append(element);
+    section.append(wrap);
+    return element;
+  };
+  const note = (section, text) => {
+    const p = document.createElement('p');
+    p.className = 'text-xs text-slate-500';
+    p.textContent = text;
+    section.append(p);
+  };
+  const button = (section, text, onClick, disabled) => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'cursor-pointer rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40';
+    el.textContent = text;
+    el.disabled = disabled;
+    el.addEventListener('click', onClick);
+    section.append(el);
+    return el;
+  };
+  const makeTeamSelect = (section, key) => {
+    const select = document.createElement('select');
+    for (const team of teams) {
+      const option = document.createElement('option');
+      option.value = team.id;
+      option.textContent = `${team.label} (${team.heroIds.length}/5)`;
+      select.append(option);
+    }
+    if (!teams.some((team) => team.id === experimentalSelection[key])) {
+      experimentalSelection[key] = teams.find((team) => team.heroIds.length === 5)?.id || teams[0]?.id || '';
+    }
+    select.value = experimentalSelection[key];
+    select.addEventListener('change', () => { experimentalSelection[key] = select.value; render(); });
+    field(section, 'Lineup', select);
+    const selected = teams.find((team) => team.id === experimentalSelection[key]);
+    note(section, selected?.heroIds.map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed.');
+    return selected;
+  };
+  const makeUnitsInput = (section) => {
+    const input = document.createElement('input'); input.type = 'text';
+    input.placeholder = '7:500, 17:500, 27:500';
+    input.value = experimentalSelection.units;
+    input.addEventListener('input', () => { experimentalSelection.units = input.value; });
+    field(section, 'Troops (unit ID:count)', input);
+  };
+  const selectedSquad = (team) => {
+    const units = experimentalSelection.units.split(',').map((part) => {
+      const match = part.trim().match(/^(\d+):(\d+)$/);
+      return match ? { unitId: Number(match[1]), count: Number(match[2]) } : null;
+    });
+    return units.every(Boolean) ? data.buildSquad(team?.heroIds || [], units) : null;
+  };
+  const rally = card('Rally raid');
+  const rallyTeam = makeTeamSelect(rally, 'rallyTeam');
+  makeUnitsInput(rally);
+  const level = document.createElement('select');
+  for (let n = 1; n <= 30; n++) {
+    const option = document.createElement('option'); option.value = String(n); option.textContent = `Boss level ${n}`; level.append(option);
+  }
+  level.value = String(experimentalSelection.bossLevel);
+  level.addEventListener('change', () => { experimentalSelection.bossLevel = Number(level.value); render(); });
+  field(rally, 'Boss level', level);
+  const wait = document.createElement('input');
+  wait.type = 'number'; wait.min = '1'; wait.max = '3600'; wait.step = '1';
+  wait.value = String(experimentalSelection.waitSeconds);
+  wait.addEventListener('change', () => { experimentalSelection.waitSeconds = Number(wait.value); });
+  field(rally, 'Rally wait (seconds)', wait);
+  note(rally, context.mapId ? `Map ready · ${context.mapId}` : 'Open the world map in game once to capture its map ID.');
+  const searchResult = cache.experimentalRallySearch?.data;
+  const matchingSearch = searchResult?.mobConfigIds?.includes(data.bossConfigId(experimentalSelection.bossLevel));
+  const targets = matchingSearch ? searchResult.mobs : [];
+  note(rally, matchingSearch ? `${targets.length} boss target(s) found for this level.` : 'Search for this level before starting a rally.');
+  button(rally, 'Find boss', async () => {
+    const configId = data.bossConfigId(experimentalSelection.bossLevel);
+    await experimentalRpc([{ name: 'searchMob', feature: 'mob', args: {
+      mapId: context.mapId, center: mapCenter,
+      mobType: 'rally', mobConfigIds: [configId]
+    } }], 'Searching boss...');
+  }, !popupRpcEnabled || !!experimentalPending || !context?.mapId || !mapCenter);
+  const targetSelect = document.createElement('select');
+  targets.forEach((target, index) => {
+    const option = document.createElement('option'); option.value = target.mobId;
+    option.textContent = `Boss ${index + 1} · (${target.coordinates?.x ?? '?'}, ${target.coordinates?.y ?? '?'})`;
+    targetSelect.append(option);
+  });
+  field(rally, 'Target', targetSelect);
+  button(rally, 'Start rally', async () => {
+    const squad = selectedSquad(rallyTeam);
+    const call = data.buildRallyCall(searchResult?.mapId, targetSelect.value,
+      squad, experimentalSelection.waitSeconds);
+    if (!call) { experimentalMessage = 'Select five heroes, valid troops, a boss, and a wait time from 1 to 3600 seconds.'; render(); return; }
+    await experimentalRpc([call], 'Starting rally...');
+  }, !popupRpcEnabled || !!experimentalPending || !targets.length || !rallyTeam || rallyTeam.heroIds.length !== 5);
+  const activeRallies = (cache.marchStatus?.data?.marches || []).filter((march) => march.rally &&
+    !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
+  for (const march of activeRallies) {
+    const phase = data.rallyPhase(march);
+    const p = document.createElement('p');
+    p.className = 'rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-900';
+    p.textContent = `${march.rally.target || 'Rally'} · ${phase.phase}${phase.result ? ` · ${phase.result}` : ''}`;
+    if (phase.until) {
+      const countdown = document.createElement('span');
+      countdown.dataset.experimentalUntil = String(phase.until);
+      countdown.textContent = ` · ${Math.max(0, Math.ceil((phase.until - Date.now()) / 1000))}s`;
+      p.append(countdown);
+    }
+    rally.append(p);
+  }
+  const history = cache.experimentalRallyHistory?.data || [];
+  if (history.length) {
+    const heading = document.createElement('h3');
+    heading.className = 'text-xs font-semibold text-slate-700';
+    heading.textContent = 'Recent rally results';
+    rally.append(heading);
+    for (const item of history.slice(0, 5)) {
+      const p = document.createElement('p');
+      p.className = 'text-xs text-slate-600';
+      p.textContent = `${globalThis.hwaHelperRallyTargets?.[item.mobConfigId] || 'Boss'} · ${item.result || 'Result pending'} · ${new Date(item.updatedAt).toLocaleString()}${item.returnAt ? ` · return ${new Date(item.returnAt).toLocaleTimeString()}` : ''}`;
+      rally.append(p);
+    }
+  }
+  const gather = card('Gather troops');
+  const gatherTeam = makeTeamSelect(gather, 'gatherTeam');
+  const typeSelect = document.createElement('select');
+  for (const type of ['food', 'wood', 'stone', 'iron']) {
+    const option = document.createElement('option'); option.value = type; option.textContent = type; typeSelect.append(option);
+  }
+  typeSelect.value = experimentalSelection.mineType;
+  typeSelect.addEventListener('change', () => { experimentalSelection.mineType = typeSelect.value; render(); });
+  field(gather, 'Resource', typeSelect);
+  const mineLevel = document.createElement('select');
+  for (let n = 1; n <= 10; n++) {
+    const option = document.createElement('option'); option.value = String(n); option.textContent = `Level ${n}`; mineLevel.append(option);
+  }
+  mineLevel.value = String(experimentalSelection.mineLevel);
+  mineLevel.addEventListener('change', () => { experimentalSelection.mineLevel = Number(mineLevel.value); render(); });
+  field(gather, 'Mine level', mineLevel);
+  button(gather, 'Find full mines', () => {
+    const call = data.buildMineSearchCall(context.mapId, mapCenter, experimentalSelection.mineType, experimentalSelection.mineLevel);
+    if (call) experimentalRpc([call], 'Searching mines...');
+  }, !popupRpcEnabled || !!experimentalPending || !context.mapId || !mapCenter);
+  const mineSearch = cache.experimentalMineSearch?.data;
+  const mines = mineSearch?.mineConfigId === data.mineConfigId(experimentalSelection.mineType, experimentalSelection.mineLevel) ? mineSearch.mines : [];
+  const mineSelect = document.createElement('select');
+  for (const mine of mines) {
+    const option = document.createElement('option'); option.value = mine.mineId;
+    option.textContent = `(${mine.coordinates?.x ?? '?'}, ${mine.coordinates?.y ?? '?'}) · ${mine.mineId.slice(0, 8)}`;
+    mineSelect.append(option);
+  }
+  if (!mines.some((mine) => mine.mineId === experimentalSelection.mineId)) experimentalSelection.mineId = mines[0]?.mineId || '';
+  mineSelect.value = experimentalSelection.mineId;
+  mineSelect.addEventListener('change', () => { experimentalSelection.mineId = mineSelect.value; });
+  field(gather, 'Search results', mineSelect);
+  note(gather, `${mines.length} full mine(s) found for this type and level.`);
+  makeUnitsInput(gather);
+  note(gather, 'The default lineup selects the five heroes with the lowest recorded power.');
+  button(gather, 'Send gathering team', async () => {
+    const squad = selectedSquad(gatherTeam);
+    const call = data.buildGatherCall(context?.mapId, experimentalSelection.mineId, squad);
+    if (!call) { experimentalMessage = 'Select five heroes, valid troops, a known mine, and capture the map ID.'; render(); return; }
+    await experimentalRpc([call], 'Sending gathering team...');
+  }, !popupRpcEnabled || !!experimentalPending || !context?.mapId || !experimentalSelection.mineId || gatherTeam?.heroIds.length !== 5);
+  const activeMines = (cache.marchStatus?.data?.marches || []).filter((march) => march.mineId &&
+    march.stage !== 'returnToOutpost' && !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
+  for (const march of activeMines) {
+    const row = document.createElement('div'); row.className = 'flex items-center justify-between gap-2 rounded-lg bg-teal-50 px-3 py-2 text-xs';
+    const label = document.createElement('span'); label.textContent = `${march.kind} · ${march.stage} · ${march.squadId}`;
+    row.append(label); gather.append(row);
+    button(row, 'Recall', () => experimentalRpc([{ name: 'stopMineGathering', feature: 'mine',
+      args: { squadId: march.squadId } }], 'Recalling team...'), !popupRpcEnabled || !!experimentalPending || !march.squadId);
+  }
+  if (experimentalMessage) note(view, experimentalMessage);
+  status.textContent = popupRpcEnabled ? 'Experimental actions use the active game tab.' :
+    'Enable Allow popup RPC calls in Settings to use Experimental actions.';
+}
+
+async function experimentalRpc(calls, message) {
+  if (!popupRpcEnabled) { experimentalMessage = 'Enable popup RPC calls in Settings.'; render(); return; }
+  if (experimentalPending) return;
+  experimentalPending = { name: calls[0].name, sentAt: Date.now() };
+  experimentalMessage = message;
+  const response = await chrome.runtime.sendMessage({ kind: 'experimental-rpc', calls }).catch((error) => ({ error: String(error) }));
+  if (response?.ok) {
+    if (experimentalPending) experimentalPending.queued = response.queued === true;
+    experimentalMessage = response.queued ? 'Queued for the next game RPC (up to two minutes).' : 'RPC sent. Waiting for game result...';
+    setTimeout(() => { if (experimentalPending?.name === calls[0].name) render(); }, response.queued ? 121000 : 31000);
+  }
+  else {
+    experimentalPending = null;
+    experimentalMessage = response?.error || 'Could not reach the game tab.';
+  }
+  render();
+}
+
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
+  renderRpcQueue(stored.rpcQueueStatus?.count || 0);
   popupRpcEnabled = stored.popupRpcEnabled === true;
+  currentRpcPolicy = { mode: stored.socketRefreshMode === 'direct' ? 'direct' : 'piggyback',
+    monitor: stored.captureSettings?.interceptEnabled !== false };
   claimRpcStatus = stored.claimRpcStatus || null;
   currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
   favoriteHeroes = new Set(Array.isArray(stored.favoriteHeroes) ? stored.favoriteHeroes.map(String) : []);
@@ -4663,7 +4873,7 @@ async function render() {
   };
   currentProductionRates = Object.fromEntries([1, 2, 3, 4, 5].map((id) =>
     [id, globalThis.hwaHelperProductionData.ratePerMinute(cache, id)]));
-  const resources = resourceEntries(cache);
+  const resources = resourceEntries(cache).filter((entry) => !['resource:refillable:62', 'resource:world-refillable:62'].includes(entry.key));
   const selectedResources = stored.resourceSelection || [];
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
   renderMarches(cache);
@@ -4698,32 +4908,13 @@ async function render() {
   refreshTimed();
   const draftStatus = cache.legendDraftStatus?.data;
   const isDraftActive = globalThis.hwaHelperPopupData.isDraftActive(draftStatus?.stageId);
-  const draftBanner = document.querySelector('#draft-banner');
-  const draftBadge = document.querySelector('#draft-tab-badge');
-  if (draftBanner && draftBadge) {
-    if (isDraftActive) {
-      draftBanner.hidden = false;
-      draftBadge.hidden = false;
-      document.querySelector('#draft-banner-stage').textContent =
-        globalThis.hwaHelperPopupData.draftStageDescription(draftStatus.stageId);
-      if (draftStatus.stageFinishTs) {
-        document.querySelector('#draft-banner-timer').textContent =
-          globalThis.hwaHelperPopupData.formatCountdown(draftStatus.stageFinishTs);
-      } else {
-        document.querySelector('#draft-banner-timer').textContent = '—';
-      }
-    } else {
-      draftBanner.hidden = true;
-      draftBadge.hidden = true;
-    }
-  }
   const towerModal = document.querySelector('#tower-modal');
   if (towerModal && !towerModal.hidden) renderTowerModal(cache);
   const draftModal = document.querySelector('#draft-modal');
   if (draftModal && !draftModal.hidden) {
     const modalBody = document.querySelector('#draft-modal-body');
     if (modalBody) {
-      modalBody.replaceChildren(renderDraft(cache));
+      renderDraft(cache, modalBody);
     }
     const stageBadge = document.querySelector('#draft-modal-stage-badge');
     if (stageBadge) {
@@ -4738,7 +4929,7 @@ async function render() {
     'cursor-pointer rounded-lg border border-slate-300 bg-slate-800 px-3 py-2 font-medium text-white hover:bg-slate-700' :
     'cursor-pointer rounded-lg border border-red-300 bg-red-50 px-3 py-2 font-medium text-red-800 hover:bg-red-100';
   view.replaceChildren();
-  document.querySelector('#toolbar').hidden = activeTab === 'config';
+  document.querySelector('#toolbar').hidden = activeTab === 'config' || activeTab === 'experimental';
   document.querySelector('#settings-panel').hidden = activeTab !== 'config';
   view.hidden = activeTab === 'config';
   document.querySelector('#export').hidden = activeTab !== 'log';
@@ -4753,12 +4944,10 @@ async function render() {
   document.querySelector('#resource-sort-wrap').hidden = activeTab !== 'resources';
   if (resourceFilterToggle) resourceFilterToggle.hidden = activeTab !== 'resources';
   document.querySelector('#search-label').textContent = activeTab === 'log' ? 'Filter endpoint' :
-    activeTab === 'draft' ? 'Search hero by name, role, or ID' :
     activeTab === 'chat' ? 'Search message or sender' :
     activeTab === 'goals' ? 'Search goal, activity, or event' :
     activeTab === 'events' ? 'Search event name or type' : 'Search ID, name, or group';
   search.placeholder = activeTab === 'log' ? 'Filter endpoint' :
-    activeTab === 'draft' ? 'Search hero by name, role, or ID' :
     activeTab === 'chat' ? 'Search message or sender' :
     activeTab === 'goals' ? 'Search goal, activity, or event' :
     activeTab === 'events' ? 'Search event name or type' : 'Search ID, name, or group';
@@ -4771,8 +4960,9 @@ async function render() {
     chrome.storage?.local?.get?.('gameEngineStatus')?.then?.((stored) => {
       renderEngineStatus(stored?.gameEngineStatus);
     });
-  } else if (activeTab === 'draft') {
-    renderDraft(cache);
+  } else if (activeTab === 'experimental') {
+    renderExperimental(cache);
+
   } else if (activeTab === 'heroes') {
     showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Equipment rank', 'Soul stones', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, hero]) => {
@@ -4819,6 +5009,8 @@ async function render() {
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
         'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
         'accountStatus', 'buildingStatus', 'marchStatus',
+        'experimentalMapContext', 'experimentalRallySearch', 'experimentalRallyHistory',
+        'experimentalActionStatus', 'experimentalLastSquad', 'wheelFortuneStatus',
         'researchStatus', 'productionConfigStatus', 'productionStatus',
         'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents', 'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry.key)
       && !entry.key.startsWith('resource:')
@@ -4939,7 +5131,8 @@ function triggerRefresh(groupKey) {
       } else {
         if (statusEl) {
           const time = new Date().toLocaleTimeString();
-          statusEl.textContent = `Quick refresh sent at ${time}. If not updating, use Reload Game Tab.`;
+          statusEl.textContent = response.queued ? `Quick refresh queued at ${time}; waiting for the next game RPC.` :
+            `Quick refresh sent at ${time}. If not updating, use Reload Game Tab.`;
           statusEl.className = 'text-xs text-emerald-600 font-medium';
         }
       }
@@ -5360,11 +5553,13 @@ document.querySelector('#clear').addEventListener('click', async () => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
+    if ('rpcQueueStatus' in changes) renderRpcQueue(changes.rpcQueueStatus.newValue?.count || 0);
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
         'socketRefreshMode' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
     if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
-        'popupRpcEnabled' in changes || 'claimRpcStatus' in changes) queueRender();
+        'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
+        'socketRefreshMode' in changes || 'captureSettings' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
     queueRender();
   }

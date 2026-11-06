@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, access } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
@@ -18,6 +18,20 @@ runInNewContext(resourceDataSource, context);
 runInNewContext(source, context);
 const cache = context.hwaHelperRpcCache;
 
+function testWithTraces(name, files, run) {
+  test(name, async (context) => {
+    for (const file of files) {
+      try { await access(new URL(`../temp/tracking-data/${file}`, import.meta.url)); }
+      catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        context.skip(`Optional private trace unavailable: ${file}`);
+        return;
+      }
+    }
+    await run(context);
+  });
+}
+
 function record(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
   return {
     method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
@@ -25,6 +39,59 @@ function record(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
     requestBodyTruncated: false, responseBodyTruncated: false
   };
 }
+
+test('rally search retains map context and candidate boss IDs for the experimental tab', () => {
+  const solo = record([{ name: 'searchMob', feature: 'mob', ident: 'solo', args: {
+    mapId: 'map-1', mobConfigIds: [37], mobType: 'solo', center: { x: 100, y: 200 }
+  } }], [{ ident: 'solo', result: { response: { mobs: [] } } }]);
+  const rally = record([{ name: 'searchMob', feature: 'mob', ident: 'rally', args: {
+    mapId: 'map-1', mobConfigIds: [60], mobType: 'rally', center: { x: 100, y: 200 }
+  } }], [{ ident: 'rally', result: { response: { mobs: [
+    { mobId: 'boss-1', coordinates: { x: 120, y: 210 } }
+  ] } } }]);
+  const first = cache.merge({}, [solo]).cache;
+  const second = cache.merge(first, [rally]).cache;
+  assert.equal(second.experimentalMapContext.data.mapId, 'map-1');
+  assert.equal(second.experimentalRallySearch.data.mobs[0].mobId, 'boss-1');
+  assert.equal(second.experimentalRallySearch.data.mobConfigIds[0], 60);
+});
+
+test('world map chunk supplies map ID and experimental actions record RPC errors', () => {
+  const chunk = record([{ name: 'getChunks', feature: 'globalMap', ident: 'map',
+    args: { mapId: 'map-1' } }], [{ ident: 'map', result: {
+    response: { chunks: [{ mobs: [], mines: [] }] }
+  } }]);
+  const failed = record([{ name: 'createRally', feature: 'mob', ident: 'rally',
+    args: { mapId: 'map-1', mobId: 'boss-1', startDelay: 300000 } }],
+  [{ ident: 'rally', result: { error: { message: 'Squad unavailable' } } }],
+  '2026-11-01T09:19:00.000Z');
+  const first = cache.merge({}, [chunk]).cache;
+  const second = cache.merge(first, [failed]).cache;
+  assert.equal(first.experimentalMapContext.data.mapId, 'map-1');
+  assert.equal(second.experimentalActionStatus.data.ok, false);
+  assert.equal(second.experimentalActionStatus.data.error, 'Squad unavailable');
+});
+
+test('rally result retains bounded history after the march returns', () => {
+  const timestamp = '2026-11-06T03:00:00.000Z';
+  const socket = { transport: 'websocket', direction: 'received', encoding: 'utf8',
+    endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt', timestamp,
+    payload: JSON.stringify({ result: { type: 'mobRallyAttackResult', body: {
+      squadId: 'squad-1', rallyId: 'rally-1', mobConfigId: 60,
+      battleResult: { battleResult: 'win' },
+      routeToOutpost: { startedAt: Date.parse(timestamp), durationMs: 60000 }
+    } } }) };
+  const initial = { marchStatus: { updatedAt: '2026-11-06T02:59:59.000Z',
+    data: { marches: [{ squadId: 'squad-1', kind: 'raid',
+      rally: { id: 'rally-1', waitUntil: Date.parse(timestamp) - 120000,
+        arrivalAt: Date.parse(timestamp) - 1000 } }] } } };
+  const result = cache.merge(initial, [socket]).cache;
+  assert.equal(result.experimentalRallyHistory.data[0].result, 'win');
+  assert.equal(result.experimentalRallyHistory.data[0].waitUntil,
+    Date.parse(timestamp) - 120000);
+  assert.equal(result.experimentalRallyHistory.data[0].returnAt,
+    Date.parse(timestamp) + 60000);
+});
 
 test('solo monster attack tracks team, cost, loss report, and estimated return without touching other marches', () => {
   const startedAt = Date.parse('2026-11-05T05:00:08.000Z');
@@ -569,7 +636,7 @@ test('heroUpgradeSkill upgrades hero skill in heroGetAll and decrements skill po
   assert.equal(state.heroGetAll.data['60'].skills['350'], 74);
 });
 
-test('skin upgrade trace advances known skin levels once and accepts later hero and stone snapshots', async () => {
+testWithTraces('skin upgrade trace advances known skin levels once and accepts later hero and stone snapshots', ['hwa-api-202611032318_hero_skin_stone.json'], async () => {
   const trace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611032318_hero_skin_stone.json', import.meta.url), 'utf8'));
   const initial = record([
     { name: 'heroGetAll', ident: 'heroes' }, { name: 'inventoryGet', ident: 'items' }
@@ -1319,9 +1386,10 @@ test('attackMine registers active gathering march and stopMineGathering transiti
 
   // Step 1: extract searchMine
   const searchExtracted = cache.extract(searchRecord);
-  assert.equal(searchExtracted.length, 1);
-  assert.equal(searchExtracted[0].key, 'mineMapAction');
-  assert.equal(searchExtracted[0].data.mines['mine-wood-1'].mineType, 'wood');
+  const mineMapAction = searchExtracted.find((entry) => entry.key === 'mineMapAction');
+  assert.equal(mineMapAction.data.mines['mine-wood-1'].mineType, 'wood');
+  assert.equal(searchExtracted.find((entry) => entry.key === 'experimentalMineSearch').data.mines[0].mineId,
+    'mine-wood-1');
 
   // Step 2: merge searchMine and attackMine
   const afterAttack = cache.merge({}, [searchRecord, attackRecord]).cache;
@@ -1351,7 +1419,7 @@ test('attackMine registers active gathering march and stopMineGathering transiti
   assert.equal(returning.remainingResourceAmount, 500000);
 });
 
-test('replaying captured gathering and return traces produces coherent marchStatus transitions', async () => {
+testWithTraces('replaying captured gathering and return traces produces coherent marchStatus transitions', ['hwa-api-202611021904_gathering.json', 'hwa-api-202611021904_gathering_return.json'], async () => {
   const gatherTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611021904_gathering.json', import.meta.url), 'utf8'));
   const returnTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611021904_gathering_return.json', import.meta.url), 'utf8'));
 
@@ -1405,7 +1473,7 @@ test('getPage:report extracts mailStatus and detects unclaimed rewards', () => {
   assert.equal(afterClaim.mailStatus.data.unclaimedReportsCount, 0);
 });
 
-test('replaying rally success trace captures unclaimed battle reports', async () => {
+testWithTraces('replaying rally success trace captures unclaimed battle reports', ['hwa-api-202611021947_rally_success.json'], async () => {
   const rallyTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611021947_rally_success.json', import.meta.url), 'utf8'));
   const merged = cache.merge({}, rallyTrace).cache;
   assert.ok(merged.mailStatus);
@@ -1413,7 +1481,7 @@ test('replaying rally success trace captures unclaimed battle reports', async ()
   assert.equal(merged.mailStatus.data.unclaimedReportsCount, 2);
 });
 
-test('replaying quest claim trace updates Energy and World Energy', async () => {
+testWithTraces('replaying quest claim trace updates Energy and World Energy', ['hwa-api-202611022008_claim_quests_rewards.json'], async () => {
   const questTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611022008_claim_quests_rewards.json', import.meta.url), 'utf8'));
   const merged = cache.merge({}, questTrace).cache;
   assert.ok(merged['resource:energy']);
@@ -1424,7 +1492,7 @@ test('replaying quest claim trace updates Energy and World Energy', async () => 
   assert.equal(merged['resource:world-energy'].data.amount, 106);
 });
 
-test('completeQuest records an event claim and only applies a known reward', async () => {
+testWithTraces('completeQuest records an event claim and only applies a known reward', ['hwa-api-202611032155_event_claim.json'], async () => {
   const eventTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611032155_event_claim.json', import.meta.url), 'utf8'));
   const unknown = cache.merge({}, eventTrace).cache;
   assert.equal(unknown.questClaimStatus.data.claims[0].id, 14360);
@@ -1442,7 +1510,7 @@ test('completeQuest records an event claim and only applies a known reward', asy
   assert.equal(cache.merge(claimed, eventTrace).cache['resource:consumable:100'].data.amount, 5);
 });
 
-test('event claim trace refreshes Balance Sigils and retains every inventory group', async () => {
+testWithTraces('event claim trace refreshes Balance Sigils and retains every inventory group', ['hwa-api-202611032321_claim_event.json'], async () => {
   const trace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611032321_claim_event.json', import.meta.url), 'utf8'));
   const merged = cache.merge({}, trace).cache;
   const inventory = JSON.parse(trace[1].responseBody).results[1].result.response;
@@ -1472,7 +1540,7 @@ test('rally details enrich an existing squad without adding a duplicate march', 
   assert.equal(merged.marchStatus.data.marches[0].rally.id, 'rally-1');
 });
 
-test('replaying mail claim trace clears unclaimed reports and updates resources', async () => {
+testWithTraces('replaying mail claim trace clears unclaimed reports and updates resources', ['hwa-api-202611021947_rally_success.json', 'hwa-api-202611022011_mail_claim.json'], async () => {
   const rallyTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611021947_rally_success.json', import.meta.url), 'utf8'));
   const initCache = cache.merge({}, rallyTrace).cache;
   assert.equal(initCache.mailStatus.data.hasUnclaimed, true);
@@ -1514,7 +1582,7 @@ test('paginated getPage:report preserves unclaimed reports across pages without 
   assert.equal(afterP2.mailStatus.data.hasUnclaimed, true, 'hasUnclaimed should remain true');
 });
 
-test('replaying titan evolve trace updates star, power, fragments, gold, and quests', async () => {
+testWithTraces('replaying titan evolve trace updates star, power, fragments, gold, and quests', ['hwa-api-202611022032_titan_evolve.json'], async () => {
   const at = '2026-11-02T13:30:00.000Z';
   const baseline = {
     titanGetAll: {
@@ -1573,7 +1641,7 @@ test('replaying titan evolve trace updates star, power, fragments, gold, and que
   assert.equal(afterEvolve.questGetAll.data['335'].progress, 13);
 });
 
-test('replaying onload trace extracts getLeaderboardPowerSummary and retains mail unclaimed status', async () => {
+testWithTraces('replaying onload trace extracts getLeaderboardPowerSummary and retains mail unclaimed status', ['hwa-api-202611022043_total_power_up_onload.json'], async () => {
   const onloadTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611022043_total_power_up_onload.json', import.meta.url), 'utf8'));
   const result = cache.merge({}, onloadTrace).cache;
 
@@ -1593,7 +1661,7 @@ test('replaying onload trace extracts getLeaderboardPowerSummary and retains mai
 });
 
 
-test('replaying auto-join raid trace tracks guild rally and auto-joined march', async () => {
+testWithTraces('replaying auto-join raid trace tracks guild rally and auto-joined march', ['hwa-api-202611022205_auto_joi_raid.json'], async () => {
   const autoJoinTrace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-api-202611022205_auto_joi_raid.json', import.meta.url), 'utf8'));
   const initial = {
     accountStatus: { data: { name: 'VplGhost', id: 1216438103 } }
@@ -1698,87 +1766,4 @@ test('randomDraft_register deducts 1 draft chip and resets legendDraftStatus', (
   assert.deepEqual([...merged.legendDraftStatus.data.defenceHeroes], []);
   assert.deepEqual([...merged.legendDraftStatus.data.attackHeroes], []);
   assert.equal(merged.legendDraftStatus.data.lastResult, null);
-});
-
-test('zero wheel spins stay unavailable even when boughtToday is zero', () => {
-  const snapshot = record([{ name: 'userGetInfo', ident: 'wheel-zero' }], [
-    { ident: 'wheel-zero', result: { response: { nextDayTs: 1793656800,
-      refillable: [{ id: 62, amount: 0, boughtToday: 0 }] } } }
-  ]);
-  const state = cache.merge({}, [snapshot]).cache;
-  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
-});
-
-test('older wheel snapshot cannot restore a consumed free spin', () => {
-  const earlier = record([{ name: 'userGetInfo', ident: 'wheel-before' }], [
-    { ident: 'wheel-before', result: { response: { nextDayTs: 1793656800,
-      refillable: [{ id: 62, amount: 1, boughtToday: 0 }] } } }
-  ], '2026-11-02T04:00:00.000Z');
-  const used = record([{ name: 'alchemyUseFree', ident: 'wheel-used' }], [
-    { ident: 'wheel-used', result: { response: { gold: 1000 } } }
-  ], '2026-11-02T04:01:00.000Z');
-  const state = cache.merge({}, [earlier, used, earlier]).cache;
-  assert.equal(state['resource:refillable:62'].data.amount, 0);
-  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
-});
-
-test('userGetInfo extracts wheelFortuneStatus and alchemyUseFree marks free spin used', () => {
-  const infoTrace = record([
-    { name: 'userGetInfo', ident: 'info1' }
-  ], [
-    {
-      ident: 'info1',
-      result: {
-        response: {
-          getTime: 1793642304,
-          nextDayTs: 1793656800,
-          refillable: [
-            { id: 62, amount: 1, boughtToday: 0 }
-          ]
-        }
-      }
-    }
-  ]);
-
-  const extracted = cache.extract(infoTrace);
-  const wheelEntry = extracted.find(e => e.key === 'wheelFortuneStatus');
-  assert.ok(wheelEntry);
-  assert.equal(wheelEntry.data.hasFree, true);
-  assert.equal(wheelEntry.data.nextResetTs, 1793656800);
-
-  const state1 = cache.merge({}, [infoTrace]).cache;
-  assert.equal(state1.wheelFortuneStatus.data.hasFree, true);
-  assert.equal(state1['resource:refillable:62'].data.amount, 1);
-
-  // Use free spin
-  const failedUse = record([{ name: 'alchemyUseFree', ident: 'spin-failed' }], [
-    { ident: 'spin-failed', result: { error: { code: 'unavailable' } } }
-  ]);
-  assert.equal(cache.merge(state1, [failedUse]).cache.wheelFortuneStatus.data.hasFree, true);
-
-  const useFreeTrace = record([
-    { name: 'alchemyUseFree', ident: 'spin1' }
-  ], [
-    { ident: 'spin1', result: { response: { gold: 100000 } } }
-  ]);
-
-  const state2 = cache.merge(state1, [useFreeTrace]).cache;
-  assert.equal(state2.wheelFortuneStatus.data.hasFree, false);
-  assert.equal(state2['resource:refillable:62'].data.amount, 0);
-  assert.equal(state2['resource:refillable:62'].data.boughtToday, 0);
-});
-
-test('wheel snapshot respects cooldown even when refillable 62 amount is one', () => {
-  const capturedAt = '2026-11-04T13:00:27.100Z';
-  const lastRefill = 1793797226;
-  const snapshot = record([{ name: 'userGetInfo', ident: 'wheel-cooldown' }], [
-    { ident: 'wheel-cooldown', result: { response: {
-      nextDayTs: 1793829600,
-      refillable: [{ id: 62, amount: 1, lastRefill, boughtToday: 0 }]
-    } } }
-  ], capturedAt);
-  const state = cache.merge({}, [snapshot]).cache;
-  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
-  assert.equal(state.wheelFortuneStatus.data.nextResetTs, lastRefill + 8 * 3600);
-  assert.equal(state['resource:refillable:62'].data.amount, 1);
 });

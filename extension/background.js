@@ -18,6 +18,25 @@ const isGameUrl = (url) => typeof url === 'string' && (
 );
 let pending = Promise.resolve();
 
+async function updateRpcQueueCount(tabId, count) {
+  const stored = await chrome.storage.session.get('rpcQueueCounts');
+  const counts = { ...stored.rpcQueueCounts };
+  if (count === null) delete counts[tabId];
+  else counts[tabId] = count;
+  if (Object.keys(counts).length || stored.rpcQueueCounts) {
+    await chrome.storage.session.set({ rpcQueueCounts: counts });
+  }
+  await chrome.storage.local.set({ rpcQueueStatus: {
+    count: Object.values(counts).reduce((sum, value) => sum + value, 0),
+    updatedAt: new Date().toISOString()
+  } });
+}
+
+chrome.tabs?.onRemoved?.addListener?.((tabId) => {
+  pending = pending.then(() => updateRpcQueueCount(tabId, null)).catch(() => {});
+});
+pending = pending.then(() => updateRpcQueueCount('__startup__', null)).catch(() => {});
+
 function bodyFields(record) {
   const result = {};
   for (const field of ['requestBody', 'responseBody']) {
@@ -70,6 +89,13 @@ function normalize(record) {
   } catch (_) {
     return null;
   }
+}
+
+function rpcMessageForSettings(stored, calls, claim = false) {
+  if (stored.popupRpcEnabled !== true) return null;
+  const queued = stored.socketRefreshMode !== 'direct';
+  if (queued && stored.captureSettings?.interceptEnabled === false) return null;
+  return { kind: queued ? (claim ? 'queue-claim' : 'queue-rpc') : 'refresh-rpc', calls };
 }
 
 function socketRefreshCalls(record, cache) {
@@ -175,6 +201,13 @@ chrome.runtime.onInstalled?.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.kind === 'rpc-queue-status' && isGameUrl(sender.url) && sender.tab?.id &&
+      Number.isInteger(message.count) && message.count >= 0 && message.count <= 64) {
+    pending = pending.then(() => updateRpcQueueCount(sender.tab.id, message.count));
+    pending.then(() => sendResponse({ ok: true }), () => sendResponse({ ok: false }));
+    pending = pending.catch(() => {});
+    return true;
+  }
   const isAllowedOrigin = sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`) || isGameUrl(sender.url);
   if (['record-start', 'record-stop', 'record-clear'].includes(message?.kind) && isAllowedOrigin) {
     pending = pending.then(() => handleControl(message.kind));
@@ -245,6 +278,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.catch(() => {});
     return true;
   }
+  if (message?.kind === 'experimental-rpc' &&
+      sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+    const allowed = new Set(['searchMob:mob', 'searchMine:mine', 'createRally:mob',
+      'attackMine:mine', 'stopMineGathering:mine']);
+    const calls = message.calls;
+    if (!Array.isArray(calls) || calls.length !== 1 ||
+        !allowed.has(`${calls[0]?.name}:${calls[0]?.feature}`)) {
+      sendResponse({ ok: false, error: 'Invalid experimental RPC.' });
+      return true;
+    }
+    chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode', 'captureSettings']).then((stored) => {
+      if (stored.popupRpcEnabled !== true) {
+        sendResponse({ ok: false, error: 'Popup RPC calls are disabled in Settings.' });
+        return;
+      }
+      const dispatch = rpcMessageForSettings(stored, calls);
+      if (!dispatch) { sendResponse({ ok: false, error: 'Enable Monitor API for Piggyback RPC.' }); return; }
+      chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, (tabs) => {
+        const tab = (tabs || []).find((candidate) => candidate.id && isGameUrl(candidate.url));
+        if (!tab) { sendResponse({ ok: false, error: 'No active Hero Wars tab found.' }); return; }
+        chrome.tabs.sendMessage(tab.id, dispatch).then(() =>
+          sendResponse({ ok: true, queued: dispatch.kind === 'queue-rpc' })).catch((error) => sendResponse({ ok: false, error: String(error) }));
+      });
+    }).catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
   if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc' ||
       message?.kind === 'claim-rewards' || message?.kind === 'engine-ping' ||
       message?.kind === 'engine-send-message') &&
@@ -254,24 +313,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       let forwarded = false;
       for (const tab of tabs || []) {
         if (tab.id) {
-          if (queued && !forwarded) await chrome.storage.local.set({ claimRpcStatus: {
+          if (queued && !forwarded && message.kind === 'claim-rewards') await chrome.storage.local.set({ claimRpcStatus: {
             state: 'queued', updatedAt: new Date().toISOString()
           } }).catch(() => {});
           chrome.tabs.sendMessage(tab.id, forwardedMessage).catch(() => {});
           forwarded = true;
-          if (message.kind === 'claim-rewards') break;
+          break;
         }
       }
       if (!forwarded) {
         chrome.tabs?.query({}, async (allTabs) => {
           for (const tab of allTabs || []) {
             if (tab.id && isGameUrl(tab.url)) {
-              if (queued && !forwarded) await chrome.storage.local.set({ claimRpcStatus: {
+              if (queued && !forwarded && message.kind === 'claim-rewards') await chrome.storage.local.set({ claimRpcStatus: {
                 state: 'queued', updatedAt: new Date().toISOString()
               } }).catch(() => {});
               chrome.tabs.sendMessage(tab.id, forwardedMessage).catch(() => {});
               forwarded = true;
-              if (message.kind === 'claim-rewards') break;
+              break;
             }
           }
           sendResponse({ ok: forwarded, queued: forwarded && queued,
@@ -295,8 +354,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ ok: false, error: 'Invalid reward claim calls.' });
             return;
           }
+          const dispatch = rpcMessageForSettings(stored, message.calls, true);
           const queued = stored.socketRefreshMode !== 'direct';
-          if (queued && stored.captureSettings?.interceptEnabled === false) {
+          if (!dispatch) {
             sendResponse({ ok: false,
               error: 'Enable Monitor API or choose Direct for reward claims.' });
             return;
@@ -307,9 +367,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
           }
           if (!queued) chrome.storage.local.remove('claimRpcStatus').catch(() => {});
-          forward({ kind: queued ? 'queue-claim' : 'refresh-rpc',
-            calls: message.calls }, queued);
-        } else forward();
+          forward(dispatch, queued);
+        } else if (message.kind === 'engine-send-message') {
+          if (stored.socketRefreshMode !== 'direct') {
+            sendResponse({ ok: false, error: 'Unity commands require Direct RPC mode.' });
+          } else forward();
+        } else {
+          let calls = message.calls;
+          if (message.kind === 'draft-action') {
+            if (!['saveDefence', 'saveAttack'].includes(message.action) ||
+                !Array.isArray(message.heroes) || message.heroes.length !== 5 ||
+                message.heroes.some((id) => !Number.isInteger(id))) {
+              sendResponse({ ok: false, error: 'Invalid Draft lineup.' }); return;
+            }
+            calls = [{ name: message.action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack',
+              args: { heroes: message.heroes } }, { name: 'randomDraft_getInfo' }];
+          }
+          const dispatch = rpcMessageForSettings(stored, calls);
+          if (!dispatch) sendResponse({ ok: false, error: 'Enable Monitor API for Piggyback RPC.' });
+          else forward(dispatch, dispatch.kind === 'queue-rpc');
+        }
       }
       else sendResponse({ ok: false, error: 'Popup RPC calls are disabled in Settings.' });
     }).catch((error) => sendResponse({ ok: false, error: String(error) }));
@@ -357,24 +434,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (cacheResult.changed) await chrome.storage.local.set({ rpcCache: cacheResult.cache });
     if (stored.popupRpcEnabled === true && sender.tab?.id) {
       const calls = socketRefreshCalls(record, cacheResult.cache);
-      if (calls.length) chrome.tabs?.sendMessage?.(sender.tab.id,
-        { kind: stored.socketRefreshMode === 'direct' ? 'refresh-rpc' : 'queue-rpc',
-          calls })?.catch?.(() => {});
+      const dispatch = rpcMessageForSettings(stored, calls);
+      if (calls.length && dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
     const latestClaim = cacheResult.cache.questClaimStatus?.data?.claims?.at(-1);
     if (stored.popupRpcEnabled === true && cacheResult.changed && latestClaim?.needsSync &&
         latestClaim.at === record.timestamp && sender.tab?.id) {
-      chrome.tabs?.sendMessage?.(sender.tab.id, { kind: 'refresh-rpc', calls: [
+      const dispatch = rpcMessageForSettings(stored, [
         { name: 'userGetInfo' },
         { name: 'inventoryGet' },
         { name: 'refillableGetAll', feature: 'refillable' }
-      ] })?.catch?.(() => {});
+      ]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
     if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
         globalThis.hwaHelperRpcCache.extract(record).some((entry) => entry.key === 'skinUpgradeAction')) {
-      chrome.tabs?.sendMessage?.(sender.tab.id, { kind: 'refresh-rpc', calls: [
+      const dispatch = rpcMessageForSettings(stored, [
         { name: 'heroGetAll' }, { name: 'inventoryGet' }
-      ] })?.catch?.(() => {});
+      ]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
     const state = (await chrome.storage.session.get(RECORD_STATE_KEY))[RECORD_STATE_KEY];
     if (!state?.active) return { saved: false, cached: cacheResult.changed };

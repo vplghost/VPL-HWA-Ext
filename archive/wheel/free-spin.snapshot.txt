@@ -1,0 +1,299 @@
+SHELVED 2026-11-06. Historical implementation only. Not loaded, built, tested or maintained. Resume only on user instruction.
+
+=== popup badge ===
+  const wheelBadge = document.querySelector('#wheel-fortune-badge');
+  const wheelLabel = document.querySelector('#wheel-fortune-label');
+  if (wheelBadge && wheelLabel) {
+    const wheelEntry = currentCache.wheelFortuneStatus;
+    const refEntry = currentCache['resource:refillable:62'];
+    const wheelStatus = wheelEntry?.data;
+    const ref62 = refEntry?.data;
+    const nextDayTs = wheelStatus?.nextResetTs || currentCache.userGetInfo?.data?.nextDayTs;
+    const resourceIsNewer = refEntry?.updatedAt &&
+      (!wheelEntry?.updatedAt || refEntry.updatedAt > wheelEntry.updatedAt);
+    const firstAmount = resourceIsNewer ? ref62?.amount : wheelStatus?.amount;
+    const secondAmount = resourceIsNewer ? wheelStatus?.amount : ref62?.amount;
+    const amount = firstAmount == null ? secondAmount : firstAmount;
+    const hasFree = amount != null && Number.isFinite(Number(amount)) ?
+      (Number(amount) > 0 && wheelStatus?.hasFree !== false &&
+        (!Number.isFinite(nextDayTs) || nextDayTs <= now / 1000)) :
+      (typeof wheelStatus?.hasFree === 'boolean' ? wheelStatus.hasFree : null);
+
+    if (hasFree === true) {
+      wheelBadge.hidden = false;
+      wheelBadge.className = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer bg-emerald-50 text-emerald-800 ring-1 ring-emerald-300 animate-pulse';
+      wheelLabel.textContent = 'Free Spin';
+      wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Free spin ready!';
+      setResourceTooltip(wheelBadge, 'Wheel of Fortune (Emerald Exchange): Free spin ready!');
+    } else if (hasFree === false && Number.isFinite(nextDayTs)) {
+      wheelBadge.hidden = false;
+      wheelBadge.className = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer bg-slate-50 text-slate-700 ring-1 ring-slate-200 font-mono';
+      if (nextDayTs <= now / 1000) {
+        wheelLabel.textContent = 'Check Wheel';
+        wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Daily reset passed; open the game to refresh.';
+        setResourceTooltip(wheelBadge, wheelBadge.title);
+      } else {
+        const remaining = Math.max(0, Math.ceil(nextDayTs - now / 1000));
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        const seconds = remaining % 60;
+        const countdown = [hours, minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
+        wheelLabel.textContent = countdown;
+        wheelBadge.title = 'Wheel of Fortune (Emerald Exchange): Next free spin in ' + countdown;
+        setResourceTooltip(wheelBadge, wheelBadge.title);
+      }
+    } else {
+      wheelBadge.hidden = true;
+    }
+  }
+
+
+
+=== wheel markup ===
+      <span id="wheel-fortune-badge" hidden data-resource-tooltip="" data-tooltip-below tabindex="0" title="Wheel of Fortune / Emerald Exchange" class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer">
+        <span class="text-sm">🎡</span><span id="wheel-fortune-label">—</span>
+      </span>
+
+
+=== snapshot ===
+          if (Array.isArray(info.refillable)) {
+            const ref62 = info.refillable.find(r => r.id === 62);
+            if (ref62) {
+              // The captured Wheel screen was cooling down with amount 1; use
+              // lastRefill as the cooldown anchor before treating it as ready.
+              const lastRefill = Number(ref62.lastRefill);
+              const cooldownEndTs = Number.isFinite(lastRefill) && lastRefill > 0
+                ? lastRefill + 8 * 60 * 60 : null;
+              const snapshotTs = Date.parse(record.timestamp) / 1000;
+              const hasFree = Number(ref62.amount) > 0 &&
+                (!cooldownEndTs || (Number.isFinite(snapshotTs) && snapshotTs >= cooldownEndTs));
+              entries.push({
+                key: 'wheelFortuneStatus', method: call.name, feature: null, group: 'header',
+                data: {
+                  hasFree,
+                  amount: ref62.amount ?? 0,
+                  boughtToday: ref62.boughtToday ?? 0,
+                  nextResetTs: cooldownEndTs || info.nextDayTs || null
+                },
+                updatedAt: record.timestamp
+              });
+            }
+          }
+
+
+=== spin action ===
+        if ((call.name === 'alchemyUseFree' ||
+          (call.name === 'refillable_alchemyUseVideo' && call.args?.type === 'alchemy')) &&
+          result?.response != null) {
+          // The wheel grants another free spin eight hours after a successful roll.
+          // The API response has the reward but no cooldown, so derive the next
+          // availability from the captured request timestamp.
+          const rolledAt = Date.parse(record.timestamp);
+          const nextResetTs = Number.isFinite(rolledAt) ? Math.floor(rolledAt / 1000) + 8 * 60 * 60 : null;
+          return [
+            ...resourceAction(record, call, 'refillable:62', -1, 'Wheel of Fortune', call.name),
+            {
+              key: 'wheelFortuneStatus',
+              method: call.name,
+              feature: null,
+              group: 'header',
+              data: {
+                hasFree: false,
+                amount: 0,
+                nextResetTs
+              },
+              updatedAt: record.timestamp
+            }
+          ];
+        }
+
+
+=== reducer ===
+        if (entry.key === 'wheelFortuneStatus') {
+          if (next.wheelFortuneStatus?.updatedAt > entry.updatedAt) continue;
+          const prev = next.wheelFortuneStatus?.data || {};
+          next.wheelFortuneStatus = {
+            key: 'wheelFortuneStatus',
+            method: entry.method,
+            feature: null,
+            group: 'header',
+            data: {
+              ...prev,
+              ...entry.data,
+              nextResetTs: entry.data.nextResetTs || prev.nextResetTs || next.userGetInfo?.data?.nextDayTs || null
+            },
+            updatedAt: entry.updatedAt
+          };
+          if (next['resource:refillable:62']?.data && entry.data.boughtToday != null) {
+            next['resource:refillable:62'].data.boughtToday = entry.data.boughtToday;
+          }
+          changed = true;
+          continue;
+        }
+
+
+=== rule ===
+    62: { label: 'Wheel of Fortune', interval: null, cap: 1 },
+
+
+=== tests/events-ui.test.mjs ===
+test('wheel badge ignores stale free flag when no spins remain', () => {
+  const futureTs = Math.floor(Date.now() / 1000) + 3600;
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: true, amount: 0, nextResetTs: futureTs } },
+    'resource:refillable:62': { data: { amount: 0, boughtToday: 0 } }
+  };
+  context.refreshTimed();
+  assert.equal(wheelFortuneBadge.hidden, false);
+  assert.notEqual(wheelFortuneLabel.textContent, 'Free Spin');
+  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
+});
+
+
+=== tests/events-ui.test.mjs ===
+test('wheel badge asks for fresh game data after the reset timestamp passes', () => {
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: false, amount: 0,
+      nextResetTs: Math.floor(Date.now() / 1000) - 60 } }
+  };
+  context.refreshTimed();
+  assert.equal(wheelFortuneLabel.textContent, 'Check Wheel');
+  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
+});
+
+
+=== tests/events-ui.test.mjs ===
+test('header wheel fortune badge displays Free Spin when available and countdown timer when cooling down', () => {
+  // 1. Free spin available
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: true, nextResetTs: 1793656800 } }
+  };
+  context.refreshTimed();
+  assert.equal(wheelFortuneBadge.hidden, false);
+  assert.ok(wheelFortuneBadge.className.includes('animate-pulse'));
+  assert.ok(wheelFortuneBadge.className.includes('bg-emerald-50'));
+  assert.equal(wheelFortuneLabel.textContent, 'Free Spin');
+
+  // 2. Free spin used, countdown active
+  const futureTs = Math.floor(Date.now() / 1000) + 7200; // 2 hours in future
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: false, nextResetTs: futureTs } }
+  };
+  context.refreshTimed();
+  assert.equal(wheelFortuneBadge.hidden, false);
+  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
+  assert.ok(wheelFortuneBadge.className.includes('font-mono'));
+  assert.match(wheelFortuneLabel.textContent, /^\d{2}:\d{2}:\d{2}$/);
+
+  // 3. No wheel fortune data hides badge
+  context.currentCache = {};
+  context.refreshTimed();
+  assert.equal(wheelFortuneBadge.hidden, true);
+});
+
+
+=== tests/events-ui.test.mjs ===
+test('wheel badge does not offer a spin while refillable 62 is cooling down', () => {
+  const futureTs = Math.floor(Date.now() / 1000) + 7200;
+  context.currentCache = {
+    wheelFortuneStatus: { data: { hasFree: false, amount: 1, nextResetTs: futureTs } },
+    'resource:refillable:62': { data: { amount: 1 } }
+  };
+  context.refreshTimed();
+  assert.match(wheelFortuneLabel.textContent, /^\d{2}:\d{2}:\d{2}$/);
+  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
+  context.currentCache.wheelFortuneStatus.data.nextResetTs = Math.floor(Date.now() / 1000) - 60;
+  context.refreshTimed();
+  assert.equal(wheelFortuneLabel.textContent, 'Check Wheel');
+});
+
+
+=== tests/rpc-cache.test.mjs ===
+test('zero wheel spins stay unavailable even when boughtToday is zero', () => {
+  const snapshot = record([{ name: 'userGetInfo', ident: 'wheel-zero' }], [
+    { ident: 'wheel-zero', result: { response: { nextDayTs: 1793656800,
+      refillable: [{ id: 62, amount: 0, boughtToday: 0 }] } } }
+  ]);
+  const state = cache.merge({}, [snapshot]).cache;
+  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
+});
+
+
+=== tests/rpc-cache.test.mjs ===
+test('older wheel snapshot cannot restore a consumed free spin', () => {
+  const earlier = record([{ name: 'userGetInfo', ident: 'wheel-before' }], [
+    { ident: 'wheel-before', result: { response: { nextDayTs: 1793656800,
+      refillable: [{ id: 62, amount: 1, boughtToday: 0 }] } } }
+  ], '2026-11-02T04:00:00.000Z');
+  const used = record([{ name: 'alchemyUseFree', ident: 'wheel-used' }], [
+    { ident: 'wheel-used', result: { response: { gold: 1000 } } }
+  ], '2026-11-02T04:01:00.000Z');
+  const state = cache.merge({}, [earlier, used, earlier]).cache;
+  assert.equal(state['resource:refillable:62'].data.amount, 0);
+  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
+});
+
+
+=== tests/rpc-cache.test.mjs ===
+test('userGetInfo extracts wheelFortuneStatus and alchemyUseFree marks free spin used', () => {
+  const infoTrace = record([
+    { name: 'userGetInfo', ident: 'info1' }
+  ], [
+    {
+      ident: 'info1',
+      result: {
+        response: {
+          getTime: 1793642304,
+          nextDayTs: 1793656800,
+          refillable: [
+            { id: 62, amount: 1, boughtToday: 0 }
+          ]
+        }
+      }
+    }
+  ]);
+
+  const extracted = cache.extract(infoTrace);
+  const wheelEntry = extracted.find(e => e.key === 'wheelFortuneStatus');
+  assert.ok(wheelEntry);
+  assert.equal(wheelEntry.data.hasFree, true);
+  assert.equal(wheelEntry.data.nextResetTs, 1793656800);
+
+  const state1 = cache.merge({}, [infoTrace]).cache;
+  assert.equal(state1.wheelFortuneStatus.data.hasFree, true);
+  assert.equal(state1['resource:refillable:62'].data.amount, 1);
+
+  // Use free spin
+  const failedUse = record([{ name: 'alchemyUseFree', ident: 'spin-failed' }], [
+    { ident: 'spin-failed', result: { error: { code: 'unavailable' } } }
+  ]);
+  assert.equal(cache.merge(state1, [failedUse]).cache.wheelFortuneStatus.data.hasFree, true);
+
+  const useFreeTrace = record([
+    { name: 'alchemyUseFree', ident: 'spin1' }
+  ], [
+    { ident: 'spin1', result: { response: { gold: 100000 } } }
+  ]);
+
+  const state2 = cache.merge(state1, [useFreeTrace]).cache;
+  assert.equal(state2.wheelFortuneStatus.data.hasFree, false);
+  assert.equal(state2['resource:refillable:62'].data.amount, 0);
+  assert.equal(state2['resource:refillable:62'].data.boughtToday, 0);
+});
+
+
+=== tests/rpc-cache.test.mjs ===
+test('wheel snapshot respects cooldown even when refillable 62 amount is one', () => {
+  const capturedAt = '2026-11-04T13:00:27.100Z';
+  const lastRefill = 1793797226;
+  const snapshot = record([{ name: 'userGetInfo', ident: 'wheel-cooldown' }], [
+    { ident: 'wheel-cooldown', result: { response: {
+      nextDayTs: 1793829600,
+      refillable: [{ id: 62, amount: 1, lastRefill, boughtToday: 0 }]
+    } } }
+  ], capturedAt);
+  const state = cache.merge({}, [snapshot]).cache;
+  assert.equal(state.wheelFortuneStatus.data.hasFree, false);
+  assert.equal(state.wheelFortuneStatus.data.nextResetTs, lastRefill + 8 * 3600);
+  assert.equal(state['resource:refillable:62'].data.amount, 1);
+});

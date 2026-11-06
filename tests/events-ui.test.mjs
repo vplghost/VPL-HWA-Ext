@@ -262,18 +262,14 @@ const itemsViewGrid = new MockElement('button');
 itemsViewGrid.setAttribute('id', 'items-view-grid');
 const itemsViewList = new MockElement('button');
 itemsViewList.setAttribute('id', 'items-view-list');
-const wheelFortuneBadge = new MockElement('div');
-wheelFortuneBadge.setAttribute('id', 'wheel-fortune-badge');
-wheelFortuneBadge.hidden = true;
-const wheelFortuneLabel = new MockElement('span');
-wheelFortuneLabel.setAttribute('id', 'wheel-fortune-label');
+const rpcQueueCount = new MockElement('span');
+rpcQueueCount.setAttribute('id', 'rpc-queue-count');
 
 const mockDoc = {
   createElement: (tag) => new MockElement(tag),
   createElementNS: (_, tag) => new MockElement(tag),
   elementsById: new Map([
-    ['wheel-fortune-badge', wheelFortuneBadge],
-    ['wheel-fortune-label', wheelFortuneLabel],
+    ['rpc-queue-count', rpcQueueCount],
     ['table-export-btn', tableExportBtn],
     ['resource-filter-toggle', resourceFilterToggle],
     ['resource-filter-toggle-text', resourceFilterToggleText],
@@ -442,6 +438,10 @@ test('shortcut dial reveals actions only while open and closes on backdrop or Es
   assert.equal(focused, 2);
   context.window.addEventListener = originalAddListener;
 });
+
+const draftAlertStart = popupJs.indexOf('function renderRpcQueue(');
+const draftAlertEnd = popupJs.indexOf('function renderExperimental(');
+vm.runInContext(popupJs.slice(draftAlertStart, draftAlertEnd), context);
 
 // Extract marches and refreshTimed
 const refreshStart = popupJs.indexOf('const marchStyles =');
@@ -1576,66 +1576,9 @@ test('renderInventoryGrid renders grouped items with dividers, abbreviations, qu
   assert.equal(spans[1].textContent, '100'); // Quantity 100
 });
 
-test('wheel badge ignores stale free flag when no spins remain', () => {
-  const futureTs = Math.floor(Date.now() / 1000) + 3600;
-  context.currentCache = {
-    wheelFortuneStatus: { data: { hasFree: true, amount: 0, nextResetTs: futureTs } },
-    'resource:refillable:62': { data: { amount: 0, boughtToday: 0 } }
-  };
-  context.refreshTimed();
-  assert.equal(wheelFortuneBadge.hidden, false);
-  assert.notEqual(wheelFortuneLabel.textContent, 'Free Spin');
-  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
-});
-
-test('wheel badge asks for fresh game data after the reset timestamp passes', () => {
-  context.currentCache = {
-    wheelFortuneStatus: { data: { hasFree: false, amount: 0,
-      nextResetTs: Math.floor(Date.now() / 1000) - 60 } }
-  };
-  context.refreshTimed();
-  assert.equal(wheelFortuneLabel.textContent, 'Check Wheel');
-  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
-});
-
-test('header wheel fortune badge displays Free Spin when available and countdown timer when cooling down', () => {
-  // 1. Free spin available
-  context.currentCache = {
-    wheelFortuneStatus: { data: { hasFree: true, nextResetTs: 1793656800 } }
-  };
-  context.refreshTimed();
-  assert.equal(wheelFortuneBadge.hidden, false);
-  assert.ok(wheelFortuneBadge.className.includes('animate-pulse'));
-  assert.ok(wheelFortuneBadge.className.includes('bg-emerald-50'));
-  assert.equal(wheelFortuneLabel.textContent, 'Free Spin');
-
-  // 2. Free spin used, countdown active
-  const futureTs = Math.floor(Date.now() / 1000) + 7200; // 2 hours in future
-  context.currentCache = {
-    wheelFortuneStatus: { data: { hasFree: false, nextResetTs: futureTs } }
-  };
-  context.refreshTimed();
-  assert.equal(wheelFortuneBadge.hidden, false);
-  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
-  assert.ok(wheelFortuneBadge.className.includes('font-mono'));
-  assert.match(wheelFortuneLabel.textContent, /^\d{2}:\d{2}:\d{2}$/);
-
-  // 3. No wheel fortune data hides badge
-  context.currentCache = {};
-  context.refreshTimed();
-  assert.equal(wheelFortuneBadge.hidden, true);
-});
-
-test('wheel badge does not offer a spin while refillable 62 is cooling down', () => {
-  const futureTs = Math.floor(Date.now() / 1000) + 7200;
-  context.currentCache = {
-    wheelFortuneStatus: { data: { hasFree: false, amount: 1, nextResetTs: futureTs } },
-    'resource:refillable:62': { data: { amount: 1 } }
-  };
-  context.refreshTimed();
-  assert.match(wheelFortuneLabel.textContent, /^\d{2}:\d{2}:\d{2}$/);
-  assert.equal(wheelFortuneBadge.className.includes('animate-pulse'), false);
-  context.currentCache.wheelFortuneStatus.data.nextResetTs = Math.floor(Date.now() / 1000) - 60;
-  context.refreshTimed();
-  assert.equal(wheelFortuneLabel.textContent, 'Check Wheel');
+test('RPC queue badge reflects current count including an empty queue', () => {
+  context.renderRpcQueue(4);
+  assert.equal(rpcQueueCount.textContent, '4');
+  context.renderRpcQueue(0);
+  assert.equal(rpcQueueCount.textContent, '0');
 });

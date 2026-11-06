@@ -10,6 +10,7 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
   const messages = [];
   const claimResults = [];
   const interactions = [];
+  const queueCounts = [];
   const listeners = [];
   let now = 0;
   class FakeXHR {
@@ -42,6 +43,7 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
       if (data.kind === 'api-record') messages.push({ data, targetOrigin });
       if (data.kind === 'claim-rpc-result') claimResults.push(data);
       if (data.kind === 'interaction-record') interactions.push(data.entry);
+      if (data.kind === 'rpc-queue-status') queueCounts.push(data.count);
       for (const handler of listeners) handler({ source: window, origin: targetOrigin, data });
     },
     ...extraContext.window
@@ -57,7 +59,7 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
   if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true,
     popupRpcEnabled: true },
     'https://www.hero-wars-alliance.com');
-  return { window, messages, claimResults, interactions, sessionStorage };
+  return { window, messages, claimResults, interactions, sessionStorage, queueCounts };
 }
 
 async function waitForMessage(messages) {
@@ -239,6 +241,7 @@ test('fetch captures RPC url and headers into sessionStorage and refresh-rpc sen
   assert.equal(storedHeaders['x-auth-user-id'], '12345');
   assert.equal(storedHeaders['x-auth-session-id'], 'abc-session');
 
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: 'direct' }, 'https://www.hero-wars-alliance.com');
   window.postMessage({
     source: 'hwa-helper-control',
     kind: 'refresh-rpc',
@@ -440,6 +443,86 @@ test('queued claim expires when no game RPC arrives', async () => {
   assert.deepEqual(sent[0], ['userGetInfo']);
 });
 
+test('queue count tracks deduplication, expiry, dispatch and settings cancellation', async () => {
+  let now = 1000; let expire;
+  class Clock extends Date { static now() { return now; } }
+  const { window, queueCounts } = setup(async (_url, options) => {
+    const request = JSON.parse(options.body);
+    return new Response(JSON.stringify({ results: request.calls.map((call) => ({
+      ident: call.ident, result: { response: {} }
+    })) }), { status: 200 });
+  }, true, { Response, Headers, Date: Clock, setTimeout: (fn) => { expire = fn; return 1; }, clearTimeout: () => {} });
+  const origin = 'https://www.hero-wars-alliance.com';
+  const enqueue = (calls) => window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls }, origin);
+  assert.equal(queueCounts.at(-1), 0);
+  enqueue([{ name: 'inventoryGet' }, { name: 'inventoryGet' }]);
+  assert.equal(queueCounts.at(-1), 1);
+  enqueue([{ name: 'attackMine', feature: 'mine', args: { mineId: 'mine' } }]);
+  assert.equal(queueCounts.at(-1), 2);
+  now += 120001; expire();
+  assert.equal(queueCounts.at(-1), 1);
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: '{"calls":[{"name":"userGetInfo","ident":"native"}]}'
+  });
+  assert.equal(queueCounts.at(-1), 0);
+  enqueue([{ name: 'inventoryGet' }]);
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true, popupRpcEnabled: false }, origin);
+  assert.equal(queueCounts.at(-1), 0);
+});
+
+test('legacy direct messages and Draft submissions piggyback by default with action results hidden', async () => {
+  const batches = [];
+  const { window } = setup(async (_url, options) => {
+    const request = JSON.parse(options.body); batches.push(request.calls);
+    return new Response(JSON.stringify({ results: request.calls.map((call) => ({
+      ident: call.ident, result: { response: {} }
+    })) }), { status: 200 });
+  }, true, { Response, Headers });
+  const origin = 'https://www.hero-wars-alliance.com';
+  window.postMessage({ source: 'hwa-helper-control', kind: 'refresh-rpc', calls: [
+    { name: 'createRally', feature: 'mob', args: { startDelay: 300000, mobId: 'boss' } }
+  ] }, origin);
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [{ name: 'randomDraft_getInfo' }] }, origin);
+  window.postMessage({ source: 'hwa-helper-control', kind: 'draft-action', action: 'saveDefence', heroes: [1, 2, 3, 4, 5] }, origin);
+  assert.equal(batches.length, 0);
+  const response = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify({ calls: [{ name: 'randomDraft_getInfo', ident: 'native' }] })
+  });
+  assert.deepEqual(batches[0].map((call) => call.name),
+    ['randomDraft_getInfo', 'createRally', 'randomDraft_saveDefence', 'randomDraft_getInfo']);
+  assert.equal(batches[0][1].args.startDelay, 300000);
+  assert.deepEqual(JSON.parse(await response.text()).results.map((result) => result.ident), ['native']);
+});
+
+test('queued actions expire, cancel on settings change and never retry after network failure', async () => {
+  for (const scenario of ['expiry', 'disable', 'direct', 'failure']) {
+    let now = 1000; const batches = [];
+    class Clock extends Date { static now() { return now; } }
+    const { window } = setup(async (_url, options) => {
+      const request = JSON.parse(options.body); batches.push(request.calls.map((call) => call.name));
+      if (scenario === 'failure' && batches.length === 1) throw Error('network failure');
+      return new Response(JSON.stringify({ results: request.calls.map((call) => ({ ident: call.ident, result: { response: {} } })) }), { status: 200 });
+    }, true, { Response, Headers, Date: Clock });
+    const origin = 'https://www.hero-wars-alliance.com';
+    window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [
+      { name: 'attackMine', feature: 'mine', args: { mineId: 'mine' } }
+    ] }, origin);
+    if (scenario === 'expiry') now += 120001;
+    if (scenario === 'disable' || scenario === 'direct') window.postMessage({
+      source: 'hwa-helper-config', kind: 'control', interceptEnabled: true,
+      popupRpcEnabled: scenario !== 'disable', socketRefreshMode: scenario === 'direct' ? 'direct' : 'piggyback'
+    }, origin);
+    const request = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+      method: 'POST', body: '{"calls":[{"name":"userGetInfo","ident":"native"}]}'
+    });
+    if (scenario === 'failure') await assert.rejects(request(), /network failure/);
+    else await request();
+    await request();
+    assert.deepEqual(batches.at(-1), ['userGetInfo']);
+    assert.equal(batches[0].includes('attackMine'), scenario === 'failure');
+  }
+});
+
 test('XHR captures RPC url and headers via setRequestHeader into sessionStorage', async () => {
   const { window, sessionStorage } = setup(async () => new Response('ok'));
   const xhr = new window.XMLHttpRequest();
@@ -476,6 +559,7 @@ test('createUnityInstance hook captures instance and reports engine status', asy
   assert.equal(lastStatus.ready, true);
   assert.equal(lastStatus.hasSendMessage, true);
 
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: 'direct' }, 'https://www.hero-wars-alliance.com');
   window.postMessage({
     source: 'hwa-helper-control',
     kind: 'engine-send-message',
@@ -566,6 +650,7 @@ test('engine scanner discovers SendMessage on window.Module and executes calls',
   assert.ok(Array.isArray(pingStatus.detectedGlobals));
   assert.ok(pingStatus.detectedGlobals.includes('Module'));
 
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: 'direct' }, 'https://www.hero-wars-alliance.com');
   window.postMessage({
     source: 'hwa-helper-control',
     kind: 'engine-send-message',
@@ -634,6 +719,7 @@ test('engine scanner discovers direct window.SendMessage function', async () => 
   assert.equal(pingStatus.ready, true);
   assert.equal(pingStatus.hasSendMessage, true);
 
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: 'direct' }, 'https://www.hero-wars-alliance.com');
   window.postMessage({
     source: 'hwa-helper-control',
     kind: 'engine-send-message',
@@ -679,6 +765,7 @@ test("refresh-rpc cleans headers, strips stale x-auth-signature, increments x-re
   });
 
   // Now trigger refresh-rpc for mailFarm
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: 'direct' }, 'https://www.hero-wars-alliance.com');
   window.postMessage({
     source: "hwa-helper-control",
     kind: "refresh-rpc",
@@ -813,6 +900,7 @@ test("refresh-rpc dispatch emits api-record with response body to update rpcCach
     }
   });
 
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: 'direct' }, 'https://www.hero-wars-alliance.com');
   window.postMessage({
     source: "hwa-helper-control",
     kind: "refresh-rpc",

@@ -21,8 +21,10 @@ function setup(quota = Infinity) {
   const tabsList = [];
   const forwardedMessages = [];
   let reloadedTabId = null;
+  let onTabRemoved;
   const chrome = {
     tabs: {
+      onRemoved: { addListener: (handler) => { onTabRemoved = handler; } },
       query: (filter, cb) => cb(tabsList),
       reload: (tabId, opts, cb) => { reloadedTabId = tabId; if (cb) cb(); },
       sendMessage: async (tabId, msg) => { forwardedMessages.push({ tabId, msg }); }
@@ -54,8 +56,21 @@ function setup(quota = Infinity) {
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
     new Promise((resolve) => listener({ kind, record }, sender, resolve));
-  return { local, session, send, installed, listener, tabsList, forwardedMessages, getReloadedTabId: () => reloadedTabId };
+  return { local, session, send, installed, listener, tabsList, forwardedMessages, removeTab: (id) => onTabRemoved(id), getReloadedTabId: () => reloadedTabId };
 }
+
+test('RPC queue totals aggregate live game tabs and remove closed tabs', async () => {
+  const { local, listener, removeTab } = setup();
+  const report = (id, count) => new Promise((resolve) => listener({ kind: 'rpc-queue-status', count },
+    { ...gameSender, tab: { id } }, resolve));
+  await report(1, 3); await report(2, 2);
+  assert.equal(local.rpcQueueStatus.count, 5);
+  await report(1, 0);
+  assert.equal(local.rpcQueueStatus.count, 2);
+  removeTab(2);
+  await report(1, 0);
+  assert.equal(local.rpcQueueStatus.count, 0);
+});
 
 function rpc(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
   return {
@@ -183,6 +198,60 @@ test('popup RPC calls and automatic follow-up refreshes are disabled by default'
     calls: [{ name: 'inventoryGet' }] }, popupSender, resolve));
   assert.equal(allowed.ok, true);
   assert.equal(forwardedMessages.length, 1);
+});
+
+test('experimental actions require popup RPC and reach one game tab', async () => {
+  const { local, listener, tabsList, forwardedMessages } = setup();
+  tabsList.push({ id: 1, url: gameSender.url }, { id: 2, url: gameSender.url });
+  const call = { name: 'stopMineGathering', feature: 'mine', args: { squadId: 'team-1' } };
+  const send = (calls) => new Promise((resolve) => listener({ kind: 'experimental-rpc', calls }, popupSender, resolve));
+  assert.equal((await send([call])).ok, false);
+  local.popupRpcEnabled = true;
+  assert.equal((await send([{ name: 'unknown', feature: 'mob' }])).ok, false);
+  assert.equal((await send([call])).ok, true);
+  assert.equal((await send([{ name: 'createRally', feature: 'mob', args: {
+    mapId: 'map-1', mobId: 'boss-1', squad: {}, startDelay: 300000
+  } }])).ok, true);
+  assert.equal(forwardedMessages.length, 2);
+  assert.equal(forwardedMessages[0].tabId, 1);
+  assert.equal(forwardedMessages[0].msg.kind, 'queue-rpc');
+});
+
+test('manual refresh, Draft and Experimental inherit both global dispatch modes', async () => {
+  for (const mode of ['piggyback', 'direct']) {
+    const { local, listener, tabsList, forwardedMessages, send } = setup();
+    tabsList.push({ id: 1, url: gameSender.url }, { id: 2, url: gameSender.url });
+    local.popupRpcEnabled = true;
+    local.socketRefreshMode = mode;
+    const messages = [
+      { kind: 'refresh-rpc', calls: [{ name: 'inventoryGet' }] },
+      { kind: 'draft-action', action: 'saveAttack', heroes: [1, 2, 3, 4, 5] },
+      { kind: 'experimental-rpc', calls: [{ name: 'createRally', feature: 'mob', args: { startDelay: 300000 } }] }
+    ];
+    for (const message of messages) {
+      const reply = await new Promise((resolve) => listener(message, popupSender, resolve));
+      assert.equal(reply.ok, true);
+      assert.equal(reply.queued, mode === 'piggyback');
+    }
+    assert.equal(forwardedMessages.length, 3);
+    assert.ok(forwardedMessages.every(({ tabId, msg }) => tabId === 1 &&
+      msg.kind === (mode === 'direct' ? 'refresh-rpc' : 'queue-rpc')));
+    assert.equal(forwardedMessages[1].msg.calls[0].name, 'randomDraft_saveAttack');
+    await send('api-record', rpc([{ name: 'skin_upgrade', ident: 'skin-policy',
+      args: { unitId: 501, skinId: 1002 } }],
+    [{ ident: 'skin-policy', result: { response: { reward: [] } } }]),
+    { ...gameSender, tab: { id: 1 } });
+    assert.equal(forwardedMessages.at(-1).msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+    assert.equal(forwardedMessages.at(-1).msg.calls[0].name, 'heroGetAll');
+    await send('api-record', rpc([{ name: 'completeQuest', feature: 'quest', ident: 'quest-policy',
+      args: { questId: 14360 } }], [{ ident: 'quest-policy', result: { response: {} } }]),
+    { ...gameSender, tab: { id: 1 } });
+    assert.equal(forwardedMessages.at(-1).msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+    assert.equal(forwardedMessages.at(-1).msg.calls[0].name, 'userGetInfo');
+    local.captureSettings = { interceptEnabled: false };
+    const reply = await new Promise((resolve) => listener(messages[0], popupSender, resolve));
+    assert.equal(reply.ok, mode === 'direct');
+  }
 });
 
 test('reward claims follow dispatch mode and target one game tab', async () => {

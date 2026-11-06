@@ -6,12 +6,36 @@
   const isTrackingUrl = globalThis.hwaHelperIsTrackingUrl;
   let captureEnabled = false;
   let popupRpcEnabled = false;
+  let rpcDispatchMode = 'piggyback';
   let recordingActive = false;
   const queuedRpcCalls = new Map();
   const queuedClaimKeys = new Set();
+  const queuedActionExpiry = new Map();
   let claimQueueTimer = null;
+  let actionQueueTimer = null;
+  function reportQueueStatus() {
+    window.postMessage({ source: 'hwa-helper-api', kind: 'rpc-queue-status',
+      count: queuedRpcCalls.size }, location.origin);
+    if (actionQueueTimer !== null) clearTimeout(actionQueueTimer);
+    actionQueueTimer = null;
+    if (queuedActionExpiry.size && typeof setTimeout === 'function') {
+      const delay = Math.max(0, Math.min(...queuedActionExpiry.values()) - Date.now());
+      actionQueueTimer = setTimeout(() => {
+        for (const [key, expiresAt] of queuedActionExpiry) {
+          if (Date.now() >= expiresAt) { queuedRpcCalls.delete(key); queuedActionExpiry.delete(key); }
+        }
+        reportQueueStatus();
+      }, delay);
+    }
+  }
   const piggybackMethods = new Set(['randomDraft_getInfo', 'getPage',
-    'questGetAll', 'questGetEvents', 'getMarches', 'getRallyById']);
+    'questGetAll', 'questGetEvents', 'getMarches', 'getRallyById',
+    'userGetInfo', 'inventoryGet', 'heroGetAll', 'titanGetAll', 'teamGetAll',
+    'refillableGetAll', 'missionGetAll', 'artifact_getAll', 'titan_artifactGetCounters',
+    'skin_getAll', 'rune_getAll', 'arenaGetAll', 'clanWarGetBriefInfo', 'mailGetAll',
+    'searchMob', 'searchMine']);
+  const helperActionMethods = new Set(['createRally', 'attackMine', 'stopMineGathering',
+    'randomDraft_saveDefence', 'randomDraft_saveAttack']);
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok, error = null) => window.postMessage({
@@ -146,33 +170,40 @@
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled === true;
       popupRpcEnabled = event.data.popupRpcEnabled === true;
+      rpcDispatchMode = event.data.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
       recordingActive = event.data.recordingActive === true;
       if (!captureEnabled || !popupRpcEnabled || event.data.socketRefreshMode === 'direct') {
         if (queuedClaimKeys.size) reportClaimResult(false, 'Queued claims were cancelled by Settings.');
         queuedRpcCalls.clear();
         queuedClaimKeys.clear();
+        queuedActionExpiry.clear();
         if (claimQueueTimer !== null) clearTimeout(claimQueueTimer);
         claimQueueTimer = null;
       }
+      reportQueueStatus();
     }
     if (event.data?.source === 'hwa-helper-control' &&
         ['queue-rpc', 'queue-claim'].includes(event.data.kind)) {
-      if (!captureEnabled || !popupRpcEnabled || !Array.isArray(event.data.calls)) return;
+      if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode !== 'piggyback' || !Array.isArray(event.data.calls)) return;
       const isClaim = event.data.kind === 'queue-claim';
       for (const call of event.data.calls) {
-        if (!(isClaim ? claimQueueMethods : piggybackMethods).has(call?.name)) continue;
+        if (!(isClaim ? claimQueueMethods.has(call?.name) :
+            piggybackMethods.has(call?.name) || helperActionMethods.has(call?.name))) continue;
         const safe = { name: call.name, args: call.args || {},
           ...(call.feature ? { feature: call.feature } : {}) };
         const key = JSON.stringify(safe);
+        if (event.data.calls.some((item) => helperActionMethods.has(item?.name) || claimActionMethods.has(item?.name)) &&
+            piggybackMethods.has(call.name)) queuedRpcCalls.delete(key);
         if (!queuedRpcCalls.has(key)) {
-          if (queuedRpcCalls.size >= 16) {
+          if (queuedRpcCalls.size >= 64) {
             const oldest = [...queuedRpcCalls.keys()].find((item) =>
-              !queuedClaimKeys.has(item));
+              !queuedClaimKeys.has(item) && !queuedActionExpiry.has(item));
             if (!oldest) continue;
             queuedRpcCalls.delete(oldest);
             queuedClaimKeys.delete(oldest);
           }
           queuedRpcCalls.set(key, safe);
+          if (helperActionMethods.has(call.name)) queuedActionExpiry.set(key, Date.now() + 120000);
         }
         if (isClaim) queuedClaimKeys.add(key);
       }
@@ -184,12 +215,18 @@
           claimQueueTimer = null;
           tracePiggyback('piggyback-expired', 'claim');
           reportClaimResult(false, 'No game RPC arrived within two minutes. Retry the claim.');
+          reportQueueStatus();
         }, 120000);
       }
       tracePiggyback('piggyback-queued', `${isClaim ? 'claim' : 'refresh'}:${event.data.calls.length}`);
+      reportQueueStatus();
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
       if (!popupRpcEnabled) return;
+      if (rpcDispatchMode !== 'direct') {
+        window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: event.data.calls }, location.origin);
+        return;
+      }
       const calls = event.data.calls;
       const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null) || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
@@ -267,62 +304,19 @@
       }
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'draft-action') {
-      if (!popupRpcEnabled) return;
-      const { action, heroes } = event.data;
-      if (!lastRpcUrl || !Array.isArray(heroes) || heroes.length === 0) return;
-      const callName = action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack';
-      const randHex = () => Math.random().toString(16).slice(2).padStart(16, '0').slice(0, 16);
-      const ident1 = randHex() + randHex();
-      const ident2 = randHex() + randHex();
-      const payload = {
-        calls: [
-          { name: callName, args: { heroes }, ident: ident1 },
-          { name: 'randomDraft_getInfo', args: {}, ident: ident2 }
-        ]
-      };
-      let headersToUse = lastRpcHeaders;
-      if (!headersToUse && typeof sessionStorage !== 'undefined') {
-        try {
-          const stored = sessionStorage.getItem('hwa_last_rpc_headers');
-          if (stored) headersToUse = JSON.parse(stored);
-        } catch (_) {}
-      }
-      const headers = buildDispatchHeaders(headersToUse);
-      try {
-        (window.fetch || originalFetch)(lastRpcUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload)
-        }).then(async (res) => {
-          try {
-            const responseText = await res.clone().text();
-            if (responseText) {
-              const u = new URL(String(lastRpcUrl), location.href);
-              window.postMessage({
-                source: 'hwa-helper-api',
-                kind: 'api-record',
-                record: {
-                  transport: 'fetch',
-                  method: 'POST',
-                  endpoint: `${u.origin}${u.pathname}`,
-                  status: res.status,
-                  durationMs: 0,
-                  outcome: res.ok ? 'completed' : 'failed',
-                  timestamp: new Date().toISOString(),
-                  requestBody: JSON.stringify(payload),
-                  responseBody: responseText
-                }
-              }, location.origin);
-            }
-          } catch (_) {}
-        }).catch(() => {});
-      } catch (_) {}
+      if (!popupRpcEnabled || !['saveDefence', 'saveAttack'].includes(event.data.action) ||
+          !Array.isArray(event.data.heroes) || event.data.heroes.length !== 5 ||
+          event.data.heroes.some((id) => !Number.isInteger(id))) return;
+      window.postMessage({ source: 'hwa-helper-control', kind: 'refresh-rpc', calls: [
+        { name: event.data.action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack',
+          args: { heroes: event.data.heroes } }, { name: 'randomDraft_getInfo' }
+      ] }, location.origin);
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'engine-ping') {
       reportEngineStatus('ping');
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'engine-send-message') {
-      if (!popupRpcEnabled) return;
+      if (!popupRpcEnabled || rpcDispatchMode !== 'direct') return;
       const { objectName, methodName, param } = event.data;
       let ok = false;
       let error = null;
@@ -763,7 +757,10 @@
   }
 
   function preparePiggyback(url, method, options, source = 'init') {
-    if (!captureEnabled || !popupRpcEnabled || !queuedRpcCalls.size ||
+    for (const [key, expiresAt] of queuedActionExpiry) {
+      if (Date.now() >= expiresAt) { queuedRpcCalls.delete(key); queuedActionExpiry.delete(key); }
+    }
+    if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode !== 'piggyback' || !queuedRpcCalls.size ||
         String(method).toUpperCase() !== 'POST' || typeof options?.body !== 'string' ||
         typeof Response !== 'function') return null;
     try {
@@ -778,8 +775,10 @@
       const appended = [];
       const consumed = [];
       const claimIds = [];
+      const hasActions = [...queuedRpcCalls.values()].some((call) =>
+        helperActionMethods.has(call.name) || claimActionMethods.has(call.name));
       for (const [key, call] of queuedRpcCalls) {
-        if (!existing.has(key)) {
+        if (!existing.has(key) || (hasActions && piggybackMethods.has(call.name))) {
           const ident = Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16) +
             Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16);
           appended.push({ ...call, ident });
@@ -793,12 +792,14 @@
         for (const key of consumed) {
           queuedRpcCalls.delete(key);
           queuedClaimKeys.delete(key);
+          queuedActionExpiry.delete(key);
         }
         if (!queuedClaimKeys.size && claimQueueTimer !== null) {
           clearTimeout(claimQueueTimer);
           claimQueueTimer = null;
         }
         if (claimIds.length) tracePiggyback('piggyback-covered', source);
+        reportQueueStatus();
         return claimIds.length ? { appended, claimIds, options } : null;
       }
       const headers = typeof Headers === 'function' ? new Headers(options.headers || {}) :
@@ -812,12 +813,14 @@
       for (const key of consumed) {
         queuedRpcCalls.delete(key);
         queuedClaimKeys.delete(key);
+        queuedActionExpiry.delete(key);
       }
       if (!queuedClaimKeys.size && claimQueueTimer !== null) {
         clearTimeout(claimQueueTimer);
         claimQueueTimer = null;
       }
       tracePiggyback('piggyback-attached', `${source}:${appended.length}`);
+      reportQueueStatus();
       return prepared;
     } catch (_) {
       return null;
@@ -825,11 +828,13 @@
   }
 
   function restorePiggyback(appended) {
+    if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode !== 'piggyback') return;
     for (const { ident, ...call } of appended || []) {
       if (!piggybackMethods.has(call.name)) continue;
       const key = JSON.stringify(call);
       if (!queuedRpcCalls.has(key)) queuedRpcCalls.set(key, call);
     }
+    reportQueueStatus();
   }
 
   if (typeof window.fetch === 'function') {
