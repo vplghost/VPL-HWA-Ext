@@ -1,12 +1,13 @@
 ---
 id: VHE-8D82V9
 title: Fix Draft dialog isolation and show RPC queue count
-status: in-progress
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-06T04:27:39.044Z'
-updatedAt: '2026-11-06T04:33:35.871Z'
-timeSpent: 0
+updatedAt: '2026-11-06T04:33:59.638Z'
+completedAt: '2026-11-06T04:33:59.638Z'
+timeSpent: 369
 ---
 # Fix Draft dialog isolation and show RPC queue count
 
@@ -21,7 +22,7 @@ Fix Draft header dialog replacing the active tab, show Draft icon only while act
 - [x] #1 Draft dialog opening and refresh preserve active tab content; icon only visible for active stages.
 - [x] #2 Header shows the actual queued RPC count across enqueue, dispatch, cancellation and expiry.
 - [x] #3 Wheel feature is archived and stops live tracking until explicitly resumed.
-- [ ] #4 Changes are verified, built and committed in appropriate groups; git status is clean.
+- [x] #4 Changes are verified, built and committed in appropriate groups; git status is clean.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -37,5 +38,7 @@ Fix Draft header dialog replacing the active tab, show Draft icon only while act
 
 <!-- SECTION:NOTES:BEGIN -->
 Fixed root cause: renderDraft previously replaced global view/status while rendering modal; target parameter now isolates dialog open and refresh. Header Draft icon hidden outside stages 1–6. Replaced Wheel badge with actual per-tab queue totals reported by interceptor through bridge/background; counters update on enqueue, dedup, consume, restore, cancellation, action/claim expiry and tab closure. Wheel UI/reducers/rule/tests are shelved in non-executable archive/wheel/free-spin.snapshot.txt and its prior memory archived. Added regression coverage. Full tests: 245 pass, 10 explicitly skipped optional private trace replays, 0 fail. Build 0.9.72 and docs validation pass. Implementation committed as 6ec7e2c; completing docs/task/config commits next. System Decision Impact: candidate @decision/20261106-1132-shelve-wheel-and-preserve-draft-dialog-isolation (changed) — preserves explicit Wheel suspension and dialog isolation guidance.
+
+Commit wave: 6ec7e2c contains implementation, tests, archive and generated dist 0.9.72; c6a2108 contains API/MQTT documentation, rules and task histories. Final chore commit records task completion and the pre-existing Knowns serverPort 6420 configuration. All requested source/doc/task changes are included; verify clean git status after final commit. Knowns-generated task markdown retains its standard trailing blank line.
 <!-- SECTION:NOTES:END -->
 
