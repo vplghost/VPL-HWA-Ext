@@ -158,10 +158,14 @@ try {
     }
     if (area !== 'local') return;
     if ('raidQueue' in changes) scheduleRaidWake(changes.raidQueue.newValue);
+    if ('towerRun' in changes) scheduleTowerWake(changes.towerRun.newValue);
     if (('captureSettings' in changes || 'popupRpcEnabled' in changes) && typeof raidWakeTimer !== 'undefined') {
-      chrome.storage.local.get('raidQueue').then((stored) => {
+      chrome.storage.local.get(['raidQueue', 'towerRun']).then((stored) => {
         if (stored.raidQueue && !['stopped', 'complete'].includes(stored.raidQueue.phase)) {
           chrome.runtime.sendMessage({ kind: 'raid-queue-tick' }).catch(() => {});
+        }
+        if (stored.towerRun && !['stopped', 'complete'].includes(stored.towerRun.phase)) {
+          chrome.runtime.sendMessage({ kind: 'tower-run-tick' }).catch(() => {});
         }
       }).catch(() => {});
     }
@@ -238,6 +242,19 @@ function scheduleRaidWake(state) {
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('raidQueue')?.then?.((stored) => scheduleRaidWake(stored.raidQueue))?.catch?.(() => {}); } catch {}
+
+let towerWakeTimer;
+function scheduleTowerWake(state) {
+  if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
+  clearTimeout(towerWakeTimer);
+  if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
+  towerWakeTimer = setTimeout(() => {
+    chrome.runtime.sendMessage({ kind: 'tower-run-tick' }).then((response) => {
+      if (response?.watch) return chrome.storage.local.get('towerRun').then((stored) => scheduleTowerWake(stored.towerRun));
+    }).catch(() => {});
+  }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+}
+try { chrome.storage?.local?.get?.('towerRun')?.then?.((stored) => scheduleTowerWake(stored.towerRun))?.catch?.(() => {}); } catch {}
 
 function handleContextInvalidated(err) {
   if (err?.message?.includes('Extension context invalidated')) {

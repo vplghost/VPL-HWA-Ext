@@ -15,10 +15,16 @@
       !tower ? unknown : tower.isCleared ? 'Cleared today' : tower.floorNumber ? `Floor ${tower.floorNumber} / 25` : 'Ready to enter'));
 
     const arena = data('arenaGetAll');
-    activities.push(row('arena', 'Arena', '⚔️', arena ? 'info' : 'unknown',
-      arena ? `Rank ${arena.arenaPlace ?? '—'} · Check daily battles in game` : unknown));
-    activities.push(row('grand-arena', 'Grand Arena', '🛡️', arena ? 'info' : 'unknown',
-      arena ? `Rank ${arena.grandPlace ?? '—'} · Check daily battles in game` : unknown));
+    for (const [id, title, icon, rank, refillableId] of [
+      ['arena', 'Arena', '⚔️', arena?.arenaPlace, 6],
+      ['grand-arena', 'Grand Arena', '🛡️', arena?.grandPlace, 21]
+    ]) {
+      const amount = data(`resource:refillable:${refillableId}`)?.amount;
+      const known = Number.isInteger(amount) && amount >= 0;
+      activities.push(row(id, title, icon, !known ? 'unknown' : amount > 0 ? 'pending' : 'info',
+        known ? `Rank ${rank ?? '—'} · ${amount} battles left today` :
+          arena ? `Rank ${rank ?? '—'} · Battles remaining unavailable` : unknown));
+    }
 
     const expeditions = data('expeditionGet');
     const slots = Array.isArray(expeditions) ? expeditions : null;

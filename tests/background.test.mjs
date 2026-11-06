@@ -9,6 +9,8 @@ const cacheSource = await readFile(new URL('../extension/rpc-cache.js', import.m
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const experimentalSource = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
 const raidSource = await readFile(new URL('../extension/raid-queue.js', import.meta.url), 'utf8');
+const towerAutomationSource = await readFile(new URL('../extension/tower-automation.js', import.meta.url), 'utf8');
+const towerRunnerSource = await readFile(new URL('../extension/tower-runner.js', import.meta.url), 'utf8');
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
 const popupSender = { url: 'chrome-extension://test-extension/popup.html' };
 
@@ -53,7 +55,7 @@ function setup(quota = Infinity) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
@@ -120,6 +122,20 @@ test('managed raid queue uses shared policy, pins one game tab and waits for ret
     assert.equal(local.raidQueue.phase, 'stopped');
     assert.equal(forwardedMessages.at(-1).msg.kind, 'drop-rpc-group');
   }
+});
+
+test('cancel queue clears pending bosses without sending cancelRally for the active raid', async () => {
+  const { local, listener, forwardedMessages } = setup();
+  local.popupRpcEnabled = true;
+  local.raidQueue = { id: 'raid:1', tabId: 1, accountId: 10, phase: 'active',
+    bossQueue: { remain_raid_count: 2, queue: [{ mobId: 'boss-a' }, { mobId: 'boss-b' }] },
+    current: { rallyId: 'rally-a', squadId: 'squad-a', mobId: 'boss-a' } };
+  const reply = await new Promise((resolve) => listener({ kind: 'raid-queue-stop' }, popupSender, resolve));
+  assert.equal(reply.ok, true);
+  assert.equal(local.raidQueue.phase, 'stopped');
+  assert.equal(local.raidQueue.bossQueue, null);
+  assert.equal(local.raidQueue.current.rallyId, 'rally-a');
+  assert.deepEqual(Array.from(forwardedMessages, ({ msg }) => msg.kind), ['drop-rpc-group']);
 });
 
 function rpc(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
@@ -547,4 +563,32 @@ test('engine-ping forwards to active game tab', async () => {
   const result = await send('engine-ping');
   assert.equal(result.ok, true);
   assert.ok(forwardedMessages.some((f) => f.tabId === 99 && f.msg.kind === 'engine-ping'));
+});
+
+test('Tower start dispatches a saved-team run to one game tab and stop clears pending actions', async () => {
+  const { local, tabsList, forwardedMessages, listener } = setup();
+  const invoke = (message) => new Promise((resolve) => listener(message, popupSender, resolve));
+  const now = new Date().toISOString();
+  local.popupRpcEnabled = true;
+  local.socketRefreshMode = 'direct';
+  local.rpcCache = {
+    accountStatus: { data: { id: 10 } },
+    teamGetAll: { data: { magicTower: [79, 72, 16, 54, 60] } },
+    towerStatus: { data: { state: 'inProgress' } },
+    towerSession: { updatedAt: now, data: { floorNumber: 1, roomNumber: 0,
+      rooms: { 1: { roomNumber: 1, type: 'hero_battle', state: 'initial' },
+        2: { roomNumber: 2, type: 'buffs', buffs: [34] } }, history: [] } }
+  };
+  local.towerAutomationSettings = { accountId: 10, buffPriority: [34] };
+  tabsList.push({ id: 1, url: gameSender.url }, { id: 2, url: gameSender.url });
+  assert.equal((await invoke({ kind: 'tower-run-start' })).ok, true);
+  assert.equal(local.towerRun.phase, 'acting');
+  assert.equal(local.towerRun.tabId, 1);
+  assert.deepEqual(Array.from(local.towerRun.buffPriority), [34]);
+  assert.equal(forwardedMessages[0].tabId, 1);
+  assert.equal(forwardedMessages[0].msg.kind, 'refresh-rpc');
+  assert.equal(forwardedMessages[0].msg.calls[0].name, 'magicTower_enterRoom');
+  assert.equal((await invoke({ kind: 'tower-run-stop' })).ok, true);
+  assert.equal(local.towerRun.phase, 'stopped');
+  assert.equal(forwardedMessages.at(-1).msg.kind, 'drop-rpc-group');
 });

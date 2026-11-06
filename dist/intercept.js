@@ -37,7 +37,9 @@
     'skin_getAll', 'rune_getAll', 'arenaGetAll', 'clanWarGetBriefInfo', 'mailGetAll',
     'searchMob', 'searchMine']);
   const helperActionMethods = new Set(['createRally', 'cancelRally', 'attackMine', 'stopMineGathering',
-    'randomDraft_saveDefence', 'randomDraft_saveAttack']);
+    'randomDraft_saveDefence', 'randomDraft_saveAttack',
+    'magicTower_enterRoom', 'magicTower_startBattle', 'magicTower_activateBuff',
+    'magicTower_openChest', 'magicTower_enterNextFloor']);
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok, error = null) => window.postMessage({

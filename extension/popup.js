@@ -54,6 +54,10 @@ const experimentalSelection = { rallyTeam: '', gatherTeam: 'weakest', bossLevel:
   waitSeconds: 300, minMembers: 4, autoCancel: true, raidCount: 2, targetMobId: '', mineType: 'food', mineLevel: 1, mineId: '', units: '' };
 let raidPreferencesLoaded = false;
 let raidQueueState = null;
+let towerAutomationSettings = { accountId: null, buffPriority: [] };
+let towerSettingsLoadedFor = null;
+let towerRunState = null;
+let towerAutomationMessage = '';
 let troopCapacitySettings = { defaultHero: 600, base: 950 };
 let experimentalMessage = '';
 
@@ -3924,8 +3928,87 @@ function renderTowerModal(cache = currentCache) {
     const buff = globalThis.hwaHelperTowerBuffs?.[id];
     return buff ? `${buff.name} (#${id}) — ${buff.description}` : `Buff #${id}`;
   }
+  function renderBuffPriority() {
+    const card = section('Buff priority');
+    line(card, 'Drag a buff to set its priority. The first offered buff in this order is selected.');
+    const catalog = globalThis.hwaHelperTowerBuffs || {};
+    const ids = Object.keys(catalog).map(Number).sort((a, b) => a - b);
+    const saved = towerAutomationSettings?.buffPriority || [];
+    const order = [...new Set([...saved, ...ids])].filter((id) => catalog[id]);
+    const list = document.createElement('div');
+    list.className = 'flex flex-wrap gap-2';
+    list.setAttribute('aria-label', 'Tower buff priority, highest first');
+    const move = (from, to) => {
+      if (!order.includes(from) || !order.includes(to) || from === to) return;
+      const targetIndex = order.indexOf(to);
+      order.splice(order.indexOf(from), 1);
+      order.splice(targetIndex, 0, from);
+      towerAutomationSettings = { accountId: cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id ?? null,
+        buffPriority: order };
+      chrome.storage.local.set({ towerAutomationSettings }).catch(() => {});
+      renderTowerModal(cache);
+    };
+    for (const id of order) {
+      const pill = document.createElement('button');
+      pill.type = 'button'; pill.draggable = true;
+      pill.dataset.buffId = String(id);
+      pill.className = 'cursor-grab rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-900 hover:bg-violet-100 active:cursor-grabbing';
+      pill.textContent = catalog[id].name;
+      pill.title = catalog[id].description;
+      pill.setAttribute('aria-label', `${catalog[id].name}, priority ${order.indexOf(id) + 1}. Use arrow keys to reorder.`);
+      pill.addEventListener('dragstart', (event) => event.dataTransfer?.setData('text/plain', String(id)));
+      pill.addEventListener('dragover', (event) => event.preventDefault());
+      pill.addEventListener('drop', (event) => {
+        event.preventDefault();
+        move(Number(event.dataTransfer?.getData('text/plain')), id);
+      });
+      pill.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const target = order[order.indexOf(id) + (event.key === 'ArrowLeft' ? -1 : 1)];
+        if (target != null) move(id, target);
+      });
+      list.append(pill);
+    }
+    card.append(list);
+  }
+  function renderAutomation() {
+    const card = section('Automatic Tower');
+    const actionButton = (label, handler, disabled = false) => {
+      const control = document.createElement('button');
+      control.type = 'button'; control.textContent = label; control.disabled = disabled;
+      control.className = 'cursor-pointer rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300';
+      control.addEventListener('click', handler);
+      card.append(control);
+    };
+    const running = towerRunState && !['stopped', 'complete'].includes(towerRunState.phase);
+    const team = cache?.teamGetAll?.data?.magicTower;
+    line(card, Array.isArray(team) && team.length === 5 ?
+      `Saved magicTower team: ${heroList(team)}` : 'Save a five-hero magicTower team in game first.');
+    if (towerRunState) line(card, `Status: ${towerRunState.phase}${towerRunState.floor ?
+      ` · floor ${towerRunState.floor}, room ${towerRunState.room}` : ''}${towerRunState.reason ?
+      ` · ${towerRunState.reason}` : ''}`);
+    if (towerAutomationMessage) line(card, towerAutomationMessage);
+    if (running) {
+      actionButton('Stop Tower automation', async () => {
+        const response = await chrome.runtime.sendMessage({ kind: 'tower-run-stop' });
+        towerAutomationMessage = response?.ok ? 'Tower automation stopped.' : response?.error || 'Could not stop Tower automation.';
+        render();
+      });
+    } else {
+      actionButton('Start Tower automation', async () => {
+        const response = await chrome.runtime.sendMessage({ kind: 'tower-run-start' });
+        towerAutomationMessage = response?.ok ? 'Tower automation started. Waiting for game responses.' :
+          response?.error || 'Could not start Tower automation.';
+        render();
+      }, !popupRpcEnabled || complete || !Array.isArray(team) || team.length !== 5);
+    }
+    line(card, 'Battle results must come from the game client; the helper waits for its endBattle response. Only a free chest is opened.');
+  }
   if (!floor && !complete) {
     line(section('Tower status'), 'No Tower data captured yet. Open the Tower in the game to sync.');
+    renderAutomation();
+    renderBuffPriority();
     return;
   }
   const summary = section('Progress');
@@ -3986,6 +4069,8 @@ function renderTowerModal(cache = currentCache) {
         `Possible rewards (positions not confirmed): ${event.possibleRewards.map(towerRewardText).join(' / ')}`);
     }
   }
+  renderAutomation();
+  renderBuffPriority();
 }
 
 function setupFabDial() {
@@ -4857,7 +4942,7 @@ function renderExperimental(cache) {
   memberField.append(memberLabel, memberControl);
   rally.append(memberField);
   const raidCountInput = document.createElement('input');
-  raidCountInput.type = 'number'; raidCountInput.min = '1'; raidCountInput.max = '100'; raidCountInput.step = '1';
+  raidCountInput.type = 'number'; raidCountInput.min = '2'; raidCountInput.max = '100'; raidCountInput.step = '1';
   raidCountInput.value = String(experimentalSelection.raidCount);
   raidCountInput.addEventListener('input', () => {
     experimentalSelection.raidCount = Number(raidCountInput.value);
@@ -4920,10 +5005,14 @@ function renderExperimental(cache) {
   }, cannotStart);
   if (raidQueueState) {
     const members = raidQueueState.current?.members;
-    note(rally, `Queue: ${raidQueueState.phase} · ${raidQueueState.completed}/${raidQueueState.options.count} returned · ${raidQueueState.started} started${members ? ` · members ${members.count}/${members.total}` : ''}${raidQueueState.reason ? ` · ${raidQueueState.reason}` : ''}`);
-    if (queueRunning) button(rally, 'Stop queue', async () => {
-      await chrome.runtime.sendMessage({ kind: 'raid-queue-stop' }); render();
-    }, false);
+    const pending = raidQueueState.bossQueue;
+    note(rally, `Queue: ${raidQueueState.phase} · ${pending?.remain_raid_count ?? 0} raids left · ${pending?.queue.length ?? 0} bosses queued · ${raidQueueState.completed} won${members ? ` · members ${members.count}/${members.total}` : ''}${raidQueueState.reason ? ` · ${raidQueueState.reason}` : ''}`);
+    if (queueRunning) {
+      button(rally, 'Cancel queue', async () => {
+        await chrome.runtime.sendMessage({ kind: 'raid-queue-stop' }); render();
+      }, false);
+      note(rally, 'Cancelling the queue clears pending bosses; a rally already running continues in game.');
+    }
   }
   const activeRallies = (cache.marchStatus?.data?.marches || []).filter((march) => march.rally &&
     !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
@@ -5028,10 +5117,17 @@ async function experimentalRpc(calls, message) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'raidPreferences', 'raidQueue', 'troopCapacitySettings']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'raidPreferences', 'raidQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
+  towerRunState = stored.towerRun || null;
+  const towerAccountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id ?? null;
+  if (towerSettingsLoadedFor !== String(towerAccountId)) {
+    towerAutomationSettings = String(stored.towerAutomationSettings?.accountId) === String(towerAccountId) ?
+      stored.towerAutomationSettings : { accountId: towerAccountId, buffPriority: [] };
+    towerSettingsLoadedFor = String(towerAccountId);
+  }
   raidQueueState = stored.raidQueue || null;
   troopCapacitySettings = globalThis.hwaHelperExperimentalData?.normalizeCapacitySettings(stored.troopCapacitySettings) || troopCapacitySettings;
   if (!raidPreferencesLoaded && cache.accountStatus?.data?.id) {
@@ -5786,7 +5882,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
         'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'troopCapacitySettings' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
-    if ('troopCapacitySettings' in changes || 'raidQueue' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('troopCapacitySettings' in changes || 'raidQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {

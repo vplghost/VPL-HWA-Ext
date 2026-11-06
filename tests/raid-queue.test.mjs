@@ -156,7 +156,7 @@ test('roster refresh falls back after hero changes and rejects deployed heroes b
 });
 
 test('queue stops at requested count and cannot reuse a won boss', () => {
-  let state = active(); state.options = { ...state.options, count: 1 };
+  let state = active(); state.bossQueue.remain_raid_count = 1;
   state = queue.advance(state, win(), {}, 70001).state;
   const complete = queue.advance(state, returned(), {}, 80001);
   assert.equal(complete.state.phase, 'complete'); assert.equal(complete.calls, undefined);
@@ -165,4 +165,123 @@ test('queue stops at requested count and cannot reuse a won boss', () => {
   step = queue.advance(step.state, rpc(step.calls, [{ mobs: [{ mobId: 'boss' }] }], 1300),
     { experimentalDefeatedBosses: { data: [{ mobId: 'boss', mapId: 'map' }] } }, 1400);
   assert.equal(step.state.phase, 'stopped'); assert.equal(step.calls, undefined);
+});
+
+function cachedQueue(bosses = ['boss-a', 'boss-b'], count = 3, energy = 100) {
+  const cache = { heroGetAll: { data: heroes }, 'getUnitSummary:unit': { data: inventory },
+    experimentalRallySearch: { data: { mapId: 'map', mobConfigIds: [64],
+      mobs: bosses.map((mobId) => ({ mobId })) } },
+    'resource:world-energy': { data: { amount: energy } } };
+  return { cache, step: queue.start({ ...options, count, firstMobId: bosses[1] || bosses[0],
+    autoCancel: false }, 1, 10, 1000, cache) };
+}
+
+test('one search supplies several rallies; next search waits until every queued boss is consumed', () => {
+  const { cache, step: first } = cachedQueue();
+  assert.equal(first.state.bossQueue.remain_raid_count, 3);
+  assert.deepEqual(Array.from(first.state.bossQueue.queue, (boss) => boss.mobId), ['boss-b', 'boss-a']);
+  assert.equal(first.calls[0].args.mobId, 'boss-b');
+  let step = queue.advance(first.state, rpc(first.calls, [{ squadId: 'squad-b',
+    rally: { rallyId: 'rally-b', plannedStartTime: 65000 } }], 1100), cache, 1200);
+  step = queue.advance(step.state, socket('mobRallyAttackResult', { rallyId: 'rally-b',
+    squadId: 'squad-b', battleResult: { battleResult: 'win' } }, 70000), cache, 70001);
+  step = queue.advance(step.state, socket('returnFromMobCompleted', { squadId: 'squad-b' }, 80000), cache, 80001);
+  assert.equal(step.state.bossQueue.remain_raid_count, 2);
+  assert.deepEqual(Array.from(step.state.bossQueue.queue, (boss) => boss.mobId), ['boss-a']);
+  step = queue.advance(step.state, rpc(step.calls, [heroes, inventory], 81000), cache, 81001);
+  assert.equal(step.state.phase, 'creating');
+  assert.equal(step.calls[0].name, 'createRally');
+  assert.equal(step.calls[0].args.mobId, 'boss-a');
+  step = queue.advance(step.state, rpc(step.calls, [{ squadId: 'squad-a',
+    rally: { rallyId: 'rally-a', plannedStartTime: 145000 } }], 82000), cache, 82001);
+  step = queue.advance(step.state, socket('mobRallyAttackResult', { rallyId: 'rally-a',
+    squadId: 'squad-a', battleResult: { battleResult: 'win' } }, 150000), cache, 150001);
+  step = queue.advance(step.state, socket('returnFromMobCompleted', { squadId: 'squad-a' }, 160000), cache, 160001);
+  step = queue.advance(step.state, rpc(step.calls, [heroes, inventory], 161000), cache, 161001);
+  assert.equal(step.state.phase, 'searching');
+  assert.equal(step.calls[0].name, 'searchMob');
+  step = queue.advance(step.state, rpc(step.calls, [{ mobs: [{ mobId: 'boss-a' },
+    { mobId: 'boss-c' }] }], 162000), cache, 162001);
+  assert.equal(step.calls[0].args.mobId, 'boss-c', 'won bosses stay excluded even if cache lags');
+});
+
+test('create errors skip only their boss and preserve remaining win count', () => {
+  const { cache, step: first } = cachedQueue(['boss-a', 'boss-b', 'boss-c']);
+  const failed = { method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(1100).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ...first.calls[0], ident: 'create' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'create', result: { error: { message: 'Boss is unavailable' } } }] }) };
+  let step = queue.advance(first.state, failed, cache, 1200);
+  assert.equal(step.state.phase, 'creating');
+  assert.equal(step.calls[0].args.mobId, 'boss-a');
+  assert.equal(step.state.bossQueue.remain_raid_count, 3);
+  assert.deepEqual(Array.from(step.state.bossQueue.queue, (boss) => boss.mobId), ['boss-a', 'boss-c']);
+  step = queue.advance(step.state, { ...failed, timestamp: new Date(1300).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ...step.calls[0], ident: 'create' }] }) }, cache, 1400);
+  assert.equal(step.calls[0].args.mobId, 'boss-c');
+  step = queue.advance(step.state, { ...failed, timestamp: new Date(1500).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ...step.calls[0], ident: 'create' }] }) }, cache, 1600);
+  assert.equal(step.state.phase, 'searching');
+  assert.equal(step.calls[0].name, 'searchMob');
+  step = queue.advance(step.state, rpc(step.calls, [{ mobs: [{ mobId: 'boss-b' },
+    { mobId: 'boss-d' }] }], 1700), cache, 1800);
+  assert.equal(step.calls[0].args.mobId, 'boss-d');
+});
+
+test('insufficient World Energy and a loss stop dispatch; cancelling clears queue but preserves active rally', () => {
+  assert.equal(cachedQueue(['boss-a'], 2, 24).step.state.phase, 'stopped');
+  const { cache, step: first } = cachedQueue();
+  const activeStep = queue.advance(first.state, rpc(first.calls, [{ squadId: 'squad-b',
+    rally: { rallyId: 'rally-b', plannedStartTime: 65000 } }], 1100), cache, 1200);
+  const cancelled = queue.stop(activeStep.state, 'Stopped by user.');
+  assert.equal(cancelled.bossQueue, null);
+  assert.equal(cancelled.current.rallyId, 'rally-b');
+  assert.equal(queue.advance(cancelled, socket('mobRallyAttackResult', { rallyId: 'rally-b',
+    squadId: 'squad-b', battleResult: { battleResult: 'win' } }, 70000), cache, 70001).calls, undefined);
+  const lost = queue.advance(activeStep.state, socket('mobRallyAttackResult', { rallyId: 'rally-b',
+    squadId: 'squad-b', battleResult: { battleResult: 'lose' } }, 70000), cache, 70001);
+  assert.equal(lost.state.phase, 'stopped');
+  assert.equal(lost.state.bossQueue, null);
+  const winStep = queue.advance(activeStep.state, socket('mobRallyAttackResult', { rallyId: 'rally-b',
+    squadId: 'squad-b', battleResult: { battleResult: 'win' } }, 70000), cache, 70001);
+  const returnedStep = queue.advance(winStep.state, socket('returnFromMobCompleted', {
+    squadId: 'squad-b' }, 80000), cache, 80001);
+  const lowEnergy = { ...cache, 'resource:world-energy': { data: { amount: 24 } } };
+  const next = queue.advance(returnedStep.state, rpc(returnedStep.calls,
+    [heroes, inventory], 81000), lowEnergy, 81001);
+  assert.equal(next.state.phase, 'stopped');
+  assert.match(next.state.reason, /World Energy/);
+  assert.equal(next.calls, undefined);
+});
+
+test('server energy rejection stops queue while a confirmed auto-cancel skips its boss', () => {
+  const { cache, step: first } = cachedQueue();
+  const failure = { method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(1100).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ...first.calls[0], ident: 'create' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'create', result: {
+      error: { code: 'NOT_ENOUGH_WORLD_ENERGY' } } }] }) };
+  assert.equal(queue.advance(first.state, failure, cache, 1200).state.phase, 'stopped');
+  let step = queue.advance(first.state, rpc(first.calls, [{ squadId: 'squad-b',
+    rally: { rallyId: 'rally-b', plannedStartTime: 65000 } }], 1100), cache, 1200);
+  const cancelCall = [{ name: 'cancelRally', feature: 'rally', args: { rallyId: 'rally-b' } }];
+  step.state.phase = 'cancelling'; step.state.expected = cancelCall;
+  step = queue.advance(step.state, rpc(cancelCall, [{}], 1300), cache, 1400);
+  assert.equal(step.state.phase, 'refreshing');
+  assert.equal(step.state.bossQueue.remain_raid_count, 3);
+  assert.deepEqual(Array.from(step.state.bossQueue.queue, (boss) => boss.mobId), ['boss-a']);
+  step = queue.advance(step.state, rpc(step.calls, [heroes, inventory], 1500), cache, 1600);
+  assert.equal(step.calls[0].args.mobId, 'boss-a');
+});
+
+test('active queues saved before the boss-list upgrade can finish their current rally', () => {
+  const legacy = active();
+  delete legacy.bossQueue;
+  let step = queue.advance(legacy, win(), {}, 70001);
+  assert.equal(step.state.bossQueue.remain_raid_count, 2);
+  step = queue.advance(step.state, returned(), {}, 80001);
+  assert.equal(step.state.phase, 'refreshing');
+  assert.equal(step.state.bossQueue.remain_raid_count, 1);
+  step = queue.advance(step.state, rpc(step.calls, [heroes, inventory], 81000), {}, 81001);
+  assert.equal(step.state.phase, 'searching');
 });

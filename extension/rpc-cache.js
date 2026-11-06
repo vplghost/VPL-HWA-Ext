@@ -1130,6 +1130,7 @@
             data: {
               state: resp.state || (resp.floorData ? 'inProgress' : 'unknown'),
               isCleared,
+              ...(resp.skipState != null ? { skipState: resp.skipState } : {}),
               deadHeroesCount: resp.deadHeroesCount ?? 0,
               floorNumber: resp.floorData?.floorNumber ?? (isCleared ? 26 : 0),
               floorData: resp.floorData ? {

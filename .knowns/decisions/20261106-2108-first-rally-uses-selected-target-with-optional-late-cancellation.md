@@ -8,20 +8,24 @@ tags:
   - rally
 sources:
   - '@task-VHE-992BGT'
+  - 'extension/raid-queue.js:start'
+  - 'extension/popup.js:renderExperimental'
+  - tests/raid-queue.test.mjs
 relatedDocs:
   - api/world-map-rpc-contracts
 relatedTasks:
   - VHE-992BGT
 verification: []
-reviewState: needs_evidence
-reviewBlockers:
-  - 'linked task "VHE-992BGT" is "in-progress"; all linked tasks must be done before accepting candidate'
+reviewState: ready_for_review
+reviewBlockers: []
 reviewMatches: []
-reviewAllowedResolutions: []
-reviewEvaluatedHash: 'db0b09795088a91d8ac2fb355f38217d781eb55b5f02e1b647a674e39a15486d'
-reviewEvaluatedAt: '2026-11-06T14:08:42.996Z'
+reviewAllowedResolutions:
+  - accept_new
+  - reject_new
+reviewEvaluatedHash: '50689d8467104c1afa1c8478ab2dd85d157a816f9dec26899707ba7fb83fb04d'
+reviewEvaluatedAt: '2026-11-06T14:56:55.283Z'
 createdAt: '2026-11-06T14:08:42.996Z'
-updatedAt: '2026-11-06T14:08:42.996Z'
+updatedAt: '2026-11-06T14:56:55.284Z'
 ---
 
 ## Context

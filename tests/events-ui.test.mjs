@@ -357,6 +357,9 @@ const context = {
   status,
   search,
   currentCache: {},
+  towerAutomationSettings: { accountId: null, buffPriority: [] },
+  towerRunState: null,
+  towerAutomationMessage: '',
   popupRpcEnabled: true,
   claimRpcStatus: null,
   globalThis: {},
@@ -530,6 +533,26 @@ test('Tower dialog resolves current relic choices and falls back for an unknown 
   } } });
   assert.match(body.textContent, /Hypno-Staff \(#3\) — Stuns enemies at the start of the battle/);
   assert.match(body.textContent, /Buff #999/);
+});
+
+test('Tower dialog shows draggable name-only buff pills with details and saves priority', () => {
+  const body = new MockElement('div');
+  const badge = new MockElement('span');
+  mockDoc.elementsById.set('tower-modal-body', body);
+  mockDoc.elementsById.set('tower-modal-badge', badge);
+  context.towerAutomationSettings = { accountId: 10, buffPriority: [17, 3] };
+  context.renderTowerModal({ accountStatus: { data: { id: 10 } } });
+  let pills = body.querySelectorAll('button').filter((button) => button.dataset.buffId);
+  assert.equal(pills[0].textContent, 'Siphoning Gauntlet');
+  assert.equal(pills[0].title, 'Restores Health when applying Control Effects');
+  assert.equal(pills[0].draggable, true);
+  assert.doesNotMatch(pills[0].textContent, /Restores Health|#17/);
+  const transfer = { value: '', setData(_type, value) { this.value = value; }, getData() { return this.value; } };
+  pills[1].dispatch('dragstart', { dataTransfer: transfer });
+  pills[0].dispatch('drop', { dataTransfer: transfer, preventDefault() {} });
+  pills = body.querySelectorAll('button').filter((button) => button.dataset.buffId);
+  assert.equal(pills[0].textContent, 'Hypno-Staff');
+  assert.equal(context.towerAutomationSettings.buffPriority[0], 3);
 });
 
 test('renderEvents renders Guild Versus and active event cards', () => {

@@ -14,6 +14,8 @@ test('daily dashboard groups activities before quests and gifts', () => {
   const model = dailyDashboard({
     towerStatus: observed({ isCleared: true, floorNumber: 26 }),
     arenaGetAll: observed({ arenaPlace: '123', grandPlace: '456' }),
+    'resource:refillable:6': observed({ amount: 3 }),
+    'resource:refillable:21': observed({ amount: 0 }),
     expeditionGet: observed([{ attemptsLeft: 2 }, { attemptsLeft: 0 }]),
     dungeonStatus: observed({ dungeonActivity: 150, floorNumber: 42 }),
     clanBoss_getAll: observed({ tries: 1, superTries: 0 }),
@@ -26,11 +28,29 @@ test('daily dashboard groups activities before quests and gifts', () => {
   assert.deepEqual(Array.from(model.activities, (item) => item.id),
     ['tower', 'arena', 'grand-arena', 'expeditions', 'dungeon', 'hydra']);
   assert.equal(model.activities[0].state, 'done');
+  assert.equal(model.activities[1].state, 'pending');
+  assert.equal(model.activities[1].detail, 'Rank 123 · 3 battles left today');
+  assert.equal(model.activities[2].state, 'info');
+  assert.equal(model.activities[2].detail, 'Rank 456 · 0 battles left today');
   assert.match(model.activities[3].detail, /2 attempts left/);
   assert.equal(model.quests[0].detail, '2 daily quests observed · 1 rewards ready to claim');
   assert.equal(model.gifts[0].state, 'pending');
   assert.equal(model.gifts[1].state, 'info');
   assert.equal(model.gifts[2].state, 'pending');
+});
+
+test('Arena counters use distinct fresh refillables and never infer zero from missing data', () => {
+  const yesterday = '2026-11-05T10:00:00Z';
+  const model = dailyDashboard({
+    arenaGetAll: observed({ arenaPlace: '12', grandPlace: '34' }),
+    'resource:refillable:6': observed({ amount: 1 }, yesterday),
+    'resource:world-refillable:6': observed({ amount: 4 }),
+    'resource:refillable:21': observed({ amount: 2 })
+  }, now);
+  assert.equal(model.activities[1].state, 'unknown');
+  assert.equal(model.activities[1].detail, 'Rank 12 · Battles remaining unavailable');
+  assert.equal(model.activities[2].state, 'pending');
+  assert.equal(model.activities[2].detail, 'Rank 34 · 2 battles left today');
 });
 
 test('old observations become unknown instead of appearing completed today', () => {
