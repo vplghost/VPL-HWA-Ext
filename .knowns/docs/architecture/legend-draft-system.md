@@ -3,7 +3,7 @@ id: doc-45cb642564ea6f7fbd7553c41c582fe2
 title: Legend Draft System
 description: Legend Draft state machine, 15 candidates matrix, review switcher, and replay extraction
 createdAt: '2026-11-02T06:43:38.355Z'
-updatedAt: '2026-11-02T06:43:47.378Z'
+updatedAt: '2026-11-06T04:32:15.101Z'
 tags:
   - draft,legend-draft,pvp
 ---
@@ -31,3 +31,10 @@ Legend Draft is a synchronized PvP drafting mode in Hero Wars: Alliance consisti
 - When match finishes (stageId 7) or lineup is locked, the 15 candidate matrix is hidden.
 - A segmented switcher enables reviewing both Defense Draft (your defense vs enemy attack) and Attack Draft (your attack vs enemy defense).
 - Match outcome banner shows Victory/Defeat, Rating change, and Draft BP EXP reward.
+
+
+## Header dialog and view isolation
+
+The Draft tab/banner has been removed. The header icon is visible only for active stages 1–6 and opens the retained dialog. Idle and completed stages hide the icon.
+
+`renderDraft(cache, target)` writes to its supplied target. `openDraftModal` and open-dialog refresh supply `#draft-modal-body`; they must not replace `#view` or its status. The earlier renderer implicitly replaced the active tab even when called by the dialog; regression tests now preserve a sentinel tab node and status across opening and refresh. Source: @task-VHE-8D82V9 and `tests/legend-draft-ui.test.mjs`.

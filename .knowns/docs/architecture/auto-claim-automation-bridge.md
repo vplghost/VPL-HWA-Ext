@@ -3,7 +3,7 @@ id: doc-bfa2648b9c5b3898c65dac2f30b9615d
 title: Auto-Claim Automation Bridge
 description: Optional popup RPC dispatch, default-off safety switch, request-id limitations, and auto-claim flow
 createdAt: '2026-11-03T14:31:58.305Z'
-updatedAt: '2026-11-03T16:37:39.446Z'
+updatedAt: '2026-11-06T04:21:46.353Z'
 tags:
   - automation
   - rpc
@@ -26,7 +26,10 @@ Enabled extension calls reuse the last captured game RPC headers, strip x-reques
 getPendingClaims in popup-data.js identifies unclaimed mail letters, battle reports, and completable quests. buildAutoClaimCalls maps them to mailFarm, readAndClaimAll, and quest_multiFarm calls.
 
 ## Dispatch Rules
-The popup checks popupRpcEnabled before quick refresh, claim, and draft submission. Background checks the stored flag before forwarding popup RPC or Unity commands. Background automatic follow-up refreshes after event claims and skin upgrades use the same flag. intercept.js checks the flag again before direct dispatch or Unity commands. Auto-claim on popup open requires both onOpen and popupRpcEnabled.
+
+All helper RPC dispatch inherits @doc/architecture/shared-rpc-settings. The shared enable switch is false by default; `socketRefreshMode` selects Piggyback by default or explicit Direct for every feature. This includes quick refresh, claims, Draft, Experimental and automatic follow-ups. Background and interceptor both enforce the policy. Piggyback requires Monitor API and must not fall back to Direct.
+
+Auto-claim on popup open also requires its `onOpen` setting. The game client remains responsible for its own native traffic. Diagnostic engine-ping does not send an RPC; generic Unity commands are rejected in Piggyback mode because no known RPC payload can be queued for them.
 
 ## Key Invariants
 - An unset popupRpcEnabled value is false.
