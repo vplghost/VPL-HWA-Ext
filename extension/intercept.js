@@ -170,7 +170,7 @@
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled === true;
       popupRpcEnabled = event.data.popupRpcEnabled === true;
-      rpcDispatchMode = event.data.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
+      rpcDispatchMode = ['direct', 'mqtt-piggyback'].includes(event.data.socketRefreshMode) ? event.data.socketRefreshMode : 'piggyback';
       recordingActive = event.data.recordingActive === true;
       if (!captureEnabled || !popupRpcEnabled || event.data.socketRefreshMode === 'direct') {
         if (queuedClaimKeys.size) reportClaimResult(false, 'Queued claims were cancelled by Settings.');
@@ -184,7 +184,7 @@
     }
     if (event.data?.source === 'hwa-helper-control' &&
         ['queue-rpc', 'queue-claim'].includes(event.data.kind)) {
-      if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode !== 'piggyback' || !Array.isArray(event.data.calls)) return;
+      if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode === 'direct' || !Array.isArray(event.data.calls)) return;
       const isClaim = event.data.kind === 'queue-claim';
       for (const call of event.data.calls) {
         if (!(isClaim ? claimQueueMethods.has(call?.name) :
@@ -220,6 +220,9 @@
       }
       tracePiggyback('piggyback-queued', `${isClaim ? 'claim' : 'refresh'}:${event.data.calls.length}`);
       reportQueueStatus();
+      if (rpcDispatchMode === 'mqtt-piggyback' && queuedRpcCalls.size) {
+        window.postMessage({ source: 'hwa-helper-control', kind: 'mqtt-rpc-nudge' }, location.origin);
+      }
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
       if (!popupRpcEnabled) return;
@@ -760,7 +763,7 @@
     for (const [key, expiresAt] of queuedActionExpiry) {
       if (Date.now() >= expiresAt) { queuedRpcCalls.delete(key); queuedActionExpiry.delete(key); }
     }
-    if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode !== 'piggyback' || !queuedRpcCalls.size ||
+    if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode === 'direct' || !queuedRpcCalls.size ||
         String(method).toUpperCase() !== 'POST' || typeof options?.body !== 'string' ||
         typeof Response !== 'function') return null;
     try {
@@ -800,6 +803,9 @@
         }
         if (claimIds.length) tracePiggyback('piggyback-covered', source);
         reportQueueStatus();
+        if (rpcDispatchMode === 'mqtt-piggyback') window.postMessage({
+          source: 'hwa-helper-api', kind: 'mqtt-rpc-nudge-status', state: 'carrier-attached'
+        }, location.origin);
         return claimIds.length ? { appended, claimIds, options } : null;
       }
       const headers = typeof Headers === 'function' ? new Headers(options.headers || {}) :
@@ -821,6 +827,9 @@
       }
       tracePiggyback('piggyback-attached', `${source}:${appended.length}`);
       reportQueueStatus();
+      if (rpcDispatchMode === 'mqtt-piggyback') window.postMessage({
+        source: 'hwa-helper-api', kind: 'mqtt-rpc-nudge-status', state: 'carrier-attached'
+      }, location.origin);
       return prepared;
     } catch (_) {
       return null;
@@ -828,7 +837,7 @@
   }
 
   function restorePiggyback(appended) {
-    if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode !== 'piggyback') return;
+    if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode === 'direct') return;
     for (const { ident, ...call } of appended || []) {
       if (!piggybackMethods.has(call.name)) continue;
       const key = JSON.stringify(call);

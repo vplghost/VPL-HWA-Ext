@@ -4857,7 +4857,7 @@ async function render() {
   currentCache = cache;
   renderRpcQueue(stored.rpcQueueStatus?.count || 0);
   popupRpcEnabled = stored.popupRpcEnabled === true;
-  currentRpcPolicy = { mode: stored.socketRefreshMode === 'direct' ? 'direct' : 'piggyback',
+  currentRpcPolicy = { mode: ['direct', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'piggyback',
     monitor: stored.captureSettings?.interceptEnabled !== false };
   claimRpcStatus = stored.claimRpcStatus || null;
   currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
@@ -5483,16 +5483,32 @@ document.querySelector('#clear-cache').addEventListener('click', async () => {
 
 async function renderSettings() {
   const stored = await chrome.storage.local.get(['captureSettings', 'popupRpcEnabled',
-    'socketRefreshMode']);
+    'socketRefreshMode', 'rpcMqttTriggerStatus']);
   document.querySelector('#intercept-enabled').checked = stored.captureSettings?.interceptEnabled !== false;
   document.querySelector('#popup-rpc-enabled').checked = stored.popupRpcEnabled === true;
   document.querySelector('#socket-refresh-mode').value =
-    stored.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
+    ['direct', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'piggyback';
+  const triggerStatus = document.querySelector('#mqtt-trigger-status');
+  if (triggerStatus) {
+    triggerStatus.hidden = stored.socketRefreshMode !== 'mqtt-piggyback';
+    const messages = {
+      triggered: 'Local map update delivered. Waiting for the game to produce a carrier RPC.',
+      'carrier-attached': 'Native game RPC observed; queued calls attached or covered by that request.',
+      'waiting-template': 'Waiting for a real MQTT map update. Open the world map in game.',
+      'expired-template': 'The MQTT map template expired. Waiting for a new real map update.',
+      'socket-closed': 'The MQTT connection is closed. Queued calls wait for native game traffic.',
+      cooldown: 'MQTT trigger is cooling down; queued calls still wait for native game traffic.',
+      disabled: 'MQTT trigger requires Monitor API, popup RPC and MQTT-assisted mode.',
+      error: 'Could not deliver a local MQTT map update. No separate RPC was sent.'
+    };
+    triggerStatus.textContent = messages[stored.rpcMqttTriggerStatus?.state] ||
+      'Uses a recent MQTT map update to request a native carrier. No separate RPC fallback.';
+  }
 }
 
 document.querySelector('#socket-refresh-mode').addEventListener('change', async (event) => {
   await chrome.storage.local.set({ socketRefreshMode:
-    event.currentTarget.value === 'direct' ? 'direct' : 'piggyback' });
+    ['direct', 'mqtt-piggyback'].includes(event.currentTarget.value) ? event.currentTarget.value : 'piggyback' });
 });
 
 document.querySelector('#popup-rpc-enabled').addEventListener('change', async (event) => {
@@ -5555,7 +5571,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
     if ('rpcQueueStatus' in changes) renderRpcQueue(changes.rpcQueueStatus.newValue?.count || 0);
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
-        'socketRefreshMode' in changes) renderSettings();
+        'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
     if (CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||

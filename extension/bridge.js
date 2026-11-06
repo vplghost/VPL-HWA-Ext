@@ -20,6 +20,15 @@ window.addEventListener('message', (event) => {
   if (event.source !== window || event.origin !== location.origin) return;
   if (event.data?.source !== 'hwa-helper-api') return;
   if (event.data.kind === 'ready') return sendControl();
+  if (event.data.kind === 'mqtt-rpc-nudge-status') {
+    const allowed = ['triggered', 'carrier-attached', 'waiting-template', 'expired-template', 'socket-closed', 'cooldown', 'disabled', 'error'];
+    if (allowed.includes(event.data.state)) {
+      try { chrome.storage?.local?.set?.({ rpcMqttTriggerStatus: {
+        state: event.data.state, updatedAt: new Date().toISOString()
+      } })?.catch?.(() => {}); } catch (_) {}
+    }
+    return;
+  }
   if (event.data.kind === 'rpc-queue-status') {
     if (Number.isInteger(event.data.count) && event.data.count >= 0 && event.data.count <= 64) {
       try { chrome.runtime?.sendMessage?.({ kind: 'rpc-queue-status', count: event.data.count })?.catch?.(() => {}); } catch (_) {}
@@ -126,7 +135,7 @@ try {
   chrome.storage?.local?.get?.(['captureSettings', 'popupRpcEnabled', 'socketRefreshMode'])?.then?.((stored) => {
     currentSettings = stored?.captureSettings || {};
     popupRpcEnabled = stored?.popupRpcEnabled === true;
-    socketRefreshMode = stored?.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
+    socketRefreshMode = ['direct', 'mqtt-piggyback'].includes(stored?.socketRefreshMode) ? stored?.socketRefreshMode : 'piggyback';
     sendControl();
   })?.catch?.(() => {
     currentSettings = {};
@@ -151,7 +160,7 @@ try {
     if ('captureSettings' in changes) currentSettings = changes.captureSettings.newValue || {};
     if ('popupRpcEnabled' in changes) popupRpcEnabled = changes.popupRpcEnabled.newValue === true;
     if ('socketRefreshMode' in changes) socketRefreshMode =
-      changes.socketRefreshMode.newValue === 'direct' ? 'direct' : 'piggyback';
+      ['direct', 'mqtt-piggyback'].includes(changes.socketRefreshMode.newValue) ? changes.socketRefreshMode.newValue : 'piggyback';
     if (!('captureSettings' in changes) && !('popupRpcEnabled' in changes) &&
         !('socketRefreshMode' in changes)) return;
     sendControl();

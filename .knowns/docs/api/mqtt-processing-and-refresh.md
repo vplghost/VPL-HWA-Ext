@@ -3,7 +3,7 @@ id: doc-efa631bed6e5592db82be3e99ebeef3c
 title: MQTT Processing and Refresh
 description: Captured versus implemented MQTT events, direct reduction, refresh routing, dispatch gates and remaining evidence gaps
 createdAt: '2026-11-06T04:08:00.363Z'
-updatedAt: '2026-11-06T04:21:46.457Z'
+updatedAt: '2026-11-06T08:36:33.805Z'
 tags:
   - mqtt
   - api
@@ -99,3 +99,8 @@ For a new event, retain source filename/hash, direction/encoding, exact event na
 Priority evidence gaps: raw win/loss `mobRallyAttackResult`, auto-join and rally base-return events, gather-plan changes, occupied/empty mine errors, expiry, and rejected rally delays. Current code/test coverage cannot replace those wire observations.
 
 Implementation anchors: `extractSocket`, `socketRefreshCalls`, `hwaHelperRpcCache.merge`; tests `tests/mqtt-capture.test.mjs`, `tests/background.test.mjs`, `tests/rpc-cache.test.mjs`. Documentation task: @task-VHE-68C0H0.
+
+
+## Optional local carrier trigger
+
+The new shared `mqtt-piggyback` mode can locally inject a bounded mapChunksUpdated notification using a recently observed native template to ask the game for a carrier RPC. Synthetic notifications are excluded from raw MQTT capture and cache reduction; they are not new server evidence and do not change the captured event inventory. See @doc/architecture/mqtt-assisted-piggyback for gating, framing, status, live-verification limits and why native request bodies are preserved.

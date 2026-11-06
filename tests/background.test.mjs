@@ -218,7 +218,7 @@ test('experimental actions require popup RPC and reach one game tab', async () =
 });
 
 test('manual refresh, Draft and Experimental inherit both global dispatch modes', async () => {
-  for (const mode of ['piggyback', 'direct']) {
+  for (const mode of ['piggyback', 'direct', 'mqtt-piggyback']) {
     const { local, listener, tabsList, forwardedMessages, send } = setup();
     tabsList.push({ id: 1, url: gameSender.url }, { id: 2, url: gameSender.url });
     local.popupRpcEnabled = true;
@@ -231,7 +231,7 @@ test('manual refresh, Draft and Experimental inherit both global dispatch modes'
     for (const message of messages) {
       const reply = await new Promise((resolve) => listener(message, popupSender, resolve));
       assert.equal(reply.ok, true);
-      assert.equal(reply.queued, mode === 'piggyback');
+      assert.equal(reply.queued, mode !== 'direct');
     }
     assert.equal(forwardedMessages.length, 3);
     assert.ok(forwardedMessages.every(({ tabId, msg }) => tabId === 1 &&

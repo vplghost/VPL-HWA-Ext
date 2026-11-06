@@ -3,7 +3,7 @@ id: doc-ae23757efba5a35e23544c6e9aabb147
 title: Shared RPC Settings
 description: User rule that every helper RPC inherits shared enable and dispatch mode settings unless an explicit feature override exists
 createdAt: '2026-11-06T04:21:46.197Z'
-updatedAt: '2026-11-06T04:32:15.160Z'
+updatedAt: '2026-11-06T08:36:33.730Z'
 tags:
   - rpc
   - settings
@@ -24,12 +24,12 @@ Requested explicitly by the user on 2026-11-06 and implemented in @task-VHE-62VV
 | Setting | Default | Required behavior |
 |---|---|---|
 | `popupRpcEnabled` | false | No extension-originated RPC when false/unset. |
-| `socketRefreshMode` | piggyback | Despite the legacy key name, this is the shared mode for every helper RPC. Only `direct` selects immediate separate dispatch. |
-| `captureSettings.interceptEnabled` | enabled unless explicitly false | Piggyback requires monitoring to attach to a game fetch; reject a queued request if monitoring is disabled. Direct can run while passive monitoring is off. |
+| `socketRefreshMode` | piggyback | `piggyback` waits for native RPC; `mqtt-piggyback` can request a native carrier via a local MQTT map notification; only `direct` sends a separate immediate RPC. |
+| `captureSettings.interceptEnabled` | enabled unless explicitly false | Both Piggyback modes require monitoring. Direct can run while passive monitoring is off. |
 
-Piggyback waits for the next suitable native game fetch POST to the RPC endpoint. It must not silently fall back to a separate request. Direct sends a separate RPC immediately, still subject to `popupRpcEnabled`. Native game requests remain the carrier for Piggyback and continue normally.
+These are shared modes, not feature-specific bypasses. Neither Piggyback mode may fall back to Direct. MQTT assistance uses a fresh validated native map-update template, an open socket and bounded local injection; see @doc/architecture/mqtt-assisted-piggyback. No full request-body replacement has been qualified.
 
-`engine-ping` is local diagnostics, not an RPC. Generic Unity commands cannot be serialized into a known piggyback RPC; they are rejected in Piggyback mode and remain enable-gated in Direct mode. This restriction is not a per-feature settings override.
+`engine-ping` is local diagnostics. Generic Unity commands cannot be serialized into a known piggyback RPC; they are rejected in both Piggyback modes and remain enable-gated in Direct.
 
 ## Enforcement and queue lifecycle
 

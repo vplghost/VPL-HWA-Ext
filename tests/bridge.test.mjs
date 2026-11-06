@@ -84,6 +84,8 @@ test('bridge sends persisted intercept setting and applies changes without page 
   assert.equal(messages.at(-1).interceptEnabled, true);
   onChanged({ popupRpcEnabled: { newValue: true } }, 'local');
   assert.equal(messages.at(-1).popupRpcEnabled, true);
+  onChanged({ socketRefreshMode: { newValue: 'mqtt-piggyback' } }, 'local');
+  assert.equal(messages.at(-1).socketRefreshMode, 'mqtt-piggyback');
 });
 
 test('bridge injects helper button when document is available and sends open-tab message on click', async () => {

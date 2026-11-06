@@ -111,10 +111,12 @@
       <label class="block rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700">RPC dispatch method
         <select id="socket-refresh-mode" class="mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800">
           <option value="piggyback">Piggyback on next game RPC (default)</option>
+          <option value="mqtt-piggyback">MQTT-assisted Piggyback (experimental)</option>
           <option value="direct">Send a separate RPC immediately</option>
         </select>
       </label>
       <p class="text-xs text-slate-500">Applies to all extension RPC calls, including Experimental, Draft, refresh and rewards. Piggyback requires Monitor API and waits for the next game fetch RPC; Direct sends immediately.</p>
+      <p id="mqtt-trigger-status" hidden role="status" class="text-xs text-slate-500">MQTT-assisted mode replays a recent map update locally so the game can create a carrier RPC. No separate RPC fallback.</p>
     </div>
     <div id="config-tabs-section" class="mt-5 border-t border-slate-200 pt-4">
       <div class="flex items-center justify-between mb-1">
