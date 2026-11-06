@@ -128,11 +128,12 @@ test('normalizeTabConfig handles defaults, reordering, missing items, and visibi
   const { helper } = await loadTabConfigHelper();
   const { DEFAULT_TAB_CONFIG, normalizeTabConfig } = helper;
 
-  assert.equal(DEFAULT_TAB_CONFIG.length, 9);
+  assert.equal(DEFAULT_TAB_CONFIG.length, 10);
 
   // 1. Empty/null input returns all defaults with visible: true
   const fromNull = normalizeTabConfig(null);
-  assert.equal(fromNull.length, 9);
+  assert.equal(fromNull.length, 10);
+  assert.equal(fromNull[0].id, 'dashboard');
   assert.ok(fromNull.every((t) => t.visible === true));
 
   // 2. Custom order preserved
@@ -142,13 +143,14 @@ test('normalizeTabConfig handles defaults, reordering, missing items, and visibi
     { id: 'log', visible: true }
   ];
   const fromCustom = normalizeTabConfig(customOrder);
-  assert.equal(fromCustom[0].id, 'titans');
-  assert.equal(fromCustom[0].visible, true);
-  assert.equal(fromCustom[1].id, 'heroes');
-  assert.equal(fromCustom[1].visible, false);
-  assert.equal(fromCustom[2].id, 'log');
+  assert.equal(fromCustom[0].id, 'dashboard');
+  assert.equal(fromCustom[1].id, 'titans');
+  assert.equal(fromCustom[1].visible, true);
+  assert.equal(fromCustom[2].id, 'heroes');
+  assert.equal(fromCustom[2].visible, false);
+  assert.equal(fromCustom[3].id, 'log');
   // Missing tabs are appended
-  assert.equal(fromCustom.length, 9);
+  assert.equal(fromCustom.length, 10);
   assert.ok(fromCustom.some((t) => t.id === 'experimental' && t.visible === true));
 
   // 3. All hidden guard ensures at least one visible
@@ -162,7 +164,7 @@ test('applyTabConfig reorders DOM tabs, hides disabled tabs, and updates activeT
   const nav = new MockElement('nav');
   nav.setAttribute('id', 'tabs');
 
-  ['heroes', 'items', 'resources', 'titans', 'teams', 'events', 'goals', 'experimental', 'log'].forEach((id) => {
+  ['dashboard', 'heroes', 'items', 'resources', 'titans', 'teams', 'events', 'goals', 'experimental', 'log'].forEach((id) => {
     const btn = new MockElement('button');
     btn.dataset.tab = id;
     btn.setAttribute('data-tab', id);
@@ -193,7 +195,8 @@ test('applyTabConfig reorders DOM tabs, hides disabled tabs, and updates activeT
     { id: 'events', visible: true },
     { id: 'goals', visible: true },
     { id: 'experimental', visible: true },
-    { id: 'log', visible: true }
+    { id: 'log', visible: true },
+    { id: 'dashboard', visible: true }
   ];
 
   helper.applyTabConfig(testConfig);
@@ -218,7 +221,7 @@ test('renderConfigTabs renders rows with up/down buttons and visibility toggle',
   const nav = new MockElement('nav');
   nav.setAttribute('id', 'tabs');
 
-  ['heroes', 'items', 'resources', 'titans', 'teams', 'events', 'goals', 'experimental', 'log'].forEach((id) => {
+  ['dashboard', 'heroes', 'items', 'resources', 'titans', 'teams', 'events', 'goals', 'experimental', 'log'].forEach((id) => {
     const btn = new MockElement('button');
     btn.dataset.tab = id;
     nav.append(btn);
@@ -243,9 +246,9 @@ test('renderConfigTabs renders rows with up/down buttons and visibility toggle',
   helper.renderConfigTabs();
 
   // 10 rows rendered
-  assert.equal(tabsList.children.length, 9);
+  assert.equal(tabsList.children.length, 10);
 
-  // First row is Heroes
+  // First row is Dashboard
   const firstRow = tabsList.children[0];
   const firstCheckbox = firstRow.querySelector('.tab-visibility-toggle');
   assert.ok(firstCheckbox);
@@ -256,18 +259,18 @@ test('renderConfigTabs renders rows with up/down buttons and visibility toggle',
   assert.equal(firstUpBtn.disabled, true); // First item cannot move up
   assert.equal(firstDownBtn.disabled, false);
 
-  // Click Move Down on first item (Heroes)
+  // Click Move Down on first item (Dashboard)
   await firstDownBtn.dispatch('click');
   // First item is now Draft, second is Heroes
-  assert.equal(helper.currentTabConfig[0].id, 'items');
-  assert.equal(helper.currentTabConfig[1].id, 'heroes');
+  assert.equal(helper.currentTabConfig[0].id, 'heroes');
+  assert.equal(helper.currentTabConfig[1].id, 'dashboard');
   assert.ok(savedConfig);
 
-  // Toggle visibility off on Heroes
-  const heroesRow = tabsList.children[1];
-  const heroesCheckbox = heroesRow.querySelector('.tab-visibility-toggle');
-  heroesCheckbox.checked = false;
-  await heroesCheckbox.dispatch('change');
+  // Toggle visibility off on Dashboard
+  const dashboardRow = tabsList.children[1];
+  const dashboardCheckbox = dashboardRow.querySelector('.tab-visibility-toggle');
+  dashboardCheckbox.checked = false;
+  await dashboardCheckbox.dispatch('change');
   assert.equal(helper.currentTabConfig[1].visible, false);
 
   // Try to hide all other tabs until 1 left

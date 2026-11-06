@@ -30,9 +30,10 @@ resourceFilterToggle?.addEventListener('click', () => {
   render();
 });
 const tabs = [...document.querySelectorAll('[data-tab]')];
-let activeTab = 'heroes';
+let activeTab = 'dashboard';
 
 const DEFAULT_TAB_CONFIG = [
+  { id: 'dashboard', label: 'Dashboard' },
   { id: 'heroes', label: 'Heroes' },
   { id: 'items', label: 'Items' },
   { id: 'resources', label: 'Resources' },
@@ -126,7 +127,8 @@ function normalizeTabConfig(storedConfig) {
   }
   for (const def of DEFAULT_TAB_CONFIG) {
     if (!seenIds.has(def.id)) {
-      result.push({ id: def.id, visible: true });
+      if (def.id === 'dashboard') result.unshift({ id: def.id, visible: true });
+      else result.push({ id: def.id, visible: true });
     }
   }
   if (!result.some((t) => t.visible)) {
@@ -3470,6 +3472,66 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   document.querySelector('#dungeon-modal-close')?.focus?.();
 }
 
+function renderDashboard(cache) {
+  const model = globalThis.hwaHelperDashboardData.dailyDashboard(cache);
+  const groups = [
+    { title: 'Activities', rows: model.activities },
+    { title: 'Daily Quests', rows: model.quests },
+    { title: 'Free Gifts', rows: model.gifts }
+  ];
+  const pending = groups.flatMap((group) => group.rows).filter((item) => item.state === 'pending').length;
+  status.textContent = `${pending} activities or rewards to check · Based on game data observed today`;
+
+  const container = document.createElement('div');
+  container.className = 'space-y-4 p-4';
+  const intro = document.createElement('div');
+  intro.className = 'rounded-xl bg-slate-900 p-4 text-white';
+  const heading = document.createElement('h2');
+  heading.className = 'text-lg font-bold';
+  heading.textContent = 'Daily Dashboard';
+  const subtitle = document.createElement('p');
+  subtitle.className = 'mt-1 text-xs text-slate-300';
+  subtitle.textContent = 'Live game snapshots update as you play. Unknown items need a fresh game snapshot.';
+  intro.append(heading, subtitle);
+  container.append(intro);
+
+  for (const group of groups) {
+    const section = document.createElement('section');
+    section.className = 'space-y-2';
+    const title = document.createElement('h3');
+    title.className = 'text-sm font-bold text-slate-800';
+    title.textContent = group.title;
+    section.append(title);
+    for (const item of group.rows) {
+      const card = document.createElement('div');
+      card.className = 'flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5';
+      const icon = document.createElement('span');
+      icon.className = 'text-xl';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = item.icon;
+      const content = document.createElement('div');
+      content.className = 'min-w-0 flex-1';
+      const name = document.createElement('div');
+      name.className = 'font-semibold text-slate-900';
+      name.textContent = item.title;
+      const detail = document.createElement('div');
+      detail.className = 'text-xs text-slate-500';
+      detail.textContent = item.detail;
+      content.append(name, detail);
+      const badge = document.createElement('span');
+      badge.className = `shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+        item.state === 'pending' ? 'bg-amber-100 text-amber-800' :
+        item.state === 'done' ? 'bg-emerald-100 text-emerald-800' :
+        'bg-slate-100 text-slate-600'}`;
+      badge.textContent = item.state === 'pending' ? 'To do' : item.state === 'done' ? 'Done' : item.state === 'info' ? 'Check' : 'Unknown';
+      card.append(icon, content, badge);
+      section.append(card);
+    }
+    container.append(section);
+  }
+  view.append(container);
+}
+
 function renderEvents(cache) {
   const query = search.value.trim().toLowerCase();
   const eventCards = [];
@@ -5002,7 +5064,7 @@ async function render() {
     'cursor-pointer rounded-lg border border-slate-300 bg-slate-800 px-3 py-2 font-medium text-white hover:bg-slate-700' :
     'cursor-pointer rounded-lg border border-red-300 bg-red-50 px-3 py-2 font-medium text-red-800 hover:bg-red-100';
   view.replaceChildren();
-  document.querySelector('#toolbar').hidden = activeTab === 'config' || activeTab === 'experimental';
+  document.querySelector('#toolbar').hidden = activeTab === 'config' || activeTab === 'experimental' || activeTab === 'dashboard';
   document.querySelector('#settings-panel').hidden = activeTab !== 'config';
   view.hidden = activeTab === 'config';
   document.querySelector('#export').hidden = activeTab !== 'log';
@@ -5025,7 +5087,9 @@ async function render() {
     activeTab === 'goals' ? 'Search goal, activity, or event' :
     activeTab === 'events' ? 'Search event name or type' : 'Search ID, name, or group';
 
-  if (activeTab === 'config') {
+  if (activeTab === 'dashboard') {
+    renderDashboard(cache);
+  } else if (activeTab === 'config') {
     status.textContent = 'Settings and data stored in this browser.';
     renderConfigTabs();
     renderConfigOther(cache);

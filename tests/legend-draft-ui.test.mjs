@@ -125,11 +125,13 @@ async function createDraftContext(viewEl, statusEl, searchEl) {
   const resourceDataSrc = await readFile('extension/resource-data.js', 'utf8');
   const heroMetaSrc = await readFile('extension/hero-metadata.js', 'utf8');
   const popupDataSrc = await readFile('extension/popup-data.js', 'utf8');
+  const dashboardDataSrc = await readFile('extension/dashboard-data.js', 'utf8');
   const popupSrc = await readFile('extension/popup.js', 'utf8');
 
   vm.runInContext(resourceDataSrc, context);
   vm.runInContext(heroMetaSrc, context);
   vm.runInContext(popupDataSrc, context);
+  vm.runInContext(dashboardDataSrc, context);
   vm.runInContext(popupSrc, context);
 
   context.hwaHelperNameMap = {

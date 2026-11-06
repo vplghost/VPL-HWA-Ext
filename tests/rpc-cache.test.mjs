@@ -40,6 +40,25 @@ function record(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
   };
 }
 
+test('dashboard sources are retained from passive RPC responses', () => {
+  const methods = [
+    ['arenaGetAll', { arenaPlace: '12', grandPlace: '34' }],
+    ['expeditionGet', [{ slotId: 1, attemptsLeft: 2 }]],
+    ['dailyBonusGetInfo', { availableToday: true }],
+    ['zeppelinGiftGet', { available: true }]
+  ];
+  const snapshot = record(
+    methods.map(([name], index) => ({ name, ident: String(index), args: {} })),
+    methods.map(([, response], index) => ({ ident: String(index), result: { response } })),
+    '2026-11-06T10:00:00Z'
+  );
+  const state = cache.merge({}, [snapshot]).cache;
+  for (const [name, response] of methods) {
+    assert.equal(JSON.stringify(state[name]?.data), JSON.stringify(response));
+    assert.equal(state[name]?.updatedAt, '2026-11-06T10:00:00Z');
+  }
+});
+
 test('capacity evidence learns only successful own rally, auto-join and gathering squads and keeps max load per profile', () => {
   const heroes = Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, { level: 30, star: 2, power: id }]));
   const initial = { accountStatus: { data: { id: 10 } }, heroGetAll: { data: heroes } };
