@@ -91,6 +91,7 @@ test('managed raid queue uses shared policy, pins one game tab and waits for ret
     assert.equal(response.ok, true);
     assert.equal(forwardedMessages[0].tabId, 1);
     assert.equal(forwardedMessages[0].msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+    local.troopCapacitySettings = { defaultHero: 700, base: 1000 };
     let clock = Date.now() + 1000;
     const answer = async (bodies) => {
       const calls = forwardedMessages.at(-1).msg.calls.map((call, ident) => ({ ...call, ident: String(ident) }));
@@ -101,7 +102,7 @@ test('managed raid queue uses shared policy, pins one game tab and waits for ret
     assert.equal(local.raidQueue.phase, 'searching');
     await answer([{ mobs: [{ mobId: 'boss' }] }]);
     assert.equal(local.raidQueue.phase, 'creating');
-    assert.equal(forwardedMessages.at(-1).msg.calls[0].args.squad.units.reduce((sum, unit) => sum + unit.count, 0), 3200);
+    assert.equal(forwardedMessages.at(-1).msg.calls[0].args.squad.units.reduce((sum, unit) => sum + unit.count, 0), 4500);
     await answer([{ squadId: 'squad', rally: { rallyId: 'rally', plannedStartTime: clock + 60000 } }]);
     assert.equal(local.raidQueue.phase, 'active');
     await env.send('api-record', socket('mobRallyAttackResult', { rallyId: 'rally', squadId: 'squad',

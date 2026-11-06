@@ -40,6 +40,43 @@ function record(calls, results, timestamp = '2026-11-01T09:18:28.248Z') {
   };
 }
 
+test('capacity evidence learns only successful own rally, auto-join and gathering squads and keeps max load per profile', () => {
+  const heroes = Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, { level: 30, star: 2, power: id }]));
+  const initial = { accountStatus: { data: { id: 10 } }, heroGetAll: { data: heroes } };
+  const squad = (count, last = 5) => ({ heroes: [1, 2, 3, 4, last].map((heroId) => ({ heroId })), units: [{ unitId: 7, count }] });
+  const create = (count) => record([{ name: 'createRally', feature: 'mob', ident: 'create', args: {
+    mapId: 'map', mobId: 'mob', squad: squad(count)
+  } }], [{ ident: 'create', result: { response: { squadId: 'squad', rally: { rallyId: 'rally', plannedStartTime: 1793937000000 } } } }]);
+  let state = cache.merge(initial, [create(4100), create(2000)]).cache;
+  assert.equal(state.troopCapacityEvidence.data.length, 1);
+  assert.equal(state.troopCapacityEvidence.data[0].total, 4100);
+  const socket = { transport: 'websocket', direction: 'received', encoding: 'utf8',
+    endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt', timestamp: '2026-11-01T09:19:00.000Z',
+    payload: JSON.stringify({ result: { type: 'rallyUserAutojoined', body: { rallyId: 'auto', squad: {
+      ...squad(4200), squadId: 'joined' } } } }) };
+  state = cache.merge(state, [socket]).cache;
+  assert.equal(state.troopCapacityEvidence.data[0].total, 4200);
+  assert.equal(state.troopCapacityEvidence.data[0].source, 'rallyUserAutojoined');
+  const gather = record([{ name: 'attackMine', feature: 'mine', ident: 'gather', args: {
+    mapId: 'map', mineId: 'mine', squad: squad(4300, 6)
+  } }], [{ ident: 'gather', result: { response: { squadId: 'gather-squad', route: { startedAt: 1, durationMs: 1000 } } } }], '2026-11-01T09:20:00.000Z');
+  state = cache.merge(state, [gather]).cache;
+  assert.equal(state.troopCapacityEvidence.data.length, 2);
+  assert.equal(state.troopCapacityEvidence.data[0].total, 4300);
+  const foreign = record([{ name: 'getRallyById', feature: 'rally', ident: 'foreign' }], [{ ident: 'foreign', result: {
+    response: { rally: { rallyId: 'foreign', leader: { userId: 20, squad: squad(9000) }, members: [] } }
+  } }], '2026-11-01T09:21:00.000Z');
+  assert.equal(cache.merge(state, [foreign]).cache.troopCapacityEvidence.data.length, 2);
+  const details = record([{ name: 'getRallyById', feature: 'rally', ident: 'own' }], [{ ident: 'own', result: {
+    response: { rally: { rallyId: 'own', leader: { userId: 20, squad: squad(9000) },
+      members: [{ userId: 10, squad: { ...squad(4400), squadId: 'member' } }] } }
+  } }], '2026-11-01T09:22:00.000Z');
+  state = cache.merge(state, [details]).cache;
+  assert.equal(state.troopCapacityEvidence.data[0].total, 4400, 'own manual join details can update the observed load');
+  const failed = create(9999); failed.responseBody = JSON.stringify({ results: [{ ident: 'create', result: { error: 'rejected' } }] });
+  assert.equal(cache.merge(state, [failed]).cache.troopCapacityEvidence.data[0].total, 4400);
+});
+
 test('rally search retains map context and candidate boss IDs for the experimental tab', () => {
   const solo = record([{ name: 'searchMob', feature: 'mob', ident: 'solo', args: {
     mapId: 'map-1', mobConfigIds: [37], mobType: 'solo', center: { x: 100, y: 200 }

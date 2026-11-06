@@ -27,7 +27,7 @@
   }
   const sameCall = (a, b) => a.name === b.name && (a.feature || '') === (b.feature || '') &&
     JSON.stringify(a.args || {}) === JSON.stringify(b.args || {});
-  function advance(previous, record, cache, now) {
+  function advance(previous, record, cache, now, settings) {
     if (terminal(previous)) return { state: previous };
     let state = { ...previous, current: previous.current ? { ...previous.current } : null };
     if (cache?.accountStatus?.data?.id != null && String(cache.accountStatus.data.id) !== String(state.accountId)) {
@@ -51,11 +51,11 @@
             state.options.heroIds.includes(hero.id ?? hero.heroId)))) {
           return { state: stop(state, 'Selected heroes are already deployed. Queue stopped.') };
         }
-        const cap = data.squadCapacity(state.options.heroIds, state.roster.heroes,
-          state.options.capacities, state.options.baseTroops);
+        const cap = data.capacityModel(state.options.heroIds, state.roster.heroes,
+          cache?.troopCapacityEvidence?.data, settings || state.options.capacitySettings, state.accountId).total;
         const units = data.allocateTroops(state.roster.units, cap);
         state.squad = data.buildSquad(state.options.heroIds, units);
-        if (!state.squad) return { state: stop(state, 'Missing verified hero capacity or available troops. Refresh the form.') };
+        if (!state.squad) return { state: stop(state, 'No available troops. Refresh the form.') };
         state.roster = null;
         return issue(state, 'searching', [{ name: 'searchMob', feature: 'mob', args: {
           mapId: state.options.mapId, center: state.options.center, mobType: 'rally',

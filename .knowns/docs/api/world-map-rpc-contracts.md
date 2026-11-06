@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-06T09:12:57.982Z'
+updatedAt: '2026-11-06T10:09:54.377Z'
 tags:
   - api
   - rpc
@@ -184,23 +184,33 @@ Related implementation tasks: @task-VHE-C0GGBR and @task-VHE-XTBH0Y. Documentati
 
 ## Managed raid queue and troop allocation
 
-Implemented by @task-VHE-1K5J8J. `extension/raid-queue.js` owns a pure transition controller; background serializes transitions and persists `raidQueue` before dispatch. The popup persists account-scoped `raidPreferences`: last selected lineup, last **searched** boss level, wait, minimum members, raid count, extra base capacity and per-hero observed capacities. Editing a level without searching does not replace the saved search level.
+Implemented by @task-VHE-1K5J8J. `extension/raid-queue.js` owns a pure transition controller; background serializes transitions and persists `raidQueue` before dispatch. The popup persists account-scoped `raidPreferences`: last selected lineup, last **searched** boss level, wait, minimum members, raid count. Capacity defaults live in global Settings; squad observations are learned in the cache. Editing a level without searching does not replace the saved search level.
 
 ### Capacity and available units
 
-`getUnitSummary:unit {}` supplies `available[{unitId,unitConfigId,count}]`, `reserved` and deployed `squads`. Allocate only available stock; never add reserved or deployed troops. Refresh `heroGetAll` and `getUnitSummary:unit` before every raid and reject selected heroes still deployed. Config `unit/fecf9b97742bf5b29376c1ae8df0a211` maps IDs 1–10 to Front/infantry, 11–20 to Middle/lancer and 21–30 to Back/marksman; tier increases from 1 to 10 inside each range.
+Updated by @task-VHE-NFV32J after the user's 2026-11-06 UI/capacity clarification. The Rally form has no hero or base capacity inputs. It shows total allocated troops and three compact per-type counts with level breakdowns.
 
-`allocateTroops` maximizes the total up to selected capacity/inventory, gives the three types equal quotas, redistributes shortages among types with stock, then fills each type from highest tier down. Unknown unit IDs are excluded.
+`troopCapacitySettings` is stored in global Settings: `defaultHero:600`, `base:950`. Invalid stored values fall back to those defaults. Explicit hero `troopCapacity` data and the five previously supplied matching level/star samples take precedence over the default. Legacy manual `raidPreferences.capacities` and `baseTroops` are no longer read by the popup/queue. Settings changes affect preview and each background roster refresh; no manual confirmation is required after hero stats change.
 
-**Capacity formula remains unverified.** `squadSetting/22d70185aacfb7a220a3b456f80889e1` exposes coefficients (`baseCapacity:200`, `deceleration:8000`, `growth:100000`, three phases), but their executable mapping to per-hero capacity has not been established. Do not use those coefficients, troop counts from a prior squad, or a fitted power/level formula as capacity.
+**Corrected troop mapping, per user instruction:** IDs **1–9 = Marksmen levels 1–9**, **11–19 = Spearmen levels 1–9**, **21–29 = Infantry levels 1–9**. The former Front/Middle/Back interpretation in this doc was incorrect. IDs 0/10/20/30 and other unknown IDs are excluded from allocation and type summaries.
 
-The user supplied in-game samples on 2026-11-06: Dante level 80/star 3 = 799; Polaris 70/4 = 740; Fox 30/2 = 685; Lars 2/1 = 623; Elmir 1/1 = 622. The form seeds matching profiles and permits explicit capacities for every hero plus **additional** base troops. Saved values bind to hero level/star/power; changes invalidate them and stop the queue before creating another rally. Default additional base is 0; the player must enter any verified extra capacity excluding hero contributions. This is an explicit observed-capacity workflow, not automatic derivation of unknown hero capacities.
+`getUnitSummary:unit {}` supplies `available[{unitId,unitConfigId,count}]`, `reserved` and deployed `squads`. Allocate only available stock. Refresh heroes and troop stock before each raid and reject selected heroes still deployed. `allocateTroops` maximizes the total up to capacity/inventory, balances the three types, redistributes shortages and fills each type from highest level down.
+
+### Observed squad capacity model
+
+`troopCapacityEvidence` retains at most 100 own-account lineup/profile observations. Successful native/manual or helper `createRally:mob`, `rallyUserAutojoined`, own member/leader data in `getRallyById:rally`, and successful `attackMine:mine` contribute deployed troop totals. Unknown own hero data, failed RPCs, foreign rally members and observations older than the cached hero snapshot are excluded. All troop rows are counted, including mixed tiers beyond five rows.
+
+Each observation binds five unique sorted hero IDs to their cached level/star/power signatures and account ID. Repeated observations retain the **maximum** load for that same profile; smaller/partially filled squads never reduce it. Stat changes invalidate observations for the changed profiles.
+
+`capacityModel` uses the configured base as a fixed assumption and solves observed lineup sums after subtracting known hero contributions. Row reduction exposes only uniquely identifiable hero contributions. Underdetermined contributions keep the configured fallback instead of receiving an arbitrary equal split; inconsistent systems produce no inferred hero values. Equations below the fallback minimum are ignored. The observed maximum for the exact selected lineup can still improve that lineup's total without claiming individual hero contributions.
+
+A troop load demonstrates that a squad carried that quantity; it does **not** prove the game filled its true maximum. Inferred contributions and lineup totals therefore remain operational estimates, while 600/950 provide immediate fallback behavior. There is still no verified executable power/level capacity curve; the exposed `squadSetting` coefficients are not fitted or treated as such. Tests cover a full-rank set of overlapping lineups, underdetermined/conflicting data, partial loads, account/stat isolation and Settings propagation.
 
 ### Sequential lifecycle
 
 `refreshing → searching → creating → active → refreshing|complete`. Requested count is 1–100. A fresh search uses the chosen boss level each time. Create confirmation matches the expected map, mob, heroes, units and delay, and records server `rallyId`, `squadId`, `plannedStartTime`. The queue stays pinned to its game tab/account and selected options; a second popup cannot start a concurrent queue.
 
-Only a matching `mobRallyAttackResult` with `battleResult.battleResult:"win"` plus either matching `returnFromMobCompleted` or a newer well-formed `getMarches:march` snapshot lacking that squad permits another raid. Return can arrive before result. Return ETA/countdown expiry alone never advances the queue. Loss, RPC error/timeout, missing capacity, account switch, disconnection or explicit stop ends the queue. Mutating commands are never automatically retried. Stopping removes unsent RPCs owned by the queue; commands already sent continue in game.
+Only a matching `mobRallyAttackResult` with `battleResult.battleResult:"win"` plus either matching `returnFromMobCompleted` or a newer well-formed `getMarches:march` snapshot lacking that squad permits another raid. Return can arrive before result. Return ETA/countdown expiry alone never advances the queue. Loss, RPC error/timeout, no available troops, account switch, disconnection or explicit stop ends the queue. Mutating commands are never automatically retried. Stopping removes unsent RPCs owned by the queue; commands already sent continue in game.
 
 The cache retains bounded rally-to-mob mappings and defeated `{mapId,mobId}` tombstones (200 each), plus result history (20). A matching win removes that boss from current candidates and subsequent searches, including result delivery after the squad has returned. Other boss IDs and losses do not remove candidates.
 

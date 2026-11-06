@@ -259,7 +259,7 @@
         .filter(Number.isInteger).slice(0, 5),
       units: (squad?.units || []).filter((unit) =>
         Number.isInteger(unit.unitId) && Number.isFinite(unit.count) && unit.count > 0)
-        .map((unit) => ({ id: unit.unitId, count: unit.count })).slice(0, 5)
+        .map((unit) => ({ id: unit.unitId, count: unit.count }))
     };
   }
 
@@ -351,6 +351,7 @@
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
         const result = results.get(call.ident);
+        if (result?.error && ['createRally:mob', 'attackMine:mine', 'getRallyById:rally'].includes(key)) return [];
         if (key === 'searchMob:mob' && call.args?.mobType === 'rally' &&
             Array.isArray(result?.response?.mobs)) {
           return [{ key: 'experimentalRallySearch', method: call.name,
@@ -1544,6 +1545,23 @@
     }
   }
 
+  function observeSquad(cache, team, source, at) {
+    const accountId = cache.accountStatus?.data?.id;
+    const heroes = cache.heroGetAll?.data || {};
+    const ids = [...new Set(team?.heroIds || [])].sort((a, b) => a - b);
+    const total = (team?.units || []).reduce((sum, unit) => sum + (Number.isSafeInteger(unit.count) && unit.count > 0 ? unit.count : 0), 0);
+    if (!accountId || ids.length !== 5 || !total || !ids.every((id) => Number.isInteger(heroes[id]?.level) &&
+        Number.isInteger(heroes[id]?.star) && Number.isFinite(heroes[id]?.power)) || cache.heroGetAll?.updatedAt > at) return false;
+    const profiles = ids.map((id) => ({ id, signature: JSON.stringify([heroes[id].level, heroes[id].star, heroes[id].power]) }));
+    const key = JSON.stringify([accountId, profiles]);
+    const prior = cache.troopCapacityEvidence?.data || [];
+    const previous = prior.find((row) => row.key === key);
+    if (previous && previous.total >= total) return false;
+    cache.troopCapacityEvidence = { key: 'troopCapacityEvidence', group: 'internal', method: source, updatedAt: at,
+      data: [{ key, accountId, profiles, total, source, observedAt: at }, ...prior.filter((row) => row.key !== key)].slice(0, 100) };
+    return true;
+  }
+
   function merge(cache, records, maxBytes = 2 * 1024 * 1024) {
     const next = { ...(cache && typeof cache === 'object' ? cache : {}) };
     let changed = false;
@@ -1671,6 +1689,12 @@
           continue;
         }
         if (entry.key === 'rallyAction') {
+          if (['create', 'socketAutojoined'].includes(entry.data.action)) changed = observeSquad(next, entry.data.team, entry.method, entry.updatedAt) || changed;
+          if (entry.data.action === 'details') {
+            const accountId = next.accountStatus?.data?.id;
+            const member = [entry.data.leader, ...(entry.data.members || [])].find((member) => accountId && String(member?.userId) === String(accountId));
+            if (member?.squad) changed = observeSquad(next, rallyTeam(member.squad), entry.method, entry.updatedAt) || changed;
+          }
           if (entry.data.action === 'socketReturnCompleted') {
             next.experimentalRallyReturns = { key: 'experimentalRallyReturns', group: 'internal',
               method: entry.method, updatedAt: entry.updatedAt,
@@ -1890,6 +1914,7 @@
           continue;
         }
         if (entry.key === 'gatherAction') {
+          if (entry.data.action === 'startGather') changed = observeSquad(next, entry.data.team, entry.method, entry.updatedAt) || changed;
           const current = next.marchStatus;
           if (current?.updatedAt > entry.updatedAt) continue;
           const marches = [...(current?.data?.marches || [])];

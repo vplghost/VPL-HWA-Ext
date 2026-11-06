@@ -118,6 +118,18 @@
       <p class="text-xs text-slate-500">Applies to all extension RPC calls, including Experimental, Draft, refresh and rewards. Piggyback requires Monitor API and waits for the next game fetch RPC; Direct sends immediately.</p>
       <p id="mqtt-trigger-status" hidden role="status" class="text-xs text-slate-500">MQTT-assisted mode replays a recent map update locally so the game can create a carrier RPC. No separate RPC fallback.</p>
     </div>
+    <div class="mt-5 border-t border-slate-200 pt-4">
+      <h3 class="text-sm font-semibold text-slate-800">Troop capacity defaults</h3>
+      <div class="mt-2 grid grid-cols-2 gap-3">
+        <label class="text-xs text-slate-600">Default per hero
+          <input id="default-hero-troop-capacity" type="number" required min="1" max="1000000" step="1" value="600" class="mt-1 block w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+        </label>
+        <label class="text-xs text-slate-600">Base troops
+          <input id="base-troop-capacity" type="number" required min="0" max="1000000" step="1" value="950" class="mt-1 block w-full rounded border border-slate-300 px-2 py-1.5 text-sm">
+        </label>
+      </div>
+      <p class="mt-2 text-xs text-slate-500">Used when hero capacity is unknown. Successful rally, auto-join and gathering squads improve lineup estimates; hero contributions are inferred when the observations identify them.</p>
+    </div>
     <div id="config-tabs-section" class="mt-5 border-t border-slate-200 pt-4">
       <div class="flex items-center justify-between mb-1">
         <h3 class="text-sm font-semibold text-slate-800">Customize Tabs</h3>

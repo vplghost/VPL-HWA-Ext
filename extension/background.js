@@ -130,10 +130,11 @@ async function saveRaidTransition(transition, stored) {
 }
 
 async function updateRaidQueue(record, tabId) {
-  const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
   const state = stored.raidQueue;
   if (globalThis.hwaHelperRaidQueue.terminal(state) || state.tabId !== tabId) return state;
-  return saveRaidTransition(globalThis.hwaHelperRaidQueue.advance(state, record, stored.rpcCache, Date.now()), stored);
+  return saveRaidTransition(globalThis.hwaHelperRaidQueue.advance(state, record, stored.rpcCache, Date.now(),
+    globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings)), stored);
 }
 
 chrome.storage.onChanged?.addListener?.((changes, area) => {

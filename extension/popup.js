@@ -50,17 +50,17 @@ let popupRpcEnabled = false;
 let claimRpcStatus = null;
 let hasAutoClaimedThisSession = false;
 const experimentalSelection = { rallyTeam: '', gatherTeam: 'weakest', bossLevel: 1, searchedBossLevel: 1,
-  waitSeconds: 300, minMembers: 4, raidCount: 1, baseTroops: 0, capacities: {}, mineType: 'food', mineLevel: 1, mineId: '', units: '' };
+  waitSeconds: 300, minMembers: 4, raidCount: 1, mineType: 'food', mineLevel: 1, mineId: '', units: '' };
 let raidPreferencesLoaded = false;
 let raidQueueState = null;
+let troopCapacitySettings = { defaultHero: 600, base: 950 };
 let experimentalMessage = '';
 
 function saveRaidPreferences() {
   return chrome.storage.local.set({ raidPreferences: { accountId: currentCache.accountStatus?.data?.id,
     rallyTeam: experimentalSelection.rallyTeam, bossLevel: experimentalSelection.searchedBossLevel ?? experimentalSelection.bossLevel,
     waitSeconds: experimentalSelection.waitSeconds, minMembers: experimentalSelection.minMembers,
-    raidCount: experimentalSelection.raidCount, baseTroops: experimentalSelection.baseTroops,
-    capacities: experimentalSelection.capacities } });
+    raidCount: experimentalSelection.raidCount } });
 }
 let experimentalPending = null;
 let currentRpcPolicy = { mode: 'piggyback', monitor: true };
@@ -4723,34 +4723,24 @@ function renderExperimental(cache) {
   };
   const rally = card('Rally raid');
   const rallyTeam = makeTeamSelect(rally, 'rallyTeam');
-  const capacityFields = document.createElement('div');
-  capacityFields.className = 'grid grid-cols-2 gap-2'; rally.append(capacityFields);
-  for (const id of rallyTeam?.heroIds || []) {
-    const hero = heroes[id];
-    const capacity = data.heroCapacity(id, hero, experimentalSelection.capacities[id]);
-    if (!experimentalSelection.capacities[id] && capacity) {
-      experimentalSelection.capacities[id] = { signature: data.capacitySignature(hero), count: capacity };
-      saveRaidPreferences();
-    }
-    const input = document.createElement('input'); input.type = 'number'; input.min = '1'; input.step = '1';
-    input.value = capacity == null ? '' : String(capacity);
-    input.placeholder = 'Capacity shown in game';
-    input.addEventListener('change', () => {
-      experimentalSelection.capacities[id] = { signature: data.capacitySignature(hero), count: Number(input.value) };
-      saveRaidPreferences(); render();
-    });
-    field(capacityFields, `${globalThis.hwaHelperNameMap.hero(id) || id} · troop capacity`, input);
-  }
-  const base = document.createElement('input'); base.type = 'number'; base.min = '0'; base.step = '1';
-  base.value = String(experimentalSelection.baseTroops);
-  base.addEventListener('change', () => { experimentalSelection.baseTroops = Number(base.value); saveRaidPreferences(); render(); });
-  field(rally, 'Additional base troops (excluding hero capacity)', base);
-  const capacity = data.squadCapacity(rallyTeam?.heroIds, heroes, experimentalSelection.capacities, experimentalSelection.baseTroops);
-  const optimized = data.allocateTroops(cache['getUnitSummary:unit']?.data, capacity);
+  const model = data.capacityModel(rallyTeam?.heroIds, heroes, cache.troopCapacityEvidence?.data,
+    troopCapacitySettings, cache.accountStatus?.data?.id);
+  const optimized = data.allocateTroops(cache['getUnitSummary:unit']?.data, model.total);
   const rallySquad = data.buildSquad(rallyTeam?.heroIds || [], optimized);
-  note(rally, capacity == null ? 'Enter each hero capacity shown in game. Re-enter after the hero changes.' :
-    `Troops: ${optimized.reduce((sum, unit) => sum + unit.count, 0)} / ${capacity} · ${optimized.map((unit) => `#${unit.unitId}: ${unit.count}`).join(' · ')}`);
-  note(rally, 'Available troops only. Highest tiers first, balanced across infantry, lancer and marksman. Capacity is refreshed against hero stats before each raid.');
+  note(rally, `Troops: ${optimized.reduce((sum, unit) => sum + unit.count, 0)} / ${model.total ?? 0}${model.observed ? ' · observed lineup' : ''}`);
+  const troopSummary = document.createElement('div');
+  troopSummary.className = 'grid grid-cols-3 gap-2';
+  for (let type = 0; type < 3; type++) {
+    const units = optimized.filter((unit) => data.unitInfo(unit.unitId)?.type === type);
+    const block = document.createElement('div');
+    block.className = 'rounded-lg bg-slate-50 p-2 text-xs text-slate-700';
+    const label = document.createElement('div'); label.className = 'font-semibold';
+    label.textContent = `${data.unitInfo(type * 10 + 1).label}: ${units.reduce((sum, unit) => sum + unit.count, 0)}`;
+    const tiers = document.createElement('div'); tiers.className = 'mt-1 text-slate-500';
+    tiers.textContent = units.map((unit) => `Lv${data.unitInfo(unit.unitId).level}: ${unit.count}`).join(' · ') || '0';
+    block.append(label, tiers); troopSummary.append(block);
+  }
+  rally.append(troopSummary);
   button(rally, 'Refresh available troops', () => chrome.runtime.sendMessage({ kind: 'refresh-rpc',
     calls: [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }] }), !popupRpcEnabled);
 
@@ -4804,7 +4794,6 @@ function renderExperimental(cache) {
     const response = await chrome.runtime.sendMessage({ kind: 'raid-queue-start', options: {
       mapId: context.mapId, center: mapCenter, firstMobId: targetSelect.value,
       level: experimentalSelection.bossLevel, heroIds: rallyTeam.heroIds,
-      capacities: experimentalSelection.capacities, baseTroops: experimentalSelection.baseTroops,
       waitSeconds: experimentalSelection.waitSeconds, minMembers: experimentalSelection.minMembers, count
     } }).catch((error) => ({ error: String(error) }));
     experimentalMessage = response?.ok ? 'Raid queue started. Next raid waits for a confirmed win and return to base.' : response?.error || 'Could not start queue.';
@@ -4923,15 +4912,16 @@ async function experimentalRpc(calls, message) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'raidPreferences', 'raidQueue']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'raidPreferences', 'raidQueue', 'troopCapacitySettings']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
   raidQueueState = stored.raidQueue || null;
+  troopCapacitySettings = globalThis.hwaHelperExperimentalData?.normalizeCapacitySettings(stored.troopCapacitySettings) || troopCapacitySettings;
   if (!raidPreferencesLoaded && cache.accountStatus?.data?.id) {
     const saved = stored.raidPreferences;
     if (saved && String(saved.accountId) === String(cache.accountStatus.data.id)) {
-      for (const key of ['rallyTeam', 'bossLevel', 'waitSeconds', 'minMembers', 'raidCount', 'baseTroops', 'capacities']) {
+      for (const key of ['rallyTeam', 'bossLevel', 'waitSeconds', 'minMembers', 'raidCount']) {
         if (saved[key] !== undefined) experimentalSelection[key] = saved[key];
       }
       experimentalSelection.searchedBossLevel = experimentalSelection.bossLevel;
@@ -5566,7 +5556,12 @@ document.querySelector('#clear-cache').addEventListener('click', async () => {
 
 async function renderSettings() {
   const stored = await chrome.storage.local.get(['captureSettings', 'popupRpcEnabled',
-    'socketRefreshMode', 'rpcMqttTriggerStatus']);
+    'socketRefreshMode', 'rpcMqttTriggerStatus', 'troopCapacitySettings']);
+  const capacities = globalThis.hwaHelperExperimentalData?.normalizeCapacitySettings(stored.troopCapacitySettings) || { defaultHero: 600, base: 950 };
+  for (const [id, key] of [['default-hero-troop-capacity', 'defaultHero'], ['base-troop-capacity', 'base']]) {
+    const input = document.querySelector(`#${id}`);
+    if (input) input.value = String(capacities[key]);
+  }
   document.querySelector('#intercept-enabled').checked = stored.captureSettings?.interceptEnabled !== false;
   document.querySelector('#popup-rpc-enabled').checked = stored.popupRpcEnabled === true;
   document.querySelector('#socket-refresh-mode').value =
@@ -5587,6 +5582,21 @@ async function renderSettings() {
     triggerStatus.textContent = messages[stored.rpcMqttTriggerStatus?.state] ||
       'Uses a recent MQTT map update to request a native carrier. No separate RPC fallback.';
   }
+}
+
+for (const [id, key] of [['default-hero-troop-capacity', 'defaultHero'], ['base-troop-capacity', 'base']]) {
+  document.querySelector(`#${id}`)?.addEventListener('change', (event) => {
+    const count = Number(event.currentTarget.value);
+    if (!event.currentTarget.value.trim() || !Number.isSafeInteger(count) || count < (key === 'base' ? 0 : 1) || count > 1000000) {
+      event.currentTarget.reportValidity?.(); return;
+    }
+    settingsPending = settingsPending.catch(() => {}).then(async () => {
+      const stored = await chrome.storage.local.get('troopCapacitySettings');
+      const settings = globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings);
+      await chrome.storage.local.set({ troopCapacitySettings: { ...settings, [key]: count } });
+    });
+    settingsPending.catch(() => { status.textContent = 'Could not save troop capacity settings.'; });
+  });
 }
 
 document.querySelector('#socket-refresh-mode').addEventListener('change', async (event) => {
@@ -5654,9 +5664,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
     if ('rpcQueueStatus' in changes) renderRpcQueue(changes.rpcQueueStatus.newValue?.count || 0);
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
-        'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes) renderSettings();
+        'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'troopCapacitySettings' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
-    if ('raidQueue' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('troopCapacitySettings' in changes || 'raidQueue' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {

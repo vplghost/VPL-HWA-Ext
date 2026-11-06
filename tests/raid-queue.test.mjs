@@ -118,12 +118,13 @@ test('queue validates waits, count and threshold and stops on account switch or 
   assert.equal(queue.advance(step.state, null, {}, 121000).state.phase, 'stopped');
 });
 
-test('roster refresh rejects stale capacity and deployed heroes before spending energy', () => {
+test('roster refresh falls back after hero changes and rejects deployed heroes before spending energy', () => {
   for (const [roster, troops] of [[{ ...heroes, 1: { ...heroes[1], power: 999 } }, inventory],
       [heroes, { ...inventory, squads: [{ heroes: [{ id: 1 }] }] }]]) {
     const start = queue.start(options, 1, 10, 1000);
     const step = queue.advance(start.state, rpc(start.calls, [roster, troops], 1100), {}, 1200);
-    assert.equal(step.state.phase, 'stopped'); assert.equal(step.calls, undefined);
+    if (troops.squads.length) { assert.equal(step.state.phase, 'stopped'); assert.equal(step.calls, undefined); }
+    else { assert.equal(step.state.phase, 'searching'); assert.equal(step.state.squad.units.reduce((sum, unit) => sum + unit.count, 0), 3950); }
   }
 });
 

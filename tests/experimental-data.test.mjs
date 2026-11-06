@@ -78,7 +78,7 @@ test('troop allocator maximizes capacity, uses highest tier first and redistribu
   assert.equal(data.allocateTroops({ available: [{ unitId: 99, count: 10 }] }, 10).length, 0);
 });
 
-test('capacity uses each selected hero plus base and invalidates saved values after stats change', () => {
+test('capacity uses hero data and falls back after saved values become stale', () => {
   const heroes = { 16: { level: 80, star: 3, power: 1234 }, 67: { level: 70, star: 4 },
     14: { level: 30, star: 2 }, 33: { level: 2, star: 1 }, 38: { level: 1, star: 1 } };
   const ids = [16, 67, 14, 33, 38];
@@ -86,9 +86,48 @@ test('capacity uses each selected hero plus base and invalidates saved values af
   const saved = { 16: { count: 799, signature: data.capacitySignature(heroes[16]) } };
   assert.equal(data.squadCapacity(ids, heroes, saved, 200), 3669);
   heroes[16].power++;
-  assert.equal(data.squadCapacity(ids, heroes, saved, 200), null);
+  assert.equal(data.squadCapacity(ids, heroes, saved, 200), 3669);
   assert.equal(data.squadCapacity([16, 67, 14, 33, 33], heroes, {}, 200), null);
   assert.equal(data.squadCapacity(ids, heroes, {}, -1), null);
+});
+
+test('capacity defaults and corrected troop ranges apply without manual capacities', () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(data.normalizeCapacitySettings())), { defaultHero: 600, base: 950 });
+  assert.equal(data.squadCapacity([1, 2, 3, 4, 5], {}, {}, 950), 3950);
+  for (const [id, label, level] of [[1, 'Marksmen', 1], [9, 'Marksmen', 9], [11, 'Spearmen', 1],
+      [19, 'Spearmen', 9], [21, 'Infantry', 1], [29, 'Infantry', 9]]) {
+    assert.equal(data.unitInfo(id).label, label); assert.equal(data.unitInfo(id).level, level);
+  }
+  for (const id of [0, 10, 20, 30, 31, -1]) assert.equal(data.unitInfo(id), null);
+  const units = data.allocateTroops({ available: [9, 10, 19, 20, 29, 30].map((unitId) => ({ unitId, count: 100 })) }, 300);
+  assert.deepEqual(Array.from(units, (unit) => unit.unitId), [9, 19, 29]);
+});
+
+test('capacity inference preserves unknowns until independent observations identify each hero', () => {
+  const ids = [1, 2, 3, 4, 5, 6];
+  const heroes = Object.fromEntries(ids.map((id) => [id, { level: 30, star: 2, power: id }]));
+  const observation = (members, total, accountId = 10) => ({ accountId, total,
+    profiles: members.map((id) => ({ id, signature: data.capacitySignature(heroes[id]) })) });
+  const capacities = ids.map((id) => 600 + id * 10);
+  const selected = ids.slice(0, 5);
+  const rows = ids.map((_, excluded) => {
+    const members = ids.filter((_, i) => i !== excluded);
+    return observation(members, 950 + members.reduce((sum, id) => sum + capacities[id - 1], 0));
+  });
+  const underdetermined = data.capacityModel(selected, heroes, rows.slice(0, 1), {}, 10);
+  assert.equal(Object.keys(underdetermined.inferred).length, 0);
+  const solved = data.capacityModel(selected, heroes, rows, {}, 10);
+  assert.deepEqual(Array.from(solved.counts), [610, 620, 630, 640, 650]);
+  assert.equal(solved.total, 4100);
+  const conflicting = data.capacityModel(selected, heroes, [...rows, observation(selected, 4200)], {}, 10);
+  assert.equal(Object.keys(conflicting.inferred).length, 0, 'inconsistent load equations cannot identify hero contributions');
+  assert.equal(data.capacityModel(selected, heroes, [observation(selected, 1000)], {}, 10).total, 3950);
+  assert.equal(data.capacityModel(selected, heroes, [observation(selected, 5000, 11)], {}, 10).total, 3950);
+  const same = observation(selected, 5000);
+  assert.equal(data.capacityModel(selected, heroes, [same], {}, 10).total, 5000);
+  heroes[1].power++;
+  assert.equal(data.capacityModel(selected, heroes, [same], {}, 10).total, 3950);
+  assert.equal(data.capacityModel(selected, heroes, [], { defaultHero: 700, base: 1000 }, 10).total, 4500);
 });
 
 test('member threshold includes leader once and distinguishes unknown membership', () => {

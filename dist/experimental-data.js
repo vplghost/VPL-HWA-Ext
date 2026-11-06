@@ -5,27 +5,70 @@
   const capacityExamples = { 16: [80, 3, 799], 67: [70, 4, 740],
     14: [30, 2, 685], 33: [2, 1, 623], 38: [1, 1, 622] };
 
-  function heroCapacity(id, hero, saved) {
+  function normalizeCapacitySettings(settings) {
+    return { defaultHero: Number.isSafeInteger(settings?.defaultHero) && settings.defaultHero > 0 && settings.defaultHero <= 1000000 ? settings.defaultHero : 600,
+      base: Number.isSafeInteger(settings?.base) && settings.base >= 0 && settings.base <= 1000000 ? settings.base : 950 };
+  }
+  function heroCapacity(id, hero, saved, fallback = 600) {
+    if (Number.isSafeInteger(hero?.troopCapacity) && hero.troopCapacity > 0) return hero.troopCapacity;
     if (saved?.signature === capacitySignature(hero) && Number.isSafeInteger(saved.count) && saved.count > 0) return saved.count;
-    if (saved) return null;
-    // Observed in game by the user, 2026-11-06; never extrapolate to other levels/stars.
     const example = capacityExamples[id];
-    return example && hero?.level === example[0] && hero?.star === example[1] ? example[2] : null;
+    return example && hero?.level === example[0] && hero?.star === example[1] ? example[2] : fallback;
   }
-
-  function squadCapacity(ids, heroes, capacities, base) {
+  function squadCapacity(ids, heroes, capacities, base = 950, defaultHero = 600) {
     if (ids?.length !== 5 || new Set(ids).size !== 5 || !Number.isSafeInteger(base) || base < 0) return null;
-    const counts = ids.map((id) => heroCapacity(id, heroes[id], capacities?.[id]));
-    return counts.every((n) => Number.isSafeInteger(n) && n > 0) ? base + counts.reduce((a, b) => a + b, 0) : null;
+    return base + ids.reduce((sum, id) => sum + heroCapacity(id, heroes[id], capacities?.[id], defaultHero), 0);
   }
 
+  function capacityModel(ids, heroes, observations, rawSettings, accountId) {
+    const settings = normalizeCapacitySettings(rawSettings);
+    const known = Object.fromEntries(Object.entries(heroes || {}).map(([id, hero]) => [id, heroCapacity(id, hero, null, null)])
+      .filter(([, value]) => value != null));
+    const rows = (observations || []).filter((row) => accountId != null && String(row.accountId) === String(accountId) &&
+      Number.isSafeInteger(row.total) && row.total > 0 && row.profiles?.length === 5 && new Set(row.profiles.map((profile) => profile.id)).size === 5 &&
+      row.profiles.every((profile) => Number.isInteger(profile.id) && heroes[profile.id] && profile.signature === capacitySignature(heroes[profile.id])));
+    const unknown = [...new Set(rows.flatMap((row) => row.profiles.map((profile) => profile.id)).filter((id) => known[id] == null))];
+    const matrix = rows.map((row) => {
+      const members = row.profiles.map((profile) => profile.id);
+      return [...unknown.map((id) => members.includes(id) ? 1 : 0),
+        row.total - settings.base - members.reduce((sum, id) => sum + (known[id] || 0), 0)];
+    }).filter((row) => row.slice(0, -1).some((value) => value) && row.at(-1) >= row.slice(0, -1).reduce((a, b) => a + b, 0) * settings.defaultHero);
+    // Solve only identifiable contributions. Free variables retain the configured fallback.
+    let pivot = 0;
+    for (let column = 0; column < unknown.length && pivot < matrix.length; column++) {
+      const found = matrix.findIndex((row, index) => index >= pivot && Math.abs(row[column]) > 1e-7);
+      if (found < 0) continue;
+      [matrix[pivot], matrix[found]] = [matrix[found], matrix[pivot]];
+      const factor = matrix[pivot][column]; matrix[pivot] = matrix[pivot].map((value) => value / factor);
+      for (let index = 0; index < matrix.length; index++) if (index !== pivot) {
+        const scale = matrix[index][column]; matrix[index] = matrix[index].map((value, col) => value - scale * matrix[pivot][col]);
+      }
+      pivot++;
+    }
+    const inferred = {};
+    const inconsistent = matrix.some((row) => row.slice(0, -1).every((value) => Math.abs(value) < 1e-7) && Math.abs(row.at(-1)) > 1e-7);
+    if (!inconsistent) for (const row of matrix) {
+      const columns = row.slice(0, -1).map((value, index) => Math.abs(value) > 1e-7 ? index : -1).filter((index) => index >= 0);
+      if (columns.length === 1 && row.at(-1) >= settings.defaultHero && row.at(-1) <= 1000000) inferred[unknown[columns[0]]] = Math.floor(row.at(-1) + 1e-7);
+    }
+    const counts = (ids || []).map((id) => known[id] ?? inferred[id] ?? settings.defaultHero);
+    const observed = Math.max(0, ...rows.filter((row) => row.profiles.every((profile) => ids?.includes(profile.id))).map((row) => row.total));
+    const total = ids?.length === 5 && new Set(ids).size === 5 ? Math.max(observed, settings.base + counts.reduce((a, b) => a + b, 0)) : null;
+    return { total, observed, inferred, counts, settings };
+  }
+
+  function unitInfo(id) {
+    const level = id % 10, type = Math.floor(id / 10);
+    return Number.isInteger(id) && level >= 1 && level <= 9 && type >= 0 && type <= 2 ?
+      { type, level, label: ['Marksmen', 'Spearmen', 'Infantry'][type] } : null;
+  }
   function allocateTroops(summary, capacity) {
     if (!Number.isSafeInteger(capacity) || capacity <= 0) return [];
-    // unit config fecf9b97: IDs 1–10 front, 11–20 middle, 21–30 back; tier ascends.
+    // Troop ID ranges: 1–9 Marksmen, 11–19 Spearmen, 21–29 Infantry.
     const stocks = new Map();
     for (const item of summary?.available || []) {
       const id = item.unitId;
-      if (Number.isInteger(id) && id >= 1 && id <= 30 && Number.isSafeInteger(item.count) && item.count > 0) {
+      if (unitInfo(id) && Number.isSafeInteger(item.count) && item.count > 0) {
         stocks.set(id, Math.max(stocks.get(id) || 0, item.count));
       }
     }
@@ -44,7 +87,7 @@
     const units = [];
     for (let type = 0; type < 3; type++) {
       let remaining = quotas[type];
-      for (let tier = 10; tier >= 1 && remaining > 0; tier--) {
+      for (let tier = 9; tier >= 1 && remaining > 0; tier--) {
         const unitId = type * 10 + tier;
         const count = Math.min(remaining, stocks.get(unitId) || 0);
         if (count) units.push({ unitId, count });
@@ -148,7 +191,7 @@
   }
 
   globalThis.hwaHelperExperimentalData = { rallyWaitOptions, capacitySignature, heroCapacity,
-    squadCapacity, allocateTroops, rallyMembers, bossConfigId, lowestPowerHeroes,
+    squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, lowestPowerHeroes,
     mineConfigId, mineTypeLevel, teamOptions, buildSquad, buildRallyCall,
     buildGatherCall, buildMineSearchCall, rallyPhase };
 })();
