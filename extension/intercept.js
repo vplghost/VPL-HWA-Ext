@@ -36,7 +36,7 @@
     'refillableGetAll', 'missionGetAll', 'artifact_getAll', 'titan_artifactGetCounters',
     'skin_getAll', 'rune_getAll', 'arenaGetAll', 'clanWarGetBriefInfo', 'mailGetAll',
     'searchMob', 'searchMine']);
-  const helperActionMethods = new Set(['createRally', 'cancelRally', 'attackMine', 'stopMineGathering',
+  const helperActionMethods = new Set(['createRally', 'cancelRally', 'attackMob', 'attackMine', 'stopMineGathering',
     'randomDraft_saveDefence', 'randomDraft_saveAttack',
     'magicTower_enterRoom', 'magicTower_startBattle', 'magicTower_activateBuff',
     'magicTower_openChest', 'magicTower_enterNextFloor']);

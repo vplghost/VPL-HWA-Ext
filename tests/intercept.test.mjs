@@ -94,6 +94,42 @@ test('raid cancellation expires before departure and stopping a group preserves 
   await carrier(); assert.deepEqual(sent[3], ['userGetInfo'], 'mutation must never retry');
 });
 
+test('monster attack joins one native RPC and MQTT-assisted mode nudges after queue acceptance', async () => {
+  for (const mode of ['piggyback', 'mqtt-piggyback']) {
+    const batches = [];
+    const { window, queueCounts } = setup(async (_url, options) => {
+      const calls = JSON.parse(options.body).calls;
+      batches.push(calls);
+      return new Response(JSON.stringify({ results: calls.map((call) => ({ ident: call.ident,
+        result: { response: call.name === 'attackMob' ?
+          { squadId: 'squad-1', route: { routeId: 'route-1' } } : {} } })) }),
+      { status: 200, headers: { 'content-type': 'application/json' } });
+    }, true, { Response, Headers });
+    let nudges = 0;
+    window.addEventListener('message', (event) => {
+      if (event.data.kind === 'mqtt-rpc-nudge') nudges++;
+    });
+    window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+      interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: mode },
+    'https://www.hero-wars-alliance.com');
+    window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', group: 'monster',
+      calls: [{ name: 'attackMob', feature: 'mob', args: { mapId: 'map', mobId: 'mob-1',
+        squad: { heroes: [{ heroId: 1 }], units: [{ unitId: 7, count: 100 }] } } }] },
+    'https://www.hero-wars-alliance.com');
+    assert.equal(queueCounts.at(-1), 1);
+    assert.equal(nudges, mode === 'mqtt-piggyback' ? 1 : 0);
+    const carrier = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+      method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] })
+    });
+    const response = await carrier();
+    assert.deepEqual(batches[0].map((call) => call.name), ['userGetInfo', 'attackMob']);
+    assert.equal(batches[0][1].args.mobId, 'mob-1');
+    assert.deepEqual(JSON.parse(await response.text()).results.map((item) => item.ident), ['native']);
+    await carrier();
+    assert.deepEqual(batches[1].map((call) => call.name), ['userGetInfo']);
+  }
+});
+
 test('POST fetch preserves response and stores request/response text', async () => {
   const response = new Response('{"hero":1}', { status: 200, headers: { 'content-type': 'application/json' } });
   const { window, messages } = setup(async () => response);
