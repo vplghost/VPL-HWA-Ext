@@ -37,6 +37,38 @@ function members(state, count, at = 43000) {
   return queue.advance(state, rpc([{ name: 'getRallyById', feature: 'rally', args: { rallyId: 'rally' } }], [{ rally }], at), {}, at + 1).state;
 }
 
+test('weakest queue recalculates available heroes after roster refresh', () => {
+  const roster = { ...heroes, 6: { power: 600 }, 7: { power: 700 } };
+  const units = { ...inventory, squads: [{ heroes: [{ id: 1 }, { heroId: 2 }] }] };
+  let step = queue.start({ ...options, teamId: 'weakest' }, 1, 10, 1000);
+  step = queue.advance(step.state, rpc(step.calls, [roster, units], 1100), {}, 1200);
+  assert.equal(step.state.phase, 'searching');
+  assert.deepEqual(Array.from(step.state.options.heroIds), [3, 4, 5, 6, 7]);
+  step = queue.start({ ...options, teamId: 'weakest' }, 1, 10, 1000);
+  step = queue.advance(step.state, rpc(step.calls, [heroes, units], 1100), {}, 1200);
+  assert.equal(step.state.phase, 'stopped');
+  assert.match(step.state.reason, /five available/);
+});
+
+test('persisted calls match responses after storage reorders object keys', () => {
+  const reorder = (value) => Array.isArray(value) ? value.map(reorder) :
+    value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, reorder(value[key])])) : value;
+  let step = queue.start(options, 1, 10, 1000);
+  step = queue.advance(reorder(step.state), rpc(step.calls, [heroes, inventory], 1100), {}, 1200);
+  step = queue.advance(reorder(step.state), rpc(step.calls, [{ mobs: [{ mobId: 'boss' }] }], 1300), {}, 1400);
+  assert.equal(step.state.phase, 'creating');
+  const sent = step.calls;
+  const unrelated = sent.map((call) => ({ ...call, args: { ...call.args, mobId: 'other-boss' } }));
+  const ignored = queue.advance(reorder(step.state), rpc(unrelated, [{ squadId: 'other', rally: { rallyId: 'other-rally', plannedStartTime: 301500 } }], 1450), {}, 1451);
+  assert.equal(ignored.state.phase, 'creating', 'different boss confirmation must not be accepted');
+  step = queue.advance(reorder(step.state), rpc(sent, [{ squadId: 'squad', rally: { rallyId: 'rally', plannedStartTime: 301500 } }], 1500), {}, 1600);
+  assert.equal(step.state.phase, 'active');
+  step = queue.advance(reorder(step.state), null, {}, 121401);
+  assert.equal(step.state.phase, 'active', 'waiting rally must survive the creation timeout');
+  assert.equal(step.state.bossQueue.remain_raid_count, 2);
+  assert.equal(step.state.started, 1);
+});
+
 test('queue waits for both matching win and confirmed return, never elapsed ETA', () => {
   let state = active();
   state = queue.advance(state, win(), {}, 70001).state;
@@ -175,6 +207,26 @@ function cachedQueue(bosses = ['boss-a', 'boss-b'], count = 3, energy = 100) {
   return { cache, step: queue.start({ ...options, count, firstMobId: bosses[1] || bosses[0],
     autoCancel: false }, 1, 10, 1000, cache) };
 }
+
+test('custom troop maximum applies to first rally and every refreshed round', () => {
+  const { cache } = cachedQueue();
+  for (const maxTroops of [700, 6000]) {
+    let step = queue.start({ ...options, teamId: 'custom:one', maxTroops, firstMobId: 'boss-a',
+      autoCancel: false }, 1, 10, 1000, cache);
+    const total = (call) => call.args.squad.units.reduce((sum, unit) => sum + unit.count, 0);
+    assert.equal(total(step.calls[0]), maxTroops);
+    step = queue.advance(step.state, rpc(step.calls, [{ squadId: 'squad', rally: {
+      rallyId: 'rally', plannedStartTime: 65000 } }], 1100), cache, 1200);
+    step = queue.advance(step.state, win(), cache, 70001);
+    step = queue.advance(step.state, returned(), cache, 80001);
+    step = queue.advance(JSON.parse(JSON.stringify(step.state)), rpc(step.calls, [heroes, inventory], 81000), cache, 81001);
+    assert.equal(step.state.phase, 'creating');
+    assert.equal(total(step.calls[0]), maxTroops);
+  }
+  for (const maxTroops of [0, -1, 0.5, '700']) {
+    assert.equal(queue.start({ ...options, maxTroops }, 1, 10, 1000), null);
+  }
+});
 
 test('one search supplies several rallies; next search waits until every queued boss is consumed', () => {
   const { cache, step: first } = cachedQueue();

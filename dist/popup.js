@@ -4834,6 +4834,86 @@ function renderDraftAlert(cache) {
   setResourceTooltip(button, `Legend Draft · ${globalThis.hwaHelperPopupData.draftStageDescription(draft?.stageId)}${active && draft?.stageFinishTs ? ` · ${globalThis.hwaHelperPopupData.formatCountdown(draft.stageFinishTs)}` : ''}`);
 }
 
+function renderCustomTeams(cache) {
+  const accountId = cache.accountStatus?.data?.id;
+  const heroes = cache.heroGetAll?.data || {};
+  const section = document.createElement('section');
+  section.className = 'm-3 rounded-xl border border-slate-200 bg-white p-4 space-y-3';
+  const title = document.createElement('h2'); title.textContent = 'Custom raid / farm teams';
+  section.append(title);
+  view.prepend(section);
+  const save = async (change) => {
+    const stored = await chrome.storage.local.get('customTeams');
+    const accounts = stored.customTeams || {};
+    accounts[String(accountId)] = change(accounts[String(accountId)] || []);
+    await chrome.storage.local.set({ customTeams: accounts });
+    await render();
+  };
+  const editor = (team = {}) => {
+    const form = document.createElement('form');
+    form.className = 'space-y-2 rounded-lg border border-slate-200 p-3';
+    const name = document.createElement('input');
+    name.placeholder = 'Team name'; name.value = team.name || ''; name.required = true; name.maxLength = 80;
+    name.className = 'block w-full rounded border p-2 text-sm';
+    form.append(name);
+    const troopLabel = document.createElement('label');
+    troopLabel.className = 'block text-xs text-slate-600';
+    troopLabel.textContent = 'Maximum troops (total for this team; blank = automatic)';
+    const maxTroops = document.createElement('input');
+    maxTroops.type = 'number'; maxTroops.min = '1'; maxTroops.step = '1';
+    maxTroops.max = String(Number.MAX_SAFE_INTEGER);
+    maxTroops.value = team.maxTroops == null ? '' : String(team.maxTroops);
+    maxTroops.placeholder = 'Automatic';
+    maxTroops.className = 'block w-full rounded border p-2 text-sm';
+    troopLabel.append(maxTroops); form.append(troopLabel);
+    const selected = new Set(team.heroIds || []);
+    const choices = document.createElement('div'); choices.className = 'grid grid-cols-3 gap-2 max-h-64 overflow-auto';
+    for (const [id, hero] of Object.entries(heroes).sort((a, b) => (b[1].power || 0) - (a[1].power || 0))) {
+      const label = document.createElement('label'); label.className = 'text-xs flex gap-1 items-center';
+      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = selected.has(Number(id));
+      input.addEventListener('change', () => {
+        if (input.checked && selected.size >= 5) { input.checked = false; return; }
+        if (input.checked) selected.add(Number(id)); else selected.delete(Number(id));
+        submit.textContent = `Save team (${selected.size}/5)`;
+      });
+      label.append(input, document.createTextNode(globalThis.hwaHelperNameMap.hero(id) || `#${id}`)); choices.append(label);
+    }
+    form.append(choices);
+    const submit = document.createElement('button'); submit.type = 'submit'; submit.textContent = `Save team (${selected.size}/5)`;
+    submit.className = 'rounded bg-blue-600 px-3 py-2 text-xs text-white';
+    form.append(submit);
+    const status = document.createElement('p'); status.className = 'text-xs text-red-600'; form.append(status);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const value = globalThis.hwaHelperExperimentalData.normalizeCustomTeam({
+        id: team.id || crypto.randomUUID(), name: name.value, heroIds: [...selected],
+        maxTroops: maxTroops.value === '' ? undefined : Number(maxTroops.value) }, heroes);
+      if (!value) { status.textContent = 'Enter a team name, select exactly five heroes, and enter a positive whole troop count or leave it blank.'; return; }
+      submit.disabled = true;
+      try { await save((teams) => [...teams.filter((item) => item.id !== value.id), value]); }
+      catch { submit.disabled = false; status.textContent = 'Could not save team. Try again.'; }
+    });
+    return form;
+  };
+  for (const team of render.customTeams || []) {
+    const row = document.createElement('div'); row.className = 'space-y-2 border-b pb-2';
+    const label = document.createElement('div');
+    label.textContent = `${team.name}: ${team.heroIds.map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ')}`;
+    const edit = document.createElement('button'); edit.textContent = 'Edit'; edit.className = 'mr-3 text-xs text-blue-600';
+    edit.addEventListener('click', () => { row.replaceChildren(editor(team)); });
+    const remove = document.createElement('button'); remove.textContent = 'Delete'; remove.className = 'text-xs text-red-600';
+    remove.addEventListener('click', async () => { await save((teams) => teams.filter((item) => item.id !== team.id)); });
+    const capacity = document.createElement('div'); capacity.className = 'text-xs text-slate-500';
+    capacity.textContent = `Maximum troops: ${team.maxTroops == null ? 'Automatic' : formatNumber(team.maxTroops)}`;
+    row.append(label, capacity, edit, remove); section.append(row);
+  }
+  if (accountId != null) {
+    const add = document.createElement('button'); add.textContent = 'Add custom team'; add.className = 'text-sm text-blue-600';
+    add.addEventListener('click', () => { add.replaceWith(editor()); });
+    section.append(add);
+  }
+}
+
 function renderExperimental(cache) {
   const data = globalThis.hwaHelperExperimentalData;
   if (experimentalPending && (!popupRpcEnabled ||
@@ -4852,7 +4932,8 @@ function renderExperimental(cache) {
     experimentalPending = null;
   }
   const heroes = cache.heroGetAll?.data || {};
-  const teams = data.teamOptions(cache.teamGetAll?.data, heroes);
+  const available = data.availableHeroIds(heroes, cache['getUnitSummary:unit']?.data, cache.marchStatus?.data?.marches);
+  const teams = data.teamOptions(cache.teamGetAll?.data, heroes, render.customTeams || [], available);
   const context = { ...cache.experimentalMineSearch?.data,
     ...cache.experimentalRallySearch?.data,
     ...cache.experimentalMapContext?.data };
@@ -4936,9 +5017,10 @@ function renderExperimental(cache) {
   const rallyTeam = makeTeamSelect(rally, 'rallyTeam');
   const model = data.capacityModel(rallyTeam?.heroIds, heroes, cache.troopCapacityEvidence?.data,
     troopCapacitySettings, cache.accountStatus?.data?.id);
-  const optimized = data.allocateTroops(cache['getUnitSummary:unit']?.data, model.total);
+  const rallyCapacity = data.teamTroopCapacity(model.total, rallyTeam?.maxTroops);
+  const optimized = data.allocateTroops(cache['getUnitSummary:unit']?.data, rallyCapacity);
   const rallySquad = data.buildSquad(rallyTeam?.heroIds || [], optimized);
-  note(rally, `Troops: ${optimized.reduce((sum, unit) => sum + unit.count, 0)} / ${model.total ?? 0}${model.observed ? ' · observed lineup' : ''}`);
+  note(rally, `Troops: ${optimized.reduce((sum, unit) => sum + unit.count, 0)} / ${rallyCapacity ?? 0}${rallyTeam?.maxTroops != null ? ' · custom maximum' : model.observed ? ' · observed lineup' : ''}`);
   const troopSummary = document.createElement('div');
   troopSummary.className = 'grid grid-cols-3 gap-2';
   for (let type = 0; type < 3; type++) {
@@ -5042,7 +5124,7 @@ function renderExperimental(cache) {
   const startRaid = async (count, single = false) => {
     const response = await chrome.runtime.sendMessage({ kind: 'raid-queue-start', options: {
       mapId: context.mapId, center: mapCenter, firstMobId: targetSelect.value,
-      level: experimentalSelection.bossLevel, heroIds: rallyTeam.heroIds,
+      level: experimentalSelection.bossLevel, heroIds: rallyTeam.heroIds, teamId: rallyTeam.id, maxTroops: rallyTeam.maxTroops,
       waitSeconds: experimentalSelection.waitSeconds, minMembers: experimentalSelection.minMembers,
       autoCancel: experimentalSelection.autoCancel, count
     } }).catch((error) => ({ error: String(error) }));
@@ -5139,9 +5221,24 @@ function renderExperimental(cache) {
   field(gather, 'Search results', mineSelect);
   note(gather, `${mines.length} full mine(s) found for this type and level.`);
   makeUnitsInput(gather);
-  note(gather, 'The default lineup selects the five heroes with the lowest recorded power.');
+  if (gatherTeam?.maxTroops != null) note(gather, `Custom team maximum: ${formatNumber(gatherTeam.maxTroops)} troops. Entered troops are capped to this total.`);
+  note(gather, 'The default lineup selects the five available heroes with the lowest recorded power.');
   button(gather, 'Send gathering team', async () => {
-    const squad = selectedSquad(gatherTeam);
+    const latest = (await chrome.storage.local.get(CACHE_KEY))[CACHE_KEY] || {};
+    if (String(latest.accountStatus?.data?.id) !== String(cache.accountStatus?.data?.id)) {
+      experimentalMessage = 'Game account changed. Select the team again.'; render(); return;
+    }
+    const latestHeroes = latest.heroGetAll?.data || {};
+    const availableNow = data.availableHeroIds(latestHeroes, latest['getUnitSummary:unit']?.data,
+      latest.marchStatus?.data?.marches);
+    const heroIds = gatherTeam?.id === 'weakest' ? data.lowestPowerHeroes(latestHeroes, availableNow) : gatherTeam?.heroIds || [];
+    if (heroIds.some((id) => !availableNow.includes(id))) {
+      experimentalMessage = 'Selected heroes are already deployed. Select an available team.'; render(); return;
+    }
+    let squad = selectedSquad({ heroIds });
+    if (squad && gatherTeam?.maxTroops != null) {
+      squad = data.buildSquad(heroIds, data.allocateTroops({ available: squad.units }, gatherTeam.maxTroops));
+    }
     const call = data.buildGatherCall(context?.mapId, experimentalSelection.mineId, squad);
     if (!call) { experimentalMessage = 'Select five heroes, valid troops, a known mine, and capture the map ID.'; render(); return; }
     await experimentalRpc([call], 'Sending gathering team...');
@@ -5180,10 +5277,11 @@ async function experimentalRpc(calls, message) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'raidPreferences', 'raidQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
+  render.customTeams = stored.customTeams?.[String(cache.accountStatus?.data?.id)] || [];
   towerRunState = stored.towerRun || null;
   const towerAccountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id ?? null;
   if (towerSettingsLoadedFor !== String(towerAccountId)) {
@@ -5348,6 +5446,7 @@ async function render() {
   } else if (activeTab === 'teams') {
     showSnapshot(cache.teamGetAll, ['Mode', 'Team', 'Members', 'Hero/Titan names'], (data) =>
       globalThis.hwaHelperPopupData.teamRows(data, globalThis.hwaHelperNameMap));
+    renderCustomTeams(cache);
   } else if (activeTab === 'chat') {
     const prevRead = currentGuildChatLastReadTime;
     renderGuildChat(cache, false, prevRead);

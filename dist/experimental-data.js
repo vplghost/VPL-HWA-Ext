@@ -120,15 +120,35 @@
     return null;
   };
 
-  function lowestPowerHeroes(heroes) {
+  function availableHeroIds(heroes, summary, marches = []) {
+    const busy = new Set((summary?.squads || []).flatMap((squad) =>
+      (squad.heroes || []).map((hero) => Number(hero.id ?? hero.heroId ?? hero))));
+    for (const march of marches) {
+      for (const id of march.team?.heroIds || []) busy.add(Number(id));
+    }
+    return Object.keys(heroes || {}).map(Number).filter((id) => !busy.has(id));
+  }
+
+  function normalizeCustomTeam(team, heroes) {
+    const name = typeof team?.name === 'string' ? team.name.trim().slice(0, 80) : '';
+    const heroIds = [...new Set(team?.heroIds || [])];
+    const maxTroops = team?.maxTroops;
+    if (maxTroops != null && (!Number.isSafeInteger(maxTroops) || maxTroops <= 0)) return null;
+    return name && heroIds.length === 5 && heroIds.every((id) => Number.isInteger(id) && heroes?.[id]) ?
+      { id: team.id, name, heroIds, ...(maxTroops != null ? { maxTroops } : {}) } : null;
+  }
+
+  function lowestPowerHeroes(heroes, availableIds = Object.keys(heroes || {}).map(Number)) {
     return Object.entries(heroes || {})
-      .filter(([id, hero]) => Number.isInteger(Number(id)) && Number.isFinite(hero?.power))
+      .filter(([id, hero]) => Number.isInteger(Number(id)) && availableIds.includes(Number(id)) && Number.isFinite(hero?.power))
       .sort((a, b) => a[1].power - b[1].power || Number(a[0]) - Number(b[0]))
       .slice(0, 5).map(([id]) => Number(id));
   }
 
-  function teamOptions(teams, heroes) {
-    const options = [{ id: 'weakest', label: '5 lowest power heroes', heroIds: lowestPowerHeroes(heroes) }];
+  function teamOptions(teams, heroes, customTeams = [], availableIds) {
+    const options = customTeams.map((team) => normalizeCustomTeam(team, heroes)).filter(Boolean)
+      .map((team) => ({ id: `custom:${team.id}`, label: `Custom · ${team.name}`, heroIds: team.heroIds, maxTroops: team.maxTroops }));
+    options.push({ id: 'weakest', label: '5 lowest power heroes', heroIds: lowestPowerHeroes(heroes, availableIds) });
     for (const [mode, members] of Object.entries(teams || {})) {
       if (!Array.isArray(members)) continue;
       const groups = members.some(Array.isArray) ? members : [members];
@@ -140,6 +160,10 @@
       });
     }
     return options;
+  }
+
+  function teamTroopCapacity(automatic, maxTroops) {
+    return Number.isSafeInteger(maxTroops) && maxTroops > 0 ? maxTroops : automatic;
   }
 
   function buildSquad(heroIds, units) {
@@ -192,6 +216,6 @@
 
   globalThis.hwaHelperExperimentalData = { rallyWaitOptions, capacitySignature, heroCapacity,
     squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, lowestPowerHeroes,
-    mineConfigId, mineTypeLevel, teamOptions, buildSquad, buildRallyCall,
+    mineConfigId, mineTypeLevel, availableHeroIds, normalizeCustomTeam, teamOptions, teamTroopCapacity, buildSquad, buildRallyCall,
     buildGatherCall, buildMineSearchCall, rallyPhase };
 })();

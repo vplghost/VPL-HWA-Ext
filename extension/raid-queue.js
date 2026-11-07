@@ -53,7 +53,13 @@
         !Number.isInteger(options.count) || options.count < 1 || options.count > 100 ||
         !Number.isInteger(options.minMembers) || options.minMembers < 1 || options.minMembers > 6 ||
         (options.autoCancel != null && typeof options.autoCancel !== 'boolean') ||
+        (options.maxTroops != null && (!Number.isSafeInteger(options.maxTroops) || options.maxTroops <= 0)) ||
         options.heroIds?.length !== 5 || new Set(options.heroIds).size !== 5) return null;
+    if (options.teamId === 'weakest' && cache) {
+      options = { ...options, heroIds: data.lowestPowerHeroes(cache.heroGetAll?.data,
+        data.availableHeroIds(cache.heroGetAll?.data, cache['getUnitSummary:unit']?.data, cache.marchStatus?.data?.marches)) };
+      if (options.heroIds.length !== 5) return null;
+    }
     const state = { id: `${now}:${tabId}`, tabId, accountId, options: { ...options, autoCancel: options.autoCancel !== false }, started: 0, completed: 0,
       bossQueue: { remain_raid_count: options.count, queue: [] }, failedBossIds: [], wonBossIds: [],
       phase: 'refreshing', current: null };
@@ -72,7 +78,7 @@
           options.heroIds.includes(hero.id ?? hero.heroId)))) return null;
     const cap = data.capacityModel(options.heroIds, heroes, cache.troopCapacityEvidence?.data,
       settings, accountId).total;
-    const squad = data.buildSquad(options.heroIds, data.allocateTroops(summary, cap));
+    const squad = data.buildSquad(options.heroIds, data.allocateTroops(summary, data.teamTroopCapacity(cap, options.maxTroops)));
     const won = cache.experimentalDefeatedBosses?.data || [];
     const bosses = search.mobs.filter((mob) => mob.mobId &&
       !won.some((item) => item.mapId === options.mapId && item.mobId === mob.mobId));
@@ -90,8 +96,16 @@
         result: response.results?.find((result) => result.ident === call.ident)?.result }));
     } catch { return []; }
   }
+  function sameValue(a, b) {
+    if (a === b) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object' ||
+        Array.isArray(a) !== Array.isArray(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length &&
+      keys.every((key) => Object.hasOwn(b, key) && sameValue(a[key], b[key]));
+  }
   const sameCall = (a, b) => a.name === b.name && (a.feature || '') === (b.feature || '') &&
-    JSON.stringify(a.args || {}) === JSON.stringify(b.args || {});
+    sameValue(a.args || {}, b.args || {});
   function advance(previous, record, cache, now, settings) {
     if (terminal(previous)) return { state: previous };
     let state = { ...previous, current: previous.current ? { ...previous.current } : null };
@@ -124,13 +138,18 @@
         if (call.name === 'getUnitSummary' && call.feature === 'unit' && result?.response) state.roster.units = result.response;
       }
       if (state.roster.heroes && state.roster.units) {
+        if (state.options.teamId === 'weakest') {
+          state.options = { ...state.options, heroIds: data.lowestPowerHeroes(state.roster.heroes,
+            data.availableHeroIds(state.roster.heroes, state.roster.units, cache?.marchStatus?.data?.marches)) };
+          if (state.options.heroIds.length !== 5) return { state: stop(state, 'Fewer than five available heroes.') };
+        }
         if (state.roster.units.squads?.some((squad) => squad.heroes?.some((hero) =>
             state.options.heroIds.includes(hero.id ?? hero.heroId)))) {
           return { state: stop(state, 'Selected heroes are already deployed. Queue stopped.') };
         }
         const cap = data.capacityModel(state.options.heroIds, state.roster.heroes,
           cache?.troopCapacityEvidence?.data, settings || state.options.capacitySettings, state.accountId).total;
-        const units = data.allocateTroops(state.roster.units, cap);
+        const units = data.allocateTroops(state.roster.units, data.teamTroopCapacity(cap, state.options.maxTroops));
         state.squad = data.buildSquad(state.options.heroIds, units);
         if (!state.squad) return { state: stop(state, 'No available troops. Refresh the form.') };
         state.roster = null;

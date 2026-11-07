@@ -17,6 +17,49 @@ test('gather default chooses five owned heroes with least power', () => {
   assert.deepEqual(Array.from(options[0].heroIds), [8, 9, 10, 12, 7]);
 });
 
+test('custom teams precede defaults and synced teams without modifying game data', () => {
+  const heroes = Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((id) => [id, { power: id }]));
+  const synced = { arena: [1, 2, 3, 4, 5] };
+  const custom = [{ id: 'one', name: ' Raid ', heroIds: [3, 4, 5, 6, 7] }];
+  const options = data.teamOptions(synced, heroes, custom);
+  assert.deepEqual(Array.from(options, (team) => team.id), ['custom:one', 'weakest', 'arena:0']);
+  assert.equal(options[0].label, 'Custom · Raid');
+  assert.equal(synced.arena[0], 1);
+  assert.equal(data.normalizeCustomTeam({ name: 'bad', heroIds: [1, 1, 2, 3, 4] }, heroes), null);
+  assert.equal(data.normalizeCustomTeam({ name: 'bad', heroIds: [1, 2, 3, 4, 99] }, heroes), null);
+  assert.equal(data.normalizeCustomTeam({ name: ' ', heroIds: [1, 2, 3, 4, 5] }, heroes), null);
+  assert.equal(data.teamOptions(synced, heroes, []).some((team) => team.id === 'custom:one'), false);
+});
+
+test('custom team troop maximum survives storage, can be cleared and overrides estimates', () => {
+  const heroes = Object.fromEntries([1, 2, 3, 4, 5].map((id) => [id, {}]));
+  const base = { id: 'one', name: 'Raid', heroIds: [1, 2, 3, 4, 5] };
+  for (const maxTroops of [1, 2000, 6000]) {
+    const team = data.normalizeCustomTeam({ ...base, maxTroops }, heroes);
+    const stored = JSON.parse(JSON.stringify(team));
+    assert.equal(data.teamOptions({}, heroes, [stored])[0].maxTroops, maxTroops);
+    assert.equal(data.teamTroopCapacity(3950, stored.maxTroops), maxTroops);
+  }
+  for (const maxTroops of [0, -1, 1.5, '6000', Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(data.normalizeCustomTeam({ ...base, maxTroops }, heroes), null);
+  }
+  const cleared = data.normalizeCustomTeam({ ...base, maxTroops: undefined }, heroes);
+  assert.equal(cleared.maxTroops, undefined);
+  assert.equal(data.teamTroopCapacity(3950, cleared.maxTroops), 3950);
+  const troops = data.allocateTroops({ available: [7, 17, 27].map((unitId) => ({ unitId, count: 1000 })) }, 700);
+  assert.equal(troops.reduce((sum, unit) => sum + unit.count, 0), 700);
+  assert.equal(data.allocateTroops({ available: [{ unitId: 7, count: 100 }] }, 6000)[0].count, 100);
+});
+
+test('lowest power excludes deployed squad and march heroes and leaves incomplete teams incomplete', () => {
+  const heroes = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map((id) => [id, { power: id }]));
+  const summary = { squads: [{ heroes: [{ id: 1 }, { heroId: 2 }] }] };
+  const available = data.availableHeroIds(heroes, summary, [{ team: { heroIds: [3] } }]);
+  assert.deepEqual(Array.from(data.lowestPowerHeroes(heroes, available)), [4, 5, 6, 7, 8]);
+  assert.deepEqual(Array.from(data.teamOptions({}, heroes, [], available)[0].heroIds), [4, 5, 6, 7, 8]);
+  assert.equal(data.lowestPowerHeroes(heroes, [7, 8]).length, 2);
+});
+
 test('rally boss level maps to captured config range and squad rejects incomplete troops', () => {
   assert.equal(data.bossConfigId(1), 60);
   assert.equal(data.bossConfigId(30), 89);
