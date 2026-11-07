@@ -962,7 +962,7 @@
     return false;
   }
 
-  function extractEventGoals(cache) {
+  function extractEventGoals(cache, now = Date.now()) {
     const goalsMap = new Map();
     const towerCleared = isTowerCleared(cache);
 
@@ -977,7 +977,8 @@
       const finalHint = (isTower && towerCleared)
         ? 'Tower cleared today • No more chests available until daily reset'
         : hint;
-      const isLimited = (isTower && towerCleared) ? false : dailyLimitedKeys.has(key);
+      const isLimited = (isTower && towerCleared) ? false :
+        dailyLimitedKeys.has(key) || key.startsWith('act:daily_quest_');
 
       if (!goalsMap.has(key)) {
         const icon = goalIconMap[key] || (category === 'Resources' ? '💎' : '🎯');
@@ -1105,7 +1106,8 @@
     }
 
     // 4. Special Quest Events
-    const questEvents = cache?.questEvents?.data?.events;
+    const questData = globalThis.hwaHelperQuestData;
+    const questEvents = questData?.visibleMetadata(cache, now);
     if (Array.isArray(questEvents)) {
       for (const qe of questEvents) {
         const title = knownEventNames[qe.name_localeKey] || knownEventNames[qe.id] || qe.name_localeKey?.replace(/_/g, ' ') || `Special Event #${qe.id}`;
@@ -1128,19 +1130,17 @@
     }
 
     // 5. Special Quest Status (Detailed Chains & Daily Tasks from getSpecialQuestState / getDailyQuests)
-    const specialEvents = cache?.specialQuestStatus?.data?.events
-      || cache?.['getSpecialQuestState:quest']?.data?.events
-      || cache?.['getDailyQuests:quest']?.data?.events;
+    const specialEvents = questData?.visibleEvents(cache, now);
 
     if (Array.isArray(specialEvents)) {
       for (const ev of specialEvents) {
-        const evTitle = knownEventNames[ev.id] || `Special Event #${ev.id}`;
+        const evTitle = questData.title(ev);
         for (const group of ev.groups || []) {
           if (group.hide) continue;
           const questsList = Array.isArray(group.quests) ? group.quests : [];
           const activeQ = questsList.find((q) => q.state === 'inProgress');
           const completedCount = questsList.filter((q) => q.state === 'completed').length;
-          if (!activeQ && completedCount === questsList.length && questsList.length > 0) continue;
+          if (!activeQ) continue;
 
           const mapping = questLocaleMap[group.localeKey];
           const repeatLabel = group.repeatType === 'daily' ? 'Daily' : 'Chain';
@@ -1164,7 +1164,7 @@
               unit: mapping.unit || '',
               points: 0,
               stock,
-              hint
+              hint: `${hint} · Ends ${new Date(ev.end).toLocaleString()}`
             });
           } else if (group.localeKey) {
             const humanTitle = group.localeKey
@@ -1182,11 +1182,21 @@
               unit: 'tier',
               points: 0,
               stock: null,
-              hint: activeQ ? `In progress (${completedCount}/${questsList.length})` : `${completedCount} completed`
+              hint: `${activeQ ? `In progress (${completedCount}/${questsList.length})` :
+                `${completedCount} completed`} · Ends ${new Date(ev.end).toLocaleString()}`
             });
           }
         }
       }
+    }
+
+    for (const quest of questData?.dailyQuests(cache, now) || []) {
+      if (quest.state !== 'inProgress') continue;
+      const resetAt = questData.nextReset(cache, now);
+      addOrMergeGoal({ key: `act:daily_quest_${quest.id}`, title: questData.dailyTitle(quest),
+        category: 'Activities', eventName: 'Daily Quests', amount: 1, unit: 'quest',
+        hint: `Progress: ${quest.progress ?? 0} · ${resetAt ?
+          `Resets at ${new Date(resetAt).toLocaleString()}` : 'Resets daily'}` });
     }
 
     // 6. Game Quests (questGetAll - completed rewards ready to claim)

@@ -450,12 +450,25 @@ test('metadata-only MQTT pushes request authoritative RPC only when enabled', as
   }
   assert.deepEqual(forwardedMessages.map((item) =>
     Array.from(item.msg.calls, (call) => call.name)),
-    [['randomDraft_getInfo'], ['getPage'], ['questGetAll', 'questGetEvents'], ['getMarches']]);
+    [['randomDraft_getInfo'], ['getPage'],
+      ['getDailyQuests', 'getSpecialQuestState', 'questGetAll', 'questGetEvents'], ['getMarches']]);
   assert.ok(forwardedMessages.every((item) => item.msg.kind === 'queue-rpc'));
   local.socketRefreshMode = 'direct';
   await send('api-record', socket('randomDraft_statusChanged', {},
     '2026-11-05T14:57:40.389Z'), sender);
   assert.equal(forwardedMessages.at(-1).msg.kind, 'refresh-rpc');
+});
+
+test('full special quest MQTT snapshot updates cache without dispatching a duplicate RPC', async () => {
+  const { local, send, forwardedMessages } = setup();
+  local.popupRpcEnabled = true;
+  const result = await send('api-record', socket('specialQuestEvents', {
+    events: [{ id: 100273, start: 0, end: Date.now() + 86400000, viewId: 65,
+      groups: [{ id: 1070, hide: false, quests: [{ id: 11241, state: 'inProgress', progress: 5 }] }] }]
+  }), { ...gameSender, tab: { id: 42 } });
+  assert.equal(result.cached, true);
+  assert.equal(local.rpcCache.specialQuestStatus.data.events[0].groups[0].quests[0].progress, 5);
+  assert.equal(forwardedMessages.length, 0);
 });
 
 test('rally result push can create a return march and ignores sent or binary data', async () => {

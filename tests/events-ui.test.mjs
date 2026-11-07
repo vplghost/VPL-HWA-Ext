@@ -345,6 +345,7 @@ const clanVersusRulesJs = await readFile(new URL('../extension/clan-versus-rules
 const resourceDataJs = await readFile(new URL('../extension/resource-data.js', import.meta.url), 'utf8');
 const titanMetadataJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
 const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
+const questDataJs = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const towerBuffsJs = await readFile(new URL('../extension/tower-buffs.js', import.meta.url), 'utf8');
 const popupCss = await readFile(new URL('../extension/popup.css', import.meta.url), 'utf8');
@@ -382,6 +383,7 @@ vm.runInContext(towerBuffsJs, context);
 vm.runInContext(clanVersusRulesJs, context);
 vm.runInContext(resourceDataJs, context);
 vm.runInContext(titanMetadataJs, context);
+vm.runInContext(questDataJs, context);
 vm.runInContext(popupDataJs, context);
 context.Date = Date;
 context.resourceData = context.globalThis.hwaHelperResourceData;
@@ -535,7 +537,7 @@ test('Tower dialog resolves current relic choices and falls back for an unknown 
   assert.match(body.textContent, /Buff #999/);
 });
 
-test('Tower dialog shows draggable name-only buff pills with details and saves priority', () => {
+test('Tower dialog colors and icons buff pills while preserving details and drag priority', () => {
   const body = new MockElement('div');
   const badge = new MockElement('span');
   mockDoc.elementsById.set('tower-modal-body', body);
@@ -543,15 +545,24 @@ test('Tower dialog shows draggable name-only buff pills with details and saves p
   context.towerAutomationSettings = { accountId: 10, buffPriority: [17, 3] };
   context.renderTowerModal({ accountStatus: { data: { id: 10 } } });
   let pills = body.querySelectorAll('button').filter((button) => button.dataset.buffId);
-  assert.equal(pills[0].textContent, 'Siphoning Gauntlet');
-  assert.equal(pills[0].title, 'Restores Health when applying Control Effects');
+  assert.equal(pills[0].textContent, '17. Siphoning Gauntlet');
+  assert.equal(pills[0].title, 'Health · Restores Health when applying Control Effects');
+  assert.match(pills[0].className, /bg-emerald-100/);
   assert.equal(pills[0].draggable, true);
   assert.doesNotMatch(pills[0].textContent, /Restores Health|#17/);
+  const buff = (id) => pills.find((button) => button.dataset.buffId === String(id));
+  assert.match(buff(1).textContent, /^01\. Exploding Morningstar 💥$/);
+  assert.match(buff(8).className, /bg-rose-100/);
+  assert.match(buff(9).className, /bg-indigo-100/);
+  assert.match(buff(2).textContent, /🎯$/);
+  assert.match(buff(11).textContent, /🩸$/);
+  assert.match(buff(18).textContent, /🔇$/);
+  assert.match(buff(3).textContent, /✴$/);
   const transfer = { value: '', setData(_type, value) { this.value = value; }, getData() { return this.value; } };
   pills[1].dispatch('dragstart', { dataTransfer: transfer });
   pills[0].dispatch('drop', { dataTransfer: transfer, preventDefault() {} });
   pills = body.querySelectorAll('button').filter((button) => button.dataset.buffId);
-  assert.equal(pills[0].textContent, 'Hypno-Staff');
+  assert.equal(pills[0].textContent, '03. Hypno-Staff ✴');
   assert.equal(context.towerAutomationSettings.buffPriority[0], 3);
 });
 
@@ -579,7 +590,8 @@ test('renderEvents renders Guild Versus and active event cards', () => {
       data: { seasonId: 58, tries: 0, seasonStatus: { current: { stageType: 'REGULAR_STAGE', startHour: 7, endHour: 20 } } }
     },
     questEvents: {
-      data: { events: [{ id: 90249, name_localeKey: 'ADVENTURE_HERO62_TITLE_EVENT_UPGRADE' }] }
+      data: { events: [{ id: 90249, name_localeKey: 'ADVENTURE_HERO62_TITLE_EVENT_UPGRADE',
+        startTime: 0, endTime: Math.floor(Date.now() / 1000) + 86400, clientData: {} }] }
     }
   };
 
@@ -622,6 +634,27 @@ test('renderEvents filters cards according to search query', () => {
   assert.equal(container.children.length, 1);
   assert.ok(container.textContent.includes('Guild War Championship'));
   assert.equal(container.textContent.includes('Guild Versus'), false);
+});
+
+test('renderEvents shows visible MQTT quest events and excludes hidden metadata and views', () => {
+  const now = Date.now();
+  view.replaceChildren();
+  search.value = '';
+  context.renderEvents({
+    questEvents: { data: { events: [{ id: 90249, name_localeKey: 'ADVENTURE_HERO62_TITLE_EVENT_UPGRADE',
+      startTime: 0, endTime: Math.floor(now / 1000) + 86400,
+      clientData: { hideInSpecialQuestPopup: 1 } }] } },
+    specialQuestStatus: { updatedAt: new Date(now).toISOString(), data: { events: [
+      { id: 100273, viewId: 65, start: now - 1000, end: now + 86400000,
+        groups: [{ id: 1070, repeatType: 'daily', hide: false,
+          quests: [{ id: 11241, state: 'inProgress', progress: 5 }] }] },
+      { id: 100293, viewId: 29, start: now - 1000, end: now + 86400000,
+        groups: [{ id: 1122, quests: [{ id: 11874, state: 'inProgress' }] }] }
+    ] } }
+  });
+  assert.match(view.textContent, /Clan Clash Event/);
+  assert.match(view.textContent, /1 open milestones · 1 daily groups/);
+  assert.doesNotMatch(view.textContent, /Soleil Upgrade Event|Special Event #100293/);
 });
 
 test('openGuildVersusModal populates all 6 sections and displays modal', () => {
@@ -993,7 +1026,7 @@ test('renderGoals renders Activities and Resources with KPI bar, synergy badges,
       data: {
         events: [
           {
-            id: 100347,
+            id: 100347, viewId: 127, start: 0, end: Date.now() + 86400000,
             groups: [
               {
                 id: 101,

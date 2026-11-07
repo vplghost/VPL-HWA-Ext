@@ -199,7 +199,11 @@ function socketRefreshCalls(record, cache) {
   if (type === 'randomDraft_statusChanged') return [{ name: 'randomDraft_getInfo' }];
   if (type === 'newReport') return [{ name: 'getPage', feature: 'report',
     args: { limit: 10, cursor: null } }];
-  if (type === 'questUpdateAll') return [{ name: 'questGetAll' }, { name: 'questGetEvents' }];
+  if (type === 'questUpdateAll') return [
+    { name: 'getDailyQuests', feature: 'quest', args: {} },
+    { name: 'getSpecialQuestState', feature: 'quest', args: {} },
+    { name: 'questGetAll' }, { name: 'questGetEvents' }
+  ];
   if (type === 'rallyUserAutojoined' && typeof body?.rallyId === 'string') {
     return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } },
       { name: 'getMarches', feature: 'march' }];

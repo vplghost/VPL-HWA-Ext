@@ -290,7 +290,9 @@
         key, method: type, feature, group, data, updatedAt: record.timestamp
       });
       if (type === 'specialQuestEvents' && Array.isArray(body.events)) {
-        return [entry('specialQuestStatus', 'events', { events: body.events })];
+        return [entry('specialQuestStatus', 'events', {
+          events: body.events, accountId: body.pushUserId ?? null
+        })];
       }
       if (type === 'chatMessage' && body.chatType === 'clan' && body.id && body.userId) {
         const { id, userId, messageType, chatType, ctime, data, user } = body;
@@ -1084,6 +1086,11 @@
             data: { events: result.response },
             updatedAt: record.timestamp
           }];
+        }
+        if (call.name === 'user_getNextDayTime' && Number.isFinite(result?.response?.ts)) {
+          return [{ key: 'questResetStatus', method: call.name, feature: null,
+            group: 'events', data: { nextDayAt: result.response.ts * 1000 },
+            updatedAt: record.timestamp }];
         }
         if ((call.name === 'getSpecialQuestState' || call.name === 'getDailyQuests') && result?.response?.events) {
           return [{
@@ -2913,15 +2920,16 @@
           continue;
         }
         if (entry.key === 'specialQuestStatus') {
+          if (next.specialQuestStatus?.updatedAt > entry.updatedAt) continue;
+          const accountId = next.accountStatus?.data?.id;
+          if (accountId != null && entry.data?.accountId != null &&
+              String(accountId) !== String(entry.data.accountId)) continue;
           const existing = next.specialQuestStatus?.data?.events || [];
           const incoming = entry.data?.events || [];
+          const fullSnapshot = ['specialQuestEvents', 'getSpecialQuestState'].includes(entry.method);
           const evMap = new Map();
-          for (const ev of existing) {
-            if (ev?.id) evMap.set(ev.id, ev);
-          }
-          for (const ev of incoming) {
-            if (ev?.id) evMap.set(ev.id, ev);
-          }
+          for (const ev of fullSnapshot ? [] : existing) if (ev?.id) evMap.set(ev.id, ev);
+          for (const ev of incoming) if (ev?.id) evMap.set(ev.id, ev);
           next.specialQuestStatus = {
             key: 'specialQuestStatus',
             method: entry.method,

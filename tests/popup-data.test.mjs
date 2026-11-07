@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
 const context = {};
-for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'resource-data.js', 'hero-metadata.js', 'titan-metadata.js', 'hero-stat-data.js', 'popup-data.js']) {
+for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'resource-data.js', 'hero-metadata.js', 'titan-metadata.js', 'hero-stat-data.js', 'quest-data.js', 'popup-data.js']) {
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 const { heroSoulProgress, formatTitanArtifactLevels, isTitanArtifactUpgradable, exportTableData, teamRows, sortRows, isNumericColumn,
@@ -530,7 +530,7 @@ test('extractEventGoals groups activities and resources, calculates synergies, a
       data: {
         events: [
           {
-            id: 100347,
+            id: 100347, viewId: 127, start: 0, end: Date.now() + 86400000,
             groups: [
               {
                 id: 101,
@@ -617,7 +617,7 @@ test('extractEventGoals mines specialQuestStatus and questGetAll into goals and 
       data: {
         events: [
           {
-            id: 100347,
+            id: 100347, viewId: 127, start: 0, end: Date.now() + 86400000,
             groups: [
               {
                 id: 101,

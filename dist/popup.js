@@ -584,7 +584,10 @@ function refreshTimed() {
 
   const eventsBadge = document.querySelector('#events-tab-badge');
   if (eventsBadge) {
-    const hasActiveEvents = Boolean(currentCache.clanVersusStatus || currentCache.clanWarChampStatus || currentCache.clanClashStatus || currentCache.brawlStatus || currentCache.questEvents);
+    const hasActiveEvents = Boolean(currentCache.clanVersusStatus || currentCache.clanWarChampStatus ||
+      currentCache.clanClashStatus || currentCache.brawlStatus ||
+      globalThis.hwaHelperQuestData?.visibleEvents(currentCache).length ||
+      globalThis.hwaHelperQuestData?.visibleMetadata(currentCache).length);
     eventsBadge.hidden = !hasActiveEvents;
   }
   const heroesBadge = document.querySelector('#heroes-tab-badge');
@@ -3774,7 +3777,8 @@ function renderEvents(cache) {
   }
 
   // 5. Special Quest Events
-  const questEvents = cache.questEvents?.data?.events;
+  const questData = globalThis.hwaHelperQuestData;
+  const questEvents = questData?.visibleMetadata(cache);
   if (Array.isArray(questEvents)) {
     for (const qe of questEvents) {
       const titleMap = {
@@ -3801,6 +3805,28 @@ function renderEvents(cache) {
         }
       });
     }
+  }
+
+  for (const event of questData?.visibleEvents(cache) || []) {
+    const title = questData.title(event);
+    const open = event.groups.reduce((sum, group) => sum + group.quests.filter((quest) =>
+      quest.state === 'inProgress').length, 0);
+    const daily = event.groups.filter((group) => group.repeatType === 'daily' &&
+      group.quests.some((quest) => quest.state === 'inProgress')).length;
+    eventCards.push({ id: `specialQuest:${event.id}`, type: 'special_event',
+      title: `✨ ${title}`, searchStr: `special quest ${title}`.toLowerCase(),
+      render: () => {
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs';
+        const heading = document.createElement('div');
+        heading.className = 'font-bold text-slate-900 text-sm';
+        heading.textContent = `✨ ${title}`;
+        const detail = document.createElement('div');
+        detail.className = 'mt-1 text-xs text-slate-600';
+        detail.textContent = `${open} open milestones · ${daily} daily groups · Ends ${new Date(event.end).toLocaleString()}`;
+        card.append(heading, detail);
+        return card;
+      } });
   }
 
   // 6. Fortress Event
@@ -3931,6 +3957,34 @@ function renderTowerModal(cache = currentCache) {
   function renderBuffPriority() {
     const card = section('Buff priority');
     line(card, 'Drag a buff to set its priority. The first offered buff in this order is selected.');
+    const groups = [
+      { label: 'Physical', ids: [8, 14, 26, 30], classes: 'border-rose-300 bg-rose-100 text-rose-950' },
+      { label: 'Magic', ids: [9, 15, 27, 33, 45], classes: 'border-indigo-300 bg-indigo-100 text-indigo-950' },
+      { label: 'Physical + Magic', ids: [41], classes: 'border-fuchsia-300 bg-fuchsia-100 text-fuchsia-950' },
+      { label: 'Critical', ids: [2, 7, 13, 28, 29], classes: 'border-amber-300 bg-amber-100 text-amber-950' },
+      { label: 'Vampirism', ids: [11, 16], classes: 'border-pink-300 bg-pink-100 text-pink-950' },
+      { label: 'Control', ids: [3, 5, 18, 31, 32], classes: 'border-cyan-300 bg-cyan-100 text-cyan-950' },
+      { label: 'Health', ids: [17, 34, 35, 37], classes: 'border-emerald-300 bg-emerald-100 text-emerald-950' },
+      { label: 'Energy', ids: [6, 25, 38, 39, 46], classes: 'border-yellow-300 bg-yellow-100 text-yellow-950' },
+      { label: 'Defense', ids: [10, 12, 36, 42, 43], classes: 'border-slate-300 bg-slate-100 text-slate-900' },
+      { label: 'Damage', ids: [1, 4, 40], classes: 'border-orange-300 bg-orange-100 text-orange-950' },
+      { label: 'Utility', ids: [44], classes: 'border-violet-300 bg-violet-100 text-violet-950' }
+    ];
+    const effectIcons = {
+      1: '💥', 2: '🎯', 3: '✴', 4: '💥', 5: '✴', 7: '🎯', 11: '🩸', 13: '🎯',
+      16: '🩸', 18: '🔇', 26: '💥', 27: '💥', 28: '🎯', 29: '🎯', 30: '💥',
+      31: '👁', 32: '🔇', 33: '💥', 40: '💥', 41: '💥', 42: '💥', 45: '💥'
+    };
+    const legend = document.createElement('div');
+    legend.className = 'mb-2 flex flex-wrap gap-1.5';
+    legend.setAttribute('aria-label', 'Tower buff color legend');
+    for (const group of groups) {
+      const key = document.createElement('span');
+      key.className = `rounded-full border px-2 py-0.5 text-[10px] font-medium ${group.classes}`;
+      key.textContent = group.label;
+      legend.append(key);
+    }
+    card.append(legend);
     const catalog = globalThis.hwaHelperTowerBuffs || {};
     const ids = Object.keys(catalog).map(Number).sort((a, b) => a - b);
     const saved = towerAutomationSettings?.buffPriority || [];
@@ -3952,10 +4006,19 @@ function renderTowerModal(cache = currentCache) {
       const pill = document.createElement('button');
       pill.type = 'button'; pill.draggable = true;
       pill.dataset.buffId = String(id);
-      pill.className = 'cursor-grab rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-900 hover:bg-violet-100 active:cursor-grabbing';
-      pill.textContent = catalog[id].name;
-      pill.title = catalog[id].description;
-      pill.setAttribute('aria-label', `${catalog[id].name}, priority ${order.indexOf(id) + 1}. Use arrow keys to reorder.`);
+      const group = groups.find((item) => item.ids.includes(id));
+      pill.className = `cursor-grab rounded-full border px-3 py-1 text-xs font-medium active:cursor-grabbing ${
+        group?.classes || 'border-violet-200 bg-violet-50 text-violet-900'}`;
+      pill.textContent = `${String(id).padStart(2, '0')}. ${catalog[id].name}`;
+      if (effectIcons[id]) {
+        const icon = document.createElement('span');
+        icon.className = 'ml-1';
+        icon.textContent = effectIcons[id];
+        icon.setAttribute('aria-hidden', 'true');
+        pill.append(icon);
+      }
+      pill.title = `${group?.label || 'Other'} · ${catalog[id].description}`;
+      pill.setAttribute('aria-label', `Buff ${id}: ${catalog[id].name}, ${group?.label || 'Other'}, priority ${order.indexOf(id) + 1}. Use arrow keys to reorder.`);
       pill.addEventListener('dragstart', (event) => event.dataTransfer?.setData('text/plain', String(id)));
       pill.addEventListener('dragover', (event) => event.preventDefault());
       pill.addEventListener('drop', (event) => {
@@ -5360,6 +5423,9 @@ const refreshGroups = {
     { name: 'teamGetAll' },
     { name: 'refillableGetAll', feature: 'refillable' },
     { name: 'questGetAll' },
+    { name: 'getDailyQuests', feature: 'quest', args: {} },
+    { name: 'getSpecialQuestState', feature: 'quest', args: {} },
+    { name: 'user_getNextDayTime' },
     { name: 'missionGetAll' },
     { name: 'questGetEvents' },
     { name: 'artifact_getAll' },
@@ -5388,6 +5454,9 @@ const refreshGroups = {
   ],
   quests: [
     { name: 'questGetAll' },
+    { name: 'getDailyQuests', feature: 'quest', args: {} },
+    { name: 'getSpecialQuestState', feature: 'quest', args: {} },
+    { name: 'user_getNextDayTime' },
     { name: 'missionGetAll' },
     { name: 'questGetEvents' },
     { name: 'clanWarGetBriefInfo' }

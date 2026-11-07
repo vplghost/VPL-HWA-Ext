@@ -41,13 +41,22 @@
     activities.push(row('hydra', 'Hydra', '🐉', !hydra ? 'unknown' : tries > 0 ? 'pending' : 'info',
       !hydra ? unknown : `${hydra.tries ?? 0} regular · ${hydra.superTries ?? 0} super tries left`));
 
-    const daily = data('getDailyQuests:quest');
+    const questData = globalThis.hwaHelperQuestData;
     const quests = data('questGetAll');
-    const dailyList = Array.isArray(daily?.quests) ? daily.quests : null;
+    const dailyList = questData?.dailyQuests(cache, now) || null;
+    const openDaily = dailyList?.filter((quest) => quest.state === 'inProgress') || [];
     const ready = Array.isArray(quests) ? quests.filter((quest) => quest?.state === 2).length : 0;
-    const questRows = [row('daily-quests', 'Daily Quests', '📜', ready > 0 ? 'pending' : dailyList || Array.isArray(quests) ? 'info' : 'unknown',
-      dailyList ? `${dailyList.length} daily quests observed · ${ready} rewards ready to claim` :
+    const questRows = [row('daily-quests', 'Daily Quests', '📜', openDaily.length || ready ? 'pending' : dailyList || Array.isArray(quests) ? 'info' : 'unknown',
+      dailyList ? `${openDaily.length} remaining of ${dailyList.length} · ${ready} rewards ready to claim` :
         Array.isArray(quests) ? `${ready} quest rewards ready to claim · Daily list unavailable` : unknown)];
+    const eventDailies = (questData?.visibleEvents(cache, now) || []).flatMap((event) =>
+      event.groups.filter((group) => group.repeatType === 'daily' &&
+        group.quests.some((quest) => quest.state === 'inProgress')).map((group) => ({ event, group })));
+    if (eventDailies.length) {
+      const earliestEnd = Math.min(...eventDailies.map(({ event }) => event.end));
+      questRows.push(row('event-daily-quests', 'Event Daily Quests', '⏳', 'pending',
+        `${eventDailies.length} active groups · Earliest event ends ${new Date(earliestEnd).toLocaleString()}`));
+    }
 
     const dailyBonus = data('dailyBonusGetInfo');
     const zeppelin = data('zeppelinGiftGet');

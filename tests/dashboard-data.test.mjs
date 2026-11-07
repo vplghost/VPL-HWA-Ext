@@ -4,7 +4,9 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const source = await readFile(new URL('../extension/dashboard-data.js', import.meta.url), 'utf8');
+const questSource = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
 const context = { Date, Number, Array, globalThis: {} };
+vm.runInNewContext(questSource, context);
 vm.runInNewContext(source, context);
 const { dailyDashboard } = context.globalThis.hwaHelperDashboardData;
 const now = new Date('2026-11-06T12:00:00Z').getTime();
@@ -33,7 +35,7 @@ test('daily dashboard groups activities before quests and gifts', () => {
   assert.equal(model.activities[2].state, 'info');
   assert.equal(model.activities[2].detail, 'Rank 456 · 0 battles left today');
   assert.match(model.activities[3].detail, /2 attempts left/);
-  assert.equal(model.quests[0].detail, '2 daily quests observed · 1 rewards ready to claim');
+  assert.equal(model.quests[0].detail, '0 remaining of 2 · 1 rewards ready to claim');
   assert.equal(model.gifts[0].state, 'pending');
   assert.equal(model.gifts[1].state, 'info');
   assert.equal(model.gifts[2].state, 'pending');
