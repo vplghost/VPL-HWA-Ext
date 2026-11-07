@@ -41,7 +41,6 @@ const DEFAULT_TAB_CONFIG = [
   { id: 'teams', label: 'Teams' },
   { id: 'events', label: 'Events' },
   { id: 'goals', label: 'Goals' },
-  { id: 'experimental', label: 'Experimental' },
   { id: 'log', label: 'Log' }
 ];
 
@@ -54,6 +53,16 @@ const experimentalSelection = { rallyTeam: '', gatherTeam: 'weakest', bossLevel:
   waitSeconds: 300, minMembers: 4, autoCancel: true, raidCount: 2, targetMobId: '', mineType: 'food', mineLevel: 1, mineId: '', units: '' };
 let raidPreferencesLoaded = false;
 let raidQueueState = null;
+const monsterSelection = { teamId: '', level: 1, count: 2, targetMobId: '' };
+let monsterPreferencesAccount = null;
+let monsterQueueState = null;
+let monsterMessage = '';
+function saveMonsterPreferences() {
+  return chrome.storage.local.set({ monsterPreferences: {
+    accountId: currentCache.accountStatus?.data?.id,
+    teamId: monsterSelection.teamId, level: monsterSelection.level, count: monsterSelection.count
+  } });
+}
 let towerAutomationSettings = { accountId: null, buffPriority: [] };
 let towerSettingsLoadedFor = null;
 let towerRunState = null;
@@ -3500,16 +3509,26 @@ function renderDashboard(cache) {
   const subtitle = document.createElement('p');
   subtitle.className = 'mt-1 text-xs text-slate-300';
   subtitle.textContent = 'Live game snapshots update as you play. Unknown items need a fresh game snapshot.';
-  const raidButton = document.createElement('button');
-  raidButton.type = 'button'; raidButton.textContent = 'Raid';
-  raidButton.className = 'mt-3 cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500';
-  raidButton.setAttribute('aria-haspopup', 'dialog');
-  raidButton.setAttribute('aria-controls', 'raid-dialog');
-  raidButton.addEventListener('click', () => {
-    renderExperimental(currentCache, true);
-    document.querySelector('#raid-dialog').showModal();
-  });
-  intro.append(heading, subtitle, raidButton);
+  const actions = document.createElement('div');
+  actions.className = 'mt-3 flex flex-wrap gap-2';
+  const dialogButton = (id, label, dialogId, color, open) => {
+    const control = document.createElement('button');
+    control.id = id; control.type = 'button'; control.textContent = label;
+    control.className = `cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-white ${color}`;
+    control.setAttribute('aria-haspopup', 'dialog');
+    control.setAttribute('aria-controls', dialogId);
+    control.addEventListener('click', () => {
+      open(); document.querySelector(`#${dialogId}`).showModal();
+    });
+    actions.append(control);
+  };
+  dialogButton('open-raid-dialog', 'Raid', 'raid-dialog', 'bg-blue-600 hover:bg-blue-500',
+    () => renderExperimental(currentCache, true));
+  dialogButton('open-gather-dialog', 'Gathering', 'gather-dialog', 'bg-teal-600 hover:bg-teal-500',
+    () => renderExperimental(currentCache));
+  dialogButton('open-monster-dialog', 'Monster', 'monster-dialog', 'bg-orange-600 hover:bg-orange-500',
+    () => renderMonster(currentCache));
+  intro.append(heading, subtitle, actions);
   container.append(intro);
 
   for (const group of groups) {
@@ -4579,7 +4598,7 @@ function renderConfigOther(cache) {
     !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
       'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
       'accountStatus', 'buildingStatus', 'marchStatus', 'soloMobMap',
-      'experimentalMapContext', 'experimentalRallySearch', 'experimentalRallyHistory',
+      'experimentalMapContext', 'experimentalRallySearch', 'experimentalSoloSearch', 'experimentalRallyHistory',
       'experimentalActionStatus', 'experimentalLastSquad', 'wheelFortuneStatus',
       'researchStatus', 'productionConfigStatus', 'productionStatus',
       'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents',
@@ -4923,10 +4942,7 @@ function renderCustomTeams(cache) {
   }
 }
 
-function renderExperimental(cache, raidOnly = false) {
-  const host = raidOnly ? document.querySelector('#raid-dialog-body') : view;
-  if (raidOnly) host.replaceChildren();
-  const data = globalThis.hwaHelperExperimentalData;
+function syncExperimentalPending(cache) {
   if (experimentalPending && (!popupRpcEnabled ||
       (experimentalPending.queued && (currentRpcPolicy.mode === 'direct' || !currentRpcPolicy.monitor)))) {
     experimentalPending = null;
@@ -4942,6 +4958,148 @@ function renderExperimental(cache, raidOnly = false) {
     experimentalMessage = `${experimentalPending.name}: no game result received before the request timeout.`;
     experimentalPending = null;
   }
+}
+
+function renderMonster(cache) {
+  const host = document.querySelector('#monster-dialog-body');
+  host.replaceChildren();
+  syncExperimentalPending(cache);
+  const data = globalThis.hwaHelperExperimentalData;
+  const heroes = cache.heroGetAll?.data || {};
+  const available = data.availableHeroIds(heroes, cache['getUnitSummary:unit']?.data,
+    cache.marchStatus?.data?.marches);
+  const teams = data.teamOptions(cache.teamGetAll?.data, heroes, render.customTeams || [], available);
+  if (!teams.some((team) => team.id === monsterSelection.teamId)) {
+    monsterSelection.teamId = teams.find((team) => team.heroIds.length === 5)?.id || teams[0]?.id || '';
+  }
+  const team = teams.find((item) => item.id === monsterSelection.teamId);
+  const section = document.createElement('section');
+  section.className = 'm-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3';
+  host.append(section);
+  const heading = document.createElement('h3');
+  heading.className = 'font-semibold text-slate-900'; heading.textContent = 'Attack setup'; section.append(heading);
+  const field = (label, control) => {
+    const wrap = document.createElement('label');
+    wrap.className = 'block min-w-0 text-xs font-medium text-slate-600';
+    wrap.textContent = label;
+    control.className = 'mt-1 block h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-900';
+    wrap.append(control); return wrap;
+  };
+  const button = (parent, label, action, disabled = false) => {
+    const el = document.createElement('button'); el.type = 'button'; el.textContent = label;
+    el.className = 'inline-flex h-10 cursor-pointer items-center justify-center rounded-lg bg-orange-600 px-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40';
+    el.disabled = disabled; el.addEventListener('click', action); parent.append(el); return el;
+  };
+  const note = (text) => { const p = document.createElement('p'); p.className = 'text-xs text-slate-600';
+    p.textContent = text; section.append(p); };
+  const teamSelect = document.createElement('select');
+  for (const item of teams) {
+    const option = document.createElement('option'); option.value = item.id;
+    option.textContent = `${item.label} (${item.heroIds.length}/5)`; teamSelect.append(option);
+  }
+  teamSelect.value = monsterSelection.teamId;
+  teamSelect.addEventListener('change', () => {
+    monsterSelection.teamId = teamSelect.value; saveMonsterPreferences(); render();
+  });
+  section.append(field('Lineup', teamSelect));
+  note((team?.heroIds || []).map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed.');
+  const cap = data.capacityModel(team?.heroIds, heroes, cache.troopCapacityEvidence?.data,
+    troopCapacitySettings, cache.accountStatus?.data?.id).total;
+  const maxTroops = data.teamTroopCapacity(cap, team?.maxTroops);
+  const units = data.allocateTroops(cache['getUnitSummary:unit']?.data, maxTroops);
+  note(`Troops: ${formatNumber(units.reduce((sum, unit) => sum + unit.count, 0))} / ${formatNumber(maxTroops || 0)} · World Energy: 10 per attack`);
+  const levelRow = document.createElement('div'); levelRow.className = 'grid grid-cols-2 items-end gap-3';
+  const level = document.createElement('select');
+  for (let value = 1; value <= 30; value++) {
+    const option = document.createElement('option'); option.value = String(value);
+    option.textContent = `Level ${value}`; level.append(option);
+  }
+  level.value = String(monsterSelection.level);
+  level.addEventListener('change', () => {
+    monsterSelection.level = Number(level.value); monsterSelection.targetMobId = '';
+    saveMonsterPreferences(); render();
+  });
+  levelRow.append(field('Monster level', level));
+  const searchWrap = document.createElement('div'); searchWrap.className = 'flex items-end';
+  const context = cache.experimentalMapContext?.data || {};
+  const center = context.center || context.outposts?.[cache.accountStatus?.data?.id];
+  const searchDisabled = !popupRpcEnabled || !!experimentalPending || !context.mapId || !center;
+  button(searchWrap, 'Find monsters', () => experimentalRpc([{ name: 'searchMob', feature: 'mob', args: {
+    mapId: context.mapId, center, mobType: 'solo',
+    mobConfigIds: data.soloMonsterConfigIds(monsterSelection.level)
+  } }], 'Searching monsters...'), searchDisabled);
+  levelRow.append(searchWrap); section.append(levelRow);
+  const found = cache.experimentalSoloSearch?.data;
+  const configs = data.soloMonsterConfigIds(monsterSelection.level);
+  const matching = found?.mapId === context.mapId && Array.isArray(found.mobConfigIds) &&
+    found.mobConfigIds.length === configs.length && found.mobConfigIds.every((id, i) => id === configs[i]);
+  const targets = matching ? found.mobs || [] : [];
+  const targetSelect = document.createElement('select');
+  for (const [index, target] of targets.entries()) {
+    const option = document.createElement('option'); option.value = target.mobId;
+    option.textContent = `Monster ${index + 1} · (${target.coordinates?.x ?? '?'}, ${target.coordinates?.y ?? '?'})`;
+    targetSelect.append(option);
+  }
+  if (!targets.some((target) => target.mobId === monsterSelection.targetMobId)) {
+    monsterSelection.targetMobId = targets[0]?.mobId || '';
+  }
+  targetSelect.value = monsterSelection.targetMobId;
+  targetSelect.addEventListener('change', () => { monsterSelection.targetMobId = targetSelect.value; });
+  section.append(field(`Target (${targets.length} found)`, targetSelect));
+  const count = document.createElement('input'); count.type = 'number'; count.min = '2'; count.max = '100'; count.step = '1';
+  count.value = String(monsterSelection.count);
+  count.addEventListener('input', () => { monsterSelection.count = Number(count.value); saveMonsterPreferences(); });
+  section.append(field('Number of attacks', count));
+  const running = monsterQueueState && !['stopped', 'complete'].includes(monsterQueueState.phase);
+  const actions = document.createElement('div'); actions.className = 'flex flex-wrap gap-3'; section.append(actions);
+  const cannotStart = !popupRpcEnabled || running || !!experimentalPending || !monsterSelection.targetMobId ||
+    team?.heroIds?.length !== 5 || !data.buildSquad(team.heroIds, units);
+  const start = async (attackCount) => {
+    const response = await chrome.runtime.sendMessage({ kind: 'monster-queue-start', options: {
+      mapId: context.mapId, center, level: monsterSelection.level,
+      firstMobId: monsterSelection.targetMobId, heroIds: team.heroIds,
+      teamId: team.id, maxTroops: team.maxTroops, count: attackCount
+    } }).catch((error) => ({ error: String(error) }));
+    monsterMessage = response?.ok ? (response.queued ? 'Attack queued for the next game RPC.' :
+      'Attack sent. Waiting for confirmation.') : response?.error || 'Could not start monster attack.';
+    render();
+  };
+  button(actions, 'Attack once', () => start(1), cannotStart);
+  button(actions, 'Start queue', () => {
+    const value = Number(count.value);
+    if (!Number.isInteger(value) || value < 2 || value > 100) {
+      monsterMessage = 'Queue needs 2–100 attacks. Use Attack once for one monster.'; render(); return;
+    }
+    monsterSelection.count = value; saveMonsterPreferences(); start(value);
+  }, cannotStart);
+  if (monsterQueueState) {
+    note(`${running ? 'Queue' : 'Previous queue'}: ${monsterQueueState.phase} · ${data.soloMonsterLevel(monsterQueueState.current?.mobConfigId) ?
+      `level ${data.soloMonsterLevel(monsterQueueState.current.mobConfigId)} · ` : ''}${globalThis.hwaHelperMonsterQueue.confirmedWins(monsterQueueState)} won / ${monsterQueueState.options?.count || 0} requested${monsterQueueState.reason ? ` · ${monsterQueueState.reason}` : ''}`);
+    if (running) button(section, 'Stop queue', async () => {
+      await chrome.runtime.sendMessage({ kind: 'monster-queue-stop' }); render();
+    });
+    for (const item of monsterQueueState.recentResults || []) {
+      note(`${data.soloMonsterLevel(item.mobConfigId) ? `Level ${data.soloMonsterLevel(item.mobConfigId)}` : 'Monster'} · ${item.result} · ${new Date(item.at).toLocaleString()}`);
+    }
+  }
+  const reports = cache.soloAttackResults?.data || [];
+  if (reports.length) {
+    const title = document.createElement('h3'); title.className = 'text-xs font-semibold text-slate-800';
+    title.textContent = 'Recent attack results'; section.append(title);
+    for (const item of reports.slice(0, 5)) note(`${data.soloMonsterLevel(item.mobConfigId) ?
+      `Level ${data.soloMonsterLevel(item.mobConfigId)}` : 'Monster'} · ${item.result} · ${new Date(item.createdAt).toLocaleString()}`);
+  }
+  if (monsterMessage) note(monsterMessage);
+  if (experimentalMessage) note(experimentalMessage);
+  if (!popupRpcEnabled) note('Enable Allow popup RPC calls in Settings to attack monsters.');
+  if (!context.mapId) note('Open the world map in game to capture its map ID.');
+}
+
+function renderExperimental(cache, raidOnly = false) {
+  const host = document.querySelector(raidOnly ? '#raid-dialog-body' : '#gather-dialog-body');
+  host.replaceChildren();
+  const data = globalThis.hwaHelperExperimentalData;
+  syncExperimentalPending(cache);
   const heroes = cache.heroGetAll?.data || {};
   const available = data.availableHeroIds(heroes, cache['getUnitSummary:unit']?.data, cache.marchStatus?.data?.marches);
   const teams = data.teamOptions(cache.teamGetAll?.data, heroes, render.customTeams || [], available);
@@ -5298,19 +5456,20 @@ function renderExperimental(cache, raidOnly = false) {
     button(row, 'Recall', () => experimentalRpc([{ name: 'stopMineGathering', feature: 'mine',
       args: { squadId: march.squadId } }], 'Recalling team...'), !popupRpcEnabled || !!experimentalPending || !march.squadId);
   }
-  if (experimentalMessage) note(view, experimentalMessage);
-  status.textContent = popupRpcEnabled ? 'Experimental actions use the active game tab.' :
-    'Enable Allow popup RPC calls in Settings to use Experimental actions.';
+  if (experimentalMessage) note(host, experimentalMessage);
+  if (!popupRpcEnabled) note(host, 'Enable Allow popup RPC calls in Settings to use gathering actions.');
 }
 
 async function experimentalRpc(calls, message) {
   if (!popupRpcEnabled) { experimentalMessage = 'Enable popup RPC calls in Settings.'; render(); return; }
   if (experimentalPending) return;
-  experimentalPending = { name: calls[0].name, sentAt: Date.now() };
+  const pending = { name: calls[0].name, sentAt: Date.now() };
+  experimentalPending = pending;
   experimentalMessage = message;
   const response = await chrome.runtime.sendMessage({ kind: 'experimental-rpc', calls }).catch((error) => ({ error: String(error) }));
+  if (experimentalPending !== pending) return;
   if (response?.ok) {
-    if (experimentalPending) experimentalPending.queued = response.queued === true;
+    pending.queued = response.queued === true;
     experimentalMessage = response.queued ? 'Queued for the next game RPC (up to two minutes).' : 'RPC sent. Waiting for game result...';
     setTimeout(() => { if (experimentalPending?.name === calls[0].name) render(); }, response.queued ? 121000 : 31000);
   }
@@ -5323,7 +5482,7 @@ async function experimentalRpc(calls, message) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
@@ -5336,6 +5495,18 @@ async function render() {
     towerSettingsLoadedFor = String(towerAccountId);
   }
   raidQueueState = stored.raidQueue || null;
+  monsterQueueState = stored.monsterQueue || null;
+  const monsterAccount = String(cache.accountStatus?.data?.id ?? '');
+  if (monsterPreferencesAccount !== monsterAccount) {
+    const saved = stored.monsterPreferences;
+    monsterSelection.teamId = String(saved?.accountId) === monsterAccount ? saved.teamId || '' : '';
+    monsterSelection.level = String(saved?.accountId) === monsterAccount &&
+      Number.isInteger(saved.level) && saved.level >= 1 && saved.level <= 30 ? saved.level : 1;
+    monsterSelection.count = String(saved?.accountId) === monsterAccount &&
+      Number.isInteger(saved.count) && saved.count >= 2 && saved.count <= 100 ? saved.count : 2;
+    monsterSelection.targetMobId = '';
+    monsterPreferencesAccount = monsterAccount;
+  }
   troopCapacitySettings = globalThis.hwaHelperExperimentalData?.normalizeCapacitySettings(stored.troopCapacitySettings) || troopCapacitySettings;
   if (!raidPreferencesLoaded && cache.accountStatus?.data?.id) {
     const saved = stored.raidPreferences;
@@ -5405,6 +5576,8 @@ async function render() {
   const towerModal = document.querySelector('#tower-modal');
   if (towerModal && !towerModal.hidden) renderTowerModal(cache);
   if (document.querySelector('#raid-dialog')?.open) renderExperimental(cache, true);
+  if (document.querySelector('#gather-dialog')?.open) renderExperimental(cache);
+  if (document.querySelector('#monster-dialog')?.open) renderMonster(cache);
   const draftModal = document.querySelector('#draft-modal');
   if (draftModal && !draftModal.hidden) {
     const modalBody = document.querySelector('#draft-modal-body');
@@ -5424,7 +5597,7 @@ async function render() {
     'cursor-pointer rounded-lg border border-slate-300 bg-slate-800 px-3 py-2 font-medium text-white hover:bg-slate-700' :
     'cursor-pointer rounded-lg border border-red-300 bg-red-50 px-3 py-2 font-medium text-red-800 hover:bg-red-100';
   view.replaceChildren();
-  document.querySelector('#toolbar').hidden = activeTab === 'config' || activeTab === 'experimental' || activeTab === 'dashboard';
+  document.querySelector('#toolbar').hidden = activeTab === 'config' || activeTab === 'dashboard';
   document.querySelector('#settings-panel').hidden = activeTab !== 'config';
   view.hidden = activeTab === 'config';
   document.querySelector('#export').hidden = activeTab !== 'log';
@@ -5457,9 +5630,6 @@ async function render() {
     chrome.storage?.local?.get?.('gameEngineStatus')?.then?.((stored) => {
       renderEngineStatus(stored?.gameEngineStatus);
     });
-  } else if (activeTab === 'experimental') {
-    renderExperimental(cache);
-
   } else if (activeTab === 'heroes') {
     showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Equipment rank', 'Soul stones', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, hero]) => {
@@ -5507,7 +5677,7 @@ async function render() {
       !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
         'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
         'accountStatus', 'buildingStatus', 'marchStatus',
-        'experimentalMapContext', 'experimentalRallySearch', 'experimentalRallyHistory',
+        'experimentalMapContext', 'experimentalRallySearch', 'experimentalSoloSearch', 'experimentalRallyHistory',
         'experimentalActionStatus', 'experimentalLastSquad', 'wheelFortuneStatus',
         'researchStatus', 'productionConfigStatus', 'productionStatus',
         'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents', 'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry.key)
@@ -6097,7 +6267,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
         'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'troopCapacitySettings' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
-    if ('troopCapacitySettings' in changes || 'raidQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {

@@ -12,6 +12,7 @@
   let assistedMode = false;
   let recordingActive = false;
   let triggerTemplate = null;
+  let viewedChunks = null;
   let lastTriggerAt = -Infinity;
   const syntheticEvents = new WeakSet();
   const reportTrigger = (state) => window.postMessage({
@@ -28,8 +29,31 @@
       if (!captureEnabled || !popupRpcEnabled) triggerTemplate = null;
       return;
     }
+    if (event.data?.source === 'hwa-helper-api' && event.data.kind === 'api-record') {
+      rememberViewedChunks(event.data.record);
+      return;
+    }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'mqtt-rpc-nudge') triggerGameRefresh();
   });
+
+  function rememberViewedChunks(record) {
+    if (record?.transport !== 'fetch' || record.method !== 'POST' ||
+        record.endpoint !== 'https://api.hero-wars-alliance.com/api/rpc' ||
+        record.requestBodyTruncated || typeof record.requestBody !== 'string' ||
+        record.requestBody.length > MAX_PAYLOAD_BYTES) return;
+    try {
+      const calls = JSON.parse(record.requestBody)?.calls;
+      const native = calls?.find((call) => call.name === 'getChunks' &&
+        call.feature === 'globalMap' && typeof call.args?.mapId === 'string' &&
+        Array.isArray(call.args?.chunkCoordinates));
+      if (!native) return;
+      const coordinates = native.args.chunkCoordinates.filter((item) =>
+        Number.isInteger(item?.x) && Number.isInteger(item?.y)).slice(-32)
+        .map(({ x, y }) => ({ x, y }));
+      if (coordinates.length) viewedChunks = { mapId: native.args.mapId,
+        observedAt: Date.now(), coordinates };
+    } catch (_) {}
+  }
 
   function rememberTrigger(packet, state) {
     if (packet.payload.length > MAX_PAYLOAD_BYTES || packet.topic.length > 512) return;
@@ -40,8 +64,17 @@
           !Array.isArray(chunks) || !chunks.length || chunks.length > 32 ||
           chunks.some((chunk) => !Number.isInteger(chunk?.x) || !Number.isInteger(chunk?.y) ||
             !Number.isFinite(chunk?.updatedAt))) return;
-      triggerTemplate = { state, topic: packet.topic, observedAt: Date.now(),
-        chunks: chunks.map(({ x, y, updatedAt }) => ({ x, y, updatedAt })) };
+      const observedAt = Date.now();
+      const previous = triggerTemplate?.state === state && triggerTemplate.topic === packet.topic ?
+        triggerTemplate.chunks.filter((chunk) => observedAt - chunk.observedAt <= 60000) : [];
+      const byCoordinate = new Map(previous.map((chunk) => [`${chunk.x}:${chunk.y}`, chunk]));
+      for (const { x, y, updatedAt } of chunks) {
+        const key = `${x}:${y}`;
+        byCoordinate.delete(key);
+        byCoordinate.set(key, { x, y, updatedAt, observedAt });
+      }
+      triggerTemplate = { state, topic: packet.topic, observedAt,
+        chunks: [...byCoordinate.values()].slice(-32) };
     } catch (_) {}
   }
 
@@ -54,11 +87,22 @@
     if (Date.now() - lastTriggerAt < 5000) return reportTrigger('cooldown');
     if (typeof MessageEvent !== 'function' || typeof sample.state.socket.dispatchEvent !== 'function') return reportTrigger('error');
     try {
+      const chunks = new Map(sample.chunks.map((chunk) => [`${chunk.x}:${chunk.y}`, chunk]));
+      if (viewedChunks && Date.now() - viewedChunks.observedAt <= 60000 &&
+          sample.topic.endsWith(`/${viewedChunks.mapId}`)) {
+        const latestTimestamp = Math.max(...sample.chunks.map((chunk) => chunk.updatedAt));
+        for (const { x, y } of viewedChunks.coordinates) {
+          const key = `${x}:${y}`;
+          const chunk = chunks.get(key);
+          chunks.delete(key);
+          chunks.set(key, chunk || { x, y, updatedAt: latestTimestamp });
+        }
+      }
       const encoder = new TextEncoder();
       const topic = encoder.encode(sample.topic);
       const payload = encoder.encode(JSON.stringify({ method: 'msg', result: {
-        type: 'mapChunksUpdated', body: { chunks: sample.chunks.map((chunk) => ({
-          ...chunk, updatedAt: Math.max(Date.now(), chunk.updatedAt + 1)
+        type: 'mapChunksUpdated', body: { chunks: [...chunks.values()].slice(-32).map(({ x, y, updatedAt }) => ({
+          x, y, updatedAt: Math.max(Date.now(), updatedAt + 1)
         })) }
       } }));
       // A fresh QoS0 PUBLISH avoids reusing packet IDs or server push counters.

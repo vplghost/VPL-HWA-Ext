@@ -9,6 +9,7 @@ const cacheSource = await readFile(new URL('../extension/rpc-cache.js', import.m
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const experimentalSource = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
 const raidSource = await readFile(new URL('../extension/raid-queue.js', import.meta.url), 'utf8');
+const monsterSource = await readFile(new URL('../extension/monster-queue.js', import.meta.url), 'utf8');
 const towerAutomationSource = await readFile(new URL('../extension/tower-automation.js', import.meta.url), 'utf8');
 const towerRunnerSource = await readFile(new URL('../extension/tower-runner.js', import.meta.url), 'utf8');
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
@@ -55,7 +56,7 @@ function setup(quota = Infinity) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
@@ -122,6 +123,58 @@ test('managed raid queue uses shared policy, pins one game tab and waits for ret
     assert.equal(local.raidQueue.phase, 'stopped');
     assert.equal(forwardedMessages.at(-1).msg.kind, 'drop-rpc-group');
   }
+});
+
+test('monster queue dispatches one attack at a time and stops after a correlated loss', async () => {
+  const env = setup();
+  const { local, tabsList, forwardedMessages, listener } = env;
+  local.popupRpcEnabled = true; local.socketRefreshMode = 'direct';
+  tabsList.push({ id: 1, url: gameSender.url });
+  local.rpcCache = { accountStatus: { data: { id: 10 } },
+    heroGetAll: { data: Object.fromEntries([1, 2, 3, 4, 5].map((id) =>
+      [id, { level: 30, star: 2, power: 100, troopCapacity: 500 }])) },
+    'getUnitSummary:unit': { data: { available: [7, 17, 27].map((unitId) => ({ unitId, count: 5000 })) } },
+    experimentalSoloSearch: { data: { mapId: 'map', mobConfigIds: [37, 67],
+      mobs: [{ mobId: 'mob-a' }, { mobId: 'mob-b' }] } },
+    'resource:world-energy': { data: { amount: 100 } } };
+  const invoke = (message, sender = popupSender) => new Promise((resolve) => listener(message, sender, resolve));
+  const response = await invoke({ kind: 'monster-queue-start', options: {
+    mapId: 'map', center: { x: 1, y: 2 }, level: 15, heroIds: [1, 2, 3, 4, 5],
+    firstMobId: 'mob-a', count: 2
+  } });
+  assert.equal(response.ok, true);
+  assert.equal(forwardedMessages.at(-1).msg.calls[0].name, 'attackMob');
+  assert.equal(forwardedMessages.at(-1).msg.calls[0].args.mobId, 'mob-a');
+  const answer = async (bodies) => {
+    const calls = forwardedMessages.at(-1).msg.calls.map((call, ident) => ({ ...call, ident: String(ident) }));
+    await env.send('api-record', rpc(calls, bodies.map((body, ident) => ({ ident: String(ident), result: { response: body } })),
+      new Date(Date.now() + 1000).toISOString()), { ...gameSender, tab: { id: 1 } });
+  };
+  await answer([{ squadId: 'squad-a', route: { routeId: 'route-a', startedAt: Date.now(), durationMs: 1000 } }]);
+  assert.equal(local.monsterQueue.phase, 'active');
+  const count = forwardedMessages.length;
+  await env.send('api-record', socket('mobSoloAttackResult', { squadId: 'wrong', mobId: 'mob-a',
+    battleResult: { battleResult: 'win' } }, new Date(Date.now() + 2000).toISOString()),
+  { ...gameSender, tab: { id: 1 } });
+  assert.equal(forwardedMessages.length, count);
+  await env.send('api-record', socket('mobSoloAttackResult', { squadId: 'squad-a', mobId: 'mob-a', mobConfigId: 67,
+    battleResult: { battleResult: 'win' } }, new Date(Date.now() + 3000).toISOString()),
+  { ...gameSender, tab: { id: 1 } });
+  assert.equal(local.monsterQueue.completed, 0);
+  await env.send('api-record', socket('returnFromMobCompleted', { squadId: 'squad-a' },
+    new Date(Date.now() + 4000).toISOString()), { ...gameSender, tab: { id: 1 } });
+  assert.equal(local.monsterQueue.completed, 1);
+  assert.equal(forwardedMessages.at(-1).msg.calls[0].name, 'heroGetAll');
+  await answer([local.rpcCache.heroGetAll.data, local.rpcCache['getUnitSummary:unit'].data]);
+  assert.equal(local.monsterQueue.phase, 'attacking', JSON.stringify(local.monsterQueue));
+  assert.equal(forwardedMessages.at(-1).msg.calls[0].args.mobId, 'mob-b');
+  await answer([{ squadId: 'squad-b', route: { routeId: 'route-b', startedAt: Date.now(), durationMs: 1000 } }]);
+  await env.send('api-record', socket('mobSingleAttackResult', { squadId: 'squad-b', mobId: 'mob-b', mobConfigId: 67,
+    battleResult: { battleResult: 'lose' } }, new Date(Date.now() + 5000).toISOString()),
+  { ...gameSender, tab: { id: 1 } });
+  assert.equal(local.monsterQueue.phase, 'stopped');
+  assert.match(local.monsterQueue.reason, /lost/);
+  assert.equal(forwardedMessages.at(-1).msg.kind, 'drop-rpc-group');
 });
 
 test('cancel queue clears pending bosses without sending cancelRally for the active raid', async () => {

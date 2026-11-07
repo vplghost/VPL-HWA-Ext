@@ -108,6 +108,8 @@ test('rally search retains map context and candidate boss IDs for the experiment
   const first = cache.merge({}, [solo]).cache;
   const second = cache.merge(first, [rally]).cache;
   assert.equal(second.experimentalMapContext.data.mapId, 'map-1');
+  assert.equal(second.experimentalSoloSearch.data.mapId, 'map-1');
+  assert.deepEqual(Array.from(second.experimentalSoloSearch.data.mobConfigIds), [37]);
   assert.equal(second.experimentalRallySearch.data.mobs[0].mobId, 'boss-1');
   assert.equal(second.experimentalRallySearch.data.mobConfigIds[0], 60);
 });

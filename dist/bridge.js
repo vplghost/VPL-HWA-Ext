@@ -158,11 +158,15 @@ try {
     }
     if (area !== 'local') return;
     if ('raidQueue' in changes) scheduleRaidWake(changes.raidQueue.newValue);
+    if ('monsterQueue' in changes) scheduleMonsterWake(changes.monsterQueue.newValue);
     if ('towerRun' in changes) scheduleTowerWake(changes.towerRun.newValue);
     if (('captureSettings' in changes || 'popupRpcEnabled' in changes) && typeof raidWakeTimer !== 'undefined') {
-      chrome.storage.local.get(['raidQueue', 'towerRun']).then((stored) => {
+      chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun']).then((stored) => {
         if (stored.raidQueue && !['stopped', 'complete'].includes(stored.raidQueue.phase)) {
           chrome.runtime.sendMessage({ kind: 'raid-queue-tick' }).catch(() => {});
+        }
+        if (stored.monsterQueue && !['stopped', 'complete'].includes(stored.monsterQueue.phase)) {
+          chrome.runtime.sendMessage({ kind: 'monster-queue-tick' }).catch(() => {});
         }
         if (stored.towerRun && !['stopped', 'complete'].includes(stored.towerRun.phase)) {
           chrome.runtime.sendMessage({ kind: 'tower-run-tick' }).catch(() => {});
@@ -242,6 +246,19 @@ function scheduleRaidWake(state) {
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('raidQueue')?.then?.((stored) => scheduleRaidWake(stored.raidQueue))?.catch?.(() => {}); } catch {}
+
+let monsterWakeTimer;
+function scheduleMonsterWake(state) {
+  if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
+  clearTimeout(monsterWakeTimer);
+  if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
+  monsterWakeTimer = setTimeout(() => {
+    chrome.runtime.sendMessage({ kind: 'monster-queue-tick' }).then((response) => {
+      if (response?.watch) return chrome.storage.local.get('monsterQueue').then((stored) => scheduleMonsterWake(stored.monsterQueue));
+    }).catch(() => {});
+  }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+}
+try { chrome.storage?.local?.get?.('monsterQueue')?.then?.((stored) => scheduleMonsterWake(stored.monsterQueue))?.catch?.(() => {}); } catch {}
 
 let towerWakeTimer;
 function scheduleTowerWake(state) {

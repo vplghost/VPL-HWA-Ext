@@ -119,6 +119,75 @@ test('local map trigger lets the engine create a native carrier and hides append
   assert.equal(records.filter((record) => record.transport === 'websocket').length, 1);
 });
 
+test('assisted trigger includes recently observed chunks when the newest push is outside the watched area', async () => {
+  const network = [];
+  const { window, control, triggerStates } = setup({ intercept: true,
+    fetch: async (_url, options) => {
+      const request = JSON.parse(options.body); network.push(request);
+      return new Response(JSON.stringify({ results: request.calls.map((call) => ({
+        ident: call.ident, result: { response: {} }
+      })) }), { status: 200 });
+    }
+  });
+  const socket = new window.WebSocket(endpoint);
+  control(false, true, assisted);
+  const update = (x, y, updatedAt) => JSON.stringify({ method: 'msg', result: {
+    type: 'mapChunksUpdated', body: { chunks: [{ x, y, updatedAt }] }
+  } });
+  socket.receive(publish('map/topic', update(61, 34, 100))); await tick();
+  socket.receive(publish('map/topic', update(27, 43, 101))); await tick();
+  let carrier;
+  socket.addEventListener('message', (event) => {
+    const packet = new TextDecoder().decode(event.data);
+    const payload = JSON.parse(packet.slice(packet.indexOf('{"method":"msg"')));
+    if (!payload.result.body.chunks.some((chunk) => chunk.x === 61 && chunk.y === 34)) return;
+    carrier = window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+      method: 'POST', body: JSON.stringify({ calls: [{ name: 'getChunks', feature: 'globalMap',
+        args: { mapId: 'map', lod: 1, chunkCoordinates: [{ x: 61, y: 34 }] }, ident: 'native' }] })
+    });
+  });
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [{ name: 'inventoryGet' }] });
+  assert.equal(triggerStates.at(-1), 'carrier-attached');
+  await carrier;
+  assert.deepEqual(network[0].calls.map((call) => call.name), ['getChunks', 'inventoryGet']);
+});
+
+test('assisted trigger favors chunks from the latest native map request over unrelated MQTT updates', async () => {
+  const network = [];
+  const { window, control, triggerStates } = setup({ intercept: true,
+    fetch: async (_url, options) => {
+      const request = JSON.parse(options.body); network.push(request);
+      return new Response(JSON.stringify({ results: request.calls.map((call) => ({
+        ident: call.ident, result: { response: {} }
+      })) }), { status: 200 });
+    }
+  });
+  const socket = new window.WebSocket(endpoint);
+  control(false, true, assisted);
+  window.postMessage({ source: 'hwa-helper-api', kind: 'api-record', record: {
+    transport: 'fetch', method: 'POST', endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    requestBody: JSON.stringify({ calls: [{ name: 'getChunks', feature: 'globalMap',
+      args: { mapId: 'map', lod: 1, chunkCoordinates: [{ x: 61, y: 34 }] } }] })
+  } });
+  socket.receive(publish('hwm/pub/global-map/map', JSON.stringify({ method: 'msg', result: {
+    type: 'mapChunksUpdated', body: { chunks: [{ x: 3, y: 89, updatedAt: 100 }] }
+  } }))); await tick();
+  let carrier;
+  socket.addEventListener('message', (event) => {
+    const packet = new TextDecoder().decode(event.data);
+    const payload = JSON.parse(packet.slice(packet.indexOf('{"method":"msg"')));
+    if (!payload.result.body.chunks.some((chunk) => chunk.x === 61 && chunk.y === 34)) return;
+    carrier = window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+      method: 'POST', body: JSON.stringify({ calls: [{ name: 'getChunks', feature: 'globalMap',
+        args: { mapId: 'map', lod: 1, chunkCoordinates: [{ x: 61, y: 34 }] }, ident: 'native' }] })
+    });
+  });
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [{ name: 'inventoryGet' }] });
+  assert.equal(triggerStates.at(-1), 'carrier-attached');
+  await carrier;
+  assert.deepEqual(network[0].calls.map((call) => call.name), ['getChunks', 'inventoryGet']);
+});
+
 test('missing MQTT template never falls back to a separate RPC', async () => {
   const network = [];
   const { window, control, triggerStates } = setup({ intercept: true,

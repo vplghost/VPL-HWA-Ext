@@ -6,6 +6,7 @@ importScripts('march-rules.js');
 importScripts('rpc-cache.js');
 importScripts('experimental-data.js');
 importScripts('raid-queue.js');
+importScripts('monster-queue.js');
 importScripts('tower-automation.js');
 importScripts('tower-runner.js');
 
@@ -42,6 +43,10 @@ chrome.tabs?.onRemoved?.addListener?.((tabId) => {
     const stored = await chrome.storage.local.get('raidQueue');
     if (stored.raidQueue?.tabId === tabId && !globalThis.hwaHelperRaidQueue.terminal(stored.raidQueue)) {
       await chrome.storage.local.set({ raidQueue: globalThis.hwaHelperRaidQueue.stop(stored.raidQueue, 'Game tab closed.') });
+    }
+    const monster = await chrome.storage.local.get('monsterQueue');
+    if (monster.monsterQueue?.tabId === tabId && !globalThis.hwaHelperMonsterQueue.terminal(monster.monsterQueue)) {
+      await chrome.storage.local.set({ monsterQueue: globalThis.hwaHelperMonsterQueue.stop(monster.monsterQueue, 'Game tab closed.') });
     }
     const tower = await chrome.storage.local.get('towerRun');
     if (tower.towerRun?.tabId === tabId && !globalThis.hwaHelperTowerRunner.terminal(tower.towerRun)) {
@@ -142,6 +147,35 @@ async function updateRaidQueue(record, tabId) {
     globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings)), stored);
 }
 
+async function saveMonsterTransition(transition, stored) {
+  let state = transition.state;
+  if (!globalThis.hwaHelperMonsterQueue.terminal(state) && !rpcMessageForSettings(stored, [])) {
+    state = globalThis.hwaHelperMonsterQueue.stop(state, 'RPC settings disabled. Queue stopped.');
+  }
+  await chrome.storage.local.set({ monsterQueue: state });
+  if (globalThis.hwaHelperMonsterQueue.terminal(state)) {
+    await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: state.id }).catch(() => {});
+  } else if (transition.calls?.length) {
+    try {
+      await chrome.tabs.sendMessage(state.tabId, { ...rpcMessageForSettings(stored, transition.calls),
+        group: state.id, expiresAt: transition.expiresAt || Date.now() + 120000 });
+    } catch {
+      state = globalThis.hwaHelperMonsterQueue.stop(state, 'Game tab disconnected. Queue stopped.');
+      await chrome.storage.local.set({ monsterQueue: state });
+    }
+  }
+  return state;
+}
+
+async function updateMonsterQueue(record, tabId) {
+  const stored = await chrome.storage.local.get(['monsterQueue', 'rpcCache', 'popupRpcEnabled',
+    'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
+  if (globalThis.hwaHelperMonsterQueue.terminal(stored.monsterQueue) || stored.monsterQueue.tabId !== tabId) return stored.monsterQueue;
+  return saveMonsterTransition(globalThis.hwaHelperMonsterQueue.advance(stored.monsterQueue,
+    record, stored.rpcCache, Date.now(),
+    globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings)), stored);
+}
+
 async function saveTowerTransition(transition, stored) {
   let state = transition.state;
   if (!globalThis.hwaHelperTowerRunner.terminal(state) && !rpcMessageForSettings(stored, [])) {
@@ -173,11 +207,15 @@ async function updateTowerRun(record, tabId) {
 chrome.storage.onChanged?.addListener?.((changes, area) => {
   if (area !== 'local' || !['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) return;
   pending = pending.then(async () => {
-    const stored = await chrome.storage.local.get(['raidQueue', 'towerRun', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+    const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
     const modeChanged = changes.socketRefreshMode && changes.socketRefreshMode.oldValue !== changes.socketRefreshMode.newValue;
     if (!globalThis.hwaHelperRaidQueue.terminal(stored.raidQueue)) {
       const state = modeChanged ? globalThis.hwaHelperRaidQueue.stop(stored.raidQueue, 'RPC mode changed. Queue stopped.') : stored.raidQueue;
       await saveRaidTransition({ state }, stored);
+    }
+    if (!globalThis.hwaHelperMonsterQueue.terminal(stored.monsterQueue)) {
+      const state = modeChanged ? globalThis.hwaHelperMonsterQueue.stop(stored.monsterQueue, 'RPC mode changed. Queue stopped.') : stored.monsterQueue;
+      await saveMonsterTransition({ state }, stored);
     }
     if (!globalThis.hwaHelperTowerRunner.terminal(stored.towerRun)) {
       const state = modeChanged ? globalThis.hwaHelperTowerRunner.stop(stored.towerRun, 'RPC mode changed. Tower stopped.') : stored.towerRun;
@@ -296,7 +334,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (['raid-queue-start', 'raid-queue-stop'].includes(message?.kind) &&
       sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     pending = pending.then(async () => {
-      const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
+      const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
       const controller = globalThis.hwaHelperRaidQueue;
       if (message.kind === 'raid-queue-stop') {
         if (!controller.terminal(stored.raidQueue)) await saveRaidTransition({ state: controller.stop(stored.raidQueue,
@@ -304,6 +342,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return { ok: true };
       }
       if (!controller.terminal(stored.raidQueue)) return { ok: false, error: 'A raid queue is already running.' };
+      if (!globalThis.hwaHelperMonsterQueue.terminal(stored.monsterQueue)) return { ok: false, error: 'A monster queue is already running.' };
       if (!rpcMessageForSettings(stored, [])) {
         return { ok: false, error: 'Enable RPC, and enable Monitor API for Piggyback mode.' };
       }
@@ -324,6 +363,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.then(() => updateRaidQueue(null, sender.tab.id));
     pending.then((state) => sendResponse({ ok: true, watch: state?.tabId === sender.tab.id &&
       !globalThis.hwaHelperRaidQueue.terminal(state) }), () => sendResponse({ ok: false }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (['monster-queue-start', 'monster-queue-stop'].includes(message?.kind) &&
+      sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+    pending = pending.then(async () => {
+      const stored = await chrome.storage.local.get(['monsterQueue', 'raidQueue', 'rpcCache', 'popupRpcEnabled',
+        'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
+      const controller = globalThis.hwaHelperMonsterQueue;
+      if (message.kind === 'monster-queue-stop') {
+        if (!controller.terminal(stored.monsterQueue)) await saveMonsterTransition({ state: controller.stop(stored.monsterQueue,
+          'Stopped by user. An attack already sent continues in game.') }, stored);
+        return { ok: true };
+      }
+      if (!controller.terminal(stored.monsterQueue)) return { ok: false, error: 'A monster queue is already running.' };
+      if (!globalThis.hwaHelperRaidQueue.terminal(stored.raidQueue)) return { ok: false, error: 'A raid queue is already running.' };
+      if (!rpcMessageForSettings(stored, [])) return { ok: false, error: 'Enable RPC and Monitor API for Piggyback mode.' };
+      const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
+      const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
+      if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
+      const transition = controller.start(message.options, tab.id, stored.rpcCache?.accountStatus?.data?.id,
+        Date.now(), stored.rpcCache || {},
+        globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
+      if (!transition) return { ok: false, error: 'Refresh troops and search for this monster before starting. Check the lineup and target.' };
+      const state = await saveMonsterTransition(transition, stored);
+      return { ok: state.phase !== 'stopped', queued: stored.socketRefreshMode !== 'direct', error: state.reason };
+    });
+    pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'monster-queue-tick' && isGameUrl(sender.url) && sender.tab?.id) {
+    pending = pending.then(() => updateMonsterQueue(null, sender.tab.id));
+    pending.then((state) => sendResponse({ ok: true, watch: state?.tabId === sender.tab.id &&
+      !globalThis.hwaHelperMonsterQueue.terminal(state) }), () => sendResponse({ ok: false }));
     pending = pending.catch(() => {});
     return true;
   }
@@ -595,6 +669,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
     if (cacheResult.changed) await chrome.storage.local.set({ rpcCache: cacheResult.cache });
     if (sender.tab?.id) await updateRaidQueue(record, sender.tab.id);
+    if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateTowerRun(record, sender.tab.id);
     if (stored.popupRpcEnabled === true && sender.tab?.id) {
       const calls = socketRefreshCalls(record, cacheResult.cache);

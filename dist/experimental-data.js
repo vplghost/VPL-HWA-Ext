@@ -104,6 +104,16 @@
     return { count: ids.size, total: ids.size + rally.membersCapacityLeft };
   }
   const bossConfigId = (level) => Number.isInteger(level) && level >= 1 && level <= 30 ? 59 + level : null;
+  // Captured globalMapMobSolo 7bc90ab7: ordinary IDs 23–52, PvP IDs 53–67 and 74–88.
+  const soloMonsterConfigIds = (level) => Number.isInteger(level) && level >= 1 && level <= 30 ?
+    [22 + level, (level <= 15 ? 52 : 58) + level] : null;
+  const soloMonsterLevel = (configId) => {
+    const id = Number(configId);
+    if (id >= 23 && id <= 52) return id - 22;
+    if (id >= 53 && id <= 67) return id - 52;
+    if (id >= 74 && id <= 88) return id - 58;
+    return null;
+  };
   // Hero Wars: Alliance 1.292.0 globalMapMine remote config 8e714674: levels 1–10.
   const mineConfigs = {
     wood: [12, 20, 21, 22, 23, 24, 55, 56, 57, 58],
@@ -215,7 +225,7 @@
   }
 
   globalThis.hwaHelperExperimentalData = { rallyWaitOptions, capacitySignature, heroCapacity,
-    squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, lowestPowerHeroes,
+    squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, soloMonsterConfigIds, soloMonsterLevel, lowestPowerHeroes,
     mineConfigId, mineTypeLevel, availableHeroIds, normalizeCustomTeam, teamOptions, teamTroopCapacity, buildSquad, buildRallyCall,
     buildGatherCall, buildMineSearchCall, rallyPhase };
 })();

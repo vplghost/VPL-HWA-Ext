@@ -368,6 +368,17 @@
               center: call.args.center, mobs: result.response.mobs
             }, updatedAt: record.timestamp }];
         }
+        if (key === 'searchMob:mob' && call.args?.mobType === 'solo' &&
+            Array.isArray(result?.response?.mobs)) {
+          return [{ key: 'experimentalSoloSearch', method: call.name,
+            feature: call.feature, group: 'internal', data: {
+              mapId: call.args.mapId, mobConfigIds: call.args.mobConfigIds,
+              center: call.args.center, mobs: result.response.mobs
+            }, updatedAt: record.timestamp },
+          { key: 'experimentalMapContext', method: call.name, feature: call.feature,
+            group: 'internal', data: { mapId: call.args.mapId, center: call.args.center },
+            updatedAt: record.timestamp }];
+        }
         if (key === 'searchMob:mob' && call.args?.mapId && call.args?.center) {
           return [{ key: 'experimentalMapContext', method: call.name,
             feature: call.feature, group: 'internal', data: {
@@ -1791,7 +1802,7 @@
                   returnAt, mobConfigId: entry.data.mobConfigId ?? previous.rally?.mobConfigId } };
             }
           } else if (entry.data.action === 'socketReturnCompleted') {
-            index = marches.findIndex((march) => march.kind === 'raid' &&
+            index = marches.findIndex((march) => ['raid', 'attack'].includes(march.kind) &&
               march.squadId === entry.data.squadId);
             if (index < 0) continue;
             marches.splice(index, 1);
