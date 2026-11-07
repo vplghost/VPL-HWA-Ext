@@ -69,6 +69,24 @@ test('persisted calls match responses after storage reorders object keys', () =>
   assert.equal(step.state.started, 1);
 });
 
+test('confirmed win count updates before return and remains stable across duplicate events', () => {
+  let state = active();
+  assert.equal(queue.confirmedWins(state), 0);
+  state = queue.advance(state, win(), {}, 70001).state;
+  assert.equal(queue.confirmedWins(state), 1);
+  assert.equal(state.completed, 0, 'next raid still waits for return');
+  state = queue.advance(state, win(71000), {}, 71001).state;
+  assert.equal(queue.confirmedWins(state), 1);
+  state = queue.advance(state, returned(), {}, 80001).state;
+  assert.equal(queue.confirmedWins(state), 1);
+  assert.equal(state.completed, 1);
+  state = queue.advance(state, returned(81000), {}, 81001).state;
+  assert.equal(queue.confirmedWins(state), 1);
+  assert.equal(queue.confirmedWins(null), 0);
+  assert.equal(queue.confirmedWins({ completed: 2, current: { result: 'win' } }), 3);
+  assert.equal(queue.confirmedWins({ completed: 2, current: { result: 'lose' } }), 2);
+});
+
 test('queue waits for both matching win and confirmed return, never elapsed ETA', () => {
   let state = active();
   state = queue.advance(state, win(), {}, 70001).state;

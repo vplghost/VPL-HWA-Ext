@@ -332,6 +332,13 @@
       </div>
     </div>
   </div>
+  <dialog id="raid-dialog" aria-labelledby="raid-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60">
+    <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+      <h2 id="raid-dialog-title" class="font-semibold text-slate-900">Rally raid</h2>
+      <form method="dialog"><button type="submit" autofocus aria-label="Close Raid dialog" class="cursor-pointer rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-100">✕</button></form>
+    </div>
+    <div id="raid-dialog-body"></div>
+  </dialog>
   <script src="tracking-filter.js"></script>
   <script src="export-name.js"></script>
   <script src="data-names.js"></script>
@@ -346,6 +353,7 @@
   <script src="popup-data.js"></script>
   <script src="dashboard-data.js"></script>
   <script src="experimental-data.js"></script>
+  <script src="raid-queue.js"></script>
   <script src="refillable-rules.js"></script>
   <script src="clan-versus-rules.js"></script>
   <script src="resource-data.js"></script>

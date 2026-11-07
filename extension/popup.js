@@ -3500,7 +3500,16 @@ function renderDashboard(cache) {
   const subtitle = document.createElement('p');
   subtitle.className = 'mt-1 text-xs text-slate-300';
   subtitle.textContent = 'Live game snapshots update as you play. Unknown items need a fresh game snapshot.';
-  intro.append(heading, subtitle);
+  const raidButton = document.createElement('button');
+  raidButton.type = 'button'; raidButton.textContent = 'Raid';
+  raidButton.className = 'mt-3 cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500';
+  raidButton.setAttribute('aria-haspopup', 'dialog');
+  raidButton.setAttribute('aria-controls', 'raid-dialog');
+  raidButton.addEventListener('click', () => {
+    renderExperimental(currentCache, true);
+    document.querySelector('#raid-dialog').showModal();
+  });
+  intro.append(heading, subtitle, raidButton);
   container.append(intro);
 
   for (const group of groups) {
@@ -4914,7 +4923,9 @@ function renderCustomTeams(cache) {
   }
 }
 
-function renderExperimental(cache) {
+function renderExperimental(cache, raidOnly = false) {
+  const host = raidOnly ? document.querySelector('#raid-dialog-body') : view;
+  if (raidOnly) host.replaceChildren();
   const data = globalThis.hwaHelperExperimentalData;
   if (experimentalPending && (!popupRpcEnabled ||
       (experimentalPending.queued && (currentRpcPolicy.mode === 'direct' || !currentRpcPolicy.monitor)))) {
@@ -4949,14 +4960,14 @@ function renderExperimental(cache) {
     heading.className = 'font-semibold text-slate-900';
     heading.textContent = title;
     section.append(heading);
-    view.append(section);
+    host.append(section);
     return section;
   };
   const field = (section, label, element) => {
     const wrap = document.createElement('label');
     wrap.className = 'block text-xs font-medium text-slate-600';
     wrap.textContent = label;
-    element.className = 'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900';
+    element.className = 'mt-1 block h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 text-sm leading-5 text-slate-900';
     wrap.append(element);
     section.append(wrap);
     return element;
@@ -4970,7 +4981,7 @@ function renderExperimental(cache) {
   const button = (section, text, onClick, disabled) => {
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = 'cursor-pointer rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40';
+    el.className = 'inline-flex h-10 cursor-pointer items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-semibold leading-5 text-white disabled:cursor-not-allowed disabled:opacity-40';
     el.textContent = text;
     el.disabled = disabled;
     el.addEventListener('click', onClick);
@@ -4994,9 +5005,11 @@ function renderExperimental(cache) {
       if (key === 'rallyTeam') saveRaidPreferences();
       render();
     });
-    field(section, 'Lineup', select);
+    const lineupLabel = teams.find((team) => team.id === experimentalSelection[key])?.heroIds
+      .map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed';
+    field(section, raidOnly ? `Lineup (${lineupLabel})` : 'Lineup', select);
     const selected = teams.find((team) => team.id === experimentalSelection[key]);
-    note(section, selected?.heroIds.map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed.');
+    if (!raidOnly) note(section, selected?.heroIds.map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed.');
     return selected;
   };
   const makeUnitsInput = (section) => {
@@ -5013,14 +5026,29 @@ function renderExperimental(cache) {
     });
     return units.every(Boolean) ? data.buildSquad(team?.heroIds || [], units) : null;
   };
-  const rally = card('Rally raid');
+  if (raidOnly) {
+  const rally = card('Raid setup');
+  const bossRow = document.createElement('div');
+  bossRow.className = 'grid grid-cols-2 items-end gap-3';
+  const settingsRow = document.createElement('div');
+  settingsRow.className = 'grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1fr)] items-end gap-3';
   const rallyTeam = makeTeamSelect(rally, 'rallyTeam');
   const model = data.capacityModel(rallyTeam?.heroIds, heroes, cache.troopCapacityEvidence?.data,
     troopCapacitySettings, cache.accountStatus?.data?.id);
   const rallyCapacity = data.teamTroopCapacity(model.total, rallyTeam?.maxTroops);
   const optimized = data.allocateTroops(cache['getUnitSummary:unit']?.data, rallyCapacity);
   const rallySquad = data.buildSquad(rallyTeam?.heroIds || [], optimized);
-  note(rally, `Troops: ${optimized.reduce((sum, unit) => sum + unit.count, 0)} / ${rallyCapacity ?? 0}${rallyTeam?.maxTroops != null ? ' · custom maximum' : model.observed ? ' · observed lineup' : ''}`);
+  const troopHeader = document.createElement('div');
+  troopHeader.className = 'flex items-center gap-2 text-xs leading-5 text-slate-600';
+  const troopLabel = document.createElement('span');
+  troopLabel.textContent = `Troops: ${optimized.reduce((sum, unit) => sum + unit.count, 0)} / ${rallyCapacity ?? 0}`;
+  troopLabel.title = rallyTeam?.maxTroops != null ? 'Custom maximum' : model.observed ? 'Observed lineup' : 'Estimated capacity';
+  troopHeader.append(troopLabel); rally.append(troopHeader);
+  const refreshTroops = button(troopHeader, '↻', () => chrome.runtime.sendMessage({ kind: 'refresh-rpc',
+    calls: [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }] }), !popupRpcEnabled);
+  refreshTroops.className = 'inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-sm leading-5 text-slate-500 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-40';
+  refreshTroops.title = 'Refresh available troops';
+  refreshTroops.setAttribute('aria-label', 'Refresh available troops');
   const troopSummary = document.createElement('div');
   troopSummary.className = 'grid grid-cols-3 gap-2';
   for (let type = 0; type < 3; type++) {
@@ -5034,8 +5062,7 @@ function renderExperimental(cache) {
     block.append(label, tiers); troopSummary.append(block);
   }
   rally.append(troopSummary);
-  button(rally, 'Refresh available troops', () => chrome.runtime.sendMessage({ kind: 'refresh-rpc',
-    calls: [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }] }), !popupRpcEnabled);
+
 
   const level = document.createElement('select');
   for (let n = 1; n <= 30; n++) {
@@ -5043,7 +5070,17 @@ function renderExperimental(cache) {
   }
   level.value = String(experimentalSelection.bossLevel);
   level.addEventListener('change', () => { experimentalSelection.bossLevel = Number(level.value); render(); });
-  field(rally, 'Boss level', level);
+  rally.append(bossRow);
+  const bossGroup = document.createElement('div');
+  bossGroup.className = 'min-w-0';
+  const bossLabel = document.createElement('label');
+  bossLabel.className = 'block text-xs font-medium text-slate-600';
+  bossLabel.textContent = 'Boss level'; bossLabel.htmlFor = 'raid-boss-level';
+  const bossControl = document.createElement('div');
+  bossControl.className = 'mt-1 flex h-10 min-w-0 overflow-hidden rounded-lg border border-slate-300 bg-white';
+  level.id = 'raid-boss-level';
+  level.className = 'h-full min-w-0 flex-1 border-0 bg-white px-2 text-sm leading-5 text-slate-900 outline-none';
+  bossControl.append(level); bossGroup.append(bossLabel, bossControl); bossRow.append(bossGroup);
   const wait = document.createElement('select');
   for (const seconds of data.rallyWaitOptions) {
     const option = document.createElement('option'); option.value = String(seconds);
@@ -5051,14 +5088,15 @@ function renderExperimental(cache) {
   }
   wait.value = String(experimentalSelection.waitSeconds);
   wait.addEventListener('change', () => { experimentalSelection.waitSeconds = Number(wait.value); saveRaidPreferences(); });
-  field(rally, 'Rally wait', wait);
+  rally.append(settingsRow);
+  field(settingsRow, 'Rally wait', wait);
   const memberField = document.createElement('div');
   const memberLabel = document.createElement('label');
   memberLabel.className = 'block text-xs font-medium text-slate-600';
   memberLabel.htmlFor = 'raid-min-members';
-  memberLabel.textContent = 'Minimum members (leader included, usually /6)';
+  memberLabel.textContent = 'Minimum members';
   const memberControl = document.createElement('div');
-  memberControl.className = 'mt-1 flex w-full items-stretch overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100';
+  memberControl.className = 'mt-1 flex h-10 w-full items-stretch overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100';
   const cancelLabel = document.createElement('label');
   cancelLabel.className = 'inline-flex shrink-0 cursor-pointer items-center gap-2 border-r border-slate-300 bg-slate-50 px-3 text-xs font-medium text-slate-700';
   const autoCancel = document.createElement('input');
@@ -5085,7 +5123,7 @@ function renderExperimental(cache) {
   });
   memberControl.append(cancelLabel, memberInput);
   memberField.append(memberLabel, memberControl);
-  rally.append(memberField);
+  settingsRow.append(memberField);
   const raidCountInput = document.createElement('input');
   raidCountInput.type = 'number'; raidCountInput.min = '2'; raidCountInput.max = '100'; raidCountInput.step = '1';
   raidCountInput.value = String(experimentalSelection.raidCount);
@@ -5093,15 +5131,15 @@ function renderExperimental(cache) {
     experimentalSelection.raidCount = Number(raidCountInput.value);
     saveRaidPreferences();
   });
-  field(rally, 'Number of raids', raidCountInput);
+  field(settingsRow, 'Number of raids', raidCountInput);
   note(rally, 'When enabled, auto-cancel checks members during the final 10 seconds before departure. Missing fresh member data or too few members triggers one cancellation attempt. Keep the game tab open.');
 
   note(rally, context.mapId ? `Map ready · ${context.mapId}` : 'Open the world map in game once to capture its map ID.');
   const searchResult = cache.experimentalRallySearch?.data;
   const matchingSearch = searchResult?.mobConfigIds?.includes(data.bossConfigId(experimentalSelection.bossLevel));
   const targets = matchingSearch ? searchResult.mobs : [];
-  note(rally, matchingSearch ? `${targets.length} boss target(s) found for this level.` : 'Search for this level before starting a rally.');
-  button(rally, 'Find boss', async () => {
+
+  const findBoss = button(bossControl, 'Find', async () => {
     const configId = data.bossConfigId(experimentalSelection.bossLevel);
     experimentalSelection.searchedBossLevel = experimentalSelection.bossLevel;
     await saveRaidPreferences();
@@ -5119,7 +5157,8 @@ function renderExperimental(cache) {
   targetSelect.value = targets.some((target) => target.mobId === experimentalSelection.targetMobId) ?
     experimentalSelection.targetMobId : targets[0]?.mobId || '';
   targetSelect.addEventListener('change', () => { experimentalSelection.targetMobId = targetSelect.value; });
-  field(rally, 'Target', targetSelect);
+  findBoss.className = 'inline-flex h-full shrink-0 cursor-pointer items-center justify-center border-l border-slate-300 bg-blue-600 px-3 text-sm font-semibold leading-5 text-white disabled:cursor-not-allowed disabled:opacity-40';
+  field(bossRow, `Target (${matchingSearch ? `${targets.length} boss target(s) found for this level.` : 'Search this level first'})`, targetSelect);
   const queueRunning = raidQueueState && !['stopped', 'complete'].includes(raidQueueState.phase);
   const startRaid = async (count, single = false) => {
     const response = await chrome.runtime.sendMessage({ kind: 'raid-queue-start', options: {
@@ -5136,8 +5175,11 @@ function renderExperimental(cache) {
     render();
   };
   const cannotStart = !popupRpcEnabled || !!experimentalPending || queueRunning || !targets.length || !rallySquad;
-  button(rally, 'Start rally', () => startRaid(1, true), cannotStart);
-  button(rally, 'Start raid queue', () => {
+  const actions = document.createElement('div');
+  actions.className = 'flex items-center gap-4';
+  rally.append(actions);
+  button(actions, 'Start rally', () => startRaid(1, true), cannotStart);
+  button(actions, 'Start queue', () => {
     const count = Number(raidCountInput.value);
     if (!Number.isInteger(count) || count < 2 || count > 100) {
       experimentalMessage = 'Raid queue needs 2–100 raids. Use Start rally for one raid.';
@@ -5151,7 +5193,7 @@ function renderExperimental(cache) {
   if (raidQueueState) {
     const members = raidQueueState.current?.members;
     const pending = raidQueueState.bossQueue;
-    note(rally, `Queue: ${raidQueueState.phase} · ${pending?.remain_raid_count ?? 0} raids left · ${pending?.queue.length ?? 0} bosses queued · ${raidQueueState.completed} won${members ? ` · members ${members.count}/${members.total}` : ''}${raidQueueState.reason ? ` · ${raidQueueState.reason}` : ''}`);
+    note(rally, `Queue: ${raidQueueState.phase} · ${pending?.remain_raid_count ?? 0} raids left · ${pending?.queue.length ?? 0} bosses queued · ${globalThis.hwaHelperRaidQueue.confirmedWins(raidQueueState)} won${members ? ` · members ${members.count}/${members.total}` : ''}${raidQueueState.reason ? ` · ${raidQueueState.reason}` : ''}`);
     if (queueRunning) {
       button(rally, 'Cancel queue', async () => {
         await chrome.runtime.sendMessage({ kind: 'raid-queue-stop' }); render();
@@ -5186,6 +5228,10 @@ function renderExperimental(cache) {
       p.textContent = `${globalThis.hwaHelperRallyTargets?.[item.mobConfigId] || 'Boss'} · ${item.result || 'Result pending'} · ${new Date(item.updatedAt).toLocaleString()}${item.returnAt ? ` · return ${new Date(item.returnAt).toLocaleTimeString()}` : ''}`;
       rally.append(p);
     }
+  }
+  if (experimentalMessage) note(host, experimentalMessage);
+  if (!popupRpcEnabled) note(host, 'Enable Allow popup RPC calls in Settings to use raid actions.');
+  return;
   }
   const gather = card('Gather troops');
   const gatherTeam = makeTeamSelect(gather, 'gatherTeam');
@@ -5358,6 +5404,7 @@ async function render() {
   const isDraftActive = globalThis.hwaHelperPopupData.isDraftActive(draftStatus?.stageId);
   const towerModal = document.querySelector('#tower-modal');
   if (towerModal && !towerModal.hidden) renderTowerModal(cache);
+  if (document.querySelector('#raid-dialog')?.open) renderExperimental(cache, true);
   const draftModal = document.querySelector('#draft-modal');
   if (draftModal && !draftModal.hidden) {
     const modalBody = document.querySelector('#draft-modal-body');

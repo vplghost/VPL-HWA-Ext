@@ -247,5 +247,6 @@
     if (!record && now >= state.wakeAt) return { state: stop(state, 'RPC result timed out. No automatic retry.') };
     return { state };
   }
-  globalThis.hwaHelperRaidQueue = { start, advance, terminal, stop };
+  const confirmedWins = (state) => (state?.completed || 0) + (state?.current?.result === 'win' ? 1 : 0);
+  globalThis.hwaHelperRaidQueue = { start, advance, terminal, stop, confirmedWins };
 })();
