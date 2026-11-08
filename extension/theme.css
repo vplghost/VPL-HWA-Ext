@@ -346,6 +346,53 @@ html.dark body {
   border-color: #1e293b !important;
 }
 
+/* Titan Dungeon Modal Dark Theme Overrides */
+.dark #dungeon-modal .bg-white {
+  background-color: #131b2e !important;
+  border-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+.dark #dungeon-modal .bg-slate-50,
+.dark #dungeon-modal [class*="bg-slate-50/"] {
+  background-color: #162036 !important;
+  border-color: #1e293b !important;
+}
+
+.dark #dungeon-modal .bg-slate-200,
+.dark #dungeon-modal [class*="bg-slate-200/"] {
+  background-color: #223254 !important;
+  border-color: #334155 !important;
+}
+
+.dark #dungeon-modal .border-slate-100,
+.dark #dungeon-modal .border-slate-200,
+.dark #dungeon-modal [class*="border-slate-200/"],
+.dark #dungeon-modal .border-slate-300 {
+  border-color: #1e293b !important;
+}
+
+.dark #dungeon-modal .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+.dark #dungeon-modal .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+
+.dark #dungeon-modal .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+.dark #dungeon-modal .text-slate-600,
+.dark #dungeon-modal .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.dark #dungeon-modal .text-slate-400 {
+  color: #64748b !important;
+}
+
 /* Status Cards, Badges, Boxes & Alert Banners */
 
 /* Teal */

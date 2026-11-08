@@ -243,10 +243,11 @@ test('starIcons renders 1 star with slate-400 gray instead of pure white and hig
 
   const s6 = starIcons(6);
   assert.equal(s6.getAttribute('aria-label'), '6 stars');
-  assert.equal(s6.children.length, 1, '6-star threshold renders single stylized justice star badge instead of 6 stars');
-  const badge = s6.children[0];
-  assert.ok(badge.className.includes('justice-star-badge'), 'Should include justice-star-badge class');
-  assert.match(badge.innerHTML, /<svg[\s\S]*viewBox="0 0 512 512"[\s\S]*6★/, 'Should contain justice star SVG and 6★ badge');
+  assert.equal(s6.children.length, 1, '6-star threshold renders single stylized justice star icon instead of 6 stars');
+  const star = s6.children[0];
+  assert.ok(star.className.includes('justice-star'), 'Should include justice-star class');
+  assert.match(star.innerHTML, /<svg[\s\S]*viewBox="0 0 512 512"/, 'Should contain justice star SVG');
+  assert.equal(star.innerHTML.includes('6★'), false, 'Should not have 6★ text badge');
 });
 
 test('createHeroInline renders accurate glyph stats and titles for Dante and Somna', () => {

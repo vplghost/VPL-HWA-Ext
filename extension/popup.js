@@ -838,8 +838,8 @@ function starIcons(count) {
 
   if (count >= 6) {
     const starSpan = document.createElement('span');
-    starSpan.className = 'justice-star-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/20 font-bold';
-    starSpan.innerHTML = `<svg class="size-4 inline-block fill-current align-middle" viewBox="0 0 512 512" aria-hidden="true"><path fill="currentColor" d="${JUSTICE_STAR_SVG_PATH}"/></svg><span class="text-2xs font-extrabold uppercase tracking-wide">6★</span>`;
+    starSpan.className = 'justice-star inline-flex items-center text-amber-400 leading-none drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)]';
+    starSpan.innerHTML = `<svg class="size-4 inline-block fill-current align-middle" viewBox="0 0 512 512" aria-hidden="true"><path fill="currentColor" d="${JUSTICE_STAR_SVG_PATH}"/></svg>`;
     wrap.append(starSpan);
     return wrap;
   }
@@ -3610,11 +3610,11 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   ];
   for (const s of stats) {
     const tile = document.createElement('div');
-    tile.className = 'rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs';
+    tile.className = 'rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70';
     tile.innerHTML = `
-      <div class="text-[11px] font-medium text-slate-500">${s.label}</div>
-      <div class="text-base font-bold text-slate-900 tabular-nums my-0.5">${s.val}</div>
-      <div class="text-[10px] text-slate-400">${s.sub}</div>
+      <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">${s.label}</div>
+      <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">${s.val}</div>
+      <div class="text-[10px] text-slate-400 dark:text-slate-500">${s.sub}</div>
     `;
     overviewSec.append(tile);
   }
@@ -3628,17 +3628,17 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
     : 'None';
 
   const elemSec = document.createElement('div');
-  elemSec.className = 'rounded-xl border border-slate-200 bg-slate-50/70 p-4';
+  elemSec.className = 'rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/60';
   elemSec.innerHTML = `
-    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">Element Affinities</h3>
+    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">Element Affinities</h3>
     <div class="flex items-center gap-4 flex-wrap text-sm">
       <div class="flex items-center gap-1.5">
-        <span class="text-xs font-medium text-slate-500">Prime Element:</span>
-        <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">🌟 ${prime}</span>
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Prime Element:</span>
+        <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-800/60">🌟 ${prime}</span>
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="text-xs font-medium text-slate-500">Non-Prime Elements:</span>
-        <span class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">${nonprime}</span>
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Non-Prime Elements:</span>
+        <span class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:border dark:border-slate-600">${nonprime}</span>
       </div>
     </div>
   `;
@@ -3648,11 +3648,11 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   const doors = Array.isArray(data.currentFloorDoors) ? data.currentFloorDoors : [];
   if (doors.length > 0) {
     const doorsSec = document.createElement('div');
-    doorsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+    doorsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
     doorsSec.innerHTML = `
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold text-slate-900">🚪 Floor ${floorNumber} Doors</h3>
-        <span class="text-xs text-slate-500">${doors.length} battle choices</span>
+        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">🚪 Floor ${floorNumber} Doors</h3>
+        <span class="text-xs text-slate-500 dark:text-slate-400">${doors.length} battle choices</span>
       </div>
     `;
 
@@ -3661,7 +3661,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
 
     doors.forEach((door, idx) => {
       const doorCard = document.createElement('div');
-      doorCard.className = 'rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5';
+      doorCard.className = 'rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5 dark:border-slate-700/70 dark:bg-slate-800/70';
 
       const attackerType = door.attackerType ? door.attackerType.charAt(0).toUpperCase() + door.attackerType.slice(1) : 'Any';
       const defenderType = door.defenderType ? door.defenderType.charAt(0).toUpperCase() + door.defenderType.slice(1) : 'Unknown';
@@ -3669,27 +3669,27 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
 
       doorCard.innerHTML = `
         <div class="flex items-center justify-between">
-          <span class="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-white">Door ${idx + 1}</span>
-          <span class="text-xs font-bold text-slate-700">⚔️ Power: ${powerStr}</span>
+          <span class="rounded-md bg-slate-800 dark:bg-blue-900/60 dark:border dark:border-blue-700/50 px-2 py-0.5 text-[11px] font-bold text-white">Door ${idx + 1}</span>
+          <span class="text-xs font-bold text-slate-700 dark:text-slate-200">⚔️ Power: ${powerStr}</span>
         </div>
-        <div class="flex items-center justify-between text-xs text-slate-600">
-          <div>Attacker: <strong class="text-slate-900">${attackerType} Titans</strong></div>
-          <div>Defender: <strong class="text-slate-900">${defenderType}</strong></div>
+        <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+          <div>Attacker: <strong class="text-slate-900 dark:text-slate-100">${attackerType} Titans</strong></div>
+          <div>Defender: <strong class="text-slate-900 dark:text-slate-100">${defenderType}</strong></div>
         </div>
       `;
 
       if (Array.isArray(door.team) && door.team.length > 0) {
         const teamBox = document.createElement('div');
-        teamBox.className = 'flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200';
+        teamBox.className = 'flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200 dark:border-slate-700/60';
         for (const unit of door.team) {
           const titanId = String(unit.id);
           const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
           const name = meta?.name || `Titan ${titanId}`;
           const starStr = unit.star >= 6 ? '★6' : (unit.star ? '★'.repeat(unit.star) : '');
           const unitTag = document.createElement('span');
-          unitTag.className = 'inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 shadow-2xs';
-          const avatarImg = `<img src="assets/titans/${titanId}.png" class="size-4 rounded-full object-cover shrink-0 border border-slate-200">`;
-          unitTag.innerHTML = `${avatarImg}<span>${name}</span> <span class="text-slate-400 font-normal">(Lv.${unit.level || '?'}${starStr ? ` ${starStr}` : ''})</span>`;
+          unitTag.className = 'inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 shadow-2xs dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200';
+          const avatarImg = `<img src="assets/titans/${titanId}.png" class="size-4 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700">`;
+          unitTag.innerHTML = `${avatarImg}<span>${name}</span> <span class="text-slate-400 dark:text-slate-500 font-normal">(Lv.${unit.level || '?'}${starStr ? ` ${starStr}` : ''})</span>`;
           unitTag.querySelector('img')?.addEventListener('error', (event) => { event.currentTarget.hidden = true; });
           teamBox.append(unitTag);
         }
@@ -3703,7 +3703,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
     body.append(doorsSec);
   } else {
     const emptyDoors = document.createElement('div');
-    emptyDoors.className = 'rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400';
+    emptyDoors.className = 'rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500';
     emptyDoors.textContent = 'Floor doors will update when a new dungeon floor is unlocked in game.';
     body.append(emptyDoors);
   }
@@ -3713,11 +3713,11 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   const titanEntries = Object.entries(titansState);
   if (titanEntries.length > 0) {
     const titansSec = document.createElement('div');
-    titansSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+    titansSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
     titansSec.innerHTML = `
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold text-slate-900">🛡️ Titan Health & Energy</h3>
-        <span class="text-xs text-slate-500">${titanEntries.length} deployed titans</span>
+        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">🛡️ Titan Health & Energy</h3>
+        <span class="text-xs text-slate-500 dark:text-slate-400">${titanEntries.length} deployed titans</span>
       </div>
     `;
 
@@ -3736,38 +3736,38 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       const energyPct = Math.min(100, Math.round((energy / 1000) * 100));
 
       const row = document.createElement('div');
-      row.className = `rounded-xl border p-3 ${isDead ? 'border-rose-200 bg-rose-50/40 opacity-70' : 'border-slate-200 bg-slate-50/50'}`;
+      row.className = `rounded-xl border p-3 ${isDead ? 'border-rose-200 bg-rose-50/40 opacity-70 dark:border-rose-900/60 dark:bg-rose-950/30' : 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70'}`;
 
-      const avatarImg = `<img src="assets/titans/${tId}.png" class="size-8 rounded-full object-cover shrink-0 border border-slate-200">`;
+      const avatarImg = `<img src="assets/titans/${tId}.png" class="size-8 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700">`;
       row.innerHTML = `
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2 min-w-0">
             ${avatarImg}
             <div class="min-w-0">
-              <div class="font-bold text-xs sm:text-sm text-slate-900 truncate">${name}</div>
-              ${elem ? `<span class="rounded bg-slate-200 px-1.5 py-0.2 text-[10px] font-semibold text-slate-600">${elem}</span>` : ''}
+              <div class="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate">${name}</div>
+              ${elem ? `<span class="rounded bg-slate-200 dark:bg-slate-700 px-1.5 py-0.2 text-[10px] font-semibold text-slate-600 dark:text-slate-300">${elem}</span>` : ''}
             </div>
           </div>
-          <span class="rounded-full px-2 py-0.5 text-[10px] font-bold ${isDead ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}">
+          <span class="rounded-full px-2 py-0.5 text-[10px] font-bold ${isDead ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 dark:border dark:border-rose-800/60' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-800/60'}">
             ${isDead ? 'Fallen' : 'Alive'}
           </span>
         </div>
         <div class="space-y-1.5">
           <div>
-            <div class="flex justify-between text-[10px] text-slate-500 mb-0.5">
+            <div class="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
               <span>HP</span>
-              <span class="tabular-nums font-semibold">${hp.toLocaleString()} / ${maxHp.toLocaleString()} (${hpPct}%)</span>
+              <span class="tabular-nums font-semibold text-slate-700 dark:text-slate-300">${hp.toLocaleString()} / ${maxHp.toLocaleString()} (${hpPct}%)</span>
             </div>
-            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+            <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
               <div class="${isDead ? 'bg-rose-500' : 'bg-emerald-500'} h-1.5 rounded-full" style="width: ${hpPct}%"></div>
             </div>
           </div>
           <div>
-            <div class="flex justify-between text-[10px] text-slate-500 mb-0.5">
+            <div class="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
               <span>Energy</span>
-              <span class="tabular-nums font-semibold">${energy.toLocaleString()} / 1,000 (${energyPct}%)</span>
+              <span class="tabular-nums font-semibold text-slate-700 dark:text-slate-300">${energy.toLocaleString()} / 1,000 (${energyPct}%)</span>
             </div>
-            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+            <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
               <div class="bg-amber-400 h-1.5 rounded-full" style="width: ${energyPct}%"></div>
             </div>
           </div>
@@ -3782,7 +3782,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
     body.append(titansSec);
   } else {
     const emptyTitans = document.createElement('div');
-    emptyTitans.className = 'rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400';
+    emptyTitans.className = 'rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500';
     emptyTitans.textContent = 'Deployed titan health and energy will update during dungeon battles.';
     body.append(emptyTitans);
   }
@@ -3968,7 +3968,7 @@ function renderEvents(cache) {
       featured: true,
       render: () => {
         const card = document.createElement('div');
-        card.className = 'rounded-xl border border-blue-300 bg-blue-50/50 p-4 shadow-sm hover:border-blue-400 transition-colors cursor-pointer';
+        card.className = 'rounded-xl border border-blue-300 bg-blue-50/50 p-4 shadow-sm hover:border-blue-400 transition-colors cursor-pointer dark:border-blue-800/60 dark:bg-blue-950/30 dark:hover:border-blue-700/80';
         card.addEventListener('click', () => openDungeonModal(dungeonStatus, card));
 
         const topRow = document.createElement('div');
@@ -3976,36 +3976,36 @@ function renderEvents(cache) {
         topRow.innerHTML = `
           <div class="flex items-center gap-2">
             <span class="inline-flex size-2.5 rounded-full bg-blue-500 animate-pulse"></span>
-            <span class="font-bold text-slate-900 text-sm">Titan Dungeon</span>
-            <span class="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">Floor ${floor}</span>
+            <span class="font-bold text-slate-900 dark:text-slate-100 text-sm">Titan Dungeon</span>
+            <span class="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 dark:border dark:border-blue-800/50">Floor ${floor}</span>
           </div>
-          <span class="text-xs font-semibold text-blue-800">Prime Element: ${prime}</span>
+          <span class="text-xs font-semibold text-blue-800 dark:text-blue-300">Prime Element: ${prime}</span>
         `;
 
         const detailsBox = document.createElement('div');
-        detailsBox.className = 'flex items-center justify-between rounded-lg bg-white border border-blue-100 p-3 text-xs mb-2.5';
+        detailsBox.className = 'flex items-center justify-between rounded-lg bg-white border border-blue-100 p-3 text-xs mb-2.5 dark:bg-slate-800/80 dark:border-blue-900/50';
         detailsBox.innerHTML = `
           <div class="min-w-0">
-            <div class="text-slate-500">Progress</div>
-            <div class="text-blue-900 font-bold text-sm">Cleared ${dungeonStatus.maxFloorPassed || 0} Floors</div>
+            <div class="text-slate-500 dark:text-slate-400">Progress</div>
+            <div class="text-blue-900 dark:text-blue-300 font-bold text-sm">Cleared ${dungeonStatus.maxFloorPassed || 0} Floors</div>
           </div>
           <div class="text-center">
-            <div class="text-slate-500">Checkpoint</div>
-            <div class="text-slate-800 font-bold text-sm">Floor ${respawn}</div>
+            <div class="text-slate-500 dark:text-slate-400">Checkpoint</div>
+            <div class="text-slate-800 dark:text-slate-200 font-bold text-sm">Floor ${respawn}</div>
           </div>
           <div class="text-right">
-            <div class="text-slate-500">Guild Activity</div>
-            <div class="text-emerald-700 font-bold text-sm">${activity.toLocaleString()} pts</div>
+            <div class="text-slate-500 dark:text-slate-400">Guild Activity</div>
+            <div class="text-emerald-700 dark:text-emerald-400 font-bold text-sm">${activity.toLocaleString()} pts</div>
           </div>
         `;
 
         const footerRow = document.createElement('div');
-        footerRow.className = 'flex items-center justify-between gap-2 flex-wrap text-xs text-slate-600';
+        footerRow.className = 'flex items-center justify-between gap-2 flex-wrap text-xs text-slate-600 dark:text-slate-400';
         footerRow.innerHTML = `
-          <div class="text-xs text-slate-500">
+          <div class="text-xs text-slate-500 dark:text-slate-400">
             Click to view floor doors & titan health status
           </div>
-          <button type="button" class="cursor-pointer font-semibold text-blue-700 hover:text-blue-800 inline-flex items-center gap-1">
+          <button type="button" class="cursor-pointer font-semibold text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 inline-flex items-center gap-1">
             View Details <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5l7 7-7 7"/></svg>
           </button>
         `;
