@@ -20,6 +20,12 @@ test('popup.css imports theme.css and defines @variant dark', async () => {
   const themeCss = await readFile(new URL('../extension/theme.css', import.meta.url), 'utf8');
   assert.ok(themeCss.includes('.dark body'), 'theme.css should style dark body');
   assert.ok(themeCss.includes('color-scheme: dark'), 'theme.css should define dark color-scheme');
+  assert.ok(themeCss.includes('.dark .bg-teal-50'), 'theme.css should style .dark .bg-teal-50');
+  assert.ok(themeCss.includes('.dark .bg-teal-100'), 'theme.css should style .dark .bg-teal-100');
+  assert.ok(themeCss.includes('.dark .text-teal-800'), 'theme.css should style .dark .text-teal-800');
+  assert.ok(themeCss.includes('.dark .bg-emerald-100'), 'theme.css should style .dark .bg-emerald-100');
+  assert.ok(themeCss.includes('.dark .bg-amber-100'), 'theme.css should style .dark .bg-amber-100');
+  assert.ok(themeCss.includes('.dark .bg-orange-50'), 'theme.css should style .dark .bg-orange-50');
 });
 
 test('applyTheme applies dark by default, toggles light, and supports system preference', async () => {

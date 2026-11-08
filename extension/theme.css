@@ -221,57 +221,223 @@ html.dark body {
   border-color: #1e293b !important;
 }
 
-/* Status Cards & Badges */
-.dark .bg-blue-50 {
-  background-color: rgba(30, 58, 138, 0.3) !important;
-  border-color: rgba(59, 130, 246, 0.3) !important;
+/* Status Cards, Badges & Alert Banners */
+/* Teal */
+.dark .bg-teal-50,
+.dark .bg-teal-100,
+.dark .bg-teal-200 {
+  background-color: rgba(19, 78, 74, 0.4) !important;
+  border-color: rgba(45, 212, 191, 0.3) !important;
+  color: #5eead4 !important;
 }
 
-.dark .text-blue-700 {
-  color: #93c5fd !important;
+.dark .text-teal-700,
+.dark .text-teal-800,
+.dark .text-teal-900 {
+  color: #5eead4 !important;
 }
 
-.dark .bg-amber-50 {
-  background-color: rgba(120, 53, 15, 0.3) !important;
+.dark .ring-teal-200,
+.dark .ring-teal-300 {
+  --tw-ring-color: rgba(45, 212, 191, 0.3) !important;
 }
 
-.dark .text-amber-800,
-.dark .text-amber-900 {
-  color: #fde68a !important;
-}
-
-.dark .ring-amber-200 {
-  --tw-ring-color: rgba(245, 158, 11, 0.3) !important;
-}
-
-.dark .bg-sky-50 {
-  background-color: rgba(12, 74, 110, 0.3) !important;
-}
-
-.dark .text-sky-800 {
-  color: #7dd3fc !important;
-}
-
-.dark .ring-sky-200 {
-  --tw-ring-color: rgba(14, 165, 233, 0.3) !important;
-}
-
-.dark .bg-emerald-50 {
-  background-color: rgba(6, 78, 59, 0.3) !important;
-}
-
-.dark .text-emerald-700,
-.dark .text-emerald-800 {
+/* Emerald & Green */
+.dark .bg-emerald-50,
+.dark .bg-emerald-100,
+.dark .bg-emerald-200,
+.dark .bg-green-50,
+.dark .bg-green-100,
+.dark .bg-green-200 {
+  background-color: rgba(6, 78, 59, 0.4) !important;
+  border-color: rgba(52, 211, 153, 0.3) !important;
   color: #6ee7b7 !important;
 }
 
-.dark .bg-red-50 {
-  background-color: rgba(127, 29, 29, 0.3) !important;
+.dark .text-emerald-700,
+.dark .text-emerald-800,
+.dark .text-emerald-900,
+.dark .text-green-700,
+.dark .text-green-800,
+.dark .text-green-900 {
+  color: #6ee7b7 !important;
+}
+
+.dark .ring-emerald-200,
+.dark .ring-emerald-300,
+.dark .ring-green-200,
+.dark .ring-green-300 {
+  --tw-ring-color: rgba(52, 211, 153, 0.3) !important;
+}
+
+/* Amber & Yellow */
+.dark .bg-amber-50,
+.dark .bg-amber-100,
+.dark .bg-amber-200,
+.dark .bg-yellow-50,
+.dark .bg-yellow-100,
+.dark .bg-yellow-200 {
+  background-color: rgba(120, 53, 15, 0.35) !important;
+  border-color: rgba(251, 191, 36, 0.3) !important;
+  color: #fde68a !important;
+}
+
+.dark .text-amber-700,
+.dark .text-amber-800,
+.dark .text-amber-900,
+.dark .text-yellow-700,
+.dark .text-yellow-800,
+.dark .text-yellow-900 {
+  color: #fde68a !important;
+}
+
+.dark .ring-amber-200,
+.dark .ring-amber-300,
+.dark .ring-amber-400,
+.dark .ring-yellow-200 {
+  --tw-ring-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Blue & Sky */
+.dark .bg-blue-50,
+.dark .bg-blue-100,
+.dark .bg-blue-200,
+.dark .bg-sky-50,
+.dark .bg-sky-100,
+.dark .bg-sky-200 {
+  background-color: rgba(30, 58, 138, 0.35) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  color: #93c5fd !important;
+}
+
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900,
+.dark .text-sky-700,
+.dark .text-sky-800,
+.dark .text-sky-900 {
+  color: #93c5fd !important;
+}
+
+.dark .ring-blue-200,
+.dark .ring-blue-300,
+.dark .ring-sky-200 {
+  --tw-ring-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Indigo, Violet & Purple */
+.dark .bg-indigo-50,
+.dark .bg-indigo-100,
+.dark .bg-indigo-200,
+.dark .bg-violet-50,
+.dark .bg-violet-100,
+.dark .bg-violet-200,
+.dark .bg-purple-50,
+.dark .bg-purple-100,
+.dark .bg-purple-200 {
+  background-color: rgba(88, 28, 135, 0.35) !important;
+  border-color: rgba(192, 132, 252, 0.3) !important;
+  color: #d8b4fe !important;
+}
+
+.dark .text-indigo-700,
+.dark .text-indigo-800,
+.dark .text-violet-700,
+.dark .text-violet-800,
+.dark .text-purple-700,
+.dark .text-purple-800 {
+  color: #d8b4fe !important;
+}
+
+.dark .ring-indigo-200,
+.dark .ring-violet-200,
+.dark .ring-violet-300 {
+  --tw-ring-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+/* Cyan */
+.dark .bg-cyan-50,
+.dark .bg-cyan-100,
+.dark .bg-cyan-200 {
+  background-color: rgba(22, 78, 99, 0.35) !important;
+  border-color: rgba(34, 211, 238, 0.3) !important;
+  color: #67e8f9 !important;
+}
+
+.dark .text-cyan-700,
+.dark .text-cyan-800,
+.dark .text-cyan-900 {
+  color: #67e8f9 !important;
+}
+
+.dark .ring-cyan-200 {
+  --tw-ring-color: rgba(6, 182, 212, 0.3) !important;
+}
+
+/* Orange */
+.dark .bg-orange-50,
+.dark .bg-orange-100,
+.dark .bg-orange-200 {
+  background-color: rgba(124, 45, 18, 0.35) !important;
+  border-color: rgba(251, 146, 60, 0.3) !important;
+  color: #fdba74 !important;
+}
+
+.dark .text-orange-700,
+.dark .text-orange-800,
+.dark .text-orange-900 {
+  color: #fdba74 !important;
+}
+
+.dark .ring-orange-200,
+.dark .ring-orange-300 {
+  --tw-ring-color: rgba(249, 115, 22, 0.3) !important;
+}
+
+/* Red & Rose */
+.dark .bg-red-50,
+.dark .bg-red-100,
+.dark .bg-red-200,
+.dark .bg-rose-50,
+.dark .bg-rose-100,
+.dark .bg-rose-200 {
+  background-color: rgba(127, 29, 29, 0.35) !important;
+  border-color: rgba(248, 113, 113, 0.3) !important;
+  color: #fca5a5 !important;
 }
 
 .dark .text-red-700,
-.dark .text-red-800 {
+.dark .text-red-800,
+.dark .text-red-900,
+.dark .text-rose-700,
+.dark .text-rose-800,
+.dark .text-rose-900 {
   color: #fca5a5 !important;
+}
+
+.dark .ring-red-200,
+.dark .ring-red-300,
+.dark .ring-rose-200,
+.dark .ring-rose-300 {
+  --tw-ring-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Badge child elements color inherit */
+.dark .bg-teal-50 > *, .dark .bg-teal-100 > *, .dark .bg-teal-200 > *,
+.dark .bg-emerald-50 > *, .dark .bg-emerald-100 > *, .dark .bg-emerald-200 > *,
+.dark .bg-green-50 > *, .dark .bg-green-100 > *, .dark .bg-green-200 > *,
+.dark .bg-amber-50 > *, .dark .bg-amber-100 > *, .dark .bg-amber-200 > *,
+.dark .bg-yellow-50 > *, .dark .bg-yellow-100 > *, .dark .bg-yellow-200 > *,
+.dark .bg-blue-50 > *, .dark .bg-blue-100 > *, .dark .bg-blue-200 > *,
+.dark .bg-sky-50 > *, .dark .bg-sky-100 > *, .dark .bg-sky-200 > *,
+.dark .bg-indigo-50 > *, .dark .bg-indigo-100 > *, .dark .bg-indigo-200 > *,
+.dark .bg-violet-50 > *, .dark .bg-violet-100 > *, .dark .bg-violet-200 > *,
+.dark .bg-purple-50 > *, .dark .bg-purple-100 > *, .dark .bg-purple-200 > *,
+.dark .bg-cyan-50 > *, .dark .bg-cyan-100 > *, .dark .bg-cyan-200 > *,
+.dark .bg-orange-50 > *, .dark .bg-orange-100 > *, .dark .bg-orange-200 > *,
+.dark .bg-red-50 > *, .dark .bg-red-100 > *, .dark .bg-red-200 > *,
+.dark .bg-rose-50 > *, .dark .bg-rose-100 > *, .dark .bg-rose-200 > * {
+  color: inherit;
 }
 
 .dark #hero-carrier-badge {

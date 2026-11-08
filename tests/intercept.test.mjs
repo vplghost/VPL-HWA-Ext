@@ -979,3 +979,129 @@ test("refresh-rpc dispatch emits api-record with response body to update rpcCach
   assert.equal(apiRecordMsg.record.responseBody, fakeResponse);
 });
 
+test("syncRequestId rewrites stale x-request-id in window.fetch options.headers object", async () => {
+  let capturedHeaders = null;
+  const { window, sessionStorage } = setup(async (url, opts) => {
+    capturedHeaders = opts.headers;
+    return new Response("{\"results\":[]}", { status: 200, headers: { "content-type": "application/json" } });
+  }, true);
+
+  // Enable popup RPC so synchronization guard is active
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+    interceptEnabled: true, popupRpcEnabled: true }, 'https://www.hero-wars-alliance.com');
+
+  // Set current highest request ID (e.g. extension previously dispatched request #50)
+  sessionStorage.setItem("hwa_highest_request_id", "50");
+
+  // Game engine sends fetch with internal counter that fell behind (e.g. 26)
+  await window.fetch("https://api.hero-wars-alliance.com/api/rpc", {
+    method: "POST",
+    headers: { "X-Request-Id": "26", "content-type": "application/json" },
+    body: "{\"calls\":[{\"name\":\"stashClient\"}]}"
+  });
+
+  // Outgoing header sent to server must be transparently bumped to > 50 (i.e. 51)
+  assert.ok(capturedHeaders, "Headers must be captured");
+  assert.equal(capturedHeaders["X-Request-Id"], "51");
+  assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "51");
+
+  // Subsequent game request with 27 is also bumped to 52
+  await window.fetch("https://api.hero-wars-alliance.com/api/rpc", {
+    method: "POST",
+    headers: { "x-request-id": "27", "content-type": "application/json" },
+    body: "{\"calls\":[{\"name\":\"stashClient\"}]}"
+  });
+  assert.equal(capturedHeaders["x-request-id"], "52");
+  assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "52");
+});
+
+test("syncRequestId rewrites stale x-request-id in window.fetch when headers is a Headers instance", async () => {
+  let capturedHeaders = null;
+  const { window, sessionStorage } = setup(async (url, opts) => {
+    capturedHeaders = opts.headers;
+    return new Response("{\"results\":[]}", { status: 200, headers: { "content-type": "application/json" } });
+  }, true, { Response, Headers });
+
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+    interceptEnabled: true, popupRpcEnabled: true }, 'https://www.hero-wars-alliance.com');
+
+  sessionStorage.setItem("hwa_highest_request_id", "50");
+
+  const reqHeaders = new Headers();
+  reqHeaders.set("X-Request-Id", "26");
+  reqHeaders.set("content-type", "application/json");
+
+  await window.fetch("https://api.hero-wars-alliance.com/api/rpc", {
+    method: "POST",
+    headers: reqHeaders,
+    body: "{\"calls\":[{\"name\":\"stashClient\"}]}"
+  });
+
+  assert.ok(capturedHeaders, "Headers must be captured");
+  assert.equal(capturedHeaders.get("x-request-id"), "51");
+  assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "51");
+});
+
+test("native game fetch requests stay strictly monotonic after Direct RPC dispatch", async () => {
+  const sentRequests = [];
+  const { window, sessionStorage } = setup(async (url, opts) => {
+    sentRequests.push({ url, opts, headers: { ...opts.headers } });
+    return new Response("{\"results\":[]}", { status: 200, headers: { "content-type": "application/json" } });
+  }, true);
+
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+    interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: 'direct' }, 'https://www.hero-wars-alliance.com');
+
+  // Step 1: Initial game engine request #1 with ID 10
+  await window.fetch("https://api.hero-wars-alliance.com/api/rpc", {
+    method: "POST",
+    headers: { "x-request-id": "10", "x-auth-session-id": "sess-1" },
+    body: "{\"calls\":[{\"name\":\"mobileLogin\"}]}"
+  });
+  assert.equal(sentRequests[0].headers["x-request-id"], "10");
+  assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "10");
+
+  // Step 2: User triggers Direct RPC from popup (e.g. refresh-rpc)
+  window.postMessage({
+    source: "hwa-helper-control",
+    kind: "refresh-rpc",
+    calls: [{ name: "heroGetAll" }]
+  }, "https://www.hero-wars-alliance.com");
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  // The direct RPC dispatch should have advanced the ID above 10
+  const directDispatch = sentRequests.find((r) => r.opts?.body?.includes("heroGetAll"));
+  assert.ok(directDispatch, "Direct dispatch should be executed");
+  const directReqId = parseInt(directDispatch.headers["x-request-id"], 10);
+  assert.ok(directReqId > 10, `Direct request ID ${directReqId} must be > 10`);
+
+  // Step 3: Game engine sends subsequent native request with internal counter still at 11
+  await window.fetch("https://api.hero-wars-alliance.com/api/rpc", {
+    method: "POST",
+    headers: { "x-request-id": "11", "x-auth-session-id": "sess-1" },
+    body: "{\"calls\":[{\"name\":\"stashClient\"}]}"
+  });
+
+  const lastReq = sentRequests[sentRequests.length - 1];
+  const lastReqId = parseInt(lastReq.headers["x-request-id"], 10);
+  assert.ok(lastReqId > directReqId, `Game engine request ID ${lastReqId} must be strictly > direct ID ${directReqId}`);
+});
+
+test("window.__hwaRequestIdState allows inspecting and updating sequence offset", () => {
+  const { window, sessionStorage } = setup(async () => new Response("ok"), true);
+
+  assert.ok(window.__hwaRequestIdState, "window.__hwaRequestIdState helper must be defined");
+  assert.equal(typeof window.__hwaRequestIdState.get, "function");
+  assert.equal(typeof window.__hwaRequestIdState.setOffset, "function");
+
+  assert.equal(window.__hwaRequestIdState.get(), 0);
+
+  window.__hwaRequestIdState.setOffset(200);
+  assert.equal(window.__hwaRequestIdState.get(), 200);
+  assert.equal(sessionStorage.getItem("hwa_highest_request_id"), "200");
+
+  // Setting a lower offset should not regress the monotonic counter
+  window.__hwaRequestIdState.setOffset(150);
+  assert.equal(window.__hwaRequestIdState.get(), 200);
+});
+

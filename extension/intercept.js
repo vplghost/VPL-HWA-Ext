@@ -4,6 +4,7 @@
   window[flag] = true;
   const MAX_BODY_CHARS = 512 * 1024;
   const isTrackingUrl = globalThis.hwaHelperIsTrackingUrl;
+  const originalFetch = typeof window.fetch === 'function' ? window.fetch : null;
   let captureEnabled = false;
   let popupRpcEnabled = false;
   let rpcDispatchMode = 'piggyback';
@@ -100,6 +101,32 @@
     }
     return candidate;
   }
+
+  try {
+    window.__hwaRequestIdState = {
+      get: () => {
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            const stored = parseInt(sessionStorage.getItem('hwa_highest_request_id'), 10);
+            if (!isNaN(stored) && stored > highestRequestId) highestRequestId = stored;
+          }
+        } catch (_) {}
+        return highestRequestId;
+      },
+      setOffset: (offset) => {
+        const val = parseInt(offset, 10);
+        if (!isNaN(val) && val > highestRequestId) {
+          highestRequestId = val;
+          try {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem('hwa_highest_request_id', String(highestRequestId));
+            }
+          } catch (_) {}
+        }
+        return highestRequestId;
+      }
+    };
+  } catch (_) {}
 
   function getNextRequestId(baseHeaders) {
     try {
@@ -303,7 +330,7 @@
       };
       const headers = buildDispatchHeaders(headersToUse);
       try {
-        (window.fetch || originalFetch)(url, {
+        (originalFetch || window.fetch)(url, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
@@ -931,7 +958,7 @@
   }
 
   if (typeof window.fetch === 'function') {
-    const originalFetch = window.fetch;
+    const nativeFetch = originalFetch || window.fetch;
     window.fetch = function (...args) {
       const input = args[0];
       const options = args[1];
@@ -942,7 +969,76 @@
         try {
           if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('hwa_last_rpc_url', urlStr);
         } catch (_) {}
-        const rawHeaders = options?.headers || (input && typeof input === 'object' && input.headers ? input.headers : null);
+
+        // Transparent Monotonic Request ID Guard for native game engine fetch requests
+        try {
+          let origReqId = null;
+          let reqIdKey = null;
+
+          if (options && options.headers) {
+            if (typeof options.headers.get === 'function' && typeof options.headers.set === 'function') {
+              origReqId = options.headers.get('x-request-id');
+              if (origReqId) {
+                const synced = syncRequestId(origReqId);
+                if (synced !== origReqId) {
+                  options.headers.set('x-request-id', synced);
+                }
+              }
+            } else if (Array.isArray(options.headers)) {
+              const pair = options.headers.find((p) => p && String(p[0]).toLowerCase() === 'x-request-id');
+              if (pair) {
+                origReqId = pair[1];
+                const synced = syncRequestId(origReqId);
+                if (synced !== origReqId) {
+                  pair[1] = synced;
+                }
+              }
+            } else if (typeof options.headers === 'object') {
+              reqIdKey = Object.keys(options.headers).find((k) => k.toLowerCase() === 'x-request-id');
+              if (reqIdKey) {
+                origReqId = options.headers[reqIdKey];
+                const synced = syncRequestId(origReqId);
+                if (synced !== origReqId) {
+                  options.headers[reqIdKey] = synced;
+                }
+              }
+            }
+          } else if (input && typeof input === 'object' && input.headers) {
+            if (typeof input.headers.get === 'function') {
+              origReqId = input.headers.get('x-request-id');
+              if (origReqId) {
+                const synced = syncRequestId(origReqId);
+                if (synced !== origReqId) {
+                  if (typeof input.headers.set === 'function') {
+                    try { input.headers.set('x-request-id', synced); } catch (_) {}
+                  }
+                  args[1] = args[1] || {};
+                  const HdrCtor = typeof Headers !== 'undefined' ? Headers : (args[1].headers ? args[1].headers.constructor : null);
+                  if (HdrCtor) {
+                    const newHeaders = new HdrCtor(input.headers);
+                    newHeaders.set('x-request-id', synced);
+                    args[1].headers = newHeaders;
+                  }
+                }
+              }
+            } else if (typeof input.headers === 'object') {
+              reqIdKey = Object.keys(input.headers).find((k) => k.toLowerCase() === 'x-request-id');
+              if (reqIdKey) {
+                origReqId = input.headers[reqIdKey];
+                const synced = syncRequestId(origReqId);
+                if (synced !== origReqId) {
+                  try {
+                    input.headers[reqIdKey] = synced;
+                  } catch (_) {
+                    args[1] = { ...(args[1] || {}), headers: { ...input.headers, [reqIdKey]: synced } };
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+
+        const rawHeaders = (args[1] && args[1].headers) || options?.headers || (input && typeof input === 'object' && input.headers ? input.headers : null);
         if (rawHeaders) {
           try {
             if (typeof Headers !== 'undefined' && rawHeaders instanceof Headers) {
@@ -969,7 +1065,7 @@
           } catch (_) {}
         }
       }
-      if (!captureEnabled || isTrackingUrl(url, location.href)) return originalFetch.apply(this, args);
+      if (!captureEnabled || isTrackingUrl(url, location.href)) return nativeFetch.apply(this, args);
       const method = options?.method || input?.method || 'GET';
       const isPost = String(method).toUpperCase() === 'POST';
       const dispatch = (piggyback) => {
@@ -977,7 +1073,7 @@
       const requestBody = isPost ? readRequestBody(input, args[1]) : Promise.resolve(null);
       const started = performance.now();
       try {
-        return Promise.resolve(originalFetch.apply(this, args)).then(
+        return Promise.resolve(nativeFetch.apply(this, args)).then(
           async (response) => {
             if (!captureEnabled && !piggyback) return response;
             const duration = performance.now() - started;
