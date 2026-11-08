@@ -3033,7 +3033,7 @@ function openGuildVersusModal(vsStatus, cache) {
 
   // --- SECTION 1: MATCHUP BANNER ---
   const matchupSec = document.createElement('div');
-  matchupSec.className = 'rounded-xl border border-slate-200 bg-slate-50/80 p-4';
+  matchupSec.className = 'rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/60';
   const clanRoundPoints = battle.clanRoundPoints ?? 10145150;
   const enemyRoundPoints = battle.enemyClanRoundPoints ?? 657950;
   const totalPoints = clanRoundPoints + enemyRoundPoints || 1;
@@ -3043,32 +3043,32 @@ function openGuildVersusModal(vsStatus, cache) {
   const roundNumber = info.roundNumber ?? 1;
 
   matchupSec.innerHTML = `
-    <div class="flex items-center justify-between text-xs text-slate-500 mb-3">
+    <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-3">
       <span>Battle #${battleNumber} • Round ${roundNumber} of 6</span>
-      <span class="font-semibold text-emerald-700">Theme: Radar Training</span>
+      <span class="font-semibold text-emerald-700 dark:text-emerald-400">Theme: Radar Training</span>
     </div>
     <div class="grid grid-cols-5 items-center gap-2 mb-3">
       <div class="col-span-2 min-w-0">
-        <div class="font-bold text-slate-900 text-sm sm:text-base truncate">${clan.name}</div>
-        <div class="text-xs text-slate-500">Server ${clan.server || '—'}</div>
-        <div class="text-emerald-700 font-black text-base sm:text-lg tabular-nums mt-0.5">${clanRoundPoints.toLocaleString()}</div>
-        <div class="text-[11px] text-slate-500">Score: <strong class="text-slate-800">${battle.clanBattleScore ?? 0}</strong></div>
+        <div class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">${clan.name}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Server ${clan.server || '—'}</div>
+        <div class="text-emerald-700 dark:text-emerald-400 font-black text-base sm:text-lg tabular-nums mt-0.5">${clanRoundPoints.toLocaleString()}</div>
+        <div class="text-[11px] text-slate-500 dark:text-slate-400">Score: <strong class="text-slate-800 dark:text-slate-200">${battle.clanBattleScore ?? 0}</strong></div>
       </div>
       <div class="col-span-1 text-center">
-        <span class="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-xs font-black text-slate-700">VS</span>
+        <span class="inline-flex rounded-full bg-slate-200 dark:bg-slate-700 px-2.5 py-1 text-xs font-black text-slate-700 dark:text-slate-300">VS</span>
       </div>
       <div class="col-span-2 min-w-0 text-right">
-        <div class="font-bold text-slate-900 text-sm sm:text-base truncate">${enemyClan.name}</div>
-        <div class="text-xs text-slate-500">Server ${enemyClan.server || '—'}</div>
-        <div class="text-rose-700 font-black text-base sm:text-lg tabular-nums mt-0.5">${enemyRoundPoints.toLocaleString()}</div>
-        <div class="text-[11px] text-slate-500">Score: <strong class="text-slate-800">${battle.enemyClanBattleScore ?? 0}</strong></div>
+        <div class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">${enemyClan.name}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Server ${enemyClan.server || '—'}</div>
+        <div class="text-rose-700 dark:text-rose-400 font-black text-base sm:text-lg tabular-nums mt-0.5">${enemyRoundPoints.toLocaleString()}</div>
+        <div class="text-[11px] text-slate-500 dark:text-slate-400">Score: <strong class="text-slate-800 dark:text-slate-200">${battle.enemyClanBattleScore ?? 0}</strong></div>
       </div>
     </div>
-    <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden flex">
+    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden flex">
       <div class="bg-emerald-500 h-2.5" style="width: ${clanPct}%"></div>
       <div class="bg-rose-500 h-2.5" style="width: ${enemyPct}%"></div>
     </div>
-    <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-medium">
+    <div class="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
       <span>${clanPct}%</span>
       <span>${enemyPct}%</span>
     </div>
@@ -3092,11 +3092,11 @@ function openGuildVersusModal(vsStatus, cache) {
   ];
   for (const s of stats) {
     const tile = document.createElement('div');
-    tile.className = 'rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs';
+    tile.className = 'rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70';
     tile.innerHTML = `
-      <div class="text-[11px] font-medium text-slate-500">${s.label}</div>
-      <div class="text-base font-bold text-slate-900 tabular-nums my-0.5">${s.val}</div>
-      <div class="text-[10px] text-slate-400">${s.sub}</div>
+      <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">${s.label}</div>
+      <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">${s.val}</div>
+      <div class="text-[10px] text-slate-400 dark:text-slate-500">${s.sub}</div>
     `;
     personalSec.append(tile);
   }
@@ -3121,7 +3121,7 @@ function openGuildVersusModal(vsStatus, cache) {
   const targetPct = targetThreshold > 0 ? Math.min(100, Math.round((pScore / targetThreshold) * 100)) : 100;
 
   const chestsSec = document.createElement('div');
-  chestsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+  chestsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
 
   let isStackMode = true;
   let activeChestNum = targetChestNum;
@@ -3132,21 +3132,21 @@ function openGuildVersusModal(vsStatus, cache) {
   const titleWrap = document.createElement('div');
   titleWrap.className = 'flex items-center gap-2';
   titleWrap.innerHTML = `
-    <h3 class="text-sm font-bold text-slate-900">🎁 Milestone Chests</h3>
-    <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">${claimedSet.size} / 9 Claimed</span>
+    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">🎁 Milestone Chests</h3>
+    <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50">${claimedSet.size} / 9 Claimed</span>
   `;
 
   const viewToggleWrap = document.createElement('div');
-  viewToggleWrap.className = 'inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium select-none';
+  viewToggleWrap.className = 'inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium select-none dark:border-slate-700 dark:bg-slate-800';
 
   const deckModeBtn = document.createElement('button');
   deckModeBtn.type = 'button';
-  deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer';
+  deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer dark:bg-slate-700 dark:text-slate-100';
   deckModeBtn.textContent = '🎴 Stacked Deck';
 
   const gridModeBtn = document.createElement('button');
   gridModeBtn.type = 'button';
-  gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer';
+  gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer dark:text-slate-400 dark:hover:text-slate-100';
   gridModeBtn.textContent = '🃏 Grid View';
 
   viewToggleWrap.append(deckModeBtn, gridModeBtn);
@@ -3155,13 +3155,13 @@ function openGuildVersusModal(vsStatus, cache) {
 
   // Target summary progress banner
   const progBox = document.createElement('div');
-  progBox.className = 'rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5 border border-slate-100';
+  progBox.className = 'rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60';
   progBox.innerHTML = `
-    <div class="flex justify-between font-medium text-slate-700">
-      <span>Target: <strong class="text-amber-800">Chest ${targetChestNum}</strong> (${targetThreshold.toLocaleString()} pts)</span>
-      <span class="font-bold text-slate-900">${targetPct}% (${pScore.toLocaleString()} / ${targetThreshold.toLocaleString()})</span>
+    <div class="flex justify-between font-medium text-slate-700 dark:text-slate-300">
+      <span>Target: <strong class="text-amber-800 dark:text-amber-300">Chest ${targetChestNum}</strong> (${targetThreshold.toLocaleString()} pts)</span>
+      <span class="font-bold text-slate-900 dark:text-slate-100">${targetPct}% (${pScore.toLocaleString()} / ${targetThreshold.toLocaleString()})</span>
     </div>
-    <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
       <div class="bg-amber-500 h-2 rounded-full transition-all duration-300" style="width: ${targetPct}%"></div>
     </div>
   `;
@@ -3201,9 +3201,9 @@ function openGuildVersusModal(vsStatus, cache) {
 
   // 3D Deck Stack underlay layers
   const layer2 = document.createElement('div');
-  layer2.className = 'chest-deck-layer-2 absolute inset-x-4 top-3 bottom-1 rounded-2xl bg-slate-200/70 border border-slate-300 shadow-2xs -z-20 pointer-events-none';
+  layer2.className = 'chest-deck-layer-2 absolute inset-x-4 top-3 bottom-1 rounded-2xl bg-slate-200/70 border border-slate-300 shadow-2xs -z-20 pointer-events-none dark:bg-slate-800/50 dark:border-slate-700/60';
   const layer1 = document.createElement('div');
-  layer1.className = 'chest-deck-layer-1 absolute inset-x-2 top-2 bottom-2 rounded-2xl bg-slate-100/80 border border-slate-300 shadow-xs -z-10 pointer-events-none';
+  layer1.className = 'chest-deck-layer-1 absolute inset-x-2 top-2 bottom-2 rounded-2xl bg-slate-100/80 border border-slate-300 shadow-xs -z-10 pointer-events-none dark:bg-slate-800/80 dark:border-slate-700/80';
   deckContainer.append(layer2, layer1);
 
   const cardsMap = new Map();
@@ -3217,12 +3217,12 @@ function openGuildVersusModal(vsStatus, cache) {
     const chestCard = document.createElement('div');
     chestCard.className = `chest-playing-card rounded-2xl border-2 p-3.5 flex flex-col justify-between text-xs transition-all relative ${
       isClaimed
-        ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-100/50 shadow-sm'
+        ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-100/50 shadow-sm dark:border-emerald-600/60 dark:from-emerald-950/40 dark:via-slate-800/90 dark:to-emerald-950/30'
         : isReady
-          ? 'border-amber-400 bg-gradient-to-br from-amber-50/80 via-white to-amber-100/60 shadow-md resource-capped-amber'
+          ? 'border-amber-400 bg-gradient-to-br from-amber-50/80 via-white to-amber-100/60 shadow-md resource-capped-amber dark:border-amber-500/70 dark:from-amber-950/40 dark:via-slate-800/90 dark:to-amber-950/30'
           : isTarget
-            ? 'border-indigo-400 bg-gradient-to-br from-indigo-50/60 via-white to-amber-50/40 shadow-md ring-2 ring-indigo-200'
-            : 'border-slate-200 bg-gradient-to-br from-slate-50/70 via-white to-slate-100/60 text-slate-700 shadow-2xs'
+            ? 'border-indigo-400 bg-gradient-to-br from-indigo-50/60 via-white to-amber-50/40 shadow-md ring-2 ring-indigo-200 dark:border-indigo-500/70 dark:ring-indigo-900/50 dark:from-indigo-950/40 dark:via-slate-800/90 dark:to-slate-800'
+            : 'border-slate-200 bg-gradient-to-br from-slate-50/70 via-white to-slate-100/60 text-slate-700 shadow-2xs dark:border-slate-700/80 dark:from-slate-800/80 dark:via-slate-800/95 dark:to-slate-900 dark:text-slate-300'
     }`;
 
     // Card Top / Header (Rank + Suit + Status Badge)
@@ -3230,9 +3230,9 @@ function openGuildVersusModal(vsStatus, cache) {
     cardHeader.className = 'flex items-center justify-between mb-2';
     cardHeader.innerHTML = `
       <div class="flex items-center gap-1.5">
-        <span class="font-mono font-black text-xs px-2 py-0.5 rounded bg-black/5 border border-black/10">№ ${c}</span>
+        <span class="font-mono font-black text-xs px-2 py-0.5 rounded bg-black/5 border border-black/10 dark:bg-white/10 dark:border-white/10 dark:text-slate-200">№ ${c}</span>
         <span class="text-sm">🎁</span>
-        <span class="font-bold text-slate-900 text-sm">Chest ${c}</span>
+        <span class="font-bold text-slate-900 dark:text-slate-100 text-sm">Chest ${c}</span>
       </div>
       <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${
         isClaimed
@@ -3241,65 +3241,65 @@ function openGuildVersusModal(vsStatus, cache) {
             ? 'bg-amber-500 text-white animate-pulse'
             : isTarget
               ? 'bg-indigo-600 text-white'
-              : 'bg-slate-200 text-slate-600'
+              : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
       }">${isClaimed ? '✓ Claimed' : isReady ? '★ Ready to Claim' : isTarget ? '🎯 Target Chest' : '🔒 Locked'}</span>
     `;
 
     // Milestone Requirement Row
     const reqRow = document.createElement('div');
-    reqRow.className = 'flex items-baseline justify-between py-1 border-b border-slate-200/60';
+    reqRow.className = 'flex items-baseline justify-between py-1 border-b border-slate-200/60 dark:border-slate-700/60';
     reqRow.innerHTML = `
-      <span class="text-[11px] text-slate-500 font-medium">Milestone Requirement</span>
-      <span class="tabular-nums font-extrabold text-sm ${isClaimed ? 'text-emerald-700' : isReady ? 'text-amber-800' : isTarget ? 'text-indigo-900' : 'text-slate-700'}">${pts.toLocaleString()} pts</span>
+      <span class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Milestone Requirement</span>
+      <span class="tabular-nums font-extrabold text-sm ${isClaimed ? 'text-emerald-700 dark:text-emerald-400' : isReady ? 'text-amber-800 dark:text-amber-400' : isTarget ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}">${pts.toLocaleString()} pts</span>
     `;
 
     // Progress bar for active / target card
     const cardProg = document.createElement('div');
     cardProg.className = 'mt-2 space-y-1';
     cardProg.innerHTML = `
-      <div class="flex justify-between text-[11px] text-slate-600 font-medium">
+      <div class="flex justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
         <span>Progress</span>
-        <span class="tabular-nums font-bold ${isReady || isClaimed ? 'text-emerald-700' : 'text-slate-800'}">${cardPct}% (${pScore.toLocaleString()} / ${pts.toLocaleString()})</span>
+        <span class="tabular-nums font-bold ${isReady || isClaimed ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}">${cardPct}% (${pScore.toLocaleString()} / ${pts.toLocaleString()})</span>
       </div>
-      <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+      <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
         <div class="h-1.5 rounded-full transition-all duration-300 ${isClaimed ? 'bg-emerald-500' : isReady ? 'bg-amber-500' : 'bg-indigo-500'}" style="width: ${cardPct}%"></div>
       </div>
     `;
 
     // Rewards List
     const rewardList = document.createElement('div');
-    rewardList.className = 'space-y-1.5 text-[11px] text-slate-700 mt-2.5 pt-2 border-t border-slate-200/60';
+    rewardList.className = 'space-y-1.5 text-[11px] text-slate-700 dark:text-slate-300 mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60';
     const rItems = rewardMap[c];
     if (rItems) {
       const itemsGrid = document.createElement('div');
       itemsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-1.5';
       for (const [rKey, rAmt] of Object.entries(rItems)) {
         const itemRow = document.createElement('div');
-        itemRow.className = 'flex items-center gap-1.5 rounded-md bg-white/90 px-2 py-1 border border-slate-200/70 shadow-2xs font-medium truncate';
+        itemRow.className = 'flex items-center gap-1.5 rounded-md bg-white/90 px-2 py-1 border border-slate-200/70 shadow-2xs font-medium truncate dark:bg-slate-800/90 dark:border-slate-700 dark:text-slate-200';
         itemRow.textContent = formatRewardItem(rKey, rAmt);
         itemsGrid.append(itemRow);
       }
       rewardList.append(itemsGrid);
     } else {
-      rewardList.innerHTML = '<span class="text-slate-400 italic">Bonus milestone reward</span>';
+      rewardList.innerHTML = '<span class="text-slate-400 dark:text-slate-500 italic">Bonus milestone reward</span>';
     }
 
     // Stack navigation footer (visible in Stack mode)
     const cardNav = document.createElement('div');
-    cardNav.className = 'card-stack-nav flex items-center justify-between pt-2.5 mt-3 border-t border-slate-200/60 text-xs';
+    cardNav.className = 'card-stack-nav flex items-center justify-between pt-2.5 mt-3 border-t border-slate-200/60 dark:border-slate-700/60 text-xs';
 
     const prevBtn = document.createElement('button');
     prevBtn.type = 'button';
-    prevBtn.className = 'card-prev-btn px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 border border-slate-200 font-semibold text-slate-700 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+    prevBtn.className = 'card-prev-btn px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 border border-slate-200 font-semibold text-slate-700 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 dark:text-slate-200';
     prevBtn.textContent = '‹ Prev';
 
     const cardCounter = document.createElement('span');
-    cardCounter.className = 'text-slate-500 font-medium';
-    cardCounter.innerHTML = `Chest ${c} of 9 ${isTarget ? '<strong class="text-amber-600 ml-1">(Target)</strong>' : ''}`;
+    cardCounter.className = 'text-slate-500 dark:text-slate-400 font-medium';
+    cardCounter.innerHTML = `Chest ${c} of 9 ${isTarget ? '<strong class="text-amber-600 dark:text-amber-400 ml-1">(Target)</strong>' : ''}`;
 
     const nextBtn = document.createElement('button');
     nextBtn.type = 'button';
-    nextBtn.className = 'card-next-btn px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 border border-slate-200 font-semibold text-slate-700 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+    nextBtn.className = 'card-next-btn px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 border border-slate-200 font-semibold text-slate-700 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 dark:text-slate-200';
     nextBtn.textContent = 'Next ›';
 
     if (c === 1) prevBtn.disabled = true;
@@ -3337,18 +3337,18 @@ function openGuildVersusModal(vsStatus, cache) {
       const isActive = c === activeChestNum;
 
       if (isActive && isStackMode) {
-        btn.className = `px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer bg-slate-900 text-white border-slate-900 shadow-xs ${
+        btn.className = `px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer bg-slate-900 text-white border-slate-900 shadow-xs dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 ${
           isTarget ? 'ring-2 ring-amber-400' : ''
         }`;
       } else {
         btn.className = `px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
           isClaimed
-            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60 dark:hover:bg-emerald-900/60'
             : isReady
-              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60 dark:hover:bg-amber-900/60'
               : isTarget
-                ? 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-2 ring-amber-400 font-bold hover:bg-indigo-100'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                ? 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-2 ring-amber-400 font-bold hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800/60 dark:hover:bg-indigo-900/60'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 dark:bg-slate-800/70 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700/60'
         }`;
       }
     }
@@ -3382,14 +3382,14 @@ function openGuildVersusModal(vsStatus, cache) {
 
   deckModeBtn.addEventListener('click', () => {
     isStackMode = true;
-    deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer';
-    gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer';
+    deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer dark:bg-slate-700 dark:text-slate-100';
+    gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer dark:text-slate-400 dark:hover:text-slate-100';
     updateDeckView();
   });
   gridModeBtn.addEventListener('click', () => {
     isStackMode = false;
-    gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer';
-    deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer';
+    gridModeBtn.className = 'grid-mode-btn px-2.5 py-0.5 rounded-md font-bold transition-colors bg-white text-slate-900 shadow-2xs cursor-pointer dark:bg-slate-700 dark:text-slate-100';
+    deckModeBtn.className = 'deck-mode-btn px-2.5 py-0.5 rounded-md font-medium transition-colors text-slate-600 hover:text-slate-900 cursor-pointer dark:text-slate-400 dark:hover:text-slate-100';
     updateDeckView();
   });
 
@@ -3398,11 +3398,11 @@ function openGuildVersusModal(vsStatus, cache) {
 
   // --- SECTION 4: 6-ROUND SCHEDULE & QUESTS ---
   const roundsSec = document.createElement('div');
-  roundsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+  roundsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
   roundsSec.innerHTML = `
     <div class="flex items-center justify-between">
-      <h3 class="text-sm font-bold text-slate-900">🗓️ 6-Round Battle Schedule & Quests</h3>
-      <span class="text-xs text-slate-500">Click round to view point-earning quests</span>
+      <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">🗓️ 6-Round Battle Schedule & Quests</h3>
+      <span class="text-xs text-slate-500 dark:text-slate-400">Click round to view point-earning quests</span>
     </div>
   `;
 
@@ -3427,42 +3427,42 @@ function openGuildVersusModal(vsStatus, cache) {
 
     const rCard = document.createElement('details');
     rCard.className = `group rounded-lg border text-xs overflow-hidden transition-colors ${
-      isLive ? 'border-emerald-300 bg-emerald-50/60' : 'border-slate-200 bg-slate-50/50'
+      isLive ? 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-700/60 dark:bg-emerald-950/30' : 'border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/50'
     }`;
     if (isLive) rCard.open = true;
 
     const summary = document.createElement('summary');
-    summary.className = 'flex items-center justify-between p-2.5 cursor-pointer select-none hover:bg-slate-100/60 list-none';
+    summary.className = 'flex items-center justify-between p-2.5 cursor-pointer select-none hover:bg-slate-100/60 dark:hover:bg-slate-700/40 list-none';
 
     summary.innerHTML = `
       <div class="flex items-center gap-2 min-w-0">
         <span class="size-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-          isLive ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+          isLive ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
         }">${r.index}</span>
         <div class="min-w-0">
-          <div class="font-bold text-slate-900 truncate">${themeName}</div>
-          <div class="text-[10px] text-slate-500">Reward: ${r.score || roundConfig.battlePoints || 1} Battle Point${(r.score || roundConfig.battlePoints || 1) > 1 ? 's' : ''} • ${quests.length} Quests</div>
+          <div class="font-bold text-slate-900 dark:text-slate-100 truncate">${themeName}</div>
+          <div class="text-[10px] text-slate-500 dark:text-slate-400">Reward: ${r.score || roundConfig.battlePoints || 1} Battle Point${(r.score || roundConfig.battlePoints || 1) > 1 ? 's' : ''} • ${quests.length} Quests</div>
         </div>
       </div>
       <div class="text-right shrink-0 ml-2">
         ${
           isLive
-            ? `<div class="font-black text-emerald-800 tabular-nums">${resourceData.formatAmount(r.points || 0)} vs ${resourceData.formatAmount(r.enemyPoints || 0)}</div>
-               <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><span class="size-1.5 rounded-full bg-emerald-500 animate-ping"></span>In Progress</span>`
+            ? `<div class="font-black text-emerald-800 dark:text-emerald-400 tabular-nums">${resourceData.formatAmount(r.points || 0)} vs ${resourceData.formatAmount(r.enemyPoints || 0)}</div>
+               <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400"><span class="size-1.5 rounded-full bg-emerald-500 animate-ping"></span>In Progress</span>`
             : isDone
-              ? `<div class="font-bold text-slate-700">${resourceData.formatAmount(r.points || 0)} vs ${resourceData.formatAmount(r.enemyPoints || 0)}</div>
-                 <span class="text-[10px] font-semibold text-slate-500">Finished</span>`
-              : '<span class="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600">Upcoming</span>'
+              ? `<div class="font-bold text-slate-700 dark:text-slate-300">${resourceData.formatAmount(r.points || 0)} vs ${resourceData.formatAmount(r.enemyPoints || 0)}</div>
+                 <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Finished</span>`
+              : '<span class="rounded bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">Upcoming</span>'
         }
       </div>
     `;
 
     const questBody = document.createElement('div');
-    questBody.className = 'p-3 border-t border-slate-200/80 bg-white/70 space-y-2';
+    questBody.className = 'p-3 border-t border-slate-200/80 bg-white/70 space-y-2 dark:border-slate-700/80 dark:bg-slate-800/70';
     questBody.innerHTML = `
-      <div class="flex items-center justify-between text-[11px] font-bold text-slate-700">
+      <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
         <span>🎯 Quests to Earn Points:</span>
-        <span class="text-[10px] text-slate-400 font-normal">Day ${r.index}</span>
+        <span class="text-[10px] text-slate-400 dark:text-slate-500 font-normal">Day ${r.index}</span>
       </div>
     `;
 
@@ -3473,10 +3473,10 @@ function openGuildVersusModal(vsStatus, cache) {
       const cleanLabel = q.label.replace(/\s*\(\d+[\d,]*\)$/, '');
       const displayLabel = stock != null ? `${cleanLabel} (${stock.toLocaleString()})` : cleanLabel;
       const qItem = document.createElement('div');
-      qItem.className = 'flex items-center justify-between rounded bg-white border border-slate-200/80 px-2 py-1 text-[11px]';
+      qItem.className = 'flex items-center justify-between rounded bg-white border border-slate-200/80 px-2 py-1 text-[11px] dark:bg-slate-800/90 dark:border-slate-700';
       qItem.innerHTML = `
-        <span class="text-slate-800 font-medium truncate mr-1.5" title="${displayLabel}">${displayLabel}</span>
-        <span class="rounded bg-emerald-50 text-emerald-700 px-1.5 py-0.2 font-bold tabular-nums shrink-0 border border-emerald-100">+${q.points.toLocaleString()} pts</span>
+        <span class="text-slate-800 dark:text-slate-200 font-medium truncate mr-1.5" title="${displayLabel}">${displayLabel}</span>
+        <span class="rounded bg-emerald-50 text-emerald-700 px-1.5 py-0.2 font-bold tabular-nums shrink-0 border border-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60">+${q.points.toLocaleString()} pts</span>
       `;
       qList.append(qItem);
     }
@@ -3490,7 +3490,7 @@ function openGuildVersusModal(vsStatus, cache) {
 
   // --- SECTION 5: GUILD REQUIREMENTS ---
   const reqSec = document.createElement('div');
-  reqSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+  reqSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
   const curUsers = info.currentNumActiveUsers ?? 28;
   const minUsers = info.numActiveUsers ?? 5;
   const weeklyAct = info.weeklyUserActivity ?? 2450;
@@ -3498,27 +3498,27 @@ function openGuildVersusModal(vsStatus, cache) {
   const guildSat = info.guildRequirementsIsSatisfied ?? true;
 
   reqSec.innerHTML = `
-    <h3 class="text-sm font-bold text-slate-900">👥 Guild Participation & Requirements</h3>
+    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">👥 Guild Participation & Requirements</h3>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
-        <div class="text-slate-500 text-[11px]">Active Members</div>
-        <div class="font-bold text-slate-900 text-sm mt-0.5">${curUsers} / ${minUsers} req</div>
-        <span class="text-[10px] font-semibold text-emerald-600">✓ Satisfied</span>
+      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+        <div class="text-slate-500 dark:text-slate-400 text-[11px]">Active Members</div>
+        <div class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">${curUsers} / ${minUsers} req</div>
+        <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">✓ Satisfied</span>
       </div>
-      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
-        <div class="text-slate-500 text-[11px]">Weekly Activity</div>
-        <div class="font-bold text-slate-900 text-sm mt-0.5">${weeklyAct.toLocaleString()}</div>
-        <span class="text-[10px] text-slate-400">Total guild score</span>
+      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+        <div class="text-slate-500 dark:text-slate-400 text-[11px]">Weekly Activity</div>
+        <div class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">${weeklyAct.toLocaleString()}</div>
+        <span class="text-[10px] text-slate-400 dark:text-slate-500">Total guild score</span>
       </div>
-      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
-        <div class="text-slate-500 text-[11px]">Personal Status</div>
-        <div class="font-bold text-sm mt-0.5 ${personalSat ? 'text-emerald-700' : 'text-amber-700'}">${personalSat ? 'Eligible' : 'Pending'}</div>
-        <span class="text-[10px] font-semibold text-emerald-600">${personalSat ? '✓ Qualified' : 'Action needed'}</span>
+      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+        <div class="text-slate-500 dark:text-slate-400 text-[11px]">Personal Status</div>
+        <div class="font-bold text-sm mt-0.5 ${personalSat ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}">${personalSat ? 'Eligible' : 'Pending'}</div>
+        <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">${personalSat ? '✓ Qualified' : 'Action needed'}</span>
       </div>
-      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
-        <div class="text-slate-500 text-[11px]">Guild Status</div>
-        <div class="font-bold text-sm mt-0.5 ${guildSat ? 'text-emerald-700' : 'text-amber-700'}">${guildSat ? 'Eligible' : 'Pending'}</div>
-        <span class="text-[10px] font-semibold text-emerald-600">${guildSat ? '✓ Qualified' : 'Action needed'}</span>
+      <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+        <div class="text-slate-500 dark:text-slate-400 text-[11px]">Guild Status</div>
+        <div class="font-bold text-sm mt-0.5 ${guildSat ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}">${guildSat ? 'Eligible' : 'Pending'}</div>
+        <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">${guildSat ? '✓ Qualified' : 'Action needed'}</span>
       </div>
     </div>
   `;
@@ -3528,7 +3528,7 @@ function openGuildVersusModal(vsStatus, cache) {
   const challenges = Array.isArray(info.challenges) ? info.challenges : [];
   if (challenges.length > 0) {
     const chSec = document.createElement('div');
-    chSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs';
+    chSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
 
     const challengeNames = globalThis.hwaHelperClanVersusChallengeNames || {};
     const challengePoints = globalThis.hwaHelperClanVersusChallengePoints || {};
@@ -3544,8 +3544,8 @@ function openGuildVersusModal(vsStatus, cache) {
 
     chSec.innerHTML = `
       <div class="flex items-center justify-between flex-wrap gap-1">
-        <h3 class="text-sm font-bold text-slate-900">🎯 Daily Challenges (${challenges.length})</h3>
-        <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-900 border border-amber-200">Total: ${totalChallengePts.toLocaleString()} pts</span>
+        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">🎯 Daily Challenges (${challenges.length})</h3>
+        <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-900 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60">Total: ${totalChallengePts.toLocaleString()} pts</span>
       </div>
     `;
 
@@ -3563,15 +3563,15 @@ function openGuildVersusModal(vsStatus, cache) {
       const convertedPts = Math.floor(progress / step) * ptsPerStep;
 
       const item = document.createElement('div');
-      item.className = 'flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs';
+      item.className = 'flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs dark:border-slate-700/60 dark:bg-slate-800/70';
       item.innerHTML = `
-        <span class="font-medium text-slate-800 truncate mr-2" title="${displayName}">${displayName}</span>
+        <span class="font-medium text-slate-800 dark:text-slate-200 truncate mr-2" title="${displayName}">${displayName}</span>
         <div class="flex items-center gap-1.5 shrink-0">
-          <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums">${progress.toLocaleString()}</span>
+          <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">${progress.toLocaleString()}</span>
           <span class="rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
             convertedPts > 0
-              ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold'
-              : 'bg-slate-100 text-slate-500 border border-slate-200'
+              ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60'
+              : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700'
           }" title="${ptsPerStep > 0 ? `${ptsPerStep.toLocaleString()} pts per ${step === 1 ? 'completion' : `${step} units`}` : ''}">${convertedPts.toLocaleString()} pts</span>
         </div>
       `;

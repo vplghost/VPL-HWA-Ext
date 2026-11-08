@@ -221,6 +221,131 @@ html.dark body {
   border-color: #1e293b !important;
 }
 
+/* Guild Versus Modal Dark Theme Overrides */
+.dark #guild-versus-modal .bg-white {
+  background-color: #131b2e !important;
+  border-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+.dark #guild-versus-modal .bg-slate-50,
+.dark #guild-versus-modal [class*="bg-slate-50/"] {
+  background-color: #162036 !important;
+  border-color: #1e293b !important;
+}
+
+.dark #guild-versus-modal .bg-slate-100,
+.dark #guild-versus-modal [class*="bg-slate-100/"] {
+  background-color: #1a2744 !important;
+  border-color: #27375a !important;
+}
+
+.dark #guild-versus-modal .bg-slate-200,
+.dark #guild-versus-modal [class*="bg-slate-200/"] {
+  background-color: #223254 !important;
+  border-color: #334155 !important;
+}
+
+.dark #guild-versus-modal .border-slate-100,
+.dark #guild-versus-modal .border-slate-200,
+.dark #guild-versus-modal [class*="border-slate-200/"],
+.dark #guild-versus-modal .border-slate-300 {
+  border-color: #1e293b !important;
+}
+
+.dark #guild-versus-modal .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+.dark #guild-versus-modal .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+
+.dark #guild-versus-modal .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+.dark #guild-versus-modal .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+.dark #guild-versus-modal .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.dark #guild-versus-modal .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* 3D Stack Underlays */
+.dark #guild-versus-modal .chest-deck-layer-2 {
+  background-color: rgba(30, 41, 59, 0.6) !important;
+  border-color: #1e293b !important;
+}
+
+.dark #guild-versus-modal .chest-deck-layer-1 {
+  background-color: rgba(30, 41, 59, 0.85) !important;
+  border-color: #334155 !important;
+}
+
+/* Milestone Chest Playing Cards */
+.dark #guild-versus-modal .chest-playing-card {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark #guild-versus-modal .chest-playing-card.border-emerald-300 {
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, #131b2e 50%, rgba(6, 78, 59, 0.3) 100%) !important;
+}
+
+.dark #guild-versus-modal .chest-playing-card.border-amber-400 {
+  border-color: rgba(245, 158, 11, 0.6) !important;
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, #131b2e 50%, rgba(120, 53, 15, 0.35) 100%) !important;
+}
+
+.dark #guild-versus-modal .chest-playing-card.border-indigo-400 {
+  border-color: rgba(99, 102, 241, 0.6) !important;
+  background: linear-gradient(135deg, rgba(49, 46, 129, 0.45) 0%, #131b2e 50%, rgba(67, 56, 202, 0.3) 100%) !important;
+}
+
+.dark #guild-versus-modal .chest-playing-card.border-slate-200 {
+  border-color: #1e293b !important;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, #131b2e 60%, rgba(15, 23, 42, 0.8) 100%) !important;
+}
+
+/* Chest Card Nav Buttons */
+.dark #guild-versus-modal .card-prev-btn,
+.dark #guild-versus-modal .card-next-btn {
+  background-color: #1a2744 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark #guild-versus-modal .card-prev-btn:hover:not(:disabled),
+.dark #guild-versus-modal .card-next-btn:hover:not(:disabled) {
+  background-color: #24355c !important;
+}
+
+/* 6-Round Schedule Details */
+.dark #guild-versus-modal details summary:hover {
+  background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+.dark #guild-versus-modal details.border-emerald-300 {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  background-color: rgba(6, 78, 59, 0.25) !important;
+}
+
+.dark #guild-versus-modal details.border-slate-200 {
+  border-color: #1e293b !important;
+  background-color: rgba(19, 27, 46, 0.6) !important;
+}
+
+.dark #guild-versus-modal details > div {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
 /* Status Cards, Badges, Boxes & Alert Banners */
 
 /* Teal */
