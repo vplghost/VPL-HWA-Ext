@@ -79,6 +79,21 @@ test('rally boss level maps to captured config range and squad rejects incomplet
   assert.equal(gather.feature, 'mine');
   assert.equal(gather.args.battleType, 'pve');
   assert.deepEqual(Array.from(Object.keys(gather.args)), ['mapId', 'mineId', 'battleType', 'squad']);
+  assert.equal(data.bossLevel(60), 1);
+  assert.equal(data.bossLevel(89), 30);
+  assert.equal(data.bossLevel(74), 15);
+  assert.equal(data.bossLevel(59), null);
+  assert.equal(data.bossLevel(90), null);
+  assert.equal(data.bossLevel('74'), null);
+
+  const joinCall = data.buildJoinRallyCall('map-1', 'rally-1', squad);
+  assert.equal(joinCall.name, 'joinRally');
+  assert.equal(joinCall.feature, 'rally');
+  assert.equal(joinCall.args.rallyId, 'rally-1');
+  assert.equal(joinCall.args.mapId, 'map-1');
+  assert.deepEqual(joinCall.args.squad, squad);
+  assert.equal(data.buildJoinRallyCall(null, null, squad), null);
+  assert.equal(data.buildJoinRallyCall('map-1', 'rally-1', null), null);
 });
 
 test('rally phase follows wait, travel, result and return times', () => {

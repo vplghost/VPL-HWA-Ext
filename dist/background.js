@@ -224,6 +224,74 @@ chrome.storage.onChanged?.addListener?.((changes, area) => {
   }).catch(() => {});
 });
 
+const attemptedAutoJoinRallies = new Set();
+
+async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
+  if (stored.popupRpcEnabled !== true || !stored.priorityAutoJoin?.enabled || !tabId) return;
+  const minLevel = Number.isInteger(stored.priorityAutoJoin.minLevel) ? stored.priorityAutoJoin.minLevel : 10;
+  if (record?.method !== 'POST' || record.status !== 200 || record.requestBodyTruncated ||
+      record.responseBodyTruncated || record.endpoint !== 'https://api.hero-wars-alliance.com/api/rpc') return;
+  let replies = [];
+  try {
+    const req = JSON.parse(record.requestBody), res = JSON.parse(record.responseBody);
+    replies = (req.calls || []).map((call) => ({
+      call,
+      result: res.results?.find((item) => item.ident === call.ident)?.result
+    }));
+  } catch { return; }
+
+  for (const { call, result } of replies) {
+    if (call.name !== 'getRallyById' || call.feature !== 'rally' || !result?.response?.rally) continue;
+    const rally = result.response.rally;
+    const rallyId = rally.rallyId;
+    if (!rallyId || attemptedAutoJoinRallies.has(rallyId)) continue;
+
+    const configId = rally.target?.objectConfigId ?? rally.mob?.mobConfigId;
+    const level = globalThis.hwaHelperExperimentalData.bossLevel(configId);
+    if (level === null || level < minLevel) continue;
+
+    const myId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
+    if (myId != null) {
+      if (String(rally.leader?.userId) === String(myId)) continue;
+      if (Array.isArray(rally.members) && rally.members.some((m) => String(m.userId) === String(myId))) continue;
+    }
+    if (Number.isInteger(rally.membersCapacityLeft) && rally.membersCapacityLeft <= 0) continue;
+    if (Number.isFinite(rally.plannedStartTime) && rally.plannedStartTime - Date.now() < 3000) continue;
+
+    const heroes = cache.heroGetAll?.data;
+    const summary = cache['getUnitSummary:unit']?.data;
+    const marches = cache.marchStatus?.data?.marches;
+    if (!heroes || !summary) continue;
+
+    const availableHeroIds = globalThis.hwaHelperExperimentalData.availableHeroIds(heroes, summary, marches);
+    let heroIds = null;
+    if (Array.isArray(stored.raidPreferences?.heroIds) && stored.raidPreferences.heroIds.length === 5 &&
+        stored.raidPreferences.heroIds.every((id) => availableHeroIds.includes(id))) {
+      heroIds = stored.raidPreferences.heroIds;
+    } else {
+      heroIds = globalThis.hwaHelperExperimentalData.lowestPowerHeroes(heroes, availableHeroIds);
+    }
+    if (!heroIds || heroIds.length !== 5) continue;
+
+    const cap = globalThis.hwaHelperExperimentalData.capacityModel(
+      heroIds, heroes, cache.troopCapacityEvidence?.data,
+      globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings), myId
+    ).total;
+    const troops = globalThis.hwaHelperExperimentalData.allocateTroops(summary, cap);
+    const squad = globalThis.hwaHelperExperimentalData.buildSquad(heroIds, troops);
+    if (!squad) continue;
+
+    const joinCall = globalThis.hwaHelperExperimentalData.buildJoinRallyCall(rally.mapId, rallyId, squad);
+    if (!joinCall) continue;
+
+    attemptedAutoJoinRallies.add(rallyId);
+    const dispatch = rpcMessageForSettings(stored, [joinCall]);
+    if (dispatch) {
+      chrome.tabs?.sendMessage?.(tabId, dispatch)?.catch?.(() => {});
+    }
+  }
+}
+
 function socketRefreshCalls(record, cache) {
   if (record.transport !== 'websocket' || record.direction !== 'received' ||
       record.encoding !== 'utf8' || record.payloadTruncated) return [];
@@ -242,6 +310,10 @@ function socketRefreshCalls(record, cache) {
     { name: 'getSpecialQuestState', feature: 'quest', args: {} },
     { name: 'questGetAll' }, { name: 'questGetEvents' }
   ];
+  if (type === 'rallyCreated' && typeof body?.rallyId === 'string') {
+    return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } },
+      { name: 'getMarches', feature: 'march' }];
+  }
   if (type === 'rallyUserAutojoined' && typeof body?.rallyId === 'string') {
     return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } },
       { name: 'getMarches', feature: 'march' }];
@@ -250,7 +322,7 @@ function socketRefreshCalls(record, cache) {
       cache?.marchStatus?.data?.marches?.some((march) => march.rally?.id === body.rallyId)) {
     return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } }];
   }
-  if (['rallyCreated', 'rallyCompleted', 'returnToOutpostFromMob'].includes(type)) {
+  if (['rallyCompleted', 'returnToOutpostFromMob'].includes(type)) {
     return [{ name: 'getMarches', feature: 'march' }];
   }
   return [];
@@ -554,7 +626,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.kind === 'experimental-rpc' &&
       sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     const allowed = new Set(['searchMob:mob', 'searchMine:mine', 'createRally:mob',
-      'attackMine:mine', 'stopMineGathering:mine']);
+      'joinRally:rally', 'joinRally:mob', 'attackMine:mine', 'stopMineGathering:mine']);
     const calls = message.calls;
     if (!Array.isArray(calls) || calls.length !== 1 ||
         !allowed.has(`${calls[0]?.name}:${calls[0]?.feature}`)) {
@@ -720,7 +792,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   pending = pending.then(async () => {
     const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings',
-      'popupRpcEnabled', 'socketRefreshMode']);
+      'popupRpcEnabled', 'socketRefreshMode', 'priorityAutoJoin', 'troopCapacitySettings', 'raidPreferences']);
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
     if (cacheResult.changed) {
@@ -737,6 +809,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab?.id) await updateRaidQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateTowerRun(record, sender.tab.id);
+    if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id);
     if (stored.popupRpcEnabled === true && sender.tab?.id) {
       const calls = socketRefreshCalls(record, cacheResult.cache);
       const dispatch = rpcMessageForSettings(stored, calls);

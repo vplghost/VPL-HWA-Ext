@@ -252,3 +252,144 @@ test('renderResearchDialog renders idle state and filter tabs', () => {
   const dirSection = researchBody.children[2];
   assert.match(dirSection.innerHTML, /Personal Research Directory/);
 });
+
+test('renderBuildingDialog filters out unbuilt buildings, upgrading buildings, and buildings capped by Hall of Heroes', () => {
+  const buildingBody = new MockElement('div');
+  const buildingStatus = new MockElement('div');
+
+  const elements = {
+    '#building-dialog-body': buildingBody,
+    '#building-dialog-status': buildingStatus
+  };
+
+  const context = vm.createContext({
+    document: {
+      createElement: (tag) => new MockElement(tag),
+      querySelector: (sel) => elements[sel] || null
+    },
+    hwaHelperNameMap: {
+      building: (id) => `Building ${id}`
+    },
+    hwaHelperNameData: {
+      names: {
+        building: {
+          '20': 'Hall of Heroes',
+          '21': 'House 1',
+          '22': 'House 2',
+          '23': 'Bed',
+          '26': 'Sawmill'
+        }
+      }
+    }
+  });
+
+  const setupCode = popup.slice(
+    popup.indexOf("let buildingSearchQuery = '';"),
+    popup.indexOf('globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;') +
+      'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
+  );
+  vm.runInContext(setupCode, context);
+
+  // Hall of Heroes is Lv. 10.
+  // House 1 (21) is Lv. 8 (can upgrade to 9 because 8 < 10) -> SHOULD be candidate
+  // House 2 (22) is Lv. 10 (CANNOT upgrade because 10 >= 10, capped by Hall of Heroes) -> FILTERED OUT
+  // Sawmill (26) is Lv. 5, but currently in activeQueues upgrading to 6 -> FILTERED OUT
+  // Bed (23) is in dictionary but NOT built (level 0) -> FILTERED OUT
+  // Hall of Heroes (20) itself is Lv. 10 and not upgrading -> SHOULD be candidate
+  context.renderBuildingDialog({
+    buildingStatus: {
+      data: {
+        queues: [
+          { buildingId: 26, level: 6, startDate: Date.now() - 1000, durationMs: 3600000, queueNumber: 0 }
+        ],
+        buildings: [
+          { buildingId: 20, level: 10 },
+          { buildingId: 21, level: 8 },
+          { buildingId: 22, level: 10 },
+          { buildingId: 26, level: 5 }
+        ]
+      }
+    }
+  });
+
+  const nextSection = buildingBody.children[1];
+  const nextText = nextSection.innerHTML;
+  assert.match(nextText, /2 ready/);
+  assert.ok(nextText.includes('Building 20'), 'Hall of Heroes should be candidate');
+  assert.ok(nextText.includes('Building 21'), 'House 1 (level 8 < 10) should be candidate');
+  assert.ok(!nextText.includes('Building 22'), 'House 2 (level 10 == Hall level) must be filtered out');
+  assert.ok(!nextText.includes('Building 23'), 'Bed (unbuilt level 0) must be filtered out');
+  assert.ok(!nextText.includes('Building 26'), 'Sawmill (currently upgrading) must be filtered out');
+});
+
+test('renderResearchDialog filters out uncompleted tech, active tech, and tech exceeding Research Center level', () => {
+  const researchBody = new MockElement('div');
+  const researchStatus = new MockElement('div');
+
+  const elements = {
+    '#research-dialog-body': researchBody,
+    '#research-dialog-status': researchStatus
+  };
+
+  const context = vm.createContext({
+    document: {
+      createElement: (tag) => new MockElement(tag),
+      querySelector: (sel) => elements[sel] || null
+    },
+    hwaHelperNameMap: {
+      research: (id) => `Research ${id}`
+    },
+    hwaHelperNameData: {
+      names: {
+        research: {
+          '512': 'Armor-Piercing',
+          '513': 'Barrier Breaker',
+          '514': 'Magic Shield',
+          '515': 'Locked Future Tech'
+        }
+      }
+    }
+  });
+
+  const setupCode = popup.slice(
+    popup.indexOf("let buildingSearchQuery = '';"),
+    popup.indexOf('globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;') +
+      'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
+  );
+  vm.runInContext(setupCode, context);
+
+  // Research Center (building 43) is Lv. 3
+  // 512 is completed Lv. 2 -> nextLevel 3 <= 3 -> SHOULD be candidate
+  // 513 is completed Lv. 3 -> nextLevel 4 > 3 -> FILTERED OUT (exceeds Research Center)
+  // 514 is completed Lv. 1, but currently researching to 2 -> FILTERED OUT (actively researching)
+  // 515 is in dictionary but uncompleted (level 0) -> FILTERED OUT
+  context.renderResearchDialog({
+    buildingStatus: {
+      data: {
+        buildings: [
+          { buildingId: 43, level: 3 }
+        ]
+      }
+    },
+    researchStatus: {
+      data: {
+        queues: [
+          { researchId: 514, level: 2, startDate: Date.now() - 1000, durationMs: 1800000, queueNumber: 0 }
+        ],
+        completedResearches: [
+          { researchId: 512, level: 2 },
+          { researchId: 513, level: 3 },
+          { researchId: 514, level: 1 }
+        ]
+      }
+    }
+  });
+
+  const nextSection = researchBody.children[1];
+  const nextText = nextSection.innerHTML;
+  assert.match(nextText, /1 available/);
+  assert.ok(nextText.includes('Research 512'), 'Tech 512 (nextLevel 3 <= Research Center 3) should be candidate');
+  assert.ok(!nextText.includes('Research 513'), 'Tech 513 (nextLevel 4 > Research Center 3) must be filtered out');
+  assert.ok(!nextText.includes('Research 514'), 'Tech 514 (currently researching) must be filtered out');
+  assert.ok(!nextText.includes('Research 515'), 'Tech 515 (unresearched level 0) must be filtered out');
+});

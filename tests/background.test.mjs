@@ -560,6 +560,90 @@ test('auto-join push starts a rally march and refreshes its details', async () =
     ['getRallyById']);
 });
 
+test('priority auto-join joins guild rally when boss level meets or exceeds threshold', async () => {
+  const { local, send, forwardedMessages } = setup();
+  local.popupRpcEnabled = true;
+  local.priorityAutoJoin = { enabled: true, minLevel: 15 };
+  local.troopCapacitySettings = { defaultHero: 700, base: 1000 };
+  const heroes = Object.fromEntries([1, 2, 3, 4, 5].map((id) => [id, { level: 30, star: 2, power: 100 }]));
+  local.rpcCache = {
+    accountStatus: { data: { id: 10 } },
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': { data: { squads: [], available: [7, 17, 27].map((unitId) => ({ unitId, count: 5000 })) } },
+    marchStatus: { data: { marches: [] } }
+  };
+  const sender = { ...gameSender, tab: { id: 42 } };
+
+  // 1. rallyCreated MQTT triggers getRallyById and getMarches
+  await send('api-record', socket('rallyCreated', { rallyId: 'rally-high' }), sender);
+  assert.equal(forwardedMessages.length, 1);
+  assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, (c) => c.name), ['getRallyById', 'getMarches']);
+
+  // 2. getRallyById response with boss level 15 (mobConfigId 74 >= 74) triggers joinRally
+  const rallyHighRecord = rpc(
+    [{ name: 'getRallyById', feature: 'rally', ident: 1, args: { rallyId: 'rally-high' } }],
+    [{ ident: 1, result: { response: { rally: {
+      rallyId: 'rally-high', mapId: 'map-1',
+      mob: { mobId: 'mob-1', mobConfigId: 74 },
+      target: { objectId: 'mob-1', objectConfigId: 74 },
+      leader: { userId: 999, squad: { squadId: 'leader-squad' } },
+      members: [], membersCapacityLeft: 5,
+      plannedStartTime: Date.now() + 60000
+    } } } }]
+  );
+  await send('api-record', rallyHighRecord, sender);
+  assert.equal(forwardedMessages.length, 2);
+  const joinMsg = forwardedMessages[1].msg;
+  assert.equal(joinMsg.calls[0].name, 'joinRally');
+  assert.equal(joinMsg.calls[0].feature, 'rally');
+  assert.equal(joinMsg.calls[0].args.rallyId, 'rally-high');
+  assert.equal(joinMsg.calls[0].args.squad.heroes.length, 5);
+
+  // 3. Duplicate getRallyById does not dispatch join again
+  await send('api-record', rallyHighRecord, sender);
+  assert.equal(forwardedMessages.length, 2);
+
+  // 4. Low level boss (level 10 -> mobConfigId 69 < 15) does NOT join
+  const rallyLowRecord = rpc(
+    [{ name: 'getRallyById', feature: 'rally', ident: 2, args: { rallyId: 'rally-low' } }],
+    [{ ident: 2, result: { response: { rally: {
+      rallyId: 'rally-low', mapId: 'map-1',
+      mob: { mobId: 'mob-2', mobConfigId: 69 },
+      leader: { userId: 999 }, members: [], membersCapacityLeft: 5,
+      plannedStartTime: Date.now() + 60000
+    } } } }]
+  );
+  await send('api-record', rallyLowRecord, sender);
+  assert.equal(forwardedMessages.length, 2);
+
+  // 5. Own rally does NOT join
+  const ownRallyRecord = rpc(
+    [{ name: 'getRallyById', feature: 'rally', ident: 3, args: { rallyId: 'rally-own' } }],
+    [{ ident: 3, result: { response: { rally: {
+      rallyId: 'rally-own', mapId: 'map-1',
+      mob: { mobId: 'mob-3', mobConfigId: 80 },
+      leader: { userId: 10 }, members: [], membersCapacityLeft: 5,
+      plannedStartTime: Date.now() + 60000
+    } } } }]
+  );
+  await send('api-record', ownRallyRecord, sender);
+  assert.equal(forwardedMessages.length, 2);
+
+  // 6. When priority auto join is disabled, high level boss does NOT join
+  local.priorityAutoJoin.enabled = false;
+  const disabledRecord = rpc(
+    [{ name: 'getRallyById', feature: 'rally', ident: 4, args: { rallyId: 'rally-disabled' } }],
+    [{ ident: 4, result: { response: { rally: {
+      rallyId: 'rally-disabled', mapId: 'map-1',
+      mob: { mobId: 'mob-4', mobConfigId: 85 },
+      leader: { userId: 888 }, members: [], membersCapacityLeft: 5,
+      plannedStartTime: Date.now() + 60000
+    } } } }]
+  );
+  await send('api-record', disabledRecord, sender);
+  assert.equal(forwardedMessages.length, 2);
+});
+
 test('recorded POST bodies remain bounded and tracking endpoints stay excluded', async () => {
   const { session, send, listener } = setup();
   await send('record-start');

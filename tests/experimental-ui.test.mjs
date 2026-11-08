@@ -409,3 +409,53 @@ test('Gathering dialog groups inputs into rows and displays title status', async
   assert.match(teamRowLabels[0].textContent, /Lineup \(/, 'Lineup label contains lineup parentheses');
   assert.match(teamRowLabels[1].textContent, /Troops \(unit ID:count\)/, 'Troops label is on same row');
 });
+
+test('Priority auto-join section exists in popup.html and settings persist', async () => {
+  assert.ok(popupHtml.includes('id="config-priority-autojoin-section"'));
+  assert.ok(popupHtml.includes('id="setting-priority-autojoin-enabled"'));
+  assert.ok(popupHtml.includes('id="setting-priority-autojoin-min-level"'));
+  assert.ok(popupHtml.includes('id="priority-autojoin-status"'));
+
+  const elements = new Map();
+  const document = {
+    querySelector: (id) => {
+      if (!elements.has(id)) elements.set(id, new Element('div'));
+      return elements.get(id);
+    }
+  };
+  const stored = {};
+  const context = vm.createContext({
+    document,
+    chrome: {
+      storage: {
+        local: {
+          set: async (val) => Object.assign(stored, val),
+          get: async () => stored
+        }
+      }
+    }
+  });
+
+  const uiCode = popup.slice(popup.indexOf('function renderPriorityAutoJoin('), popup.indexOf('function renderEngineStatus('));
+  vm.runInContext(uiCode, context);
+
+  // Initial render with settings
+  context.renderPriorityAutoJoin({ enabled: true, minLevel: 25 });
+  const chk = elements.get('#setting-priority-autojoin-enabled');
+  const num = elements.get('#setting-priority-autojoin-min-level');
+  const badge = elements.get('#priority-autojoin-status');
+
+  assert.equal(chk.checked, true);
+  assert.equal(num.value, 25);
+  assert.equal(badge.textContent, 'Active (≥ Lv25)');
+
+  // Set up listeners and trigger change
+  context.setupPriorityAutoJoinListeners();
+  chk.checked = false;
+  num.value = 18;
+  await chk.fire('change');
+
+  assert.equal(stored.priorityAutoJoin.enabled, false);
+  assert.equal(stored.priorityAutoJoin.minLevel, 18);
+  assert.equal(badge.textContent, 'Disabled');
+});

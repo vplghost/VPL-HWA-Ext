@@ -207,6 +207,24 @@
     } };
   }
 
+  function bossLevel(configId) {
+    if (!Number.isInteger(configId)) return null;
+    if (configId >= 60 && configId <= 89) return configId - 59;
+    const name = globalThis.hwaHelperRallyTargets?.[configId];
+    if (name) {
+      const match = name.match(/level\s+(\d+)/i);
+      if (match) return Number(match[1]);
+    }
+    return null;
+  }
+
+  function buildJoinRallyCall(mapId, rallyId, squad) {
+    if (!rallyId || !squad) return null;
+    const args = { rallyId, squad };
+    if (mapId) args.mapId = mapId;
+    return { name: 'joinRally', feature: 'rally', args };
+  }
+
   function rallyPhase(march, now = Date.now()) {
     const rally = march?.rally;
     if (!rally) return null;
@@ -225,7 +243,7 @@
   }
 
   globalThis.hwaHelperExperimentalData = { rallyWaitOptions, capacitySignature, heroCapacity,
-    squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, soloMonsterConfigIds, soloMonsterLevel, lowestPowerHeroes,
-    mineConfigId, mineTypeLevel, availableHeroIds, normalizeCustomTeam, teamOptions, teamTroopCapacity, buildSquad, buildRallyCall,
+    squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, bossLevel, soloMonsterConfigIds, soloMonsterLevel, lowestPowerHeroes,
+    mineConfigId, mineTypeLevel, availableHeroIds, normalizeCustomTeam, teamOptions, teamTroopCapacity, buildSquad, buildRallyCall, buildJoinRallyCall,
     buildGatherCall, buildMineSearchCall, rallyPhase };
 })();

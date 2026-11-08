@@ -399,6 +399,7 @@
               mobConfigId: targetConfigId,
               leader: rally.leader,
               members: rally.members || [],
+              membersCapacityLeft: rally.membersCapacityLeft,
               squadId: rally.leader?.squad?.squadId,
               target: globalThis.hwaHelperRallyTargets?.[targetConfigId] ||
                 `Rally target #${targetConfigId ?? 'unknown'}`,
@@ -1404,6 +1405,12 @@
             group: 'internal', data: { action: 'cancel', rallyId: call.args.rallyId },
             updatedAt: record.timestamp }];
         }
+        if ((key === 'joinRally:rally' || key === 'joinRally:mob') && result?.response && !result.error && call.args?.rallyId) {
+          return [{ key: 'rallyAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { action: 'join', rallyId: call.args.rallyId,
+              squadId: result.response.squadId, team: rallyTeam(call.args?.squad) },
+            updatedAt: record.timestamp }];
+        }
         if (call.name === 'shopBuy') {
           const resp = result?.response;
           const cost = resp?.slot?.cost || resp?.cost || call.args?.cost;
@@ -1567,7 +1574,7 @@
           group, data: result.response, updatedAt: record.timestamp }];
       });
       const experimentalCalls = new Set(['searchMob:mob', 'searchMine:mine', 'createRally:mob', 'cancelRally:rally',
-        'attackMine:mine', 'stopMineGathering:mine']);
+        'joinRally:rally', 'joinRally:mob', 'attackMine:mine', 'stopMineGathering:mine']);
       for (const call of request.calls) {
         if (!experimentalCalls.has(`${call.name}:${call.feature}`)) continue;
         const result = results.get(call.ident);
@@ -1750,7 +1757,7 @@
           continue;
         }
         if (entry.key === 'rallyAction') {
-          if (['create', 'socketAutojoined'].includes(entry.data.action)) changed = observeSquad(next, entry.data.team, entry.method, entry.updatedAt) || changed;
+          if (['create', 'socketAutojoined', 'join'].includes(entry.data.action)) changed = observeSquad(next, entry.data.team, entry.method, entry.updatedAt) || changed;
           if (entry.data.action === 'details') {
             const accountId = next.accountStatus?.data?.id;
             const member = [entry.data.leader, ...(entry.data.members || [])].find((member) => accountId && String(member?.userId) === String(accountId));

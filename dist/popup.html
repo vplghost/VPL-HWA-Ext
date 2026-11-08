@@ -217,6 +217,22 @@
         <span id="engine-ping-result" class="text-xs text-slate-500"></span>
       </div>
     </div>
+    <div id="config-priority-autojoin-section" class="mt-5 border-t border-slate-200 pt-4">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-sm font-semibold text-slate-800">Priority Auto-Join Raid</h3>
+        <span id="priority-autojoin-status" class="text-xs text-slate-500"></span>
+      </div>
+      <p class="mb-3 text-xs text-slate-500">Automatically join guild raid rallies when the boss level is at or above the threshold.</p>
+      <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5 text-xs">
+        <label class="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+          <input id="setting-priority-autojoin-enabled" type="checkbox" class="rounded text-blue-600 focus:ring-blue-500 size-4">
+          <span>Auto-join priority boss rallies</span>
+        </label>
+        <label class="block text-xs text-slate-600">Minimum boss level (1–30)
+          <input id="setting-priority-autojoin-min-level" type="number" min="1" max="30" step="1" value="10" class="mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm">
+        </label>
+      </div>
+    </div>
     <div id="config-autoclaim-section" class="mt-5 border-t border-slate-200 pt-4">
       <div class="flex items-center justify-between mb-1">
         <h3 class="text-sm font-semibold text-slate-800">Reward Auto-Claim Automation</h3>

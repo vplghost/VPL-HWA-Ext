@@ -826,16 +826,26 @@ function renderResources(entries, selection) {
 }
 
 function starIcons(count) {
+  const JUSTICE_STAR_SVG_PATH = 'm256.438 25.78-41.75 127.19 41.625 30 42.093-30.22-41.97-126.97zm-90.157 91.064c-16.33 0-29.374 13.043-29.374 29.375 0 16.33 13.044 29.374 29.375 29.374 16.333 0 29.345-13.044 29.345-29.375 0-16.333-13.012-29.376-29.344-29.376zm179.97.375c-16.332 0-29.375 13.042-29.375 29.374 0 16.33 13.043 29.344 29.375 29.344s29.375-13.013 29.375-29.344c0-16.332-13.043-29.375-29.375-29.375zM207.5 170.843c-5.795 9.65-14.895 17.124-25.688 20.844L197.595 241l2.062 6.438-5.47 3.968-49.06 35.813c5.772 7.404 9.438 16.525 10.06 26.436l59.658.28 6.75.033 2.094 6.405L243 379.188a47.585 47.585 0 0 1 13.78-2.032c4.652 0 9.145.69 13.408 1.938l19.5-58.97 2.093-6.405 6.75-.033 56.72-.156c.83-10.39 5.006-19.848 11.438-27.342l-48.032-35.22L313.22 247l2.092-6.406 15.625-48.5a48.443 48.443 0 0 1-26-21.03l-43.187 31.03-5.47 3.906-5.467-3.906-43.313-31.25zm-44.375 23.78-140.188.657 108.157 79 46.625-34-14.595-45.655zm186.53.25-14.5 45.032 46.876 34.344c.24-.117.48-.23.72-.344l107.188-78.625-140.282-.405zm-242.405 92.44c-16.332-.002-29.375 13.042-29.375 29.373 0 16.332 13.043 29.375 29.375 29.375s29.375-13.043 29.375-29.375c0-16.33-13.043-29.375-29.375-29.375zm295.875.686c-16.332 0-29.375 13.043-29.375 29.375s13.043 29.375 29.375 29.375 29.375-13.043 29.375-29.375S419.457 288 403.125 288zm-46.594 44.22-51.217.124-18.344 55.47 113.78 81.78-44.22-137.375zm-200.5.124-43.905 137.25 113.906-82.188-18-54.812-52-.25zm100.75 63.5c-16.33 0-29.374 13.043-29.374 29.375 0 16.33 13.044 29.374 29.375 29.374 16.333 0 29.376-13.044 29.376-29.375 0-16.333-13.043-29.376-29.375-29.376z';
   const wrap = document.createElement('span');
   wrap.className = 'inline-flex items-center gap-0.5';
   if (!Number.isInteger(count) || count < 1) {
     wrap.textContent = '—';
     return wrap;
   }
-  const color = ['text-slate-400', 'text-green-500', 'text-blue-500',
-    'text-violet-500', 'text-orange-400', 'text-amber-400'][Math.min(count, 6) - 1] || 'text-slate-400';
   wrap.setAttribute('aria-label', `${count} stars`);
   wrap.title = `${count} stars`;
+
+  if (count >= 6) {
+    const starSpan = document.createElement('span');
+    starSpan.className = 'justice-star-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/20 font-bold';
+    starSpan.innerHTML = `<svg class="size-4 inline-block fill-current align-middle" viewBox="0 0 512 512" aria-hidden="true"><path fill="currentColor" d="${JUSTICE_STAR_SVG_PATH}"/></svg><span class="text-2xs font-extrabold uppercase tracking-wide">6★</span>`;
+    wrap.append(starSpan);
+    return wrap;
+  }
+
+  const color = ['text-slate-400', 'text-green-500', 'text-blue-500',
+    'text-violet-500', 'text-orange-400', 'text-amber-400'][Math.min(count, 6) - 1] || 'text-slate-400';
   for (let index = 0; index < count; index++) {
     const star = document.createElement('span');
     star.className = `${color} text-base leading-none drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)]`;
@@ -2362,7 +2372,7 @@ function renderDraft(cache, target = view) {
       if (Number.isInteger(heroSnap?.star)) {
         const starLabel = document.createElement('span');
         starLabel.className = 'text-[10px] font-bold text-amber-700';
-        starLabel.textContent = `★${heroSnap.star}`;
+        starLabel.textContent = heroSnap.star >= 6 ? '★6' : `★${heroSnap.star}`;
         heroWrapper.append(starLabel);
       }
 
@@ -2598,7 +2608,7 @@ function renderDraft(cache, target = view) {
       const statsRow = document.createElement('div');
       statsRow.className = 'text-[10px] text-slate-500 font-medium flex items-center justify-center gap-1.5 my-0.5';
       statsRow.textContent = !isKnownChoice ? 'Select hero with ⇄' :
-        (snap?.star ? `★${snap.star}` : 'Stars: —');
+        (snap?.star >= 6 ? '★6' : (snap?.star ? `★${snap.star}` : 'Stars: —'));
       card.append(statsRow);
 
       // Pick button or Chosen indicator
@@ -3430,7 +3440,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
           const titanId = String(unit.id);
           const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
           const name = meta?.name || `Titan ${titanId}`;
-          const starStr = unit.star ? '★'.repeat(unit.star) : '';
+          const starStr = unit.star >= 6 ? '★6' : (unit.star ? '★'.repeat(unit.star) : '');
           const unitTag = document.createElement('span');
           unitTag.className = 'inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 shadow-2xs';
           const avatarImg = `<img src="assets/titans/${titanId}.png" class="size-4 rounded-full object-cover shrink-0 border border-slate-200">`;
@@ -5805,8 +5815,10 @@ function renderBuildingDialog(cache) {
 
   const allBuildings = Array.from(buildingMap.values());
   const builtBuildings = allBuildings.filter((b) => b.isBuilt);
+  const hallOfHeroes = buildingMap.get(20);
+  const hallLevel = Number.isFinite(hallOfHeroes?.level) ? hallOfHeroes.level : Infinity;
   const nextUpgradable = allBuildings
-    .filter((b) => !b.isUpgrading && (b.isBuilt || b.level === 0))
+    .filter((b) => b.isBuilt && b.level > 0 && !b.isUpgrading && (b.id === 20 || b.level < hallLevel))
     .sort((a, b) => (b.level - a.level) || (a.id - b.id));
 
   // Section 2: Next Upgradable Buildings
@@ -6101,8 +6113,11 @@ function renderResearchDialog(cache) {
 
   const allResearches = Array.from(researchMap.values());
   const completedList = allResearches.filter((r) => r.isCompleted);
+  const rawBuildings = cache?.buildingStatus?.data?.buildings || [];
+  const researchCenter = rawBuildings.find((b) => b.buildingId === 43 || b.buildingId === 165);
+  const researchCenterLevel = Number.isFinite(researchCenter?.level) ? researchCenter.level : Infinity;
   const nextAvailable = allResearches
-    .filter((r) => !r.isResearching && (r.isCompleted || r.level === 0))
+    .filter((r) => r.isCompleted && r.level > 0 && !r.isResearching && r.nextLevel <= researchCenterLevel)
     .sort((a, b) => (b.level - a.level) || (a.id - b.id));
 
   // Section 2: Next Available Research
@@ -6354,7 +6369,7 @@ globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
@@ -6415,6 +6430,7 @@ async function render() {
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
   renderMarches(cache);
   renderAutoClaim(cache, currentAutoClaimSettings);
+  renderPriorityAutoJoin(stored.priorityAutoJoin);
   if (popupRpcEnabled && currentAutoClaimSettings.onOpen && !hasAutoClaimedThisSession &&
       !isClaimQueued()) {
     const pending = globalThis.hwaHelperPopupData?.getPendingClaims?.(cache);
@@ -6968,6 +6984,36 @@ function setupAutoClaimListeners() {
   });
 }
 
+function renderPriorityAutoJoin(settings) {
+  const chk = document.querySelector('#setting-priority-autojoin-enabled');
+  const num = document.querySelector('#setting-priority-autojoin-min-level');
+  const badge = document.querySelector('#priority-autojoin-status');
+  if (chk) chk.checked = Boolean(settings?.enabled);
+  if (num && settings?.minLevel != null) num.value = settings.minLevel;
+  if (badge) {
+    badge.textContent = settings?.enabled ? `Active (≥ Lv${settings.minLevel ?? 10})` : 'Disabled';
+  }
+}
+
+function setupPriorityAutoJoinListeners() {
+  const chk = document.querySelector('#setting-priority-autojoin-enabled');
+  const num = document.querySelector('#setting-priority-autojoin-min-level');
+  const save = async () => {
+    const enabled = Boolean(chk?.checked);
+    const minLevel = Math.max(1, Math.min(30, parseInt(num?.value, 10) || 10));
+    if (num) num.value = minLevel;
+    renderPriorityAutoJoin({ enabled, minLevel });
+    if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+      await chrome.storage.local.set({ priorityAutoJoin: { enabled, minLevel } });
+    }
+  };
+  chk?.addEventListener('change', save);
+  num?.addEventListener('change', save);
+}
+
+globalThis.renderPriorityAutoJoin = renderPriorityAutoJoin;
+globalThis.setupPriorityAutoJoinListeners = setupPriorityAutoJoinListeners;
+
 function renderEngineStatus(status) {
   const badgeEl = document.querySelector('#engine-status-badge');
   const instanceEl = document.querySelector('#engine-unity-instance');
@@ -7271,6 +7317,7 @@ setupDraftModal();
 setupTowerModal();
 setupFabDial();
 setupAutoClaimListeners();
+setupPriorityAutoJoinListeners();
 setupBuildingAndResearchDialogs();
 setInterval(refreshTimed, 1000);
 
