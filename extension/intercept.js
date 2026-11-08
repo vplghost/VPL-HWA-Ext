@@ -139,7 +139,8 @@
     } catch (_) {}
 
     if (baseHeaders && typeof baseHeaders === 'object') {
-      const raw = baseHeaders['x-request-id'] || baseHeaders['X-Request-Id'];
+      const reqIdKey = Object.keys(baseHeaders).find((k) => k.toLowerCase() === 'x-request-id');
+      const raw = reqIdKey ? baseHeaders[reqIdKey] : null;
       if (raw) {
         const parsed = parseInt(raw, 10);
         if (!isNaN(parsed) && parsed > highestRequestId) {
@@ -1047,7 +1048,8 @@
               lastRpcHeaders = { ...rawHeaders };
             }
             if (lastRpcHeaders) {
-              const reqId = lastRpcHeaders['x-request-id'] || lastRpcHeaders['X-Request-Id'];
+              const reqIdKey = Object.keys(lastRpcHeaders).find((k) => k.toLowerCase() === 'x-request-id');
+              const reqId = reqIdKey ? lastRpcHeaders[reqIdKey] : null;
               if (reqId) {
                 const parsed = parseInt(reqId, 10);
                 if (!isNaN(parsed) && parsed > highestRequestId) {
@@ -1056,6 +1058,14 @@
                     sessionStorage.setItem('hwa_highest_request_id', String(highestRequestId));
                   }
                 }
+              }
+              const appVerKey = Object.keys(lastRpcHeaders).find((k) => k.toLowerCase() === 'x-application-version');
+              if (appVerKey && lastRpcHeaders[appVerKey]) {
+                const appVer = String(lastRpcHeaders[appVerKey]);
+                if (typeof sessionStorage !== 'undefined') {
+                  sessionStorage.setItem('hwa_game_version', appVer);
+                }
+                window.hwaHelperGameVersion = appVer;
               }
               if (typeof sessionStorage !== 'undefined') {
                 sessionStorage.setItem('hwa_last_rpc_headers', JSON.stringify(lastRpcHeaders));
@@ -1141,10 +1151,22 @@
             }
             if (isPost) {
               Promise.all([requestBody, readFetchResponse(response)]).then(([request, received]) => {
+                const resText = received?.text ?? null;
+                if (resText && resText.includes('"version"')) {
+                  try {
+                    const parsed = JSON.parse(resText);
+                    const gv = parsed?.results?.find((r) => r.result?.response?.version)?.result?.response?.version;
+                    if (gv) {
+                      const gvStr = String(gv);
+                      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('hwa_game_version', gvStr);
+                      window.hwaHelperGameVersion = gvStr;
+                    }
+                  } catch (_) {}
+                }
                 record('fetch', method, url, response.status, duration, 'completed', {
                   requestBody: request?.text ?? null,
                   requestBodyTruncated: request?.truncated ?? false,
-                  responseBody: received?.text ?? null,
+                  responseBody: resText,
                   responseBodyTruncated: received?.truncated ?? false
                 });
               }).catch(() => record('fetch', method, url, response.status, duration, 'completed'));
@@ -1258,6 +1280,25 @@
           const headers = xhrHeaders.get(this);
           if (headers && Object.keys(headers).length > 0) {
             lastRpcHeaders = { ...headers };
+            const reqIdKey = Object.keys(lastRpcHeaders).find((k) => k.toLowerCase() === 'x-request-id');
+            const reqId = reqIdKey ? lastRpcHeaders[reqIdKey] : null;
+            if (reqId) {
+              const parsed = parseInt(reqId, 10);
+              if (!isNaN(parsed) && parsed > highestRequestId) {
+                highestRequestId = parsed;
+                if (typeof sessionStorage !== 'undefined') {
+                  sessionStorage.setItem('hwa_highest_request_id', String(highestRequestId));
+                }
+              }
+            }
+            const appVerKey = Object.keys(lastRpcHeaders).find((k) => k.toLowerCase() === 'x-application-version');
+            if (appVerKey && lastRpcHeaders[appVerKey]) {
+              const appVer = String(lastRpcHeaders[appVerKey]);
+              if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.setItem('hwa_game_version', appVer);
+              }
+              window.hwaHelperGameVersion = appVer;
+            }
             if (typeof sessionStorage !== 'undefined') {
               sessionStorage.setItem('hwa_last_rpc_headers', JSON.stringify(lastRpcHeaders));
             }

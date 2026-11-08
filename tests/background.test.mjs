@@ -36,6 +36,7 @@ function setup(quota = Infinity) {
     },
     runtime: {
       id: 'test-extension',
+      getManifest: () => ({ version: '0.9.117' }),
       onMessage: { addListener: (callback) => { listener = callback; } },
       onInstalled: { addListener: (callback) => { installed = callback; } }
     },
@@ -253,10 +254,12 @@ test('game interactions persist locally only while recording and export beside A
   assert.equal(session.recordingState.nextInteractionIndex, 1);
   const exported = await send('record-export');
   assert.equal(exported.interactions.length, 1);
+  assert.equal(exported.extensionVersion, '0.9.117');
   await send('record-stop');
   assert.equal(local.gameRecordingActive, false);
   assert.equal((await sendInteraction()).saved, false);
   assert.equal((await send('record-export')).interactions.length, 1);
+  assert.equal((await send('record-export')).extensionVersion, '0.9.117');
   await send('record-clear');
   assert.equal(Object.hasOwn(local, 'interaction:0'), false);
 });

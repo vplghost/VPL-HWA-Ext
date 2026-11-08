@@ -436,7 +436,47 @@ function injectHelperButton() {
             ...records.map((record) => ({ kind: 'api', ...record })),
             ...interactions.map((entry) => ({ kind: 'interaction', ...entry }))
           ].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-          const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), timeline }, null, 2)], { type: 'application/json' });
+          const extensionVersion = chrome.runtime?.getManifest?.()?.version || res?.extensionVersion || null;
+          let gameVersion = res?.gameVersion || null;
+          if (!gameVersion) {
+            try {
+              const storage = typeof sessionStorage !== 'undefined' ? sessionStorage : (typeof window !== 'undefined' ? window.sessionStorage : null);
+              if (storage) {
+                gameVersion = storage.getItem('hwa_game_version');
+                if (!gameVersion) {
+                  const stored = storage.getItem('hwa_last_rpc_headers');
+                  if (stored) {
+                    const h = JSON.parse(stored);
+                    const k = Object.keys(h).find((key) => key.toLowerCase() === 'x-application-version');
+                    if (k) gameVersion = h[k];
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+          if (!gameVersion && typeof window !== 'undefined' && window.hwaHelperGameVersion) {
+            gameVersion = window.hwaHelperGameVersion;
+          }
+          if (!gameVersion) {
+            for (const item of records) {
+              if (item.responseBody && item.responseBody.includes('"version"')) {
+                try {
+                  const parsed = JSON.parse(item.responseBody);
+                  const ver = parsed?.results?.find((r) => r.result?.response?.version)?.result?.response?.version;
+                  if (ver) { gameVersion = String(ver); break; }
+                } catch (_) {}
+              }
+            }
+          }
+
+          const exportPayload = {
+            version: 1,
+            extensionVersion,
+            gameVersion: gameVersion || null,
+            exportedAt: new Date().toISOString(),
+            timeline
+          };
+          const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;

@@ -493,7 +493,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.then(async () => {
       const entries = await recordedEntries();
       const interactions = await interactionEntries();
-      return { records: entries.map(([, r]) => r), interactions: interactions.map(([, r]) => r) };
+      const extensionVersion = chrome.runtime?.getManifest?.()?.version || null;
+      let gameVersion = null;
+      try {
+        const sessionStore = await chrome.storage.session?.get?.(['cachedGameVersion']).catch?.(() => ({}));
+        if (sessionStore?.cachedGameVersion) gameVersion = sessionStore.cachedGameVersion;
+      } catch (_) {}
+      return {
+        extensionVersion,
+        gameVersion,
+        records: entries.map(([, r]) => r),
+        interactions: interactions.map(([, r]) => r)
+      };
     });
     pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
     pending = pending.catch(() => {});
@@ -698,6 +709,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.kind !== 'api-record' || !isGameUrl(sender.url)) return;
   const record = normalize(message.record);
   if (!record) return;
+  if (record.responseBody && record.responseBody.includes('"version"')) {
+    try {
+      const parsed = JSON.parse(record.responseBody);
+      const ver = parsed?.results?.find((r) => r.result?.response?.version)?.result?.response?.version;
+      if (ver) {
+        chrome.storage.session?.set?.({ cachedGameVersion: String(ver) }).catch?.(() => {});
+      }
+    } catch (_) {}
+  }
   pending = pending.then(async () => {
     const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings',
       'popupRpcEnabled', 'socketRefreshMode']);

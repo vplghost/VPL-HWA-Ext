@@ -351,3 +351,88 @@ test('bridge handles engine-status message and forwards engine commands', async 
   assert.equal(sentCall.methodName, 'Claim');
   assert.equal(sentCall.param, 'all');
 });
+
+test('bridge export includes extension and game version at the beginning of the log', async () => {
+  const elements = new Map();
+  let createdBlobContent = null;
+  class MockBlob {
+    constructor(parts) {
+      createdBlobContent = parts[0];
+    }
+  }
+  const document = {
+    readyState: 'complete',
+    getElementById: (id) => elements.get(id) || null,
+    createElement: (tag) => {
+      const el = {
+        tagName: tag.toUpperCase(),
+        attributes: {},
+        listeners: {},
+        style: {},
+        hidden: false,
+        setAttribute: (k, v) => { el.attributes[k] = v; },
+        addEventListener: (event, handler) => { el.listeners[event] = handler; },
+        click: () => { el.listeners.click?.(); }
+      };
+      return el;
+    },
+    body: {
+      appendChild: (child) => {
+        if (child.id) elements.set(child.id, child);
+      }
+    }
+  };
+  const chrome = {
+    runtime: {
+      getManifest: () => ({ version: '0.9.117' }),
+      sendMessage: async (msg) => {
+        if (msg.kind === 'record-export') {
+          return {
+            records: [{ kind: 'api', transport: 'fetch', endpoint: '/api/rpc', timestamp: '2026-11-08T12:00:00.000Z' }],
+            interactions: []
+          };
+        }
+        return {};
+      }
+    },
+    storage: {
+      local: { get: async () => ({}) },
+      onChanged: { addListener: () => {} }
+    }
+  };
+  const window = {
+    addEventListener: () => {},
+    postMessage: () => {},
+    sessionStorage: {
+      getItem: (k) => k === 'hwa_game_version' ? '1.293.101' : null
+    }
+  };
+  const mockUrl = {
+    createObjectURL: () => 'blob:mock',
+    revokeObjectURL: () => {}
+  };
+
+  runInNewContext(source, {
+    window,
+    document,
+    chrome,
+    Blob: MockBlob,
+    URL: mockUrl,
+    Date,
+    location: { origin: 'https://www.hero-wars-alliance.com' }
+  });
+
+  const exportBtn = elements.get('hwa-export-btn');
+  assert.ok(exportBtn);
+  exportBtn.click();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.ok(createdBlobContent, 'Blob content should be generated');
+  const parsed = JSON.parse(createdBlobContent);
+  assert.equal(parsed.version, 1);
+  assert.equal(parsed.extensionVersion, '0.9.117');
+  assert.equal(parsed.gameVersion, '1.293.101');
+  assert.ok(parsed.exportedAt);
+  assert.equal(parsed.timeline.length, 1);
+});
