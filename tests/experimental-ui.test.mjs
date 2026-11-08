@@ -229,3 +229,151 @@ test('Monster dialog searches by level, starts selected team attack and shows re
   assert.equal(sent.at(-1).options.count, 3);
   assert.equal(saved.saved, true);
 });
+
+test('Raid rally shows Stop queue inline when queue is running, hides Start queue, and updates title status', async () => {
+  const sent = [];
+  const raidBody = new Element('div');
+  const raidStatus = new Element('div');
+  const elements = {
+    '#raid-dialog-body': raidBody,
+    '#raid-dialog-status': raidStatus
+  };
+
+  const cache = {
+    teamGetAll: { data: { raid: [2, 3, 4, 5, 6] } },
+    'getUnitSummary:unit': { data: { available: [7, 17, 27].map((unitId) => ({ unitId, count: 9000 })) } },
+    experimentalMapContext: { data: { mapId: 'map', center: { x: 1, y: 2 } } },
+    experimentalRallySearch: { data: { mapId: 'map', mobConfigIds: [60], mobs: [{ mobId: 'boss' }] } },
+    marchStatus: {
+      data: {
+        marches: [{
+          rally: { target: 'Boss 5' },
+          stage: 'moving',
+          until: Date.now() + 60000
+        }]
+      }
+    }
+  };
+
+  const context = vm.createContext({
+    document: {
+      createElement: (tag) => new Element(tag),
+      querySelector: (selector) => elements[selector] || null
+    },
+    status: {},
+    currentCache: cache,
+    experimentalPending: null,
+    experimentalMessage: '',
+    popupRpcEnabled: true,
+    currentRpcPolicy: { mode: 'piggyback', monitor: true },
+    raidQueueState: { phase: 'active', bossQueue: { remain_raid_count: 5, queue: ['b1', 'b2'] } },
+    troopCapacitySettings: { defaultHero: 600, base: 950 },
+    hwaHelperNameMap: { hero: (id) => `Hero ${id}` },
+    hwaHelperPopupData: { isMarchExpired: () => false },
+    hwaHelperRaidQueue: { confirmedWins: () => 1 },
+    chrome: {
+      storage: { local: { set: async () => {} } },
+      runtime: { sendMessage: async (message) => { sent.push(message); return { ok: true }; } }
+    },
+    experimentalRpc: async (calls) => sent.push({ calls }),
+    experimentalSelection: {
+      rallyTeam: 'weakest', gatherTeam: 'weakest', bossLevel: 1, searchedBossLevel: 1,
+      waitSeconds: 300, minMembers: 4, autoCancel: true, raidCount: 2, baseTroops: 200, capacities: {}, units: '', mineType: 'food', mineLevel: 1
+    }
+  });
+
+  vm.runInContext(dataSource, context);
+  context.render = () => context.renderExperimental(cache, true);
+  vm.runInContext(save + '\n' + pendingSync + '\n' + renderer, context);
+  context.render();
+
+  const rally = () => raidBody.children[0];
+  const buttons = rally().all('button');
+
+  // Start rally should be present (disabled)
+  const startRallyBtn = buttons.find((b) => b.textContent === 'Start rally');
+  assert.ok(startRallyBtn, 'Start rally button must exist');
+  assert.equal(startRallyBtn.disabled, true);
+
+  // Start queue button must be HIDDEN when queueRunning is true
+  const startQueueBtn = buttons.find((b) => b.textContent === 'Start queue');
+  assert.equal(startQueueBtn, undefined, 'Start queue button must be hidden when queue is running');
+
+  // Stop queue button must be PRESENT on the actions row
+  const stopQueueBtn = buttons.find((b) => b.textContent === 'Stop queue');
+  assert.ok(stopQueueBtn, 'Stop queue button must be present when queue is running');
+
+  // Clicking Stop queue sends raid-queue-stop
+  await stopQueueBtn.fire('click');
+  assert.equal(sent.at(-1).kind, 'raid-queue-stop');
+
+  // Verify status in #raid-dialog-status on dialog title bar
+  const statusBadges = raidStatus.all('span');
+  assert.ok(statusBadges.length > 0, 'Raid dialog title status must be populated');
+  const statusText = raidStatus.children.map((c) => c.textContent + c.children.map((k) => k.textContent).join(' ')).join(' ');
+  assert.match(statusText, /Boss 5/);
+  assert.match(statusText, /Queue: active/);
+});
+
+test('Gathering dialog groups inputs into rows and displays title status', async () => {
+  const gatherBody = new Element('div');
+  const gatherStatus = new Element('div');
+  const elements = {
+    '#gather-dialog-body': gatherBody,
+    '#gather-dialog-status': gatherStatus
+  };
+
+  const cache = {
+    heroGetAll: { data: { 1: { heroId: 1, level: 10 } } },
+    teamGetAll: { data: { gather: [1, 2, 3, 4, 5] } },
+    'getUnitSummary:unit': { data: { available: [{ unitId: 7, count: 500 }] } },
+    experimentalMapContext: { data: { mapId: 'map', center: { x: 1, y: 2 } } },
+    experimentalMineSearch: { data: { mineConfigId: 27, mines: [{ mineId: 'mine-1', coordinates: { x: 5, y: 8 } }] } },
+    marchStatus: {
+      data: {
+        marches: [{ kind: 'wood', stage: 'gathering', mineId: 'mine-1', squadId: 'sq-1' }]
+      }
+    }
+  };
+
+  const context = vm.createContext({
+    document: {
+      createElement: (tag) => new Element(tag),
+      querySelector: (selector) => elements[selector] || null
+    },
+    status: {},
+    currentCache: cache,
+    experimentalPending: null,
+    experimentalMessage: '',
+    popupRpcEnabled: true,
+    currentRpcPolicy: { mode: 'piggyback', monitor: true },
+    troopCapacitySettings: { defaultHero: 600, base: 950 },
+    hwaHelperNameMap: { hero: (id) => `Hero ${id}` },
+    hwaHelperPopupData: { isMarchExpired: () => false },
+    hwaHelperRaidQueue: { confirmedWins: () => 1 },
+    chrome: {
+      storage: { local: { set: async () => {}, get: async () => ({}) } },
+      runtime: { sendMessage: async () => ({ ok: true }) }
+    },
+    experimentalRpc: async () => {},
+    experimentalSelection: {
+      rallyTeam: 'weakest', gatherTeam: 'weakest', bossLevel: 1, searchedBossLevel: 1,
+      mineType: 'wood', mineLevel: 1, mineId: 'mine-1', units: '7:500'
+    }
+  });
+
+  vm.runInContext(dataSource, context);
+  context.render = () => context.renderExperimental(cache, false);
+  vm.runInContext(save + '\n' + pendingSync + '\n' + renderer, context);
+  context.render();
+
+  const gather = () => gatherBody.children[0];
+  const buttons = gather().all('button');
+  assert.ok(buttons.find((b) => b.textContent === 'Find full mines'), 'Find full mines button must exist');
+  assert.ok(buttons.find((b) => b.textContent === 'Send gathering team'), 'Send gathering team button must exist');
+  assert.ok(buttons.find((b) => b.textContent === 'Recall'), 'Recall button must exist');
+
+  // Verify status in #gather-dialog-status on dialog title bar
+  const statusText = gatherStatus.children.map((c) => c.textContent + c.children.map((k) => k.textContent).join(' ')).join(' ');
+  assert.match(statusText, /1 team\(s\) gathering/);
+});

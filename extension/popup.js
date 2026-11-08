@@ -5360,39 +5360,80 @@ function renderExperimental(cache, raidOnly = false) {
       response?.error || 'Could not start rally.';
     render();
   };
+  const activeRallies = (cache.marchStatus?.data?.marches || []).filter((march) => march.rally &&
+    !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
+
+  const raidTitleStatus = document.querySelector('#raid-dialog-status');
+  if (raidTitleStatus) {
+    raidTitleStatus.replaceChildren();
+    if (activeRallies.length > 0) {
+      const march = activeRallies[0];
+      const phase = data.rallyPhase(march);
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-300 dark:border-amber-800/50';
+      const dot = document.createElement('span');
+      dot.className = 'size-1.5 rounded-full bg-amber-500 animate-pulse';
+      const text = document.createElement('span');
+      text.textContent = `${march.rally?.target || 'Rally'}: ${phase.phase}${phase.result ? ` (${phase.result})` : ''}`;
+      badge.append(dot, text);
+      if (phase.until) {
+        const cd = document.createElement('span');
+        cd.dataset.experimentalUntil = String(phase.until);
+        cd.textContent = ` · ${Math.max(0, Math.ceil((phase.until - Date.now()) / 1000))}s`;
+        badge.append(cd);
+      }
+      raidTitleStatus.append(badge);
+    }
+    if (queueRunning) {
+      const queueBadge = document.createElement('span');
+      queueBadge.className = 'inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-950/40 dark:text-blue-200 border border-blue-300 dark:border-blue-800/50';
+      const dot = document.createElement('span');
+      dot.className = 'size-1.5 rounded-full bg-blue-500 animate-pulse';
+      const text = document.createElement('span');
+      const pending = raidQueueState?.bossQueue;
+      text.textContent = `Queue: ${raidQueueState.phase}${pending?.remain_raid_count != null ? ` (${pending.remain_raid_count} left)` : ''}`;
+      queueBadge.append(dot, text);
+      raidTitleStatus.append(queueBadge);
+    }
+  }
+
   const cannotStart = !popupRpcEnabled || !!experimentalPending || queueRunning || !targets.length || !rallySquad;
   const actions = document.createElement('div');
-  actions.className = 'flex items-center gap-4';
+  actions.className = 'flex items-center gap-3 flex-wrap';
   rally.append(actions);
   button(actions, 'Start rally', () => startRaid(1, true), cannotStart);
-  button(actions, 'Start queue', () => {
-    const count = Number(raidCountInput.value);
-    if (!Number.isInteger(count) || count < 2 || count > 100) {
-      experimentalMessage = 'Raid queue needs 2–100 raids. Use Start rally for one raid.';
+  if (!queueRunning) {
+    button(actions, 'Start queue', () => {
+      const count = Number(raidCountInput.value);
+      if (!Number.isInteger(count) || count < 2 || count > 100) {
+        experimentalMessage = 'Raid queue needs 2–100 raids. Use Start rally for one raid.';
+        render();
+        return;
+      }
+      experimentalSelection.raidCount = count;
+      saveRaidPreferences();
+      startRaid(count);
+    }, cannotStart);
+  } else {
+    const stopQueueBtn = button(actions, 'Stop queue', async () => {
+      await chrome.runtime.sendMessage({ kind: 'raid-queue-stop' });
       render();
-      return;
-    }
-    experimentalSelection.raidCount = count;
-    saveRaidPreferences();
-    startRaid(count);
-  }, cannotStart);
+    }, false);
+    stopQueueBtn.className = 'inline-flex h-10 cursor-pointer items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 px-4 text-sm font-semibold leading-5 text-white disabled:cursor-not-allowed disabled:opacity-40';
+  }
   if (raidQueueState) {
     const members = raidQueueState.current?.members;
     const pending = raidQueueState.bossQueue;
-    note(rally, `Queue: ${raidQueueState.phase} · ${pending?.remain_raid_count ?? 0} raids left · ${pending?.queue.length ?? 0} bosses queued · ${globalThis.hwaHelperRaidQueue.confirmedWins(raidQueueState)} won${members ? ` · members ${members.count}/${members.total}` : ''}${raidQueueState.reason ? ` · ${raidQueueState.reason}` : ''}`);
+    const wins = globalThis.hwaHelperRaidQueue?.confirmedWins?.(raidQueueState) ?? 0;
+    note(rally, `Queue: ${raidQueueState.phase} · ${pending?.remain_raid_count ?? 0} raids left · ${pending?.queue.length ?? 0} bosses queued · ${wins} won${members ? ` · members ${members.count}/${members.total}` : ''}${raidQueueState.reason ? ` · ${raidQueueState.reason}` : ''}`);
     if (queueRunning) {
-      button(rally, 'Cancel queue', async () => {
-        await chrome.runtime.sendMessage({ kind: 'raid-queue-stop' }); render();
-      }, false);
       note(rally, 'Cancelling the queue clears pending bosses; a rally already running continues in game.');
     }
   }
-  const activeRallies = (cache.marchStatus?.data?.marches || []).filter((march) => march.rally &&
-    !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
   for (const march of activeRallies) {
     const phase = data.rallyPhase(march);
     const p = document.createElement('p');
-    p.className = 'rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-900';
+    p.className = 'rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-900 border border-orange-200 dark:bg-orange-950/40 dark:text-orange-200 dark:border-orange-800/50';
     p.textContent = `${march.rally.target || 'Rally'} · ${phase.phase}${phase.result ? ` · ${phase.result}` : ''}`;
     if (phase.until) {
       const countdown = document.createElement('span');
@@ -5420,25 +5461,44 @@ function renderExperimental(cache, raidOnly = false) {
   return;
   }
   const gather = card('Gather troops');
-  const gatherTeam = makeTeamSelect(gather, 'gatherTeam');
+
+  // Row 1: Lineup & Troops
+  const teamRow = document.createElement('div');
+  teamRow.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3 items-end';
+  gather.append(teamRow);
+  const gatherTeam = makeTeamSelect(teamRow, 'gatherTeam');
+  makeUnitsInput(teamRow);
+  if (gatherTeam?.maxTroops != null) note(gather, `Custom team maximum: ${formatNumber(gatherTeam.maxTroops)} troops. Entered troops are capped to this total.`);
+  note(gather, 'The default lineup selects the five available heroes with the lowest recorded power.');
+
+  // Row 2: Search Parameters (Resource + Level + Find button)
+  const searchRow = document.createElement('div');
+  searchRow.className = 'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 items-end';
+  gather.append(searchRow);
+
   const typeSelect = document.createElement('select');
   for (const type of ['food', 'wood', 'stone', 'iron']) {
     const option = document.createElement('option'); option.value = type; option.textContent = type; typeSelect.append(option);
   }
   typeSelect.value = experimentalSelection.mineType;
   typeSelect.addEventListener('change', () => { experimentalSelection.mineType = typeSelect.value; render(); });
-  field(gather, 'Resource', typeSelect);
+  field(searchRow, 'Resource', typeSelect);
+
   const mineLevel = document.createElement('select');
   for (let n = 1; n <= 10; n++) {
     const option = document.createElement('option'); option.value = String(n); option.textContent = `Level ${n}`; mineLevel.append(option);
   }
   mineLevel.value = String(experimentalSelection.mineLevel);
   mineLevel.addEventListener('change', () => { experimentalSelection.mineLevel = Number(mineLevel.value); render(); });
-  field(gather, 'Mine level', mineLevel);
-  button(gather, 'Find full mines', () => {
+  field(searchRow, 'Mine level', mineLevel);
+
+  const findBtn = button(searchRow, 'Find full mines', () => {
     const call = data.buildMineSearchCall(context.mapId, mapCenter, experimentalSelection.mineType, experimentalSelection.mineLevel);
     if (call) experimentalRpc([call], 'Searching mines...');
   }, !popupRpcEnabled || !!experimentalPending || !context.mapId || !mapCenter);
+  findBtn.className = 'inline-flex h-10 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-teal-600 hover:bg-teal-700 px-4 text-sm font-semibold leading-5 text-white disabled:cursor-not-allowed disabled:opacity-40';
+
+  // Row 3: Target Mine Results & Send Team Action
   const mineSearch = cache.experimentalMineSearch?.data;
   const mines = mineSearch?.mineConfigId === data.mineConfigId(experimentalSelection.mineType, experimentalSelection.mineLevel) ? mineSearch.mines : [];
   const mineSelect = document.createElement('select');
@@ -5450,12 +5510,13 @@ function renderExperimental(cache, raidOnly = false) {
   if (!mines.some((mine) => mine.mineId === experimentalSelection.mineId)) experimentalSelection.mineId = mines[0]?.mineId || '';
   mineSelect.value = experimentalSelection.mineId;
   mineSelect.addEventListener('change', () => { experimentalSelection.mineId = mineSelect.value; });
-  field(gather, 'Search results', mineSelect);
-  note(gather, `${mines.length} full mine(s) found for this type and level.`);
-  makeUnitsInput(gather);
-  if (gatherTeam?.maxTroops != null) note(gather, `Custom team maximum: ${formatNumber(gatherTeam.maxTroops)} troops. Entered troops are capped to this total.`);
-  note(gather, 'The default lineup selects the five available heroes with the lowest recorded power.');
-  button(gather, 'Send gathering team', async () => {
+
+  const actionRow = document.createElement('div');
+  actionRow.className = 'grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-end';
+  gather.append(actionRow);
+  field(actionRow, `Search results (${mines.length} full found)`, mineSelect);
+
+  const sendBtn = button(actionRow, 'Send gathering team', async () => {
     const latest = (await chrome.storage.local.get(CACHE_KEY))[CACHE_KEY] || {};
     if (String(latest.accountStatus?.data?.id) !== String(cache.accountStatus?.data?.id)) {
       experimentalMessage = 'Game account changed. Select the team again.'; render(); return;
@@ -5475,8 +5536,27 @@ function renderExperimental(cache, raidOnly = false) {
     if (!call) { experimentalMessage = 'Select five heroes, valid troops, a known mine, and capture the map ID.'; render(); return; }
     await experimentalRpc([call], 'Sending gathering team...');
   }, !popupRpcEnabled || !!experimentalPending || !context?.mapId || !experimentalSelection.mineId || gatherTeam?.heroIds.length !== 5);
+  sendBtn.className = 'inline-flex h-10 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-teal-600 hover:bg-teal-700 px-4 text-sm font-semibold leading-5 text-white disabled:cursor-not-allowed disabled:opacity-40';
+
   const activeMines = (cache.marchStatus?.data?.marches || []).filter((march) => march.mineId &&
     march.stage !== 'returnToOutpost' && !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
+
+  // Title bar status for Gathering dialog
+  const gatherTitleStatus = document.querySelector('#gather-dialog-status');
+  if (gatherTitleStatus) {
+    gatherTitleStatus.replaceChildren();
+    if (activeMines.length > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-950/40 dark:text-teal-200 border border-teal-300 dark:border-teal-800/50';
+      const dot = document.createElement('span');
+      dot.className = 'size-1.5 rounded-full bg-teal-500 animate-pulse';
+      const text = document.createElement('span');
+      text.textContent = `${activeMines.length} team(s) gathering`;
+      badge.append(dot, text);
+      gatherTitleStatus.append(badge);
+    }
+  }
+
   for (const march of activeMines) {
     const row = document.createElement('div'); row.className = 'flex items-center justify-between gap-2 rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-900 border border-teal-200 dark:bg-teal-950/40 dark:text-teal-200 dark:border-teal-800/50';
     const label = document.createElement('span'); label.textContent = `${march.kind} · ${march.stage} · ${march.squadId}`;

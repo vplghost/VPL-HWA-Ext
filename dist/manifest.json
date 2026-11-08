@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HWA Helper",
-  "version": "0.9.115",
+  "version": "0.9.116",
   "description": "Personal page tweaks and API profiling for Hero Wars: Alliance",
   "permissions": [
     "storage",
