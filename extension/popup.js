@@ -5430,19 +5430,6 @@ function renderExperimental(cache, raidOnly = false) {
       note(rally, 'Cancelling the queue clears pending bosses; a rally already running continues in game.');
     }
   }
-  for (const march of activeRallies) {
-    const phase = data.rallyPhase(march);
-    const p = document.createElement('p');
-    p.className = 'rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-900 border border-orange-200 dark:bg-orange-950/40 dark:text-orange-200 dark:border-orange-800/50';
-    p.textContent = `${march.rally.target || 'Rally'} · ${phase.phase}${phase.result ? ` · ${phase.result}` : ''}`;
-    if (phase.until) {
-      const countdown = document.createElement('span');
-      countdown.dataset.experimentalUntil = String(phase.until);
-      countdown.textContent = ` · ${Math.max(0, Math.ceil((phase.until - Date.now()) / 1000))}s`;
-      p.append(countdown);
-    }
-    rally.append(p);
-  }
   const history = cache.experimentalRallyHistory?.data || [];
   if (history.length) {
     const heading = document.createElement('h3');

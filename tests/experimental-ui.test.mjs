@@ -313,6 +313,10 @@ test('Raid rally shows Stop queue inline when queue is running, hides Start queu
   const statusText = raidStatus.children.map((c) => c.textContent + c.children.map((k) => k.textContent).join(' ')).join(' ');
   assert.match(statusText, /Boss 5/);
   assert.match(statusText, /Queue: active/);
+
+  // Active rally status must NOT be duplicated inside dialog body
+  assert.equal(rally().all('p').some((p) => p.className?.includes('bg-orange-50')), false,
+    'Active rally status should not be inside dialog body since it is in title bar');
 });
 
 test('Gathering dialog groups inputs into rows and displays title status', async () => {
