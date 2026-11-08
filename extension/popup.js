@@ -5020,25 +5020,46 @@ function renderMonster(cache) {
     monsterSelection.teamId = teams.find((team) => team.heroIds.length === 5)?.id || teams[0]?.id || '';
   }
   const team = teams.find((item) => item.id === monsterSelection.teamId);
+  const running = monsterQueueState && !['stopped', 'complete'].includes(monsterQueueState.phase);
+
+  // Update title bar status for Monster dialog
+  const monsterTitleStatus = document.querySelector('#monster-dialog-status');
+  if (monsterTitleStatus && monsterTitleStatus !== host) {
+    monsterTitleStatus.replaceChildren();
+    if (running) {
+      const queueBadge = document.createElement('span');
+      queueBadge.className = 'inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800 dark:bg-orange-950/40 dark:text-orange-200 border border-orange-300 dark:border-orange-800/50';
+      const dot = document.createElement('span');
+      dot.className = 'size-1.5 rounded-full bg-orange-500 animate-pulse';
+      const text = document.createElement('span');
+      const wins = globalThis.hwaHelperMonsterQueue?.confirmedWins?.(monsterQueueState) ?? 0;
+      const total = monsterQueueState.options?.count || 0;
+      text.textContent = `Queue: ${monsterQueueState.phase} (${wins}/${total} won)`;
+      queueBadge.append(dot, text);
+      monsterTitleStatus.append(queueBadge);
+    }
+  }
+
   const section = document.createElement('section');
-  section.className = 'm-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3';
+  section.className = 'm-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3 dark:border-slate-800 dark:bg-slate-900';
   host.append(section);
   const heading = document.createElement('h3');
-  heading.className = 'font-semibold text-slate-900'; heading.textContent = 'Attack setup'; section.append(heading);
-  const field = (label, control) => {
+  heading.className = 'font-semibold text-slate-900 dark:text-slate-100'; heading.textContent = 'Attack setup'; section.append(heading);
+  const field = (parent, label, control) => {
     const wrap = document.createElement('label');
-    wrap.className = 'block min-w-0 text-xs font-medium text-slate-600';
+    wrap.className = 'block min-w-0 text-xs font-medium text-slate-600 dark:text-slate-400';
     wrap.textContent = label;
-    control.className = 'mt-1 block h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-900';
-    wrap.append(control); return wrap;
+    control.className = 'mt-1 block h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
+    wrap.append(control); parent.append(wrap); return wrap;
   };
   const button = (parent, label, action, disabled = false) => {
     const el = document.createElement('button'); el.type = 'button'; el.textContent = label;
     el.className = 'inline-flex h-10 cursor-pointer items-center justify-center rounded-lg bg-orange-600 px-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40';
     el.disabled = disabled; el.addEventListener('click', action); parent.append(el); return el;
   };
-  const note = (text) => { const p = document.createElement('p'); p.className = 'text-xs text-slate-600';
+  const note = (text) => { const p = document.createElement('p'); p.className = 'text-xs text-slate-600 dark:text-slate-400';
     p.textContent = text; section.append(p); };
+
   const teamSelect = document.createElement('select');
   for (const item of teams) {
     const option = document.createElement('option'); option.value = item.id;
@@ -5048,15 +5069,30 @@ function renderMonster(cache) {
   teamSelect.addEventListener('change', () => {
     monsterSelection.teamId = teamSelect.value; saveMonsterPreferences(); render();
   });
-  section.append(field('Lineup', teamSelect));
-  note((team?.heroIds || []).map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed.');
+  const lineupLabel = (team?.heroIds || []).map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed';
+  field(section, `Lineup (${lineupLabel})`, teamSelect);
+
   const cap = data.capacityModel(team?.heroIds, heroes, cache.troopCapacityEvidence?.data,
     troopCapacitySettings, cache.accountStatus?.data?.id).total;
   const maxTroops = data.teamTroopCapacity(cap, team?.maxTroops);
   const units = data.allocateTroops(cache['getUnitSummary:unit']?.data, maxTroops);
   note(`Troops: ${formatNumber(units.reduce((sum, unit) => sum + unit.count, 0))} / ${formatNumber(maxTroops || 0)} · World Energy: 10 per attack`);
-  const levelRow = document.createElement('div'); levelRow.className = 'grid grid-cols-2 items-end gap-3';
+
+  const monsterRow = document.createElement('div');
+  monsterRow.className = 'grid grid-cols-2 items-end gap-3';
+  section.append(monsterRow);
+
+  const context = cache.experimentalMapContext?.data || {};
+  const center = context.center || context.outposts?.[cache.accountStatus?.data?.id];
+  const searchDisabled = !popupRpcEnabled || !!experimentalPending || !context.mapId || !center;
+
+  const levelField = document.createElement('label');
+  levelField.className = 'block min-w-0 text-xs font-medium text-slate-600 dark:text-slate-400';
+  levelField.textContent = 'Monster level';
+  const levelWrap = document.createElement('div');
+  levelWrap.className = 'mt-1 flex h-10 items-stretch overflow-hidden rounded-lg border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800';
   const level = document.createElement('select');
+  level.className = 'h-full w-full min-w-0 border-0 bg-transparent px-2 text-sm text-slate-900 focus:outline-none dark:text-slate-100';
   for (let value = 1; value <= 30; value++) {
     const option = document.createElement('option'); option.value = String(value);
     option.textContent = `Level ${value}`; level.append(option);
@@ -5066,16 +5102,19 @@ function renderMonster(cache) {
     monsterSelection.level = Number(level.value); monsterSelection.targetMobId = '';
     saveMonsterPreferences(); render();
   });
-  levelRow.append(field('Monster level', level));
-  const searchWrap = document.createElement('div'); searchWrap.className = 'flex items-end';
-  const context = cache.experimentalMapContext?.data || {};
-  const center = context.center || context.outposts?.[cache.accountStatus?.data?.id];
-  const searchDisabled = !popupRpcEnabled || !!experimentalPending || !context.mapId || !center;
-  button(searchWrap, 'Find monsters', () => experimentalRpc([{ name: 'searchMob', feature: 'mob', args: {
+  const findBtn = document.createElement('button');
+  findBtn.type = 'button';
+  findBtn.textContent = 'Find monsters';
+  findBtn.disabled = searchDisabled;
+  findBtn.className = 'inline-flex h-full shrink-0 cursor-pointer items-center justify-center border-l border-slate-300 bg-orange-600 px-3 text-sm font-semibold leading-5 text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700';
+  findBtn.addEventListener('click', () => experimentalRpc([{ name: 'searchMob', feature: 'mob', args: {
     mapId: context.mapId, center, mobType: 'solo',
     mobConfigIds: data.soloMonsterConfigIds(monsterSelection.level)
-  } }], 'Searching monsters...'), searchDisabled);
-  levelRow.append(searchWrap); section.append(levelRow);
+  } }], 'Searching monsters...'));
+  levelWrap.append(level, findBtn);
+  levelField.append(levelWrap);
+  monsterRow.append(levelField);
+
   const found = cache.experimentalSoloSearch?.data;
   const configs = data.soloMonsterConfigIds(monsterSelection.level);
   const matching = found?.mapId === context.mapId && Array.isArray(found.mobConfigIds) &&
@@ -5092,13 +5131,17 @@ function renderMonster(cache) {
   }
   targetSelect.value = monsterSelection.targetMobId;
   targetSelect.addEventListener('change', () => { monsterSelection.targetMobId = targetSelect.value; });
-  section.append(field(`Target (${targets.length} found)`, targetSelect));
+  field(monsterRow, `Target (${matching ? `${targets.length} found` : 'Search this level first'})`, targetSelect);
+
   const count = document.createElement('input'); count.type = 'number'; count.min = '2'; count.max = '100'; count.step = '1';
   count.value = String(monsterSelection.count);
   count.addEventListener('input', () => { monsterSelection.count = Number(count.value); saveMonsterPreferences(); });
-  section.append(field('Number of attacks', count));
-  const running = monsterQueueState && !['stopped', 'complete'].includes(monsterQueueState.phase);
-  const actions = document.createElement('div'); actions.className = 'flex flex-wrap gap-3'; section.append(actions);
+  field(section, 'Number of attacks', count);
+
+  const actions = document.createElement('div');
+  actions.className = 'flex items-center gap-3 flex-wrap';
+  section.append(actions);
+
   const cannotStart = !popupRpcEnabled || running || !!experimentalPending || !monsterSelection.targetMobId ||
     team?.heroIds?.length !== 5 || !data.buildSquad(team.heroIds, units);
   const start = async (attackCount) => {
@@ -5112,26 +5155,34 @@ function renderMonster(cache) {
     render();
   };
   button(actions, 'Attack once', () => start(1), cannotStart);
-  button(actions, 'Start queue', () => {
-    const value = Number(count.value);
-    if (!Number.isInteger(value) || value < 2 || value > 100) {
-      monsterMessage = 'Queue needs 2–100 attacks. Use Attack once for one monster.'; render(); return;
-    }
-    monsterSelection.count = value; saveMonsterPreferences(); start(value);
-  }, cannotStart);
+  if (!running) {
+    button(actions, 'Start queue', () => {
+      const value = Number(count.value);
+      if (!Number.isInteger(value) || value < 2 || value > 100) {
+        monsterMessage = 'Queue needs 2–100 attacks. Use Attack once for one monster.'; render(); return;
+      }
+      monsterSelection.count = value; saveMonsterPreferences(); start(value);
+    }, cannotStart);
+  } else {
+    const stopQueueBtn = button(actions, 'Stop queue', async () => {
+      await chrome.runtime.sendMessage({ kind: 'monster-queue-stop' }); render();
+    }, false);
+    stopQueueBtn.className = 'inline-flex h-10 cursor-pointer items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 px-4 text-sm font-semibold leading-5 text-white disabled:cursor-not-allowed disabled:opacity-40';
+  }
+
   if (monsterQueueState) {
     note(`${running ? 'Queue' : 'Previous queue'}: ${monsterQueueState.phase} · ${data.soloMonsterLevel(monsterQueueState.current?.mobConfigId) ?
       `level ${data.soloMonsterLevel(monsterQueueState.current.mobConfigId)} · ` : ''}${globalThis.hwaHelperMonsterQueue.confirmedWins(monsterQueueState)} won / ${monsterQueueState.options?.count || 0} requested${monsterQueueState.reason ? ` · ${monsterQueueState.reason}` : ''}`);
-    if (running) button(section, 'Stop queue', async () => {
-      await chrome.runtime.sendMessage({ kind: 'monster-queue-stop' }); render();
-    });
+    if (running) {
+      note('Cancelling the queue clears pending attacks; an attack already sent continues in game.');
+    }
     for (const item of monsterQueueState.recentResults || []) {
       note(`${data.soloMonsterLevel(item.mobConfigId) ? `Level ${data.soloMonsterLevel(item.mobConfigId)}` : 'Monster'} · ${item.result} · ${new Date(item.at).toLocaleString()}`);
     }
   }
   const reports = cache.soloAttackResults?.data || [];
   if (reports.length) {
-    const title = document.createElement('h3'); title.className = 'text-xs font-semibold text-slate-800';
+    const title = document.createElement('h3'); title.className = 'text-xs font-semibold text-slate-800 dark:text-slate-200';
     title.textContent = 'Recent attack results'; section.append(title);
     for (const item of reports.slice(0, 5)) note(`${data.soloMonsterLevel(item.mobConfigId) ?
       `Level ${data.soloMonsterLevel(item.mobConfigId)}` : 'Monster'} · ${item.result} · ${new Date(item.createdAt).toLocaleString()}`);
@@ -5212,17 +5263,16 @@ function renderExperimental(cache, raidOnly = false) {
     });
     const lineupLabel = teams.find((team) => team.id === experimentalSelection[key])?.heroIds
       .map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed';
-    field(section, raidOnly ? `Lineup (${lineupLabel})` : 'Lineup', select);
+    field(section, `Lineup (${lineupLabel})`, select);
     const selected = teams.find((team) => team.id === experimentalSelection[key]);
-    if (!raidOnly) note(section, selected?.heroIds.map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed.');
     return selected;
   };
-  const makeUnitsInput = (section) => {
+  const makeUnitsInput = (section, label = 'Troops (unit ID:count)') => {
     const input = document.createElement('input'); input.type = 'text';
     input.placeholder = '7:500, 17:500, 27:500';
     input.value = experimentalSelection.units;
     input.addEventListener('input', () => { experimentalSelection.units = input.value; });
-    field(section, 'Troops (unit ID:count)', input);
+    field(section, label, input);
   };
   const selectedSquad = (team) => {
     const units = experimentalSelection.units.split(',').map((part) => {
@@ -5473,8 +5523,10 @@ function renderExperimental(cache, raidOnly = false) {
   teamRow.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3 items-end';
   gather.append(teamRow);
   const gatherTeam = makeTeamSelect(teamRow, 'gatherTeam');
-  makeUnitsInput(teamRow);
-  if (gatherTeam?.maxTroops != null) note(gather, `Custom team maximum: ${formatNumber(gatherTeam.maxTroops)} troops. Entered troops are capped to this total.`);
+  const troopsLabel = gatherTeam?.maxTroops != null
+    ? `Troops (unit ID:count · max ${formatNumber(gatherTeam.maxTroops)})`
+    : 'Troops (unit ID:count)';
+  makeUnitsInput(teamRow, troopsLabel);
   note(gather, 'The default lineup selects the five available heroes with the lowest recorded power.');
 
   // Row 2: Search Parameters (Resource + Level + Find button)

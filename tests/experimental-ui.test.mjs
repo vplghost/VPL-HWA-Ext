@@ -228,6 +228,20 @@ test('Monster dialog searches by level, starts selected team attack and shows re
   await section().all('button').find((item) => item.textContent === 'Start queue').fire('click');
   assert.equal(sent.at(-1).options.count, 3);
   assert.equal(saved.saved, true);
+
+  // Lineup label includes hero names in parentheses
+  const labels = section().all('label');
+  assert.match(labels[0].textContent, /Lineup \(Hero 1 · Hero 2 · Hero 3 · Hero 4 · Hero 5\)/, 'Monster lineup label contains hero names');
+
+  // When queue is running, Start queue is hidden and Stop queue is shown inline
+  context.monsterQueueState = { phase: 'active', options: { count: 5 } };
+  context.render();
+  const runningButtons = section().all('button');
+  assert.equal(runningButtons.find((item) => item.textContent === 'Start queue'), undefined, 'Start queue must be hidden when running');
+  const stopQueueBtn = runningButtons.find((item) => item.textContent === 'Stop queue');
+  assert.ok(stopQueueBtn, 'Stop queue button must be visible inline when running');
+  await stopQueueBtn.fire('click');
+  assert.equal(sent.at(-1).kind, 'monster-queue-stop');
 });
 
 test('Raid rally shows Stop queue inline when queue is running, hides Start queue, and updates title status', async () => {
@@ -388,4 +402,10 @@ test('Gathering dialog groups inputs into rows and displays title status', async
   // Verify status in #gather-dialog-status on dialog title bar
   const statusText = gatherStatus.children.map((c) => c.textContent + c.children.map((k) => k.textContent).join(' ')).join(' ');
   assert.match(statusText, /1 team\(s\) gathering/);
+
+  // Lineup label includes hero names in parentheses and Troops input is on the same row (teamRow)
+  const teamRowLabels = gather().children[1].all('label');
+  assert.equal(teamRowLabels.length, 2, 'teamRow must have exactly Lineup and Troops labels on same row');
+  assert.match(teamRowLabels[0].textContent, /Lineup \(/, 'Lineup label contains lineup parentheses');
+  assert.match(teamRowLabels[1].textContent, /Troops \(unit ID:count\)/, 'Troops label is on same row');
 });
