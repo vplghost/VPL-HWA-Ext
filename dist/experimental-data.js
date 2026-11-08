@@ -9,11 +9,31 @@
     return { defaultHero: Number.isSafeInteger(settings?.defaultHero) && settings.defaultHero > 0 && settings.defaultHero <= 1000000 ? settings.defaultHero : 600,
       base: Number.isSafeInteger(settings?.base) && settings.base >= 0 && settings.base <= 1000000 ? settings.base : 950 };
   }
+
+  function estimateHeroTroopCapacity(power) {
+    if (!Number.isFinite(power) || power < 1000) return null;
+    let troop;
+    if (power < 9000) {
+      troop = Math.max(623, Math.floor(469.5 + power / 39.0));
+    } else if (power < 30000) {
+      troop = Math.floor(578.4 + 1.24 * Math.sqrt(power));
+    } else {
+      troop = Math.floor(695.0 + power / 315.0);
+    }
+    // Giảm 2 đơn vị để tránh vượt ngưỡng (zero overflow margin)
+    return Math.max(1, troop - 2);
+  }
+
   function heroCapacity(id, hero, saved, fallback = 600) {
     if (Number.isSafeInteger(hero?.troopCapacity) && hero.troopCapacity > 0) return hero.troopCapacity;
     if (saved?.signature === capacitySignature(hero) && Number.isSafeInteger(saved.count) && saved.count > 0) return saved.count;
     const example = capacityExamples[id];
-    return example && hero?.level === example[0] && hero?.star === example[1] ? example[2] : fallback;
+    if (example && hero?.level === example[0] && hero?.star === example[1]) return example[2];
+    if (fallback != null) {
+      const estimated = estimateHeroTroopCapacity(hero?.power);
+      if (estimated != null) return estimated;
+    }
+    return fallback;
   }
   function squadCapacity(ids, heroes, capacities, base = 950, defaultHero = 600) {
     if (ids?.length !== 5 || new Set(ids).size !== 5 || !Number.isSafeInteger(base) || base < 0) return null;
@@ -51,7 +71,7 @@
       const columns = row.slice(0, -1).map((value, index) => Math.abs(value) > 1e-7 ? index : -1).filter((index) => index >= 0);
       if (columns.length === 1 && row.at(-1) >= settings.defaultHero && row.at(-1) <= 1000000) inferred[unknown[columns[0]]] = Math.floor(row.at(-1) + 1e-7);
     }
-    const counts = (ids || []).map((id) => known[id] ?? inferred[id] ?? settings.defaultHero);
+    const counts = (ids || []).map((id) => known[id] ?? inferred[id] ?? estimateHeroTroopCapacity(heroes?.[id]?.power) ?? settings.defaultHero);
     const observed = Math.max(0, ...rows.filter((row) => row.profiles.every((profile) => ids?.includes(profile.id))).map((row) => row.total));
     const total = ids?.length === 5 && new Set(ids).size === 5 ? Math.max(observed, settings.base + counts.reduce((a, b) => a + b, 0)) : null;
     return { total, observed, inferred, counts, settings };
@@ -243,6 +263,7 @@
   }
 
   globalThis.hwaHelperExperimentalData = { rallyWaitOptions, capacitySignature, heroCapacity,
+    estimateHeroTroopCapacity,
     squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, bossLevel, soloMonsterConfigIds, soloMonsterLevel, lowestPowerHeroes,
     mineConfigId, mineTypeLevel, availableHeroIds, normalizeCustomTeam, teamOptions, teamTroopCapacity, buildSquad, buildRallyCall, buildJoinRallyCall,
     buildGatherCall, buildMineSearchCall, rallyPhase };

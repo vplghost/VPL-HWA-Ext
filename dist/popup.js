@@ -4989,7 +4989,10 @@ function renderCustomTeams(cache) {
     const remove = document.createElement('button'); remove.textContent = 'Delete'; remove.className = 'text-xs text-red-600';
     remove.addEventListener('click', async () => { await save((teams) => teams.filter((item) => item.id !== team.id)); });
     const capacity = document.createElement('div'); capacity.className = 'text-xs text-slate-500';
-    capacity.textContent = `Maximum troops: ${team.maxTroops == null ? 'Automatic' : formatNumber(team.maxTroops)}`;
+    const data = globalThis.hwaHelperExperimentalData;
+    const autoCap = data?.capacityModel ? data.capacityModel(team.heroIds, heroes, cache.troopCapacityEvidence?.data,
+      troopCapacitySettings, accountId).total : null;
+    capacity.textContent = `Maximum troops: ${team.maxTroops == null ? (autoCap ? `Automatic (${formatNumber(autoCap)})` : 'Automatic') : formatNumber(team.maxTroops)}`;
     row.append(label, capacity, edit, remove); section.append(row);
   }
   if (accountId != null) {

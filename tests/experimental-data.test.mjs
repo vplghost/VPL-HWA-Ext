@@ -193,3 +193,56 @@ test('member threshold includes leader once and distinguishes unknown membership
   assert.equal(counts.count, 2); assert.equal(counts.total, 6);
   assert.equal(data.rallyMembers({ members: [] }), null);
 });
+
+
+test('hero troop capacity is estimated from power with a safe -2 margin to prevent overflow', () => {
+  // Invalid or dummy powers (< 1000) return null
+  for (const invalid of [null, undefined, NaN, -100, 0, 50, 999, '5000']) {
+    assert.equal(data.estimateHeroTroopCapacity(invalid), null);
+  }
+
+  // Bracket 1: Power < 9000
+  // Level 1 baseline (power ~5844): actual is 623, estimate(-2) is 621 (<= 623)
+  assert.equal(data.estimateHeroTroopCapacity(5844), 621);
+  // Kendle (power 6669): actual is 640, estimate(-2) is 638 (<= 640)
+  assert.equal(data.estimateHeroTroopCapacity(6669), 638);
+  // Tristan (power 7622): actual is 665, estimate(-2) is 662 (<= 665)
+  assert.equal(data.estimateHeroTroopCapacity(7622), 662);
+  // Dorian (power 8692): actual is 691, estimate(-2) is 690 (<= 691)
+  assert.equal(data.estimateHeroTroopCapacity(8692), 690);
+
+  // Bracket 2: 9000 <= Power < 30000
+  // Eva (power 9027): actual is 697, estimate(-2) is 694 (<= 697)
+  assert.equal(data.estimateHeroTroopCapacity(9027), 694);
+  // Jhu (power 12236): actual is 715, estimate(-2) is 713 (<= 715)
+  assert.equal(data.estimateHeroTroopCapacity(12236), 713);
+  // Iris (power 23242): actual is 767, estimate(-2) is 765 (<= 767)
+  assert.equal(data.estimateHeroTroopCapacity(23242), 765);
+  // Leonel (power 28744): actual is 787, estimate(-2) is 786 (<= 787)
+  assert.equal(data.estimateHeroTroopCapacity(28744), 786);
+
+  // Bracket 3: Power >= 30000
+  // Galahad (power 31637): actual is 797, estimate(-2) is 793 (<= 797)
+  assert.equal(data.estimateHeroTroopCapacity(31637), 793);
+  // Dante (power 36894): actual is 812, estimate(-2) is 810 (<= 812)
+  assert.equal(data.estimateHeroTroopCapacity(36894), 810);
+
+  // Lineups without custom maxTroops use capacityModel derived from hero powers
+  const powerLineupHeroes = {
+    10: { level: 70, star: 1, power: 12236 },
+    11: { level: 70, star: 1, power: 12236 },
+    12: { level: 70, star: 1, power: 12236 },
+    13: { level: 70, star: 1, power: 12236 },
+    14: { level: 70, star: 1, power: 12236 },
+  };
+  const ids = [10, 11, 12, 13, 14];
+  const model = data.capacityModel(ids, powerLineupHeroes, [], {}, 10);
+  // 950 base + 5 * 713 = 4515
+  assert.equal(model.total, 4515);
+
+  // When lineup has custom maxTroops, teamTroopCapacity overrides automatic capacity
+  assert.equal(data.teamTroopCapacity(model.total, 4000), 4000);
+  // When lineup has no custom maxTroops (undefined/null), teamTroopCapacity uses automatic capacity
+  assert.equal(data.teamTroopCapacity(model.total, undefined), 4515);
+  assert.equal(data.teamTroopCapacity(model.total, null), 4515);
+});
