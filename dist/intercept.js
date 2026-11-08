@@ -43,7 +43,8 @@
   const helperActionMethods = new Set(['createRally', 'cancelRally', 'joinRally', 'attackMob', 'attackMine', 'stopMineGathering',
     'randomDraft_saveDefence', 'randomDraft_saveAttack',
     'magicTower_enterRoom', 'magicTower_startBattle', 'magicTower_activateBuff',
-    'magicTower_openChest', 'magicTower_enterNextFloor']);
+    'magicTower_openChest', 'magicTower_enterNextFloor',
+    'startConstruction', 'completeConstruction']);
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok, error = null) => window.postMessage({

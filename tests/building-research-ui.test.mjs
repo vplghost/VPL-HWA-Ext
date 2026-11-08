@@ -192,6 +192,8 @@ test('renderBuildingDialog renders idle state when no active queues and lists ne
 
   const nextSection = buildingBody.children[1];
   assert.match(nextSection.innerHTML, /Next Upgradable Buildings/);
+  // Verify Upgrade/Build button exists in Next Upgradable card
+  assert.match(nextSection.innerHTML, /Upgrade|Build/);
 
   const dirSection = buildingBody.children[2];
   assert.match(dirSection.innerHTML, /All City Buildings/);

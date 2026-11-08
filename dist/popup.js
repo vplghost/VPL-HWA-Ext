@@ -6092,17 +6092,72 @@ function renderBuildingDialog(cache) {
       const card = document.createElement('div');
       card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-amber-200 hover:bg-amber-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-amber-900/50';
       const name = getBuildingName(b.id);
-      card.innerHTML = `
-        <div class="min-w-0">
-          <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
-          <div class="text-2xs text-slate-500 dark:text-slate-400">ID: ${b.id}</div>
-        </div>
-        <div class="text-right shrink-0">
-          <div class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-            ${b.isBuilt ? `Lv. ${b.level} ➔ ${b.nextLevel}` : 'Build Lv. 1'}
-          </div>
-        </div>
+
+      const infoCol = document.createElement('div');
+      infoCol.className = 'min-w-0 flex-1';
+      infoCol.innerHTML = `
+        <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
+        <div class="text-2xs text-slate-500 dark:text-slate-400">ID: ${b.id}</div>
       `;
+      card.append(infoCol);
+
+      const actionCol = document.createElement('div');
+      actionCol.className = 'flex items-center gap-2 shrink-0';
+
+      const levelBadge = document.createElement('div');
+      levelBadge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
+      levelBadge.textContent = b.isBuilt ? `Lv. ${b.level} ➔ ${b.nextLevel}` : 'Build Lv. 1';
+      actionCol.append(levelBadge);
+
+      const isQueueBusy = activeQueues.length > 0;
+      const buildBtn = document.createElement('button');
+      buildBtn.type = 'button';
+      buildBtn.className = isQueueBusy
+        ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
+        : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors';
+      buildBtn.disabled = isQueueBusy || (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled);
+      buildBtn.title = isQueueBusy
+        ? 'Builder queue is currently busy'
+        : (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled ? 'Enable Popup RPC in Settings to build' : `Build ${name} to Lv. ${b.nextLevel}`);
+      buildBtn.innerHTML = `<span>🔨</span><span>${b.isBuilt ? 'Upgrade' : 'Build'}</span>`;
+
+      buildBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (buildBtn.disabled) return;
+        buildBtn.disabled = true;
+        buildBtn.textContent = 'Building...';
+        const calls = [
+          {
+            name: 'startConstruction',
+            feature: 'building',
+            args: {
+              buildingId: b.id,
+              nextLevel: b.nextLevel,
+              startDate: Date.now(),
+              durationMs: 0
+            }
+          },
+          { name: 'getSummary', feature: 'building', args: {} }
+        ];
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+            if (!response?.ok) {
+              buildBtn.disabled = false;
+              buildBtn.textContent = response?.error || 'Failed';
+            } else {
+              buildBtn.textContent = response.queued ? 'Queued' : 'Started!';
+              setTimeout(() => {
+                if (typeof renderBuildingDialog === 'function' && typeof currentCache !== 'undefined') {
+                  renderBuildingDialog(currentCache);
+                }
+              }, 1000);
+            }
+          });
+        }
+      });
+      actionCol.append(buildBtn);
+
+      card.append(actionCol);
       nextGrid.append(card);
     }
   } else {
