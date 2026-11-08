@@ -3,7 +3,7 @@ id: doc-6f4a4a2e2e3b17941a9db8218e3a3b8c
 title: MQTT Assisted Piggyback
 description: Experimental shared RPC mode that locally delivers a bounded MQTT map update to request a native game carrier, with append-only response isolation
 createdAt: '2026-11-06T08:36:33.637Z'
-updatedAt: '2026-11-08T10:09:59.201Z'
+updatedAt: '2026-11-08T11:37:20.271Z'
 tags:
   - rpc
   - mqtt
@@ -21,16 +21,15 @@ This option requests a native carrier rather than starting a separate HTTP RPC. 
 
 ## Preconditions and limits
 
-- An actual received `mapChunksUpdated` PUBLISH must have been observed on the exact game MQTT endpoint within 60 seconds.
-- The sample must use the `msg` envelope, contain 1–32 chunks with integer x/y and finite updatedAt, fit the payload limit, and have a topic no longer than 512 characters.
-- Active viewport chunk targeting: To avoid requesting off-screen chunks that the client ignores, the observer retains up to 32 recent real MQTT chunks (within 60s) and tracks recent native `getChunks` coordinates (`viewedChunks` observed within 60s on the same `mapId`). When synthesizing a local trigger, observed native coordinates on that map are prioritized and overlaid with updated timestamps `max(local Unix milliseconds, updatedAt + 1)` (@task-VHE-BZXW0H).
-- Action allowlist gate: Queued RPC actions must be registered in `helperActionMethods` in `extension/intercept.js` (including `createRally`, `cancelRally`, `attackMob`, `attackMine`, `stopMineGathering`, `randomDraft_save*`, `magicTower_*`). Unlisted methods are dropped before the interceptor can emit the `mqtt-rpc-nudge` signal (@task-VHE-X2SJ1X).
+- An actual received PUBLISH must have been observed on the exact game MQTT endpoint (either mapChunksUpdated on world map topic within 60s, or user push on hwm/user/ within 120s).
+- Multi-event template tracking: Tracks both World Map chunk updates (triggerTemplate on hwm/pub/global-map/) and user-channel push events (userPushTemplate on hwm/user/<userId>, e.g., bundleCarousel, specialQuestEvents, newReport). When the world map is active (viewedChunks fresh <= 60s), mapChunksUpdated is dispatched; when the world map is idle or unopened, a user-channel push nudge is dispatched locally.
+- Active viewport chunk targeting: To avoid requesting off-screen chunks that the client ignores, the observer retains up to 32 recent real MQTT chunks (within 60s) and tracks recent native getChunks coordinates (viewedChunks observed within 60s on the same mapId). When synthesizing a local trigger, observed native coordinates on that map are prioritized and overlaid with updated timestamps max(local Unix milliseconds, updatedAt + 1) (@task-VHE-BZXW0H).
+- Action allowlist gate: Queued RPC actions must be registered in helperActionMethods in extension/intercept.js (including createRally, cancelRally, attackMob, attackMine, stopMineGathering, randomDraft_save*, magicTower_*). Unlisted methods are dropped before the interceptor can emit the mqtt-rpc-nudge signal (@task-VHE-X2SJ1X).
+- Hybrid carrier fallback: When mqtt-piggyback mode is active, the extension first tries the fast MQTT nudge path (~1s latency for getChunks). If no map carrier responds, calls attach to any periodic native game RPC (e.g., stashClient which fires every ~6s, or user actions) as periodic-fallback, preventing calls from remaining pending.
 - The same socket must still be OPEN. Only sockets created after the hook is installed are available; reload the game after updating the extension.
 - Both RPC and monitoring must be enabled and the selected mode must still be MQTT-assisted.
-- Local triggers are limited to one per five seconds. There is no polling loop or automatic Direct fallback. A blocked/cooling trigger leaves calls pending for ordinary native RPC traffic.
+- Local triggers are limited to one per five seconds. A blocked/cooling trigger leaves calls pending for ordinary native RPC traffic.
 - Templates remain only in page memory; they are not persisted or exported as command payloads.
-
-The synthetic body keeps observed chunk coordinates and advances each update timestamp to max(local Unix milliseconds, observed timestamp + 1), requesting a refresh without fabricating a battle, reward or resource result. It does not inject invented entity IDs or copy server push identifiers.
 
 ## MQTT framing and isolation
 
@@ -48,14 +47,17 @@ Full body replacement is not enabled. The user's proposed replacement is conditi
 
 ## Status and use
 
-Choose the mode under Settings → RPC dispatch method, enable popup RPC and Monitor API, open the world map so a real map-update template can be observed, then use any queued helper action.
+Choose the mode under Settings → RPC dispatch method, enable popup RPC and Monitor API, and use any queued helper action (or click 'Refresh Heroes' in popup Settings or Heroes tab toolbar).
 
-Settings shows:
-- local trigger delivered, awaiting native RPC;
-- native carrier observed and queued calls attached/covered;
-- missing/expired template, closed socket, cooldown, disabled gates, or delivery error.
+Settings features an interactive telemetry card and badge:
+- Fast carrier attached (⚡ <3s latency, native method name like getChunks);
+- Fallback carrier attached (⏱️ periodic traffic like stashClient or user action);
+- Local trigger delivered (Nudge Sent), awaiting native RPC;
+- Missing or expired template, closed socket, cooldown, or disabled gates.
 
-A delivered synthetic event does not prove the live engine accepted it or fetched data. An inactive/off-screen map or client deduplication can suppress the expected refresh; calls then retain ordinary Piggyback behavior and timeouts. Status never means the helper action itself succeeded; RPC response/cache data remains authoritative.
+Live rolling telemetry (rpcMqttTelemetry) tracks fast vs fallback carrier counts and the last carrier's method, source, latency, and timestamp. The Heroes tab toolbar also features a dynamic carrier badge next to 'Refresh Heroes'.
+
+A delivered synthetic event requests the engine to act; if the map viewport or client view does not react immediately, the hybrid fallback automatically attaches queued calls to the next periodic or user-driven game RPC within ~6s.
 
 ## Verification and evidence boundaries
 

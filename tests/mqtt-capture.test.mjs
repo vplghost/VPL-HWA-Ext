@@ -12,6 +12,7 @@ const endpoint = 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt';
 function setup(options = {}) {
   const records = [];
   const triggerStates = [];
+  const triggerEvents = [];
   const listeners = [];
   class FakeWebSocket {
     constructor(url) { this.url = url; this.listeners = {}; this.sent = []; this.readyState = 1; this.binaryType = 'arraybuffer'; }
@@ -26,7 +27,10 @@ function setup(options = {}) {
     addEventListener: (kind, listener) => { if (kind === 'message') listeners.push(listener); },
     postMessage: (data) => {
       if (data.kind === 'api-record') records.push(data.record);
-      if (data.kind === 'mqtt-rpc-nudge-status') triggerStates.push(data.state);
+      if (data.kind === 'mqtt-rpc-nudge-status') {
+        triggerStates.push(data.state);
+        triggerEvents.push(data);
+      }
       for (const listener of listeners) listener({ source: window, origin, data });
     }
   };
@@ -37,7 +41,7 @@ function setup(options = {}) {
   const control = (recordingActive, interceptEnabled = true, settings = {}) => window.postMessage({
     source: 'hwa-helper-config', kind: 'control', interceptEnabled, recordingActive, ...settings
   });
-  return { window, records, control, triggerStates };
+  return { window, records, control, triggerStates, triggerEvents };
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -268,4 +272,69 @@ test('ignores CONNECT credentials and encodes binary PUBLISH payloads', async ()
   assert.equal(records[0].topic, 'battle/result');
   assert.equal(records[0].encoding, 'base64');
   assert.equal(records[0].payload, 'AP8B');
+});
+
+test('user push template capture provides a local nudge when the map template is absent', async () => {
+  const { window, control, triggerStates, triggerEvents } = setup();
+  const socket = new window.WebSocket(endpoint);
+  control(false, true, assisted);
+  const userPush = { method: 'msg', result: { type: 'bundleCarousel', body: { bundles: [] } } };
+  socket.receive(publish('hwm/user/123456', JSON.stringify(userPush)));
+  await tick();
+  let injected;
+  socket.addEventListener('message', (event) => { injected = event.data; });
+  window.postMessage({ source: 'hwa-helper-control', kind: 'mqtt-rpc-nudge', trackId: 'test-track-1' });
+  await tick();
+  assert.equal(triggerStates.at(-1), 'triggered');
+  const lastEvent = triggerEvents.find((e) => e.state === 'triggered');
+  assert.equal(lastEvent?.nudgeType, 'user');
+  assert.equal(lastEvent?.trackId, 'test-track-1');
+  assert.ok(injected);
+});
+
+test('hybrid fallback classifies fast map carrier vs periodic fallback carrier', async () => {
+  let now = 1000;
+  class Clock extends Date { static now() { return now; } }
+  const network = [];
+  const { window, control, triggerEvents } = setup({
+    Date: Clock,
+    intercept: true,
+    fetch: async (_url, options) => {
+      const request = JSON.parse(options.body);
+      network.push(request);
+      return new Response(JSON.stringify({
+        results: request.calls.map((call) => ({ ident: call.ident, result: { response: {} } }))
+      }), { status: 200 });
+    }
+  });
+  const socket = new window.WebSocket(endpoint);
+  control(false, true, assisted);
+  socket.receive(publish('hwm/pub/global-map/map1', JSON.stringify(mapMessage)));
+  await tick();
+
+  // 1. Fast path: within 1000ms with getChunks
+  now = 2000;
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [{ name: 'heroGetAll' }], trackId: 'fast-track' });
+  await tick();
+  now = 2800; // 800ms later
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: '{"calls":[{"name":"getChunks","feature":"globalMap","args":{"mapId":"map1","chunkCoordinates":[]},"ident":"n1"}]}'
+  });
+  const fastCarrier = triggerEvents.find((e) => e.state === 'carrier-attached' && e.trackId === 'fast-track');
+  assert.equal(fastCarrier?.carrierSource, 'fast-map-carrier');
+  assert.equal(fastCarrier?.carrierMethod, 'getChunks');
+  assert.equal(fastCarrier?.carrierDelayMs, 800);
+
+  // 2. Fallback path: delay > 3000ms with periodic stashClient
+  now = 10000;
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [{ name: 'heroGetAll' }], trackId: 'fallback-track' });
+  await tick();
+  now = 16000; // 6000ms later (typical stashClient interval)
+  await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: '{"calls":[{"name":"stashClient","ident":"n2"}]}'
+  });
+  const fallbackCarrier = triggerEvents.find((e) => e.state === 'carrier-attached' && e.trackId === 'fallback-track');
+  assert.equal(fallbackCarrier?.carrierSource, 'periodic-fallback');
+  assert.equal(fallbackCarrier?.carrierMethod, 'stashClient');
+  assert.equal(fallbackCarrier?.carrierDelayMs, 6000);
 });

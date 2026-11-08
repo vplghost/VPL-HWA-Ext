@@ -5482,7 +5482,7 @@ async function experimentalRpc(calls, message) {
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus']), chrome.storage.session.get('recordingState')
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
@@ -5608,6 +5608,23 @@ async function render() {
   document.querySelector('#item-group-filter').hidden = activeTab !== 'items';
   const toolbarRefreshHeroesBtn = document.querySelector('#btn-toolbar-refresh-heroes');
   if (toolbarRefreshHeroesBtn) toolbarRefreshHeroesBtn.hidden = activeTab !== 'heroes';
+  const heroCarrierBadge = document.querySelector('#hero-carrier-badge');
+  if (heroCarrierBadge) {
+    heroCarrierBadge.hidden = activeTab !== 'heroes' || stored.socketRefreshMode !== 'mqtt-piggyback';
+    if (!heroCarrierBadge.hidden) {
+      const last = stored.rpcMqttTelemetry?.lastCarrier;
+      if (last && typeof last.delayMs === 'number') {
+        const isFast = last.delayMs <= 3000;
+        heroCarrierBadge.textContent = isFast ? `⚡ ${(last.delayMs / 1000).toFixed(1)}s (${last.method})` : `⏱️ ${(last.delayMs / 1000).toFixed(1)}s (${last.method})`;
+        heroCarrierBadge.title = `Last carrier: ${last.method} via ${last.source} in ${last.delayMs}ms`;
+        heroCarrierBadge.className = `inline-flex items-center px-2 py-1 rounded text-2xs font-medium border shrink-0 ${isFast ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`;
+      } else {
+        heroCarrierBadge.textContent = 'MQTT Assisted';
+        heroCarrierBadge.title = 'MQTT-assisted piggyback mode active';
+        heroCarrierBadge.className = 'inline-flex items-center px-2 py-1 rounded text-2xs font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0';
+      }
+    }
+  }
   const itemsViewToggle = document.querySelector('#items-view-toggle');
   if (itemsViewToggle) itemsViewToggle.hidden = activeTab !== 'items';
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
@@ -6186,7 +6203,7 @@ document.querySelector('#clear-cache').addEventListener('click', async () => {
 
 async function renderSettings() {
   const stored = await chrome.storage.local.get(['captureSettings', 'popupRpcEnabled',
-    'socketRefreshMode', 'rpcMqttTriggerStatus', 'troopCapacitySettings']);
+    'socketRefreshMode', 'rpcMqttTriggerStatus', 'rpcMqttTelemetry', 'troopCapacitySettings']);
   const capacities = globalThis.hwaHelperExperimentalData?.normalizeCapacitySettings(stored.troopCapacitySettings) || { defaultHero: 600, base: 950 };
   for (const [id, key] of [['default-hero-troop-capacity', 'defaultHero'], ['base-troop-capacity', 'base']]) {
     const input = document.querySelector(`#${id}`);
@@ -6196,21 +6213,66 @@ async function renderSettings() {
   document.querySelector('#popup-rpc-enabled').checked = stored.popupRpcEnabled === true;
   document.querySelector('#socket-refresh-mode').value =
     ['direct', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'piggyback';
+
+  const triggerPanel = document.querySelector('#mqtt-trigger-panel');
   const triggerStatus = document.querySelector('#mqtt-trigger-status');
-  if (triggerStatus) {
-    triggerStatus.hidden = stored.socketRefreshMode !== 'mqtt-piggyback';
+  const triggerBadge = document.querySelector('#mqtt-trigger-badge');
+  const telemetryLast = document.querySelector('#mqtt-telemetry-last');
+  const telemetryStats = document.querySelector('#mqtt-telemetry-stats');
+  const isMqttMode = stored.socketRefreshMode === 'mqtt-piggyback';
+
+  if (triggerPanel) triggerPanel.hidden = !isMqttMode;
+  else if (triggerStatus) triggerStatus.hidden = !isMqttMode;
+
+  const status = stored.rpcMqttTriggerStatus;
+  const telemetry = stored.rpcMqttTelemetry || { fastCarrierCount: 0, fallbackCarrierCount: 0, lastCarrier: null };
+
+  if (isMqttMode) {
     const messages = {
-      triggered: 'Local map update delivered. Waiting for the game to produce a carrier RPC.',
-      'carrier-attached': 'Native game RPC observed; queued calls attached or covered by that request.',
-      'waiting-template': 'Waiting for a real MQTT map update. Open the world map in game.',
-      'expired-template': 'The MQTT map template expired. Waiting for a new real map update.',
-      'socket-closed': 'The MQTT connection is closed. Queued calls wait for native game traffic.',
+      triggered: status?.nudgeType === 'user' ? 'User push delivered locally. Waiting for game carrier RPC.' :
+        status?.nudgeType === 'multi' ? 'Map + user push delivered locally. Waiting for game carrier RPC.' :
+        'Local map update delivered. Waiting for game carrier RPC.',
+      'carrier-attached': status?.carrierSource?.startsWith('fast') ?
+        `Fast carrier attached (${status.carrierMethod || 'getChunks'} in ${status.carrierDelayMs ? (status.carrierDelayMs / 1000).toFixed(2) + 's' : '<3s'}).` :
+        `Fallback carrier attached (${status?.carrierMethod || 'periodic'} after ${status?.carrierDelayMs ? (status.carrierDelayMs / 1000).toFixed(2) + 's' : 'delay'}).`,
+      'waiting-template': 'Waiting for MQTT template. Open the world map or wait for user push in game.',
+      'expired-template': 'MQTT template expired. Waiting for a fresh game push.',
+      'socket-closed': 'MQTT connection is closed. Queued calls wait for native game traffic.',
       cooldown: 'MQTT trigger is cooling down; queued calls still wait for native game traffic.',
       disabled: 'MQTT trigger requires Monitor API, popup RPC and MQTT-assisted mode.',
-      error: 'Could not deliver a local MQTT map update. No separate RPC was sent.'
+      error: 'Could not deliver local MQTT update. Queued calls wait for native game traffic.'
     };
-    triggerStatus.textContent = messages[stored.rpcMqttTriggerStatus?.state] ||
-      'Uses a recent MQTT map update to request a native carrier. No separate RPC fallback.';
+    if (triggerStatus) {
+      triggerStatus.textContent = messages[status?.state] ||
+        'Uses recent MQTT updates to request a native carrier. Fallback piggybacks on periodic game RPCs.';
+    }
+    if (triggerBadge) {
+      const badges = {
+        triggered: { text: 'Nudge Sent', bg: 'bg-yellow-100 text-yellow-800' },
+        'carrier-attached': status?.carrierSource?.startsWith('fast') ?
+          { text: 'Fast Carrier ⚡', bg: 'bg-green-100 text-green-800' } :
+          { text: 'Fallback Carrier ⏱️', bg: 'bg-blue-100 text-blue-800' },
+        'waiting-template': { text: 'Waiting Push', bg: 'bg-slate-200 text-slate-700' },
+        'expired-template': { text: 'Expired', bg: 'bg-orange-100 text-orange-800' },
+        'socket-closed': { text: 'Disconnected', bg: 'bg-red-100 text-red-800' },
+        cooldown: { text: 'Cooldown', bg: 'bg-amber-100 text-amber-800' },
+        disabled: { text: 'Disabled', bg: 'bg-slate-200 text-slate-500' }
+      };
+      const badge = badges[status?.state] || { text: 'Idle', bg: 'bg-slate-200 text-slate-700' };
+      triggerBadge.textContent = badge.text;
+      triggerBadge.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold ${badge.bg}`;
+    }
+    if (telemetryLast) {
+      if (telemetry.lastCarrier) {
+        const sec = typeof telemetry.lastCarrier.delayMs === 'number' ? `${(telemetry.lastCarrier.delayMs / 1000).toFixed(2)}s` : '-';
+        telemetryLast.textContent = `Last carrier: ${telemetry.lastCarrier.method} (${sec} · ${telemetry.lastCarrier.source})`;
+      } else {
+        telemetryLast.textContent = 'Last carrier: None';
+      }
+    }
+    if (telemetryStats) {
+      telemetryStats.textContent = `Fast: ${telemetry.fastCarrierCount || 0} · Fallback: ${telemetry.fallbackCarrierCount || 0}`;
+    }
   }
 }
 
@@ -6294,11 +6356,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
     if ('rpcQueueStatus' in changes) renderRpcQueue(changes.rpcQueueStatus.newValue?.count || 0);
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
-        'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'troopCapacitySettings' in changes) renderSettings();
+        'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'rpcMqttTelemetry' in changes || 'troopCapacitySettings' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
     if ('troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
-        'socketRefreshMode' in changes || 'captureSettings' in changes) queueRender();
+        'socketRefreshMode' in changes || 'captureSettings' in changes || 'rpcMqttTelemetry' in changes || 'rpcMqttTriggerStatus' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
     queueRender();
   }

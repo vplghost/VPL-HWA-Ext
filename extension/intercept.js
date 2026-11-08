@@ -8,6 +8,9 @@
   let popupRpcEnabled = false;
   let rpcDispatchMode = 'piggyback';
   let recordingActive = false;
+  let lastNudgeAt = -Infinity;
+  let lastNudgeTrackId = null;
+  let lastNudgeType = null;
   const queuedRpcCalls = new Map();
   const queuedClaimKeys = new Set();
   const queuedActionExpiry = new Map();
@@ -247,6 +250,8 @@
         });
       }
       if (rpcDispatchMode === 'mqtt-piggyback' && queuedRpcCalls.size) {
+        lastNudgeAt = Date.now();
+        lastNudgeTrackId = event.data?.trackId || null;
         if (event.data?.trackId) {
           console.log('[HWA-TRACK][4b/6 INTERCEPT_NUDGE_SIGNAL]', {
             trackId: event.data.trackId,
@@ -261,6 +266,14 @@
           requestedAt: event.data?.requestedAt
         }, location.origin);
       }
+    }
+    if (event.data?.source === 'hwa-helper-api' && event.data.kind === 'mqtt-rpc-nudge-status') {
+      if (event.data.state === 'triggered') {
+        lastNudgeAt = Date.now();
+        if (event.data.nudgeType) lastNudgeType = event.data.nudgeType;
+        if (event.data.trackId) lastNudgeTrackId = event.data.trackId;
+      }
+      return;
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
       if (!popupRpcEnabled) return;
@@ -830,6 +843,32 @@
         }
         consumed.push(key);
       }
+      const now = Date.now();
+      const delayMs = Number.isFinite(lastNudgeAt) && lastNudgeAt > 0 ? Math.max(0, now - lastNudgeAt) : null;
+      const nativeNames = request.calls.map((c) => c.name);
+      let carrierSource = 'native-traffic';
+      if (rpcDispatchMode === 'mqtt-piggyback') {
+        if (delayMs !== null && delayMs <= 3000) {
+          carrierSource = nativeNames.includes('getChunks') ? 'fast-map-carrier' : 'fast-user-carrier';
+        } else if (delayMs !== null && delayMs <= 15000) {
+          carrierSource = 'periodic-fallback';
+        } else {
+          carrierSource = 'passive-carrier';
+        }
+      }
+      const notifyCarrierAttached = () => {
+        if (rpcDispatchMode === 'mqtt-piggyback') window.postMessage({
+          source: 'hwa-helper-api',
+          kind: 'mqtt-rpc-nudge-status',
+          state: 'carrier-attached',
+          carrierSource,
+          carrierDelayMs: delayMs,
+          carrierMethod: nativeNames[0] || 'unknown',
+          nudgeType: lastNudgeType,
+          trackId: lastNudgeTrackId
+        }, location.origin);
+      };
+
       if (!appended.length) {
         for (const key of consumed) {
           queuedRpcCalls.delete(key);
@@ -842,9 +881,7 @@
         }
         if (claimIds.length) tracePiggyback('piggyback-covered', source);
         reportQueueStatus();
-        if (rpcDispatchMode === 'mqtt-piggyback') window.postMessage({
-          source: 'hwa-helper-api', kind: 'mqtt-rpc-nudge-status', state: 'carrier-attached'
-        }, location.origin);
+        notifyCarrierAttached();
         return claimIds.length ? { appended, claimIds, options } : null;
       }
       const headers = typeof Headers === 'function' ? new Headers(options.headers || {}) :
@@ -868,15 +905,15 @@
       console.log('[HWA-TRACK][6a/6 PIGGYBACK_ATTACHED]', {
         time: new Date().toISOString(),
         source,
-        nativeCalls: request.calls.map((c) => c.name),
+        carrierSource,
+        carrierDelayMs: delayMs,
+        nativeCalls: nativeNames,
         appendedCalls: appended.map((c) => c.name),
         totalCalls: request.calls.length + appended.length,
         xAuthSignatureStripped: true
       });
       reportQueueStatus();
-      if (rpcDispatchMode === 'mqtt-piggyback') window.postMessage({
-        source: 'hwa-helper-api', kind: 'mqtt-rpc-nudge-status', state: 'carrier-attached'
-      }, location.origin);
+      notifyCarrierAttached();
       return prepared;
     } catch (_) {
       return null;
