@@ -2422,6 +2422,251 @@ function renderDraft(cache, target = view) {
     slotsGrid.append(slotCard);
   }
   teamSection.append(slotsGrid);
+
+  // Step-by-step hero picker form when lineup is not locked
+  if (!isModeLocked) {
+    if (!observedChoices) {
+      const unprobedAlert = document.createElement('div');
+      unprobedAlert.className = 'rounded-xl border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-900 flex items-start gap-2.5';
+      unprobedAlert.innerHTML = `
+        <span class="text-base leading-none">⚠️</span>
+        <div class="space-y-0.5">
+          <div class="font-bold">Không tìm thấy danh sách hero đề xuất từ gói tin game (encrypted draft payload).</div>
+          <div class="text-[11px] text-amber-800">Dữ liệu 15 hero đề xuất được mã hóa và xử lý nội bộ trong game client. Vui lòng chọn trực tiếp hero cho từng bước (Step 1 → Step 5) bên dưới để khóa đội hình và gửi lên server.</div>
+        </div>
+      `;
+      teamSection.append(unprobedAlert);
+    }
+
+    const pickerCard = document.createElement('div');
+    pickerCard.className = 'rounded-xl border border-blue-200 bg-blue-50/40 p-3.5 space-y-3';
+
+    // Step Switcher Toolbar
+    const pickerTop = document.createElement('div');
+    pickerTop.className = 'flex items-center justify-between flex-wrap gap-2';
+
+    const pickerTitle = document.createElement('div');
+    pickerTitle.className = 'text-xs font-bold text-slate-800 flex items-center gap-1.5';
+    pickerTitle.innerHTML = `<span>🎯 Chọn Hero cho <strong>Step ${activeDraftStep + 1}</strong>:</span> <span class="text-[11px] font-normal text-slate-500">(${isViewingAttack ? 'Đội hình Công' : 'Đội hình Thủ'})</span>`;
+    pickerTop.append(pickerTitle);
+
+    const stepPills = document.createElement('div');
+    stepPills.className = 'inline-flex rounded-lg border border-slate-200 bg-white p-0.5 gap-1';
+    for (let s = 0; s < 5; s++) {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      const isSActive = activeDraftStep === s;
+      const isSPicked = Boolean(currentPicks[s]);
+      pill.className = `px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${
+        isSActive ? 'bg-blue-600 text-white shadow-xs' :
+        isSPicked ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100' :
+        'text-slate-600 hover:bg-slate-100'
+      }`;
+      pill.textContent = isSPicked ? `Step ${s + 1} ✓` : `Step ${s + 1}`;
+      pill.addEventListener('click', () => {
+        activeDraftStep = s;
+        render();
+      });
+      stepPills.append(pill);
+    }
+    pickerTop.append(stepPills);
+    pickerCard.append(pickerTop);
+
+    // Filter toolbar: Search input + Role filter buttons
+    const filterRow = document.createElement('div');
+    filterRow.className = 'flex items-center gap-2 flex-wrap';
+
+    const searchInp = document.createElement('input');
+    searchInp.type = 'text';
+    searchInp.placeholder = 'Tìm kiếm hero theo tên, role, ID...';
+    searchInp.className = 'flex-1 min-w-[150px] px-2.5 py-1 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500';
+
+    const roleChips = document.createElement('div');
+    roleChips.className = 'flex items-center gap-1 flex-wrap';
+    const roles = ['all', 'Tank', 'Warrior', 'Marksman', 'Mage', 'Support', 'Control'];
+    roles.forEach(r => {
+      const rBtn = document.createElement('button');
+      rBtn.type = 'button';
+      const isActiveRole = selectedRoleFilter === r.toLowerCase();
+      rBtn.className = `px-2 py-0.5 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
+        isActiveRole ?
+        'bg-slate-800 text-white' :
+        'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+      }`;
+      rBtn.textContent = r === 'all' ? 'Tất cả' : r;
+      rBtn.addEventListener('click', () => {
+        selectedRoleFilter = r.toLowerCase();
+        renderHeroGrid(searchInp.value);
+      });
+      roleChips.append(rBtn);
+    });
+    filterRow.append(searchInp, roleChips);
+    pickerCard.append(filterRow);
+
+    // Hero List Grid
+    const heroGrid = document.createElement('div');
+    heroGrid.className = 'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[260px] overflow-y-auto p-1.5 border border-slate-200/80 rounded-lg bg-white';
+
+    const allHeroes = Object.entries(globalThis.hwaHelperHeroMetadata || {}).map(([id, meta]) => ({
+      id: Number(id),
+      meta,
+      snap: draftSnapshot(isViewingAttack ? 'attack' : 'defence', id)
+    })).filter(h => Number.isInteger(h.id) && h.id < 1000)
+      .sort((a, b) => (a.meta.name || '').localeCompare(b.meta.name || ''));
+
+    function renderHeroGrid(query = '') {
+      heroGrid.replaceChildren();
+      const q = query.trim().toLowerCase();
+      const filtered = allHeroes.filter(({ id: hId, meta }) => {
+        if (selectedRoleFilter !== 'all' && (meta.role || '').toLowerCase() !== selectedRoleFilter) {
+          return false;
+        }
+        if (!q) return true;
+        const name = (meta.name || globalThis.hwaHelperNameMap.hero(hId) || '').toLowerCase();
+        const role = (meta.role || '').toLowerCase();
+        return name.includes(q) || role.includes(q) || String(hId).includes(q);
+      });
+
+      if (filtered.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'col-span-full py-4 text-center text-xs text-slate-400';
+        emptyMsg.textContent = 'Không tìm thấy hero phù hợp với bộ lọc';
+        heroGrid.append(emptyMsg);
+        return;
+      }
+
+      for (const { id: hId, meta, snap } of filtered) {
+        const alreadyPickIdx = currentPicks.findIndex(p => p === hId);
+        const isAlreadyPickedInOtherStep = alreadyPickIdx !== -1 && alreadyPickIdx !== activeDraftStep;
+        const isCurrentStepPick = currentPicks[activeDraftStep] === hId;
+
+        const heroBtn = document.createElement('button');
+        heroBtn.type = 'button';
+        heroBtn.disabled = isAlreadyPickedInOtherStep;
+        heroBtn.className = `flex items-center gap-2 p-1.5 rounded-lg border text-left text-xs transition-all ${
+          isCurrentStepPick ?
+            'border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-400 font-bold' :
+          isAlreadyPickedInOtherStep ?
+            'border-slate-200 bg-slate-100/70 text-slate-400 cursor-not-allowed opacity-60' :
+            'border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/60 cursor-pointer'
+        }`;
+
+        const avPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${hId}.webp` : null);
+        const glow = starGlowClass(snap?.star, false);
+        if (avPath) {
+          const img = document.createElement('img');
+          img.src = avPath;
+          img.className = `size-7 rounded-full object-cover shrink-0 ${glow}`;
+          heroBtn.append(img);
+        } else {
+          heroBtn.append(createInitialsBadge(meta.name || `#${hId}`, meta.faction, false));
+        }
+
+        const textCol = document.createElement('div');
+        textCol.className = 'min-w-0 flex-1';
+        const nameRow = document.createElement('div');
+        nameRow.className = 'truncate text-[11px] font-bold text-slate-800';
+        nameRow.textContent = meta.name || globalThis.hwaHelperNameMap.hero(hId) || `#${hId}`;
+        textCol.append(nameRow);
+
+        const subRow = document.createElement('div');
+        subRow.className = 'text-[9px] text-slate-500 truncate';
+        if (isAlreadyPickedInOtherStep) {
+          subRow.textContent = `Đã chọn (Step ${alreadyPickIdx + 1})`;
+          subRow.className = 'text-[9px] text-amber-700 font-medium truncate';
+        } else if (isCurrentStepPick) {
+          subRow.textContent = '✓ Đang chọn';
+          subRow.className = 'text-[9px] text-emerald-700 font-bold truncate';
+        } else {
+          subRow.textContent = meta.role || (snap?.star ? `★${snap.star}` : '');
+        }
+        textCol.append(subRow);
+        heroBtn.append(textCol);
+
+        if (!isAlreadyPickedInOtherStep) {
+          heroBtn.addEventListener('click', () => {
+            currentPicks[activeDraftStep] = hId;
+            const nextEmpty = currentPicks.findIndex((p) => !p);
+            if (nextEmpty !== -1) {
+              activeDraftStep = nextEmpty;
+            }
+            render();
+          });
+        }
+
+        heroGrid.append(heroBtn);
+      }
+    }
+
+    searchInp.addEventListener('input', (e) => renderHeroGrid(e.target.value));
+    renderHeroGrid('');
+    pickerCard.append(heroGrid);
+
+    // Bottom Action Bar: Clear step pick + Submit Button
+    const bottomBar = document.createElement('div');
+    bottomBar.className = 'flex items-center justify-between flex-wrap gap-2 pt-1 text-xs';
+
+    const clearBtnsGroup = document.createElement('div');
+    clearBtnsGroup.className = 'flex items-center gap-2';
+
+    if (currentPicks[activeDraftStep]) {
+      const clearStepBtn = document.createElement('button');
+      clearStepBtn.type = 'button';
+      clearStepBtn.className = 'px-2.5 py-1 rounded-md text-[11px] text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 cursor-pointer';
+      clearStepBtn.textContent = `Xóa chọn Step ${activeDraftStep + 1}`;
+      clearStepBtn.addEventListener('click', () => {
+        currentPicks[activeDraftStep] = null;
+        render();
+      });
+      clearBtnsGroup.append(clearStepBtn);
+    }
+
+    if (currentPicks.some(Boolean)) {
+      const resetAllBtn = document.createElement('button');
+      resetAllBtn.type = 'button';
+      resetAllBtn.className = 'px-2.5 py-1 rounded-md text-[11px] text-slate-500 hover:text-red-700 hover:bg-red-50 cursor-pointer';
+      resetAllBtn.textContent = 'Reset 5 bước';
+      resetAllBtn.addEventListener('click', () => {
+        if (isViewingAttack) localDraftAttackPicks = [null, null, null, null, null];
+        else localDraftDefencePicks = [null, null, null, null, null];
+        activeDraftStep = 0;
+        render();
+      });
+      clearBtnsGroup.append(resetAllBtn);
+    }
+    bottomBar.append(clearBtnsGroup);
+
+    if (val.valid && isActivelyDrafting) {
+      const submitDirectBtn = document.createElement('button');
+      submitDirectBtn.type = 'button';
+      submitDirectBtn.className = popupRpcEnabled ?
+        'px-4 py-1.5 rounded-lg bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm cursor-pointer' :
+        'px-4 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-400 cursor-not-allowed border border-slate-200';
+      submitDirectBtn.disabled = !popupRpcEnabled;
+      submitDirectBtn.textContent = popupRpcEnabled ?
+        `✓ Khóa & Gửi ${isViewingAttack ? 'Đội hình Công' : 'Đội hình Thủ'} (5/5 Hero)` :
+        'Bật Popup RPC để gửi';
+      if (popupRpcEnabled) {
+        submitDirectBtn.addEventListener('click', () => {
+          submitDirectBtn.disabled = true;
+          submitDirectBtn.textContent = 'Submitting...';
+          const action = isViewingAttack ? 'saveAttack' : 'saveDefence';
+          chrome.runtime?.sendMessage?.({ kind: 'draft-action', action, heroes: val.heroes }, (response) => {
+            if (!response?.ok) {
+              submitDirectBtn.disabled = false;
+              submitDirectBtn.textContent = response?.error || 'Could not submit lineup';
+            } else if (response.queued) submitDirectBtn.textContent = 'Queued for next game RPC...';
+            else setTimeout(render, 500);
+          });
+        });
+      }
+      bottomBar.append(submitDirectBtn);
+    }
+
+    pickerCard.append(bottomBar);
+    teamSection.append(pickerCard);
+  }
+
   container.append(teamSection);
 
   // Locked mode status notification if current phase is locked
@@ -2432,7 +2677,7 @@ function renderDraft(cache, target = view) {
       <div class="text-sm font-bold text-emerald-900 flex items-center justify-center gap-1.5">
         <span>✓</span> <span>${isViewingAttack ? 'Attack' : 'Defense'} Lineup locked!</span>
       </div>
-      <div class="text-xs text-emerald-700">The 5 heroes for this stage are locked. The candidate matrix below remains accessible for strategic calculation and team planning.</div>
+      <div class="text-xs text-emerald-700">The 5 heroes for this stage are locked.</div>
     `;
     container.append(lockedCard);
   } else if (!draft.matchId && !draft.defenceHeroes?.length && !draft.attackHeroes?.length) {
@@ -2440,14 +2685,14 @@ function renderDraft(cache, target = view) {
     idleCard.className = 'rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-center space-y-1.5';
     idleCard.innerHTML = `
       <div class="text-sm font-bold text-slate-800">Legend Draft: Not in match</div>
-      <div class="text-xs text-slate-500 max-w-md mx-auto">Start a Legend Draft match in Hero Wars to activate live assistance. You can also review candidate stats and customize hero choices below for calculation.</div>
+      <div class="text-xs text-slate-500 max-w-md mx-auto">Start a Legend Draft match in Hero Wars to activate live assistance. You can also pick heroes for each step below to test draft lineups.</div>
     `;
     container.append(idleCard);
   }
 
   // 5. Full 15-Hero Draft Grid (5 Columns x 3 Rows)
-  // Always rendered during active drafting and preparation to ensure all 15 heroes are available for calculation
-  if (!isMatchCompleted || observedChoices) {
+  // Only rendered when choices were recorded (e.g. historical / confirmed match data)
+  if (observedChoices) {
     const candidatesMode = isViewingAttack ? 'attack' : 'defense';
     const currentCandidates = observedChoices?.[candidatesMode] || draftStepCandidates[candidatesMode] ||
       globalThis.hwaHelperPopupData.defaultDraftCandidates(candidatesMode);

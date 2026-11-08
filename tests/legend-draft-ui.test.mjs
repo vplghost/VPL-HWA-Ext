@@ -182,25 +182,25 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   // Verify status contains step count during active defense drafting
   assert.match(statusEl.textContent, /Selected 0\/5 steps/);
 
-  // Check that all 15 heroes across 5 columns x 3 rows are rendered at once
-  assert.match(viewEl.textContent, /Manual Candidate Planner/);
+  // When draft candidates cannot be auto-probed, 15-hero planner matrix is NOT rendered
+  assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
+  // Instead, error notification and step-by-step picker are shown
+  assert.match(viewEl.textContent, /Không tìm thấy danh sách hero đề xuất/);
   assert.match(viewEl.textContent, /Step 1/);
   assert.match(viewEl.textContent, /Step 5/);
-  assert.match(viewEl.textContent, /Choice not recorded/);
-  assert.doesNotMatch(viewEl.textContent, /Wodryn|Qing Mao/);
 
   // Check candidates helper returns 5 steps of 3 choices
   const defaultCandidates = context.hwaHelperPopupData.defaultDraftCandidates('defense');
   assert.equal(defaultCandidates.length, 5);
   assert.equal(defaultCandidates[0].length, 3);
 
-  // Test in-game pick sync: when defenceHeroes has 5 heroes and saveDefence was performed, it renders locked status and retains candidate matrix for calculation
+  // Test in-game pick sync: when defenceHeroes has 5 heroes and saveDefence was performed, it renders locked status
   sampleCache.legendDraftStatus.data.defenceHeroes = [78, 76, 25, 37, 69];
   sampleCache.legendDraftStatus.data.lastPickAction = 'saveDefence';
   context.renderDraft(sampleCache);
   assert.match(statusEl.textContent, /Defense lineup locked/);
   assert.match(viewEl.textContent, /Lineup successfully locked/);
-  assert.match(viewEl.textContent, /Manual Candidate Planner/);
+  assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
 });
 
 test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => {
@@ -235,8 +235,9 @@ test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => 
   assert.match(viewEl.textContent, /Opponent Defense Lineup/);
   assert.match(viewEl.textContent, /Cleaver/);
   assert.match(viewEl.textContent, /Attack Draft/);
-  // While actively drafting attack, candidate matrix is shown
-  assert.match(viewEl.textContent, /Manual Candidate Planner/);
+  // When candidates cannot be auto-probed, 15-hero planner is replaced by error notice
+  assert.match(viewEl.textContent, /Không tìm thấy danh sách hero đề xuất/);
+  assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
 });
 
 test('Legend Draft UI supports defense/attack review and hides pick slots after match completion', async () => {
@@ -360,7 +361,7 @@ test('Legend Draft UI shows confirmed stars without account hero power', async (
   assert.doesNotMatch(viewEl.textContent, /120,500 pwr|Team Power/);
 });
 
-test('Legend Draft UI does NOT lock defense at match start and renders 15 candidate matrix even if old match data previously existed', async () => {
+test('Legend Draft UI does NOT lock defense at match start and shows step picker when candidates cannot be auto-probed', async () => {
   const viewEl = new MockElement('div');
   const statusEl = new MockElement('div');
   const searchEl = new MockElement('input');
@@ -391,8 +392,9 @@ test('Legend Draft UI does NOT lock defense at match start and renders 15 candid
   assert.doesNotMatch(viewEl.textContent, /Defense Lineup locked!/);
   assert.doesNotMatch(statusEl.textContent, /Defense lineup locked/);
 
-  // 15 Candidate Heroes Matrix MUST be rendered
-  assert.match(viewEl.textContent, /Manual Candidate Planner/);
+  // 15 Candidate Heroes Matrix MUST NOT be rendered; warning and step picker are shown
+  assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
+  assert.match(viewEl.textContent, /Không tìm thấy danh sách hero đề xuất/);
   assert.match(viewEl.textContent, /Step 1/);
   assert.match(viewEl.textContent, /Step 5/);
 });
@@ -428,7 +430,8 @@ test('Legend Draft dialog preserves tab content and status on open and refresh',
 
   const draftModalBody = context.document.querySelector('#draft-modal-body');
   assert.ok(draftModalBody.children.length > 0, 'Modal body should contain rendered draft');
-  assert.match(draftModalBody.textContent, /Manual Candidate Planner/);
+  assert.match(draftModalBody.textContent, /Không tìm thấy danh sách hero đề xuất/);
+  assert.doesNotMatch(draftModalBody.textContent, /Manual Candidate Planner/);
   context.renderDraft(activeCache, draftModalBody);
   assert.equal(viewEl.children[0], sentinel);
   assert.equal(statusEl.textContent, 'Active tab status');

@@ -24,7 +24,11 @@ test('popup.css imports theme.css and defines @variant dark', async () => {
   assert.ok(themeCss.includes('.dark .bg-teal-100'), 'theme.css should style .dark .bg-teal-100');
   assert.ok(themeCss.includes('.dark .text-teal-800'), 'theme.css should style .dark .text-teal-800');
   assert.ok(themeCss.includes('.dark .bg-emerald-100'), 'theme.css should style .dark .bg-emerald-100');
+  assert.ok(themeCss.includes('.dark [class*="bg-emerald-50/"]'), 'theme.css should style slash-opacity emerald backgrounds');
+  assert.ok(themeCss.includes('.dark .border-emerald-200'), 'theme.css should style dark emerald borders');
   assert.ok(themeCss.includes('.dark .bg-amber-100'), 'theme.css should style .dark .bg-amber-100');
+  assert.ok(themeCss.includes('.dark [class*="bg-amber-50/"]'), 'theme.css should style slash-opacity amber backgrounds');
+  assert.ok(themeCss.includes('.dark .border-amber-200'), 'theme.css should style dark amber borders');
   assert.ok(themeCss.includes('.dark .bg-orange-50'), 'theme.css should style .dark .bg-orange-50');
 });
 
