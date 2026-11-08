@@ -1339,8 +1339,16 @@
               level: queue.level ?? queue.nextLevel,
               queueNumber: queue.queueNumber ?? index
             }));
-          return [{ key: call.feature === 'building' ? 'buildingStatus' : 'researchStatus',
-            method: call.name, feature: call.feature, group: 'header', data: { queues },
+          const isBuilding = call.feature === 'building';
+          const buildings = isBuilding && Array.isArray(result?.response?.buildings) ? result.response.buildings : undefined;
+          const completedResearches = !isBuilding && Array.isArray(result?.response?.completedResearches) ? result.response.completedResearches : undefined;
+          return [{ key: isBuilding ? 'buildingStatus' : 'researchStatus',
+            method: call.name, feature: call.feature, group: 'header',
+            data: {
+              queues,
+              ...(buildings ? { buildings } : {}),
+              ...(completedResearches ? { completedResearches } : {})
+            },
             updatedAt: record.timestamp }];
         }
         if (key === 'startConstruction:building' && result?.response &&
@@ -3234,6 +3242,7 @@
             next[entry.key]?.updatedAt === entry.updatedAt) continue;
         if (entry.key === 'buildingStatus' && entry.data.action) {
           const queues = [...(next.buildingStatus?.data?.queues || [])];
+          let buildings = [...(next.buildingStatus?.data?.buildings || [])];
           if (entry.data.action === 'start') {
             const queue = entry.data.queue;
             const index = queues.findIndex((item) =>
@@ -3243,15 +3252,27 @@
             else queues.push(queue);
           } else {
             const index = queues.findIndex((item) => item.buildingId === entry.data.buildingId);
-            if (index >= 0) queues.splice(index, 1);
-            else if (queues.length === 1) queues.length = 0;
+            if (index >= 0) {
+              const q = queues[index];
+              if (q?.level) {
+                const bIdx = buildings.findIndex((b) => b.buildingId === entry.data.buildingId);
+                if (bIdx >= 0) buildings[bIdx] = { ...buildings[bIdx], level: q.level };
+                else buildings.push({ buildingId: entry.data.buildingId, level: q.level });
+              }
+              queues.splice(index, 1);
+            } else if (queues.length === 1) queues.length = 0;
           }
-          entry.data = { queues };
+          entry.data = { queues, buildings };
+        } else if (entry.key === 'buildingStatus' && !entry.data.action) {
+          if (!entry.data.buildings && next.buildingStatus?.data?.buildings) {
+            entry.data.buildings = next.buildingStatus.data.buildings;
+          }
         }
         if (entry.key === 'researchStatus' && entry.data.action &&
             next[entry.key]?.updatedAt === entry.updatedAt) continue;
         if (entry.key === 'researchStatus' && entry.data.action) {
           const queues = [...(next.researchStatus?.data?.queues || [])];
+          let completedResearches = [...(next.researchStatus?.data?.completedResearches || [])];
           if (entry.data.action === 'start') {
             const queue = entry.data.queue;
             const index = queues.findIndex((item) =>
@@ -3261,10 +3282,21 @@
             else queues.push(queue);
           } else {
             const index = queues.findIndex((item) => item.researchId === entry.data.researchId);
-            if (index >= 0) queues.splice(index, 1);
-            else if (queues.length === 1) queues.length = 0;
+            if (index >= 0) {
+              const q = queues[index];
+              if (q?.level) {
+                const rIdx = completedResearches.findIndex((r) => r.researchId === entry.data.researchId);
+                if (rIdx >= 0) completedResearches[rIdx] = { ...completedResearches[rIdx], level: q.level };
+                else completedResearches.push({ researchId: entry.data.researchId, level: q.level });
+              }
+              queues.splice(index, 1);
+            } else if (queues.length === 1) queues.length = 0;
           }
-          entry.data = { queues };
+          entry.data = { queues, completedResearches };
+        } else if (entry.key === 'researchStatus' && !entry.data.action) {
+          if (!entry.data.completedResearches && next.researchStatus?.data?.completedResearches) {
+            entry.data.completedResearches = next.researchStatus.data.completedResearches;
+          }
         }
         if (entry.key === 'resource:energy' && !Number.isFinite(entry.data.cap) &&
             Number.isFinite(next[entry.key]?.data?.cap)) {

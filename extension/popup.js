@@ -542,7 +542,26 @@ function renderMarches(cache, wrap = document.querySelector('#marches')) {
 function refreshTimed() {
   const now = Date.now();
   for (const countdown of document.querySelectorAll('[data-experimental-until]')) {
-    countdown.textContent = ` · ${Math.max(0, Math.ceil((Number(countdown.dataset.experimentalUntil) - now) / 1000))}s`;
+    const until = Number(countdown.dataset.experimentalUntil);
+    const diffSec = Math.max(0, Math.ceil((until - now) / 1000));
+    if (countdown.dataset.countdownFormat === 'hms') {
+      const h = Math.floor(diffSec / 3600);
+      const m = Math.floor((diffSec % 3600) / 60);
+      const s = diffSec % 60;
+      countdown.textContent = h > 0
+        ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+        : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    } else {
+      countdown.textContent = ` · ${diffSec}s`;
+    }
+  }
+  for (const bar of document.querySelectorAll('[data-progress-bar]')) {
+    const start = Number(bar.dataset.progressStart);
+    const duration = Number(bar.dataset.progressDuration);
+    if (Number.isFinite(start) && Number.isFinite(duration) && duration > 0) {
+      const pct = Math.min(100, Math.max(0, ((now - start) / duration) * 100));
+      bar.style.width = `${pct.toFixed(1)}%`;
+    }
   }
   const marches = currentCache.marchStatus?.data?.marches || [];
   const marchesWrap = document.querySelector('#marches');
@@ -5575,6 +5594,712 @@ async function experimentalRpc(calls, message) {
   render();
 }
 
+let buildingSearchQuery = '';
+let researchSearchQuery = '';
+let researchFilterTab = 'all';
+
+function formatRemainingHms(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return '00:00';
+  const totalSec = Math.ceil(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function renderBuildingDialog(cache) {
+  const host = document.querySelector('#building-dialog-body');
+  const statusWrap = document.querySelector('#building-dialog-status');
+  if (!host) return;
+  host.replaceChildren();
+  statusWrap?.replaceChildren();
+
+  const now = Date.now();
+  const getBuildingName = (id) => globalThis.hwaHelperNameMap?.building?.(id) || (id ? `Building #${id}` : 'Building');
+  const rawQueues = cache?.buildingStatus?.data?.queues || [];
+  const activeQueues = rawQueues.filter((q) =>
+    Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now
+  );
+
+  // 1. Title bar status
+  if (statusWrap) {
+    if (activeQueues.length > 0) {
+      const q = activeQueues[0];
+      const name = getBuildingName(q.buildingId);
+      const lvl = q.level ? ` Lv. ${q.level}` : '';
+      const rem = (q.startDate + q.durationMs) - now;
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+      badge.innerHTML = `<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>Active: <span class="truncate max-w-[140px]">${name}</span>${lvl} · <span data-experimental-until="${q.startDate + q.durationMs}" data-countdown-format="hms">${formatRemainingHms(rem)}</span>`;
+      statusWrap.append(badge);
+    } else {
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+      badge.innerHTML = '<span class="size-1.5 rounded-full bg-emerald-500"></span>Idle';
+      statusWrap.append(badge);
+    }
+  }
+
+  // Section 1: Active Construction Queue
+  const queueSection = document.createElement('section');
+  queueSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
+  const queueTitle = document.createElement('h3');
+  queueTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2';
+  queueTitle.innerHTML = '<span>🏗️</span> Active Construction Queue';
+  queueSection.append(queueTitle);
+
+  if (activeQueues.length > 0) {
+    const queueList = document.createElement('div');
+    queueList.className = 'space-y-3';
+    for (const q of activeQueues) {
+      const card = document.createElement('div');
+      card.className = 'rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/20';
+      const finishTs = q.startDate + q.durationMs;
+      const remMs = finishTs - now;
+      const progress = Math.min(100, Math.max(0, ((now - q.startDate) / q.durationMs) * 100));
+      const finishDate = new Date(finishTs);
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-lg">🏗️</span>
+            <div>
+              <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">${getBuildingName(q.buildingId)}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">Queue #${q.queueNumber ?? 0} · Building ID: ${q.buildingId}</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+              Target Lv. ${q.level ?? '?'}
+            </span>
+            <div class="text-xs font-mono font-bold text-amber-800 dark:text-amber-300 mt-1">
+              <span data-experimental-until="${finishTs}" data-countdown-format="hms">${formatRemainingHms(remMs)}</span> remaining
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="flex justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
+            <span>Progress: ${progress.toFixed(1)}%</span>
+            <span>Est. finish: ${finishDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+          </div>
+          <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+            <div data-progress-bar="" data-progress-start="${q.startDate}" data-progress-duration="${q.durationMs}" class="bg-amber-500 h-full rounded-full transition-all" style="width: ${progress.toFixed(1)}%"></div>
+          </div>
+        </div>
+      `;
+      queueList.append(card);
+    }
+    queueSection.append(queueList);
+  } else {
+    const emptyBox = document.createElement('div');
+    emptyBox.className = 'flex items-center gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400';
+    emptyBox.innerHTML = '<span class="text-xl">✅</span><div><div class="font-semibold text-slate-700 dark:text-slate-300">Builder is currently idle</div><div>No construction in progress. Ready for new building upgrades.</div></div>';
+    queueSection.append(emptyBox);
+  }
+  host.append(queueSection);
+
+  // Extract known city buildings
+  const rawBuildings = cache?.buildingStatus?.data?.buildings || [];
+  const buildingMap = new Map();
+  for (const b of rawBuildings) {
+    const bId = Number(b.buildingId ?? b.id);
+    if (Number.isFinite(bId)) {
+      buildingMap.set(bId, {
+        id: bId,
+        level: b.level ?? 1,
+        initialBuildDate: b.initialBuildDate,
+        isBuilt: true,
+        isUpgrading: false,
+        nextLevel: (b.level ?? 1) + 1
+      });
+    }
+  }
+
+  // Flag upgrading buildings
+  for (const q of activeQueues) {
+    const bId = Number(q.buildingId);
+    if (buildingMap.has(bId)) {
+      const item = buildingMap.get(bId);
+      item.isUpgrading = true;
+      item.nextLevel = q.level ?? (item.level + 1);
+    } else {
+      buildingMap.set(bId, {
+        id: bId,
+        level: (q.level ? q.level - 1 : 1),
+        isBuilt: true,
+        isUpgrading: true,
+        nextLevel: q.level ?? 2
+      });
+    }
+  }
+
+  // Also include known dictionary for unbuilt candidates
+  const allDict = globalThis.hwaHelperNameData?.names?.building || {};
+  for (const key of Object.keys(allDict)) {
+    const bId = Number(key);
+    if (!buildingMap.has(bId)) {
+      buildingMap.set(bId, {
+        id: bId,
+        level: 0,
+        isBuilt: false,
+        isUpgrading: false,
+        nextLevel: 1
+      });
+    }
+  }
+
+  const allBuildings = Array.from(buildingMap.values());
+  const builtBuildings = allBuildings.filter((b) => b.isBuilt);
+  const nextUpgradable = allBuildings
+    .filter((b) => !b.isUpgrading && (b.isBuilt || b.level === 0))
+    .sort((a, b) => (b.level - a.level) || (a.id - b.id));
+
+  // Section 2: Next Upgradable Buildings
+  const nextSection = document.createElement('section');
+  nextSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
+  const nextTitle = document.createElement('h3');
+  nextTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-between';
+  nextTitle.innerHTML = `<span class="flex items-center gap-2"><span>⚡</span> Next Upgradable Buildings</span><span class="text-2xs font-normal text-slate-400">${nextUpgradable.length} ready</span>`;
+  nextSection.append(nextTitle);
+
+  const nextIntro = document.createElement('p');
+  nextIntro.className = 'text-xs text-slate-500 dark:text-slate-400 mb-3';
+  nextIntro.textContent = activeQueues.length > 0
+    ? 'Builder queue is currently occupied. Once complete, the following buildings can be upgraded next:'
+    : 'Builder queue is available. The following buildings can be upgraded next:';
+  nextSection.append(nextIntro);
+
+  const nextGrid = document.createElement('div');
+  nextGrid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5';
+  const topCandidates = nextUpgradable.slice(0, 9);
+  if (topCandidates.length > 0) {
+    for (const b of topCandidates) {
+      const card = document.createElement('div');
+      card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-amber-200 hover:bg-amber-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-amber-900/50';
+      const name = getBuildingName(b.id);
+      card.innerHTML = `
+        <div class="min-w-0">
+          <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
+          <div class="text-2xs text-slate-500 dark:text-slate-400">ID: ${b.id}</div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+            ${b.isBuilt ? `Lv. ${b.level} ➔ ${b.nextLevel}` : 'Build Lv. 1'}
+          </div>
+        </div>
+      `;
+      nextGrid.append(card);
+    }
+  } else {
+    const emptyP = document.createElement('p');
+    emptyP.className = 'text-xs text-slate-400 italic';
+    emptyP.textContent = 'No upgradable buildings found.';
+    nextGrid.append(emptyP);
+  }
+  nextSection.append(nextGrid);
+  host.append(nextSection);
+
+  // Section 3: All City Buildings Directory
+  const dirSection = document.createElement('section');
+  dirSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
+  const dirHeader = document.createElement('div');
+  dirHeader.className = 'flex items-center justify-between gap-3 flex-wrap mb-3';
+  dirHeader.innerHTML = `
+    <div>
+      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <span>🏛️</span> All City Buildings
+      </h3>
+      <p id="building-count-subtitle" class="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">${builtBuildings.length} built buildings</p>
+    </div>
+  `;
+
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'w-full sm:w-64';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'search';
+  searchInput.id = 'building-search-input';
+  searchInput.placeholder = 'Search buildings or ID...';
+  searchInput.value = buildingSearchQuery;
+  searchInput.className = 'h-8 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500';
+
+  searchWrap.append(searchInput);
+  dirHeader.append(searchWrap);
+  dirSection.append(dirHeader);
+
+  const dirGrid = document.createElement('div');
+  dirGrid.id = 'building-grid-list';
+  dirGrid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1';
+
+  function updateBuildingGrid() {
+    dirGrid.replaceChildren();
+    const query = buildingSearchQuery.toLowerCase();
+    const filtered = allBuildings
+      .filter((b) => {
+        if (!query) return b.isBuilt;
+        const name = getBuildingName(b.id).toLowerCase();
+        const idStr = String(b.id);
+        return name.includes(query) || idStr.includes(query);
+      })
+      .sort((a, b) => {
+        if (a.isUpgrading !== b.isUpgrading) return a.isUpgrading ? -1 : 1;
+        if (a.isBuilt !== b.isBuilt) return a.isBuilt ? -1 : 1;
+        return (b.level - a.level) || (a.id - b.id);
+      });
+
+    const sub = dirSection.querySelector('#building-count-subtitle');
+    if (sub) {
+      sub.textContent = query
+        ? `${filtered.length} matching "${query}" (${builtBuildings.length} built)`
+        : `${builtBuildings.length} built buildings`;
+    }
+
+    if (filtered.length > 0) {
+      for (const b of filtered) {
+        const card = document.createElement('div');
+        card.className = `flex items-center justify-between gap-2 rounded-lg border p-2.5 text-xs transition-colors ${
+          b.isUpgrading
+            ? 'border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/30'
+            : b.isBuilt
+              ? 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+              : 'border-dashed border-slate-200 bg-slate-50/40 text-slate-400 dark:border-slate-800 dark:bg-slate-900/40'
+        }`;
+        const name = getBuildingName(b.id);
+        const statusBadge = b.isUpgrading
+          ? '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"><span class="size-1 rounded-full bg-amber-500 animate-pulse"></span>Upgrading</span>'
+          : b.isBuilt
+            ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Built</span>'
+            : '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Unbuilt</span>';
+
+        card.innerHTML = `
+          <div class="min-w-0">
+            <div class="font-semibold ${b.isBuilt ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'} truncate" title="${name}">${name}</div>
+            <div class="text-2xs text-slate-400 dark:text-slate-500">ID: ${b.id}${b.initialBuildDate ? ` · Built ${new Date(b.initialBuildDate * 1000).toLocaleDateString()}` : ''}</div>
+          </div>
+          <div class="text-right shrink-0 space-y-1">
+            <div class="font-bold text-xs ${b.isBuilt ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}">
+              ${b.isBuilt ? `Lv. ${b.level}` : '—'}
+            </div>
+            <div>${statusBadge}</div>
+          </div>
+        `;
+        dirGrid.append(card);
+      }
+    } else {
+      const emptyBox = document.createElement('div');
+      emptyBox.className = 'col-span-full py-8 text-center text-xs text-slate-400';
+      emptyBox.textContent = query
+        ? `No buildings matching "${query}"`
+        : 'No city buildings recorded yet. Snapshots update as you play.';
+      dirGrid.append(emptyBox);
+    }
+  }
+
+  searchInput.addEventListener('input', (e) => {
+    buildingSearchQuery = e.target.value.trim();
+    updateBuildingGrid();
+  });
+
+  updateBuildingGrid();
+  dirSection.append(dirGrid);
+  host.append(dirSection);
+}
+
+function renderResearchDialog(cache) {
+  const host = document.querySelector('#research-dialog-body');
+  const statusWrap = document.querySelector('#research-dialog-status');
+  if (!host) return;
+  host.replaceChildren();
+  statusWrap?.replaceChildren();
+
+  const now = Date.now();
+  const getResearchName = (id) => globalThis.hwaHelperNameMap?.research?.(id) || (id ? `Research #${id}` : 'Research');
+  const rawQueues = cache?.researchStatus?.data?.queues || [];
+  const activeQueues = rawQueues.filter((q) =>
+    Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now
+  );
+
+  // 1. Title bar status
+  if (statusWrap) {
+    if (activeQueues.length > 0) {
+      const q = activeQueues[0];
+      const name = getResearchName(q.researchId);
+      const lvl = q.level ? ` Lv. ${q.level}` : '';
+      const rem = (q.startDate + q.durationMs) - now;
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300';
+      badge.innerHTML = `<span class="size-1.5 rounded-full bg-purple-500 animate-pulse"></span>Active: <span class="truncate max-w-[140px]">${name}</span>${lvl} · <span data-experimental-until="${q.startDate + q.durationMs}" data-countdown-format="hms">${formatRemainingHms(rem)}</span>`;
+      statusWrap.append(badge);
+    } else {
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+      badge.innerHTML = '<span class="size-1.5 rounded-full bg-emerald-500"></span>Idle';
+      statusWrap.append(badge);
+    }
+  }
+
+  // Section 1: Active Research Queue
+  const queueSection = document.createElement('section');
+  queueSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
+  const queueTitle = document.createElement('h3');
+  queueTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2';
+  queueTitle.innerHTML = '<span>🔬</span> Active Research Queue';
+  queueSection.append(queueTitle);
+
+  if (activeQueues.length > 0) {
+    const queueList = document.createElement('div');
+    queueList.className = 'space-y-3';
+    for (const q of activeQueues) {
+      const card = document.createElement('div');
+      card.className = 'rounded-lg border border-purple-200 bg-purple-50/60 p-3.5 dark:border-purple-900/50 dark:bg-purple-950/20';
+      const finishTs = q.startDate + q.durationMs;
+      const remMs = finishTs - now;
+      const progress = Math.min(100, Math.max(0, ((now - q.startDate) / q.durationMs) * 100));
+      const finishDate = new Date(finishTs);
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-lg">🔬</span>
+            <div>
+              <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">${getResearchName(q.researchId)}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">Queue #${q.queueNumber ?? 0} · Research ID: ${q.researchId}</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-purple-200 text-purple-900 dark:bg-purple-900/60 dark:text-purple-200">
+              Target Lv. ${q.level ?? '?'}
+            </span>
+            <div class="text-xs font-mono font-bold text-purple-800 dark:text-purple-300 mt-1">
+              <span data-experimental-until="${finishTs}" data-countdown-format="hms">${formatRemainingHms(remMs)}</span> remaining
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="flex justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
+            <span>Progress: ${progress.toFixed(1)}%</span>
+            <span>Est. finish: ${finishDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+          </div>
+          <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+            <div data-progress-bar="" data-progress-start="${q.startDate}" data-progress-duration="${q.durationMs}" class="bg-purple-500 h-full rounded-full transition-all" style="width: ${progress.toFixed(1)}%"></div>
+          </div>
+        </div>
+      `;
+      queueList.append(card);
+    }
+    queueSection.append(queueList);
+  } else {
+    const emptyBox = document.createElement('div');
+    emptyBox.className = 'flex items-center gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400';
+    emptyBox.innerHTML = '<span class="text-xl">✅</span><div><div class="font-semibold text-slate-700 dark:text-slate-300">Academy is currently idle</div><div>No research in progress. Ready for new technology research.</div></div>';
+    queueSection.append(emptyBox);
+  }
+  host.append(queueSection);
+
+  // Extract completed researches
+  const rawCompleted = cache?.researchStatus?.data?.completedResearches || [];
+  const researchMap = new Map();
+  for (const r of rawCompleted) {
+    const rId = Number(r.researchId ?? r.id);
+    if (Number.isFinite(rId)) {
+      researchMap.set(rId, {
+        id: rId,
+        level: r.level ?? 1,
+        isCompleted: true,
+        isResearching: false,
+        nextLevel: (r.level ?? 1) + 1
+      });
+    }
+  }
+
+  // Flag active research
+  for (const q of activeQueues) {
+    const rId = Number(q.researchId);
+    if (researchMap.has(rId)) {
+      const item = researchMap.get(rId);
+      item.isResearching = true;
+      item.nextLevel = q.level ?? (item.level + 1);
+    } else {
+      researchMap.set(rId, {
+        id: rId,
+        level: (q.level ? q.level - 1 : 0),
+        isCompleted: false,
+        isResearching: true,
+        nextLevel: q.level ?? 1
+      });
+    }
+  }
+
+  // Also include known dictionary
+  const allDict = globalThis.hwaHelperNameData?.names?.research || {};
+  for (const key of Object.keys(allDict)) {
+    const rId = Number(key);
+    if (!researchMap.has(rId)) {
+      researchMap.set(rId, {
+        id: rId,
+        level: 0,
+        isCompleted: false,
+        isResearching: false,
+        nextLevel: 1
+      });
+    }
+  }
+
+  const allResearches = Array.from(researchMap.values());
+  const completedList = allResearches.filter((r) => r.isCompleted);
+  const nextAvailable = allResearches
+    .filter((r) => !r.isResearching && (r.isCompleted || r.level === 0))
+    .sort((a, b) => (b.level - a.level) || (a.id - b.id));
+
+  // Section 2: Next Available Research
+  const nextSection = document.createElement('section');
+  nextSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
+  const nextTitle = document.createElement('h3');
+  nextTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-between';
+  nextTitle.innerHTML = `<span class="flex items-center gap-2"><span>⚡</span> Next Research Candidates</span><span class="text-2xs font-normal text-slate-400">${nextAvailable.length} available</span>`;
+  nextSection.append(nextTitle);
+
+  const nextIntro = document.createElement('p');
+  nextIntro.className = 'text-xs text-slate-500 dark:text-slate-400 mb-3';
+  nextIntro.textContent = activeQueues.length > 0
+    ? 'Academy queue is currently occupied. Once complete, the following technologies can be researched or upgraded next:'
+    : 'Academy queue is available. The following technologies can be researched or upgraded next:';
+  nextSection.append(nextIntro);
+
+  const nextGrid = document.createElement('div');
+  nextGrid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5';
+  const topCandidates = nextAvailable.slice(0, 9);
+  if (topCandidates.length > 0) {
+    for (const r of topCandidates) {
+      const card = document.createElement('div');
+      card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-purple-200 hover:bg-purple-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-purple-900/50';
+      const name = getResearchName(r.id);
+      card.innerHTML = `
+        <div class="min-w-0">
+          <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
+          <div class="text-2xs text-slate-500 dark:text-slate-400">ID: ${r.id}</div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
+            ${r.isCompleted ? `Lv. ${r.level} ➔ ${r.nextLevel}` : 'Research Lv. 1'}
+          </div>
+        </div>
+      `;
+      nextGrid.append(card);
+    }
+  } else {
+    const emptyP = document.createElement('p');
+    emptyP.className = 'text-xs text-slate-400 italic';
+    emptyP.textContent = 'No research candidates found.';
+    nextGrid.append(emptyP);
+  }
+  nextSection.append(nextGrid);
+  host.append(nextSection);
+
+  // Section 3: Personal Research Directory
+  const dirSection = document.createElement('section');
+  dirSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
+  const dirHeader = document.createElement('div');
+  dirHeader.className = 'flex items-center justify-between gap-3 flex-wrap mb-3';
+  dirHeader.innerHTML = `
+    <div>
+      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <span>📚</span> Personal Research Directory
+      </h3>
+      <p id="research-count-subtitle" class="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">${completedList.length} completed technologies</p>
+    </div>
+  `;
+
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'w-full sm:w-64';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'search';
+  searchInput.id = 'research-search-input';
+  searchInput.placeholder = 'Search technologies or ID...';
+  searchInput.value = researchSearchQuery;
+  searchInput.className = 'h-8 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500';
+
+  searchWrap.append(searchInput);
+  dirHeader.append(searchWrap);
+  dirSection.append(dirHeader);
+
+  // Filter tabs: All, Completed, In Progress, Available
+  const tabsWrap = document.createElement('div');
+  tabsWrap.id = 'research-filter-tabs';
+  tabsWrap.className = 'flex items-center gap-1.5 flex-wrap mb-3';
+
+  function renderTabs() {
+    tabsWrap.replaceChildren();
+    const availableCount = allResearches.filter((r) => !r.isCompleted && !r.isResearching).length;
+    const tabs = [
+      { id: 'all', label: 'All', count: allResearches.length },
+      { id: 'completed', label: 'Completed', count: completedList.length },
+      { id: 'in_progress', label: 'In Progress', count: activeQueues.length },
+      { id: 'available', label: 'Available', count: availableCount }
+    ];
+    for (const tab of tabs) {
+      const tabBtn = document.createElement('button');
+      tabBtn.type = 'button';
+      const isActive = researchFilterTab === tab.id;
+      tabBtn.className = `cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors ${
+        isActive
+          ? 'bg-purple-600 text-white shadow-2xs'
+          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+      }`;
+      tabBtn.textContent = `${tab.label} (${tab.count})`;
+      tabBtn.addEventListener('click', () => {
+        researchFilterTab = tab.id;
+        renderTabs();
+        updateResearchGrid();
+      });
+      tabsWrap.append(tabBtn);
+    }
+  }
+  renderTabs();
+  dirSection.append(tabsWrap);
+
+  const dirGrid = document.createElement('div');
+  dirGrid.id = 'research-grid-list';
+  dirGrid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1';
+
+  function updateResearchGrid() {
+    dirGrid.replaceChildren();
+    const query = researchSearchQuery.toLowerCase();
+    const filtered = allResearches
+      .filter((r) => {
+        if (researchFilterTab === 'completed' && !r.isCompleted) return false;
+        if (researchFilterTab === 'in_progress' && !r.isResearching) return false;
+        if (researchFilterTab === 'available' && (r.isCompleted || r.isResearching)) return false;
+        if (!query) {
+          if (researchFilterTab === 'all') return r.isCompleted || r.isResearching;
+          return true;
+        }
+        const name = getResearchName(r.id).toLowerCase();
+        const idStr = String(r.id);
+        return name.includes(query) || idStr.includes(query);
+      })
+      .sort((a, b) => {
+        if (a.isResearching !== b.isResearching) return a.isResearching ? -1 : 1;
+        if (a.isCompleted !== b.isCompleted) return a.isCompleted ? -1 : 1;
+        return (b.level - a.level) || (a.id - b.id);
+      });
+
+    const sub = dirSection.querySelector('#research-count-subtitle');
+    if (sub) {
+      sub.textContent = query
+        ? `${filtered.length} matching "${query}" (${completedList.length} completed)`
+        : `${completedList.length} completed technologies`;
+    }
+
+    if (filtered.length > 0) {
+      for (const r of filtered) {
+        const card = document.createElement('div');
+        card.className = `flex items-center justify-between gap-2 rounded-lg border p-2.5 text-xs transition-colors ${
+          r.isResearching
+            ? 'border-purple-300 bg-purple-50/70 dark:border-purple-800 dark:bg-purple-950/30'
+            : r.isCompleted
+              ? 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+              : 'border-dashed border-slate-200 bg-slate-50/40 text-slate-400 dark:border-slate-800 dark:bg-slate-900/40'
+        }`;
+        const name = getResearchName(r.id);
+        const statusBadge = r.isResearching
+          ? '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"><span class="size-1 rounded-full bg-purple-500 animate-pulse"></span>Researching</span>'
+          : r.isCompleted
+            ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Completed</span>'
+            : '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Available</span>';
+
+        card.innerHTML = `
+          <div class="min-w-0">
+            <div class="font-semibold ${r.isCompleted || r.isResearching ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'} truncate" title="${name}">${name}</div>
+            <div class="text-2xs text-slate-400 dark:text-slate-500">ID: ${r.id}</div>
+          </div>
+          <div class="text-right shrink-0 space-y-1">
+            <div class="font-bold text-xs ${r.isCompleted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}">
+              ${r.isCompleted ? `Lv. ${r.level}` : (r.isResearching ? `Lv. ${r.nextLevel}` : '—')}
+            </div>
+            <div>${statusBadge}</div>
+          </div>
+        `;
+        dirGrid.append(card);
+      }
+    } else {
+      const emptyBox = document.createElement('div');
+      emptyBox.className = 'col-span-full py-8 text-center text-xs text-slate-400';
+      emptyBox.textContent = query
+        ? `No technologies matching "${query}"`
+        : 'No technologies found for this filter.';
+      dirGrid.append(emptyBox);
+    }
+  }
+
+  searchInput.addEventListener('input', (e) => {
+    researchSearchQuery = e.target.value.trim();
+    updateResearchGrid();
+  });
+
+  updateResearchGrid();
+  dirSection.append(dirGrid);
+  host.append(dirSection);
+}
+
+function setupBuildingAndResearchDialogs() {
+  const buildingBadge = document.querySelector('#building-badge');
+  const buildingDialog = document.querySelector('#building-dialog');
+  const researchBadge = document.querySelector('#research-badge');
+  const researchDialog = document.querySelector('#research-dialog');
+
+  if (buildingBadge && buildingDialog) {
+    const openBuilding = () => {
+      renderBuildingDialog(currentCache);
+      if (typeof buildingDialog.showModal === 'function') {
+        buildingDialog.showModal();
+      } else {
+        buildingDialog.setAttribute('open', '');
+      }
+    };
+    buildingBadge.addEventListener('click', openBuilding);
+    buildingBadge.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openBuilding();
+      }
+    });
+  }
+
+  if (researchBadge && researchDialog) {
+    const openResearch = () => {
+      renderResearchDialog(currentCache);
+      if (typeof researchDialog.showModal === 'function') {
+        researchDialog.showModal();
+      } else {
+        researchDialog.setAttribute('open', '');
+      }
+    };
+    researchBadge.addEventListener('click', openResearch);
+    researchBadge.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openResearch();
+      }
+    });
+  }
+
+  for (const dlg of [buildingDialog, researchDialog]) {
+    dlg?.addEventListener('click', (e) => {
+      if (e.target === dlg) {
+        if (typeof dlg.close === 'function') dlg.close();
+        else dlg.removeAttribute('open');
+      }
+    });
+  }
+}
+
+globalThis.renderBuildingDialog = renderBuildingDialog;
+globalThis.renderResearchDialog = renderResearchDialog;
+globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
+
 async function render() {
   const [stored, session] = await Promise.all([
     chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus']), chrome.storage.session.get('recordingState')
@@ -5673,6 +6398,8 @@ async function render() {
   if (document.querySelector('#raid-dialog')?.open) renderExperimental(cache, true);
   if (document.querySelector('#gather-dialog')?.open) renderExperimental(cache);
   if (document.querySelector('#monster-dialog')?.open) renderMonster(cache);
+  if (document.querySelector('#building-dialog')?.open) renderBuildingDialog(cache);
+  if (document.querySelector('#research-dialog')?.open) renderResearchDialog(cache);
   const draftModal = document.querySelector('#draft-modal');
   if (draftModal && !draftModal.hidden) {
     const modalBody = document.querySelector('#draft-modal-body');
@@ -6492,6 +7219,7 @@ setupDraftModal();
 setupTowerModal();
 setupFabDial();
 setupAutoClaimListeners();
+setupBuildingAndResearchDialogs();
 setInterval(refreshTimed, 1000);
 
 

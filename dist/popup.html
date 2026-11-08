@@ -380,6 +380,26 @@
     </div>
     <div id="monster-dialog-body"></div>
   </dialog>
+  <dialog id="building-dialog" aria-labelledby="building-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60 dark:bg-slate-900 dark:border-slate-800">
+    <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+      <div class="flex items-center gap-2 min-w-0">
+        <h2 id="building-dialog-title" class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">City Buildings</h2>
+        <div id="building-dialog-status" class="flex items-center gap-2 truncate"></div>
+      </div>
+      <form method="dialog"><button type="submit" autofocus aria-label="Close Building dialog" class="cursor-pointer rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">✕</button></form>
+    </div>
+    <div id="building-dialog-body" class="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh_-_60px)]"></div>
+  </dialog>
+  <dialog id="research-dialog" aria-labelledby="research-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60 dark:bg-slate-900 dark:border-slate-800">
+    <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+      <div class="flex items-center gap-2 min-w-0">
+        <h2 id="research-dialog-title" class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">Personal Research</h2>
+        <div id="research-dialog-status" class="flex items-center gap-2 truncate"></div>
+      </div>
+      <form method="dialog"><button type="submit" autofocus aria-label="Close Research dialog" class="cursor-pointer rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">✕</button></form>
+    </div>
+    <div id="research-dialog-body" class="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh_-_60px)]"></div>
+  </dialog>
   <script src="tracking-filter.js"></script>
   <script src="export-name.js"></script>
   <script src="data-names.js"></script>

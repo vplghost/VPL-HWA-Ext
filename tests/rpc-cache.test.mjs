@@ -1921,3 +1921,71 @@ test('randomDraft_register deducts 1 draft chip and resets legendDraftStatus', (
   assert.deepEqual([...merged.legendDraftStatus.data.attackHeroes], []);
   assert.equal(merged.legendDraftStatus.data.lastResult, null);
 });
+
+test('getSummary extracts buildings and completedResearches and completion updates levels', () => {
+  const summaryTrace = record([
+    { name: 'getSummary', feature: 'building', ident: 'b1' },
+    { name: 'getSummary', feature: 'personalResearch', ident: 'r1' }
+  ], [
+    { ident: 'b1', result: { response: {
+      buildings: [
+        { buildingId: 20, level: 10, initialBuildDate: 1700000000 },
+        { buildingId: 21, level: 5 }
+      ],
+      queues: [
+        { buildingId: 21, level: 6, startDate: 1793528241401, durationMs: 3600000, queueNumber: 0 }
+      ]
+    } } },
+    { ident: 'r1', result: { response: {
+      completedResearches: [
+        { researchId: 512, level: 3 },
+        { researchId: 513, level: 1 }
+      ],
+      queues: [
+        { researchId: 513, level: 2, startDate: 1793528241401, durationMs: 1800000, queueNumber: 0 }
+      ]
+    } } }
+  ], '2026-11-01T12:00:00.000Z');
+
+  const extracted = cache.extract(summaryTrace);
+  const buildingStatus = extracted.find((e) => e.key === 'buildingStatus');
+  const researchStatus = extracted.find((e) => e.key === 'researchStatus');
+
+  assert.ok(buildingStatus, 'buildingStatus extracted');
+  assert.equal(buildingStatus.data.buildings.length, 2);
+  assert.equal(buildingStatus.data.buildings[0].buildingId, 20);
+  assert.equal(buildingStatus.data.queues[0].level, 6);
+
+  assert.ok(researchStatus, 'researchStatus extracted');
+  assert.equal(researchStatus.data.completedResearches.length, 2);
+  assert.equal(researchStatus.data.completedResearches[0].researchId, 512);
+  assert.equal(researchStatus.data.queues[0].level, 2);
+
+  const merged = cache.merge({}, [summaryTrace]).cache;
+  assert.equal(merged.buildingStatus.data.buildings.length, 2);
+  assert.equal(merged.researchStatus.data.completedResearches.length, 2);
+
+  // Complete building 21
+  const completeBuildingTrace = record([
+    { name: 'completeConstruction', feature: 'building', ident: 'b2', args: { buildingId: 21 } }
+  ], [
+    { ident: 'b2', result: { response: {} } }
+  ], '2026-11-01T13:00:00.000Z');
+
+  const mergedAfterBuilding = cache.merge(merged, [completeBuildingTrace]).cache;
+  assert.equal(mergedAfterBuilding.buildingStatus.data.queues.length, 0, 'queue cleared');
+  const updatedB21 = mergedAfterBuilding.buildingStatus.data.buildings.find((b) => b.buildingId === 21);
+  assert.equal(updatedB21?.level, 6, 'building 21 level updated to 6');
+
+  // Complete research 513
+  const completeResearchTrace = record([
+    { name: 'completeResearch', feature: 'personalResearch', ident: 'r2', args: { researchId: 513 } }
+  ], [
+    { ident: 'r2', result: { response: {} } }
+  ], '2026-11-01T13:30:00.000Z');
+
+  const mergedAfterResearch = cache.merge(mergedAfterBuilding, [completeResearchTrace]).cache;
+  assert.equal(mergedAfterResearch.researchStatus.data.queues.length, 0, 'queue cleared');
+  const updatedR513 = mergedAfterResearch.researchStatus.data.completedResearches.find((r) => r.researchId === 513);
+  assert.equal(updatedR513?.level, 2, 'research 513 level updated to 2');
+});
