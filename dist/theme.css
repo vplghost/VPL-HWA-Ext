@@ -1,0 +1,305 @@
+/* ==========================================================================
+   Theme Variables & Global Dark Theme
+   Separated stylesheet for HWA Helper theme management
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+  --color-bg-page: #f8fafc;
+  --color-bg-card: #ffffff;
+  --color-bg-card-muted: #f1f5f9;
+  --color-border-card: #e2e8f0;
+  --color-text-main: #0f172a;
+  --color-text-muted: #64748b;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-bg-page: #090d16;
+  --color-bg-card: #0f172a;
+  --color-bg-card-muted: #1e293b;
+  --color-border-card: #1e293b;
+  --color-text-main: #f8fafc;
+  --color-text-muted: #94a3b8;
+}
+
+/* Base Body & Surfaces */
+.dark body,
+html.dark body {
+  background-color: #090d16 !important;
+  color: #f1f5f9 !important;
+}
+
+.dark header {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark section#settings-panel {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+/* Global Utility Adaptations under .dark */
+.dark .bg-white {
+  background-color: #0f172a !important;
+  color: #f1f5f9;
+}
+
+.dark .bg-slate-50 {
+  background-color: #0e1526 !important;
+}
+
+.dark .bg-slate-100 {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+}
+
+.dark .bg-slate-200 {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .border-slate-200,
+.dark .border-slate-100 {
+  border-color: #1e293b !important;
+}
+
+.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+.dark .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-slate-500 {
+  color: #64748b !important;
+}
+
+.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Form Inputs, Selects, and Textareas */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]):focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #3b82f6 !important;
+  outline: 2px solid rgba(59, 130, 246, 0.25) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark select option {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+.dark label {
+  border-color: #1e293b !important;
+}
+
+.dark label:hover {
+  border-color: #334155 !important;
+}
+
+/* Navigation Tabs */
+.dark nav#tabs {
+  border-color: #1e293b !important;
+}
+
+.dark nav#tabs button {
+  color: #94a3b8;
+}
+
+.dark nav#tabs button:hover {
+  background-color: #1e293b !important;
+  color: #f8fafc;
+}
+
+.dark nav#tabs button[aria-selected="true"] {
+  background-color: #0f172a !important;
+  border-color: #3b82f6 !important;
+  color: #60a5fa !important;
+}
+
+/* Tables & Data Grid */
+.dark table {
+  border-color: #1e293b;
+}
+
+.dark table th {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+.dark table th button {
+  color: #cbd5e1;
+}
+
+.dark table th button:hover {
+  color: #60a5fa !important;
+}
+
+.dark table td {
+  border-color: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+.dark table tr:hover td {
+  background-color: rgba(30, 41, 59, 0.7) !important;
+}
+
+.dark table tr[data-favorite="true"] {
+  background-color: rgba(245, 158, 11, 0.08) !important;
+  border-color: rgba(245, 158, 11, 0.2) !important;
+}
+
+.dark table tr[data-can-evolve="true"] {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+/* Modals & Dialogs */
+.dark dialog {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+  color: #f8fafc !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75) !important;
+}
+
+.dark dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+.dark dialog > div:first-child {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+.dark #tower-modal > div,
+.dark #guild-versus-modal > div,
+.dark #dungeon-modal > div,
+.dark #draft-modal > div {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+.dark #tower-modal .bg-slate-50,
+.dark #guild-versus-modal .bg-slate-50,
+.dark #dungeon-modal .bg-slate-50,
+.dark #draft-modal .bg-slate-50 {
+  background-color: #131b2e !important;
+  border-color: #1e293b !important;
+}
+
+/* Status Cards & Badges */
+.dark .bg-blue-50 {
+  background-color: rgba(30, 58, 138, 0.3) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.dark .text-blue-700 {
+  color: #93c5fd !important;
+}
+
+.dark .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.3) !important;
+}
+
+.dark .text-amber-800,
+.dark .text-amber-900 {
+  color: #fde68a !important;
+}
+
+.dark .ring-amber-200 {
+  --tw-ring-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.dark .bg-sky-50 {
+  background-color: rgba(12, 74, 110, 0.3) !important;
+}
+
+.dark .text-sky-800 {
+  color: #7dd3fc !important;
+}
+
+.dark .ring-sky-200 {
+  --tw-ring-color: rgba(14, 165, 233, 0.3) !important;
+}
+
+.dark .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.3) !important;
+}
+
+.dark .text-emerald-700,
+.dark .text-emerald-800 {
+  color: #6ee7b7 !important;
+}
+
+.dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.3) !important;
+}
+
+.dark .text-red-700,
+.dark .text-red-800 {
+  color: #fca5a5 !important;
+}
+
+.dark #hero-carrier-badge {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+.dark #mqtt-trigger-panel {
+  background-color: #131b2e !important;
+  border-color: #1e293b !important;
+}
+
+/* Scrollbars */
+.dark ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

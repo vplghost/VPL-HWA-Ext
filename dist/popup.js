@@ -1,3 +1,31 @@
+function applyTheme(theme) {
+  const isDark = theme === 'dark' || (!theme) ||
+    (theme === 'system' && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (isDark) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}
+
+try {
+  chrome.storage?.local?.get?.('theme', (res) => {
+    applyTheme(res?.theme || 'dark');
+  });
+} catch (_) {
+  applyTheme('dark');
+}
+
+if (typeof window !== 'undefined' && window.matchMedia) {
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      chrome.storage?.local?.get?.('theme', (res) => {
+        if (res?.theme === 'system') applyTheme('system');
+      });
+    });
+  } catch (_) {}
+}
+
 const CACHE_KEY = 'rpcCache';
 const view = document.querySelector('#view');
 const status = document.querySelector('#status');
@@ -6203,12 +6231,14 @@ document.querySelector('#clear-cache').addEventListener('click', async () => {
 
 async function renderSettings() {
   const stored = await chrome.storage.local.get(['captureSettings', 'popupRpcEnabled',
-    'socketRefreshMode', 'rpcMqttTriggerStatus', 'rpcMqttTelemetry', 'troopCapacitySettings']);
+    'socketRefreshMode', 'rpcMqttTriggerStatus', 'rpcMqttTelemetry', 'troopCapacitySettings', 'theme']);
   const capacities = globalThis.hwaHelperExperimentalData?.normalizeCapacitySettings(stored.troopCapacitySettings) || { defaultHero: 600, base: 950 };
   for (const [id, key] of [['default-hero-troop-capacity', 'defaultHero'], ['base-troop-capacity', 'base']]) {
     const input = document.querySelector(`#${id}`);
     if (input) input.value = String(capacities[key]);
   }
+  const themeSelect = document.querySelector('#setting-theme');
+  if (themeSelect) themeSelect.value = stored.theme || 'dark';
   document.querySelector('#intercept-enabled').checked = stored.captureSettings?.interceptEnabled !== false;
   document.querySelector('#popup-rpc-enabled').checked = stored.popupRpcEnabled === true;
   document.querySelector('#socket-refresh-mode').value =
@@ -6291,6 +6321,12 @@ for (const [id, key] of [['default-hero-troop-capacity', 'defaultHero'], ['base-
   });
 }
 
+document.querySelector('#setting-theme')?.addEventListener('change', async (event) => {
+  const selectedTheme = ['dark', 'light', 'system'].includes(event.currentTarget.value) ? event.currentTarget.value : 'dark';
+  await chrome.storage.local.set({ theme: selectedTheme });
+  applyTheme(selectedTheme);
+});
+
 document.querySelector('#socket-refresh-mode').addEventListener('change', async (event) => {
   await chrome.storage.local.set({ socketRefreshMode:
     ['direct', 'mqtt-piggyback'].includes(event.currentTarget.value) ? event.currentTarget.value : 'piggyback' });
@@ -6354,9 +6390,13 @@ document.querySelector('#clear').addEventListener('click', async () => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local') {
+    if ('theme' in changes) {
+      applyTheme(changes.theme.newValue || 'dark');
+      renderSettings();
+    }
     if ('rpcQueueStatus' in changes) renderRpcQueue(changes.rpcQueueStatus.newValue?.count || 0);
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
-        'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'rpcMqttTelemetry' in changes || 'troopCapacitySettings' in changes) renderSettings();
+        'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'rpcMqttTelemetry' in changes || 'troopCapacitySettings' in changes || 'theme' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
     if ('troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||

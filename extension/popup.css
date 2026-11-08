@@ -1,6 +1,8 @@
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 @source "./popup.html";
 @source "./popup.js";
+@import "./theme.css";
 
 @layer base {
   [hidden] { display: none !important; }

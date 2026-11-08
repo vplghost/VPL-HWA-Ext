@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -107,6 +107,13 @@
     <h2 class="text-base font-semibold">Settings</h2>
     <p class="mt-1 text-xs text-slate-500">API monitoring updates the cache. Record, Clear, and Export are in the Log tab.</p>
     <div class="mt-4 space-y-3">
+      <label class="block rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700">Appearance Theme
+        <select id="setting-theme" class="mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800">
+          <option value="dark">Dark Theme (Default)</option>
+          <option value="light">Light Theme</option>
+          <option value="system">Follow System</option>
+        </select>
+      </label>
       <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2"><input id="intercept-enabled" type="checkbox" checked class="size-4 accent-blue-600"> Monitor API</label>
       <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2"><input id="popup-rpc-enabled" type="checkbox" class="size-4 accent-blue-600"> Allow popup RPC calls</label>
       <p class="text-xs text-slate-500">Off by default. Quick refresh, reward claims, draft submission, and automatic follow-up requests stay disabled. API monitoring and Reload Game Tab still work.</p>
