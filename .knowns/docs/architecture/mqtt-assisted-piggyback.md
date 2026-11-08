@@ -3,7 +3,7 @@ id: doc-6f4a4a2e2e3b17941a9db8218e3a3b8c
 title: MQTT Assisted Piggyback
 description: Experimental shared RPC mode that locally delivers a bounded MQTT map update to request a native game carrier, with append-only response isolation
 createdAt: '2026-11-06T08:36:33.637Z'
-updatedAt: '2026-11-06T08:36:33.637Z'
+updatedAt: '2026-11-08T10:09:59.201Z'
 tags:
   - rpc
   - mqtt
@@ -23,6 +23,8 @@ This option requests a native carrier rather than starting a separate HTTP RPC. 
 
 - An actual received `mapChunksUpdated` PUBLISH must have been observed on the exact game MQTT endpoint within 60 seconds.
 - The sample must use the `msg` envelope, contain 1–32 chunks with integer x/y and finite updatedAt, fit the payload limit, and have a topic no longer than 512 characters.
+- Active viewport chunk targeting: To avoid requesting off-screen chunks that the client ignores, the observer retains up to 32 recent real MQTT chunks (within 60s) and tracks recent native `getChunks` coordinates (`viewedChunks` observed within 60s on the same `mapId`). When synthesizing a local trigger, observed native coordinates on that map are prioritized and overlaid with updated timestamps `max(local Unix milliseconds, updatedAt + 1)` (@task-VHE-BZXW0H).
+- Action allowlist gate: Queued RPC actions must be registered in `helperActionMethods` in `extension/intercept.js` (including `createRally`, `cancelRally`, `attackMob`, `attackMine`, `stopMineGathering`, `randomDraft_save*`, `magicTower_*`). Unlisted methods are dropped before the interceptor can emit the `mqtt-rpc-nudge` signal (@task-VHE-X2SJ1X).
 - The same socket must still be OPEN. Only sockets created after the hook is installed are available; reload the game after updating the extension.
 - Both RPC and monitoring must be enabled and the selected mode must still be MQTT-assisted.
 - Local triggers are limited to one per five seconds. There is no polling loop or automatic Direct fallback. A blocked/cooling trigger leaves calls pending for ordinary native RPC traffic.
@@ -59,4 +61,4 @@ A delivered synthetic event does not prove the live engine accepted it or fetche
 
 Implemented in `extension/mqtt-capture.js`, `extension/intercept.js`, `extension/bridge.js` and shared settings UI. Tests in `tests/mqtt-capture.test.mjs` cover MQTT v4/v5 and Blob/ArrayBuffer framing, gates, template age, closed sockets, cooldown, synthetic capture exclusion, a simulated engine generating getChunks, native result isolation, and no separate RPC fallback. Background/bridge tests cover third-mode routing and propagation.
 
-The trigger's message shape is grounded in captured mapChunksUpdated evidence: @doc/api/captured-mqtt-event-catalog. End-to-end behavior has been tested with a simulated engine receiver, not a live authenticated game session. Source task: @task-VHE-6PCSC3.
+The trigger's message shape is grounded in captured mapChunksUpdated evidence: @doc/api/captured-mqtt-event-catalog. End-to-end behavior has been tested with a simulated engine receiver, not a live authenticated game session. Source tasks: @task-VHE-6PCSC3, @task-VHE-BZXW0H, @task-VHE-X2SJ1X.

@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-06T10:31:30.538Z'
+updatedAt: '2026-11-08T10:10:34.789Z'
 tags:
   - api
   - rpc
@@ -222,7 +222,7 @@ The cache retains bounded rally-to-mob mappings and defeated `{mapId,mobId}` tom
 
 ### Ten-second membership cancellation
 
-The leader counts once alongside unique member user IDs; total slots are current participants plus `membersCapacityLeft`. Threshold is 1–6 (default 4). The controller requests current details on creation and about 20 seconds before server departure, then evaluates at 10 seconds. Membership older than 25 seconds before departure or missing membership is treated conservatively as insufficient evidence to proceed, also triggering cancellation. Underfilled rallies issue **one** `cancelRally:rally {rallyId}`, then stop the queue; no replacement raid is started.
+The leader counts once alongside unique member user IDs; total slots are current participants plus `membersCapacityLeft`. Threshold is 1–6 (default 4). Cancellation is optional and governed by an auto-cancel checkbox persisted per account (@task-VHE-992BGT). When enabled, the controller requests current details on creation and about 20 seconds before server departure, then evaluates at 10 seconds before departure. Membership older than 25 seconds before departure or missing membership is treated conservatively as insufficient evidence to proceed, triggering cancellation when the auto-cancel option is enabled. Underfilled rallies issue **one** `cancelRally:rally {rallyId}`, then stop the queue; no replacement raid is started. When auto-cancel is disabled, the rally departs regardless of member count.
 
 Cancellation expires one second before departure. The background, content bridge and MAIN interceptor forward an absolute `expiresAt` deadline and queue owner `group`; expired mutations are discarded and stopping drops unsent calls in that group. A missed timer deadline stops with an explicit status instead of issuing a late cancel.
 

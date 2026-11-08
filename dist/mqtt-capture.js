@@ -33,8 +33,38 @@
       rememberViewedChunks(event.data.record);
       return;
     }
-    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'mqtt-rpc-nudge') triggerGameRefresh();
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'mqtt-rpc-nudge') {
+      triggerGameRefresh(event.data.trackId, event.data.requestedAt);
+      return;
+    }
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'mqtt-send-upstream') {
+      sendUpstreamMqttPacket(event.data.packet || event.data.payload, event.data.trackId);
+      return;
+    }
   });
+
+  function sendUpstreamMqttPacket(payload, trackId) {
+    const sample = triggerTemplate;
+    if (!sample || sample.state.closed || sample.state.socket.readyState !== 1) {
+      console.warn('[HWA-TRACK][MQTT_UPSTREAM_FAILED]', {
+        trackId,
+        time: new Date().toISOString(),
+        reason: 'No open MQTT socket available to send upstream to game server'
+      });
+      return;
+    }
+    try {
+      console.log('[HWA-TRACK][MQTT_SEND_UPSTREAM_SERVER]', {
+        trackId,
+        time: new Date().toISOString(),
+        mechanism: 'WebSocket.send to remote MQTT broker (upstream: client -> server)',
+        payloadType: typeof payload
+      });
+      sample.state.socket.send(payload);
+    } catch (err) {
+      console.error('[HWA-TRACK][MQTT_UPSTREAM_ERROR]', { trackId, error: String(err) });
+    }
+  }
 
   function rememberViewedChunks(record) {
     if (record?.transport !== 'fetch' || record.method !== 'POST' ||
@@ -78,9 +108,21 @@
     } catch (_) {}
   }
 
-  function triggerGameRefresh() {
+  function triggerGameRefresh(trackId = null, requestedAt = null) {
     if (!captureEnabled || !popupRpcEnabled || !assistedMode) return reportTrigger('disabled');
     const sample = triggerTemplate;
+    console.log('[HWA-TRACK][5a/6 MQTT_NUDGE_CHECK]', {
+      trackId,
+      time: new Date().toISOString(),
+      assistedMode,
+      captureEnabled,
+      popupRpcEnabled,
+      hasTemplate: Boolean(sample),
+      templateAgeMs: sample ? Date.now() - sample.observedAt : null,
+      socketReady: sample?.state?.socket?.readyState,
+      socketClosed: sample?.state?.closed,
+      viewedChunks: viewedChunks ? { mapId: viewedChunks.mapId, count: viewedChunks.coordinates.length, ageMs: Date.now() - viewedChunks.observedAt } : null
+    });
     if (!sample) return reportTrigger('waiting-template');
     if (Date.now() - sample.observedAt > 60000) return reportTrigger('expired-template');
     if (sample.state.closed || sample.state.socket.readyState !== 1) return reportTrigger('socket-closed');
@@ -116,6 +158,14 @@
       } while (remaining);
       const packet = new Uint8Array(1 + length.length + body.length);
       packet[0] = 0x30; packet.set(length, 1); packet.set(body, 1 + length.length);
+      console.log('[HWA-TRACK][5b/6 MQTT_DISPATCH_DOWNSTREAM_ENGINE]', {
+        trackId,
+        time: new Date().toISOString(),
+        mechanism: 'synthetic MessageEvent dispatched locally to socket (downstream: server -> local engine)',
+        topic: sample.topic,
+        chunksInjected: chunks.size,
+        packetBytes: packet.length
+      });
       const data = sample.state.socket.binaryType === 'blob' ? new Blob([packet]) : packet.buffer;
       const event = new MessageEvent('message', { data, origin: new URL(sample.state.socket.url).origin });
       syntheticEvents.add(event);
@@ -236,6 +286,15 @@
       if (!captureAtArrival || !captureEnabled) return;
       for (const packet of parsed.packets) {
         if (direction === 'received') rememberTrigger(packet, state);
+        if (packet.topic.includes('map') || packet.topic.includes('chunks') || direction === 'sent') {
+          console.log(`[HWA-TRACK][MQTT_${direction.toUpperCase()}]`, {
+            time: timestamp,
+            direction,
+            topic: packet.topic,
+            qos: packet.qos,
+            bytes: packet.payload.length
+          });
+        }
         window.postMessage({ source: 'hwa-helper-api', kind: 'api-record', record: {
           transport: 'websocket', method: 'PUBLISH', endpoint: MQTT_ENDPOINT,
           status: null, durationMs: 0, outcome: 'completed', timestamp,

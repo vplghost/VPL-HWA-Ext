@@ -5606,6 +5606,8 @@ async function render() {
   }
   document.querySelector('#clear').hidden = activeTab !== 'log';
   document.querySelector('#item-group-filter').hidden = activeTab !== 'items';
+  const toolbarRefreshHeroesBtn = document.querySelector('#btn-toolbar-refresh-heroes');
+  if (toolbarRefreshHeroesBtn) toolbarRefreshHeroesBtn.hidden = activeTab !== 'heroes';
   const itemsViewToggle = document.querySelector('#items-view-toggle');
   if (itemsViewToggle) itemsViewToggle.hidden = activeTab !== 'items';
   document.querySelector('#log-sort-wrap').hidden = activeTab !== 'log';
@@ -5631,6 +5633,11 @@ async function render() {
       renderEngineStatus(stored?.gameEngineStatus);
     });
   } else if (activeTab === 'heroes') {
+    console.log('[HWA-TRACK][UI_RENDER_HEROES]', {
+      time: new Date().toISOString(),
+      heroCount: Object.keys(cache.heroGetAll?.data || {}).length,
+      updatedAt: cache.heroGetAll?.updatedAt
+    });
     showSnapshot(cache.heroGetAll, ['Hero ID', 'Name', 'Level', 'Star', 'Equipment rank', 'Soul stones', 'Power'], (data) =>
       Object.entries(data).sort(byId).map(([id, hero]) => {
         const { owned, needed } = globalThis.hwaHelperPopupData.heroSoulProgress(id, hero, cache.inventoryGet?.data);
@@ -5753,6 +5760,9 @@ const refreshGroups = {
     { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
     { name: 'mailGetAll' }
   ],
+  heroes: [
+    { name: 'heroGetAll' }
+  ],
   core: [
     { name: 'userGetInfo' },
     { name: 'inventoryGet' },
@@ -5791,12 +5801,28 @@ function triggerRefresh(groupKey) {
     if (statusEl) statusEl.textContent = 'Enable popup RPC calls in Settings to use quick refresh.';
     return;
   }
+  const trackId = 'trk_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+  const requestedAt = Date.now();
+  console.log('[HWA-TRACK][1/6 UI_TRIGGER]', {
+    trackId,
+    time: new Date().toISOString(),
+    groupKey,
+    calls,
+    popupRpcEnabled,
+    dispatchMode: typeof socketRefreshMode !== 'undefined' ? socketRefreshMode : null
+  });
   if (statusEl) {
-    statusEl.textContent = 'Requesting quick refresh...';
+    statusEl.textContent = `Requesting quick refresh (${groupKey})...`;
     statusEl.className = 'text-xs text-blue-600 font-medium';
   }
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+    chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls, trackId, requestedAt }, (response) => {
+      console.log('[HWA-TRACK][UI_TRIGGER_ACK]', {
+        trackId,
+        time: new Date().toISOString(),
+        elapsedMs: Date.now() - requestedAt,
+        response
+      });
       if (chrome.runtime.lastError || !response?.ok) {
         if (statusEl) {
           statusEl.textContent = response?.error || 'No active Hero Wars tab found.';
@@ -5805,7 +5831,8 @@ function triggerRefresh(groupKey) {
       } else {
         if (statusEl) {
           const time = new Date().toLocaleTimeString();
-          statusEl.textContent = response.queued ? `Quick refresh queued at ${time}; waiting for the next game RPC.` :
+          statusEl.textContent = response.queued ?
+            `Quick refresh queued at ${time}; waiting for native game RPC carrier.` :
             `Quick refresh sent at ${time}. If not updating, use Reload Game Tab.`;
           statusEl.className = 'text-xs text-emerald-600 font-medium';
         }
@@ -5838,6 +5865,8 @@ document.querySelector('#btn-reload-game')?.addEventListener('click', () => {
 });
 
 document.querySelector('#btn-refresh-all')?.addEventListener('click', () => triggerRefresh('all'));
+document.querySelector('#btn-refresh-heroes')?.addEventListener('click', () => triggerRefresh('heroes'));
+document.querySelector('#btn-toolbar-refresh-heroes')?.addEventListener('click', () => triggerRefresh('heroes'));
 document.querySelector('#btn-refresh-core')?.addEventListener('click', () => triggerRefresh('core'));
 document.querySelector('#btn-refresh-roster')?.addEventListener('click', () => triggerRefresh('roster'));
 document.querySelector('#btn-refresh-quests')?.addEventListener('click', () => triggerRefresh('quests'));

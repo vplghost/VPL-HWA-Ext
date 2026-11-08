@@ -201,12 +201,22 @@ chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
   }
   if (message?.kind === 'refresh-rpc' || message?.kind === 'queue-rpc' ||
       message?.kind === 'queue-claim') {
+    if (message.trackId) {
+      console.log('[HWA-TRACK][3/6 BRIDGE_FORWARD]', {
+        trackId: message.trackId,
+        time: new Date().toISOString(),
+        kind: message.kind,
+        callCount: message.calls?.length
+      });
+    }
     window.postMessage({
       source: 'hwa-helper-control',
       kind: message.kind,
       calls: message.calls,
       group: message.group,
-      expiresAt: message.expiresAt
+      expiresAt: message.expiresAt,
+      trackId: message.trackId,
+      requestedAt: message.requestedAt
     }, location.origin);
     sendResponse?.({ ok: true });
     return true;

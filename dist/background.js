@@ -110,11 +110,11 @@ function normalize(record) {
   }
 }
 
-function rpcMessageForSettings(stored, calls, claim = false) {
+function rpcMessageForSettings(stored, calls, claim = false, extra = {}) {
   if (stored.popupRpcEnabled !== true) return null;
   const queued = stored.socketRefreshMode !== 'direct';
   if (queued && stored.captureSettings?.interceptEnabled === false) return null;
-  return { kind: queued ? (claim ? 'queue-claim' : 'queue-rpc') : 'refresh-rpc', calls };
+  return { kind: queued ? (claim ? 'queue-claim' : 'queue-rpc') : 'refresh-rpc', calls, ...extra };
 }
 
 async function saveRaidTransition(transition, stored) {
@@ -619,7 +619,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             calls = [{ name: message.action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack',
               args: { heroes: message.heroes } }, { name: 'randomDraft_getInfo' }];
           }
-          const dispatch = rpcMessageForSettings(stored, calls);
+          const extra = {};
+          if (message.trackId) extra.trackId = message.trackId;
+          if (message.requestedAt) extra.requestedAt = message.requestedAt;
+          const dispatch = rpcMessageForSettings(stored, calls, false, extra);
+          console.log('[HWA-TRACK][2/6 BG_RECEIVE_ROUTE]', {
+            trackId: message.trackId,
+            time: new Date().toISOString(),
+            calls,
+            dispatchMode: stored.socketRefreshMode,
+            dispatchKind: dispatch?.kind
+          });
           if (!dispatch) sendResponse({ ok: false, error: 'Enable Monitor API for Piggyback RPC.' });
           else forward(dispatch, dispatch.kind === 'queue-rpc');
         }
@@ -667,7 +677,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       'popupRpcEnabled', 'socketRefreshMode']);
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
-    if (cacheResult.changed) await chrome.storage.local.set({ rpcCache: cacheResult.cache });
+    if (cacheResult.changed) {
+      await chrome.storage.local.set({ rpcCache: cacheResult.cache });
+      const heroSnap = cacheResult.cache.heroGetAll;
+      if (heroSnap && heroSnap.updatedAt === record.timestamp) {
+        console.log('[HWA-TRACK][CACHE_HEROES_UPDATED]', {
+          time: new Date().toISOString(),
+          heroCount: Object.keys(heroSnap.data || {}).length,
+          updatedAt: heroSnap.updatedAt
+        });
+      }
+    }
     if (sender.tab?.id) await updateRaidQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateTowerRun(record, sender.tab.id);

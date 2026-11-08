@@ -11,14 +11,23 @@ const data = context.hwaHelperQuestData;
 const cacheReducer = context.hwaHelperRpcCache;
 const dashboard = context.hwaHelperDashboardData.dailyDashboard;
 const goals = context.hwaHelperPopupData.extractEventGoals;
-const trace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-game-record-202611062259_start.json', import.meta.url)));
-const rpcRecords = trace.timeline.filter((entry) => entry.kind === 'api' && entry.transport === 'fetch' &&
-  entry.endpoint === 'https://api.hero-wars-alliance.com/api/rpc');
-const mqttRecord = trace.timeline.find((entry) => entry.kind === 'api' && entry.transport === 'websocket' &&
-  entry.eventType === 'specialQuestEvents');
-const at = Date.parse(trace.exportedAt);
+let trace = null;
+try {
+  trace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-game-record-202611062259_start.json', import.meta.url)));
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
+const rpcRecords = trace ? trace.timeline.filter((entry) => entry.kind === 'api' && entry.transport === 'fetch' &&
+  entry.endpoint === 'https://api.hero-wars-alliance.com/api/rpc') : [];
+const mqttRecord = trace ? trace.timeline.find((entry) => entry.kind === 'api' && entry.transport === 'websocket' &&
+  entry.eventType === 'specialQuestEvents') : null;
+const at = trace ? Date.parse(trace.exportedAt) : 0;
 
-test('startup trace yields actionable daily quests and only visible timed events', () => {
+test('startup trace yields actionable daily quests and only visible timed events', (t) => {
+  if (!trace) {
+    t.skip('Optional private trace unavailable: hwa-game-record-202611062259_start.json');
+    return;
+  }
   const cache = cacheReducer.merge({}, rpcRecords).cache;
   assert.deepEqual(Array.from(data.dailyQuests(cache, at).filter((quest) => quest.state === 'inProgress'),
     (quest) => quest.id), [346, 356, 363]);
@@ -37,7 +46,11 @@ test('startup trace yields actionable daily quests and only visible timed events
   assert.ok(!keys.includes('misc:lib_special_quest_event_chain_name_test_wendygift'));
 });
 
-test('full MQTT specialQuestEvents snapshot updates timed progress without a quest RPC', () => {
+test('full MQTT specialQuestEvents snapshot updates timed progress without a quest RPC', (t) => {
+  if (!trace) {
+    t.skip('Optional private trace unavailable: hwa-game-record-202611062259_start.json');
+    return;
+  }
   assert.ok(mqttRecord);
   const before = cacheReducer.merge({}, rpcRecords).cache;
   delete before.specialQuestStatus;

@@ -237,8 +237,29 @@
       }
       tracePiggyback('piggyback-queued', `${isClaim ? 'claim' : 'refresh'}:${event.data.calls.length}`);
       reportQueueStatus();
+      if (event.data?.trackId) {
+        console.log('[HWA-TRACK][4a/6 INTERCEPT_QUEUE]', {
+          trackId: event.data.trackId,
+          time: new Date().toISOString(),
+          calls: event.data.calls,
+          queueSize: queuedRpcCalls.size,
+          dispatchMode: rpcDispatchMode
+        });
+      }
       if (rpcDispatchMode === 'mqtt-piggyback' && queuedRpcCalls.size) {
-        window.postMessage({ source: 'hwa-helper-control', kind: 'mqtt-rpc-nudge' }, location.origin);
+        if (event.data?.trackId) {
+          console.log('[HWA-TRACK][4b/6 INTERCEPT_NUDGE_SIGNAL]', {
+            trackId: event.data.trackId,
+            time: new Date().toISOString(),
+            queueSize: queuedRpcCalls.size
+          });
+        }
+        window.postMessage({
+          source: 'hwa-helper-control',
+          kind: 'mqtt-rpc-nudge',
+          trackId: event.data?.trackId,
+          requestedAt: event.data?.requestedAt
+        }, location.origin);
       }
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
@@ -844,6 +865,14 @@
         claimQueueTimer = null;
       }
       tracePiggyback('piggyback-attached', `${source}:${appended.length}`);
+      console.log('[HWA-TRACK][6a/6 PIGGYBACK_ATTACHED]', {
+        time: new Date().toISOString(),
+        source,
+        nativeCalls: request.calls.map((c) => c.name),
+        appendedCalls: appended.map((c) => c.name),
+        totalCalls: request.calls.length + appended.length,
+        xAuthSignatureStripped: true
+      });
       reportQueueStatus();
       if (rpcDispatchMode === 'mqtt-piggyback') window.postMessage({
         source: 'hwa-helper-api', kind: 'mqtt-rpc-nudge-status', state: 'carrier-attached'
@@ -920,6 +949,12 @@
                 const fullText = await response.clone().text();
                 const full = JSON.parse(fullText);
                 if (!response.ok || !Array.isArray(full.results)) throw Error('Piggyback RPC failed');
+                console.log('[HWA-TRACK][6b/6 API_RESPONSE_RECEIVED]', {
+                  time: new Date().toISOString(),
+                  status: response.status,
+                  durationMs: Math.round(duration),
+                  appendedCalls: piggyback.appended.map((c) => c.name)
+                });
                 const appendedIds = new Set(piggyback.appended.map((call) => call.ident));
                 const extraResults = full.results.filter((item) => appendedIds.has(item.ident));
                 if (extraResults.length < piggyback.appended.length) {
@@ -928,6 +963,12 @@
                 }
                 const gameResponse = { ...full,
                   results: full.results.filter((item) => !appendedIds.has(item.ident)) };
+                console.log('[HWA-TRACK][6c/6 API_RESPONSE_SPLIT]', {
+                  time: new Date().toISOString(),
+                  nativeResultsReturnedToGame: gameResponse.results.length,
+                  extraResultsForHelper: extraResults.length,
+                  helperCalls: piggyback.appended.map((c) => c.name)
+                });
                 const headers = new Headers(response.headers);
                 headers.delete('content-length');
                 headers.delete('content-encoding');

@@ -3,7 +3,7 @@ id: doc-ae23757efba5a35e23544c6e9aabb147
 title: Shared RPC Settings
 description: User rule that every helper RPC inherits shared enable and dispatch mode settings unless an explicit feature override exists
 createdAt: '2026-11-06T04:21:46.197Z'
-updatedAt: '2026-11-06T08:36:33.730Z'
+updatedAt: '2026-11-08T10:10:18.099Z'
 tags:
   - rpc
   - settings
@@ -45,14 +45,13 @@ Append results are captured for the extension and stripped from the response ret
 
 1. Construct the feature's known RPC payload, preserving method/feature/args.
 2. Dispatch through the settings-aware background route.
-3. Register any new method in the interceptor's read-only or helper-action queue classification; never classify a mutation as a retryable read.
-4. Test disabled, default Piggyback, explicit Direct, monitoring disabled, settings changes while queued, and failure/expiry behavior.
+3. Register any new mutating action in the interceptor's `helperActionMethods` allowlist (`extension/intercept.js`) and any read-only method in `piggybackMethods`. Unlisted methods are dropped at enqueue time before they can attach to a native carrier or trigger an MQTT nudge (@task-VHE-X2SJ1X). Never classify a mutation as a retryable read.
+4. Test disabled, default Piggyback, MQTT-assisted Piggyback, explicit Direct, monitoring disabled, settings changes while queued, and failure/expiry behavior.
 5. Introduce a feature override only after the user explicitly specifies its settings contract.
 
-Current tests: `tests/background.test.mjs`, `tests/intercept.test.mjs`, `tests/events-ui.test.mjs`, `tests/legend-draft-ui.test.mjs`.
+Current tests: `tests/background.test.mjs`, `tests/intercept.test.mjs`, `tests/mqtt-capture.test.mjs`, `tests/events-ui.test.mjs`, `tests/legend-draft-ui.test.mjs`.
 
-Related references: @doc/architecture/rpc-cache-pipeline, @doc/architecture/auto-claim-automation-bridge, @doc/api/mqtt-processing-and-refresh.
-
+Related references: @doc/architecture/rpc-cache-pipeline, @doc/architecture/auto-claim-automation-bridge, @doc/architecture/mqtt-assisted-piggyback, @doc/api/mqtt-processing-and-refresh.
 
 ## Queue visibility
 
