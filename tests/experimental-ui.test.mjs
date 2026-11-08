@@ -317,6 +317,14 @@ test('Raid rally shows Stop queue inline when queue is running, hides Start queu
   // Active rally status must NOT be duplicated inside dialog body
   assert.equal(rally().all('p').some((p) => p.className?.includes('bg-orange-50')), false,
     'Active rally status should not be inside dialog body since it is in title bar');
+
+  // experimentalMessage must be rendered INSIDE the section card, not outside in dialog body
+  context.experimentalMessage = 'Rally creation sent. Waiting for game confirmation.';
+  context.render();
+  assert.equal(raidBody.children.length, 1, 'Only section card must exist in dialog body');
+  assert.equal(raidBody.children[0].tagName.toUpperCase(), 'SECTION');
+  assert.ok(rally().all('p').some((p) => p.textContent.includes('Rally creation sent. Waiting for game confirmation.')),
+    'experimentalMessage must be inside the section card');
 });
 
 test('Gathering dialog groups inputs into rows and displays title status', async () => {

@@ -5443,8 +5443,8 @@ function renderExperimental(cache, raidOnly = false) {
       rally.append(p);
     }
   }
-  if (experimentalMessage) note(host, experimentalMessage);
-  if (!popupRpcEnabled) note(host, 'Enable Allow popup RPC calls in Settings to use raid actions.');
+  if (experimentalMessage) note(rally, experimentalMessage);
+  if (!popupRpcEnabled) note(rally, 'Enable Allow popup RPC calls in Settings to use raid actions.');
   return;
   }
   const gather = card('Gather troops');
