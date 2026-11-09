@@ -51,6 +51,7 @@
     quest_farm: 'other',
     questFarm: 'other',
     dailyQuestFarm: 'other',
+    dungeonGetInfo: 'events',
     dungeonEndBattle: 'events',
     dungeonSaveProgress: 'events',
     dungeonStartBattle: 'events',
@@ -694,7 +695,9 @@
           }
           if (call.name === 'dungeonGetInfo' && result?.response &&
               typeof result.response === 'object' && !Array.isArray(result.response)) {
-            const snapshot = result.response;
+            const snapshot = (result.response.dungeon && typeof result.response.dungeon === 'object')
+              ? result.response.dungeon
+              : result.response;
             return [{
               key: 'dungeonStatus',
               method: call.name,
@@ -711,7 +714,8 @@
                 states: snapshot.states || {},
                 ...(snapshot.dungeonActivity != null ?
                   { dungeonActivity: Number(snapshot.dungeonActivity) || 0 } : {}),
-                currentFloorDoors: Array.isArray(snapshot.floor?.userData) ? snapshot.floor.userData : []
+                currentFloorDoors: Array.isArray(snapshot.floor?.userData) ? snapshot.floor.userData : [],
+                activeBattle: null
               },
               updatedAt: record.timestamp
             }];

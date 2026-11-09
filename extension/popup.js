@@ -5214,6 +5214,7 @@ function setupDungeonModal() {
   const modal = document.querySelector('#dungeon-modal');
   const trigger = document.querySelector('#dungeon-fab');
   const closeBtn = document.querySelector('#dungeon-modal-close');
+  const refreshBtn = document.querySelector('#dungeon-refresh-btn');
   if (!modal) return;
 
   function closeModal() {
@@ -5223,7 +5224,7 @@ function setupDungeonModal() {
   }
 
   trigger?.addEventListener('click', () =>
-    openDungeonModal(currentCache.dungeonStatus?.data, document.querySelector('#fab-trigger') || trigger));
+    openDungeonModal(currentCache?.dungeonStatus?.data, document.querySelector('#fab-trigger') || trigger));
   if (closeBtn) closeBtn.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeModal();
@@ -5231,6 +5232,81 @@ function setupDungeonModal() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !modal.hidden) closeModal();
   });
+
+  if (refreshBtn) {
+    const defaultRefreshHtml = refreshBtn.innerHTML;
+    refreshBtn.addEventListener('click', () => {
+      if (refreshBtn.disabled) return;
+      if (!popupRpcEnabled) {
+        refreshBtn.innerHTML = `
+          <span class="text-amber-500">⚠️</span>
+          <span class="dungeon-refresh-label text-amber-600 dark:text-amber-400">RPC Disabled</span>
+        `;
+        refreshBtn.title = 'Enable popup RPC calls in Settings to refresh dungeon data.';
+        setTimeout(() => {
+          refreshBtn.innerHTML = defaultRefreshHtml;
+          refreshBtn.title = 'Refresh dungeon data from game (dungeonGetInfo)';
+        }, 2500);
+        return;
+      }
+
+      refreshBtn.disabled = true;
+      refreshBtn.innerHTML = `
+        <svg class="size-3.5 animate-spin text-blue-600 dark:text-blue-400 shrink-0" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        <span class="dungeon-refresh-label text-blue-600 dark:text-blue-400">Refreshing...</span>
+      `;
+
+      const calls = [
+        { name: 'dungeonGetInfo', args: {}, ident: 'dungeonRefresh' },
+        { name: 'teamGetAll', args: {} },
+        { name: 'titanGetAll', args: {} }
+      ];
+      const trackId = 'trk_dungeon_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      const requestedAt = Date.now();
+
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls, trackId, requestedAt }, (response) => {
+          const hasError = Boolean(chrome.runtime.lastError || !response?.ok);
+          if (hasError) {
+            refreshBtn.innerHTML = `
+              <span class="text-rose-500">✕</span>
+              <span class="dungeon-refresh-label text-rose-600 dark:text-rose-400">Failed</span>
+            `;
+            refreshBtn.title = response?.error || 'No active Hero Wars tab found or refresh failed.';
+            setTimeout(() => {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = defaultRefreshHtml;
+              refreshBtn.title = 'Refresh dungeon data from game (dungeonGetInfo)';
+            }, 2500);
+          } else {
+            refreshBtn.innerHTML = `
+              <span class="text-emerald-500">✓</span>
+              <span class="dungeon-refresh-label text-emerald-600 dark:text-emerald-400">${response.queued ? 'Queued' : 'Refreshed'}</span>
+            `;
+            refreshBtn.title = response.queued
+              ? 'Dungeon refresh queued; waiting for native game RPC carrier.'
+              : 'Dungeon data refreshed from game.';
+            setTimeout(() => {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = defaultRefreshHtml;
+              refreshBtn.title = 'Refresh dungeon data from game (dungeonGetInfo)';
+              if (!modal.hidden && typeof currentCache !== 'undefined') {
+                openDungeonModal(currentCache?.dungeonStatus?.data, dungeonModalReturnFocus);
+              }
+            }, 1500);
+          }
+        });
+      } else {
+        setTimeout(() => {
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = defaultRefreshHtml;
+        }, 1000);
+      }
+    });
+  }
 }
 
 function openDraftModal(cache) {
@@ -8816,6 +8892,11 @@ const refreshGroups = {
   mail: [
     { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
     { name: 'mailGetAll' }
+  ],
+  dungeon: [
+    { name: 'dungeonGetInfo', args: {}, ident: 'dungeonRefresh' },
+    { name: 'teamGetAll', args: {} },
+    { name: 'titanGetAll', args: {} }
   ]
 };
 

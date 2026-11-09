@@ -292,3 +292,244 @@ test('replaying sample tracking file verify startBattle, endBattle and saveProgr
   assert.equal(endBattleCount, 41, 'Should process all 41 dungeonEndBattle calls');
   assert.equal(saveProgressCount, 8, 'Should process all 8 dungeonSaveProgress calls');
 });
+
+test('dungeonGetInfo refreshes floor, door enemy teams, and titan hp/energy state in rpc-cache', () => {
+  const previousCache = {
+    dungeonStatus: {
+      data: {
+        floorNumber: 780,
+        activeBattle: { teamNum: 0, heroes: [4000, 4001] },
+        states: {
+          titans: {
+            '4000': { hp: 1000, maxHp: 1000000, energy: 100, isDead: false }
+          }
+        }
+      }
+    }
+  };
+
+  const getInfoRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-09T08:00:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{ name: 'dungeonGetInfo', ident: 'call-refresh-1', args: {} }]
+    }),
+    responseBody: JSON.stringify({
+      results: [
+        {
+          ident: 'call-refresh-1',
+          result: {
+            response: {
+              floorNumber: 782,
+              floorType: 'battle',
+              maxFloorPassed: 781,
+              maxFloorReached: 782,
+              respawnFloor: 776,
+              elements: { prime: 'earth', nonprime: ['water', 'fire'] },
+              states: {
+                titans: {
+                  '4000': { isDead: false, hp: 988545, maxHp: 1469630, energy: 959 },
+                  '4001': { isDead: true, hp: 0, maxHp: 1200000, energy: 0 }
+                }
+              },
+              dungeonActivity: 282,
+              floor: {
+                userData: [
+                  {
+                    attackerType: 'water',
+                    defenderType: 'fire',
+                    power: 42360,
+                    team: [{ id: 4010, level: 120, star: 6 }, { id: 4011, level: 115, star: 5 }]
+                  },
+                  {
+                    attackerType: 'earth',
+                    defenderType: 'water',
+                    power: 25000,
+                    team: [{ id: 4000, level: 110, star: 4 }]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    })
+  };
+
+  const { cache: updatedCache } = cacheModule.merge(previousCache, [getInfoRecord]);
+  const dungeon = updatedCache.dungeonStatus?.data;
+
+  assert.ok(dungeon, 'dungeonStatus data should exist after dungeonGetInfo');
+  assert.equal(dungeon.floorNumber, 782);
+  assert.equal(dungeon.floorType, 'battle');
+  assert.equal(dungeon.respawnFloor, 776);
+  assert.equal(dungeon.elements?.prime, 'earth');
+  assert.deepEqual([...dungeon.elements?.nonprime], ['water', 'fire']);
+  assert.equal(dungeon.dungeonActivity, 282);
+
+  // Active battle must be cleared
+  assert.equal(dungeon.activeBattle, null, 'activeBattle must be cleared on dungeonGetInfo refresh');
+
+  // Titan HP and energy
+  assert.equal(dungeon.states?.titans?.['4000']?.hp, 988545);
+  assert.equal(dungeon.states?.titans?.['4000']?.maxHp, 1469630);
+  assert.equal(dungeon.states?.titans?.['4000']?.energy, 959);
+  assert.equal(dungeon.states?.titans?.['4000']?.isDead, false);
+  assert.equal(dungeon.states?.titans?.['4001']?.isDead, true);
+  assert.equal(dungeon.states?.titans?.['4001']?.hp, 0);
+
+  // Door enemy configurations
+  assert.equal(dungeon.currentFloorDoors?.length, 2);
+  assert.equal(dungeon.currentFloorDoors[0].attackerType, 'water');
+  assert.equal(dungeon.currentFloorDoors[0].defenderType, 'fire');
+  assert.equal(dungeon.currentFloorDoors[0].power, 42360);
+  assert.equal(dungeon.currentFloorDoors[0].team.length, 2);
+  assert.equal(dungeon.currentFloorDoors[0].team[0].id, 4010);
+  assert.equal(dungeon.currentFloorDoors[0].team[0].level, 120);
+  assert.equal(dungeon.currentFloorDoors[0].team[0].star, 6);
+});
+
+test('dungeonGetInfo supports nested response.dungeon structure', () => {
+  const getInfoNestedRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-09T08:05:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{ name: 'dungeonGetInfo', ident: 'call-refresh-2', args: {} }]
+    }),
+    responseBody: JSON.stringify({
+      results: [
+        {
+          ident: 'call-refresh-2',
+          result: {
+            response: {
+              dungeon: {
+                floorNumber: 800,
+                floorType: 'battle',
+                states: {
+                  titans: {
+                    '4020': { isDead: false, hp: 500000, maxHp: 500000, energy: 1000 }
+                  }
+                },
+                floor: {
+                  userData: [{ attackerType: 'fire', defenderType: 'earth', power: 30000, team: [] }]
+                }
+              }
+            }
+          }
+        }
+      ]
+    })
+  };
+
+  const { cache } = cacheModule.merge({}, [getInfoNestedRecord]);
+  assert.equal(cache.dungeonStatus?.data?.floorNumber, 800);
+  assert.equal(cache.dungeonStatus?.data?.states?.titans?.['4020']?.energy, 1000);
+  assert.equal(cache.dungeonStatus?.data?.currentFloorDoors?.[0]?.attackerType, 'fire');
+});
+
+test('popup.html includes #dungeon-refresh-btn with refresh icon and label', async () => {
+  const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
+  assert.ok(popupHtml.includes('id="dungeon-refresh-btn"'), 'popup.html must contain #dungeon-refresh-btn');
+  assert.ok(popupHtml.includes('dungeon-refresh-label'), 'popup.html must contain dungeon-refresh-label span');
+  assert.ok(popupHtml.includes('Refresh dungeon data from game'), 'popup.html must have tooltip for dungeon refresh');
+});
+
+test('setupDungeonModal dispatches dungeonGetInfo, teamGetAll, and titanGetAll when refresh button is clicked', async () => {
+  const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+
+  // Extract setupDungeonModal function from popupJs
+  const match = popupJs.match(/function setupDungeonModal\(\)[\s\S]*?\n\}/);
+  assert.ok(match, 'setupDungeonModal must be defined in popup.js');
+  const setupFnCode = match[0];
+
+  class MockElement {
+    constructor(id) {
+      this.id = id;
+      this.hidden = true;
+      this.disabled = false;
+      this.innerHTML = '<span>Refresh</span>';
+      this.listeners = {};
+    }
+    addEventListener(type, fn) {
+      this.listeners[type] = this.listeners[type] || [];
+      this.listeners[type].push(fn);
+    }
+    click() {
+      (this.listeners['click'] || []).forEach((fn) => fn({ target: this }));
+    }
+  }
+
+  const elements = {
+    '#dungeon-modal': new MockElement('dungeon-modal'),
+    '#dungeon-fab': new MockElement('dungeon-fab'),
+    '#dungeon-modal-close': new MockElement('dungeon-modal-close'),
+    '#dungeon-refresh-btn': new MockElement('dungeon-refresh-btn')
+  };
+
+  let dispatchedMessage = null;
+  const mockChrome = {
+    runtime: {
+      sendMessage: (msg, callback) => {
+        dispatchedMessage = msg;
+        if (typeof callback === 'function') {
+          callback({ ok: true, queued: false });
+        }
+      }
+    }
+  };
+
+  const pendingTimeouts = [];
+  const sandbox = {
+    document: {
+      querySelector: (selector) => elements[selector] || null
+    },
+    window: {
+      addEventListener: () => {}
+    },
+    chrome: mockChrome,
+    popupRpcEnabled: true,
+    currentCache: { dungeonStatus: { data: { floorNumber: 782 } } },
+    openDungeonModal: () => {},
+    dungeonModalReturnFocus: null,
+    setTimeout: (fn) => {
+      pendingTimeouts.push(fn);
+      return pendingTimeouts.length;
+    },
+    Date,
+    Math
+  };
+
+  vm.runInNewContext(`${setupFnCode}; setupDungeonModal();`, sandbox);
+
+  // Click the refresh button
+  elements['#dungeon-refresh-btn'].click();
+
+  assert.ok(dispatchedMessage, 'sendMessage should be called on refresh button click');
+  assert.equal(dispatchedMessage.kind, 'refresh-rpc');
+  assert.equal(dispatchedMessage.calls.length, 3);
+  assert.equal(dispatchedMessage.calls[0].name, 'dungeonGetInfo');
+  assert.equal(dispatchedMessage.calls[1].name, 'teamGetAll');
+  assert.equal(dispatchedMessage.calls[2].name, 'titanGetAll');
+
+  // Verify successful status shown on button before timeout reset
+  assert.ok(elements['#dungeon-refresh-btn'].innerHTML.includes('Refreshed'));
+
+  // Drain restore timeout so button becomes enabled again
+  while (pendingTimeouts.length > 0) pendingTimeouts.shift()();
+  assert.equal(elements['#dungeon-refresh-btn'].disabled, false);
+
+  // Verify warning when popupRpcEnabled is false
+  dispatchedMessage = null;
+  sandbox.popupRpcEnabled = false;
+  elements['#dungeon-refresh-btn'].click();
+  assert.equal(dispatchedMessage, null, 'sendMessage must NOT be called when popupRpcEnabled is false');
+  assert.ok(elements['#dungeon-refresh-btn'].innerHTML.includes('RPC Disabled'));
+
+  // Drain restore timeout
+  while (pendingTimeouts.length > 0) pendingTimeouts.shift()();
+  assert.ok(!elements['#dungeon-refresh-btn'].innerHTML.includes('RPC Disabled'));
+});
