@@ -301,19 +301,25 @@
   </div>
 
   <!-- Floating Guild Chat Panel (Reverse scroll container) -->
-  <div id="guild-chat-panel" hidden class="fixed bottom-18 right-4 z-40 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden flex flex-col transition-all">
-    <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+  <div id="guild-chat-panel" hidden class="fixed bottom-18 right-4 z-40 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden flex flex-col transition-all dark:border-slate-800 dark:bg-slate-900">
+    <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/80">
       <div class="flex items-center gap-2">
         <span class="inline-flex size-2.5 rounded-full bg-emerald-500"></span>
-        <h3 class="font-bold text-sm text-slate-900">Guild Chat</h3>
-        <span id="guild-chat-count" class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">0</span>
+        <h3 class="font-bold text-sm text-slate-900 dark:text-slate-100">Guild Chat</h3>
+        <span id="guild-chat-count" class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-300">0</span>
       </div>
-      <button id="guild-chat-close" type="button" class="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700" aria-label="Close chat">
+      <button id="guild-chat-close" type="button" class="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-label="Close chat">
         <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
-    <div id="guild-chat-messages" class="h-80 overflow-y-auto p-3 space-y-2.5 bg-slate-50/50">
+    <div id="guild-chat-messages" class="h-80 overflow-y-auto p-3 space-y-2.5 bg-slate-50/50 dark:bg-slate-900/40">
     </div>
+    <form id="guild-chat-form" class="border-t border-slate-200 bg-white p-2.5 flex items-center gap-2 dark:border-slate-800 dark:bg-slate-900">
+      <input id="guild-chat-input" type="text" placeholder="Send a message to guild..." maxlength="250" autocomplete="off" class="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500" />
+      <button id="guild-chat-send" type="submit" class="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-500 active:scale-95 disabled:opacity-50 cursor-pointer transition-all shadow-xs" title="Send message" aria-label="Send message">
+        <svg class="size-4 translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
+    </form>
   </div>
   <div id="tower-modal" hidden role="dialog" aria-modal="true" aria-labelledby="tower-modal-title" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs">
     <div class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">

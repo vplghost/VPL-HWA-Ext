@@ -21,7 +21,10 @@ class MockElement {
     this._textContent = String(val);
     this.children = [];
   }
-  get innerHTML() { return this._innerHTML || ''; }
+  get innerHTML() {
+    if (this._innerHTML) return this._innerHTML;
+    return this.children.map(c => `<${c.tagName} class="${c.className}">${c.innerHTML || c.textContent}</${c.tagName}>`).join(' ');
+  }
   set innerHTML(val) {
     this._innerHTML = String(val);
     this._textContent = String(val).replace(/<[^>]*>/g, '');
@@ -40,7 +43,19 @@ class MockElement {
   setAttribute(k, v) { this.attributes[k] = String(v); }
   getAttribute(k) { return this.attributes[k]; }
   removeAttribute(k) { delete this.attributes[k]; }
-  addEventListener() {}
+  addEventListener(name, handler) {
+    this.listeners = this.listeners || {};
+    this.listeners[name] = handler;
+  }
+  async fire(name, event = {}) {
+    await this.listeners?.[name]?.({
+      preventDefault: () => {},
+      stopPropagation: () => {},
+      target: this,
+      currentTarget: this,
+      ...event
+    });
+  }
   replaceChildren(...nodes) { this.children = nodes; }
   querySelector(selector) {
     return this.children.find(c => c.className?.includes(selector.replace('.', ''))) || null;
@@ -56,6 +71,12 @@ const chatBadge = new MockElement('span');
 const chatCount = new MockElement('span');
 const chatMessages = new MockElement('div');
 const chatPanel = new MockElement('div');
+const chatForm = new MockElement('form');
+const chatInput = new MockElement('input');
+const chatSend = new MockElement('button');
+
+let lastSendMessageCall = null;
+let sendMessageHandler = null;
 
 const mockLocalStorage = {};
 const mockChrome = {
@@ -73,6 +94,14 @@ const mockChrome = {
         Object.assign(mockLocalStorage, obj);
       }
     }
+  },
+  runtime: {
+    sendMessage: (msg, callback) => {
+      lastSendMessageCall = msg;
+      if (typeof sendMessageHandler === 'function') {
+        sendMessageHandler(msg, callback);
+      }
+    }
   }
 };
 
@@ -86,6 +115,9 @@ const mockDoc = {
     if (sel === '#guild-chat-count') return chatCount;
     if (sel === '#guild-chat-messages') return chatMessages;
     if (sel === '#guild-chat-panel') return chatPanel;
+    if (sel === '#guild-chat-form') return chatForm;
+    if (sel === '#guild-chat-input') return chatInput;
+    if (sel === '#guild-chat-send') return chatSend;
     return null;
   }
 };
@@ -160,6 +192,7 @@ test('renderGuildChat renders message cards with sender, role, time, and content
     }
   };
 
+  context.currentCache = cache;
   context.renderGuildChat(cache);
 
   const text = chatMessages.textContent;
@@ -205,6 +238,7 @@ test('renderGuildChat filters messages according to search query', () => {
     }
   };
 
+  context.currentCache = cache;
   context.renderGuildChat(cache);
 
   const text = chatMessages.textContent;
@@ -237,6 +271,7 @@ test('renderGuildChat limits visible messages to latest batch and indicates olde
     }
   };
 
+  context.currentCache = cache;
   context.renderGuildChat(cache);
   assert.equal(chatCount.textContent, '25');
   assert.ok(chatMessages.textContent.includes('Scroll up for older messages (10 more)'));
@@ -265,6 +300,7 @@ test('renderGuildChat sorts messages chronologically ascending with newest at th
     }
   };
 
+  context.currentCache = cache;
   context.renderGuildChat(cache);
   assert.equal(chatCount.textContent, '3');
   assert.equal(chatMessages.children.length, 3);
@@ -388,6 +424,7 @@ test('renderGuildChat falls back to view and updates status only when chatMessag
   const savedQuerySelector = mockDoc.querySelector;
   mockDoc.querySelector = (sel) => (sel === '#guild-chat-messages' ? null : savedQuerySelector(sel));
   try {
+    context.currentCache = cache;
     context.renderGuildChat(cache);
     assert.equal(view.children.length, 1);
     assert.ok(view.textContent.includes('Fallback message'));
@@ -415,6 +452,7 @@ test('opening guild chat FAB preserves existing page tab content in view and sta
     }
   };
 
+  context.currentCache = cache;
   context.renderGuildChat(cache);
 
   // FAB panel gets the messages
@@ -451,10 +489,117 @@ test('renderGuildChat and updateGuildChatBadge auto clear messages older than 3 
     }
   };
 
+  context.currentCache = cache;
   context.renderGuildChat(cache);
   assert.ok(chatMessages.textContent.includes('Recent 2d message'), 'Recent message should be rendered');
   assert.ok(!chatMessages.textContent.includes('Expired 4d message'), 'Messages older than 3 days should be cleared');
 
   const unread = context.updateGuildChatBadge(cache, 0);
   assert.equal(unread, 1, 'Only active 1 message within 3 days should count towards unread');
+});
+
+test('sendGuildChatMessage appends message with loading spinner and clears spinner upon game success response', async () => {
+  view.replaceChildren();
+  chatMessages.replaceChildren();
+  search.value = '';
+  context.pendingGuildChatMessages = [];
+
+  const nowSec = Math.floor(Date.parse('2026-11-09T12:00:00.000Z') / 1000);
+  const cache = {
+    accountStatus: { data: { id: '777', name: 'CommanderHero' } },
+    guildChat: {
+      updatedAt: '2026-11-09T12:00:00.000Z',
+      data: {
+        messages: [
+          { id: '1', userId: '1001', ctime: String(nowSec - 3600), chatType: 'clan', data: { text: 'Hello team!' } }
+        ],
+        users: {
+          '1001': { id: '1001', name: 'Member1' }
+        }
+      }
+    }
+  };
+
+  context.currentCache = cache;
+  context.renderGuildChat(cache);
+  assert.ok(chatMessages.textContent.includes('Hello team!'));
+
+  let replyCallback = null;
+  sendMessageHandler = (msg, cb) => {
+    replyCallback = cb;
+  };
+
+  // 1. Send chat message from popup
+  context.sendGuildChatMessage('Raid boss level 150 ready!', cache);
+
+  // Assert pending message appears immediately in UI
+  assert.ok(chatMessages.textContent.includes('Raid boss level 150 ready!'), 'Pending message text must be appended to chat');
+  assert.ok(chatMessages.textContent.includes('CommanderHero'), 'Pending message should display account name');
+  assert.ok(chatMessages.innerHTML.includes('chat-spinner'), 'Pending message must have a loading spinner');
+
+  // Assert RPC call was constructed properly
+  assert.ok(lastSendMessageCall, 'refresh-rpc must be dispatched');
+  assert.equal(lastSendMessageCall.kind, 'refresh-rpc');
+  assert.equal(lastSendMessageCall.calls[0].name, 'chatSendText');
+  assert.equal(lastSendMessageCall.calls[0].args.chatType, 'clan');
+  assert.equal(lastSendMessageCall.calls[0].args.text, 'Raid boss level 150 ready!');
+  assert.equal(lastSendMessageCall.calls[1].name, 'chatGetAll');
+
+  // 2. Simulate game returning success
+  replyCallback({ ok: true });
+
+  // Assert spinner is removed after successful response
+  assert.ok(chatMessages.textContent.includes('Raid boss level 150 ready!'), 'Message remains in UI');
+  assert.ok(!chatMessages.innerHTML.includes('chat-spinner'), 'Spinner must be removed after game returns success');
+
+  // 3. Simulate authoritative server message arrived in cache -> pending is deduplicated
+  const updatedCache = {
+    ...cache,
+    guildChat: {
+      updatedAt: '2026-11-09T12:01:00.000Z',
+      data: {
+        messages: [
+          { id: '1', userId: '1001', ctime: String(nowSec - 3600), chatType: 'clan', data: { text: 'Hello team!' } },
+          { id: '2', userId: '777', ctime: String(nowSec), chatType: 'clan', data: { text: 'Raid boss level 150 ready!' } }
+        ],
+        users: {
+          '1001': { id: '1001', name: 'Member1' },
+          '777': { id: '777', name: 'CommanderHero' }
+        }
+      }
+    }
+  };
+
+  context.renderGuildChat(updatedCache);
+  const occurrences = (chatMessages.textContent.match(/Raid boss level 150 ready!/g) || []).length;
+  assert.equal(occurrences, 1, 'Message must not duplicate when server confirms it');
+});
+
+test('guild-chat-form submission invokes sendGuildChatMessage and clears input', async () => {
+  view.replaceChildren();
+  chatMessages.replaceChildren();
+  context.pendingGuildChatMessages = [];
+
+  const cache = {
+    accountStatus: { data: { id: '777', name: 'CommanderHero' } },
+    guildChat: { data: { messages: [], users: {} } }
+  };
+  context.currentCache = cache;
+
+  context.setupGuildChatInput();
+
+  chatInput.value = '   Good luck everyone!   ';
+  let sentCall = null;
+  sendMessageHandler = (msg, cb) => {
+    sentCall = msg;
+    cb?.({ ok: true });
+  };
+
+  // Trigger form submit
+  await chatForm.fire('submit');
+
+  assert.equal(chatInput.value, '', 'Input must be cleared after sending');
+  assert.ok(sentCall, 'Must send message call');
+  assert.equal(sentCall.calls[0].args.text, 'Good luck everyone!');
+  assert.ok(chatMessages.textContent.includes('Good luck everyone!'));
 });

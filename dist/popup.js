@@ -5219,6 +5219,7 @@ async function markGuildChatAsRead(cache) {
 
 let chatVisibleCount = 15;
 let chatScrollListenerAttached = false;
+let pendingGuildChatMessages = [];
 
 function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   const visibleLimit = (typeof chatVisibleCount !== 'undefined') ? chatVisibleCount : (renderGuildChat.visibleCount || 15);
@@ -5228,10 +5229,30 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   const cutoffSec = refSec > 0 ? refSec - (3 * 24 * 60 * 60) : 0;
   const rawMessages = (Array.isArray(chatData?.messages) ? chatData.messages : [])
     .filter((m) => cutoffSec <= 0 || !m.ctime || Number(m.ctime) >= cutoffSec);
-  const users = chatData?.users || {};
+  const users = { ...(chatData?.users || {}) };
+
+  const myId = String(cache?.accountStatus?.data?.id || 'me');
+  const myName = cache?.accountStatus?.data?.name || 'You';
+  if (!users[myId]) {
+    users[myId] = { id: myId, name: myName };
+  }
+
+  // Deduplicate and filter pending messages that are already confirmed by server in rawMessages
+  if (Array.isArray(pendingGuildChatMessages) && pendingGuildChatMessages.length > 0) {
+    pendingGuildChatMessages = pendingGuildChatMessages.filter((p) => {
+      const match = rawMessages.some((rm) =>
+        rm.data?.text === p.data?.text &&
+        (String(rm.userId) === String(p.userId) || p.userId === 'me') &&
+        (!rm.ctime || !p.ctime || Math.abs(Number(rm.ctime || 0) - Number(p.ctime || 0)) < 86400)
+      );
+      return !match;
+    });
+  }
+
+  const combinedMessages = [...rawMessages, ...(Array.isArray(pendingGuildChatMessages) ? pendingGuildChatMessages : [])];
 
   // Sort messages chronologically ascending (oldest at top, newest at bottom) for standard chat UI dialog flow
-  const sortedMessages = [...rawMessages].sort((a, b) => Number(a.ctime || 0) - Number(b.ctime || 0));
+  const sortedMessages = [...combinedMessages].sort((a, b) => Number(a.ctime || 0) - Number(b.ctime || 0));
 
   const isChatTab = typeof activeTab === 'undefined' || activeTab === 'chat';
   const query = (isChatTab && typeof search !== 'undefined' && search?.value) ? search.value.trim().toLowerCase() : '';
@@ -5354,8 +5375,26 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
     }
 
     const body = document.createElement('div');
-    body.className = 'mt-1 text-xs text-slate-800 break-words whitespace-pre-wrap select-text pl-6.5';
-    body.textContent = m.data?.text || '—';
+    body.className = 'mt-1 text-xs text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap select-text pl-6.5 flex items-start gap-1.5';
+
+    if (m.isPending) {
+      const spinner = document.createElement('span');
+      spinner.className = 'chat-spinner inline-block size-3 shrink-0 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin mt-0.5';
+      spinner.title = 'Sending...';
+      spinner.setAttribute('data-chat-spinner', m.tempId || 'pending');
+      body.append(spinner);
+    } else if (m.status === 'failed') {
+      const errorIcon = document.createElement('span');
+      errorIcon.className = 'chat-error text-red-500 text-xs shrink-0 cursor-help';
+      errorIcon.title = m.error || 'Failed to send';
+      errorIcon.textContent = '⚠️';
+      body.append(errorIcon);
+    }
+
+    const textSpan = document.createElement('span');
+    textSpan.className = m.isPending ? 'text-slate-500 dark:text-slate-400 italic' : '';
+    textSpan.textContent = m.data?.text || '—';
+    body.append(textSpan);
 
     card.append(header, body);
     targetEl.append(card);
@@ -5382,6 +5421,86 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
     });
   }
 }
+
+function sendGuildChatMessage(text, cache = typeof currentCache !== 'undefined' ? currentCache : {}) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return null;
+
+  const myId = String(cache?.accountStatus?.data?.id || 'me');
+  const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const refTime = cache?.guildChat?.updatedAt ? Math.floor(Date.parse(cache.guildChat.updatedAt) / 1000) : 0;
+  const nowSec = refTime > 0 ? refTime : Math.floor(Date.now() / 1000);
+
+  const pendingMsg = {
+    id: tempId,
+    tempId,
+    userId: myId,
+    ctime: String(nowSec),
+    chatType: 'clan',
+    messageType: 'text',
+    data: { text: trimmed },
+    isPending: true,
+    status: 'pending'
+  };
+
+  if (!Array.isArray(pendingGuildChatMessages)) pendingGuildChatMessages = [];
+  pendingGuildChatMessages.push(pendingMsg);
+
+  if (typeof renderGuildChat === 'function') {
+    renderGuildChat(cache, false);
+  }
+
+  const calls = [
+    { name: 'chatSendText', feature: 'chat', args: { chatType: 'clan', text: trimmed } },
+    { name: 'chatGetAll', feature: 'chat', args: { chatType: 'clan' } }
+  ];
+
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    try {
+      const p = chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+        const targetCache = typeof currentCache !== 'undefined' ? currentCache : cache;
+        if (response && response.ok) {
+          pendingMsg.isPending = false;
+          pendingMsg.status = 'success';
+          const spinner = document.querySelector?.(`[data-chat-spinner="${pendingMsg.tempId}"]`);
+          spinner?.remove?.();
+          if (typeof renderGuildChat === 'function' && targetCache) {
+            renderGuildChat(targetCache, true);
+          }
+        } else {
+          pendingMsg.isPending = false;
+          pendingMsg.status = 'failed';
+          pendingMsg.error = response?.error || 'Failed to send';
+          if (typeof renderGuildChat === 'function' && targetCache) {
+            renderGuildChat(targetCache, true);
+          }
+        }
+      });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {}
+  }
+
+  return pendingMsg;
+}
+
+function setupGuildChatInput() {
+  const form = document.querySelector?.('#guild-chat-form');
+  const input = document.querySelector?.('#guild-chat-input');
+  if (!form || !input || form.dataset?.listenerAttached) return;
+
+  if (form.dataset) form.dataset.listenerAttached = 'true';
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = input.value?.trim?.() || '';
+    if (!text) return;
+    input.value = '';
+    sendGuildChatMessage(text);
+  });
+}
+
+globalThis.sendGuildChatMessage = sendGuildChatMessage;
+globalThis.setupGuildChatInput = setupGuildChatInput;
+globalThis.pendingGuildChatMessages = pendingGuildChatMessages;
 
 function renderRpcQueue(count, mode = currentRpcPolicy?.mode) {
   const badge = document.querySelector('#rpc-queue-badge');
@@ -8869,6 +8988,7 @@ setupFabDial();
 setupAutoClaimListeners();
 setupPriorityAutoJoinListeners();
 setupBuildingAndResearchDialogs();
+setupGuildChatInput();
 setInterval(refreshTimed, 1000);
 
 
@@ -8880,10 +9000,13 @@ if (chatFab && chatPanel) {
   chatFab.addEventListener('click', async () => {
     chatPanel.hidden = !chatPanel.hidden;
     if (!chatPanel.hidden) {
+      setupGuildChatInput();
       const prevRead = currentGuildChatLastReadTime;
       renderGuildChat(currentCache, false, prevRead);
       await markGuildChatAsRead(currentCache);
-      chatClose?.focus?.();
+      const input = document.querySelector('#guild-chat-input');
+      if (input && typeof input.focus === 'function') input.focus();
+      else chatClose?.focus?.();
     } else {
       updateGuildChatBadge(currentCache, currentGuildChatLastReadTime);
     }
