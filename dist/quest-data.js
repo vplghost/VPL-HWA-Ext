@@ -1,21 +1,40 @@
 (() => {
-  // specialQuestEventView/48be248d9c2a3f0df5f3ee0cd6800ac7.json (game config 1.293.1010).
-  const hiddenViewIds = new Set([29, 30, 61, 93, 95, 106, 107, 108, 116, 118, 119, 120]);
+  // Game configs: specialQuestEventView, quest_daily, specialQuestEvent_chain, specialQuestEvent_type
+  const defaultHiddenViewIds = [29, 30, 61, 67, 93, 95, 106, 107, 108, 116, 118, 119, 120, 129, 133];
+  const hiddenViewIds = new Set(defaultHiddenViewIds);
+
   const viewTitles = {
-    65: 'Clan Clash Event', 94: 'Hero Upgrade Event', 99: 'Hero’s Way',
-    126: 'Faction Event I', 127: 'Faction Event II', 128: 'Faction Event III',
-    129: 'Relic Pass', 67: 'Glory Pass'
+    29: "Wendy's Special Gift",
+    30: 'Hero Promotion Milestone',
+    65: 'Clan Clash Event',
+    67: 'Glory Pass',
+    83: 'Arms Race & Military Growth',
+    84: 'Ascension Festival',
+    94: 'Hero Upgrade Event',
+    95: "Hero's Way Milestone Pass",
+    99: 'Hero’s Way',
+    126: 'Faction Clash I',
+    127: 'Faction Clash II',
+    128: 'Faction Clash III',
+    129: 'Relic Pass',
+    133: 'Season Battle Pass'
   };
+
   const dailyTitles = {
     346: 'Complete a building upgrade',
     348: 'Complete a personal research',
     349: 'Train units in barracks',
     350: 'Heal wounded units',
+    351: 'Claim Daily Free Energy (Noon Bonus)',
+    352: 'Claim Daily Free Energy (Evening Bonus)',
+    353: 'Claim Daily Free Energy (Night Bonus)',
     354: 'Gather food on world map',
     355: 'Gather wood on world map',
     356: 'Gather 10,000 stone',
     357: 'Gather gold on world map',
     358: 'Spend energy on battles',
+    359: 'Gather 100,000 wood on world map',
+    360: 'Gather 100,000 stone on world map',
     361: 'Defeat monsters on world map',
     362: 'Help clan members',
     363: 'Win 5 camp battles',
@@ -27,11 +46,115 @@
     370: 'Complete daily activity goals',
     2413: 'Fight in Titan Dungeon'
   };
+
+  const localeTitles = {
+    QUEST_TAB_NAME_SKINSTONES_SPEND: { title: 'Spend Hero Skin Stones', category: 'Resources', unit: 'stones', amount: 100 },
+    QUEST_TAB_NAME_TITAN_SKINSTONES_SPEND: { title: 'Spend Titan Skin Stones', category: 'Resources', unit: 'stones', amount: 15 },
+    LIB_PSEUDO_STAMINA: { title: 'Spend Energy', category: 'Resources', unit: 'energy', amount: 100 },
+    LIB_PSEUDO_STARMONEY: { title: 'Spend Emeralds', category: 'Resources', unit: 'emeralds', amount: 100 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TRAIN_SPEEDUP: { title: 'Use Training Speedups', category: 'Resources', unit: 'speedups', amount: 1 },
+    RECOMMENDATION_RUNES_NEW: { title: 'Upgrade Runes', category: 'Resources', unit: 'runes', amount: 1 },
+    QUEST_TAB_NAME_TOWER_CHESTS: { title: 'Open Tower Chests', category: 'Activities', unit: 'chests', amount: 1 },
+    UI_FEATURE_HUB_ARENA_TITLE: { title: 'Fight in Arena', category: 'Activities', unit: 'battles', amount: 1 },
+    STRATEGIC_GLOBAL_MAP_RALLY_POPUP_TITLE: { title: 'Defeat Map Boss / Rally', category: 'Activities', unit: 'bosses', amount: 1 },
+    QUEST_TAB_NAME_GET_VIP: { title: 'Obtain VIP Points', category: 'Activities', unit: 'points', amount: 1 },
+    QUEST_TAB_NAME_LOGIN: { title: 'Daily Sign In', category: 'Activities', unit: 'days', amount: 1 },
+    UI_DIALOG_HERO_ARTIFACTS_ARTIFACT_EVOLUTION: { title: 'Evolve Hero Artifacts', category: 'Activities', unit: 'evolutions', amount: 1 },
+    QUEST_TAB_NAME_ARTLEVEL: { title: 'Level Up Artifacts', category: 'Activities', unit: 'levels', amount: 1 },
+    QUEST_TAB_NAME_HERO_RANK: { title: 'Promote Hero Rank', category: 'Activities', unit: 'ranks', amount: 1 },
+    QUEST_TAB_HERO_LEVEL: { title: 'Level Up Heroes', category: 'Activities', unit: 'levels', amount: 1 },
+    UI_CLANBOSS_MENU_ALTAR: { title: 'Pray at Clan Altar', category: 'Activities', unit: 'prayers', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_LOSEUNITS: { title: 'PvP Unit Battles', category: 'Activities', unit: 'units', amount: 1 },
+    LIB_TEST_BP_DAILY_QUESTS: { title: 'Battle Pass Daily Quests', category: 'Activities', unit: 'quests', amount: 1 },
+    LIB_TEST_BP_SINGLE_QUESTS: { title: 'Battle Pass Milestones', category: 'Activities', unit: 'milestones', amount: 1 },
+    LIB_SEASONAL_EVENT_NAME_FACTION_1: { title: 'Faction Quests: Honor', category: 'Activities', unit: 'quests', amount: 1 },
+    LIB_SEASONAL_EVENT_NAME_FACTION_2: { title: 'Faction Quests: Mastery', category: 'Activities', unit: 'quests', amount: 1 },
+    STRATEGIC_BASE_INTERFACE_BUTTON_SPEEDUPS: { title: 'Use Speedups in City', category: 'Resources', unit: 'speedups', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TRAIN_TROOPS: { title: 'Train Troops in Barracks', category: 'Activities', unit: 'troops', amount: 100 },
+    STRATEGIC_RESOURCE_12_NAME: { title: 'Gather Iron / Ore on Map', category: 'Resources', unit: 'iron', amount: 1000 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_PVPKILLUNITS: { title: 'Defeat Enemy Units in PvP', category: 'Activities', unit: 'units', amount: 50 },
+    UI_DIALOG_BOSS_TITLE: { title: 'Defeat World Map Bosses', category: 'Activities', unit: 'bosses', amount: 1 },
+    UI_HEROIC_CHEST_MAIN_TITLE: { title: 'Open Heroic Chests', category: 'Activities', unit: 'chests', amount: 1 },
+    QUEST_TAB_NAME_SPEND_ARTCOINS: { title: 'Spend Artifact Coins', category: 'Resources', unit: 'coins', amount: 100 },
+    LIB_AGGREGATOR_BUTTON_LADDER_HERO_RELIC: { title: 'Upgrade Hero Relics', category: 'Activities', unit: 'relics', amount: 1 },
+    QUEST_TAB_NAME_SPEND_RUNE_SPHERES: { title: 'Spend Rune Spheres', category: 'Resources', unit: 'spheres', amount: 1 },
+    UI_DIALOG_ARTIFACT_CHEST_DROP_PACK1: { title: 'Open Artifact Chests', category: 'Activities', unit: 'chests', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_NAME_9: { title: 'Clash of Worlds Battles', category: 'Activities', unit: 'battles', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_48: { title: 'Clan Clash Victories', category: 'Activities', unit: 'wins', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_763: { title: 'Titan Power & Evolution', category: 'Activities', unit: 'points', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_64: { title: 'Guild Activity & Titanite', category: 'Activities', unit: 'points', amount: 100 },
+    LIB_SPECIAL_QUEST_EVENT_NAME_38: { title: 'Hero Ascension Milestones', category: 'Activities', unit: 'tiers', amount: 1 },
+    UI_HERO78_TITLE: { title: 'Wodryn Hero Quests', category: 'Activities', unit: 'quests', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_NAME_143: { title: 'Tower Floor Progress', category: 'Activities', unit: 'floors', amount: 5 }
+  };
+
+  const questTemplates = {
+    10001: 'Level up hero skills',
+    10002: 'Complete any campaign mission',
+    10003: 'Complete heroic campaign missions',
+    10004: 'Fight in Arena',
+    10006: 'Use Emerald Exchange',
+    10007: 'Open Heroic Chest',
+    10009: 'Claim Free Energy (Bonus Stamina)',
+    10010: 'Claim Free Energy (Bonus Stamina)',
+    10011: "Valkyrie's Favor Subscription Bonus",
+    10013: 'Earn Guild Activity Points',
+    10014: 'Earn Guild Activity Points',
+    10015: 'Claim Free Energy (Bonus Stamina)',
+    10016: 'Send gifts to friends',
+    10018: 'Use Hero EXP potions',
+    10019: 'Open Tower Chests',
+    10020: 'Watch Boxy video',
+    10021: 'Open Outland Boss Chests',
+    10022: 'Spend Energy',
+    10031: 'Collect Titanite in Dungeon',
+    10032: 'Collect Titanite in Dungeon',
+    10033: 'Upgrade Titan Gift of the Elements',
+    10034: 'Level up a Hero Artifact',
+    10035: 'Send heroes on Expeditions',
+    10036: 'Send heroes on Expeditions',
+    10039: 'Defeat all 3 Outland Bosses',
+    10040: 'Level up a Hero Skin',
+    10041: 'Attack Clan Boss Hydra',
+    10044: 'Use Emerald Exchange',
+    10082: 'Open chests in Tower',
+    10091: 'Fight in Legend Draft',
+    10092: 'Fight in Grand Arena',
+    10093: 'Collect Eternal Story Chest',
+    10101: 'Start Expeditions',
+    10102: 'Obtain VIP Points',
+    10104: 'Fight in Arena',
+    10107: 'Open chests in Tower',
+    10108: 'Collect Titanite in Dungeon'
+  };
+
+  function registerRuntimeDefinitions(overrides = {}) {
+    if (!overrides || typeof overrides !== 'object') return;
+    if (overrides.dailyTitles) Object.assign(dailyTitles, overrides.dailyTitles);
+    if (overrides.viewTitles) Object.assign(viewTitles, overrides.viewTitles);
+    if (overrides.localeTitles) Object.assign(localeTitles, overrides.localeTitles);
+    if (overrides.questTemplates) Object.assign(questTemplates, overrides.questTemplates);
+    if (Array.isArray(overrides.hiddenViewIds)) {
+      overrides.hiddenViewIds.forEach((id) => hiddenViewIds.add(Number(id)));
+    }
+  }
+
+  // Auto-load runtime overrides from storage
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+      chrome.storage.local.get(['questCatalog', 'questDefinitions']).then((stored) => {
+        if (stored?.questCatalog) registerRuntimeDefinitions(stored.questCatalog);
+        if (stored?.questDefinitions) registerRuntimeDefinitions(stored.questDefinitions);
+      }).catch(() => {});
+    }
+  } catch (_) {}
+
   const nextReset = (cache, now) => {
     const next = cache?.questResetStatus?.data?.nextDayAt;
     if (!Number.isFinite(next)) return null;
     return next > now ? next : next + (Math.floor((now - next) / 86400000) + 1) * 86400000;
   };
+
   function dailyQuests(cache, now = Date.now()) {
     const entry = cache?.['getDailyQuests:quest'];
     if (!Array.isArray(entry?.data?.quests)) return null;
@@ -41,6 +164,7 @@
       ? observedAt < resetAt - 86400000 : new Date(observedAt).toDateString() !== new Date(now).toDateString())) return null;
     return entry.data.quests;
   }
+
   function visibleGroups(event) {
     return (event?.groups || []).filter((group) => group && !group.hide).map((group) => ({
       ...group,
@@ -48,6 +172,7 @@
         quest && !group.inactiveQuestIds?.some((id) => String(id) === String(quest.id)))
     }));
   }
+
   function visibleEvents(cache, now = Date.now()) {
     const entry = cache?.specialQuestStatus;
     const resetAt = nextReset(cache, now);
@@ -56,19 +181,63 @@
     return (entry?.data?.events || []).filter((event) =>
       Number.isFinite(event?.start) && Number.isFinite(event?.end) &&
       event.start <= now && now < event.end && Number.isInteger(event.viewId) &&
-      !hiddenViewIds.has(event.viewId))
+      !hiddenViewIds.has(event.viewId) && !event.clientData?.hideInSpecialQuestPopup)
       .map((event) => ({ ...event, groups: visibleGroups(event).filter((group) =>
         group.repeatType !== 'daily' || dailyFresh) }))
       .filter((event) => event.groups.length > 0);
   }
+
   function visibleMetadata(cache, now = Date.now()) {
     return (cache?.questEvents?.data?.events || []).filter((event) =>
       !event?.clientData?.hideInSpecialQuestPopup &&
       Number.isFinite(event.startTime) && Number.isFinite(event.endTime) &&
       event.startTime * 1000 <= now && now < event.endTime * 1000);
   }
+
+  function formatLocaleKey(key) {
+    if (!key || typeof key !== 'string') return 'Special Quest';
+    const clean = key
+      .replace(/^(LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_|LIB_SPECIAL_QUEST_EVENT_NAME_|LIB_SEASONAL_EVENT_NAME_|LIB_TEST_BP_|QUEST_TAB_NAME_|QUEST_TAB_|UI_DIALOG_|UI_FEATURE_HUB_|UI_)/, '')
+      .replace(/_/g, ' ')
+      .trim();
+    if (!clean) return 'Special Quest';
+    if (/^\d+$/.test(clean)) return `Mission Chain #${clean}`;
+    return clean.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
   const title = (event) => viewTitles[event?.viewId] || `Special Event #${event?.id}`;
-  const dailyTitle = (quest) => dailyTitles[quest?.id] || `Daily Quest #${quest?.id}`;
-  globalThis.hwaHelperQuestData = { dailyQuests, visibleEvents, visibleMetadata,
-    visibleGroups, nextReset, title, dailyTitle, dailyTitles };
+
+  const dailyTitle = (quest) => {
+    const id = quest?.id ?? quest;
+    if (dailyTitles[id]) return dailyTitles[id];
+    if (questTemplates[id]) return questTemplates[id];
+    return `Daily Quest #${id}`;
+  };
+
+  const groupTitle = (localeKey) => {
+    if (!localeKey) return 'Special Quest';
+    if (localeTitles[localeKey]?.title) return localeTitles[localeKey].title;
+    return formatLocaleKey(localeKey);
+  };
+
+  const questTemplateTitle = (id) => questTemplates[id] || null;
+
+  const isRecognizedQuest = (id) => Boolean(dailyTitles[id] || questTemplates[id]);
+
+  const getCatalog = () => ({
+    dailyTitles: { ...dailyTitles },
+    viewTitles: { ...viewTitles },
+    hiddenViewIds: Array.from(hiddenViewIds),
+    localeTitles: { ...localeTitles },
+    questTemplates: { ...questTemplates }
+  });
+
+  const exportCatalogJson = () => JSON.stringify(getCatalog(), null, 2);
+
+  globalThis.hwaHelperQuestData = {
+    dailyQuests, visibleEvents, visibleMetadata, visibleGroups, nextReset,
+    title, dailyTitle, dailyTitles, viewTitles, hiddenViewIds, localeTitles,
+    questTemplates, groupTitle, questTemplateTitle, isRecognizedQuest,
+    registerRuntimeDefinitions, getCatalog, exportCatalogJson
+  };
 })();

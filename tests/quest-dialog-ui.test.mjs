@@ -305,14 +305,20 @@ test('renderQuestDetailDialog renders filter tabs, search input, status badge, a
   // Status should contain Ready count badge
   assert.ok(statusEl.textContent.includes('Ready to Claim'));
 
-  // Body should contain toolbar (tabs + search) and cards container
+  // Body should contain toolbar (tabs + search + action buttons) and cards container
   assert.ok(bodyEl.children.length >= 2);
   const toolbar = bodyEl.children[0];
-  const tabs = toolbar.all('button');
-  assert.equal(tabs.length, 4); // All, Daily, Event, Ready
+  const allButtons = toolbar.all('button');
+  assert.equal(allButtons.length, 6); // 4 filter tabs + 2 action buttons (Refresh, Export)
 
-  const searchInput = toolbar.children.find((c) => c.tagName === 'input');
+  const filterTabs = allButtons.filter((b) => ['All', 'Daily', 'Event', 'Ready'].some((k) => b.textContent.includes(k)));
+  assert.equal(filterTabs.length, 4);
+  const tabs = filterTabs;
+
+  const searchInput = toolbar.querySelector('#quest-detail-search') || toolbar.all('input')[0];
   assert.ok(searchInput);
+  assert.ok(allButtons.find((b) => b.id === 'quest-detail-refresh'));
+  assert.ok(allButtons.find((b) => b.id === 'quest-detail-export'));
 
   const cardsContainer = bodyEl.children[1];
   const grid = cardsContainer.children[0];

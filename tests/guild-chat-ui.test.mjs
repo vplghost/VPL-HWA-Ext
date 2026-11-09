@@ -424,3 +424,37 @@ test('opening guild chat FAB preserves existing page tab content in view and sta
   assert.equal(view.children[0].textContent, 'Dante (Hero details)');
   assert.equal(status.textContent, '54 heroes');
 });
+
+test('renderGuildChat and updateGuildChatBadge auto clear messages older than 3 days of cache updatedAt', () => {
+  view.replaceChildren();
+  chatMessages.replaceChildren();
+  search.value = '';
+
+  const atNow = '2026-11-05T12:00:00.000Z';
+  const nowSec = Math.floor(Date.parse(atNow) / 1000);
+  const twoDaysAgo = String(nowSec - 2 * 86400);
+  const fourDaysAgo = String(nowSec - 4 * 86400);
+
+  const cache = {
+    guildChat: {
+      updatedAt: atNow,
+      data: {
+        messages: [
+          { id: 'recent', userId: '1001', ctime: twoDaysAgo, chatType: 'clan', data: { text: 'Recent 2d message' } },
+          { id: 'expired', userId: '1002', ctime: fourDaysAgo, chatType: 'clan', data: { text: 'Expired 4d message' } }
+        ],
+        users: {
+          '1001': { id: '1001', name: 'ActiveMember' },
+          '1002': { id: '1002', name: 'OldMember' }
+        }
+      }
+    }
+  };
+
+  context.renderGuildChat(cache);
+  assert.ok(chatMessages.textContent.includes('Recent 2d message'), 'Recent message should be rendered');
+  assert.ok(!chatMessages.textContent.includes('Expired 4d message'), 'Messages older than 3 days should be cleared');
+
+  const unread = context.updateGuildChatBadge(cache, 0);
+  assert.equal(unread, 1, 'Only active 1 message within 3 days should count towards unread');
+});

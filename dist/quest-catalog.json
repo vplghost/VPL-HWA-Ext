@@ -1,0 +1,394 @@
+{
+  "dailyTitles": {
+    "346": "Complete a building upgrade",
+    "348": "Complete a personal research",
+    "349": "Train units in barracks",
+    "350": "Heal wounded units",
+    "351": "Claim Daily Free Energy (Noon Bonus)",
+    "352": "Claim Daily Free Energy (Evening Bonus)",
+    "353": "Claim Daily Free Energy (Night Bonus)",
+    "354": "Gather food on world map",
+    "355": "Gather wood on world map",
+    "356": "Gather 10,000 stone on world map",
+    "357": "Gather gold on world map",
+    "358": "Spend energy on battles",
+    "359": "Gather 100,000 wood on world map",
+    "360": "Gather 100,000 stone on world map",
+    "361": "Defeat monsters on world map",
+    "362": "Help clan members",
+    "363": "Win 5 camp battles",
+    "365": "Open chests in Tower",
+    "366": "Fight in Arena or Grand Arena",
+    "367": "Send heroes on Expeditions",
+    "368": "Level up a hero or skill",
+    "369": "Open free heroic chest",
+    "370": "Complete daily activity goals",
+    "2413": "Fight in Titan Dungeon"
+  },
+  "viewTitles": {
+    "29": "Wendy's Special Gift",
+    "30": "Hero Promotion Milestone",
+    "65": "Clan Clash Event",
+    "67": "Glory Pass",
+    "83": "Arms Race & Military Growth",
+    "84": "Ascension Festival",
+    "94": "Hero Upgrade Event",
+    "95": "Hero's Way Milestone Pass",
+    "99": "Hero's Way Season",
+    "126": "Faction Clash I",
+    "127": "Faction Clash II",
+    "128": "Faction Clash III",
+    "129": "Relic Pass",
+    "133": "Season Battle Pass"
+  },
+  "hiddenViewIds": [
+    29,
+    30,
+    61,
+    67,
+    93,
+    95,
+    106,
+    107,
+    108,
+    116,
+    118,
+    119,
+    120,
+    129,
+    133
+  ],
+  "localeTitles": {
+    "QUEST_TAB_NAME_SKINSTONES_SPEND": {
+      "title": "Spend Hero Skin Stones",
+      "category": "Resources",
+      "unit": "stones",
+      "amount": 100
+    },
+    "QUEST_TAB_NAME_TITAN_SKINSTONES_SPEND": {
+      "title": "Spend Titan Skin Stones",
+      "category": "Resources",
+      "unit": "stones",
+      "amount": 15
+    },
+    "LIB_PSEUDO_STAMINA": {
+      "title": "Spend Energy",
+      "category": "Resources",
+      "unit": "energy",
+      "amount": 100
+    },
+    "LIB_PSEUDO_STARMONEY": {
+      "title": "Spend Emeralds",
+      "category": "Resources",
+      "unit": "emeralds",
+      "amount": 100
+    },
+    "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TRAIN_SPEEDUP": {
+      "title": "Use Training Speedups",
+      "category": "Resources",
+      "unit": "speedups",
+      "amount": 1
+    },
+    "RECOMMENDATION_RUNES_NEW": {
+      "title": "Upgrade Runes",
+      "category": "Resources",
+      "unit": "runes",
+      "amount": 1
+    },
+    "QUEST_TAB_NAME_TOWER_CHESTS": {
+      "title": "Open Tower Chests",
+      "category": "Activities",
+      "unit": "chests",
+      "amount": 1
+    },
+    "UI_FEATURE_HUB_ARENA_TITLE": {
+      "title": "Fight in Arena",
+      "category": "Activities",
+      "unit": "battles",
+      "amount": 1
+    },
+    "STRATEGIC_GLOBAL_MAP_RALLY_POPUP_TITLE": {
+      "title": "Defeat Map Boss / Rally",
+      "category": "Activities",
+      "unit": "bosses",
+      "amount": 1
+    },
+    "QUEST_TAB_NAME_GET_VIP": {
+      "title": "Obtain VIP Points",
+      "category": "Activities",
+      "unit": "points",
+      "amount": 1
+    },
+    "QUEST_TAB_NAME_LOGIN": {
+      "title": "Daily Sign In",
+      "category": "Activities",
+      "unit": "days",
+      "amount": 1
+    },
+    "UI_DIALOG_HERO_ARTIFACTS_ARTIFACT_EVOLUTION": {
+      "title": "Evolve Hero Artifacts",
+      "category": "Activities",
+      "unit": "evolutions",
+      "amount": 1
+    },
+    "QUEST_TAB_NAME_ARTLEVEL": {
+      "title": "Level Up Artifacts",
+      "category": "Activities",
+      "unit": "levels",
+      "amount": 1
+    },
+    "QUEST_TAB_NAME_HERO_RANK": {
+      "title": "Promote Hero Rank",
+      "category": "Activities",
+      "unit": "ranks",
+      "amount": 1
+    },
+    "QUEST_TAB_HERO_LEVEL": {
+      "title": "Level Up Heroes",
+      "category": "Activities",
+      "unit": "levels",
+      "amount": 1
+    },
+    "UI_CLANBOSS_MENU_ALTAR": {
+      "title": "Pray at Clan Altar",
+      "category": "Activities",
+      "unit": "prayers",
+      "amount": 1
+    },
+    "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_LOSEUNITS": {
+      "title": "PvP Unit Battles",
+      "category": "Activities",
+      "unit": "units",
+      "amount": 1
+    },
+    "LIB_TEST_BP_DAILY_QUESTS": {
+      "title": "Battle Pass Daily Quests",
+      "category": "Activities",
+      "unit": "quests",
+      "amount": 1
+    },
+    "LIB_TEST_BP_SINGLE_QUESTS": {
+      "title": "Battle Pass Milestones",
+      "category": "Activities",
+      "unit": "milestones",
+      "amount": 1
+    },
+    "LIB_SEASONAL_EVENT_NAME_FACTION_1": {
+      "title": "Faction Quests: Honor",
+      "category": "Activities",
+      "unit": "quests",
+      "amount": 1
+    },
+    "LIB_SEASONAL_EVENT_NAME_FACTION_2": {
+      "title": "Faction Quests: Mastery",
+      "category": "Activities",
+      "unit": "quests",
+      "amount": 1
+    },
+    "STRATEGIC_BASE_INTERFACE_BUTTON_SPEEDUPS": {
+      "title": "Use Speedups in City",
+      "category": "Resources",
+      "unit": "speedups",
+      "amount": 1
+    },
+    "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TRAIN_TROOPS": {
+      "title": "Train Troops in Barracks",
+      "category": "Activities",
+      "unit": "troops",
+      "amount": 100
+    },
+    "STRATEGIC_RESOURCE_12_NAME": {
+      "title": "Gather Iron / Ore on Map",
+      "category": "Resources",
+      "unit": "iron",
+      "amount": 1000
+    },
+    "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_PVPKILLUNITS": {
+      "title": "Defeat Enemy Units in PvP",
+      "category": "Activities",
+      "unit": "units",
+      "amount": 50
+    },
+    "UI_DIALOG_BOSS_TITLE": {
+      "title": "Defeat World Map Bosses",
+      "category": "Activities",
+      "unit": "bosses",
+      "amount": 1
+    },
+    "UI_HEROIC_CHEST_MAIN_TITLE": {
+      "title": "Open Heroic Chests",
+      "category": "Activities",
+      "unit": "chests",
+      "amount": 1
+    },
+    "QUEST_TAB_NAME_SPEND_ARTCOINS": {
+      "title": "Spend Artifact Coins",
+      "category": "Resources",
+      "unit": "coins",
+      "amount": 100
+    },
+    "LIB_AGGREGATOR_BUTTON_LADDER_HERO_RELIC": {
+      "title": "Upgrade Hero Relics",
+      "category": "Activities",
+      "unit": "relics",
+      "amount": 1
+    },
+    "QUEST_TAB_NAME_SPEND_RUNE_SPHERES": {
+      "title": "Spend Rune Spheres",
+      "category": "Resources",
+      "unit": "spheres",
+      "amount": 1
+    },
+    "UI_DIALOG_ARTIFACT_CHEST_DROP_PACK1": {
+      "title": "Open Artifact Chests",
+      "category": "Activities",
+      "unit": "chests",
+      "amount": 1
+    },
+    "LIB_SPECIAL_QUEST_EVENT_NAME_9": {
+      "title": "Clash of Worlds Battles",
+      "category": "Activities",
+      "unit": "battles",
+      "amount": 1
+    },
+    "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_48": {
+      "title": "Clan Clash Victories",
+      "category": "Activities",
+      "unit": "wins",
+      "amount": 1
+    },
+    "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_763": {
+      "title": "Titan Power & Evolution",
+      "category": "Activities",
+      "unit": "points",
+      "amount": 1
+    },
+    "LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_64": {
+      "title": "Guild Activity & Titanite",
+      "category": "Activities",
+      "unit": "points",
+      "amount": 100
+    },
+    "LIB_SPECIAL_QUEST_EVENT_NAME_38": {
+      "title": "Hero Ascension Milestones",
+      "category": "Activities",
+      "unit": "tiers",
+      "amount": 1
+    },
+    "UI_HERO78_TITLE": {
+      "title": "Wodryn Hero Quests",
+      "category": "Activities",
+      "unit": "quests",
+      "amount": 1
+    },
+    "LIB_SPECIAL_QUEST_EVENT_NAME_143": {
+      "title": "Tower Floor Progress",
+      "category": "Activities",
+      "unit": "floors",
+      "amount": 5
+    }
+  },
+  "questTemplates": {
+    "10001": "Level up hero skills",
+    "10002": "Complete any campaign mission",
+    "10003": "Complete heroic campaign missions",
+    "10004": "Fight in Arena",
+    "10006": "Use Emerald Exchange",
+    "10007": "Open Heroic Chest",
+    "10009": "Claim Free Energy (Bonus Stamina)",
+    "10010": "Claim Free Energy (Bonus Stamina)",
+    "10011": "Valkyrie's Favor Subscription Bonus",
+    "10013": "Earn Guild Activity Points",
+    "10014": "Earn Guild Activity Points",
+    "10015": "Claim Free Energy (Bonus Stamina)",
+    "10016": "Send gifts to friends",
+    "10018": "Use Hero EXP potions",
+    "10019": "Open Tower Chests",
+    "10020": "Watch Boxy video",
+    "10021": "Open Outland Boss Chests",
+    "10022": "Spend Energy",
+    "10023": "Spend energy",
+    "10024": "Spend energy",
+    "10025": "Spend energy",
+    "10026": "Spend energy",
+    "10027": "Spend energy",
+    "10030": "Kill some robbers",
+    "10031": "Collect Titanite in Dungeon",
+    "10032": "Collect Titanite in Dungeon",
+    "10033": "Upgrade Titan Gift of the Elements",
+    "10034": "Level up a Hero Artifact",
+    "10035": "Send heroes on Expeditions",
+    "10036": "Send heroes on Expeditions",
+    "10037": "Boss chest",
+    "10038": "Boss chest",
+    "10039": "Defeat all 3 Outland Bosses",
+    "10040": "Level up a Hero Skin",
+    "10041": "Attack Clan Boss Hydra",
+    "10042": "Clan boss attack",
+    "10043": "Clan boss attack",
+    "10044": "Use Emerald Exchange",
+    "10045": "Boss chest",
+    "10046": "Spend energy",
+    "10047": "Spend energy",
+    "10048": "Spend energy",
+    "10049": "Activity points",
+    "10050": "Mission complete elite any",
+    "10051": "Mission complete elite any",
+    "10052": "Mission complete elite any",
+    "10053": "Mission complete elite any",
+    "10054": "Mission complete elite any",
+    "10055": "Mission complete any",
+    "10056": "Mission complete any",
+    "10057": "Mission complete any",
+    "10058": "Mission complete any",
+    "10059": "Mission complete any",
+    "10060": "Mission complete any",
+    "10061": "Mission complete any",
+    "10062": "Video play",
+    "10063": "Video play",
+    "10064": "Hero skin upgrade",
+    "10065": "Hero skin upgrade",
+    "10066": "Hero skin upgrade",
+    "10067": "Boss battle",
+    "10068": "Boss battle",
+    "10069": "Boss battle",
+    "10070": "Start expedition",
+    "10071": "Artifact level up",
+    "10072": "Artifact level up",
+    "10073": "Artifact level up",
+    "10074": "Chest open count",
+    "10075": "Chest open count",
+    "10076": "Alchemy count",
+    "10078": "Alchemy count",
+    "10079": "Hero upgrade skill count",
+    "10080": "Hero upgrade skill count",
+    "10081": "Titan gift level up",
+    "10082": "Open chests in Tower",
+    "10083": "Tower chest",
+    "10084": "Tower chest",
+    "10085": "Tower chest",
+    "10086": "Boss chest",
+    "10088": "Daily quest farm",
+    "10089": "Daily quest farm",
+    "10090": "Daily quest farm",
+    "10091": "Fight in Legend Draft",
+    "10092": "Fight in Grand Arena",
+    "10093": "Collect Eternal Story Chest",
+    "10096": "Mission complete any",
+    "10097": "Mission complete any",
+    "10098": "Mission complete any",
+    "10099": "Mission complete any",
+    "10100": "Mission complete any",
+    "10101": "Start Expeditions",
+    "10102": "Obtain VIP Points",
+    "10103": "Hero upgrade skill count",
+    "10104": "Fight in Arena",
+    "10105": "Chest open count",
+    "10106": "Activity points",
+    "10107": "Open chests in Tower",
+    "10108": "Collect Titanite in Dungeon",
+    "10109": "Hero skin upgrade",
+    "10110": "Clan boss attack",
+    "10111": "Grand arena battle count"
+  }
+}

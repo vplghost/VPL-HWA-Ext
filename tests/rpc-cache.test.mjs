@@ -814,6 +814,36 @@ test('chatGetAll extracts clan and announcement messages and merges deduplicated
   assert.equal(state2.guildChat.data.users.u1.name, 'MemberBob');
 });
 
+test('chatGetAll automatically purges guild chat messages older than 3 days', () => {
+  const atNow = '2026-11-05T12:00:00.000Z';
+  const nowSec = Math.floor(Date.parse(atNow) / 1000); // 1793880000 approx
+  const twoDaysAgo = String(nowSec - 2 * 86400);
+  const fourDaysAgo = String(nowSec - 4 * 86400);
+
+  const chatRecord = record([
+    { name: 'chatGetAll', ident: 'chat-purge', args: { chatType: 'clan' } }
+  ], [
+    { ident: 'chat-purge', result: { response: {
+      messages: [
+        { id: 'recent', userId: 'u1', messageType: 'text', chatType: 'clan', ctime: twoDaysAgo, data: { text: 'Recent 2d message' } },
+        { id: 'old', userId: 'u2', messageType: 'text', chatType: 'clan', ctime: fourDaysAgo, data: { text: 'Expired 4d message' } }
+      ],
+      users: {
+        u1: { id: 'u1', name: 'ActiveUser' },
+        u2: { id: 'u2', name: 'OldUser' }
+      }
+    } } }
+  ], atNow);
+
+  const merged = cache.merge({}, [chatRecord]).cache;
+  assert.ok(merged.guildChat);
+  assert.equal(merged.guildChat.data.messages.length, 1);
+  assert.equal(merged.guildChat.data.messages[0].id, 'recent');
+  assert.equal(merged.guildChat.data.messages.some(m => m.id === 'old'), false);
+  assert.equal(merged.guildChat.data.users.u1.name, 'ActiveUser');
+  assert.equal(merged.guildChat.data.users.u2, undefined);
+});
+
 test('claimChest in clanVersus extracts rewards and updates energy, resources, and chest status', () => {
   const at = '2026-11-02T04:16:11.131Z';
   const baseline = record([
@@ -1920,6 +1950,40 @@ test('randomDraft_register deducts 1 draft chip and resets legendDraftStatus', (
   assert.deepEqual([...merged.legendDraftStatus.data.defenceHeroes], []);
   assert.deepEqual([...merged.legendDraftStatus.data.attackHeroes], []);
   assert.equal(merged.legendDraftStatus.data.lastResult, null);
+});
+
+test('randomDraft_saveDefence records server rejection error without falsely advancing stage', () => {
+  const current = {
+    legendDraftStatus: {
+      data: {
+        active: true,
+        stageId: 2,
+        matchId: 360413879,
+        defenceHeroes: []
+      },
+      updatedAt: '2026-11-09T05:30:00.000Z'
+    }
+  };
+
+  const failedCallRecord = record([
+    { name: 'randomDraft_saveDefence', args: { heroes: [72, 24, 54, 57, 64] }, ident: 'save1' }
+  ], [
+    { ident: 'save1', result: { response: { error: 'Invalid heroes list', errorCode: 5 } } }
+  ], '2026-11-09T05:30:30.995Z');
+
+  const extracted = cache.extract(failedCallRecord);
+  assert.equal(extracted.length, 1);
+  assert.equal(extracted[0].key, 'legendDraftAction');
+  assert.equal(extracted[0].data.action, 'saveDefence');
+  assert.equal(extracted[0].data.error, 'Invalid heroes list');
+  assert.equal(extracted[0].data.errorCode, 5);
+
+  const merged = cache.merge(current, [failedCallRecord]).cache;
+  assert.equal(merged.legendDraftStatus.data.stageId, 2, 'Stage must remain at 2 on error');
+  assert.deepEqual(merged.legendDraftStatus.data.defenceHeroes, [], 'Rejected heroes must not be saved');
+  assert.equal(merged.legendDraftStatus.data.lastError, 'Invalid heroes list');
+  assert.equal(merged.legendDraftStatus.data.lastErrorCode, 5);
+  assert.equal(merged.legendDraftStatus.data.lastErrorAction, 'saveDefence');
 });
 
 test('getSummary extracts buildings and completedResearches and completion updates levels', () => {

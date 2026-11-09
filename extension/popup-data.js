@@ -935,7 +935,24 @@
     LIB_TEST_BP_DAILY_QUESTS: { key: 'act:battle_pass_daily', title: 'Battle Pass Daily Quests', category: 'Activities', unit: 'quests', amount: 1 },
     LIB_TEST_BP_SINGLE_QUESTS: { key: 'act:battle_pass_milestone', title: 'Battle Pass Milestones', category: 'Activities', unit: 'milestones', amount: 1 },
     LIB_SEASONAL_EVENT_NAME_FACTION_1: { key: 'act:seasonal_faction_1', title: 'Faction Quests: Honor', category: 'Activities', unit: 'quests', amount: 1 },
-    LIB_SEASONAL_EVENT_NAME_FACTION_2: { key: 'act:seasonal_faction_2', title: 'Faction Quests: Mastery', category: 'Activities', unit: 'quests', amount: 1 }
+    LIB_SEASONAL_EVENT_NAME_FACTION_2: { key: 'act:seasonal_faction_2', title: 'Faction Quests: Mastery', category: 'Activities', unit: 'quests', amount: 1 },
+    STRATEGIC_BASE_INTERFACE_BUTTON_SPEEDUPS: { key: 'res:city_speedups', title: 'Use Speedups in City', category: 'Resources', unit: 'speedups', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TRAIN_TROOPS: { key: 'act:train_troops', title: 'Train Troops in Barracks', category: 'Activities', unit: 'troops', amount: 100 },
+    STRATEGIC_RESOURCE_12_NAME: { key: 'res:iron_gather', title: 'Gather Iron / Ore on Map', category: 'Resources', unit: 'iron', amount: 1000 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_PVPKILLUNITS: { key: 'act:pvp_kills', title: 'Defeat Enemy Units in PvP', category: 'Activities', unit: 'units', amount: 50 },
+    UI_DIALOG_BOSS_TITLE: { key: 'act:world_boss', title: 'Defeat World Map Bosses', category: 'Activities', unit: 'bosses', amount: 1 },
+    UI_HEROIC_CHEST_MAIN_TITLE: { key: 'act:heroic_chest', title: 'Open Heroic Chests', category: 'Activities', unit: 'chests', amount: 1 },
+    QUEST_TAB_NAME_SPEND_ARTCOINS: { key: 'res:artifact_coins', title: 'Spend Artifact Coins', category: 'Resources', unit: 'coins', amount: 100 },
+    LIB_AGGREGATOR_BUTTON_LADDER_HERO_RELIC: { key: 'act:hero_relics', title: 'Upgrade Hero Relics', category: 'Activities', unit: 'relics', amount: 1 },
+    QUEST_TAB_NAME_SPEND_RUNE_SPHERES: { key: 'res:rune_spheres', title: 'Spend Rune Spheres', category: 'Resources', unit: 'spheres', amount: 1 },
+    UI_DIALOG_ARTIFACT_CHEST_DROP_PACK1: { key: 'act:artifact_chests', title: 'Open Artifact Chests', category: 'Activities', unit: 'chests', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_NAME_9: { key: 'act:clash_of_worlds', title: 'Clash of Worlds Battles', category: 'Activities', unit: 'battles', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_48: { key: 'act:clan_clash_wins', title: 'Clan Clash Victories', category: 'Activities', unit: 'wins', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_763: { key: 'act:titan_evolution', title: 'Titan Power & Evolution', category: 'Activities', unit: 'points', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_64: { key: 'act:guild_activity_titanite', title: 'Guild Activity & Titanite', category: 'Activities', unit: 'points', amount: 100 },
+    LIB_SPECIAL_QUEST_EVENT_NAME_38: { key: 'act:hero_ascension', title: 'Hero Ascension Milestones', category: 'Activities', unit: 'tiers', amount: 1 },
+    UI_HERO78_TITLE: { key: 'act:wodryn_hero_quest', title: 'Wodryn Hero Quests', category: 'Activities', unit: 'quests', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_NAME_143: { key: 'act:tower_floor_progress', title: 'Tower Floor Progress', category: 'Activities', unit: 'floors', amount: 5 }
   };
 
   const knownEventNames = {
@@ -1262,11 +1279,14 @@
     };
   }
 
-  function getUnreadChatCount(messages, lastReadTime) {
+  function getUnreadChatCount(messages, lastReadTime, referenceTimeSec = null) {
     if (!Array.isArray(messages) || messages.length === 0) return 0;
+    const refSec = Number(referenceTimeSec);
+    const cutoffSec = Number.isFinite(refSec) && refSec > 0 ? refSec - (3 * 24 * 60 * 60) : 0;
+    const active = cutoffSec > 0 ? messages.filter((m) => !m.ctime || Number(m.ctime) >= cutoffSec) : messages;
     const threshold = Number(lastReadTime) || 0;
-    if (threshold <= 0) return messages.length;
-    return messages.filter((m) => Number(m.ctime || 0) > threshold).length;
+    if (threshold <= 0) return active.length;
+    return active.filter((m) => Number(m.ctime || 0) > threshold).length;
   }
 
   function isResourceSelectableForHeader(entry) {

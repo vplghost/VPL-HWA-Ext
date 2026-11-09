@@ -1480,6 +1480,20 @@
           }];
         }
         if (call.name === 'randomDraft_saveDefence' && Array.isArray(call.args?.heroes)) {
+          if (result?.error || result?.response?.error) {
+            return [{
+              key: 'legendDraftAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                action: 'saveDefence',
+                error: result?.response?.error || result?.error || 'Invalid heroes list',
+                errorCode: result?.response?.errorCode || null
+              },
+              updatedAt: record.timestamp
+            }];
+          }
           return [{
             key: 'legendDraftAction',
             method: call.name,
@@ -1490,6 +1504,20 @@
           }];
         }
         if (call.name === 'randomDraft_saveAttack' && Array.isArray(call.args?.heroes)) {
+          if (result?.error || result?.response?.error) {
+            return [{
+              key: 'legendDraftAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                action: 'saveAttack',
+                error: result?.response?.error || result?.error || 'Invalid heroes list',
+                errorCode: result?.response?.errorCode || null
+              },
+              updatedAt: record.timestamp
+            }];
+          }
           return [{
             key: 'legendDraftAction',
             method: call.name,
@@ -2249,6 +2277,23 @@
         }
         if (entry.key === 'legendDraftAction') {
           const draft = next.legendDraftStatus ? { ...next.legendDraftStatus.data } : { active: true };
+          if (entry.data.error) {
+            draft.lastError = entry.data.error;
+            draft.lastErrorCode = entry.data.errorCode;
+            draft.lastErrorAction = entry.data.action;
+            draft.lastErrorTime = entry.updatedAt;
+            next.legendDraftStatus = {
+              ...next.legendDraftStatus,
+              data: draft,
+              updatedAt: entry.updatedAt
+            };
+            changed = true;
+            continue;
+          }
+          delete draft.lastError;
+          delete draft.lastErrorCode;
+          delete draft.lastErrorAction;
+          delete draft.lastErrorTime;
           if (entry.data.action === 'saveDefence') {
             draft.defenceHeroes = entry.data.heroes;
             draft.stageId = 4;
@@ -2929,7 +2974,14 @@
           for (const m of incomingMessages) {
             if (m?.id) msgMap.set(String(m.id), m);
           }
-          const mergedMessages = Array.from(msgMap.values()).sort((a, b) => Number(b.ctime || 0) - Number(a.ctime || 0));
+          const sorted = Array.from(msgMap.values()).sort((a, b) => Number(b.ctime || 0) - Number(a.ctime || 0));
+          const recordTimeSec = Math.floor((Date.parse(entry.updatedAt) || Date.now()) / 1000);
+          const cutoffSec = recordTimeSec - (3 * 24 * 60 * 60); // Auto clear messages older than 3 days
+          const mergedMessages = sorted.filter((m) => !m.ctime || Number(m.ctime) >= cutoffSec);
+          const activeUserIds = new Set(mergedMessages.map((m) => String(m.userId)));
+          const prunedUsers = Object.fromEntries(
+            Object.entries(mergedUsers).filter(([uid]) => activeUserIds.has(String(uid)))
+          );
           const latestTime = entry.updatedAt > (next.guildChat?.updatedAt || '') ? entry.updatedAt : (next.guildChat?.updatedAt || entry.updatedAt);
           next.guildChat = {
             key: 'guildChat',
@@ -2938,7 +2990,7 @@
             group: entry.group,
             data: {
               messages: mergedMessages,
-              users: mergedUsers
+              users: Object.keys(prunedUsers).length > 0 ? prunedUsers : mergedUsers
             },
             updatedAt: latestTime
           };
@@ -2954,8 +3006,17 @@
           const incoming = entry.data?.events || [];
           const fullSnapshot = ['specialQuestEvents', 'getSpecialQuestState'].includes(entry.method);
           const evMap = new Map();
-          for (const ev of fullSnapshot ? [] : existing) if (ev?.id) evMap.set(ev.id, ev);
-          for (const ev of incoming) if (ev?.id) evMap.set(ev.id, ev);
+          const recordTime = Date.parse(entry.updatedAt) || Date.now();
+          for (const ev of fullSnapshot ? [] : existing) {
+            if (ev?.id && (!Number.isFinite(ev.end) || ev.end >= recordTime - 1800000)) {
+              evMap.set(ev.id, ev);
+            }
+          }
+          for (const ev of incoming) {
+            if (ev?.id && (!Number.isFinite(ev.end) || ev.end >= recordTime - 1800000)) {
+              evMap.set(ev.id, ev);
+            }
+          }
           next.specialQuestStatus = {
             key: 'specialQuestStatus',
             method: entry.method,

@@ -577,3 +577,30 @@ test('Legend Draft hero picking retains all 5 picks without wipe-out, auto-switc
   assert.match(viewEl.textContent, /Opponent Defense Lineup/);
   assert.match(statusEl.textContent, /Attack Draft/);
 });
+
+test('Legend Draft displays server rejection error banner and keeps slots editable', async () => {
+  const viewEl = new MockElement('div');
+  const statusEl = new MockElement('div');
+  const searchEl = new MockElement('input');
+  const context = await createDraftContext(viewEl, statusEl, searchEl);
+
+  const errorCache = {
+    legendDraftStatus: {
+      data: {
+        active: true,
+        stageId: 2,
+        matchId: 360413879,
+        lastError: 'Invalid heroes list',
+        lastErrorCode: 5,
+        lastErrorAction: 'saveDefence',
+        defenceHeroes: []
+      }
+    }
+  };
+
+  context.renderDraft(errorCache);
+  assert.match(viewEl.textContent, /Máy chủ từ chối đội hình: "Invalid heroes list"/);
+  assert.match(viewEl.textContent, /Mã lỗi: 5/);
+  assert.doesNotMatch(viewEl.textContent, /Lineup successfully locked/);
+  assert.match(viewEl.textContent, /Step 1/);
+});

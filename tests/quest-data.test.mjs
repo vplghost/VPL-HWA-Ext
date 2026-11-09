@@ -88,3 +88,38 @@ test('quest eligibility excludes hidden, future, expired, inactive and stale dai
   assert.equal(data.dailyQuests(cache, 200000), null);
   assert.equal(data.visibleEvents(cache, 200000)[0].groups.length, 1);
 });
+
+test('runtime quest definitions update, catalog export, and unknown quest filtering', () => {
+  // Test runtime registration of new definitions
+  data.registerRuntimeDefinitions({
+    dailyTitles: {
+      99999: 'Custom Test Daily Quest'
+    },
+    viewTitles: {
+      999: 'Custom Holiday Festival'
+    },
+    localeTitles: {
+      CUSTOM_LOCALE_TEST: { title: 'Custom Mission Chain', category: 'Activities', unit: 'tasks', amount: 1 }
+    },
+    questTemplates: {
+      88888: 'Custom Template Battle'
+    }
+  });
+
+  assert.equal(data.dailyTitle({ id: 99999 }), 'Custom Test Daily Quest');
+  assert.equal(data.title({ viewId: 999, id: 1 }), 'Custom Holiday Festival');
+  assert.equal(data.groupTitle('CUSTOM_LOCALE_TEST'), 'Custom Mission Chain');
+  assert.equal(data.questTemplateTitle(88888), 'Custom Template Battle');
+  assert.equal(data.isRecognizedQuest(99999), true);
+  assert.equal(data.isRecognizedQuest(12345678), false);
+
+  // Fallback humanizer for unmapped localeKey
+  assert.equal(data.groupTitle('LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_99'), 'Mission Chain #99');
+
+  // Verify catalog export is valid JSON
+  const exported = data.exportCatalogJson();
+  assert.ok(typeof exported === 'string');
+  const parsed = JSON.parse(exported);
+  assert.equal(parsed.dailyTitles['99999'], 'Custom Test Daily Quest');
+  assert.equal(parsed.viewTitles['999'], 'Custom Holiday Festival');
+});

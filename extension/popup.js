@@ -2003,7 +2003,8 @@ function renderDraft(cache, target = view) {
     (isMatchCompleted && Array.isArray(draft.lastResult?.defenceHeroes) && draft.lastResult.defenceHeroes.length === 5) ||
     (Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5)
   ) : Boolean(
-    Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5 && draft.lastPickAction === 'saveDefence'
+    Array.isArray(draft.defenceHeroes) && draft.defenceHeroes.length === 5 && draft.lastPickAction === 'saveDefence' &&
+    !(draft.lastError && draft.lastErrorAction === 'saveDefence')
   );
 
   const isAttackLocked = !isAttackStage ? Boolean(
@@ -2011,7 +2012,8 @@ function renderDraft(cache, target = view) {
     (isMatchCompleted && Array.isArray(draft.lastResult?.attackHeroes) && draft.lastResult.attackHeroes.length === 5) ||
     (Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5)
   ) : Boolean(
-    Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5 && draft.lastPickAction === 'saveAttack'
+    Array.isArray(draft.attackHeroes) && draft.attackHeroes.length === 5 && draft.lastPickAction === 'saveAttack' &&
+    !(draft.lastError && draft.lastErrorAction === 'saveAttack')
   );
 
   if (isDefenseLocked) {
@@ -2483,6 +2485,21 @@ function renderDraft(cache, target = view) {
 
   // Step-by-step hero picker form when lineup is not locked
   if (!isModeLocked) {
+    if (draft.lastError && (draft.lastErrorAction === (isViewingAttack ? 'saveAttack' : 'saveDefence'))) {
+      const errorAlert = document.createElement('div');
+      errorAlert.className = 'rounded-xl border border-red-300 bg-red-50/90 p-3 text-xs text-red-900 flex items-start gap-2.5';
+      errorAlert.innerHTML = `
+        <span class="text-base leading-none">❌</span>
+        <div class="space-y-0.5">
+          <div class="font-bold">Máy chủ từ chối đội hình: "${draft.lastError}"${draft.lastErrorCode ? ` (Mã lỗi: ${draft.lastErrorCode})` : ''}</div>
+          <div class="text-[11px] text-red-800">
+            Trong Legend Draft, máy chủ chỉ chấp nhận hero nằm trong 3 lựa chọn đề xuất của từng bước (Step 1 → Step 5) hiển thị trên màn hình game. Đội hình vừa gửi chứa hero không hợp lệ. Vui lòng nhìn màn hình game để chọn đúng hero tương ứng cho từng Step.
+          </div>
+        </div>
+      `;
+      teamSection.append(errorAlert);
+    }
+
     if (!observedChoices) {
       const unprobedAlert = document.createElement('div');
       unprobedAlert.className = 'rounded-xl border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-900 flex items-start gap-2.5';
@@ -2490,7 +2507,9 @@ function renderDraft(cache, target = view) {
         <span class="text-base leading-none">⚠️</span>
         <div class="space-y-0.5">
           <div class="font-bold">Không tìm thấy danh sách hero đề xuất từ gói tin game (encrypted draft payload).</div>
-          <div class="text-[11px] text-amber-800">Dữ liệu 15 hero đề xuất được mã hóa và xử lý nội bộ trong game client. Vui lòng chọn trực tiếp hero cho từng bước (Step 1 → Step 5) bên dưới để khóa đội hình và gửi lên server.</div>
+          <div class="text-[11px] text-amber-800">
+            Dữ liệu 15 hero đề xuất được mã hóa và xử lý nội bộ trong game client. Máy chủ chỉ chấp nhận hero nằm trong 3 lựa chọn của từng lượt (Step 1 → Step 5) đang hiển thị trên màn hình game. Vui lòng nhìn màn hình game để chọn đúng hero tương ứng cho từng Step trước khi khóa và gửi.
+          </div>
         </div>
       `;
       teamSection.append(unprobedAlert);
@@ -5150,9 +5169,12 @@ function updateGuildChatBadge(cache, lastReadTime) {
   const chatBadgeEl = document.querySelector?.('#guild-chat-badge');
   const fabBadgeEl = document.querySelector?.('#fab-unread-badge');
   const chatCountEl = document.querySelector?.('#guild-chat-count');
-  const messages = cache?.guildChat?.data?.messages || [];
+  const rawMessages = cache?.guildChat?.data?.messages || [];
+  const refSec = cache?.guildChat?.updatedAt ? Math.floor(Date.parse(cache.guildChat.updatedAt) / 1000) : 0;
+  const cutoffSec = refSec > 0 ? refSec - (3 * 24 * 60 * 60) : 0;
+  const messages = cutoffSec > 0 ? rawMessages.filter((m) => !m.ctime || Number(m.ctime) >= cutoffSec) : rawMessages;
   const unreadCount = globalThis.hwaHelperPopupData?.getUnreadChatCount
-    ? globalThis.hwaHelperPopupData.getUnreadChatCount(messages, lastReadTime)
+    ? globalThis.hwaHelperPopupData.getUnreadChatCount(messages, lastReadTime, refSec)
     : (Array.isArray(messages) ? messages.filter((m) => Number(m.ctime || 0) > Number(lastReadTime || 0)).length : 0);
 
   if (chatCountEl) {
@@ -5202,7 +5224,10 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   const visibleLimit = (typeof chatVisibleCount !== 'undefined') ? chatVisibleCount : (renderGuildChat.visibleCount || 15);
   renderGuildChat.visibleCount = visibleLimit;
   const chatData = cache?.guildChat?.data;
-  const rawMessages = Array.isArray(chatData?.messages) ? chatData.messages : [];
+  const refSec = cache?.guildChat?.updatedAt ? Math.floor(Date.parse(cache.guildChat.updatedAt) / 1000) : 0;
+  const cutoffSec = refSec > 0 ? refSec - (3 * 24 * 60 * 60) : 0;
+  const rawMessages = (Array.isArray(chatData?.messages) ? chatData.messages : [])
+    .filter((m) => cutoffSec <= 0 || !m.ctime || Number(m.ctime) >= cutoffSec);
   const users = chatData?.users || {};
 
   // Sort messages chronologically ascending (oldest at top, newest at bottom) for standard chat UI dialog flow
@@ -6952,13 +6977,13 @@ function getDetailedQuests(cache = currentCache, now = Date.now()) {
 
       const repeatLabel = group.repeatType === 'daily' ? 'Event Daily' : 'Event Chain';
       const questLocMap = globalThis.hwaHelperPopupData?.questLocaleMap || {};
-      const groupTitle = group.localeKey
+      const groupTitle = questData?.groupTitle ? questData.groupTitle(group.localeKey) : (group.localeKey
         ? (questLocMap[group.localeKey]?.title ||
            group.localeKey.replace(/^(LIB_SPECIAL_QUEST_EVENT_|LIB_SEASONAL_EVENT_NAME_|QUEST_TAB_|UI_)/, '')
                           .replace(/_/g, ' ')
                           .toLowerCase()
                           .replace(/\b\w/g, (c) => c.toUpperCase()))
-        : 'Special Quest';
+        : 'Special Quest');
 
       const tierText = `Tier ${completedCount + (activeQ ? 1 : 0)} of ${groupQuests.length}`;
       const progress = Number(currentQ.progress ?? qAllEntry?.progress) || 0;
@@ -6982,17 +7007,28 @@ function getDetailedQuests(cache = currentCache, now = Date.now()) {
   // 3. Any additional ready/active quests in questGetAll
   for (const q of qAll) {
     if (!q || q.id == null || seenIds.has(String(q.id))) continue;
-    if (q.state === 3) continue;
+    if (q.state === 3) continue; // completed & claimed in past
     const isReady = q.state === 2;
+    const recognizedDaily = questData?.dailyTitles?.[q.id];
+    const recognizedTemplate = questData?.questTemplateTitle?.(q.id);
+    const hasKnownName = Boolean(q.name || recognizedDaily || recognizedTemplate);
+
+    // Filter out unmapped internal tracking counters (state === 1 with no UI presence)
+    if (!isReady && !hasKnownName) continue;
+
+    const title = q.name || recognizedDaily || recognizedTemplate || (isReady ? `Claimable Reward #${q.id}` : `Quest #${q.id}`);
+    const category = recognizedDaily || recognizedTemplate ? 'daily' : 'story';
+    const categoryLabel = isReady ? 'Claimable Reward' : (recognizedDaily || recognizedTemplate ? 'Daily Quest' : 'Quest');
+
     items.push({
       id: q.id,
-      category: 'story',
-      categoryLabel: 'Quest',
-      title: q.name || `Quest #${q.id}`,
+      category,
+      categoryLabel,
+      title,
       state: isReady ? 'ready' : 'inProgress',
       progress: Number(q.progress) || 0,
       reward: q.reward || null,
-      subtitle: isReady ? 'Reward ready to claim in game' : 'General Quest'
+      subtitle: isReady ? '🎁 Reward ready to claim in game' : (recognizedDaily || recognizedTemplate ? 'Daily Task' : 'General Quest')
     });
   }
 
@@ -7087,13 +7123,60 @@ function renderQuestDetailDialog(filter = currentQuestFilter, cache = currentCac
   searchInput.type = 'text';
   searchInput.value = questSearchQuery;
   searchInput.placeholder = 'Search quests...';
-  searchInput.className = 'rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 w-full sm:w-48';
+  searchInput.className = 'rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 w-full sm:w-44';
   searchInput.addEventListener('input', (e) => {
     questSearchQuery = e.target.value.trim().toLowerCase();
     updateQuestCardsList();
   });
 
-  toolbar.append(tabsWrap, searchInput);
+  const actionsWrap = document.createElement('div');
+  actionsWrap.className = 'flex items-center gap-1.5 flex-wrap';
+
+  const refreshBtn = document.createElement('button');
+  refreshBtn.id = 'quest-detail-refresh';
+  refreshBtn.type = 'button';
+  refreshBtn.title = 'Refresh quests from game server (RPC)';
+  refreshBtn.className = 'cursor-pointer inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0';
+  refreshBtn.innerHTML = '<span>🔄</span> <span>Refresh</span>';
+  refreshBtn.addEventListener('click', () => {
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<span>⏳</span> <span>Updating...</span>';
+    chrome.runtime?.sendMessage?.({
+      kind: 'refresh-rpc',
+      calls: [
+        { name: 'getDailyQuests', feature: 'quest', args: {} },
+        { name: 'getSpecialQuestState' },
+        { name: 'questGetAll' },
+        { name: 'questGetEvents' }
+      ]
+    }, () => {
+      setTimeout(() => {
+        renderQuestDetailDialog(currentQuestFilter, currentCache);
+      }, 500);
+    });
+  });
+
+  const exportBtn = document.createElement('button');
+  exportBtn.id = 'quest-detail-export';
+  exportBtn.type = 'button';
+  exportBtn.title = 'Export quest definitions JSON file';
+  exportBtn.className = 'cursor-pointer inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0';
+  exportBtn.innerHTML = '<span>📥</span> <span>Export JSON</span>';
+  exportBtn.addEventListener('click', () => {
+    try {
+      const json = globalThis.hwaHelperQuestData?.exportCatalogJson?.() || '{}';
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'quest-catalog.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (_) {}
+  });
+
+  actionsWrap.append(searchInput, refreshBtn, exportBtn);
+  toolbar.append(tabsWrap, actionsWrap);
   host.append(toolbar);
 
   // Cards Container
