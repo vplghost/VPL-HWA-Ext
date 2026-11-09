@@ -745,3 +745,54 @@ test('Tower start dispatches a saved-team run to one game tab and stop clears pe
   assert.equal(local.towerRun.phase, 'stopped');
   assert.equal(forwardedMessages.at(-1).msg.kind, 'drop-rpc-group');
 });
+
+test('campaign-raid, craft-fragment, and craft-recipe messages forward RPC calls to active game tab', async () => {
+  const { local, tabsList, forwardedMessages, listener } = setup();
+  const invoke = (message) => new Promise((resolve) => listener(message, popupSender, resolve));
+
+  tabsList.push({ id: 5, url: gameSender.url });
+
+  // Disabled RPC check
+  local.popupRpcEnabled = false;
+  const disabledRaid = await invoke({ kind: 'campaign-raid', missionId: 10, times: 3 });
+  assert.equal(disabledRaid.ok, false);
+  assert.match(disabledRaid.error, /disabled/i);
+
+  local.popupRpcEnabled = true;
+  local.socketRefreshMode = 'direct';
+
+  // Invalid mission ID check
+  const invalidRaid = await invoke({ kind: 'campaign-raid', missionId: 'abc', times: 3 });
+  assert.equal(invalidRaid.ok, false);
+  assert.match(invalidRaid.error, /invalid mission ID/i);
+
+  // Valid campaign-raid
+  const validRaid = await invoke({ kind: 'campaign-raid', missionId: 42, times: 5 });
+  assert.equal(validRaid.ok, true);
+  const raidMsg = forwardedMessages.find((m) => m.msg.calls?.some((c) => c.name === 'missionRaid'));
+  assert.ok(raidMsg);
+  assert.equal(raidMsg.tabId, 5);
+  assert.equal(raidMsg.msg.calls[0].name, 'missionRaid');
+  assert.equal(raidMsg.msg.calls[0].args.id, 42);
+  assert.equal(raidMsg.msg.calls[0].args.times, 5);
+  assert.equal(raidMsg.msg.calls[1].name, 'playable_getAvailable');
+  assert.equal(raidMsg.msg.calls[2].name, 'worldStars_getAvailable');
+
+  // Valid craft-fragment (gear)
+  const validFrag = await invoke({ kind: 'craft-fragment', type: 'gear', libId: 57, amount: 1 });
+  assert.equal(validFrag.ok, true);
+  const fragMsg = forwardedMessages.find((m) => m.msg.calls?.some((c) => c.name === 'inventoryCraftFragments'));
+  assert.ok(fragMsg);
+  assert.equal(fragMsg.msg.calls[0].args.type, 'gear');
+  assert.equal(fragMsg.msg.calls[0].args.libId, 57);
+  assert.equal(fragMsg.msg.calls[0].args.amount, 1);
+
+  // Valid craft-recipe (scroll/recipe)
+  const validRecipe = await invoke({ kind: 'craft-recipe', type: 'gear', libId: 102, amount: 1 });
+  assert.equal(validRecipe.ok, true);
+  const recipeMsg = forwardedMessages.find((m) => m.msg.calls?.some((c) => c.name === 'inventoryCraftRecipe'));
+  assert.ok(recipeMsg);
+  assert.equal(recipeMsg.msg.calls[0].args.type, 'gear');
+  assert.equal(recipeMsg.msg.calls[0].args.libId, 102);
+  assert.equal(recipeMsg.msg.calls[0].args.amount, 1);
+});

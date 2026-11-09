@@ -12052,35 +12052,50 @@ globalThis.hwaHelperGearCraftData = {
       "24": 1,
       "25": 1
     },
-    "gold": 13500
+    "gold": 13500,
+    "scroll": {
+      "141": 1
+    }
   },
   "43": {
     "recipe": {
       "25": 1,
       "27": 1
     },
-    "gold": 13500
+    "gold": 13500,
+    "scroll": {
+      "142": 1
+    }
   },
   "44": {
     "recipe": {
       "27": 1,
       "28": 1
     },
-    "gold": 13500
+    "gold": 13500,
+    "scroll": {
+      "143": 1
+    }
   },
   "45": {
     "recipe": {
       "26": 1,
       "28": 1
     },
-    "gold": 13500
+    "gold": 13500,
+    "scroll": {
+      "144": 1
+    }
   },
   "46": {
     "recipe": {
       "24": 1,
       "26": 1
     },
-    "gold": 13500
+    "gold": 13500,
+    "scroll": {
+      "145": 1
+    }
   },
   "47": {
     "fragmentCount": 5,
@@ -12268,42 +12283,60 @@ globalThis.hwaHelperGearCraftData = {
       "56": 1,
       "74": 1
     },
-    "gold": 90000
+    "gold": 90000,
+    "scroll": {
+      "146": 1
+    }
   },
   "86": {
     "recipe": {
       "60": 1,
       "75": 1
     },
-    "gold": 90000
+    "gold": 90000,
+    "scroll": {
+      "147": 1
+    }
   },
   "87": {
     "recipe": {
       "57": 1,
       "76": 1
     },
-    "gold": 90000
+    "gold": 90000,
+    "scroll": {
+      "148": 1
+    }
   },
   "88": {
     "recipe": {
       "59": 1,
       "63": 1
     },
-    "gold": 90000
+    "gold": 90000,
+    "scroll": {
+      "149": 1
+    }
   },
   "89": {
     "recipe": {
       "61": 1,
       "66": 1
     },
-    "gold": 90000
+    "gold": 90000,
+    "scroll": {
+      "150": 1
+    }
   },
   "90": {
     "recipe": {
       "57": 1,
       "69": 1
     },
-    "gold": 90000
+    "gold": 90000,
+    "scroll": {
+      "151": 1
+    }
   },
   "91": {
     "fragmentCount": 20,
@@ -12341,25 +12374,37 @@ globalThis.hwaHelperGearCraftData = {
     "recipe": {
       "59": 1
     },
-    "gold": 45000
+    "gold": 45000,
+    "scroll": {
+      "162": 1
+    }
   },
   "100": {
     "recipe": {
       "60": 1
     },
-    "gold": 45000
+    "gold": 45000,
+    "scroll": {
+      "163": 1
+    }
   },
   "101": {
     "recipe": {
       "61": 1
     },
-    "gold": 45000
+    "gold": 45000,
+    "scroll": {
+      "164": 1
+    }
   },
   "102": {
     "recipe": {
       "62": 1
     },
-    "gold": 45000
+    "gold": 45000,
+    "scroll": {
+      "165": 1
+    }
   },
   "114": {
     "recipe": {
@@ -12438,7 +12483,10 @@ globalThis.hwaHelperGearCraftData = {
     "recipe": {
       "77": 2
     },
-    "gold": 105000
+    "gold": 105000,
+    "scroll": {
+      "166": 1
+    }
   },
   "125": {
     "recipe": {
@@ -12467,63 +12515,93 @@ globalThis.hwaHelperGearCraftData = {
       "94": 1,
       "127": 1
     },
-    "gold": 217500
+    "gold": 217500,
+    "scroll": {
+      "161": 1
+    }
   },
   "132": {
     "recipe": {
       "95": 1,
       "127": 1
     },
-    "gold": 217500
+    "gold": 217500,
+    "scroll": {
+      "160": 1
+    }
   },
   "133": {
     "recipe": {
       "96": 1,
       "127": 1
     },
-    "gold": 217500
+    "gold": 217500,
+    "scroll": {
+      "159": 1
+    }
   },
   "134": {
     "recipe": {
       "125": 2
     },
-    "gold": 217500
+    "gold": 217500,
+    "scroll": {
+      "158": 1
+    }
   },
   "135": {
     "recipe": {
       "126": 2
     },
-    "gold": 217500
+    "gold": 217500,
+    "scroll": {
+      "157": 1
+    }
   },
   "136": {
     "recipe": {
       "131": 2
     },
-    "gold": 382500
+    "gold": 382500,
+    "scroll": {
+      "156": 1
+    }
   },
   "137": {
     "recipe": {
       "132": 2
     },
-    "gold": 382500
+    "gold": 382500,
+    "scroll": {
+      "155": 1
+    }
   },
   "138": {
     "recipe": {
       "133": 2
     },
-    "gold": 382500
+    "gold": 382500,
+    "scroll": {
+      "154": 1
+    }
   },
   "139": {
     "recipe": {
       "134": 2
     },
-    "gold": 382500
+    "gold": 382500,
+    "scroll": {
+      "153": 1
+    }
   },
   "140": {
     "recipe": {
       "135": 2
     },
-    "gold": 382500
+    "gold": 382500,
+    "scroll": {
+      "152": 1
+    }
   },
   "167": {
     "fragmentCount": 80,
@@ -12578,63 +12656,90 @@ globalThis.hwaHelperGearCraftData = {
       "91": 2,
       "168": 2
     },
-    "gold": 472500
+    "gold": 472500,
+    "scroll": {
+      "190": 1
+    }
   },
   "180": {
     "recipe": {
       "91": 2,
       "169": 2
     },
-    "gold": 472500
+    "gold": 472500,
+    "scroll": {
+      "191": 1
+    }
   },
   "181": {
     "recipe": {
       "98": 2,
       "169": 1
     },
-    "gold": 337500
+    "gold": 337500,
+    "scroll": {
+      "192": 1
+    }
   },
   "182": {
     "recipe": {
       "97": 2,
       "168": 1
     },
-    "gold": 337500
+    "gold": 337500,
+    "scroll": {
+      "193": 1
+    }
   },
   "183": {
     "recipe": {
       "99": 2,
       "167": 1
     },
-    "gold": 371250
+    "gold": 371250,
+    "scroll": {
+      "194": 1
+    }
   },
   "184": {
     "recipe": {
       "100": 2,
       "167": 1
     },
-    "gold": 371250
+    "gold": 371250,
+    "scroll": {
+      "195": 1
+    }
   },
   "185": {
     "recipe": {
       "127": 2,
       "170": 2
     },
-    "gold": 506250
+    "gold": 506250,
+    "scroll": {
+      "196": 1
+    }
   },
   "186": {
     "recipe": {
       "127": 2,
       "171": 2
     },
-    "gold": 506250
+    "gold": 506250,
+    "scroll": {
+      "197": 1
+    }
   },
   "187": {
     "recipe": {
       "127": 2,
       "172": 2
     },
-    "gold": 506250
+    "gold": 506250,
+    "scroll": {
+      "198": 1
+    }
   },
   "188": {
     "recipe": {
@@ -12642,7 +12747,10 @@ globalThis.hwaHelperGearCraftData = {
       "168": 1,
       "177": 1
     },
-    "gold": 506250
+    "gold": 506250,
+    "scroll": {
+      "199": 1
+    }
   },
   "189": {
     "recipe": {
@@ -12650,48 +12758,69 @@ globalThis.hwaHelperGearCraftData = {
       "167": 1,
       "178": 1
     },
-    "gold": 506250
+    "gold": 506250,
+    "scroll": {
+      "200": 1
+    }
   },
   "201": {
     "recipe": {
       "179": 2
     },
-    "gold": 1008000
+    "gold": 1008000,
+    "scroll": {
+      "204": 1
+    }
   },
   "202": {
     "recipe": {
       "96": 6,
       "177": 2
     },
-    "gold": 567000
+    "gold": 567000,
+    "scroll": {
+      "205": 1
+    }
   },
   "203": {
     "recipe": {
       "95": 5,
       "169": 2
     },
-    "gold": 535500
+    "gold": 535500,
+    "scroll": {
+      "206": 1
+    }
   },
   "207": {
     "recipe": {
       "188": 1,
       "202": 1
     },
-    "gold": 1275750
+    "gold": 1275750,
+    "scroll": {
+      "214": 1
+    }
   },
   "208": {
     "recipe": {
       "179": 1,
       "201": 1
     },
-    "gold": 1685250
+    "gold": 1685250,
+    "scroll": {
+      "215": 1
+    }
   },
   "209": {
     "recipe": {
       "180": 1,
       "203": 1
     },
-    "gold": 1212750
+    "gold": 1212750,
+    "scroll": {
+      "216": 1
+    }
   },
   "210": {
     "recipe": {
@@ -12699,99 +12828,144 @@ globalThis.hwaHelperGearCraftData = {
       "170": 2,
       "180": 1
     },
-    "gold": 1055250
+    "gold": 1055250,
+    "scroll": {
+      "217": 1
+    }
   },
   "211": {
     "recipe": {
       "185": 2
     },
-    "gold": 1181250
+    "gold": 1181250,
+    "scroll": {
+      "218": 1
+    }
   },
   "212": {
     "recipe": {
       "186": 2
     },
-    "gold": 1181250
+    "gold": 1181250,
+    "scroll": {
+      "219": 1
+    }
   },
   "213": {
     "recipe": {
       "187": 2
     },
-    "gold": 1181250
+    "gold": 1181250,
+    "scroll": {
+      "220": 1
+    }
   },
   "214": {
     "recipe": {
       "137": 2,
       "171": 3
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "221": 1
+    }
   },
   "215": {
     "recipe": {
       "168": 2,
       "182": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "222": 1
+    }
   },
   "216": {
     "recipe": {
       "177": 3,
       "202": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "223": 1
+    }
   },
   "217": {
     "recipe": {
       "117": 3,
       "181": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "224": 1
+    }
   },
   "218": {
     "recipe": {
       "169": 3,
       "203": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "225": 1
+    }
   },
   "219": {
     "recipe": {
       "175": 1,
       "201": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "226": 1
+    }
   },
   "220": {
     "recipe": {
       "180": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "227": 1
+    }
   },
   "221": {
     "recipe": {
       "138": 2,
       "172": 3
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "228": 1
+    }
   },
   "222": {
     "recipe": {
       "136": 2,
       "170": 3
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "229": 1
+    }
   },
   "223": {
     "recipe": {
       "183": 3
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "230": 1
+    }
   },
   "224": {
     "recipe": {
       "184": 3
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "231": 1
+    }
   },
   "225": {
     "recipe": {
@@ -12799,7 +12973,10 @@ globalThis.hwaHelperGearCraftData = {
       "181": 1,
       "182": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "232": 1
+    }
   },
   "226": {
     "recipe": {
@@ -12807,49 +12984,70 @@ globalThis.hwaHelperGearCraftData = {
       "183": 1,
       "184": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "233": 1
+    }
   },
   "227": {
     "recipe": {
       "138": 1,
       "187": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "234": 1
+    }
   },
   "228": {
     "recipe": {
       "137": 1,
       "186": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "235": 1
+    }
   },
   "229": {
     "recipe": {
       "136": 1,
       "185": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "236": 1
+    }
   },
   "230": {
     "recipe": {
       "138": 1,
       "187": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "237": 1
+    }
   },
   "231": {
     "recipe": {
       "136": 2,
       "170": 3
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "238": 1
+    }
   },
   "232": {
     "recipe": {
       "137": 3,
       "171": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "239": 1
+    }
   },
   "233": {
     "recipe": {
@@ -12857,35 +13055,50 @@ globalThis.hwaHelperGearCraftData = {
       "174": 2,
       "181": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "240": 1
+    }
   },
   "234": {
     "recipe": {
       "140": 1,
       "180": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "241": 1
+    }
   },
   "235": {
     "recipe": {
       "177": 2,
       "202": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "242": 1
+    }
   },
   "236": {
     "recipe": {
       "182": 1,
       "187": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "243": 1
+    }
   },
   "237": {
     "recipe": {
       "175": 2,
       "183": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "244": 1
+    }
   },
   "238": {
     "recipe": {
@@ -12893,7 +13106,10 @@ globalThis.hwaHelperGearCraftData = {
       "177": 2,
       "202": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "245": 1
+    }
   },
   "239": {
     "recipe": {
@@ -12901,28 +13117,40 @@ globalThis.hwaHelperGearCraftData = {
       "174": 2,
       "181": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "246": 1
+    }
   },
   "240": {
     "recipe": {
       "169": 3,
       "186": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "247": 1
+    }
   },
   "241": {
     "recipe": {
       "168": 3,
       "187": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "248": 1
+    }
   },
   "242": {
     "recipe": {
       "167": 3,
       "185": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "249": 1
+    }
   },
   "243": {
     "recipe": {
@@ -12930,7 +13158,10 @@ globalThis.hwaHelperGearCraftData = {
       "179": 1,
       "182": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "250": 1
+    }
   },
   "244": {
     "recipe": {
@@ -12938,7 +13169,10 @@ globalThis.hwaHelperGearCraftData = {
       "178": 2,
       "202": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "251": 1
+    }
   },
   "245": {
     "recipe": {
@@ -12946,7 +13180,10 @@ globalThis.hwaHelperGearCraftData = {
       "175": 3,
       "183": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "252": 1
+    }
   },
   "246": {
     "recipe": {
@@ -12954,7 +13191,10 @@ globalThis.hwaHelperGearCraftData = {
       "177": 2,
       "188": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "253": 1
+    }
   },
   "247": {
     "recipe": {
@@ -12962,14 +13202,20 @@ globalThis.hwaHelperGearCraftData = {
       "174": 2,
       "180": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "254": 1
+    }
   },
   "248": {
     "recipe": {
       "174": 2,
       "181": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "255": 1
+    }
   },
   "249": {
     "recipe": {
@@ -12977,21 +13223,30 @@ globalThis.hwaHelperGearCraftData = {
       "176": 3,
       "184": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "256": 1
+    }
   },
   "250": {
     "recipe": {
       "181": 1,
       "203": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "257": 1
+    }
   },
   "251": {
     "recipe": {
       "170": 1,
       "201": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "258": 1
+    }
   },
   "252": {
     "recipe": {
@@ -12999,7 +13254,10 @@ globalThis.hwaHelperGearCraftData = {
       "168": 2,
       "179": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "259": 1
+    }
   },
   "253": {
     "recipe": {
@@ -13007,7 +13265,10 @@ globalThis.hwaHelperGearCraftData = {
       "175": 2,
       "183": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "260": 1
+    }
   },
   "254": {
     "recipe": {
@@ -13015,7 +13276,10 @@ globalThis.hwaHelperGearCraftData = {
       "174": 1,
       "181": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "261": 1
+    }
   },
   "255": {
     "recipe": {
@@ -13023,14 +13287,20 @@ globalThis.hwaHelperGearCraftData = {
       "167": 2,
       "184": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "262": 1
+    }
   },
   "256": {
     "recipe": {
       "170": 3,
       "185": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "263": 1
+    }
   },
   "257": {
     "recipe": {
@@ -13038,14 +13308,20 @@ globalThis.hwaHelperGearCraftData = {
       "134": 1,
       "201": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "264": 1
+    }
   },
   "258": {
     "recipe": {
       "137": 3,
       "171": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "265": 1
+    }
   },
   "259": {
     "recipe": {
@@ -13053,14 +13329,20 @@ globalThis.hwaHelperGearCraftData = {
       "176": 2,
       "180": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "266": 1
+    }
   },
   "260": {
     "recipe": {
       "140": 1,
       "186": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "267": 1
+    }
   },
   "261": {
     "recipe": {
@@ -13068,14 +13350,20 @@ globalThis.hwaHelperGearCraftData = {
       "169": 1,
       "180": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "268": 1
+    }
   },
   "262": {
     "recipe": {
       "133": 3,
       "187": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "269": 1
+    }
   },
   "263": {
     "recipe": {
@@ -13083,14 +13371,20 @@ globalThis.hwaHelperGearCraftData = {
       "168": 2,
       "179": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "270": 1
+    }
   },
   "264": {
     "recipe": {
       "173": 3,
       "187": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "271": 1
+    }
   },
   "265": {
     "recipe": {
@@ -13098,7 +13392,10 @@ globalThis.hwaHelperGearCraftData = {
       "177": 2,
       "188": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "272": 1
+    }
   },
   "266": {
     "recipe": {
@@ -13106,7 +13403,10 @@ globalThis.hwaHelperGearCraftData = {
       "170": 1,
       "185": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "273": 1
+    }
   },
   "267": {
     "recipe": {
@@ -13114,7 +13414,10 @@ globalThis.hwaHelperGearCraftData = {
       "175": 2,
       "183": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "274": 1
+    }
   },
   "268": {
     "recipe": {
@@ -13122,14 +13425,20 @@ globalThis.hwaHelperGearCraftData = {
       "169": 2,
       "180": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "275": 1
+    }
   },
   "269": {
     "recipe": {
       "140": 2,
       "174": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "276": 1
+    }
   },
   "270": {
     "recipe": {
@@ -13137,21 +13446,30 @@ globalThis.hwaHelperGearCraftData = {
       "177": 2,
       "202": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "277": 1
+    }
   },
   "271": {
     "recipe": {
       "133": 3,
       "187": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "278": 1
+    }
   },
   "272": {
     "recipe": {
       "182": 1,
       "183": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "279": 1
+    }
   },
   "273": {
     "recipe": {
@@ -13159,21 +13477,30 @@ globalThis.hwaHelperGearCraftData = {
       "180": 1,
       "184": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "280": 1
+    }
   },
   "274": {
     "recipe": {
       "177": 2,
       "201": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "281": 1
+    }
   },
   "275": {
     "recipe": {
       "133": 2,
       "182": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "282": 1
+    }
   },
   "276": {
     "recipe": {
@@ -13181,7 +13508,10 @@ globalThis.hwaHelperGearCraftData = {
       "167": 1,
       "183": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "283": 1
+    }
   },
   "277": {
     "recipe": {
@@ -13189,7 +13519,10 @@ globalThis.hwaHelperGearCraftData = {
       "172": 2,
       "187": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "284": 1
+    }
   },
   "278": {
     "recipe": {
@@ -13197,7 +13530,10 @@ globalThis.hwaHelperGearCraftData = {
       "122": 2,
       "201": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "285": 1
+    }
   },
   "279": {
     "recipe": {
@@ -13205,7 +13541,10 @@ globalThis.hwaHelperGearCraftData = {
       "182": 1,
       "202": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "286": 1
+    }
   },
   "280": {
     "recipe": {
@@ -13213,21 +13552,30 @@ globalThis.hwaHelperGearCraftData = {
       "183": 1,
       "185": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "287": 1
+    }
   },
   "281": {
     "recipe": {
       "188": 1,
       "202": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "288": 1
+    }
   },
   "282": {
     "recipe": {
       "178": 1,
       "189": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "289": 1
+    }
   },
   "283": {
     "recipe": {
@@ -13235,7 +13583,10 @@ globalThis.hwaHelperGearCraftData = {
       "180": 1,
       "183": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "290": 1
+    }
   },
   "284": {
     "recipe": {
@@ -13243,7 +13594,10 @@ globalThis.hwaHelperGearCraftData = {
       "174": 1,
       "184": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "291": 1
+    }
   },
   "285": {
     "recipe": {
@@ -13251,7 +13605,10 @@ globalThis.hwaHelperGearCraftData = {
       "169": 2,
       "186": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "292": 1
+    }
   },
   "286": {
     "recipe": {
@@ -13259,7 +13616,10 @@ globalThis.hwaHelperGearCraftData = {
       "176": 2,
       "184": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "293": 1
+    }
   },
   "287": {
     "recipe": {
@@ -13267,7 +13627,10 @@ globalThis.hwaHelperGearCraftData = {
       "180": 1,
       "183": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "294": 1
+    }
   },
   "288": {
     "recipe": {
@@ -13275,7 +13638,10 @@ globalThis.hwaHelperGearCraftData = {
       "169": 2,
       "180": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "295": 1
+    }
   },
   "289": {
     "recipe": {
@@ -13283,7 +13649,10 @@ globalThis.hwaHelperGearCraftData = {
       "177": 1,
       "182": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "296": 1
+    }
   },
   "290": {
     "recipe": {
@@ -13291,7 +13660,10 @@ globalThis.hwaHelperGearCraftData = {
       "174": 1,
       "180": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "297": 1
+    }
   },
   "291": {
     "recipe": {
@@ -13299,7 +13671,10 @@ globalThis.hwaHelperGearCraftData = {
       "173": 2,
       "188": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "298": 1
+    }
   },
   "292": {
     "recipe": {
@@ -13307,7 +13682,10 @@ globalThis.hwaHelperGearCraftData = {
       "167": 2,
       "183": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "299": 1
+    }
   },
   "293": {
     "recipe": {
@@ -13315,7 +13693,10 @@ globalThis.hwaHelperGearCraftData = {
       "114": 2,
       "201": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "300": 1
+    }
   },
   "308": {
     "recipe": {
@@ -13323,7 +13704,10 @@ globalThis.hwaHelperGearCraftData = {
       "179": 1,
       "183": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "315": 1
+    }
   },
   "319": {
     "recipe": {
@@ -13331,7 +13715,10 @@ globalThis.hwaHelperGearCraftData = {
       "167": 3,
       "183": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "326": 1
+    }
   },
   "324": {
     "recipe": {
@@ -13339,7 +13726,10 @@ globalThis.hwaHelperGearCraftData = {
       "168": 1,
       "201": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "331": 1
+    }
   },
   "325": {
     "recipe": {
@@ -13347,7 +13737,10 @@ globalThis.hwaHelperGearCraftData = {
       "183": 1,
       "185": 1
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "332": 1
+    }
   },
   "326": {
     "recipe": {
@@ -13355,7 +13748,10 @@ globalThis.hwaHelperGearCraftData = {
       "175": 2,
       "183": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "333": 1
+    }
   },
   "328": {
     "recipe": {
@@ -13363,6 +13759,524 @@ globalThis.hwaHelperGearCraftData = {
       "176": 2,
       "184": 2
     },
-    "gold": 3370000
+    "gold": 3370000,
+    "scroll": {
+      "335": 1
+    }
+  }
+};
+
+globalThis.hwaHelperScrollCraftData = {
+  "146": {
+    "fragmentCount": 10,
+    "gold": 30000
+  },
+  "147": {
+    "fragmentCount": 10,
+    "gold": 30000
+  },
+  "148": {
+    "fragmentCount": 10,
+    "gold": 30000
+  },
+  "149": {
+    "fragmentCount": 10,
+    "gold": 30000
+  },
+  "150": {
+    "fragmentCount": 10,
+    "gold": 30000
+  },
+  "151": {
+    "fragmentCount": 10,
+    "gold": 30000
+  },
+  "152": {
+    "fragmentCount": 50,
+    "gold": 75000
+  },
+  "153": {
+    "fragmentCount": 50,
+    "gold": 75000
+  },
+  "154": {
+    "fragmentCount": 50,
+    "gold": 75000
+  },
+  "155": {
+    "fragmentCount": 50,
+    "gold": 75000
+  },
+  "156": {
+    "fragmentCount": 50,
+    "gold": 75000
+  },
+  "157": {
+    "fragmentCount": 20,
+    "gold": 60000
+  },
+  "158": {
+    "fragmentCount": 20,
+    "gold": 60000
+  },
+  "159": {
+    "fragmentCount": 20,
+    "gold": 60000
+  },
+  "160": {
+    "fragmentCount": 20,
+    "gold": 60000
+  },
+  "161": {
+    "fragmentCount": 20,
+    "gold": 60000
+  },
+  "162": {
+    "fragmentCount": 20,
+    "gold": 45000
+  },
+  "163": {
+    "fragmentCount": 20,
+    "gold": 45000
+  },
+  "164": {
+    "fragmentCount": 20,
+    "gold": 45000
+  },
+  "165": {
+    "fragmentCount": 20,
+    "gold": 45000
+  },
+  "166": {
+    "fragmentCount": 20,
+    "gold": 45000
+  },
+  "190": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "191": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "192": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "193": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "194": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "195": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "196": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "197": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "198": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "199": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "200": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "204": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "205": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "206": {
+    "fragmentCount": 80,
+    "gold": 180000
+  },
+  "214": {
+    "fragmentCount": 150,
+    "gold": 337500
+  },
+  "215": {
+    "fragmentCount": 150,
+    "gold": 337500
+  },
+  "216": {
+    "fragmentCount": 150,
+    "gold": 337500
+  },
+  "217": {
+    "fragmentCount": 150,
+    "gold": 337500
+  },
+  "218": {
+    "fragmentCount": 150,
+    "gold": 337500
+  },
+  "219": {
+    "fragmentCount": 150,
+    "gold": 337500
+  },
+  "220": {
+    "fragmentCount": 150,
+    "gold": 337500
+  },
+  "221": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "222": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "223": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "224": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "225": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "226": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "227": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "228": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "229": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "230": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "231": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "232": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "233": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "234": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "235": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "236": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "237": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "238": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "239": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "240": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "241": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "242": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "243": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "244": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "245": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "246": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "247": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "248": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "249": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "250": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "251": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "252": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "253": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "254": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "255": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "256": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "257": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "258": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "259": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "260": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "261": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "262": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "263": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "264": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "265": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "266": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "267": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "268": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "269": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "270": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "271": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "272": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "273": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "274": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "275": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "276": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "277": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "278": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "279": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "280": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "281": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "282": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "283": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "284": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "285": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "286": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "287": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "288": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "289": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "290": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "291": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "292": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "293": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "294": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "295": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "296": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "297": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "298": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "299": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "300": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "315": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "326": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "331": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "332": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "333": {
+    "fragmentCount": 300,
+    "gold": 675000
+  },
+  "335": {
+    "fragmentCount": 300,
+    "gold": 675000
   }
 };

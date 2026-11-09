@@ -18,6 +18,8 @@ for (const [idStr, data] of Object.entries(missionMap)) {
 
   const gears = new Set();
   const frags = new Set();
+  const scrolls = new Set();
+  const fragScrolls = new Set();
 
   for (const wave of data.normalMode?.waves || []) {
     for (const enemy of wave.enemies || []) {
@@ -34,6 +36,18 @@ for (const [idStr, data] of Object.entries(missionMap)) {
             (itemDrops[fId] = itemDrops[fId] || []).push(id);
           }
         }
+        if (drop.reward?.scroll) {
+          for (const sId of Object.keys(drop.reward.scroll)) {
+            scrolls.add(Number(sId));
+            (itemDrops[sId] = itemDrops[sId] || []).push(id);
+          }
+        }
+        if (drop.reward?.fragmentScroll) {
+          for (const sId of Object.keys(drop.reward.fragmentScroll)) {
+            fragScrolls.add(Number(sId));
+            (itemDrops[sId] = itemDrops[sId] || []).push(id);
+          }
+        }
       }
     }
   }
@@ -46,7 +60,9 @@ for (const [idStr, data] of Object.entries(missionMap)) {
     cost: Number(data.normalMode?.cost?.stamina || 6),
     drops: {
       gear: [...gears],
-      fragmentGear: [...frags]
+      fragmentGear: [...frags],
+      scroll: [...scrolls],
+      fragmentScroll: [...fragScrolls]
     }
   };
 }

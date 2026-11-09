@@ -179,10 +179,16 @@ const playableHeroes = Object.entries(splitlibHeroes)
 console.log(`Found ${playableHeroes.length} playable heroes.`);
 
 let splitlibGears = {};
+let splitlibScrolls = {};
 try {
   splitlibGears = JSON.parse(await readFile(join(root, 'temp/splitlib/inventoryItem_gear.json'), 'utf8'));
 } catch (e) {
   console.warn('Could not read temp/splitlib/inventoryItem_gear.json:', e.message);
+}
+try {
+  splitlibScrolls = JSON.parse(await readFile(join(root, 'temp/splitlib/inventoryItem_scroll.json'), 'utf8'));
+} catch (e) {
+  console.warn('Could not read temp/splitlib/inventoryItem_scroll.json:', e.message);
 }
 
 const gearCraftData = {};
@@ -195,8 +201,19 @@ for (const [id, g] of Object.entries(splitlibGears)) {
   if (g.craftRecipe?.gear) {
     entry.recipe = g.craftRecipe.gear;
     if (g.craftRecipe.gold) entry.gold = g.craftRecipe.gold;
+    if (g.craftRecipe.scroll) entry.scroll = g.craftRecipe.scroll;
   }
   if (Object.keys(entry).length > 0) gearCraftData[id] = entry;
+}
+
+const scrollCraftData = {};
+for (const [id, s] of Object.entries(splitlibScrolls)) {
+  const entry = {};
+  if (s.fragmentMergeCost?.fragmentCount) {
+    entry.fragmentCount = s.fragmentMergeCost.fragmentCount;
+    if (s.fragmentMergeCost.gold) entry.gold = s.fragmentMergeCost.gold;
+  }
+  if (Object.keys(entry).length > 0) scrollCraftData[id] = entry;
 }
 
 // Download/convert avatars with assets:sync first; metadata generation stays local.
@@ -232,7 +249,8 @@ for (const [id, h] of playableHeroes) {
 
 const outputJs = `// Generated hero metadata\n` +
   `globalThis.hwaHelperHeroMetadata = ${JSON.stringify(metadata, null, 2)};\n\n` +
-  `globalThis.hwaHelperGearCraftData = ${JSON.stringify(gearCraftData, null, 2)};\n`;
+  `globalThis.hwaHelperGearCraftData = ${JSON.stringify(gearCraftData, null, 2)};\n\n` +
+  `globalThis.hwaHelperScrollCraftData = ${JSON.stringify(scrollCraftData, null, 2)};\n`;
 
 await writeFile(join(root, 'extension/hero-metadata.js'), outputJs, 'utf8');
-console.log(`Wrote hero metadata to extension/hero-metadata.js (${Object.keys(metadata).length} heroes, ${Object.keys(gearCraftData).length} gear craft definitions).`);
+console.log(`Wrote hero metadata to extension/hero-metadata.js (${Object.keys(metadata).length} heroes, ${Object.keys(gearCraftData).length} gear craft definitions, ${Object.keys(scrollCraftData).length} scroll craft definitions).`);

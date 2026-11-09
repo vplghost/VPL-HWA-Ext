@@ -807,7 +807,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if ((message?.kind === 'draft-action' || message?.kind === 'refresh-rpc' ||
       message?.kind === 'claim-rewards' || message?.kind === 'engine-ping' ||
-      message?.kind === 'engine-send-message') &&
+      message?.kind === 'engine-send-message' ||
+      message?.kind === 'campaign-raid' || message?.kind === 'craft-fragment' ||
+      message?.kind === 'craft-recipe') &&
       sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     const forward = (forwardedMessage = message, queued = false) =>
       chrome.tabs?.query({ url: GAME_ORIGINS.map((o) => `${o}/*`) }, async (tabs) => {

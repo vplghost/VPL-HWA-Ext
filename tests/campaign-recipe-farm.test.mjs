@@ -174,9 +174,10 @@ test('buildGearRecipeTree builds hierarchy and marks fulfilled vs unfulfilled co
   assert.ok(tree1, 'Tree should be created');
   assert.equal(tree1.id, '102');
   assert.equal(tree1.isFulfilled, false, 'Root should be unfulfilled');
-  assert.equal(tree1.children.length, 1, 'Should have 1 child (gear 62)');
+  assert.equal(tree1.children.length, 2, 'Should have 2 children (gear 62 and scroll 158)');
 
-  const child1 = tree1.children[0];
+  const child1 = tree1.children.find((c) => c.id === '62');
+  assert.ok(child1, 'Gear 62 child should exist');
   assert.equal(child1.id, '62');
   assert.equal(child1.isFulfilled, false, 'Child should be unfulfilled');
   assert.equal(child1.fragment.required, 5);
@@ -193,8 +194,9 @@ test('buildGearRecipeTree builds hierarchy and marks fulfilled vs unfulfilled co
     }
   };
   const tree2 = context.buildGearRecipeTree(102, cache2);
-  assert.equal(tree2.children[0].fragment.isFulfilled, true, 'Fragment should be fulfilled');
-  assert.equal(tree2.children[0].canCraft, true, 'Child should be craftable');
+  const gear62 = tree2.children.find((c) => c.id === '62');
+  assert.equal(gear62.fragment.isFulfilled, true, 'Fragment should be fulfilled');
+  assert.equal(gear62.canCraft, true, 'Child should be craftable');
 
   // When player already owns item 102
   const cache3 = {
@@ -209,7 +211,53 @@ test('buildGearRecipeTree builds hierarchy and marks fulfilled vs unfulfilled co
   assert.equal(tree3.isFulfilled, true, 'Root should be fulfilled when owned');
 });
 
-test('getMissionsForItem and getHighestRaidableMission returns highest 3-star mission', async () => {
+test('buildGearRecipeTree includes recipe scrolls and scroll fragments', async () => {
+  const context = await createTestContext();
+
+  // Gear 85 requires Gear 56, Gear 74, and Scroll 146 x 1
+  const cache = {
+    inventoryGet: {
+      data: {
+        gear: { '85': 0, '56': 1, '74': 1 },
+        scroll: { '146': 0 },
+        fragmentScroll: { '146': 4 }
+      }
+    }
+  };
+
+  const tree = context.buildGearRecipeTree(85, cache);
+  assert.ok(tree, 'Tree for gear 85 should be created');
+  assert.equal(tree.id, '85');
+  assert.equal(tree.children.length, 3, 'Should have 3 children: gear 56, gear 74, and scroll 146');
+
+  const scrollChild = tree.children.find((c) => c.isScroll && c.id === '146');
+  assert.ok(scrollChild, 'Scroll 146 should be a child node in recipe tree');
+  assert.equal(scrollChild.category, 'scroll');
+  assert.equal(scrollChild.requiredCount, 1);
+  assert.equal(scrollChild.owned, 0);
+  assert.equal(scrollChild.isFulfilled, false, 'Scroll should be unfulfilled');
+  assert.ok(scrollChild.fragment, 'Scroll 146 should have fragment info');
+  assert.equal(scrollChild.fragment.required, 10, 'Scroll 146 requires 10 fragments');
+  assert.equal(scrollChild.fragment.owned, 4);
+  assert.equal(scrollChild.fragment.isFulfilled, false);
+
+  // When player has 10 scroll fragments
+  const cacheWithScroll = {
+    inventoryGet: {
+      data: {
+        gear: { '85': 0, '56': 1, '74': 1 },
+        scroll: { '146': 0 },
+        fragmentScroll: { '146': 10 }
+      }
+    }
+  };
+  const treeWithScroll = context.buildGearRecipeTree(85, cacheWithScroll);
+  const scrollChildReady = treeWithScroll.children.find((c) => c.isScroll && c.id === '146');
+  assert.equal(scrollChildReady.fragment.isFulfilled, true, 'Scroll fragments should be fulfilled');
+  assert.equal(scrollChildReady.canCraft, true, 'Scroll should be craftable from fragments');
+});
+
+test('getMissionsForItem and getHighestRaidableMission returns highest 3-star mission for gear and scroll', async () => {
   const context = await createTestContext();
   const campaignData = context.hwaHelperCampaignMissions;
 
@@ -243,6 +291,22 @@ test('getMissionsForItem and getHighestRaidableMission returns highest 3-star mi
   };
   const highestRaidable2 = campaignData.getHighestRaidableMission(missionIds57, progress2);
   assert.equal(highestRaidable2, 163, 'Should select mission 163 when it has 3 stars');
+
+  // Scroll 146 has drop missions [54, 85, 125, 137, 156, 173]
+  const missions146 = campaignData.getMissionsForItem(146);
+  assert.ok(missions146.length >= 6, 'Scroll 146 should have drop missions');
+  const scrollIds146 = missions146.map((m) => m.id);
+  assert.ok(scrollIds146.includes(54), 'Should include mission 54');
+  assert.ok(scrollIds146.includes(125), 'Should include mission 125');
+
+  const scrollProgress = {
+    '54': { stars: 3 },
+    '85': { stars: 3 },
+    '125': { stars: 3 },
+    '137': { stars: 1 }
+  };
+  const highestScrollMission = campaignData.getHighestRaidableMission(scrollIds146, scrollProgress);
+  assert.equal(highestScrollMission, 125, 'Should select mission 125 as highest 3-star mission for scroll 146');
 });
 
 test('openCampaignDialog with gearId renders recipe tree and auto-fills highest 3-star mission', async () => {
@@ -280,8 +344,6 @@ test('openCampaignDialog with gearId renders recipe tree and auto-fills highest 
   assert.match(text, /Đang chọn farm/);
 
   // Check auto-filled mission ID is the highest 3-star mission for gear 62
-  // Candidate missions for gear 62: [48, 65, 84, 113, 142, 151, 168]
-  // None of them are in progress above except let's test with progress containing mission 84 with 3 stars
   const cacheWith62 = {
     ...cache,
     missionGetAll: {
@@ -301,6 +363,31 @@ test('openCampaignDialog with gearId renders recipe tree and auto-fills highest 
   assert.ok(missionInput, 'Mission input should exist');
   assert.equal(missionInput.value, '84', 'Mission input should be auto-filled to highest 3-star mission (84)');
   assert.equal(context.hwaHelperCampaignState.selectedCampaignMissionId, 84, 'selectedCampaignMissionId should be 84');
+});
+
+test('renderCampaignDialog displays both fragmentGear and fragmentScroll in crafting list', async () => {
+  const context = await createTestContext();
+  const target = new MockElement('div');
+
+  const cache = {
+    energyStatus: { data: { energy: 100, max: 150 } },
+    inventoryGet: {
+      data: {
+        gear: {},
+        scroll: {},
+        fragmentGear: { '57': 8 },
+        fragmentScroll: { '146': 6 }
+      }
+    }
+  };
+
+  context.renderCampaignDialog(cache, target);
+  const text = target.textContent;
+
+  assert.match(text, /Mảnh trang bị & Bản vẽ hiện có trong kho/);
+  assert.match(text, /8 mảnh/);
+  assert.match(text, /Mảnh bản vẽ/);
+  assert.match(text, /6 mảnh/);
 });
 
 test('hero dialog equipment slot click passes gearId to openCampaignDialog', async () => {

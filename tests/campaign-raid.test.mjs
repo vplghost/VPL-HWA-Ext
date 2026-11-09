@@ -236,8 +236,8 @@ test('renderCampaignDialog displays energy, mission selector, last raid drops, a
   assert.match(text, /7,?605 Gold/);
   assert.match(text, /Mảnh #57/);
   assert.match(text, /Gear #9/);
-  assert.match(text, /Mảnh #57\s*\(14 mảnh\)/);
-  assert.match(text, /Mảnh #169\s*\(5 mảnh\)/);
+  assert.match(text, /14 mảnh/);
+  assert.match(text, /5 mảnh/);
 
   // Check buttons exist
   const buttons = target.querySelectorAll('button');

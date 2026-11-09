@@ -9651,6 +9651,11 @@ function renderHeroDialog(heroId, cache) {
           chrome.runtime?.sendMessage?.(
             { kind: 'craft-fragment', libId: itemId, amount: 1 },
             (res) => {
+              if (chrome.runtime?.lastError) {
+                craftBtn.disabled = false;
+                craftBtn.textContent = 'Lỗi';
+                return;
+              }
               if (res?.ok) {
                 setTimeout(() => {
                   if (typeof renderHeroDialog === 'function' && typeof currentCache !== 'undefined') {
@@ -9659,7 +9664,7 @@ function renderHeroDialog(heroId, cache) {
                 }, 500);
               } else {
                 craftBtn.disabled = false;
-                craftBtn.textContent = 'Lỗi';
+                craftBtn.textContent = res?.error || 'Lỗi';
               }
             }
           );
@@ -9734,9 +9739,12 @@ function buildGearRecipeTree(gearId, cache, visited = new Set()) {
     }
   }
 
+  let allSubFulfilled = true;
+  let hasSubComponents = false;
+
   if (craftInfo?.recipe) {
-    let allSubFulfilled = true;
     for (const [subId, reqCount] of Object.entries(craftInfo.recipe)) {
+      hasSubComponents = true;
       const child = buildGearRecipeTree(subId, cache, new Set(visited));
       if (child) {
         child.requiredCount = Number(reqCount) || 1;
@@ -9745,9 +9753,59 @@ function buildGearRecipeTree(gearId, cache, visited = new Set()) {
         node.children.push(child);
       }
     }
-    if (ownedGear < 1 && allSubFulfilled && node.children.length > 0) {
-      node.canCraft = true;
+  }
+
+  // Include recipe scroll / scroll fragments
+  if (craftInfo?.scroll) {
+    for (const [scrollId, reqCount] of Object.entries(craftInfo.scroll)) {
+      hasSubComponents = true;
+      const scrollStr = String(scrollId);
+      const scrollCraft = globalThis.hwaHelperScrollCraftData?.[scrollStr] || null;
+      const scrollName = globalThis.hwaHelperNameData?.names?.scroll?.[scrollStr] ||
+                         globalThis.hwaHelperNameMap?.item?.('scroll', scrollStr) ||
+                         `Bản vẽ #${scrollStr}`;
+      const ownedScroll = Number(cache?.inventoryGet?.data?.scroll?.[scrollStr] || 0);
+      const reqNum = Number(reqCount) || 1;
+      const isScrollFulfilled = ownedScroll >= reqNum;
+      if (!isScrollFulfilled) allSubFulfilled = false;
+
+      const scrollNode = {
+        id: scrollStr,
+        name: scrollName,
+        category: 'scroll',
+        isScroll: true,
+        owned: ownedScroll,
+        requiredCount: reqNum,
+        craftInfo: scrollCraft,
+        fragment: null,
+        children: [],
+        isFulfilled: isScrollFulfilled,
+        canCraft: false
+      };
+
+      if (scrollCraft?.fragmentCount) {
+        const fragReq = Number(scrollCraft.fragmentCount) || 0;
+        const ownedFragScroll = Number(cache?.inventoryGet?.data?.fragmentScroll?.[scrollStr] || 0);
+        const fragFulfilled = ownedFragScroll >= fragReq;
+        scrollNode.fragment = {
+          id: scrollStr,
+          category: 'fragmentScroll',
+          required: fragReq,
+          owned: ownedFragScroll,
+          isFulfilled: fragFulfilled,
+          gold: scrollCraft.gold || 0
+        };
+        if (ownedScroll < reqNum && fragFulfilled) {
+          scrollNode.canCraft = true;
+        }
+      }
+
+      node.children.push(scrollNode);
     }
+  }
+
+  if (ownedGear < 1 && allSubFulfilled && hasSubComponents) {
+    node.canCraft = true;
   }
 
   return node;
@@ -9876,7 +9934,9 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       }
 
       const icon = document.createElement('img');
-      icon.src = `assets/items/gear/${node.id}.png`;
+      icon.src = node.isScroll
+        ? `assets/items/scroll/${node.id}.png`
+        : `assets/items/gear/${node.id}.png`;
       icon.alt = node.name;
       icon.className = 'size-6 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 object-cover shrink-0';
       icon.onerror = () => { icon.style.display = 'none'; };
@@ -9888,7 +9948,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       const reqLabel = node.requiredCount ? ` (Cần ${node.requiredCount})` : (isRoot ? ' (Mục tiêu)' : '');
       nameInfo.innerHTML = `
         <div class="flex items-center gap-1.5 flex-wrap">
-          <span class="font-bold text-xs truncate ${isSelected ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-800 dark:text-slate-200'}">${node.name}</span>
+          <span class="font-bold text-xs truncate ${isSelected ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-800 dark:text-slate-200'}">${node.isScroll ? '📜 ' : ''}${node.name}</span>
           <span class="text-3xs font-mono text-slate-400">#${node.id}${reqLabel}</span>
         </div>
         <div class="text-3xs text-slate-500 dark:text-slate-400 flex items-center gap-2 flex-wrap">
@@ -9909,7 +9969,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       } else if (node.fragment && !node.fragment.isFulfilled) {
         const missingFrags = node.fragment.required - node.fragment.owned;
         statusPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
-        statusPill.textContent = `🧩 Thiếu ${missingFrags} mảnh`;
+        statusPill.textContent = node.isScroll ? `📜 Thiếu ${missingFrags} mảnh bản vẽ` : `🧩 Thiếu ${missingFrags} mảnh`;
       } else {
         const missingCount = node.requiredCount ? Math.max(1, node.requiredCount - node.owned) : 1;
         statusPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300';
@@ -9922,13 +9982,21 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
         quickCraftBtn.type = 'button';
         quickCraftBtn.className = 'px-2 py-0.5 rounded text-3xs font-bold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer shadow-xs';
         quickCraftBtn.textContent = 'Ghép';
-        quickCraftBtn.title = node.fragment ? `Ghép mảnh #${node.id}` : `Chế tạo recipe #${node.id}`;
+        quickCraftBtn.title = node.isScroll
+          ? `Ghép mảnh bản vẽ #${node.id}`
+          : (node.fragment ? `Ghép mảnh #${node.id}` : `Chế tạo recipe #${node.id}`);
         quickCraftBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           quickCraftBtn.disabled = true;
           quickCraftBtn.textContent = '...';
-          const kind = node.fragment ? 'craft-fragment' : 'craft-recipe';
-          chrome.runtime?.sendMessage?.({ kind, libId: Number(node.id), amount: 1 }, () => {
+          const kind = (node.fragment || node.isScroll) ? 'craft-fragment' : 'craft-recipe';
+          const type = node.isScroll ? 'scroll' : 'gear';
+          chrome.runtime?.sendMessage?.({ kind, type, libId: Number(node.id), amount: 1 }, (res) => {
+            if (chrome.runtime?.lastError) {
+              quickCraftBtn.disabled = false;
+              quickCraftBtn.textContent = 'Lỗi';
+              return;
+            }
             setTimeout(() => {
               if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
             }, 600);
@@ -10141,6 +10209,11 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       chrome.runtime?.sendMessage?.(
         { kind: 'campaign-raid', missionId: selectedCampaignMissionId, times: selectedCampaignTimes },
         (res) => {
+          if (chrome.runtime?.lastError) {
+            raidBtn.disabled = false;
+            raidBtn.textContent = chrome.runtime.lastError.message || 'Lỗi kết nối';
+            return;
+          }
           if (!res?.ok) {
             raidBtn.disabled = false;
             raidBtn.textContent = res?.error || 'Raid thất bại';
@@ -10236,28 +10309,45 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   `;
   craftCard.append(craftHead);
 
-  // Owned Fragments list
-  const invFrags = cache?.inventoryGet?.data?.fragmentGear || {};
-  const fragEntries = Object.entries(invFrags).filter(([, count]) => Number(count) > 0);
+  // Owned Fragments list (Gear & Scroll Recipes)
+  const invGearFrags = cache?.inventoryGet?.data?.fragmentGear || {};
+  const invScrollFrags = cache?.inventoryGet?.data?.fragmentScroll || {};
+  const fragEntries = [
+    ...Object.entries(invGearFrags).filter(([, count]) => Number(count) > 0).map(([id, count]) => ({ id, count: Number(count), type: 'gear' })),
+    ...Object.entries(invScrollFrags).filter(([, count]) => Number(count) > 0).map(([id, count]) => ({ id, count: Number(count), type: 'scroll' }))
+  ];
 
   const fragsSection = document.createElement('div');
   fragsSection.className = 'space-y-1.5';
   
   const fragsTitle = document.createElement('div');
   fragsTitle.className = 'text-xs font-semibold text-slate-700 dark:text-slate-300';
-  fragsTitle.textContent = 'Mảnh trang bị hiện có trong kho:';
+  fragsTitle.textContent = 'Mảnh trang bị & Bản vẽ hiện có trong kho:';
   fragsSection.append(fragsTitle);
 
   if (fragEntries.length > 0) {
     const fragsGrid = document.createElement('div');
     fragsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[180px] overflow-y-auto p-1 border border-slate-100 dark:border-slate-800 rounded-lg';
-    for (const [fragId, count] of fragEntries) {
+    for (const fragItem of fragEntries) {
+      const isScroll = fragItem.type === 'scroll';
+      const itemName = isScroll
+        ? (globalThis.hwaHelperNameData?.names?.scroll?.[fragItem.id] ||
+           globalThis.hwaHelperNameMap?.item?.('scroll', fragItem.id) ||
+           `Bản vẽ #${fragItem.id}`)
+        : (globalThis.hwaHelperNameData?.names?.gear?.[fragItem.id] ||
+           globalThis.hwaHelperNameMap?.item?.('gear', fragItem.id) ||
+           `Gear #${fragItem.id}`);
+      const iconSrc = isScroll ? `assets/items/scroll/${fragItem.id}.png` : `assets/items/gear/${fragItem.id}.png`;
+
       const fragRow = document.createElement('div');
-      fragRow.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 text-xs';
+      fragRow.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 text-xs gap-2';
       fragRow.innerHTML = `
-        <div class="min-w-0 flex items-center gap-1.5">
-          <span class="font-bold text-slate-800 dark:text-slate-200">Mảnh #${fragId}</span>
-          <span class="text-2xs text-slate-500">(${count} mảnh)</span>
+        <div class="min-w-0 flex items-center gap-2">
+          <img src="${iconSrc}" class="size-6 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 object-cover shrink-0" onerror="this.style.display='none'" />
+          <div class="min-w-0">
+            <div class="font-bold text-slate-800 dark:text-slate-200 truncate" title="${itemName}">${isScroll ? '📜 ' : '🧩 '}${itemName}</div>
+            <div class="text-3xs text-slate-500">${isScroll ? 'Mảnh bản vẽ' : 'Mảnh trang bị'} • ${fragItem.count} mảnh</div>
+          </div>
         </div>
       `;
 
@@ -10265,13 +10355,18 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       craftBtn.type = 'button';
       craftBtn.className = 'px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-2xs font-bold cursor-pointer transition-all shrink-0';
       craftBtn.textContent = 'Ghép';
-      craftBtn.title = `Ghép mảnh #${fragId} thành Gear`;
+      craftBtn.title = isScroll ? `Ghép mảnh bản vẽ #${fragItem.id}` : `Ghép mảnh trang bị #${fragItem.id}`;
       craftBtn.addEventListener('click', () => {
         craftBtn.disabled = true;
         craftBtn.textContent = '⏳';
         chrome.runtime?.sendMessage?.(
-          { kind: 'craft-fragment', libId: Number(fragId), amount: 1 },
+          { kind: 'craft-fragment', type: fragItem.type, libId: Number(fragItem.id), amount: 1 },
           (res) => {
+            if (chrome.runtime?.lastError) {
+              craftBtn.disabled = false;
+              craftBtn.textContent = 'Lỗi';
+              return;
+            }
             setTimeout(() => {
               if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
             }, 600);
@@ -10302,18 +10397,34 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
 
   const craftInput = document.createElement('input');
   craftInput.type = 'number';
-  craftInput.placeholder = 'Nhập Item ID (VD: 57, 65)...';
+  craftInput.placeholder = 'Nhập Item ID (VD: 57, 146)...';
   craftInput.className = 'w-44 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-400';
   manualForm.append(craftInput);
 
   const craftFragBtn = document.createElement('button');
   craftFragBtn.type = 'button';
   craftFragBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer';
-  craftFragBtn.textContent = 'Ghép Mảnh';
+  craftFragBtn.textContent = 'Ghép Mảnh Gear';
   craftFragBtn.addEventListener('click', () => {
     const val = Number(craftInput.value);
     if (!val) return;
-    chrome.runtime?.sendMessage?.({ kind: 'craft-fragment', libId: val, amount: 1 }, () => {
+    chrome.runtime?.sendMessage?.({ kind: 'craft-fragment', type: 'gear', libId: val, amount: 1 }, () => {
+      if (chrome.runtime?.lastError) return;
+      setTimeout(() => {
+        if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
+      }, 600);
+    });
+  });
+
+  const craftScrollBtn = document.createElement('button');
+  craftScrollBtn.type = 'button';
+  craftScrollBtn.className = 'px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold cursor-pointer';
+  craftScrollBtn.textContent = 'Ghép Mảnh Bản Vẽ';
+  craftScrollBtn.addEventListener('click', () => {
+    const val = Number(craftInput.value);
+    if (!val) return;
+    chrome.runtime?.sendMessage?.({ kind: 'craft-fragment', type: 'scroll', libId: val, amount: 1 }, () => {
+      if (chrome.runtime?.lastError) return;
       setTimeout(() => {
         if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
       }, 600);
@@ -10323,18 +10434,19 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   const craftRecipeBtn = document.createElement('button');
   craftRecipeBtn.type = 'button';
   craftRecipeBtn.className = 'px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold cursor-pointer';
-  craftRecipeBtn.textContent = 'Chế Tạo Recipe';
+  craftRecipeBtn.textContent = 'Chế Tạo Recipe Gear';
   craftRecipeBtn.addEventListener('click', () => {
     const val = Number(craftInput.value);
     if (!val) return;
     chrome.runtime?.sendMessage?.({ kind: 'craft-recipe', libId: val, amount: 1 }, () => {
+      if (chrome.runtime?.lastError) return;
       setTimeout(() => {
         if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
       }, 600);
     });
   });
 
-  manualForm.append(craftFragBtn, craftRecipeBtn);
+  manualForm.append(craftFragBtn, craftScrollBtn, craftRecipeBtn);
   manualCraftRow.append(manualForm);
   craftCard.append(manualCraftRow);
 

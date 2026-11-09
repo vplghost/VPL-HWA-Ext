@@ -1370,6 +1370,7 @@
                 action: call.name,
                 libId: call.args.libId,
                 amount: call.args.amount || 1,
+                args: call.args,
                 result: result.response,
                 token: `${call.ident}:gearCraft`
               },
@@ -2756,10 +2757,14 @@
           if (seen[entry.data.token] || !entry.data.libId) continue;
           const libId = String(entry.data.libId);
           const amount = Math.max(1, Number(entry.data.amount) || 1);
-          const craftInfo = globalThis.hwaHelperGearCraftData?.[libId];
+          const isScrollType = entry.data.args?.type === 'scroll';
+          const craftInfo = isScrollType
+            ? (globalThis.hwaHelperScrollCraftData?.[libId] || globalThis.hwaHelperGearCraftData?.[libId])
+            : (globalThis.hwaHelperGearCraftData?.[libId] || globalThis.hwaHelperScrollCraftData?.[libId]);
 
           // 1. Add crafted items
           const responseGears = entry.data.result?.gear;
+          const responseScrolls = entry.data.result?.scroll;
           if (responseGears && typeof responseGears === 'object') {
             for (const [gId, count] of Object.entries(responseGears)) {
               const numCount = Number(count) || 0;
@@ -2788,22 +2793,51 @@
               }
             }
           }
+          if (responseScrolls && typeof responseScrolls === 'object') {
+            for (const [sId, count] of Object.entries(responseScrolls)) {
+              const numCount = Number(count) || 0;
+              if (numCount > 0) {
+                if (next.inventoryGet) {
+                  const curScroll = Number(next.inventoryGet.data?.scroll?.[sId] || 0);
+                  next.inventoryGet = {
+                    ...next.inventoryGet,
+                    data: {
+                      ...next.inventoryGet.data,
+                      scroll: { ...(next.inventoryGet.data?.scroll || {}), [sId]: curScroll + numCount }
+                    }
+                  };
+                }
+                const resKey = `resource:scroll:${sId}`;
+                if (next[resKey]?.data) {
+                  next[resKey] = {
+                    ...next[resKey],
+                    data: {
+                      ...next[resKey].data,
+                      amount: (next[resKey].data.amount ?? 0) + numCount
+                    },
+                    updatedAt: entry.updatedAt
+                  };
+                }
+              }
+            }
+          }
 
           // 2. Deduct fragments or recipe components
           if (entry.data.action === 'inventoryCraftFragments') {
+            const fragField = isScrollType ? 'fragmentScroll' : 'fragmentGear';
             const fragCost = (craftInfo?.fragmentCount || 0) * amount;
             if (fragCost > 0) {
               if (next.inventoryGet) {
-                const curFrags = Number(next.inventoryGet.data?.fragmentGear?.[libId] || 0);
+                const curFrags = Number(next.inventoryGet.data?.[fragField]?.[libId] || 0);
                 next.inventoryGet = {
                   ...next.inventoryGet,
                   data: {
                     ...next.inventoryGet.data,
-                    fragmentGear: { ...(next.inventoryGet.data?.fragmentGear || {}), [libId]: Math.max(0, curFrags - fragCost) }
+                    [fragField]: { ...(next.inventoryGet.data?.[fragField] || {}), [libId]: Math.max(0, curFrags - fragCost) }
                   }
                 };
               }
-              const resKey = `resource:fragmentGear:${libId}`;
+              const resKey = `resource:${fragField}:${libId}`;
               if (next[resKey]?.data) {
                 next[resKey] = {
                   ...next[resKey],
@@ -2839,6 +2873,34 @@
                     },
                     updatedAt: entry.updatedAt
                   };
+                }
+              }
+            }
+            if (craftInfo.scroll && typeof craftInfo.scroll === 'object') {
+              for (const [sId, sCount] of Object.entries(craftInfo.scroll)) {
+                const sCost = (Number(sCount) || 1) * amount;
+                if (sCost > 0) {
+                  if (next.inventoryGet) {
+                    const curScroll = Number(next.inventoryGet.data?.scroll?.[sId] || 0);
+                    next.inventoryGet = {
+                      ...next.inventoryGet,
+                      data: {
+                        ...next.inventoryGet.data,
+                        scroll: { ...(next.inventoryGet.data?.scroll || {}), [sId]: Math.max(0, curScroll - sCost) }
+                      }
+                    };
+                  }
+                  const resKey = `resource:scroll:${sId}`;
+                  if (next[resKey]?.data) {
+                    next[resKey] = {
+                      ...next[resKey],
+                      data: {
+                        ...next[resKey].data,
+                        amount: Math.max(0, (next[resKey].data.amount ?? 0) - sCost)
+                      },
+                      updatedAt: entry.updatedAt
+                    };
+                  }
                 }
               }
             }
