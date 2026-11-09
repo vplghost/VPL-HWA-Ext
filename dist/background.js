@@ -3,6 +3,7 @@ importScripts('refillable-rules.js');
 importScripts('clan-versus-rules.js');
 importScripts('mission-costs.js');
 importScripts('march-rules.js');
+importScripts('hero-metadata.js');
 importScripts('rpc-cache.js');
 importScripts('experimental-data.js');
 importScripts('raid-queue.js');

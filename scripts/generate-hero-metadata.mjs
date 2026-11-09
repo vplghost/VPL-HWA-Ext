@@ -188,8 +188,14 @@ try {
 const gearCraftData = {};
 for (const [id, g] of Object.entries(splitlibGears)) {
   const entry = {};
-  if (g.fragmentMergeCost?.fragmentCount) entry.fragmentCount = g.fragmentMergeCost.fragmentCount;
-  if (g.craftRecipe?.gear) entry.recipe = g.craftRecipe.gear;
+  if (g.fragmentMergeCost?.fragmentCount) {
+    entry.fragmentCount = g.fragmentMergeCost.fragmentCount;
+    if (g.fragmentMergeCost.gold) entry.gold = g.fragmentMergeCost.gold;
+  }
+  if (g.craftRecipe?.gear) {
+    entry.recipe = g.craftRecipe.gear;
+    if (g.craftRecipe.gold) entry.gold = g.craftRecipe.gold;
+  }
   if (Object.keys(entry).length > 0) gearCraftData[id] = entry;
 }
 

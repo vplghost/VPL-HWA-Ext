@@ -7,12 +7,14 @@ const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.u
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const missionCosts = await readFile(new URL('../extension/mission-costs.js', import.meta.url), 'utf8');
 const marchRules = await readFile(new URL('../extension/march-rules.js', import.meta.url), 'utf8');
+const heroMetadata = await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8');
 const resourceDataSource = await readFile(new URL('../extension/resource-data.js', import.meta.url), 'utf8');
 const clanVersusRules = await readFile(new URL('../extension/clan-versus-rules.js', import.meta.url), 'utf8');
 const context = { TextEncoder };
 runInNewContext(refillRules, context);
 runInNewContext(missionCosts, context);
 runInNewContext(marchRules, context);
+runInNewContext(heroMetadata, context);
 runInNewContext(clanVersusRules, context);
 runInNewContext(resourceDataSource, context);
 runInNewContext(source, context);
@@ -2052,4 +2054,146 @@ test('getSummary extracts buildings and completedResearches and completion updat
   assert.equal(mergedAfterResearch.researchStatus.data.queues.length, 0, 'queue cleared');
   const updatedR513 = mergedAfterResearch.researchStatus.data.completedResearches.find((r) => r.researchId === 513);
   assert.equal(updatedR513?.level, 2, 'research 513 level updated to 2');
+});
+
+test('heroUpgradeSkill deducts gold and skill points while upgrading target skill', () => {
+  const initialCache = {
+    heroGetAll: {
+      key: 'heroGetAll',
+      data: {
+        '1': {
+          id: 1,
+          level: 50,
+          skills: { '2': 1, '3': 1 }
+        }
+      },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    'resource:gold': {
+      key: 'resource:gold',
+      data: { amount: 50000 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    'resource:refillable:2': {
+      key: 'resource:refillable:2',
+      data: { amount: 10, cap: 10 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    userGetInfo: {
+      key: 'userGetInfo',
+      data: { gold: 50000 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    inventoryGet: {
+      key: 'inventoryGet',
+      data: { coin: { '1': 50000 } },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    }
+  };
+
+  // Upgrade skill 1 (key '2') from level 1 to level 2: cost is 100 gold and 1 skill point
+  const upgradeTrace = record([
+    { name: 'heroUpgradeSkill', ident: 'uskill1', args: { heroId: 1, skill: 1 } }
+  ], [
+    { ident: 'uskill1', result: { response: null } }
+  ], '2026-11-01T10:01:00.000Z');
+
+  const afterMerge = cache.merge(initialCache, [upgradeTrace]).cache;
+
+  assert.equal(afterMerge.heroGetAll.data['1'].skills['2'], 2, 'skill 1 upgraded to level 2');
+  assert.equal(afterMerge['resource:gold'].data.amount, 49900, 'gold deducted by 100');
+  assert.equal(afterMerge.userGetInfo.data.gold, 49900, 'userGetInfo gold deducted');
+  assert.equal(afterMerge.inventoryGet.data.coin['1'], 49900, 'coin[1] gold deducted');
+  assert.equal(afterMerge['resource:refillable:2'].data.amount, 9, 'skill point decremented');
+
+  // Upgrade skill 1 from level 2 to level 3: cost is 550 gold
+  const upgradeTrace2 = record([
+    { name: 'heroUpgradeSkill', ident: 'uskill2', args: { heroId: 1, skill: 1 } }
+  ], [
+    { ident: 'uskill2', result: { response: null } }
+  ], '2026-11-01T10:02:00.000Z');
+
+  const afterMerge2 = cache.merge(afterMerge, [upgradeTrace2]).cache;
+
+  assert.equal(afterMerge2.heroGetAll.data['1'].skills['2'], 3, 'skill 1 upgraded to level 3');
+  assert.equal(afterMerge2['resource:gold'].data.amount, 49350, 'gold deducted by 550 (49900 - 550 = 49350)');
+  assert.equal(afterMerge2.userGetInfo.data.gold, 49350, 'userGetInfo gold deducted by 550');
+  assert.equal(afterMerge2['resource:refillable:2'].data.amount, 8, 'skill point decremented to 8');
+});
+
+test('inventoryCraftFragments deducts fragments and gold, adds crafted gear', () => {
+  // Gear 57 has fragmentCount: 5, gold: 22500
+  const initialCache = {
+    inventoryGet: {
+      key: 'inventoryGet',
+      data: {
+        gear: { '57': 0 },
+        fragmentGear: { '57': 10 },
+        coin: { '1': 100000 }
+      },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    'resource:gold': {
+      key: 'resource:gold',
+      data: { amount: 100000 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    userGetInfo: {
+      key: 'userGetInfo',
+      data: { gold: 100000 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    }
+  };
+
+  const craftTrace = record([
+    { name: 'inventoryCraftFragments', ident: 'craft57', args: { type: 'gear', libId: 57, amount: 1 } }
+  ], [
+    { ident: 'craft57', result: { response: { gear: { '57': 1 } } } }
+  ], '2026-11-01T10:05:00.000Z');
+
+  const afterMerge = cache.merge(initialCache, [craftTrace]).cache;
+
+  assert.equal(afterMerge.inventoryGet.data.gear['57'], 1, 'gear 57 incremented');
+  assert.equal(afterMerge.inventoryGet.data.fragmentGear['57'], 5, 'fragments deducted (10 - 5 = 5)');
+  assert.equal(afterMerge['resource:gold'].data.amount, 77500, 'gold deducted (100000 - 22500 = 77500)');
+  assert.equal(afterMerge.userGetInfo.data.gold, 77500, 'userGetInfo gold deducted');
+  assert.equal(afterMerge.inventoryGet.data.coin['1'], 77500, 'inventoryGet coin[1] deducted');
+});
+
+test('inventoryCraftRecipe deducts component gears and gold, adds crafted gear', () => {
+  // Gear 65 recipe: { '57': 1, '60': 1 }, gold: 22500
+  const initialCache = {
+    inventoryGet: {
+      key: 'inventoryGet',
+      data: {
+        gear: { '57': 2, '60': 3, '65': 0 },
+        coin: { '1': 100000 }
+      },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    'resource:gold': {
+      key: 'resource:gold',
+      data: { amount: 100000 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    userGetInfo: {
+      key: 'userGetInfo',
+      data: { gold: 100000 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    }
+  };
+
+  const craftTrace = record([
+    { name: 'inventoryCraftRecipe', ident: 'craft65', args: { type: 'gear', libId: 65, amount: 1 } }
+  ], [
+    { ident: 'craft65', result: { response: { gear: { '65': 1 } } } }
+  ], '2026-11-01T10:06:00.000Z');
+
+  const afterMerge = cache.merge(initialCache, [craftTrace]).cache;
+
+  assert.equal(afterMerge.inventoryGet.data.gear['65'], 1, 'gear 65 incremented');
+  assert.equal(afterMerge.inventoryGet.data.gear['57'], 1, 'ingredient gear 57 deducted (2 - 1 = 1)');
+  assert.equal(afterMerge.inventoryGet.data.gear['60'], 2, 'ingredient gear 60 deducted (3 - 1 = 2)');
+  assert.equal(afterMerge['resource:gold'].data.amount, 77500, 'gold deducted (100000 - 22500 = 77500)');
+  assert.equal(afterMerge.userGetInfo.data.gold, 77500, 'userGetInfo gold deducted');
 });

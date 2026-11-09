@@ -72,6 +72,23 @@
     speedUpConstruction: 'Construction Speedup', speedUpResearch: 'Research Speedup',
     teleporter: 'Teleporter', lootboxChanced: 'Chance Lootbox', patron: 'Relic Shard' };
 
+  const SKILL_LEVEL_COSTS = [
+    0, 0, 100, 550, 1000, 1450, 1900, 2350, 2800, 3250, 3700, 4150, 4600, 5050, 5500, 5950,
+    6400, 6850, 7300, 7750, 8200, 8650, 9200, 9750, 10300, 10850, 11400, 11950, 12500, 13050, 13600,
+    14150, 14700, 15250, 15800, 16350, 16900, 17450, 18000, 18550, 19100, 19650, 20200, 21200, 22200, 23200,
+    24200, 25200, 26200, 27200, 28200, 29200, 30200, 31200, 32200, 33200, 34200, 35200, 36200, 37200, 38200,
+    39200, 40200, 41200, 42200, 43200, 44200, 45200, 46200, 47200, 48200, 49200, 50200, 51300, 52400, 53500,
+    54600, 55700, 56800, 57900, 59000, 60100, 61200, 62300, 63400, 64500, 65600, 66700, 67800, 68900, 70000,
+    71000, 72000, 73000, 74000, 75000, 76000, 77000, 78000, 79000, 80000, 81000, 82000, 83000, 84000, 85000,
+    86000, 87000, 88000, 89000, 90000, 91000, 92000, 93000, 94000, 95000, 96000, 97000, 98000, 99000, 100000
+  ];
+
+  function getSkillUpgradeGoldCost(targetLevel) {
+    if (!Number.isFinite(targetLevel) || targetLevel <= 1) return 0;
+    if (targetLevel < SKILL_LEVEL_COSTS.length) return SKILL_LEVEL_COSTS[targetLevel];
+    return (SKILL_LEVEL_COSTS[SKILL_LEVEL_COSTS.length - 1] || 100000) + (targetLevel - (SKILL_LEVEL_COSTS.length - 1)) * 1000;
+  }
+
   function resolveResourceLabel(key) {
     if (key === 'energy') return 'Energy';
     if (key === 'world-energy') return 'World Energy';
@@ -1331,7 +1348,7 @@
             group, data: result.response, updatedAt: record.timestamp }] : [progress];
         }
         if ((call.name === 'inventoryCraftFragments' || call.name === 'inventoryCraftRecipe') && result?.response) {
-          return [{
+          const records = [{
             key: 'lastCraftResult',
             method: call.name,
             feature: null,
@@ -1343,6 +1360,23 @@
             },
             updatedAt: record.timestamp
           }];
+          if (call.args?.libId && call.ident) {
+            records.push({
+              key: 'gearCraftAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                action: call.name,
+                libId: call.args.libId,
+                amount: call.args.amount || 1,
+                result: result.response,
+                token: `${call.ident}:gearCraft`
+              },
+              updatedAt: record.timestamp
+            });
+          }
+          return records;
         }
         if (call.name === 'userGetInfo' && result?.response) {
           const info = result.response;
@@ -2652,7 +2686,8 @@
             const sortedKeys = Object.keys(skills).sort((a, b) => Number(a) - Number(b));
             const targetKey = sortedKeys[(entry.data.skillIndex || 1) - 1];
             if (targetKey) {
-              skills[targetKey] = (skills[targetKey] || 0) + 1;
+              const nextLevel = (skills[targetKey] || 0) + 1;
+              skills[targetKey] = nextLevel;
               next.heroGetAll = {
                 ...next.heroGetAll,
                 data: {
@@ -2663,6 +2698,42 @@
                   }
                 }
               };
+
+              const goldCost = getSkillUpgradeGoldCost(nextLevel);
+              if (goldCost > 0) {
+                if (next['resource:gold']?.data) {
+                  next['resource:gold'] = {
+                    ...next['resource:gold'],
+                    data: {
+                      ...next['resource:gold'].data,
+                      amount: Math.max(0, (next['resource:gold'].data.amount ?? 0) - goldCost)
+                    },
+                    updatedAt: entry.updatedAt
+                  };
+                }
+                if (next.inventoryGet?.data?.coin?.['1'] !== undefined) {
+                  next.inventoryGet = {
+                    ...next.inventoryGet,
+                    data: {
+                      ...next.inventoryGet.data,
+                      coin: {
+                        ...next.inventoryGet.data.coin,
+                        '1': Math.max(0, (next.inventoryGet.data.coin['1'] ?? 0) - goldCost)
+                      }
+                    }
+                  };
+                }
+                if (next.userGetInfo?.data?.gold !== undefined) {
+                  next.userGetInfo = {
+                    ...next.userGetInfo,
+                    data: {
+                      ...next.userGetInfo.data,
+                      gold: Math.max(0, (next.userGetInfo.data.gold ?? 0) - goldCost)
+                    }
+                  };
+                }
+              }
+
               const history = { ...seen, [entry.data.token]: entry.updatedAt };
               const tokens = Object.keys(history).sort((a, b) =>
                 history[b].localeCompare(history[a]));
@@ -2678,6 +2749,150 @@
               changed = true;
             }
           }
+          continue;
+        }
+        if (entry.key === 'gearCraftAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.libId) continue;
+          const libId = String(entry.data.libId);
+          const amount = Math.max(1, Number(entry.data.amount) || 1);
+          const craftInfo = globalThis.hwaHelperGearCraftData?.[libId];
+
+          // 1. Add crafted items
+          const responseGears = entry.data.result?.gear;
+          if (responseGears && typeof responseGears === 'object') {
+            for (const [gId, count] of Object.entries(responseGears)) {
+              const numCount = Number(count) || 0;
+              if (numCount > 0) {
+                if (next.inventoryGet) {
+                  const curGear = Number(next.inventoryGet.data?.gear?.[gId] || 0);
+                  next.inventoryGet = {
+                    ...next.inventoryGet,
+                    data: {
+                      ...next.inventoryGet.data,
+                      gear: { ...(next.inventoryGet.data?.gear || {}), [gId]: curGear + numCount }
+                    }
+                  };
+                }
+                const resKey = `resource:gear:${gId}`;
+                if (next[resKey]?.data) {
+                  next[resKey] = {
+                    ...next[resKey],
+                    data: {
+                      ...next[resKey].data,
+                      amount: (next[resKey].data.amount ?? 0) + numCount
+                    },
+                    updatedAt: entry.updatedAt
+                  };
+                }
+              }
+            }
+          }
+
+          // 2. Deduct fragments or recipe components
+          if (entry.data.action === 'inventoryCraftFragments') {
+            const fragCost = (craftInfo?.fragmentCount || 0) * amount;
+            if (fragCost > 0) {
+              if (next.inventoryGet) {
+                const curFrags = Number(next.inventoryGet.data?.fragmentGear?.[libId] || 0);
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    fragmentGear: { ...(next.inventoryGet.data?.fragmentGear || {}), [libId]: Math.max(0, curFrags - fragCost) }
+                  }
+                };
+              }
+              const resKey = `resource:fragmentGear:${libId}`;
+              if (next[resKey]?.data) {
+                next[resKey] = {
+                  ...next[resKey],
+                  data: {
+                    ...next[resKey].data,
+                    amount: Math.max(0, (next[resKey].data.amount ?? 0) - fragCost)
+                  },
+                  updatedAt: entry.updatedAt
+                };
+              }
+            }
+          } else if (entry.data.action === 'inventoryCraftRecipe' && craftInfo?.recipe) {
+            for (const [ingId, ingCount] of Object.entries(craftInfo.recipe)) {
+              const ingCost = (Number(ingCount) || 1) * amount;
+              if (ingCost > 0) {
+                if (next.inventoryGet) {
+                  const curIng = Number(next.inventoryGet.data?.gear?.[ingId] || 0);
+                  next.inventoryGet = {
+                    ...next.inventoryGet,
+                    data: {
+                      ...next.inventoryGet.data,
+                      gear: { ...(next.inventoryGet.data?.gear || {}), [ingId]: Math.max(0, curIng - ingCost) }
+                    }
+                  };
+                }
+                const resKey = `resource:gear:${ingId}`;
+                if (next[resKey]?.data) {
+                  next[resKey] = {
+                    ...next[resKey],
+                    data: {
+                      ...next[resKey].data,
+                      amount: Math.max(0, (next[resKey].data.amount ?? 0) - ingCost)
+                    },
+                    updatedAt: entry.updatedAt
+                  };
+                }
+              }
+            }
+          }
+
+          // 3. Deduct gold
+          const goldCost = (Number(craftInfo?.gold) || 0) * amount;
+          if (goldCost > 0) {
+            if (next['resource:gold']?.data) {
+              next['resource:gold'] = {
+                ...next['resource:gold'],
+                data: {
+                  ...next['resource:gold'].data,
+                  amount: Math.max(0, (next['resource:gold'].data.amount ?? 0) - goldCost)
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+            if (next.inventoryGet?.data?.coin?.['1'] !== undefined) {
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  coin: {
+                    ...next.inventoryGet.data.coin,
+                    '1': Math.max(0, (next.inventoryGet.data.coin['1'] ?? 0) - goldCost)
+                  }
+                }
+              };
+            }
+            if (next.userGetInfo?.data?.gold !== undefined) {
+              next.userGetInfo = {
+                ...next.userGetInfo,
+                data: {
+                  ...next.userGetInfo.data,
+                  gold: Math.max(0, (next.userGetInfo.data.gold ?? 0) - goldCost)
+                }
+              };
+            }
+          }
+
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) =>
+            history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = {
+            key: 'resourceActionHistory',
+            method: entry.method,
+            feature: null,
+            group: 'internal',
+            data: history,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
           continue;
         }
         if (entry.key === 'dungeonRewardAction') {

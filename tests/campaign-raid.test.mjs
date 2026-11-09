@@ -307,9 +307,9 @@ test('renderHeroDialog renders equipment names and availability states (equipped
           power: 45000,
           star: 4,
           // Aurora color 7 has items: [ 56, 62, 71, 84, 93, 94 ]
-          // slots with 0 are unequipped: slot 1 (62), 2 (71), 4 (93), 5 (94) are unequipped
-          // slot 0 (56) and slot 3 (84) are equipped
-          slots: { '1': 0, '2': 0, '4': 0, '5': 0 },
+          // slots listed in slots object/array are equipped (slot 0: 56, slot 3: 84)
+          // unequipped slots: slot 1 (62), slot 2 (71), slot 4 (93), slot 5 (94)
+          slots: { '0': 0, '3': 0 },
           skills: { '1': 80, '2': 80, '3': 60, '4': 40 }
         }
       }
@@ -351,4 +351,58 @@ test('renderHeroDialog renders equipment names and availability states (equipped
   // Missing fragments state
   assert.match(text, /Chưa ghép \(5\/20\)/);
   assert.match(text, /Thiếu 15 mảnh ghép/);
+});
+
+test('renderHeroDialog equipment slot equipped states correctly identify unequipped vs equipped slots', async () => {
+  const context = await createCampaignContext();
+  let host = new MockElement('div');
+  context.document.querySelector = (sel) => {
+    if (sel === '#hero-dialog-body') return host;
+    if (sel.startsWith('#')) {
+      const el = new MockElement('div');
+      el.attributes.id = sel.slice(1);
+      return el;
+    }
+    return new MockElement('div');
+  };
+
+  // Test 1: hero with empty slots array [] (no equipment)
+  const cacheEmpty = {
+    heroGetAll: {
+      data: {
+        '1': { id: 1, level: 50, color: 1, slots: [] }
+      }
+    }
+  };
+  context.renderHeroDialog('1', cacheEmpty);
+  let text = host.textContent;
+  assert.doesNotMatch(text, /✓ Đã trang bị/, 'empty slots array must have no equipped slots');
+
+  // Test 2: hero with sparse object slots: { "1": 0 } (only slot 1 equipped)
+  host = new MockElement('div');
+  const cacheObject = {
+    heroGetAll: {
+      data: {
+        '1': { id: 1, level: 50, color: 1, slots: { '1': 0 } }
+      }
+    }
+  };
+  context.renderHeroDialog('1', cacheObject);
+  text = host.textContent;
+  const equippedCountObj = (text.match(/✓ Đã trang bị/g) || []).length;
+  assert.equal(equippedCountObj, 1, 'only slot 1 should be equipped');
+
+  // Test 3: hero with array slots: [0, 0] (slots 0 and 1 equipped)
+  host = new MockElement('div');
+  const cacheArray = {
+    heroGetAll: {
+      data: {
+        '1': { id: 1, level: 50, color: 1, slots: [0, 0] }
+      }
+    }
+  };
+  context.renderHeroDialog('1', cacheArray);
+  text = host.textContent;
+  const equippedCountArr = (text.match(/✓ Đã trang bị/g) || []).length;
+  assert.equal(equippedCountArr, 2, 'slots 0 and 1 should be equipped');
 });

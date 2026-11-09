@@ -1901,6 +1901,10 @@ function renderInventoryGrid(cache) {
         itemImgSrc = `assets/items/consumable/${item.id}.png`;
       } else if (item.category === 'scroll' || item.category === 'fragmentScroll') {
         itemImgSrc = `assets/items/scroll/${item.id}.png`;
+      } else if (item.category === 'fragmentArtifact') {
+        itemImgSrc = `assets/items/fragmentArtifact/${item.id}.png`;
+      } else if (item.category === 'artifact') {
+        itemImgSrc = `assets/items/artifact/${item.id}.png`;
       }
 
       const showFallbackIcon = () => {
@@ -1918,6 +1922,13 @@ function renderInventoryGrid(cache) {
         img.onerror = () => {
           if (item.category === 'fragmentHero') {
             img.src = `assets/heroes/${item.id}.png`;
+            img.onerror = () => {
+              img.style.display = 'none';
+              showFallbackIcon();
+            };
+          } else if (item.category === 'fragmentArtifact') {
+            // Fallback to corresponding artifact image if separate fragment is not found
+            img.src = `assets/items/artifact/${item.id}.png`;
             img.onerror = () => {
               img.style.display = 'none';
               showFallbackIcon();
@@ -9540,15 +9551,14 @@ function renderHeroDialog(heroId, cache) {
          `Gear #${itemId}`)
       : `Slot ${slotNum}`;
 
-    let isUnequipped = false;
+    let isEquipped = false;
     if (hero.slots) {
       if (Array.isArray(hero.slots)) {
-        isUnequipped = hero.slots[sIdx] === 0;
+        isEquipped = sIdx < hero.slots.length && hero.slots[sIdx] !== undefined && hero.slots[sIdx] !== null;
       } else if (typeof hero.slots === 'object') {
-        isUnequipped = hero.slots[sIdx] === 0 || hero.slots[String(sIdx)] === 0;
+        isEquipped = Object.hasOwn(hero.slots, String(sIdx)) || Object.hasOwn(hero.slots, sIdx);
       }
     }
-    const isEquipped = !isUnequipped;
 
     const slotBox = document.createElement('div');
     slotBox.className = 'p-2.5 rounded-lg border text-xs flex flex-col justify-between gap-1.5 transition-all';
