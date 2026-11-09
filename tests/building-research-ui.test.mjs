@@ -550,3 +550,176 @@ test('renderBuildingDialog excludes buildings with unsatisfied prerequisites and
   assert.ok(Number.isFinite(startCall.args.durationMs) && startCall.args.durationMs > 0,
     `durationMs must be positive non-zero, got: ${startCall.args.durationMs}`);
 });
+
+test('Next Upgradable Buildings uses 2 columns, renders all candidates without 9-item cap, and supports search and sort', async () => {
+  const buildingBody = new MockElement('div');
+  const buildingStatus = new MockElement('div');
+
+  const elements = {
+    '#building-dialog-body': buildingBody,
+    '#building-dialog-status': buildingStatus
+  };
+
+  const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
+    document: {
+      createElement: (tag) => new MockElement(tag),
+      querySelector: (sel) => elements[sel] || null
+    },
+    hwaHelperNameMap: {
+      building: (id) => `Building ${id}`
+    },
+    hwaHelperNameData: {
+      names: {
+        building: {}
+      }
+    }
+  });
+
+  const setupCode = popup.slice(
+    popup.indexOf("let buildingSearchQuery = '';"),
+    popup.indexOf('globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;') +
+      'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
+  );
+  vm.runInContext(setupCode, context);
+
+  // Generate 12 upgradable buildings (Hall of Heroes level 50, buildings level 10..21)
+  const testBuildings = [{ buildingId: 20, level: 50 }];
+  for (let i = 1; i <= 12; i++) {
+    testBuildings.push({ buildingId: 100 + i, level: i });
+  }
+
+  context.renderBuildingDialog({
+    buildingStatus: {
+      data: {
+        queues: [],
+        buildings: testBuildings
+      }
+    }
+  });
+
+  const nextSection = buildingBody.children[1];
+  const nextGrid = nextSection.children[2];
+
+  // 1. Check 2-column layout across all sizes (no lg:grid-cols-3)
+  assert.ok(nextGrid.className.includes('grid-cols-1 sm:grid-cols-2'), 'Grid must use 2 columns on sm+');
+  assert.ok(!nextGrid.className.includes('lg:grid-cols-3'), 'Grid must not use 3 columns on large screens');
+
+  // 2. Check no 9-item cap: all 13 upgradable buildings (12 + Hall) must be present
+  assert.equal(nextGrid.children.length, 13, 'Must render all 13 upgradable buildings instead of capping at 9');
+
+  // 3. Test filter by search query (e.g. ID "105")
+  const searchInput = nextSection.querySelector('#next-building-search-input');
+  assert.ok(searchInput, 'Search input must exist');
+  searchInput.value = '105';
+  await searchInput.fire('input', { target: searchInput });
+  assert.equal(nextGrid.children.length, 1, 'Only 1 building matching "105" should remain');
+  assert.match(nextGrid.children[0].innerHTML, /Building 105/);
+
+  // Clear search
+  searchInput.value = '';
+  await searchInput.fire('input', { target: searchInput });
+  assert.equal(nextGrid.children.length, 13);
+
+  // 4. Test sort by level ascending
+  const sortSelect = nextSection.querySelector('#next-building-sort-select');
+  assert.ok(sortSelect, 'Sort select must exist');
+  sortSelect.value = 'level-asc';
+  await sortSelect.fire('change', { target: sortSelect });
+  assert.match(nextGrid.children[0].innerHTML, /Building 101/, 'Lowest level building (Lv. 1) should be first');
+
+  // Test sort by level descending
+  sortSelect.value = 'level-desc';
+  await sortSelect.fire('change', { target: sortSelect });
+  assert.match(nextGrid.children[0].innerHTML, /Building 20/, 'Highest level building (Lv. 50) should be first');
+});
+
+test('Next Research Candidates uses 2 columns, renders all candidates without 9-item cap, and supports search and sort', async () => {
+  const researchBody = new MockElement('div');
+  const researchStatus = new MockElement('div');
+
+  const elements = {
+    '#research-dialog-body': researchBody,
+    '#research-dialog-status': researchStatus
+  };
+
+  const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
+    document: {
+      createElement: (tag) => new MockElement(tag),
+      querySelector: (sel) => elements[sel] || null
+    },
+    hwaHelperNameMap: {
+      research: (id) => `Tech ${id}`
+    },
+    hwaHelperNameData: {
+      names: {
+        research: {}
+      }
+    }
+  });
+
+  const setupCode = popup.slice(
+    popup.indexOf("let buildingSearchQuery = '';"),
+    popup.indexOf('globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;') +
+      'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
+  );
+  vm.runInContext(setupCode, context);
+
+  // Generate 12 completed researches
+  const completedResearches = [];
+  for (let i = 1; i <= 12; i++) {
+    completedResearches.push({ researchId: 500 + i, level: i });
+  }
+
+  context.renderResearchDialog({
+    buildingStatus: {
+      data: {
+        buildings: [{ buildingId: 43, level: 99 }]
+      }
+    },
+    researchStatus: {
+      data: {
+        queues: [],
+        completedResearches
+      }
+    }
+  });
+
+  const nextSection = researchBody.children[1];
+  const nextGrid = nextSection.children[2];
+
+  // 1. Check 2-column layout across all sizes (no lg:grid-cols-3)
+  assert.ok(nextGrid.className.includes('grid-cols-1 sm:grid-cols-2'), 'Grid must use 2 columns on sm+');
+  assert.ok(!nextGrid.className.includes('lg:grid-cols-3'), 'Grid must not use 3 columns on large screens');
+
+  // 2. Check no 9-item cap: all 12 tech must be present
+  assert.equal(nextGrid.children.length, 12, 'Must render all 12 candidates instead of capping at 9');
+
+  // 3. Test filter by search query (e.g. ID "507")
+  const searchInput = nextSection.querySelector('#next-research-search-input');
+  assert.ok(searchInput, 'Search input must exist');
+  searchInput.value = '507';
+  await searchInput.fire('input', { target: searchInput });
+  assert.equal(nextGrid.children.length, 1, 'Only 1 tech matching "507" should remain');
+  assert.match(nextGrid.children[0].innerHTML, /Tech 507/);
+
+  // Clear search
+  searchInput.value = '';
+  await searchInput.fire('input', { target: searchInput });
+  assert.equal(nextGrid.children.length, 12);
+
+  // 4. Test sort by level ascending
+  const sortSelect = nextSection.querySelector('#next-research-sort-select');
+  assert.ok(sortSelect, 'Sort select must exist');
+  sortSelect.value = 'level-asc';
+  await sortSelect.fire('change', { target: sortSelect });
+  assert.match(nextGrid.children[0].innerHTML, /Tech 501/, 'Lowest level tech (Lv. 1) should be first');
+
+  // Test sort by level descending
+  sortSelect.value = 'level-desc';
+  await sortSelect.fire('change', { target: sortSelect });
+  assert.match(nextGrid.children[0].innerHTML, /Tech 512/, 'Highest level tech (Lv. 12) should be first');
+});

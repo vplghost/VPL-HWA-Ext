@@ -6160,6 +6160,10 @@ async function experimentalRpc(calls, message) {
 let buildingSearchQuery = '';
 let researchSearchQuery = '';
 let researchFilterTab = 'all';
+let nextBuildingFilterQuery = '';
+let nextBuildingSortOrder = 'level-desc';
+let nextResearchFilterQuery = '';
+let nextResearchSortOrder = 'level-desc';
 
 function formatRemainingHms(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return '00:00';
@@ -6348,118 +6352,212 @@ function renderBuildingDialog(cache) {
   nextSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
   const nextTitle = document.createElement('h3');
   nextTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-between';
-  nextTitle.innerHTML = `<span class="flex items-center gap-2"><span>⚡</span> Next Upgradable Buildings</span><span class="text-2xs font-normal text-slate-400">${nextUpgradable.length} ready</span>`;
+  const nextTitleText = document.createElement('span');
+  nextTitleText.className = 'flex items-center gap-2';
+  nextTitleText.innerHTML = '<span>⚡</span> Next Upgradable Buildings';
+  const nextBadge = document.createElement('span');
+  nextBadge.id = 'next-building-count-badge';
+  nextBadge.className = 'text-2xs font-normal text-slate-400';
+  nextBadge.textContent = `${nextUpgradable.length} ready`;
+  nextTitle.append(nextTitleText, nextBadge);
   nextSection.append(nextTitle);
 
-  const nextIntro = document.createElement('p');
-  nextIntro.className = 'text-xs text-slate-500 dark:text-slate-400 mb-3';
-  nextIntro.textContent = activeQueues.length > 0
+  const nextIntro = document.createElement('div');
+  nextIntro.className = 'mb-3 flex flex-col gap-2.5';
+  const desc = document.createElement('p');
+  desc.className = 'text-xs text-slate-500 dark:text-slate-400';
+  desc.textContent = activeQueues.length > 0
     ? 'Builder queue is currently occupied. Once complete, the following buildings can be upgraded next:'
     : 'Builder queue is available. The following buildings can be upgraded next:';
+  nextIntro.append(desc);
+
+  const nextControls = document.createElement('div');
+  nextControls.className = 'flex items-center gap-2 flex-wrap pt-0.5';
+
+  const nextSearchWrap = document.createElement('div');
+  nextSearchWrap.className = 'flex-1 min-w-[140px]';
+  const nextSearchInput = document.createElement('input');
+  nextSearchInput.type = 'search';
+  nextSearchInput.id = 'next-building-search-input';
+  nextSearchInput.placeholder = 'Filter candidates or ID...';
+  nextSearchInput.value = nextBuildingFilterQuery;
+  nextSearchInput.className = 'h-7 w-full rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500';
+  nextSearchWrap.append(nextSearchInput);
+  nextControls.append(nextSearchWrap);
+
+  const nextSortWrap = document.createElement('div');
+  nextSortWrap.className = 'shrink-0 flex items-center gap-1.5';
+  const sortLabel = document.createElement('span');
+  sortLabel.className = 'text-2xs text-slate-400';
+  sortLabel.textContent = 'Sort:';
+  nextSortWrap.append(sortLabel);
+
+  const nextSortSelect = document.createElement('select');
+  nextSortSelect.id = 'next-building-sort-select';
+  nextSortSelect.className = 'h-7 rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-700 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200';
+
+  const sortOptions = [
+    { value: 'level-desc', label: 'Level: High → Low' },
+    { value: 'level-asc', label: 'Level: Low → High' },
+    { value: 'name-asc', label: 'Name: A → Z' }
+  ];
+  for (const opt of sortOptions) {
+    const optEl = document.createElement('option');
+    optEl.value = opt.value;
+    optEl.textContent = opt.label;
+    if (opt.value === nextBuildingSortOrder) optEl.selected = true;
+    nextSortSelect.append(optEl);
+  }
+  nextSortSelect.value = nextBuildingSortOrder;
+  nextSortWrap.append(nextSortSelect);
+  nextControls.append(nextSortWrap);
+  nextIntro.append(nextControls);
   nextSection.append(nextIntro);
 
   const nextGrid = document.createElement('div');
-  nextGrid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5';
-  const topCandidates = nextUpgradable.slice(0, 9);
-  if (topCandidates.length > 0) {
-    for (const b of topCandidates) {
-      const card = document.createElement('div');
-      card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-amber-200 hover:bg-amber-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-amber-900/50';
-      const name = getBuildingName(b.id);
+  nextGrid.id = 'next-building-grid';
+  nextGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1';
 
-      const durationMs = bHelper?.calculateEffectiveDurationMs
-        ? bHelper.calculateEffectiveDurationMs(b.id, b.nextLevel)
-        : 1000;
-      const missingCosts = bHelper?.getMissingCosts
-        ? bHelper.getMissingCosts(b.id, b.nextLevel, resourcesMap)
-        : [];
-      const hasEnoughResources = missingCosts.length === 0;
-
-      const infoCol = document.createElement('div');
-      infoCol.className = 'min-w-0 flex-1';
-      infoCol.innerHTML = `
-        <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
-        <div class="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400">
-          <span>ID: ${b.id}</span>
-          ${durationMs > 0 ? `<span>·</span><span>⏱ ${formatRemainingHms(durationMs)}</span>` : ''}
-        </div>
-      `;
-      card.append(infoCol);
-
-      const actionCol = document.createElement('div');
-      actionCol.className = 'flex items-center gap-2 shrink-0';
-
-      const levelBadge = document.createElement('div');
-      levelBadge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
-      levelBadge.textContent = b.isBuilt ? `Lv. ${b.level} ➔ ${b.nextLevel}` : 'Build Lv. 1';
-      actionCol.append(levelBadge);
-
-      const isQueueBusy = activeQueues.length > 0;
-      const buildBtn = document.createElement('button');
-      buildBtn.type = 'button';
-      const isBtnDisabled = isQueueBusy || (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled) || !hasEnoughResources;
-      buildBtn.className = isBtnDisabled
-        ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
-        : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors';
-      buildBtn.disabled = isBtnDisabled;
-
-      const matNames = { 2: 'Iron', 3: 'Stone', 4: 'Wood', 5: 'Food' };
-      let btnTitle = `Build ${name} to Lv. ${b.nextLevel}`;
-      if (isQueueBusy) {
-        btnTitle = 'Builder queue is currently busy';
-      } else if (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled) {
-        btnTitle = 'Enable Popup RPC in Settings to build';
-      } else if (!hasEnoughResources) {
-        btnTitle = 'Not enough resources: ' + missingCosts.map((m) => `${(m.required - m.current).toLocaleString('en-US')} more ${matNames[m.materialId] || 'Material'}`).join(', ');
-      }
-      buildBtn.title = btnTitle;
-      buildBtn.innerHTML = `<span>🔨</span><span>${b.isBuilt ? 'Upgrade' : 'Build'}</span>`;
-
-      buildBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (buildBtn.disabled) return;
-        buildBtn.disabled = true;
-        buildBtn.textContent = 'Building...';
-        const calls = [
-          {
-            name: 'startConstruction',
-            feature: 'building',
-            args: {
-              buildingId: b.id,
-              nextLevel: b.nextLevel,
-              startDate: Date.now(),
-              durationMs
-            }
-          },
-          { name: 'getSummary', feature: 'building', args: {} }
-        ];
-        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-          chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
-            if (!response?.ok) {
-              buildBtn.disabled = false;
-              buildBtn.textContent = response?.error || 'Failed';
-            } else {
-              buildBtn.textContent = response.queued ? 'Queued' : 'Started!';
-              setTimeout(() => {
-                if (typeof renderBuildingDialog === 'function' && typeof currentCache !== 'undefined') {
-                  renderBuildingDialog(currentCache);
-                }
-              }, 1000);
-            }
-          });
+  function renderNextBuildingCards() {
+    nextGrid.replaceChildren();
+    const query = nextBuildingFilterQuery.toLowerCase().trim();
+    const filtered = nextUpgradable
+      .filter((b) => {
+        if (!query) return true;
+        const name = getBuildingName(b.id).toLowerCase();
+        const idStr = String(b.id);
+        return name.includes(query) || idStr.includes(query);
+      })
+      .sort((a, b) => {
+        if (nextBuildingSortOrder === 'level-asc') {
+          return (a.level - b.level) || (a.id - b.id);
         }
+        if (nextBuildingSortOrder === 'name-asc') {
+          const nameA = getBuildingName(a.id);
+          const nameB = getBuildingName(b.id);
+          return nameA.localeCompare(nameB) || (a.id - b.id);
+        }
+        return (b.level - a.level) || (a.id - b.id);
       });
-      actionCol.append(buildBtn);
 
-      card.append(actionCol);
-      nextGrid.append(card);
+    const badge = nextSection.querySelector('#next-building-count-badge');
+    if (badge) {
+      badge.textContent = query
+        ? `${filtered.length} / ${nextUpgradable.length} ready`
+        : `${nextUpgradable.length} ready`;
     }
-  } else {
-    const emptyP = document.createElement('p');
-    emptyP.className = 'text-xs text-slate-400 italic';
-    emptyP.textContent = 'No upgradable buildings found.';
-    nextGrid.append(emptyP);
+
+    if (filtered.length > 0) {
+      for (const b of filtered) {
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-amber-200 hover:bg-amber-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-amber-900/50';
+        const name = getBuildingName(b.id);
+
+        const durationMs = bHelper?.calculateEffectiveDurationMs
+          ? bHelper.calculateEffectiveDurationMs(b.id, b.nextLevel)
+          : 1000;
+        const missingCosts = bHelper?.getMissingCosts
+          ? bHelper.getMissingCosts(b.id, b.nextLevel, resourcesMap)
+          : [];
+        const hasEnoughResources = missingCosts.length === 0;
+
+        const infoCol = document.createElement('div');
+        infoCol.className = 'min-w-0 flex-1';
+        infoCol.innerHTML = `
+          <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
+          <div class="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400">
+            <span>ID: ${b.id}</span>
+            ${durationMs > 0 ? `<span>·</span><span>⏱ ${formatRemainingHms(durationMs)}</span>` : ''}
+          </div>
+        `;
+        card.append(infoCol);
+
+        const actionCol = document.createElement('div');
+        actionCol.className = 'flex items-center gap-2 shrink-0';
+
+        const levelBadge = document.createElement('div');
+        levelBadge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
+        levelBadge.textContent = b.isBuilt ? `Lv. ${b.level} ➔ ${b.nextLevel}` : 'Build Lv. 1';
+        actionCol.append(levelBadge);
+
+        const isQueueBusy = activeQueues.length > 0;
+        const buildBtn = document.createElement('button');
+        buildBtn.type = 'button';
+        const isBtnDisabled = isQueueBusy || (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled) || !hasEnoughResources;
+        buildBtn.className = isBtnDisabled
+          ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
+          : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors';
+        buildBtn.disabled = isBtnDisabled;
+
+        const matNames = { 2: 'Iron', 3: 'Stone', 4: 'Wood', 5: 'Food' };
+        let btnTitle = `Build ${name} to Lv. ${b.nextLevel}`;
+        if (isQueueBusy) {
+          btnTitle = 'Builder queue is currently busy';
+        } else if (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled) {
+          btnTitle = 'Enable Popup RPC in Settings to build';
+        } else if (!hasEnoughResources) {
+          btnTitle = 'Not enough resources: ' + missingCosts.map((m) => `${(m.required - m.current).toLocaleString('en-US')} more ${matNames[m.materialId] || 'Material'}`).join(', ');
+        }
+        buildBtn.title = btnTitle;
+        buildBtn.innerHTML = `<span>🔨</span><span>${b.isBuilt ? 'Upgrade' : 'Build'}</span>`;
+
+        buildBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (buildBtn.disabled) return;
+          buildBtn.disabled = true;
+          buildBtn.textContent = 'Building...';
+          const calls = [
+            {
+              name: 'startConstruction',
+              feature: 'building',
+              args: {
+                buildingId: b.id,
+                nextLevel: b.nextLevel,
+                startDate: Date.now(),
+                durationMs
+              }
+            },
+            { name: 'getSummary', feature: 'building', args: {} }
+          ];
+          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+              if (!response?.ok) {
+                buildBtn.disabled = false;
+                buildBtn.textContent = response?.error || 'Failed';
+              } else {
+                buildBtn.textContent = response.queued ? 'Queued' : 'Started!';
+                setTimeout(() => {
+                  if (typeof renderBuildingDialog === 'function' && typeof currentCache !== 'undefined') {
+                    renderBuildingDialog(currentCache);
+                  }
+                }, 1000);
+              }
+            });
+          }
+        });
+        actionCol.append(buildBtn);
+
+        card.append(actionCol);
+        nextGrid.append(card);
+      }
+    } else {
+      const emptyP = document.createElement('p');
+      emptyP.className = 'text-xs text-slate-400 italic py-2 col-span-full';
+      emptyP.textContent = query ? 'No matching buildings found.' : 'No upgradable buildings found.';
+      nextGrid.append(emptyP);
+    }
   }
+
+  nextSearchInput.addEventListener('input', (e) => {
+    nextBuildingFilterQuery = e.target.value;
+    renderNextBuildingCards();
+  });
+  nextSortSelect.addEventListener('change', (e) => {
+    nextBuildingSortOrder = e.target.value;
+    renderNextBuildingCards();
+  });
+
+  renderNextBuildingCards();
   nextSection.append(nextGrid);
   host.append(nextSection);
 
@@ -6722,43 +6820,137 @@ function renderResearchDialog(cache) {
   nextSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
   const nextTitle = document.createElement('h3');
   nextTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-between';
-  nextTitle.innerHTML = `<span class="flex items-center gap-2"><span>⚡</span> Next Research Candidates</span><span class="text-2xs font-normal text-slate-400">${nextAvailable.length} available</span>`;
+  const nextTitleText = document.createElement('span');
+  nextTitleText.className = 'flex items-center gap-2';
+  nextTitleText.innerHTML = '<span>⚡</span> Next Research Candidates';
+  const nextBadge = document.createElement('span');
+  nextBadge.id = 'next-research-count-badge';
+  nextBadge.className = 'text-2xs font-normal text-slate-400';
+  nextBadge.textContent = `${nextAvailable.length} available`;
+  nextTitle.append(nextTitleText, nextBadge);
   nextSection.append(nextTitle);
 
-  const nextIntro = document.createElement('p');
-  nextIntro.className = 'text-xs text-slate-500 dark:text-slate-400 mb-3';
-  nextIntro.textContent = activeQueues.length > 0
+  const nextIntro = document.createElement('div');
+  nextIntro.className = 'mb-3 flex flex-col gap-2.5';
+  const desc = document.createElement('p');
+  desc.className = 'text-xs text-slate-500 dark:text-slate-400';
+  desc.textContent = activeQueues.length > 0
     ? 'Academy queue is currently occupied. Once complete, the following technologies can be researched or upgraded next:'
     : 'Academy queue is available. The following technologies can be researched or upgraded next:';
+  nextIntro.append(desc);
+
+  const nextControls = document.createElement('div');
+  nextControls.className = 'flex items-center gap-2 flex-wrap pt-0.5';
+
+  const nextSearchWrap = document.createElement('div');
+  nextSearchWrap.className = 'flex-1 min-w-[140px]';
+  const nextSearchInput = document.createElement('input');
+  nextSearchInput.type = 'search';
+  nextSearchInput.id = 'next-research-search-input';
+  nextSearchInput.placeholder = 'Filter research or ID...';
+  nextSearchInput.value = nextResearchFilterQuery;
+  nextSearchInput.className = 'h-7 w-full rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-900 placeholder-slate-400 focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500';
+  nextSearchWrap.append(nextSearchInput);
+  nextControls.append(nextSearchWrap);
+
+  const nextSortWrap = document.createElement('div');
+  nextSortWrap.className = 'shrink-0 flex items-center gap-1.5';
+  const sortLabel = document.createElement('span');
+  sortLabel.className = 'text-2xs text-slate-400';
+  sortLabel.textContent = 'Sort:';
+  nextSortWrap.append(sortLabel);
+
+  const nextSortSelect = document.createElement('select');
+  nextSortSelect.id = 'next-research-sort-select';
+  nextSortSelect.className = 'h-7 rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-700 focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200';
+
+  const sortOptions = [
+    { value: 'level-desc', label: 'Level: High → Low' },
+    { value: 'level-asc', label: 'Level: Low → High' },
+    { value: 'name-asc', label: 'Name: A → Z' }
+  ];
+  for (const opt of sortOptions) {
+    const optEl = document.createElement('option');
+    optEl.value = opt.value;
+    optEl.textContent = opt.label;
+    if (opt.value === nextResearchSortOrder) optEl.selected = true;
+    nextSortSelect.append(optEl);
+  }
+  nextSortSelect.value = nextResearchSortOrder;
+  nextSortWrap.append(nextSortSelect);
+  nextControls.append(nextSortWrap);
+  nextIntro.append(nextControls);
   nextSection.append(nextIntro);
 
   const nextGrid = document.createElement('div');
-  nextGrid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5';
-  const topCandidates = nextAvailable.slice(0, 9);
-  if (topCandidates.length > 0) {
-    for (const r of topCandidates) {
-      const card = document.createElement('div');
-      card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-purple-200 hover:bg-purple-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-purple-900/50';
-      const name = getResearchName(r.id);
-      card.innerHTML = `
-        <div class="min-w-0">
-          <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
-          <div class="text-2xs text-slate-500 dark:text-slate-400">ID: ${r.id}</div>
-        </div>
-        <div class="text-right shrink-0">
-          <div class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
-            ${r.isCompleted ? `Lv. ${r.level} ➔ ${r.nextLevel}` : 'Research Lv. 1'}
-          </div>
-        </div>
-      `;
-      nextGrid.append(card);
+  nextGrid.id = 'next-research-grid';
+  nextGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1';
+
+  function renderNextResearchCards() {
+    nextGrid.replaceChildren();
+    const query = nextResearchFilterQuery.toLowerCase().trim();
+    const filtered = nextAvailable
+      .filter((r) => {
+        if (!query) return true;
+        const name = getResearchName(r.id).toLowerCase();
+        const idStr = String(r.id);
+        return name.includes(query) || idStr.includes(query);
+      })
+      .sort((a, b) => {
+        if (nextResearchSortOrder === 'level-asc') {
+          return (a.level - b.level) || (a.id - b.id);
+        }
+        if (nextResearchSortOrder === 'name-asc') {
+          const nameA = getResearchName(a.id);
+          const nameB = getResearchName(b.id);
+          return nameA.localeCompare(nameB) || (a.id - b.id);
+        }
+        return (b.level - a.level) || (a.id - b.id);
+      });
+
+    const badge = nextSection.querySelector('#next-research-count-badge');
+    if (badge) {
+      badge.textContent = query
+        ? `${filtered.length} / ${nextAvailable.length} available`
+        : `${nextAvailable.length} available`;
     }
-  } else {
-    const emptyP = document.createElement('p');
-    emptyP.className = 'text-xs text-slate-400 italic';
-    emptyP.textContent = 'No research candidates found.';
-    nextGrid.append(emptyP);
+
+    if (filtered.length > 0) {
+      for (const r of filtered) {
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-purple-200 hover:bg-purple-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-purple-900/50';
+        const name = getResearchName(r.id);
+        card.innerHTML = `
+          <div class="min-w-0">
+            <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
+            <div class="text-2xs text-slate-500 dark:text-slate-400">ID: ${r.id}</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
+              ${r.isCompleted ? `Lv. ${r.level} ➔ ${r.nextLevel}` : 'Research Lv. 1'}
+            </div>
+          </div>
+        `;
+        nextGrid.append(card);
+      }
+    } else {
+      const emptyP = document.createElement('p');
+      emptyP.className = 'text-xs text-slate-400 italic py-2 col-span-full';
+      emptyP.textContent = query ? 'No matching research found.' : 'No research candidates found.';
+      nextGrid.append(emptyP);
+    }
   }
+
+  nextSearchInput.addEventListener('input', (e) => {
+    nextResearchFilterQuery = e.target.value;
+    renderNextResearchCards();
+  });
+  nextSortSelect.addEventListener('change', (e) => {
+    nextResearchSortOrder = e.target.value;
+    renderNextResearchCards();
+  });
+
+  renderNextResearchCards();
   nextSection.append(nextGrid);
   host.append(nextSection);
 
