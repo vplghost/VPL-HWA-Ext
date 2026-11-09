@@ -676,6 +676,22 @@
             }
             return actions;
           }
+          if (call.name === 'dungeonStartBattle') {
+            return [{
+              key: 'dungeonStatus',
+              method: call.name,
+              feature: null,
+              group: 'events',
+              data: {
+                activeBattle: {
+                  teamNum: call.args?.teamNum ?? 0,
+                  heroes: Array.isArray(call.args?.heroes) ? call.args.heroes : [],
+                  startTime: record.timestamp || Date.now()
+                }
+              },
+              updatedAt: record.timestamp
+            }];
+          }
           if (call.name === 'dungeonGetInfo' && result?.response &&
               typeof result.response === 'object' && !Array.isArray(result.response)) {
             const snapshot = result.response;
@@ -706,21 +722,29 @@
             const dungeon = rep.dungeon || {};
             const floor = Number.isFinite(Number(dungeon.floorNumber)) ? Number(dungeon.floorNumber) :
               (Number.isFinite(Number(dungeon.maxFloorPassed)) ? Number(dungeon.maxFloorPassed) + 1 : null);
-            if (Object.keys(dungeon).length) actions.push({
+            actions.push({
               key: 'dungeonStatus',
               method: call.name,
               feature: null,
               group: 'events',
               data: {
-                floorNumber: floor,
-                floorType: dungeon.floorType || null,
-                maxFloorPassed: Number(dungeon.maxFloorPassed) || 0,
-                maxFloorReached: Number(dungeon.maxFloorReached) || 0,
-                respawnFloor: Number(dungeon.respawnFloor) || 0,
-                elements: dungeon.elements || { prime: 'earth', nonprime: ['water', 'fire'] },
+                ...(floor != null ? { floorNumber: floor } : {}),
+                ...(dungeon.floorType ? { floorType: dungeon.floorType } : {}),
+                ...(dungeon.maxFloorPassed != null ? { maxFloorPassed: Number(dungeon.maxFloorPassed) || 0 } : {}),
+                ...(dungeon.maxFloorReached != null ? { maxFloorReached: Number(dungeon.maxFloorReached) || 0 } : {}),
+                ...(dungeon.respawnFloor != null ? { respawnFloor: Number(dungeon.respawnFloor) || 0 } : {}),
+                ...(dungeon.elements ? { elements: dungeon.elements } : {}),
                 states: dungeon.states || rep.states || {},
-                dungeonActivity: rep.dungeonActivity ?? dungeon.dungeonActivity ?? 0,
-                currentFloorDoors: dungeon.floor?.userData || []
+                ...(rep.dungeonActivity != null || dungeon.dungeonActivity != null
+                  ? { dungeonActivity: rep.dungeonActivity ?? dungeon.dungeonActivity ?? 0 }
+                  : {}),
+                ...(Array.isArray(dungeon.floor?.userData) ? { currentFloorDoors: dungeon.floor.userData } : {}),
+                activeBattle: null,
+                lastBattleResult: {
+                  win: Boolean(call.args?.result?.win ?? true),
+                  stars: Number(call.args?.result?.stars) || 3,
+                  reward: rep.reward || null
+                }
               },
               updatedAt: record.timestamp
             });
@@ -759,7 +783,8 @@
                 elements: dungeon.elements || { prime: 'earth', nonprime: ['water', 'fire'] },
                 states: dungeon.states || rep.states || {},
                 dungeonActivity: rep.dungeonActivity ?? dungeon.dungeonActivity ?? 0,
-                currentFloorDoors: dungeon.floor?.userData || []
+                currentFloorDoors: dungeon.floor?.userData || [],
+                activeBattle: null
               },
               updatedAt: record.timestamp
             });

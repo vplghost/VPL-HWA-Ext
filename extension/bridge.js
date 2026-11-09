@@ -66,7 +66,24 @@ window.addEventListener('message', (event) => {
   }
   if (event.data.kind === 'engine-status' && event.data.status) {
     try {
-      chrome.storage?.local?.set?.({ gameEngineStatus: event.data.status });
+      const extensionVersion = chrome.runtime?.getManifest?.()?.version;
+      const status = extensionVersion ? { ...event.data.status, extensionVersion } : event.data.status;
+      chrome.storage?.local?.set?.({ gameEngineStatus: status });
+    } catch (_) {}
+    return;
+  }
+  if (event.data.kind === 'legend-draft-hook-result' && event.data.payload) {
+    try {
+      chrome.storage?.local?.set?.({ legendDraftHookTelemetry: event.data.payload });
+      if (Array.isArray(event.data.payload.topCandidateIds) && event.data.payload.topCandidateIds.length >= 15) {
+        chrome.storage?.local?.get?.('rpcCache')?.then?.((stored) => {
+          const cache = stored?.rpcCache || {};
+          if (!cache.legendDraft) cache.legendDraft = {};
+          cache.legendDraft.candidates = event.data.payload.topCandidateIds;
+          cache.legendDraft.candidatesDiscoveredAt = new Date().toISOString();
+          chrome.storage?.local?.set?.({ rpcCache: cache });
+        })?.catch?.(() => {});
+      }
     } catch (_) {}
     return;
   }

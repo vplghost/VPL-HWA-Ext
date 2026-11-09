@@ -870,6 +870,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+  if (message?.kind === 'get-game-tab-status' && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+    const queryPatterns = GAME_ORIGINS.map((o) => `${o}/*`);
+    chrome.tabs?.query({ url: queryPatterns }, (tabs) => {
+      let gameTabs = (tabs || []).filter((tab) => tab.id && isGameUrl(tab.url));
+      const finish = (finalTabs) => {
+        chrome.storage.local.get('gameEngineStatus', (stored) => {
+          sendResponse({
+            ok: true,
+            hasGameTab: finalTabs.length > 0,
+            tabCount: finalTabs.length,
+            gameEngineStatus: stored?.gameEngineStatus || null
+          });
+        });
+      };
+      if (gameTabs.length === 0) {
+        chrome.tabs?.query({}, (allTabs) => {
+          gameTabs = (allTabs || []).filter((tab) => tab.id && isGameUrl(tab.url));
+          finish(gameTabs);
+        });
+        return;
+      }
+      finish(gameTabs);
+    });
+    return true;
+  }
   if (message?.kind === 'open-tab') {
     chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?view=tab') });
     sendResponse({ ok: true });

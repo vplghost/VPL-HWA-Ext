@@ -539,8 +539,15 @@ function renderMarches(cache, wrap = document.querySelector('#marches')) {
   wrap.hidden = wrap.children.length === 0;
 }
 
+let dashboardStatusPollCounter = 0;
+
 function refreshTimed() {
   const now = Date.now();
+  if (typeof activeTab !== 'undefined' && activeTab === 'dashboard') {
+    if (++dashboardStatusPollCounter % 3 === 0 && typeof updateDashboardGameStatus === 'function') {
+      updateDashboardGameStatus();
+    }
+  }
   for (const countdown of document.querySelectorAll('[data-experimental-until]')) {
     const until = Number(countdown.dataset.experimentalUntil);
     const diffSec = Math.max(0, Math.ceil((until - now) / 1000));
@@ -1987,7 +1994,20 @@ function renderDraft(cache, target = view) {
     lastRenderedMatchId = null;
     lastRenderedStageId = null;
   }
-  if (draft.matchId && draftStepCandidates.matchId !== draft.matchId) {
+  if (Array.isArray(cache.legendDraft?.candidates) && cache.legendDraft.candidates.length >= 15) {
+    const pool = cache.legendDraft.candidates;
+    const stepCount = 5;
+    const perStep = Math.floor(pool.length / stepCount);
+    const steps = [];
+    for (let s = 0; s < stepCount; s++) {
+      steps.push(pool.slice(s * perStep, (s + 1) * perStep));
+    }
+    draftStepCandidates = {
+      matchId: draft.matchId || 'hooked',
+      defense: steps,
+      attack: steps
+    };
+  } else if (draft.matchId && draftStepCandidates.matchId !== draft.matchId) {
     draftStepCandidates = {
       matchId: draft.matchId,
       defense: storedDraftStepCandidates?.matchId === draft.matchId && Array.isArray(storedDraftStepCandidates.defense) ?
@@ -2085,6 +2105,13 @@ function renderDraft(cache, target = view) {
                           'bg-slate-100 text-slate-700 border-slate-300';
   stageTitle.innerHTML = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${stageBadgeColor}">${globalThis.hwaHelperPopupData.draftStageDescription(stageId)}</span>`;
   stageCol.append(stageTitle);
+
+  if (Array.isArray(cache.legendDraft?.candidates) && cache.legendDraft.candidates.length >= 15) {
+    const hookBadge = document.createElement('div');
+    hookBadge.className = 'text-2xs font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-md px-2 py-0.5 inline-flex items-center gap-1';
+    hookBadge.innerHTML = `<span>🧠 Unity Hook: ${cache.legendDraft.candidates.length} pool candidates</span>`;
+    stageCol.append(hookBadge);
+  }
 
   if (draft.stageFinishTs && !isMatchCompleted) {
     const timerRow = document.createElement('div');
@@ -3676,6 +3703,65 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
 
   body.replaceChildren();
 
+  // --- ACTIVE BATTLE OR LAST BATTLE OUTCOME ---
+  if (data.activeBattle) {
+    const battleSec = document.createElement('div');
+    battleSec.className = 'rounded-xl border border-blue-400 bg-blue-50/90 p-4 space-y-2.5 dark:border-blue-600 dark:bg-blue-950/50 shadow-sm';
+    const activeDoorIdx = Number(data.activeBattle.teamNum ?? 0) + 1;
+    const heroList = Array.isArray(data.activeBattle.heroes) ? data.activeBattle.heroes : [];
+    battleSec.innerHTML = `
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="relative flex size-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full size-3 bg-blue-600"></span>
+          </span>
+          <span class="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-100">⚔️ Battle In Progress</span>
+        </div>
+        <span class="rounded-full bg-blue-600 text-white px-2.5 py-0.5 text-xs font-bold shadow-xs">
+          Door ${activeDoorIdx}
+        </span>
+      </div>
+      <div class="text-xs text-blue-800 dark:text-blue-200">
+        Actively fighting on Floor ${floorNumber} · Door ${activeDoorIdx} with ${heroList.length} titans deployed.
+      </div>
+    `;
+    if (heroList.length > 0) {
+      const activeTitansBox = document.createElement('div');
+      activeTitansBox.className = 'flex flex-wrap items-center gap-1.5 pt-2 border-t border-blue-200/80 dark:border-blue-800/60';
+      for (const hid of heroList) {
+        const titanId = String(hid);
+        const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
+        const name = meta?.name || `Titan ${titanId}`;
+        const unitTag = document.createElement('span');
+        unitTag.className = 'inline-flex items-center gap-1.5 rounded-lg bg-white/95 border border-blue-200 px-2 py-0.5 text-[11px] text-slate-800 shadow-2xs dark:bg-slate-900 dark:border-blue-800 dark:text-slate-200';
+        unitTag.innerHTML = `<img src="assets/titans/${titanId}.png" class="size-4 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700"><span>${name}</span>`;
+        unitTag.querySelector('img')?.addEventListener('error', (event) => { event.currentTarget.hidden = true; });
+        activeTitansBox.append(unitTag);
+      }
+      battleSec.append(activeTitansBox);
+    }
+    body.append(battleSec);
+  } else if (data.lastBattleResult) {
+    const resSec = document.createElement('div');
+    const win = data.lastBattleResult.win !== false;
+    resSec.className = `rounded-xl border p-3 flex items-center justify-between text-xs shadow-2xs ${
+      win
+        ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+        : 'border-rose-200 bg-rose-50/70 text-rose-900 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-200'
+    }`;
+    const stars = data.lastBattleResult.stars ? '★'.repeat(Math.min(3, data.lastBattleResult.stars)) : '';
+    resSec.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="font-bold">${win ? '🏆 Victory' : '❌ Defeat'}</span>
+        ${stars ? `<span class="text-amber-500 font-bold tracking-widest">${stars}</span>` : ''}
+        <span class="text-[11px] text-slate-500 dark:text-slate-400">Previous battle outcome</span>
+      </div>
+      <div class="text-[11px] font-medium text-slate-600 dark:text-slate-300">Floor ${floorNumber}</div>
+    `;
+    body.append(resSec);
+  }
+
   // --- SECTION 1: OVERVIEW STATS ---
   const overviewSec = document.createElement('div');
   overviewSec.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2.5';
@@ -3726,6 +3812,34 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   if (doors.length > 0) {
     const doorsSec = document.createElement('div');
     doorsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
+
+    const dungeonAuto = globalThis.hwaHelperDungeonAutomation;
+    const plan = dungeonAuto?.selectBestDoor?.(
+      doors,
+      typeof currentCache !== 'undefined' ? currentCache : { dungeonStatus: { data } }
+    );
+
+    const autoStatusBox = document.createElement('div');
+    if (plan && !plan.canAttack) {
+      autoStatusBox.className = 'rounded-lg border border-rose-300 bg-rose-50/70 p-2.5 text-xs text-rose-800 dark:border-rose-800/70 dark:bg-rose-950/40 dark:text-rose-300 flex items-center justify-between';
+      autoStatusBox.innerHTML = `
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold">⛔ Auto-Attack Halted:</span>
+          <span>${plan.reason}</span>
+        </div>
+        <span class="rounded bg-rose-200/80 px-2 py-0.5 text-[10px] font-bold text-rose-900 dark:bg-rose-900/60 dark:text-rose-200 shrink-0">Halted</span>
+      `;
+    } else if (plan && plan.canAttack && plan.chosen) {
+      autoStatusBox.className = 'rounded-lg border border-emerald-300 bg-emerald-50/70 p-2.5 text-xs text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center justify-between';
+      autoStatusBox.innerHTML = `
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold">⚡ Auto-Attack Target:</span>
+          <span>Door ${plan.chosen.teamNum + 1} (${plan.chosen.attackerType}) · Lineup intact</span>
+        </div>
+        <span class="rounded bg-emerald-200/80 px-2 py-0.5 text-[10px] font-bold text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200 shrink-0">Ready</span>
+      `;
+    }
+
     doorsSec.innerHTML = `
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">🚪 Floor ${floorNumber} Doors</h3>
@@ -3733,20 +3847,51 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       </div>
     `;
 
+    if (autoStatusBox.children?.length > 0 || autoStatusBox.innerHTML) {
+      doorsSec.append(autoStatusBox);
+    }
+
     const doorsGrid = document.createElement('div');
     doorsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
 
     doors.forEach((door, idx) => {
+      const evaluation = plan?.evaluations?.[idx];
+      const isChosen = plan?.chosen?.teamNum === idx;
+      const isAttacking = Boolean(data.activeBattle && data.activeBattle.teamNum === idx);
+
+      let cardBorder = 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70';
+      if (isAttacking) {
+        cardBorder = 'border-blue-400 bg-blue-50/60 ring-2 ring-blue-400 dark:border-blue-600 dark:bg-blue-950/40';
+      } else if (evaluation && !evaluation.canAttack) {
+        cardBorder = 'border-rose-200 bg-rose-50/30 dark:border-rose-900/50 dark:bg-rose-950/20';
+      } else if (isChosen) {
+        cardBorder = 'border-emerald-300 bg-emerald-50/30 dark:border-emerald-800/50 dark:bg-emerald-950/20';
+      }
+
       const doorCard = document.createElement('div');
-      doorCard.className = 'rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5 dark:border-slate-700/70 dark:bg-slate-800/70';
+      doorCard.className = `rounded-xl border ${cardBorder} p-3.5 space-y-2.5`;
 
       const attackerType = door.attackerType ? door.attackerType.charAt(0).toUpperCase() + door.attackerType.slice(1) : 'Any';
       const defenderType = door.defenderType ? door.defenderType.charAt(0).toUpperCase() + door.defenderType.slice(1) : 'Unknown';
       const powerStr = door.power ? Number(door.power).toLocaleString() : '—';
 
+      let statusBadge = '';
+      if (isAttacking) {
+        statusBadge = '<span class="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-bold animate-pulse">⚔️ In Combat</span>';
+      } else if (evaluation && !evaluation.canAttack) {
+        statusBadge = '<span class="rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 px-2 py-0.5 text-[10px] font-bold">⚠️ Lineup Defective</span>';
+      } else if (isChosen) {
+        statusBadge = '<span class="rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-bold">⭐ Recommended</span>';
+      } else if (evaluation?.canAttack) {
+        statusBadge = '<span class="rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 px-2 py-0.5 text-[10px] font-semibold">✓ Intact</span>';
+      }
+
       doorCard.innerHTML = `
         <div class="flex items-center justify-between">
-          <span class="rounded-md bg-slate-800 dark:bg-blue-900/60 dark:border dark:border-blue-700/50 px-2 py-0.5 text-[11px] font-bold text-white">Door ${idx + 1}</span>
+          <div class="flex items-center gap-1.5">
+            <span class="rounded-md bg-slate-800 dark:bg-blue-900/60 dark:border dark:border-blue-700/50 px-2 py-0.5 text-[11px] font-bold text-white">Door ${idx + 1}</span>
+            ${statusBadge}
+          </div>
           <span class="text-xs font-bold text-slate-700 dark:text-slate-200">⚔️ Power: ${powerStr}</span>
         </div>
         <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
@@ -3754,6 +3899,13 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
           <div>Defender: <strong class="text-slate-900 dark:text-slate-100">${defenderType}</strong></div>
         </div>
       `;
+
+      if (evaluation && !evaluation.canAttack) {
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'text-[11px] text-rose-600 dark:text-rose-400 bg-rose-100/60 dark:bg-rose-950/50 rounded-md px-2 py-1 font-medium';
+        warningDiv.textContent = `Casualties in lineup: Titan(s) ${evaluation.intactness.deadTitans.join(', ')} fallen. Auto-attack skipped.`;
+        doorCard.append(warningDiv);
+      }
 
       if (Array.isArray(door.team) && door.team.length > 0) {
         const teamBox = document.createElement('div');
@@ -3868,6 +4020,141 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   document.querySelector('#dungeon-modal-close')?.focus?.();
 }
 
+function updateDashboardGameStatus(actionsEl = document.querySelector('#dashboard-actions'), alertEl = document.querySelector('#dashboard-game-status-alert')) {
+  const targetActions = actionsEl || document.querySelector('#dashboard-actions');
+  const targetAlert = alertEl || document.querySelector('#dashboard-game-status-alert');
+
+  const processStatus = (data) => {
+    const hasGameTab = Boolean(data?.hasGameTab);
+    const engineStatus = data?.gameEngineStatus || null;
+    const currentExtVersion = (typeof chrome !== 'undefined' && chrome.runtime?.getManifest?.()?.version) || '';
+
+    const isHooked = Boolean(engineStatus && (engineStatus.ready || (engineStatus.hasCanvas && engineStatus.hasRpcHeaders)));
+    const isVersionChanged = Boolean(
+      engineStatus?.extensionVersion &&
+      currentExtVersion &&
+      engineStatus.extensionVersion !== currentExtVersion
+    );
+    const isRefreshRequired = Boolean(
+      engineStatus?.refreshRequired === true ||
+      engineStatus?.needsRefresh === true ||
+      engineStatus?.reason === 'refresh-required' ||
+      engineStatus?.reason === 'extension-updated' ||
+      (engineStatus?.rpcUrlAvailable && !engineStatus?.hasRpcHeaders)
+    );
+
+    // 1. Dashboard Alert Banner:
+    if (targetAlert) {
+      if (!hasGameTab) {
+        targetAlert.className = 'dashboard-game-alert flex items-start sm:items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200 shadow-2xs transition-all';
+        targetAlert.innerHTML = '<span class="text-lg select-none shrink-0 leading-none">⚠️</span><div class="flex-1 text-xs leading-relaxed"><strong class="font-semibold block sm:inline text-amber-950 dark:text-amber-100 mb-0.5 sm:mb-0 sm:mr-1">No Game Window Detected:</strong>Hero Wars: Alliance is not currently open in any browser tab. Open the game in a tab to enable live tracking and automated features.</div>';
+        targetAlert.hidden = false;
+      } else if (!isHooked || isVersionChanged || isRefreshRequired) {
+        let reason = 'Game window is open but engine hooks are not yet connected.';
+        if (isVersionChanged) {
+          reason = `Extension updated to v${currentExtVersion} (game tab has v${engineStatus.extensionVersion}). Please refresh browser.`;
+        } else if (isRefreshRequired) {
+          reason = 'Game engine requested a refresh to reconnect RPC bridge and hooks.';
+        }
+        targetAlert.className = 'dashboard-game-alert flex items-start sm:items-center gap-3 rounded-xl border border-sky-300 bg-sky-50 p-3.5 text-sky-900 dark:border-sky-700/50 dark:bg-sky-950/40 dark:text-sky-200 shadow-2xs transition-all';
+        targetAlert.innerHTML = `<span class="text-lg select-none shrink-0 leading-none">🔄</span><div class="flex-1 text-xs leading-relaxed"><strong class="font-semibold block sm:inline text-sky-950 dark:text-sky-100 mb-0.5 sm:mb-0 sm:mr-1">Refresh Recommended:</strong>${reason}</div>`;
+        targetAlert.hidden = false;
+      } else {
+        targetAlert.hidden = true;
+        targetAlert.className = 'hidden';
+      }
+    }
+
+    // 2. Refresh Browser Button in actions (common row with raid, gather, monster):
+    if (targetActions) {
+      let refreshBtn = targetActions.querySelector('#btn-refresh-browser');
+      const needsRefreshBtn = hasGameTab && (!isHooked || isVersionChanged || isRefreshRequired);
+
+      if (needsRefreshBtn) {
+        if (!refreshBtn) {
+          refreshBtn = document.createElement('button');
+          refreshBtn.id = 'btn-refresh-browser';
+          refreshBtn.type = 'button';
+          refreshBtn.className = 'cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all shadow-xs inline-flex items-center gap-1.5';
+          refreshBtn.title = 'Refresh the active game tab';
+          refreshBtn.setAttribute('aria-label', 'Refresh browser');
+          refreshBtn.innerHTML = '<svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg><span>Refresh browser</span>';
+          refreshBtn.addEventListener('click', () => {
+            refreshBtn.disabled = true;
+            const span = refreshBtn.querySelector('span');
+            if (span) span.textContent = 'Refreshing...';
+            if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+              chrome.runtime.sendMessage({ kind: 'reload-game-tab' }, () => {
+                const reset = () => {
+                  refreshBtn.disabled = false;
+                  if (span) span.textContent = 'Refresh browser';
+                  updateDashboardGameStatus(targetActions, targetAlert);
+                };
+                if (typeof setTimeout !== 'undefined') setTimeout(reset, 1200);
+                else reset();
+              });
+            }
+          });
+          targetActions.append(refreshBtn);
+        } else {
+          refreshBtn.hidden = false;
+        }
+      } else if (refreshBtn) {
+        refreshBtn.remove();
+      }
+    }
+  };
+
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    try {
+      chrome.runtime.sendMessage({ kind: 'get-game-tab-status' }, (response) => {
+        if (response && response.ok) {
+          processStatus(response);
+        } else {
+          checkFallbackTabStatus(processStatus);
+        }
+      });
+    } catch (_) {
+      checkFallbackTabStatus(processStatus);
+    }
+  } else {
+    checkFallbackTabStatus(processStatus);
+  }
+}
+
+function checkFallbackTabStatus(callback) {
+  if (typeof chrome !== 'undefined' && chrome.tabs?.query) {
+    const queryPatterns = ['https://*.hero-wars-alliance.com/*', 'https://hero-wars-alliance.com/*'];
+    chrome.tabs.query({ url: queryPatterns }, (tabs) => {
+      const hasGame = Array.isArray(tabs) && tabs.length > 0;
+      if (chrome.storage?.local?.get) {
+        chrome.storage.local.get('gameEngineStatus', (stored) => {
+          callback({
+            hasGameTab: hasGame,
+            gameEngineStatus: stored?.gameEngineStatus || null
+          });
+        });
+      } else {
+        callback({ hasGameTab: hasGame, gameEngineStatus: null });
+      }
+    });
+  } else if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    chrome.storage.local.get('gameEngineStatus', (stored) => {
+      callback({
+        hasGameTab: Boolean(stored?.gameEngineStatus?.hasCanvas || stored?.gameEngineStatus?.ready),
+        gameEngineStatus: stored?.gameEngineStatus || null
+      });
+    });
+  } else {
+    callback({ hasGameTab: false, gameEngineStatus: null });
+  }
+}
+
+globalThis.updateDashboardGameStatus = updateDashboardGameStatus;
+globalThis.checkFallbackTabStatus = checkFallbackTabStatus;
+globalThis.getExpandedTowerFloor = () => expandedTowerFloor;
+globalThis.setExpandedTowerFloor = (f) => { expandedTowerFloor = f; };
+
 function renderDashboard(cache) {
   const model = globalThis.hwaHelperDashboardData.dailyDashboard(cache);
   const groups = [
@@ -3880,6 +4167,12 @@ function renderDashboard(cache) {
 
   const container = document.createElement('div');
   container.className = 'space-y-4 p-4';
+
+  const gameTabAlert = document.createElement('div');
+  gameTabAlert.id = 'dashboard-game-status-alert';
+  gameTabAlert.className = 'hidden';
+  container.append(gameTabAlert);
+
   const intro = document.createElement('div');
   intro.className = 'rounded-xl bg-slate-900 p-4 text-white';
   const heading = document.createElement('h2');
@@ -3889,6 +4182,7 @@ function renderDashboard(cache) {
   subtitle.className = 'mt-1 text-xs text-slate-300';
   subtitle.textContent = 'Live game snapshots update as you play. Unknown items need a fresh game snapshot.';
   const actions = document.createElement('div');
+  actions.id = 'dashboard-actions';
   actions.className = 'mt-3 flex flex-wrap gap-2';
   const dialogButton = (id, label, dialogId, color, open) => {
     const control = document.createElement('button');
@@ -3909,6 +4203,10 @@ function renderDashboard(cache) {
     () => renderMonster(currentCache));
   intro.append(heading, subtitle, actions);
   container.append(intro);
+
+  if (typeof updateDashboardGameStatus === 'function') {
+    updateDashboardGameStatus(actions, gameTabAlert);
+  }
 
   for (const group of groups) {
     const section = document.createElement('section');
@@ -4340,6 +4638,8 @@ function renderEvents(cache) {
   view.append(listContainer);
 }
 
+let expandedTowerFloor = null;
+
 function towerRewardText(reward) {
   if (!reward || typeof reward !== 'object') return '—';
   const parts = [];
@@ -4355,6 +4655,24 @@ function towerRewardText(reward) {
     }
   }
   return parts.join(', ') || '—';
+}
+
+function combineTowerRewards(...rewards) {
+  const merged = {};
+  for (const r of rewards) {
+    if (!r || typeof r !== 'object') continue;
+    for (const [kind, value] of Object.entries(r)) {
+      if (typeof value === 'number' || (typeof value === 'string' && Number.isFinite(Number(value)))) {
+        merged[kind] = (Number(merged[kind]) || 0) + Number(value);
+      } else if (value && typeof value === 'object') {
+        if (!merged[kind]) merged[kind] = {};
+        for (const [id, amount] of Object.entries(value)) {
+          merged[kind][id] = (Number(merged[kind][id]) || 0) + Number(amount);
+        }
+      }
+    }
+  }
+  return merged;
 }
 
 function renderTowerModal(cache = currentCache) {
@@ -4674,20 +4992,153 @@ function renderTowerModal(cache = currentCache) {
 
   const history = section('Route and decisions');
   const entries = session.history || [];
-  if (!entries.length) line(history, 'No Tower actions recorded in this session.');
-  for (const event of entries) {
-    if (event.action === 'endBattle') {
-      line(history, `Floor ${event.floor}, room ${event.room}: ${event.win ? 'Victory' : 'Defeat'}${event.stars != null ? ` · ${event.stars} stars` : ''}${event.enemyIds?.length ? ` vs ${heroList(event.enemyIds)}` : ''} · ${towerRewardText(event.reward)}`);
-    } else if (event.action === 'activateBuff') {
-      line(history, `Floor ${event.floor}, room ${event.room}: selected ${buffText(event.buffId)}`);
-      if (event.options?.length) line(history, `Offered buffs: ${event.options.map(buffText).join(' / ')}`);
-    } else if (event.action === 'openChest') {
-      line(history, `Floor ${event.floor}, room ${event.room}: opened chest ${event.number} · ${towerRewardText(event.reward)}`);
-      const offered = Object.entries(event.options || {}).map(([number, cost]) =>
-        `#${number} ${cost ? towerRewardText(cost) : 'free'}`);
-      if (offered.length) line(history, `Offered chests: ${offered.join(' / ')}`);
-      if (event.possibleRewards?.length) line(history,
-        `Possible rewards (positions not confirmed): ${event.possibleRewards.map(towerRewardText).join(' / ')}`);
+  if (!entries.length) {
+    line(history, 'No Tower actions recorded in this session.');
+  } else {
+    // Group events by floor for accordion progress view
+    const floorGroups = new Map();
+    const ungrouped = [];
+    for (const event of entries) {
+      const f = Number(event.floor);
+      if (Number.isInteger(f) && f > 0) {
+        if (!floorGroups.has(f)) {
+          floorGroups.set(f, {
+            floor: f,
+            battle: null,
+            buff: null,
+            chest: null,
+            events: []
+          });
+        }
+        const group = floorGroups.get(f);
+        group.events.push(event);
+        if (event.action === 'endBattle') group.battle = event;
+        else if (event.action === 'activateBuff') group.buff = event;
+        else if (event.action === 'openChest') group.chest = event;
+      } else {
+        ungrouped.push(event);
+      }
+    }
+
+    const accordionWrap = document.createElement('div');
+    accordionWrap.className = 'space-y-2 mt-2';
+    accordionWrap.setAttribute('data-tower-accordion', 'true');
+
+    // Sort floors ascending (1, 2, 3...)
+    const sortedFloors = Array.from(floorGroups.values()).sort((a, b) => a.floor - b.floor);
+
+    for (const group of sortedFloors) {
+      const f = group.floor;
+      const isExpanded = expandedTowerFloor === f;
+
+      // 1. Battle summary
+      let battleSummary = 'Chưa đấu';
+      if (group.battle) {
+        const roomNum = group.battle.room != null ? `Ải ${group.battle.room}` : 'Ải';
+        const result = group.battle.win ? 'Thắng' : 'Thua';
+        battleSummary = `${roomNum} (${result})`;
+      }
+
+      // 2. Buff summary
+      let buffSummary = 'Không buff';
+      if (group.buff) {
+        const buffObj = catalog[group.buff.buffId];
+        buffSummary = buffObj?.name || `Buff #${group.buff.buffId}`;
+      }
+
+      // 3. Combined rewards summary
+      const combinedReward = combineTowerRewards(group.battle?.reward, group.chest?.reward);
+      const rewardSummary = Object.keys(combinedReward).length > 0 ? towerRewardText(combinedReward) : '—';
+
+      // Card wrapper for this floor
+      const itemCard = document.createElement('div');
+      itemCard.className = `rounded-xl border transition-all overflow-hidden ${
+        isExpanded
+          ? 'border-violet-300 bg-violet-50/20 dark:border-violet-800 dark:bg-violet-950/20 shadow-xs'
+          : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/80 hover:border-slate-300 dark:hover:border-slate-700'
+      }`;
+      itemCard.setAttribute('data-tower-floor', String(f));
+
+      // Compact Clickable Header Button
+      const headerBtn = document.createElement('button');
+      headerBtn.type = 'button';
+      headerBtn.className = 'w-full flex items-center justify-between p-3 text-left transition-colors cursor-pointer gap-2 select-none';
+      headerBtn.setAttribute('aria-expanded', String(isExpanded));
+      headerBtn.setAttribute('aria-controls', `tower-floor-detail-${f}`);
+
+      headerBtn.innerHTML = `
+        <div class="flex items-center gap-2.5 flex-wrap flex-1 min-w-0 text-xs">
+          <span class="rounded-lg bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800 dark:bg-violet-950/80 dark:text-violet-300 dark:border dark:border-violet-800/60 shrink-0">
+            Tầng ${f}
+          </span>
+          <span class="inline-flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200 shrink-0">
+            <span>⚔️</span>
+            <span>${battleSummary}</span>
+          </span>
+          <span class="inline-flex items-center gap-1 text-violet-700 dark:text-violet-300 truncate max-w-[180px] shrink-0" title="${buffSummary}">
+            <span>✨</span>
+            <span class="truncate">${buffSummary}</span>
+          </span>
+          <span class="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium truncate flex-1 min-w-[120px]" title="${rewardSummary}">
+            <span>🎁</span>
+            <span class="truncate">${rewardSummary}</span>
+          </span>
+        </div>
+        <div class="shrink-0 flex items-center text-slate-400 dark:text-slate-500 pl-1">
+          <svg class="size-4 transform transition-transform ${isExpanded ? 'rotate-180 text-violet-600 dark:text-violet-400' : ''}" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+      `;
+
+      // Accordion toggle: single floor active at any time
+      headerBtn.addEventListener('click', () => {
+        expandedTowerFloor = expandedTowerFloor === f ? null : f;
+        renderTowerModal(cache);
+      });
+
+      itemCard.append(headerBtn);
+
+      // Detail Panel (visible only when expanded)
+      const detailPanel = document.createElement('div');
+      detailPanel.id = `tower-floor-detail-${f}`;
+      detailPanel.className = `border-t border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2 bg-slate-50/70 dark:bg-slate-950/40 text-xs ${
+        isExpanded ? '' : 'hidden'
+      }`;
+
+      for (const event of group.events) {
+        if (event.action === 'endBattle') {
+          line(detailPanel, `Floor ${event.floor}, room ${event.room}: ${event.win ? 'Victory' : 'Defeat'}${event.stars != null ? ` · ${event.stars} stars` : ''}${event.enemyIds?.length ? ` vs ${heroList(event.enemyIds)}` : ''} · ${towerRewardText(event.reward)}`);
+        } else if (event.action === 'activateBuff') {
+          line(detailPanel, `Floor ${event.floor}, room ${event.room}: selected ${buffText(event.buffId)}`);
+          if (event.options?.length) line(detailPanel, `Offered buffs: ${event.options.map(buffText).join(' / ')}`);
+        } else if (event.action === 'openChest') {
+          line(detailPanel, `Floor ${event.floor}, room ${event.room}: opened chest ${event.number} · ${towerRewardText(event.reward)}`);
+          const offered = Object.entries(event.options || {}).map(([number, cost]) =>
+            `#${number} ${cost ? towerRewardText(cost) : 'free'}`);
+          if (offered.length) line(detailPanel, `Offered chests: ${offered.join(' / ')}`);
+          if (event.possibleRewards?.length) line(detailPanel,
+            `Possible rewards (positions not confirmed): ${event.possibleRewards.map(towerRewardText).join(' / ')}`);
+        }
+      }
+
+      itemCard.append(detailPanel);
+      accordionWrap.append(itemCard);
+    }
+
+    history.append(accordionWrap);
+
+    if (ungrouped.length > 0) {
+      for (const event of ungrouped) {
+        if (event.action === 'endBattle') {
+          line(history, `Floor ${event.floor || '?'}, room ${event.room}: ${event.win ? 'Victory' : 'Defeat'}${event.stars != null ? ` · ${event.stars} stars` : ''}${event.enemyIds?.length ? ` vs ${heroList(event.enemyIds)}` : ''} · ${towerRewardText(event.reward)}`);
+        } else if (event.action === 'activateBuff') {
+          line(history, `Floor ${event.floor || '?'}, room ${event.room}: selected ${buffText(event.buffId)}`);
+          if (event.options?.length) line(history, `Offered buffs: ${event.options.map(buffText).join(' / ')}`);
+        } else if (event.action === 'openChest') {
+          line(history, `Floor ${event.floor || '?'}, room ${event.room}: opened chest ${event.number} · ${towerRewardText(event.reward)}`);
+        }
+      }
     }
   }
   renderAutomation();
@@ -8128,6 +8579,8 @@ async function render() {
   const isDraftActive = globalThis.hwaHelperPopupData.isDraftActive(draftStatus?.stageId);
   const towerModal = document.querySelector('#tower-modal');
   if (towerModal && !towerModal.hidden) renderTowerModal(cache);
+  const dungeonModal = document.querySelector('#dungeon-modal');
+  if (dungeonModal && !dungeonModal.hidden) openDungeonModal(cache.dungeonStatus?.data, dungeonModalReturnFocus);
   if (document.querySelector('#raid-dialog')?.open) renderExperimental(cache, true);
   if (document.querySelector('#gather-dialog')?.open) renderExperimental(cache);
   if (document.querySelector('#monster-dialog')?.open) renderMonster(cache);
@@ -8958,7 +9411,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if ('cachedGameVersion' in changes) renderGameVersion(changes.cachedGameVersion.newValue);
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
         'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'rpcMqttTelemetry' in changes || 'troopCapacitySettings' in changes || 'theme' in changes) renderSettings();
-    if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
+    if ('gameEngineStatus' in changes) {
+      renderEngineStatus(changes.gameEngineStatus.newValue);
+      if (typeof activeTab !== 'undefined' && activeTab === 'dashboard' && typeof updateDashboardGameStatus === 'function') {
+        updateDashboardGameStatus();
+      }
+    }
     if ('buildingQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes || 'rpcMqttTelemetry' in changes || 'rpcMqttTriggerStatus' in changes) queueRender();
@@ -9018,4 +9476,19 @@ if (chatClose && chatPanel) {
     updateGuildChatBadge(currentCache, currentGuildChatLastReadTime);
     document.querySelector('#fab-trigger')?.focus?.();
   });
+}
+
+if (typeof chrome !== 'undefined' && chrome.tabs) {
+  try {
+    chrome.tabs.onUpdated?.addListener?.(() => {
+      if (typeof activeTab !== 'undefined' && activeTab === 'dashboard' && typeof updateDashboardGameStatus === 'function') {
+        updateDashboardGameStatus();
+      }
+    });
+    chrome.tabs.onRemoved?.addListener?.(() => {
+      if (typeof activeTab !== 'undefined' && activeTab === 'dashboard' && typeof updateDashboardGameStatus === 'function') {
+        updateDashboardGameStatus();
+      }
+    });
+  } catch (_) {}
 }

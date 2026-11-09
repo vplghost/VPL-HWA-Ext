@@ -692,6 +692,218 @@
   watchGlobalProperty('Module');
   watchGlobalProperty('SendMessage');
 
+  // --- Legend Draft Unity Memory Hook & Candidate Scanner ---
+  let lastDraftPayload = null;
+  let draftHookScanTimers = [];
+  const capturedDraftStrings = [];
+
+  function getWasmMemory() {
+    const mod = activeUnityInstance?.Module || window.Module || activeUnityInstance;
+    if (!mod) return null;
+    let heapU8 = null;
+    let heapU32 = null;
+    try {
+      if (mod.HEAPU8 && mod.HEAPU8.buffer && !mod.HEAPU8.buffer.detached) {
+        heapU8 = mod.HEAPU8;
+      } else if (mod.wasmMemory?.buffer && !mod.wasmMemory.buffer.detached) {
+        heapU8 = new Uint8Array(mod.wasmMemory.buffer);
+      }
+      if (mod.HEAPU32 && mod.HEAPU32.buffer && !mod.HEAPU32.buffer.detached) {
+        heapU32 = mod.HEAPU32;
+      } else if (mod.wasmMemory?.buffer && !mod.wasmMemory.buffer.detached) {
+        heapU32 = new Uint32Array(mod.wasmMemory.buffer);
+      }
+    } catch (_) {}
+    return { mod, heapU8, heapU32 };
+  }
+
+  function findSequenceInHeap(heapU8, targetBytes, maxMatches = 10) {
+    if (!heapU8 || !targetBytes || targetBytes.length === 0) return [];
+    const len = targetBytes.length;
+    const max = heapU8.length - len;
+    const first = targetBytes[0];
+    const matches = [];
+    for (let i = 0; i < max; i++) {
+      if (heapU8[i] === first) {
+        let match = true;
+        for (let j = 1; j < len; j++) {
+          if (heapU8[i + j] !== targetBytes[j]) {
+            match = false;
+            break;
+          }
+        }
+        if (match) {
+          matches.push(i);
+          if (matches.length >= maxMatches) break;
+        }
+      }
+    }
+    return matches;
+  }
+
+  function scanCandidateHeroArrays(heapU32, maxResults = 8) {
+    if (!heapU32) return [];
+    const results = [];
+    const len = heapU32.length - 26;
+    for (let i = 0; i < len; i++) {
+      const candidateCount = heapU32[i];
+      if (candidateCount === 25 || candidateCount === 15) {
+        let valid = true;
+        const heroIds = [];
+        for (let j = 1; j <= candidateCount; j++) {
+          const val = heapU32[i + j];
+          if (val < 1 || val > 150) {
+            valid = false;
+            break;
+          }
+          heroIds.push(val);
+        }
+        if (valid) {
+          const chunkSize = candidateCount === 25 ? 5 : 3;
+          let distinctInChunks = true;
+          for (let c = 0; c < candidateCount; c += chunkSize) {
+            const chunk = heroIds.slice(c, c + chunkSize);
+            const set = new Set(chunk);
+            if (set.size !== chunkSize) {
+              distinctInChunks = false;
+              break;
+            }
+          }
+          if (distinctInChunks) {
+            results.push({
+              ptr: i * 4,
+              count: candidateCount,
+              heroIds
+            });
+            if (results.length >= maxResults) break;
+          }
+        }
+      }
+    }
+    return results;
+  }
+
+  function instrumentModuleStrings(mod) {
+    if (!mod || mod.__hwaStringsHooked) return;
+    const origUTF8ToString = mod.UTF8ToString;
+    if (typeof origUTF8ToString === 'function') {
+      mod.UTF8ToString = function (ptr, maxBytesToRead) {
+        const str = origUTF8ToString.apply(this, arguments);
+        if (typeof str === 'string' && str.length > 0) {
+          if (str.length < 250 && (str.includes('hero') || str.includes('draft') || str.includes('Hero') || str.includes('Draft'))) {
+            if (capturedDraftStrings.length > 100) capturedDraftStrings.shift();
+            capturedDraftStrings.push({ time: Date.now(), str, ptr });
+          }
+        }
+        return str;
+      };
+      mod.UTF8ToString.__hwaOriginal = origUTF8ToString;
+    }
+    mod.__hwaStringsHooked = true;
+  }
+
+  function runLegendDraftMemoryScan() {
+    const memory = getWasmMemory();
+    if (!memory || !memory.mod) {
+      return { ok: false, error: 'Unity WebGL Module or WebAssembly memory buffer not available' };
+    }
+
+    instrumentModuleStrings(memory.mod);
+
+    let cipherOffsets = [];
+    if (lastDraftPayload?.draft) {
+      try {
+        const binStr = atob(lastDraftPayload.draft);
+        const rawTargetBytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) rawTargetBytes[i] = binStr.charCodeAt(i);
+        if (memory.heapU8) {
+          cipherOffsets = findSequenceInHeap(memory.heapU8, rawTargetBytes);
+        }
+      } catch (_) {}
+    }
+
+    const detectedPools = memory.heapU32 ? scanCandidateHeroArrays(memory.heapU32) : [];
+    const topCandidateIds = detectedPools[0]?.heroIds || null;
+
+    const result = {
+      ok: true,
+      timestamp: new Date().toISOString(),
+      stageId: lastDraftPayload?.stageId ?? null,
+      draftBase64: lastDraftPayload?.draft ?? null,
+      cipherOffsets,
+      detectedPoolsCount: detectedPools.length,
+      detectedCandidatePools: detectedPools,
+      topCandidateIds,
+      capturedStringsCount: capturedDraftStrings.length
+    };
+
+    if (topCandidateIds) {
+      window.__hwa_legend_draft_candidates = topCandidateIds;
+      console.log('[HWA-DRAFT-HOOK][CANDIDATES_DISCOVERED]', {
+        count: topCandidateIds.length,
+        heroIds: topCandidateIds,
+        ptr: detectedPools[0]?.ptr
+      });
+    }
+
+    try {
+      window.postMessage({
+        source: 'hwa-helper-api',
+        kind: 'legend-draft-hook-result',
+        payload: result
+      }, location.origin);
+    } catch (_) {}
+
+    return result;
+  }
+
+  function scheduleLegendDraftScans() {
+    draftHookScanTimers.forEach(clearTimeout);
+    draftHookScanTimers = [];
+    const delays = [100, 300, 700, 1500, 3000];
+    for (const delay of delays) {
+      const timer = setTimeout(() => {
+        const res = runLegendDraftMemoryScan();
+        if (res?.topCandidateIds) {
+          draftHookScanTimers.forEach(clearTimeout);
+          draftHookScanTimers = [];
+        }
+      }, delay);
+      draftHookScanTimers.push(timer);
+    }
+  }
+
+  function handleLegendDraftRpcResponse(resText) {
+    if (!resText || !resText.includes('randomDraft_getInfo')) return;
+    try {
+      const parsed = JSON.parse(resText);
+      const draftObj = parsed?.results?.find((r) => r.ident === 'randomDraft_getInfo' || r.result?.response?.draft)?.result?.response;
+      if (draftObj && draftObj.draft) {
+        lastDraftPayload = {
+          stageId: draftObj.stageId,
+          draft: draftObj.draft,
+          draftEnemy: draftObj.draftEnemy,
+          receivedAt: Date.now()
+        };
+        console.log('[HWA-DRAFT-HOOK][RECEIVE_DRAFT_RPC]', {
+          stageId: draftObj.stageId,
+          draftLength: draftObj.draft.length
+        });
+        scheduleLegendDraftScans();
+      }
+    } catch (_) {}
+  }
+
+  window.__hwaLegendDraftHook = {
+    getMemory: getWasmMemory,
+    runScan: runLegendDraftMemoryScan,
+    getLastPayload: () => lastDraftPayload,
+    getCapturedStrings: () => [...capturedDraftStrings],
+    findSequenceInHeap,
+    scanCandidateHeroArrays,
+    handleLegendDraftRpcResponse
+  };
+
   if (typeof setInterval === 'function') {
     let pollAttempts = 0;
     const pollInterval = setInterval(() => {
@@ -1125,6 +1337,9 @@
                 record('fetch', method, url, response.status, duration, 'completed', {
                   requestBody: piggyback.options.body, responseBody: fullText
                 });
+                if (fullText && fullText.includes('randomDraft_getInfo')) {
+                  handleLegendDraftRpcResponse(fullText);
+                }
                 if (fullText.length > MAX_BODY_CHARS && extraResults.length) {
                   record('fetch', method, url, response.status, duration, 'completed', {
                     requestBody: JSON.stringify({ calls: piggyback.appended }),
@@ -1153,6 +1368,9 @@
             if (isPost) {
               Promise.all([requestBody, readFetchResponse(response)]).then(([request, received]) => {
                 const resText = received?.text ?? null;
+                if (resText && resText.includes('randomDraft_getInfo')) {
+                  handleLegendDraftRpcResponse(resText);
+                }
                 if (resText && resText.includes('"version"')) {
                   try {
                     const parsed = JSON.parse(resText);
@@ -1321,6 +1539,10 @@
           const duration = performance.now() - info.started;
           if (String(info.method).toUpperCase() === 'POST') {
             const received = readXhrResponse(this);
+            const resText = received?.text ?? null;
+            if (resText && resText.includes('randomDraft_getInfo')) {
+              handleLegendDraftRpcResponse(resText);
+            }
             info.requestBody.then((request) => record('xhr', info.method, info.url,
               this.status || null, duration, info.outcome, {
                 requestBody: request?.text ?? null,
