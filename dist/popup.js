@@ -6601,6 +6601,8 @@ function renderBuildingDialog(cache) {
     [5, cache['resource:material:5']?.data?.amount ?? 0]
   ]);
 
+  const SYSTEM_LANDMARK_BUILDING_IDS = new Set([44, 160, 161, 166, 167, 168, 169, 176, 177]);
+
   const nextUpgradable = allBuildings
     .map((b) => {
       const curLvl = simulatedLevels.get(b.id) ?? (b.isBuilt ? b.level : 0);
@@ -6617,8 +6619,12 @@ function renderBuildingDialog(cache) {
       };
     })
     .filter((b) => {
+      if (SYSTEM_LANDMARK_BUILDING_IDS.has(Number(b.id))) return false;
       if (!b.isBuilt || b.level <= 0 || b.isUpgrading) return false;
       if (b.id !== 20 && b.level >= hallLevel) return false;
+      if (bHelper?.getBuildingLevelData && bHelper.data?.[b.id] && !bHelper.getBuildingLevelData(b.id, b.nextLevel)) {
+        return false;
+      }
       if (bHelper?.getMissingRequirements) {
         const missingReqs = bHelper.getMissingRequirements(b.id, b.nextLevel, simulatedLevels);
         if (missingReqs.length > 0) return false;
@@ -6738,7 +6744,7 @@ function renderBuildingDialog(cache) {
     if (filtered.length > 0) {
       for (const b of filtered) {
         const card = document.createElement('div');
-        card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-amber-200 hover:bg-amber-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-amber-900/50';
+        card.className = 'flex flex-col gap-2 rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5 text-xs hover:border-amber-300 hover:bg-amber-50/40 transition-colors dark:border-slate-700/80 dark:bg-slate-800/60 dark:hover:border-amber-800/60';
         const name = getBuildingName(b.id);
         const durationMs = b.durationMs || (bHelper?.calculateEffectiveDurationMs
           ? bHelper.calculateEffectiveDurationMs(b.id, b.nextLevel)
@@ -6751,26 +6757,50 @@ function renderBuildingDialog(cache) {
         const estFinishTs = (queueTimeline.allDoneAt || now) + durationMs;
         const estFinishDate = new Date(estFinishTs);
 
-        const infoCol = document.createElement('div');
-        infoCol.className = 'min-w-0 flex-1';
-        infoCol.innerHTML = `
-          <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
-          <div class="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400 flex-wrap">
-            <span>ID: ${b.id}</span>
-            ${durationMs > 0 ? `<span>·</span><span>⏱ ${formatRemainingHms(durationMs)}</span>` : ''}
-            <span>·</span>
-            <span class="text-slate-400">🏁 ${estFinishDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-        `;
-        card.append(infoCol);
+        // Top row: ID pill + full building name (1 line truncate) + Level badge
+        const topRow = document.createElement('div');
+        topRow.className = 'flex items-center justify-between gap-2 min-w-0';
 
-        const actionCol = document.createElement('div');
-        actionCol.className = 'flex items-center gap-1.5 shrink-0';
+        const nameGroup = document.createElement('div');
+        nameGroup.className = 'flex items-center gap-1.5 min-w-0 flex-1';
 
-        const levelBadge = document.createElement('div');
-        levelBadge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
+        const idPill = document.createElement('span');
+        idPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-mono font-bold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0';
+        idPill.textContent = `#${b.id}`;
+
+        const nameText = document.createElement('span');
+        nameText.className = 'font-bold text-slate-900 dark:text-slate-100 truncate text-xs';
+        nameText.textContent = name;
+        nameText.title = name;
+
+        nameGroup.append(idPill, nameText);
+
+        const levelBadge = document.createElement('span');
+        levelBadge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 shrink-0';
         levelBadge.textContent = b.isBuilt ? `Lv. ${b.level} ➔ ${b.nextLevel}` : 'Build Lv. 1';
-        actionCol.append(levelBadge);
+
+        topRow.append(nameGroup, levelBadge);
+        card.append(topRow);
+
+        // Bottom row: Time info on left, action buttons on right
+        const bottomRow = document.createElement('div');
+        bottomRow.className = 'flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/50';
+
+        const timeInfo = document.createElement('div');
+        timeInfo.className = 'flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400 min-w-0';
+        timeInfo.innerHTML = `
+          <span class="inline-flex items-center gap-1 font-mono text-slate-600 dark:text-slate-300" title="Build Duration">
+            <span>⏱</span><span>${formatRemainingHms(durationMs)}</span>
+          </span>
+          <span class="text-slate-300 dark:text-slate-600">·</span>
+          <span class="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500" title="Estimated Finish Time">
+            <span>🏁</span><span>${estFinishDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </span>
+        `;
+        bottomRow.append(timeInfo);
+
+        const actionGroup = document.createElement('div');
+        actionGroup.className = 'flex items-center gap-1.5 shrink-0';
 
         const queueBtn = document.createElement('button');
         queueBtn.type = 'button';
@@ -6798,76 +6828,69 @@ function renderBuildingDialog(cache) {
           saveBuildingQueue();
           renderBuildingDialog(cache);
         });
-        actionCol.append(queueBtn);
+        actionGroup.append(queueBtn);
 
         const isQueueBusy = activeQueues.length > 0;
-        const buildBtn = document.createElement('button');
-        buildBtn.type = 'button';
-        const isBtnDisabled = isQueueBusy || (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled) || !hasEnoughResources;
-        buildBtn.className = isBtnDisabled
-          ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
-          : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors';
-        buildBtn.disabled = isBtnDisabled;
+        const isRpcReady = typeof popupRpcEnabled === 'undefined' || popupRpcEnabled !== false;
+        const canUpgrade = !isQueueBusy && isRpcReady && hasEnoughResources;
 
-        const matNames = { 2: 'Iron', 3: 'Stone', 4: 'Wood', 5: 'Food' };
-        let btnTitle = `Build ${name} to Lv. ${b.nextLevel}`;
-        if (isQueueBusy) {
-          btnTitle = 'Builder queue is currently busy';
-        } else if (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled) {
-          btnTitle = 'Enable Popup RPC in Settings to build';
-        } else if (!hasEnoughResources) {
-          btnTitle = 'Not enough resources: ' + missingCosts.map((m) => `${(m.required - m.current).toLocaleString('en-US')} more ${matNames[m.materialId] || 'Material'}`).join(', ');
-        }
-        buildBtn.title = btnTitle;
-        buildBtn.innerHTML = `<span>🔨</span><span>${b.isBuilt ? 'Upgrade' : 'Build'}</span>`;
+        if (canUpgrade) {
+          const buildBtn = document.createElement('button');
+          buildBtn.type = 'button';
+          buildBtn.disabled = false;
+          buildBtn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors';
+          buildBtn.title = `Build ${name} to Lv. ${b.nextLevel}`;
+          buildBtn.innerHTML = `<span>🔨</span><span>${b.isBuilt ? 'Upgrade' : 'Build'}</span>`;
 
-        buildBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (buildBtn.disabled) return;
-          buildBtn.disabled = true;
-          buildBtn.textContent = 'Building...';
-          const calls = [];
-          for (const f of finishedQueues) {
+          buildBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (buildBtn.disabled) return;
+            buildBtn.disabled = true;
+            buildBtn.textContent = 'Building...';
+            const calls = [];
+            for (const f of finishedQueues) {
+              calls.push({
+                name: 'completeConstruction',
+                feature: 'building',
+                args: {
+                  buildingId: f.buildingId,
+                  nextLevel: f.level,
+                  completeDate: Date.now()
+                }
+              });
+            }
             calls.push({
-              name: 'completeConstruction',
+              name: 'startConstruction',
               feature: 'building',
               args: {
-                buildingId: f.buildingId,
-                nextLevel: f.level,
-                completeDate: Date.now()
+                buildingId: b.id,
+                nextLevel: b.nextLevel,
+                startDate: Date.now(),
+                durationMs
               }
             });
-          }
-          calls.push({
-            name: 'startConstruction',
-            feature: 'building',
-            args: {
-              buildingId: b.id,
-              nextLevel: b.nextLevel,
-              startDate: Date.now(),
-              durationMs
+            calls.push({ name: 'getSummary', feature: 'building', args: {} });
+            if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+              chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+                if (!response?.ok) {
+                  buildBtn.disabled = false;
+                  buildBtn.textContent = response?.error || 'Failed';
+                } else {
+                  buildBtn.textContent = response.queued ? 'Queued' : 'Started!';
+                  setTimeout(() => {
+                    if (typeof renderBuildingDialog === 'function' && typeof currentCache !== 'undefined') {
+                      renderBuildingDialog(currentCache);
+                    }
+                  }, 1000);
+                }
+              });
             }
           });
-          calls.push({ name: 'getSummary', feature: 'building', args: {} });
-          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-            chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
-              if (!response?.ok) {
-                buildBtn.disabled = false;
-                buildBtn.textContent = response?.error || 'Failed';
-              } else {
-                buildBtn.textContent = response.queued ? 'Queued' : 'Started!';
-                setTimeout(() => {
-                  if (typeof renderBuildingDialog === 'function' && typeof currentCache !== 'undefined') {
-                    renderBuildingDialog(currentCache);
-                  }
-                }, 1000);
-              }
-            });
-          }
-        });
-        actionCol.append(buildBtn);
+          actionGroup.append(buildBtn);
+        }
 
-        card.append(actionCol);
+        bottomRow.append(actionGroup);
+        card.append(bottomRow);
         nextGrid.append(card);
       }
     } else {

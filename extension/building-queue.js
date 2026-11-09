@@ -28,16 +28,24 @@
     return simulated;
   }
 
+  const SYSTEM_LANDMARK_IDS = new Set([44, 160, 161, 166, 167, 168, 169, 176, 177]);
+
   function getEligibleCandidates(allBuildings, simulatedLevels, bHelper) {
     const simulatedHall = simulatedLevels.get(20) || 1;
     const candidates = [];
     for (const b of allBuildings || []) {
+      const bId = Number(b.id);
+      if (SYSTEM_LANDMARK_IDS.has(bId)) continue;
       const currentSimulated = simulatedLevels.get(b.id) ?? (b.isBuilt ? b.level : 0);
       if (currentSimulated <= 0 && !b.isBuilt) continue;
       const candidateNextLevel = (currentSimulated > 0 || b.isBuilt) ? (currentSimulated + 1) : 1;
 
       // Hall of Heroes limitation: non-hall buildings cannot exceed simulated Hall of Heroes level
       if (b.id !== 20 && currentSimulated >= simulatedHall) continue;
+
+      if (bHelper?.getBuildingLevelData && bHelper.data?.[b.id] && !bHelper.getBuildingLevelData(b.id, candidateNextLevel)) {
+        continue;
+      }
 
       if (bHelper?.getMissingRequirements) {
         const missing = bHelper.getMissingRequirements(b.id, candidateNextLevel, simulatedLevels);

@@ -868,3 +868,160 @@ test('Building Automation Queue auto-chains finish, supports virtual prerequisit
   assert.equal(sentMessage.calls[1].name, 'startConstruction', 'Second call must be startConstruction');
   assert.equal(sentMessage.calls[1].args.buildingId, 43, 'Must start Archery Barracks');
 });
+
+test('Building dialog excludes system landmarks and displays card with #ID pill, clean time, and conditional Upgrade button', async () => {
+  const buildingBody = new MockElement('div');
+  const buildingStatus = new MockElement('div');
+  const elements = {
+    '#building-dialog-body': buildingBody,
+    '#building-dialog-status': buildingStatus
+  };
+
+  const context = vm.createContext({
+    Date: class extends Date { static now() { return 1700000000000; } },
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
+    document: {
+      createElement: (tag) => new MockElement(tag),
+      querySelector: (sel) => elements[sel] || null
+    },
+    hwaHelperNameMap: {
+      building: (id) => {
+        const names = {
+          20: 'Hall of Heroes',
+          170: 'Food Warehouse',
+          171: 'Stone Warehouse',
+          44: 'Portal',
+          160: 'Arena',
+          161: 'Tower',
+          166: 'Zeppelin',
+          167: 'Hero Chest',
+          168: 'Events Area',
+          169: 'Adventure',
+          177: 'Lighthouse'
+        };
+        return names[id] || `Building #${id}`;
+      }
+    },
+    hwaHelperNameData: {
+      names: {
+        building: {
+          '20': 'Hall of Heroes',
+          '170': 'Food Warehouse',
+          '171': 'Stone Warehouse',
+          '44': 'Portal',
+          '160': 'Arena',
+          '161': 'Tower',
+          '166': 'Zeppelin',
+          '167': 'Hero Chest',
+          '168': 'Events Area',
+          '169': 'Adventure',
+          '177': 'Lighthouse'
+        }
+      }
+    }
+  });
+
+  const setupCode = popup.slice(
+    popup.indexOf("let buildingSearchQuery = '';"),
+    popup.indexOf('globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;') +
+      'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
+  );
+  vm.runInContext(setupCode, context);
+  vm.runInContext(buildingDataJs, context);
+  vm.runInContext(buildingQueueJs, context);
+
+  // 1. Render when builder is idle with sufficient resources
+  context.renderBuildingDialog({
+    buildingStatus: {
+      data: {
+        queues: [],
+        buildings: [
+          { buildingId: 20, level: 10 },
+          { buildingId: 170, level: 1 }, // Food Warehouse (eligible -> lv 2)
+          { buildingId: 171, level: 1 }, // Stone Warehouse (eligible -> lv 2)
+          { buildingId: 44, level: 1 },  // Landmark
+          { buildingId: 160, level: 1 }, // Landmark
+          { buildingId: 161, level: 1 }, // Landmark
+          { buildingId: 166, level: 1 }, // Landmark
+          { buildingId: 167, level: 1 }, // Landmark
+          { buildingId: 168, level: 1 }, // Landmark
+          { buildingId: 169, level: 1 }, // Landmark
+          { buildingId: 177, level: 1 }  // Landmark
+        ]
+      }
+    },
+    'resource:material:2': { data: { amount: 10000000 } },
+    'resource:material:3': { data: { amount: 10000000 } },
+    'resource:material:4': { data: { amount: 10000000 } },
+    'resource:material:5': { data: { amount: 10000000 } }
+  });
+
+  const nextSection = buildingBody.children[1];
+  const nextGrid = nextSection.children[2];
+  const nextCards = nextGrid.children;
+
+  // System landmarks (44, 160, 161, 166, 167, 168, 169, 177) must NOT be present
+  assert.equal(nextCards.length, 2, 'Only Food Warehouse and Stone Warehouse should be eligible');
+  const cardTexts = nextCards.map((c) => c.innerHTML);
+  assert.ok(!cardTexts.some((t) => t.includes('Portal')), 'Portal landmark must be excluded');
+  assert.ok(!cardTexts.some((t) => t.includes('Arena')), 'Arena landmark must be excluded');
+  assert.ok(!cardTexts.some((t) => t.includes('Tower')), 'Tower landmark must be excluded');
+  assert.ok(!cardTexts.some((t) => t.includes('Zeppelin')), 'Zeppelin landmark must be excluded');
+  assert.ok(!cardTexts.some((t) => t.includes('Hero Chest')), 'Hero Chest landmark must be excluded');
+
+  // Check card structure: #ID pill in front of name, and both + Queue and Upgrade buttons exist when idle + funded
+  const warehouseCard = nextCards.find((c) => c.innerHTML.includes('Food Warehouse'));
+  assert.ok(warehouseCard, 'Food Warehouse card must exist');
+  assert.match(warehouseCard.innerHTML, /#170/, 'Card must contain #170 pill');
+  assert.match(warehouseCard.innerHTML, /⏱/, 'Card must include duration icon');
+  assert.match(warehouseCard.innerHTML, /🏁/, 'Card must include finish icon');
+
+  const warehouseButtons = warehouseCard.all('button');
+  const queueBtn = warehouseButtons.find((b) => b.innerHTML.includes('Queue'));
+  const upgradeBtn = warehouseButtons.find((b) => b.innerHTML.includes('Upgrade') || b.innerHTML.includes('Build'));
+  assert.ok(queueBtn, '+ Queue button must exist');
+  assert.ok(upgradeBtn, 'Upgrade button must exist when canUpgrade is true');
+
+  // 2. Render when builder is BUSY -> Upgrade button must be HIDDEN, only + Queue visible
+  context.renderBuildingDialog({
+    buildingStatus: {
+      data: {
+        queues: [
+          { buildingId: 20, level: 11, startDate: 1700000000000, durationMs: 3600000 }
+        ],
+        buildings: [
+          { buildingId: 20, level: 10 },
+          { buildingId: 170, level: 1 }
+        ]
+      }
+    },
+    'resource:material:2': { data: { amount: 10000000 } },
+    'resource:material:3': { data: { amount: 10000000 } },
+    'resource:material:4': { data: { amount: 10000000 } },
+    'resource:material:5': { data: { amount: 10000000 } }
+  });
+
+  const busyCards = buildingBody.children[1].children[2].children;
+  const busyWarehouseCard = busyCards.find((c) => c.innerHTML.includes('Food Warehouse'));
+  assert.ok(busyWarehouseCard, 'Food Warehouse card must still be in next upgradable');
+  const busyWarehouseButtons = busyWarehouseCard.all('button');
+  const busyQueueBtn = busyWarehouseButtons.find((b) => b.innerHTML.includes('Queue'));
+  const busyUpgradeBtn = busyWarehouseButtons.find((b) => b.innerHTML.includes('Upgrade') || b.innerHTML.includes('Build'));
+  assert.ok(busyQueueBtn, '+ Queue button must still exist when queue is busy');
+  assert.equal(busyUpgradeBtn, undefined, 'Upgrade button must NOT be rendered when queue is busy');
+
+  // 3. Verify building-queue.js getEligibleCandidates also excludes landmarks
+  const eligible = context.hwaHelperBuildingQueue.getEligibleCandidates(
+    [
+      { id: 170, level: 1, isBuilt: true },
+      { id: 171, level: 1, isBuilt: true },
+      { id: 44, level: 1, isBuilt: true },
+      { id: 160, level: 1, isBuilt: true }
+    ],
+    new Map([[20, 10], [170, 1], [171, 1], [44, 1], [160, 1]]),
+    context.hwaHelperBuildingData
+  );
+  assert.equal(eligible.length, 2, 'Only building 170 and 171 should be eligible in building-queue');
+  assert.ok(!eligible.some((e) => e.id === 44 || e.id === 160), 'Landmarks must not be in eligible queue candidates');
+});
