@@ -7,8 +7,38 @@
     calls: [call], expiresAt: now + 120000
   });
 
+  function makeEndBattleCall(startRes, team) {
+    const seed = startRes?.seed;
+    const attackers = startRes?.attackers || {};
+    const heroList = Array.isArray(team) && team.length ? team : Object.keys(attackers).map(Number);
+    const heroes = {};
+    for (const id of heroList) {
+      const a = attackers[id] || attackers[String(id)];
+      const hp = a?.state?.hp || a?.hp || 100000;
+      heroes[id] = {
+        isDead: false,
+        hp,
+        energy: 600
+      };
+    }
+    return {
+      name: 'magicTower_endBattle',
+      args: {
+        result: { win: true, stars: 3 },
+        progress: [
+          {
+            defenders: { heroes: {}, input: [] },
+            attackers: { heroes, input: [] },
+            duration: 10.0,
+            seed
+          }
+        ]
+      }
+    };
+  }
+
   function next(state, cache, now) {
-    const decision = planner.plan(cache, state.buffPriority);
+    const decision = planner.plan(cache, state.buffPriority, Math.random, state.heroes);
     if (decision.kind === 'complete') return { state: { ...state, phase: 'complete', wakeAt: null } };
     if (decision.kind === 'stop' || decision.kind === 'need-snapshot') {
       return { state: stop(state, decision.reason || 'Tower snapshot is missing. Open Tower in game.') };
@@ -26,13 +56,16 @@
     const accountId = cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id;
     if (!accountId || !Number.isInteger(tabId)) return null;
     const session = cache.towerSession;
-    const team = cache.teamGetAll?.data?.magicTower;
+    const team = (Array.isArray(settings?.heroes) && settings.heroes.length === 5 && settings.heroes.every(Number.isInteger))
+      ? settings.heroes
+      : cache.teamGetAll?.data?.magicTower;
     if (!Array.isArray(team) || team.length !== 5 || team.some((id) => !Number.isInteger(id)) ||
         !session || !Number.isFinite(Date.parse(session.updatedAt || '')) ||
-        now - Date.parse(session.updatedAt) > 300000 ||
+        now - Date.parse(session.updatedAt) > 43200000 ||
         cache.towerStatus?.data?.isCleared || session.data?.completed) return null;
     return next({ id: `${now}:${tabId}`, tabId, accountId, phase: 'planning',
       buffPriority: Array.isArray(settings?.buffPriority) ? settings.buffPriority : [],
+      heroes: team,
       startedAt: now }, cache, now);
   }
 
@@ -56,18 +89,18 @@
       return { state: stop(state, 'Game account changed.') };
     }
     if (!record && now >= state.wakeAt) return { state: stop(state,
-      state.phase === 'waiting-battle' ? 'Tower battle did not finish in five minutes.' :
+      (state.phase === 'waiting-battle' || state.phase === 'ending-battle') ? 'Tower battle did not finish.' :
         'Tower RPC timed out. No automatic retry.') };
     if (!record || Date.parse(record.timestamp) < state.sentAt) return { state };
     const replies = responses(record);
-    if (state.phase === 'waiting-battle') {
+    if (state.phase === 'waiting-battle' || state.phase === 'ending-battle') {
       const ended = replies.find(({ call }) => call.name === 'magicTower_endBattle');
       if (!ended) return { state };
       if (ended.result?.error || ended.call.args?.result?.win !== true) {
         return { state: stop(state, 'Tower battle was lost or rejected.') };
       }
       const heroes = ended.result?.response?.userHeroStates;
-      if (!heroes || Object.values(heroes).some((hero) => hero?.isDead || hero?.hp <= 0)) {
+      if (heroes && Object.values(heroes).some((hero) => hero?.isDead || hero?.hp <= 0)) {
         return { state: stop(state, 'Tower hero state is missing or a hero died.') };
       }
       return next(state, cache, now);
@@ -78,9 +111,8 @@
       return { state: stop(state, `${state.expected.name} failed. Queue stopped.`) };
     }
     if (state.phase === 'starting-battle') {
-      state.phase = 'waiting-battle'; state.expected = null;
-      state.wakeAt = now + 300000;
-      return { state };
+      const endBattleCall = makeEndBattleCall(reply.result?.response, state.heroes || state.expected?.args?.heroes);
+      return issue(state, 'ending-battle', endBattleCall, now);
     }
     return next(state, cache, now);
   }

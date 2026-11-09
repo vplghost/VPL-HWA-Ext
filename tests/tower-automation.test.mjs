@@ -47,7 +47,7 @@ test('Tower opens one randomly selected free chest and never chooses paid option
     1: { starmoney: '70' } } } })).kind, 'stop');
 });
 
-test('Tower runner sends saved team and waits for game endBattle before choosing buff and chest', () => {
+test('Tower runner sends saved team and automatically finishes battle before choosing buff and chest', () => {
   let cache = snapshot();
   let step = runner.start(cache, { buffPriority: [32, 34] }, 1, time);
   assert.equal(step.calls[0].args.number, 3);
@@ -55,13 +55,13 @@ test('Tower runner sends saved team and waits for game endBattle before choosing
   step = runner.advance(step.state, rpc(step.calls[0], { currentRoomNumber: 3 }, time + 1000), cache, time + 1001);
   assert.equal(step.calls[0].name, 'magicTower_startBattle');
   assert.deepEqual(Array.from(step.calls[0].args.heroes), team);
-  step = runner.advance(step.state, rpc(step.calls[0], { type: 'tower' }, time + 2000), cache, time + 2001);
-  assert.equal(step.state.phase, 'waiting-battle');
-  assert.equal(step.calls, undefined);
-  assert.equal(runner.advance(step.state, null, cache, time + 3000).state.phase, 'waiting-battle');
+  step = runner.advance(step.state, rpc(step.calls[0], { type: 'tower', seed: 8888, attackers: {} }, time + 2000), cache, time + 2001);
+  assert.equal(step.state.phase, 'ending-battle');
+  assert.equal(step.calls[0].name, 'magicTower_endBattle');
+  assert.equal(step.calls[0].args.progress[0].seed, 8888);
+  assert.equal(step.calls[0].args.result.win, true);
   cache = snapshot(3, 4);
-  step = runner.advance(step.state, rpc({ name: 'magicTower_endBattle', args: {
-    result: { win: true, stars: 3 } } }, { currentRoomNumber: 4,
+  step = runner.advance(step.state, rpc(step.calls[0], { currentRoomNumber: 4,
     userHeroStates: Object.fromEntries(team.map((id) => [id, { isDead: false, hp: 100 }])) }, time + 4000),
     cache, time + 4001);
   assert.equal(step.calls[0].name, 'magicTower_activateBuff');
@@ -76,6 +76,20 @@ test('Tower runner sends saved team and waits for game endBattle before choosing
   assert.equal(step.calls[0].args.number, 1);
 });
 
+test('Tower runner supports custom heroes from settings and detects boss floor completion', () => {
+  const customTeam = [1, 2, 3, 4, 5];
+  const cacheWithoutSavedTeam = { ...snapshot(), teamGetAll: { data: {} } };
+  const step = runner.start(cacheWithoutSavedTeam, { heroes: customTeam }, 1, time);
+  assert.ok(step, 'Runner should start with custom heroes');
+  assert.deepEqual(step.state.heroes, customTeam);
+
+  const bossRooms = { 1: { roomNumber: 1, type: 'boss_battle', state: 'initial' } };
+  const wonHistory = [{ action: 'endBattle', floor: 23, room: 1, win: true }];
+  const bossSnapshot = snapshot(23, 0, bossRooms, wonHistory);
+  const decision = planner.plan(bossSnapshot, []);
+  assert.equal(decision.kind, 'complete');
+});
+
 test('Tower runner stops on battle loss, failed action, timeout, missing team and completion', () => {
   const cache = snapshot();
   assert.equal(runner.start({ ...cache, teamGetAll: { data: {} } }, {}, 1, time), null);
@@ -85,10 +99,11 @@ test('Tower runner stops on battle loss, failed action, timeout, missing team an
   assert.equal(runner.advance(step.state, null, cache, time + 120001).state.phase, 'stopped');
   step = runner.advance(step.state, rpc(step.calls[0], { currentRoomNumber: 3 }, time + 1000),
     snapshot(3, 3), time + 1001);
-  step = runner.advance(step.state, rpc(step.calls[0], { type: 'tower' }, time + 2000),
+  step = runner.advance(step.state, rpc(step.calls[0], { type: 'tower', seed: 123 }, time + 2000),
     snapshot(3, 3), time + 2001);
-  const lost = runner.advance(step.state, rpc({ name: 'magicTower_endBattle', args: {
-    result: { win: false } } }, { currentRoomNumber: 0 }, time + 3000), cache, time + 3001);
+  assert.equal(step.calls[0].name, 'magicTower_endBattle');
+  const lost = runner.advance(step.state, rpc(step.calls[0], { currentRoomNumber: 0 }, time + 3000,
+    { message: 'rejected' }), cache, time + 3001);
   assert.equal(lost.state.phase, 'stopped');
   const completed = planner.plan({ ...cache, towerStatus: { data: { state: 'win', isCleared: true } } });
   assert.equal(completed.kind, 'complete');

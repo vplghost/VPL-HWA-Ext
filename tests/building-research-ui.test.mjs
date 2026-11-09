@@ -20,7 +20,15 @@ class MockElement {
   getAttribute(name) { return this.attributes[name]; }
   removeAttribute(name) { delete this.attributes[name]; }
   addEventListener(name, handler) { this.listeners[name] = handler; }
-  async fire(name, event = {}) { await this.listeners[name]?.({ currentTarget: this, target: this, ...event }); }
+  async fire(name, event = {}) {
+    await this.listeners[name]?.({
+      currentTarget: this,
+      target: this,
+      stopPropagation: () => {},
+      preventDefault: () => {},
+      ...event
+    });
+  }
   showModal() { this.open = true; }
   close() { this.open = false; }
   all(tag) {
@@ -55,6 +63,7 @@ class MockElement {
 
 const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
+const buildingDataJs = await readFile(new URL('../extension/building-data.js', import.meta.url), 'utf8');
 
 test('popup.html defines building-dialog and research-dialog with title, status, and body', () => {
   assert.match(popupHtml, /<dialog id="building-dialog"[\s\S]*id="building-dialog-title"[\s\S]*id="building-dialog-status"[\s\S]*id="building-dialog-body"[\s\S]*<\/dialog>/);
@@ -85,6 +94,8 @@ test('Header badge click opens building-dialog and research-dialog', async () =>
   };
 
   const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
     document: {
       createElement: (tag) => new MockElement(tag),
       querySelector: (sel) => elements[sel] || null,
@@ -150,6 +161,8 @@ test('renderBuildingDialog renders idle state when no active queues and lists ne
   };
 
   const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
     document: {
       createElement: (tag) => new MockElement(tag),
       querySelector: (sel) => elements[sel] || null
@@ -209,6 +222,8 @@ test('renderResearchDialog renders idle state and filter tabs', () => {
   };
 
   const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
     document: {
       createElement: (tag) => new MockElement(tag),
       querySelector: (sel) => elements[sel] || null
@@ -265,6 +280,8 @@ test('renderBuildingDialog filters out unbuilt buildings, upgrading buildings, a
   };
 
   const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
     document: {
       createElement: (tag) => new MockElement(tag),
       querySelector: (sel) => elements[sel] || null
@@ -334,6 +351,8 @@ test('renderResearchDialog filters out uncompleted tech, active tech, and tech e
   };
 
   const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
     document: {
       createElement: (tag) => new MockElement(tag),
       querySelector: (sel) => elements[sel] || null
@@ -394,4 +413,140 @@ test('renderResearchDialog filters out uncompleted tech, active tech, and tech e
   assert.ok(!nextText.includes('Research 513'), 'Tech 513 (nextLevel 4 > Research Center 3) must be filtered out');
   assert.ok(!nextText.includes('Research 514'), 'Tech 514 (currently researching) must be filtered out');
   assert.ok(!nextText.includes('Research 515'), 'Tech 515 (unresearched level 0) must be filtered out');
+});
+
+test('building-data.js provides metadata, validates prerequisites, costs, and calculates durations', () => {
+  const bContext = vm.createContext({ globalThis: {} });
+  vm.runInContext(buildingDataJs, bContext);
+
+  const helper = bContext.globalThis.hwaHelperBuildingData;
+  assert.ok(helper, 'hwaHelperBuildingData must exist');
+
+  // Building 40 Level 20: 12:20:30 (44,430s) -> effective duration: 25,769,400 ms
+  const dur40 = helper.calculateEffectiveDurationMs(40, 20);
+  assert.equal(dur40, 25769400, 'Infantry Camp Lv.20 duration must equal 25,769,400 ms');
+
+  // Building 33 (Iron Mine) Level 19 requires Auxiliary buildings 90-95 at level 28
+  const testMap = new Map([
+    [20, 19],
+    [33, 18],
+    [90, 27],
+    [91, 28]
+  ]);
+  const missing = helper.getMissingRequirements(33, 19, testMap);
+  assert.ok(missing.length >= 1, 'Building 33 Lv.19 must have missing requirements');
+  assert.ok(missing.some((m) => m.buildingId === 90 && m.requiredLevel === 28 && m.currentLevel === 27));
+
+  // Resource cost check
+  const resMap = new Map([[4, 1000]]); // only 1000 wood, needs 1.4M
+  const missingCosts = helper.getMissingCosts(33, 19, resMap);
+  assert.ok(missingCosts.length > 0, 'Must detect missing wood cost');
+  assert.ok(missingCosts.some((m) => m.materialId === 4 && m.required === 1400000));
+});
+
+test('renderBuildingDialog excludes buildings with unsatisfied prerequisites and sends non-zero durationMs on build click', async () => {
+  let sentMessage = null;
+  const buildingBadge = new MockElement('span');
+  const buildingDialog = new MockElement('dialog');
+  const buildingBody = new MockElement('div');
+  const buildingStatus = new MockElement('div');
+
+  const elements = {
+    '#building-badge': buildingBadge,
+    '#building-dialog': buildingDialog,
+    '#building-dialog-body': buildingBody,
+    '#building-dialog-status': buildingStatus
+  };
+
+  const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
+    document: {
+      createElement: (tag) => new MockElement(tag),
+      querySelector: (sel) => elements[sel] || null,
+      querySelectorAll: () => []
+    },
+    chrome: {
+      runtime: {
+        sendMessage: (msg, callback) => {
+          sentMessage = msg;
+          callback?.({ ok: true });
+        }
+      }
+    },
+    popupRpcEnabled: true,
+    currentCache: {
+      buildingStatus: {
+        data: {
+          queues: [],
+          buildings: [
+            { buildingId: 20, level: 19 }, // Hall of Heroes
+            { buildingId: 43, level: 19 }, // Archery Barracks (satisfies Hall 20 req)
+            { buildingId: 33, level: 18 }, // Iron Mine (requires 90-95 Lv 28)
+            { buildingId: 90, level: 27 }, // Not Lv 28
+            { buildingId: 162, level: 19 }, // Infirmary (requires Hall Lv 20)
+            { buildingId: 40, level: 19 }  // Infantry Camp
+          ]
+        }
+      },
+      'resource:material:2': { data: { amount: 50000000 } },
+      'resource:material:3': { data: { amount: 50000000 } },
+      'resource:material:4': { data: { amount: 50000000 } },
+      'resource:material:5': { data: { amount: 50000000 } }
+    },
+    hwaHelperNameMap: {
+      building: (id) => ({ '20': 'Hall of Heroes', '33': 'Iron Mine', '40': 'Infantry Camp', '90': 'Iron Plot', '162': 'Infirmary' }[id] || `Building ${id}`),
+      research: (id) => `Research ${id}`
+    },
+    hwaHelperNameData: {
+      names: {
+        building: { '20': 'Hall of Heroes', '33': 'Iron Mine', '40': 'Infantry Camp', '90': 'Iron Plot', '162': 'Infirmary' },
+        research: {}
+      }
+    }
+  });
+
+  vm.runInContext(buildingDataJs, context);
+
+  const setupCode = popup.slice(
+    popup.indexOf("let buildingSearchQuery = '';"),
+    popup.indexOf('globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;') +
+      'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
+  );
+  vm.runInContext(setupCode, context);
+  context.setupBuildingAndResearchDialogs();
+
+  await buildingBadge.fire('click');
+
+  const nextSection = buildingBody.children[1];
+  const nextHtml = nextSection.innerHTML;
+
+  // Iron Mine (#33) must be filtered out because prerequisite building #90 is lv 27 < 28
+  assert.ok(!nextHtml.includes('Iron Mine'), 'Iron Mine must be excluded when prerequisites are not met');
+  // Infirmary (#162) must be filtered out because it requires Hall of Heroes 20, but Hall is 19
+  assert.ok(!nextHtml.includes('Infirmary'), 'Infirmary must be excluded when Hall of Heroes level is insufficient');
+
+  // Infantry Camp (#40) to Lv 20 requires Hall 20, wait, Hall is 19 so Camp is excluded or Hall 20 is eligible
+  assert.ok(nextHtml.includes('Hall of Heroes'), 'Hall of Heroes Lv. 20 must be eligible');
+
+  // Find build button on Hall of Heroes card
+  const cards = nextSection.children[2].children;
+  const hallCard = cards.find((c) => c.innerHTML.includes('Hall of Heroes'));
+  assert.ok(hallCard, 'Hall of Heroes card must exist');
+
+  const buildBtn = hallCard.all('button').find((b) => b.innerHTML.includes('Upgrade') || b.innerHTML.includes('Build'));
+  assert.ok(buildBtn, 'Upgrade button must exist');
+  assert.equal(buildBtn.disabled, false, 'Upgrade button must be enabled when resources are sufficient');
+
+  // Click build button
+  await buildBtn.fire('click');
+
+  assert.ok(sentMessage, 'A message must be sent on click');
+  assert.equal(sentMessage.kind, 'refresh-rpc');
+  const startCall = sentMessage.calls.find((c) => c.name === 'startConstruction');
+  assert.ok(startCall, 'startConstruction call must be present');
+  assert.equal(startCall.args.buildingId, 20);
+  assert.equal(startCall.args.nextLevel, 20);
+  assert.ok(Number.isFinite(startCall.args.durationMs) && startCall.args.durationMs > 0,
+    `durationMs must be positive non-zero, got: ${startCall.args.durationMs}`);
 });

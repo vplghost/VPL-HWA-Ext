@@ -10,10 +10,15 @@
     return order[0] ?? null;
   }
 
-  function chooseBattleRoom(rooms, preferred) {
-    const battles = Object.values(rooms).filter((room) =>
-      ['hero_battle', 'boss_battle'].includes(room?.type) && room.state === 'initial')
-      .sort((a, b) => Number(a.roomNumber) - Number(b.roomNumber));
+  function chooseBattleRoom(rooms, preferred, history = [], floor = null) {
+    const battles = Object.values(rooms).filter((room) => {
+      if (!['hero_battle', 'boss_battle'].includes(room?.type)) return false;
+      if (room.state !== 'initial') return false;
+      const alreadyWon = history.some((e) =>
+        e.action === 'endBattle' && e.floor === floor && Number(e.room) === Number(room.roomNumber) && e.win);
+      return !alreadyWon;
+    }).sort((a, b) => Number(a.roomNumber) - Number(b.roomNumber));
+
     if (!battles.length) return null;
     const rank = (room) => {
       const next = rooms[Number(room.roomNumber) + 1];
@@ -25,7 +30,7 @@
     return battles.reduce((best, room) => rank(room) < rank(best) ? room : best);
   }
 
-  function plan(cache, preferred = [], random = Math.random) {
+  function plan(cache, preferred = [], random = Math.random, preferredTeam = null) {
     const session = cache?.towerSession?.data;
     const status = cache?.towerStatus?.data;
     if (session?.completed || status?.isCleared || status?.state === 'win') return { kind: 'complete' };
@@ -38,16 +43,26 @@
     const room = rooms[roomNumber];
     const history = session.history || [];
     if (roomNumber === 0) {
-      const choice = chooseBattleRoom(rooms, preferred);
-      return choice ? { kind: 'rpc', call: { name: 'magicTower_enterRoom',
-        args: { number: Number(choice.roomNumber) } }, floor: session.floorNumber,
-        room: Number(choice.roomNumber) } : { kind: 'stop', reason: 'No available Tower battle room.' };
+      const choice = chooseBattleRoom(rooms, preferred, history, session.floorNumber);
+      if (choice) {
+        return { kind: 'rpc', call: { name: 'magicTower_enterRoom',
+          args: { number: Number(choice.roomNumber) } }, floor: session.floorNumber,
+          room: Number(choice.roomNumber) };
+      }
+      const wonOnFloor = history.some((e) => e.action === 'endBattle' && e.floor === session.floorNumber && e.win);
+      const isBossFloor = Object.values(rooms).some((r) => r?.type === 'boss_battle');
+      if (wonOnFloor && (isBossFloor || session.floorNumber >= 20)) {
+        return { kind: 'complete' };
+      }
+      return { kind: 'stop', reason: 'No available Tower battle room.' };
     }
     if (!room) return { kind: 'need-snapshot' };
     if (room.type === 'hero_battle' || room.type === 'boss_battle') {
-      const team = cache?.teamGetAll?.data?.magicTower;
+      const team = (Array.isArray(preferredTeam) && preferredTeam.length === 5 && preferredTeam.every(Number.isInteger))
+        ? preferredTeam
+        : cache?.teamGetAll?.data?.magicTower;
       if (!Array.isArray(team) || team.length !== 5 || team.some((id) => !Number.isInteger(id))) {
-        return { kind: 'stop', reason: 'Saved magicTower team is missing or invalid.' };
+        return { kind: 'stop', reason: 'Saved magicTower team is missing or invalid. Select 5 heroes in Tower settings.' };
       }
       return { kind: 'battle', team, skipState: status?.skipState ?? null,
         floor: session.floorNumber, room: roomNumber };
@@ -55,10 +70,13 @@
     if (room.type === 'buffs') {
       const chosen = history.some((event) => event.action === 'activateBuff' &&
         event.floor === session.floorNumber && event.room === roomNumber);
-      if (chosen) return { kind: 'rpc', call: { name: 'magicTower_enterNextFloor', args: {} },
-        floor: session.floorNumber, room: roomNumber };
+      if (chosen || !room.buffs?.length) {
+        return { kind: 'rpc', call: { name: 'magicTower_enterNextFloor', args: {} },
+          floor: session.floorNumber, room: roomNumber };
+      }
       const buffId = chooseBuff(room.buffs, preferred);
-      return buffId == null ? { kind: 'stop', reason: 'No Tower buff offered.' } :
+      return buffId == null ? { kind: 'rpc', call: { name: 'magicTower_enterNextFloor', args: {} },
+        floor: session.floorNumber, room: roomNumber } :
         { kind: 'rpc', call: { name: 'magicTower_activateBuff', args: { id: buffId } },
           floor: session.floorNumber, room: roomNumber };
     }

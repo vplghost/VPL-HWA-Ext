@@ -490,11 +490,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
       if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
       const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
-      const settings = String(stored.towerAutomationSettings?.accountId) === String(accountId) ?
+      const baseSettings = String(stored.towerAutomationSettings?.accountId) === String(accountId) ?
         stored.towerAutomationSettings : { buffPriority: [] };
+      const teamFromMsg = Array.isArray(message.heroes) && message.heroes.length === 5 && message.heroes.every(Number.isInteger)
+        ? message.heroes
+        : null;
+      const teamFromStored = Array.isArray(baseSettings.heroes) && baseSettings.heroes.length === 5 && baseSettings.heroes.every(Number.isInteger)
+        ? baseSettings.heroes
+        : null;
+      const settings = {
+        ...baseSettings,
+        buffPriority: Array.isArray(baseSettings.buffPriority) ? baseSettings.buffPriority : [],
+        heroes: teamFromMsg || teamFromStored || stored.rpcCache?.teamGetAll?.data?.magicTower
+      };
       const transition = runner.start(stored.rpcCache, settings, tab.id, Date.now());
       if (!transition) return { ok: false,
-        error: 'Open Tower in game and refresh a saved five-hero magicTower team before starting.' };
+        error: 'Open Tower in game and select a 5-hero team before starting.' };
       const state = await saveTowerTransition(transition, stored);
       return { ok: state.phase !== 'stopped', error: state.reason };
     });

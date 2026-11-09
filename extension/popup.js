@@ -4263,9 +4263,9 @@ function renderTowerModal(cache = currentCache) {
 
   function section(title) {
     const card = document.createElement('section');
-    card.className = 'space-y-2 rounded-xl border border-slate-200 bg-white p-4';
+    card.className = 'space-y-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900';
     const heading = document.createElement('h3');
-    heading.className = 'text-sm font-bold text-slate-900';
+    heading.className = 'text-sm font-bold text-slate-900 dark:text-slate-100';
     heading.textContent = title;
     card.append(heading);
     body.append(card);
@@ -4273,7 +4273,7 @@ function renderTowerModal(cache = currentCache) {
   }
   function line(parent, value, emphasis = false) {
     const row = document.createElement('p');
-    row.className = emphasis ? 'text-sm font-semibold text-slate-800' : 'text-xs leading-5 text-slate-600';
+    row.className = emphasis ? 'text-sm font-semibold text-slate-800 dark:text-slate-200' : 'text-xs leading-5 text-slate-600 dark:text-slate-400';
     row.textContent = value;
     parent.append(row);
   }
@@ -4288,17 +4288,17 @@ function renderTowerModal(cache = currentCache) {
     const card = section('Buff priority');
     line(card, 'Drag a buff to set its priority. The first offered buff in this order is selected.');
     const groups = [
-      { label: 'Physical', ids: [8, 14, 26, 30], classes: 'border-rose-300 bg-rose-100 text-rose-950' },
-      { label: 'Magic', ids: [9, 15, 27, 33, 45], classes: 'border-indigo-300 bg-indigo-100 text-indigo-950' },
-      { label: 'Physical + Magic', ids: [41], classes: 'border-fuchsia-300 bg-fuchsia-100 text-fuchsia-950' },
-      { label: 'Critical', ids: [2, 7, 13, 28, 29], classes: 'border-amber-300 bg-amber-100 text-amber-950' },
-      { label: 'Vampirism', ids: [11, 16], classes: 'border-pink-300 bg-pink-100 text-pink-950' },
-      { label: 'Control', ids: [3, 5, 18, 31, 32], classes: 'border-cyan-300 bg-cyan-100 text-cyan-950' },
-      { label: 'Health', ids: [17, 34, 35, 37], classes: 'border-emerald-300 bg-emerald-100 text-emerald-950' },
-      { label: 'Energy', ids: [6, 25, 38, 39, 46], classes: 'border-yellow-300 bg-yellow-100 text-yellow-950' },
-      { label: 'Defense', ids: [10, 12, 36, 42, 43], classes: 'border-slate-300 bg-slate-100 text-slate-900' },
-      { label: 'Damage', ids: [1, 4, 40], classes: 'border-orange-300 bg-orange-100 text-orange-950' },
-      { label: 'Utility', ids: [44], classes: 'border-violet-300 bg-violet-100 text-violet-950' }
+      { label: 'Physical', ids: [8, 14, 26, 30], classes: 'border-rose-300 bg-rose-100 text-rose-950 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200' },
+      { label: 'Magic', ids: [9, 15, 27, 33, 45], classes: 'border-indigo-300 bg-indigo-100 text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200' },
+      { label: 'Physical + Magic', ids: [41], classes: 'border-fuchsia-300 bg-fuchsia-100 text-fuchsia-950 dark:border-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-200' },
+      { label: 'Critical', ids: [2, 7, 13, 28, 29], classes: 'border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200' },
+      { label: 'Vampirism', ids: [11, 16], classes: 'border-pink-300 bg-pink-100 text-pink-950 dark:border-pink-800 dark:bg-pink-950/60 dark:text-pink-200' },
+      { label: 'Control', ids: [3, 5, 18, 31, 32], classes: 'border-cyan-300 bg-cyan-100 text-cyan-950 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-200' },
+      { label: 'Health', ids: [17, 34, 35, 37], classes: 'border-emerald-300 bg-emerald-100 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200' },
+      { label: 'Energy', ids: [6, 25, 38, 39, 46], classes: 'border-yellow-300 bg-yellow-100 text-yellow-950 dark:border-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-200' },
+      { label: 'Defense', ids: [10, 12, 36, 42, 43], classes: 'border-slate-300 bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200' },
+      { label: 'Damage', ids: [1, 4, 40], classes: 'border-orange-300 bg-orange-100 text-orange-950 dark:border-orange-800 dark:bg-orange-950/60 dark:text-orange-200' },
+      { label: 'Utility', ids: [44], classes: 'border-violet-300 bg-violet-100 text-violet-950 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-200' }
     ];
     const effectIcons = {
       1: '💥', 2: '🎯', 3: '✴', 4: '💥', 5: '✴', 7: '🎯', 11: '🩸', 13: '🎯',
@@ -4338,7 +4338,7 @@ function renderTowerModal(cache = currentCache) {
       pill.dataset.buffId = String(id);
       const group = groups.find((item) => item.ids.includes(id));
       pill.className = `cursor-grab rounded-full border px-3 py-1 text-xs font-medium active:cursor-grabbing ${
-        group?.classes || 'border-violet-200 bg-violet-50 text-violet-900'}`;
+        group?.classes || 'border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-200'}`;
       pill.textContent = `${String(id).padStart(2, '0')}. ${catalog[id].name}`;
       if (effectIcons[id]) {
         const icon = document.createElement('span');
@@ -4367,21 +4367,112 @@ function renderTowerModal(cache = currentCache) {
   }
   function renderAutomation() {
     const card = section('Automatic Tower');
+    const running = towerRunState && !['stopped', 'complete'].includes(towerRunState.phase);
+
+    // Get candidate heroes from cache
+    const heroEntries = Object.entries(cache?.heroGetAll?.data || {}).map(([id, h]) => ({
+      id: Number(id),
+      name: globalThis.hwaHelperNameMap?.hero?.(id) || `Hero #${id}`,
+      power: Number(h.power) || 0,
+      level: Number(h.level) || 1
+    })).sort((a, b) => b.power - a.power);
+
+    const savedTeam = cache?.teamGetAll?.data?.magicTower;
+    let selectedHeroes = Array.isArray(towerAutomationSettings?.heroes) && towerAutomationSettings.heroes.length === 5 && towerAutomationSettings.heroes.every(Number.isInteger)
+      ? [...towerAutomationSettings.heroes]
+      : (Array.isArray(savedTeam) && savedTeam.length === 5 && savedTeam.every(Number.isInteger)
+        ? [...savedTeam]
+        : heroEntries.slice(0, 5).map((h) => h.id));
+
+    function saveSelectedTeam(teamIds) {
+      towerAutomationSettings = {
+        ...(towerAutomationSettings || {}),
+        accountId: cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id ?? null,
+        heroes: teamIds
+      };
+      chrome.storage?.local?.set?.({ towerAutomationSettings }).catch(() => {});
+    }
+
+    // Team selection container
+    const teamBox = document.createElement('div');
+    teamBox.className = 'space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/50';
+
+    const teamHeader = document.createElement('div');
+    teamHeader.className = 'flex items-center justify-between gap-2';
+    teamHeader.innerHTML = '<span class="text-xs font-bold text-slate-800 dark:text-slate-200">Magic Tower Team (5 Heroes)</span>';
+
+    if (heroEntries.length >= 5) {
+      const autoFillBtn = document.createElement('button');
+      autoFillBtn.type = 'button';
+      autoFillBtn.className = 'text-2xs font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400 cursor-pointer';
+      autoFillBtn.textContent = '⚡ Auto-fill Top 5 Power';
+      autoFillBtn.addEventListener('click', () => {
+        selectedHeroes = heroEntries.slice(0, 5).map((h) => h.id);
+        saveSelectedTeam(selectedHeroes);
+        renderTowerModal(cache);
+      });
+      teamHeader.append(autoFillBtn);
+    }
+    teamBox.append(teamHeader);
+
+    if (heroEntries.length > 0) {
+      const selectsGrid = document.createElement('div');
+      selectsGrid.className = 'grid grid-cols-1 sm:grid-cols-5 gap-2';
+      for (let i = 0; i < 5; i++) {
+        const select = document.createElement('select');
+        select.className = 'w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-violet-500';
+        select.disabled = running;
+        for (const h of heroEntries) {
+          const opt = document.createElement('option');
+          opt.value = String(h.id);
+          opt.textContent = `${h.name} (${h.power ? h.power.toLocaleString('en-US') : `Lv.${h.level}`})`;
+          if (selectedHeroes[i] === h.id) opt.selected = true;
+          select.append(opt);
+        }
+        if (!selectedHeroes[i] && heroEntries[i]) {
+          selectedHeroes[i] = heroEntries[i].id;
+        }
+        select.addEventListener('change', (e) => {
+          selectedHeroes[i] = Number(e.target.value);
+          saveSelectedTeam(selectedHeroes);
+        });
+        selectsGrid.append(select);
+      }
+      teamBox.append(selectsGrid);
+    } else {
+      const inputWrap = document.createElement('div');
+      inputWrap.className = 'flex items-center gap-2';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.disabled = running;
+      input.placeholder = 'e.g. 79, 72, 16, 54, 60';
+      input.value = selectedHeroes.join(', ');
+      input.className = 'flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200';
+      input.addEventListener('change', () => {
+        const parsed = input.value.split(/[,;\s]+/).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+        if (parsed.length === 5) {
+          selectedHeroes = parsed;
+          saveSelectedTeam(selectedHeroes);
+        }
+      });
+      inputWrap.append(input);
+      teamBox.append(inputWrap);
+    }
+    card.append(teamBox);
+
     const actionButton = (label, handler, disabled = false) => {
       const control = document.createElement('button');
       control.type = 'button'; control.textContent = label; control.disabled = disabled;
-      control.className = 'cursor-pointer rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300';
+      control.className = 'cursor-pointer rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700 transition-colors shadow-xs';
       control.addEventListener('click', handler);
       card.append(control);
     };
-    const running = towerRunState && !['stopped', 'complete'].includes(towerRunState.phase);
-    const team = cache?.teamGetAll?.data?.magicTower;
-    line(card, Array.isArray(team) && team.length === 5 ?
-      `Saved magicTower team: ${heroList(team)}` : 'Save a five-hero magicTower team in game first.');
+
     if (towerRunState) line(card, `Status: ${towerRunState.phase}${towerRunState.floor ?
       ` · floor ${towerRunState.floor}, room ${towerRunState.room}` : ''}${towerRunState.reason ?
-      ` · ${towerRunState.reason}` : ''}`);
+      ` · ${towerRunState.reason}` : ''}`, true);
     if (towerAutomationMessage) line(card, towerAutomationMessage);
+
     if (running) {
       actionButton('Stop Tower automation', async () => {
         const response = await chrome.runtime.sendMessage({ kind: 'tower-run-stop' });
@@ -4390,13 +4481,14 @@ function renderTowerModal(cache = currentCache) {
       });
     } else {
       actionButton('Start Tower automation', async () => {
-        const response = await chrome.runtime.sendMessage({ kind: 'tower-run-start' });
-        towerAutomationMessage = response?.ok ? 'Tower automation started. Waiting for game responses.' :
+        const response = await chrome.runtime.sendMessage({ kind: 'tower-run-start', heroes: selectedHeroes });
+        towerAutomationMessage = response?.ok ? 'Tower automation started. Running automatically...' :
           response?.error || 'Could not start Tower automation.';
         render();
-      }, !popupRpcEnabled || complete || !Array.isArray(team) || team.length !== 5);
+      }, !popupRpcEnabled || complete || selectedHeroes.length !== 5);
     }
-    line(card, 'Battle results must come from the game client; the helper waits for its endBattle response. Only a free chest is opened.');
+
+    line(card, 'Fully automatic: automatically executes battles, selects the optimal door towards priority buffs, collects free chests, and activates buffs.');
   }
   if (!floor && !complete) {
     line(section('Tower status'), 'No Tower data captured yet. Open the Tower in the game to sync.');
@@ -6084,8 +6176,29 @@ function renderBuildingDialog(cache) {
   const builtBuildings = allBuildings.filter((b) => b.isBuilt);
   const hallOfHeroes = buildingMap.get(20);
   const hallLevel = Number.isFinite(hallOfHeroes?.level) ? hallOfHeroes.level : Infinity;
+
+  const bHelper = globalThis.hwaHelperBuildingData;
+  const buildingLevelsMap = new Map();
+  for (const [id, b] of buildingMap.entries()) {
+    buildingLevelsMap.set(id, b.level);
+  }
+  const resourcesMap = new Map([
+    [2, cache['resource:material:2']?.data?.amount ?? 0],
+    [3, cache['resource:material:3']?.data?.amount ?? 0],
+    [4, cache['resource:material:4']?.data?.amount ?? 0],
+    [5, cache['resource:material:5']?.data?.amount ?? 0]
+  ]);
+
   const nextUpgradable = allBuildings
-    .filter((b) => b.isBuilt && b.level > 0 && !b.isUpgrading && (b.id === 20 || b.level < hallLevel))
+    .filter((b) => {
+      if (!b.isBuilt || b.level <= 0 || b.isUpgrading) return false;
+      if (b.id !== 20 && b.level >= hallLevel) return false;
+      if (bHelper?.getMissingRequirements) {
+        const missingReqs = bHelper.getMissingRequirements(b.id, b.nextLevel, buildingLevelsMap);
+        if (missingReqs.length > 0) return false;
+      }
+      return true;
+    })
     .sort((a, b) => (b.level - a.level) || (a.id - b.id));
 
   // Section 2: Next Upgradable Buildings
@@ -6112,11 +6225,22 @@ function renderBuildingDialog(cache) {
       card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-amber-200 hover:bg-amber-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-amber-900/50';
       const name = getBuildingName(b.id);
 
+      const durationMs = bHelper?.calculateEffectiveDurationMs
+        ? bHelper.calculateEffectiveDurationMs(b.id, b.nextLevel)
+        : 1000;
+      const missingCosts = bHelper?.getMissingCosts
+        ? bHelper.getMissingCosts(b.id, b.nextLevel, resourcesMap)
+        : [];
+      const hasEnoughResources = missingCosts.length === 0;
+
       const infoCol = document.createElement('div');
       infoCol.className = 'min-w-0 flex-1';
       infoCol.innerHTML = `
         <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
-        <div class="text-2xs text-slate-500 dark:text-slate-400">ID: ${b.id}</div>
+        <div class="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400">
+          <span>ID: ${b.id}</span>
+          ${durationMs > 0 ? `<span>·</span><span>⏱ ${formatRemainingHms(durationMs)}</span>` : ''}
+        </div>
       `;
       card.append(infoCol);
 
@@ -6131,13 +6255,22 @@ function renderBuildingDialog(cache) {
       const isQueueBusy = activeQueues.length > 0;
       const buildBtn = document.createElement('button');
       buildBtn.type = 'button';
-      buildBtn.className = isQueueBusy
+      const isBtnDisabled = isQueueBusy || (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled) || !hasEnoughResources;
+      buildBtn.className = isBtnDisabled
         ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
         : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors';
-      buildBtn.disabled = isQueueBusy || (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled);
-      buildBtn.title = isQueueBusy
-        ? 'Builder queue is currently busy'
-        : (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled ? 'Enable Popup RPC in Settings to build' : `Build ${name} to Lv. ${b.nextLevel}`);
+      buildBtn.disabled = isBtnDisabled;
+
+      const matNames = { 2: 'Iron', 3: 'Stone', 4: 'Wood', 5: 'Food' };
+      let btnTitle = `Build ${name} to Lv. ${b.nextLevel}`;
+      if (isQueueBusy) {
+        btnTitle = 'Builder queue is currently busy';
+      } else if (typeof popupRpcEnabled !== 'undefined' && !popupRpcEnabled) {
+        btnTitle = 'Enable Popup RPC in Settings to build';
+      } else if (!hasEnoughResources) {
+        btnTitle = 'Not enough resources: ' + missingCosts.map((m) => `${(m.required - m.current).toLocaleString('en-US')} more ${matNames[m.materialId] || 'Material'}`).join(', ');
+      }
+      buildBtn.title = btnTitle;
       buildBtn.innerHTML = `<span>🔨</span><span>${b.isBuilt ? 'Upgrade' : 'Build'}</span>`;
 
       buildBtn.addEventListener('click', (e) => {
@@ -6153,7 +6286,7 @@ function renderBuildingDialog(cache) {
               buildingId: b.id,
               nextLevel: b.nextLevel,
               startDate: Date.now(),
-              durationMs: 0
+              durationMs
             }
           },
           { name: 'getSummary', feature: 'building', args: {} }
