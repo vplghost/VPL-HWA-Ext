@@ -99,6 +99,7 @@ async function createCampaignContext() {
     document: mockDoc,
     window: { location: { search: '' }, addEventListener: () => {} },
     location: { search: '' },
+    TextEncoder,
     URLSearchParams,
     setInterval: () => {},
     clearInterval: () => {},
@@ -407,4 +408,53 @@ test('renderHeroDialog equipment slot equipped states correctly identify unequip
   text = host.textContent;
   const equippedCountArr = (text.match(/✓ Đã trang bị/g) || []).length;
   assert.equal(equippedCountArr, 2, 'slots 0 and 1 should be equipped');
+});
+
+test('campaign-raid sequential mode accumulates drops across consecutive raids within 15 seconds', async () => {
+  const context = await createCampaignContext();
+  const cache = context.hwaHelperRpcCache;
+
+  const t0 = new Date('2026-11-09T16:00:00.000Z');
+  const t1 = new Date('2026-11-09T16:00:02.000Z');
+
+  const rec1 = {
+    method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: t0.toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ident: 'r1', name: 'missionRaid', args: { id: 163, times: 1 } }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'r1', result: { response: { '0': { fragmentGear: { '146': 1 }, gold: 2000, experience: 10 } } } }] })
+  };
+
+  const rec2 = {
+    method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: t1.toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ident: 'r2', name: 'missionRaid', args: { id: 163, times: 1 } }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'r2', result: { response: { '0': { gear: { '42': 1 }, gold: 2000, experience: 10 } } } }] })
+  };
+
+  const merged = cache.merge({}, [rec1, rec2]);
+  const raidRes = merged.cache.lastCampaignRaidResult?.data;
+  assert.ok(raidRes);
+  assert.equal(raidRes.missionId, 163);
+  assert.equal(raidRes.times, 2, 'Consecutive sequential raids should accumulate times to 2');
+  assert.equal(raidRes.drops.gold, 4000);
+  assert.equal(raidRes.drops.experience, 20);
+  assert.equal(raidRes.drops.fragmentGear['146'], 1);
+  assert.equal(raidRes.drops.gear['42'], 1);
+});
+
+test('renderCampaignDialog includes sequential loop checkbox and accurate mission energy cost', async () => {
+  const context = await createCampaignContext();
+  await context.render();
+  const target = new MockElement('div');
+  const cache = { energyStatus: { data: { energy: 100 } } };
+
+  context.renderCampaignDialog(cache, target);
+
+  const seqCheck = target.querySelector('#campaign-raid-sequential');
+  assert.ok(seqCheck, 'Sequential checkbox must be present in dialog');
+  assert.equal(seqCheck.checked, true, 'Sequential mode should default to true');
+
+  const text = target.textContent;
+  assert.match(text, /Loop tuần tự 1x \(Hỗ trợ VIP 0 \/ F2P\)/);
+  assert.match(text, /Raid tuần tự \d+x Ải/);
 });

@@ -107,6 +107,9 @@ function saveRaidPreferences() {
 }
 let experimentalPending = null;
 let currentRpcPolicy = { mode: 'piggyback', monitor: true };
+let campaignRaidSequential = true;
+let isCampaignRaidLoopRunning = false;
+let abortCampaignRaidLoop = false;
 
 let itemsViewMode = 'grid'; // 'grid' | 'list'
 try {
@@ -10181,50 +10184,154 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   timesRow.append(timesBtnsGroup);
   raidCard.append(timesRow);
 
+  // Sequential Mode Toggle (VIP 0 fallback support)
+  const modeRow = document.createElement('div');
+  modeRow.className = 'flex items-center justify-between flex-wrap gap-2 pt-1';
+
+  const seqLabel = document.createElement('label');
+  seqLabel.className = 'inline-flex items-center gap-1.5 text-2xs cursor-pointer select-none text-slate-600 dark:text-slate-300 font-medium';
+  const seqCheck = document.createElement('input');
+  seqCheck.type = 'checkbox';
+  seqCheck.id = 'campaign-raid-sequential';
+  seqCheck.checked = campaignRaidSequential;
+  seqCheck.className = 'rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800';
+  seqCheck.addEventListener('change', () => {
+    campaignRaidSequential = seqCheck.checked;
+    chrome.storage.local.set({ campaignRaidSequential });
+    renderCampaignDialog(cache, target);
+  });
+  seqLabel.append(seqCheck);
+  const seqText = document.createElement('span');
+  seqText.textContent = 'Loop tuần tự 1x (Hỗ trợ VIP 0 / F2P)';
+  seqLabel.append(seqText);
+  modeRow.append(seqLabel);
+  raidCard.append(modeRow);
+
   // Raid Action Button & Status
   const actionRow = document.createElement('div');
   actionRow.className = 'flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/40';
 
-  const estCost = selectedCampaignTimes * 6;
+  const missionCostPair = globalThis.hwaHelperMissionCosts?.[selectedCampaignMissionId];
+  const unitCost = missionCostPair ? (missionCostPair[0] + missionCostPair[1]) : 6;
+  const estCost = selectedCampaignTimes * unitCost;
   const costHint = document.createElement('span');
   costHint.className = 'text-2xs text-slate-500 dark:text-slate-400';
-  costHint.textContent = `Ước tính cần ~${estCost} Energy`;
+  costHint.textContent = `Ước tính cần ~${estCost} Energy (${unitCost}/lượt)`;
   actionRow.append(costHint);
 
   const raidBtn = document.createElement('button');
   raidBtn.id = 'campaign-raid-submit';
   raidBtn.type = 'button';
-  raidBtn.className = popupRpcEnabled
-    ? 'px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer shadow-xs transition-all active:scale-95 flex items-center gap-1.5'
-    : 'px-4 py-2 rounded-lg bg-slate-200 text-slate-400 font-bold text-xs cursor-not-allowed border border-slate-300';
-  raidBtn.disabled = !popupRpcEnabled;
-  raidBtn.innerHTML = popupRpcEnabled
-    ? `<span>⚡</span> <span>Raid ${selectedCampaignTimes}x Ải #${selectedCampaignMissionId}</span>`
-    : 'Bật Popup RPC để Raid';
 
-  if (popupRpcEnabled) {
+  if (isCampaignRaidLoopRunning) {
+    raidBtn.className = 'px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5';
+    raidBtn.innerHTML = '<span>🛑</span> <span>Dừng Raid Loop</span>';
     raidBtn.addEventListener('click', () => {
-      raidBtn.disabled = true;
-      raidBtn.innerHTML = '<span class="animate-spin">⏳</span> <span>Đang thực hiện Raid...</span>';
-      chrome.runtime?.sendMessage?.(
-        { kind: 'campaign-raid', missionId: selectedCampaignMissionId, times: selectedCampaignTimes },
-        (res) => {
-          if (chrome.runtime?.lastError) {
-            raidBtn.disabled = false;
-            raidBtn.textContent = chrome.runtime.lastError.message || 'Lỗi kết nối';
-            return;
+      abortCampaignRaidLoop = true;
+      raidBtn.textContent = 'Đang dừng...';
+    });
+  } else {
+    raidBtn.className = popupRpcEnabled
+      ? 'px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer shadow-xs transition-all active:scale-95 flex items-center gap-1.5'
+      : 'px-4 py-2 rounded-lg bg-slate-200 text-slate-400 font-bold text-xs cursor-not-allowed border border-slate-300';
+    raidBtn.disabled = !popupRpcEnabled;
+    raidBtn.innerHTML = popupRpcEnabled
+      ? (campaignRaidSequential && selectedCampaignTimes > 1
+          ? `<span>⚡</span> <span>Raid tuần tự ${selectedCampaignTimes}x Ải #${selectedCampaignMissionId}</span>`
+          : `<span>⚡</span> <span>Raid ${selectedCampaignTimes}x Ải #${selectedCampaignMissionId}</span>`)
+      : 'Bật Popup RPC để Raid';
+
+    if (popupRpcEnabled) {
+      const executeSequentialLoop = async (missionId, totalTimes) => {
+        isCampaignRaidLoopRunning = true;
+        abortCampaignRaidLoop = false;
+        let completed = 0;
+        raidBtn.className = 'px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5';
+
+        for (let i = 1; i <= totalTimes; i++) {
+          if (abortCampaignRaidLoop) {
+            raidBtn.textContent = `Đã dừng ở lượt ${completed}/${totalTimes}`;
+            break;
           }
-          if (!res?.ok) {
+
+          raidBtn.innerHTML = `<span class="animate-spin">⏳</span> <span>Đang Raid ${i}/${totalTimes}... (Click để Dừng)</span>`;
+
+          const currentEnergy = currentCache?.energyStatus?.data?.energy ?? currentCache?.['resource:energy']?.data?.amount;
+          if (typeof currentEnergy === 'number' && currentEnergy < unitCost) {
+            raidBtn.textContent = `Hết Energy (${currentEnergy}/${unitCost}) ở lượt ${completed}/${totalTimes}`;
+            break;
+          }
+
+          const res = await new Promise((resolve) => {
+            chrome.runtime?.sendMessage?.(
+              { kind: 'campaign-raid', missionId, times: 1 },
+              (response) => {
+                if (chrome.runtime?.lastError) {
+                  resolve({ ok: false, error: chrome.runtime.lastError.message });
+                } else {
+                  resolve(response || { ok: true });
+                }
+              }
+            );
+          });
+
+          if (!res.ok) {
             raidBtn.disabled = false;
-            raidBtn.textContent = res?.error || 'Raid thất bại';
-          } else {
-            setTimeout(() => {
-              if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
-            }, 600);
+            raidBtn.textContent = res.error || `Lỗi ở lượt ${i}`;
+            break;
+          }
+
+          completed++;
+
+          if (i < totalTimes && !abortCampaignRaidLoop) {
+            await new Promise((r) => setTimeout(r, 650));
           }
         }
-      );
-    });
+
+        isCampaignRaidLoopRunning = false;
+        setTimeout(() => {
+          if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
+        }, 500);
+      };
+
+      raidBtn.addEventListener('click', () => {
+        if (selectedCampaignTimes > 1 && campaignRaidSequential) {
+          executeSequentialLoop(selectedCampaignMissionId, selectedCampaignTimes);
+          return;
+        }
+
+        raidBtn.disabled = true;
+        raidBtn.innerHTML = '<span class="animate-spin">⏳</span> <span>Đang thực hiện Raid...</span>';
+        chrome.runtime?.sendMessage?.(
+          { kind: 'campaign-raid', missionId: selectedCampaignMissionId, times: selectedCampaignTimes },
+          (res) => {
+            if (chrome.runtime?.lastError) {
+              raidBtn.disabled = false;
+              raidBtn.textContent = chrome.runtime.lastError.message || 'Lỗi kết nối';
+              return;
+            }
+            if (!res?.ok) {
+              const errLower = String(res?.error || '').toLowerCase();
+              if (errLower.includes('vip') || errLower.includes('notenough')) {
+                raidBtn.textContent = 'Chưa đủ VIP, tự động chuyển sang loop tuần tự...';
+                campaignRaidSequential = true;
+                chrome.storage.local.set({ campaignRaidSequential: true });
+                setTimeout(() => {
+                  executeSequentialLoop(selectedCampaignMissionId, selectedCampaignTimes);
+                }, 600);
+                return;
+              }
+              raidBtn.disabled = false;
+              raidBtn.textContent = res?.error || 'Raid thất bại';
+            } else {
+              setTimeout(() => {
+                if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
+              }, 600);
+            }
+          }
+        );
+      });
+    }
   }
   actionRow.append(raidBtn);
   raidCard.append(actionRow);
@@ -10573,9 +10680,10 @@ globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
+    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion', 'campaignRaidSequential']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
   ]);
   const cache = stored[CACHE_KEY] || {};
+  if (stored.campaignRaidSequential !== undefined) campaignRaidSequential = stored.campaignRaidSequential === true;
   if (stored.buildingQueue) currentBuildingQueue = stored.buildingQueue;
   if (stored.researchQueue) currentResearchQueue = stored.researchQueue;
   currentCache = cache;
@@ -10679,6 +10787,7 @@ async function render() {
   if (document.querySelector('#research-dialog')?.open) renderResearchDialog(cache);
   if (document.querySelector('#hero-dialog')?.open && currentHeroDialogId) renderHeroDialog(currentHeroDialogId, cache);
   if (document.querySelector('#quest-detail-dialog')?.open) renderQuestDetailDialog(currentQuestFilter, cache);
+  if (document.querySelector('#campaign-dialog')?.open && !isCampaignRaidLoopRunning) renderCampaignDialog(cache);
   const draftModal = document.querySelector('#draft-modal');
   if (draftModal && !draftModal.hidden) {
     const modalBody = document.querySelector('#draft-modal-body');

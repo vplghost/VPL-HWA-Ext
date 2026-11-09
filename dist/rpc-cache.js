@@ -3615,6 +3615,44 @@
         }
         if (entry.key.startsWith('experimental') && next[entry.key]?.updatedAt === entry.updatedAt &&
             JSON.stringify(next[entry.key].data) === JSON.stringify(entry.data)) continue;
+        if (entry.key === 'lastCampaignRaidResult') {
+          const prev = next.lastCampaignRaidResult;
+          if (prev && prev.updatedAt >= entry.updatedAt) continue;
+          const prevTime = prev?.updatedAt ? Date.parse(prev.updatedAt) : 0;
+          const currTime = entry.updatedAt ? Date.parse(entry.updatedAt) : 0;
+          if (prev && prev.data?.missionId === entry.data?.missionId && currTime - prevTime < 15000 && currTime > prevTime) {
+            const combinedDrops = {
+              fragmentGear: { ...(prev.data?.drops?.fragmentGear || {}) },
+              gear: { ...(prev.data?.drops?.gear || {}) },
+              consumable: { ...(prev.data?.drops?.consumable || {}) },
+              gold: (prev.data?.drops?.gold || 0) + (entry.data?.drops?.gold || 0),
+              experience: (prev.data?.drops?.experience || 0) + (entry.data?.drops?.experience || 0)
+            };
+            if (entry.data?.drops?.fragmentGear) {
+              for (const [k, v] of Object.entries(entry.data.drops.fragmentGear)) {
+                combinedDrops.fragmentGear[k] = (combinedDrops.fragmentGear[k] || 0) + v;
+              }
+            }
+            if (entry.data?.drops?.gear) {
+              for (const [k, v] of Object.entries(entry.data.drops.gear)) {
+                combinedDrops.gear[k] = (combinedDrops.gear[k] || 0) + v;
+              }
+            }
+            if (entry.data?.drops?.consumable) {
+              for (const [k, v] of Object.entries(entry.data.drops.consumable)) {
+                combinedDrops.consumable[k] = (combinedDrops.consumable[k] || 0) + v;
+              }
+            }
+            entry.data = {
+              ...entry.data,
+              times: (prev.data?.times || 0) + (entry.data?.times || 1),
+              drops: combinedDrops
+            };
+          }
+          next.lastCampaignRaidResult = entry;
+          changed = true;
+          continue;
+        }
         if (['lastCampaignRaidResult', 'lastCraftResult'].includes(entry.key) &&
             next[entry.key] && next[entry.key].updatedAt >= entry.updatedAt) continue;
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
