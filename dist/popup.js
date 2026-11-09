@@ -10448,15 +10448,25 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
 
       const fragRow = document.createElement('div');
       fragRow.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 text-xs gap-2';
-      fragRow.innerHTML = `
-        <div class="min-w-0 flex items-center gap-2">
-          <img src="${iconSrc}" class="size-6 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 object-cover shrink-0" onerror="this.style.display='none'" />
-          <div class="min-w-0">
-            <div class="font-bold text-slate-800 dark:text-slate-200 truncate" title="${itemName}">${isScroll ? '📜 ' : '🧩 '}${itemName}</div>
-            <div class="text-3xs text-slate-500">${isScroll ? 'Mảnh bản vẽ' : 'Mảnh trang bị'} • ${fragItem.count} mảnh</div>
-          </div>
-        </div>
+
+      const leftWrap = document.createElement('div');
+      leftWrap.className = 'min-w-0 flex items-center gap-2';
+
+      const img = document.createElement('img');
+      img.src = iconSrc;
+      img.alt = itemName;
+      img.className = 'size-6 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 object-cover shrink-0';
+      img.onerror = () => { img.style.display = 'none'; };
+      leftWrap.append(img);
+
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'min-w-0';
+      infoDiv.innerHTML = `
+        <div class="font-bold text-slate-800 dark:text-slate-200 truncate" title="${itemName}">${isScroll ? '📜 ' : '🧩 '}${itemName}</div>
+        <div class="text-3xs text-slate-500">${isScroll ? 'Mảnh bản vẽ' : 'Mảnh trang bị'} • ${fragItem.count} mảnh</div>
       `;
+      leftWrap.append(infoDiv);
+      fragRow.append(leftWrap);
 
       const craftBtn = document.createElement('button');
       craftBtn.type = 'button';
