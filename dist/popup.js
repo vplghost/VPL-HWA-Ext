@@ -1936,6 +1936,7 @@ let localDraftAttackPicks = [null, null, null, null, null];
 let activeDraftStep = 0;
 let draftViewMode = null; // 'defense' or 'attack'
 let lastRenderedMatchId = null;
+let lastRenderedStageId = null;
 let draftStepCandidates = {
   matchId: null,
   defense: globalThis.hwaHelperPopupData.defaultDraftCandidates('defense'),
@@ -1976,13 +1977,15 @@ function renderDraft(cache, target = view) {
   // Reset local picks when entering a new match
   if (draft.matchId && draft.matchId !== lastRenderedMatchId) {
     lastRenderedMatchId = draft.matchId;
+    lastRenderedStageId = stageId;
     localDraftDefencePicks = [null, null, null, null, null];
     localDraftAttackPicks = [null, null, null, null, null];
     activeHeroSwapTarget = null;
-  } else if (isDefenseStage && (!draft.defenceHeroes || draft.defenceHeroes.length === 0) && localDraftDefencePicks.every(Boolean)) {
-    localDraftDefencePicks = [null, null, null, null, null];
-    localDraftAttackPicks = [null, null, null, null, null];
-    activeHeroSwapTarget = null;
+    draftViewMode = isAttackStage ? 'attack' : 'defense';
+    activeDraftStep = 0;
+  } else if (!draft.matchId && !draft.active) {
+    lastRenderedMatchId = null;
+    lastRenderedStageId = null;
   }
   if (draft.matchId && draftStepCandidates.matchId !== draft.matchId) {
     draftStepCandidates = {
@@ -2018,6 +2021,18 @@ function renderDraft(cache, target = view) {
   if (isAttackLocked) {
     const src = (draft.attackHeroes?.length === 5 ? draft.attackHeroes : draft.lastResult?.attackHeroes) || [];
     if (src.length === 5) localDraftAttackPicks = [...src];
+  }
+
+  // Auto-switch viewMode when stage changes
+  if (stageId !== lastRenderedStageId) {
+    lastRenderedStageId = stageId;
+    if (isAttackStage && !isAttackLocked) {
+      draftViewMode = 'attack';
+      activeDraftStep = globalThis.hwaHelperPopupData.getDraftActiveStep(localDraftAttackPicks);
+    } else if (isDefenseStage && !isDefenseLocked) {
+      draftViewMode = 'defense';
+      activeDraftStep = globalThis.hwaHelperPopupData.getDraftActiveStep(localDraftDefencePicks);
+    }
   }
 
   // Determine active view mode (toggle takes priority, else match stage)
@@ -2132,6 +2147,49 @@ function renderDraft(cache, target = view) {
     headerGrid.append(enemyCol);
   }
   headerCard.append(headerGrid);
+
+  if (!popupRpcEnabled) {
+    const rpcAlert = document.createElement('div');
+    rpcAlert.className = 'mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 flex items-center justify-between gap-2';
+    rpcAlert.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="text-base leading-none">⚠️</span>
+        <span>Tính năng Popup RPC đang tắt. Cần bật để khóa/gửi đội hình Legend Draft.</span>
+      </div>
+    `;
+    const enableBtn = document.createElement('button');
+    enableBtn.type = 'button';
+    enableBtn.className = 'px-2.5 py-1 rounded bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 cursor-pointer shrink-0';
+    enableBtn.textContent = 'Bật Popup RPC';
+    enableBtn.addEventListener('click', async () => {
+      popupRpcEnabled = true;
+      await chrome.storage?.local?.set?.({ popupRpcEnabled: true });
+      render();
+    });
+    rpcAlert.append(enableBtn);
+    headerCard.append(rpcAlert);
+  } else if (currentRpcPolicy?.mode !== 'direct') {
+    const modeAlert = document.createElement('div');
+    modeAlert.className = 'mt-3 rounded-lg border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-900 flex items-center justify-between gap-2';
+    modeAlert.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="text-base leading-none">⚡</span>
+        <span>Khuyến nghị: Chuyển sang <strong>Direct RPC</strong> để gửi đội hình lập tức (tránh bị hoãn do game không tự gửi RPC khi đang chọn hero).</span>
+      </div>
+    `;
+    const switchDirectBtn = document.createElement('button');
+    switchDirectBtn.type = 'button';
+    switchDirectBtn.className = 'px-2.5 py-1 rounded bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 cursor-pointer shrink-0';
+    switchDirectBtn.textContent = 'Chuyển Direct RPC';
+    switchDirectBtn.addEventListener('click', async () => {
+      currentRpcPolicy = { ...currentRpcPolicy, mode: 'direct' };
+      await chrome.storage?.local?.set?.({ socketRefreshMode: 'direct' });
+      render();
+    });
+    modeAlert.append(switchDirectBtn);
+    headerCard.append(modeAlert);
+  }
+
   container.append(headerCard);
 
   // 2. Draft Team Switcher: Defense Draft vs Attack Draft
@@ -3837,34 +3895,67 @@ function renderDashboard(cache) {
     const section = document.createElement('section');
     section.className = 'space-y-2';
     const title = document.createElement('h3');
-    title.className = 'text-sm font-bold text-slate-800';
+    title.className = 'text-sm font-bold text-slate-800 dark:text-slate-200';
     title.textContent = group.title;
     section.append(title);
+    const cardGrid = document.createElement('div');
+    cardGrid.className = 'grid grid-cols-1 min-[480px]:grid-cols-2 gap-2.5';
     for (const item of group.rows) {
+      const isQuest = group.title === 'Daily Quests' || item.id === 'daily-quests' || item.id === 'event-daily-quests';
       const card = document.createElement('div');
-      card.className = 'flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5';
+      card.className = `flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/80 transition-all ${
+        isQuest
+          ? 'cursor-pointer hover:border-violet-400 hover:bg-violet-50/40 dark:hover:border-violet-500/60 dark:hover:bg-slate-800 shadow-2xs hover:shadow-xs'
+          : 'hover:border-slate-300 dark:hover:border-slate-700'
+      }`;
+      if (isQuest) {
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-haspopup', 'dialog');
+        card.setAttribute('aria-controls', 'quest-detail-dialog');
+        card.title = 'Click to view quest details';
+
+        const openHandler = () => {
+          openQuestDetailDialog(item.id, typeof currentCache !== 'undefined' ? currentCache : cache);
+        };
+        card.addEventListener('click', openHandler);
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openHandler();
+          }
+        });
+      }
+
       const icon = document.createElement('span');
-      icon.className = 'text-xl';
+      icon.className = 'text-xl shrink-0';
       icon.setAttribute('aria-hidden', 'true');
       icon.textContent = item.icon;
       const content = document.createElement('div');
       content.className = 'min-w-0 flex-1';
       const name = document.createElement('div');
-      name.className = 'font-semibold text-slate-900';
+      name.className = 'font-semibold text-slate-900 dark:text-slate-100 truncate text-xs sm:text-sm flex items-center justify-between gap-1';
       name.textContent = item.title;
+      if (isQuest) {
+        const indicator = document.createElement('span');
+        indicator.className = 'text-[10px] text-violet-500 dark:text-violet-400 font-normal shrink-0';
+        indicator.textContent = 'Details ›';
+        name.append(indicator);
+      }
       const detail = document.createElement('div');
-      detail.className = 'text-xs text-slate-500';
+      detail.className = 'text-xs text-slate-500 dark:text-slate-400 truncate';
       detail.textContent = item.detail;
       content.append(name, detail);
       const badge = document.createElement('span');
       badge.className = `shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-        item.state === 'pending' ? 'bg-amber-100 text-amber-800' :
-        item.state === 'done' ? 'bg-emerald-100 text-emerald-800' :
-        'bg-slate-100 text-slate-600'}`;
+        item.state === 'pending' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 dark:border dark:border-amber-700/50' :
+        item.state === 'done' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50' :
+        'bg-slate-100 text-slate-600 dark:bg-slate-700/80 dark:text-slate-300 dark:border dark:border-slate-600'}`;
       badge.textContent = item.state === 'pending' ? 'To do' : item.state === 'done' ? 'Done' : item.state === 'info' ? 'Check' : 'Unknown';
       card.append(icon, content, badge);
-      section.append(card);
+      cardGrid.append(card);
     }
+    section.append(cardGrid);
     container.append(section);
   }
   view.append(container);
@@ -4235,7 +4326,7 @@ function towerRewardText(reward) {
   const parts = [];
   for (const [kind, value] of Object.entries(reward)) {
     if (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)))) {
-      const label = { gold: 'Gold', starmoney: 'Emeralds', experience: 'XP' }[kind] || kind;
+      const label = { gold: 'Gold', starmoney: 'Emeralds', experience: 'XP', stamina: 'Energy', drafts_chip: 'Draft Chips' }[kind] || kind;
       parts.push(`${Number(value).toLocaleString()} ${label}`);
     } else if (value && typeof value === 'object') {
       for (const [id, amount] of Object.entries(value)) {
@@ -6792,11 +6883,352 @@ function renderResearchDialog(cache) {
   host.append(dirSection);
 }
 
+let currentQuestFilter = 'all';
+let questSearchQuery = '';
+
+function getDetailedQuests(cache = currentCache, now = Date.now()) {
+  const questData = globalThis.hwaHelperQuestData;
+  const items = [];
+  const seenIds = new Set();
+  const nextResetTime = questData?.nextReset(cache, now);
+  const resetText = nextResetTime ? `Resets ${new Date(nextResetTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Daily reset';
+
+  const qAll = Array.isArray(cache?.questGetAll?.data) ? cache.questGetAll.data :
+    (Array.isArray(cache?.questGetAll) ? cache.questGetAll : []);
+  const qAllMap = new Map();
+  for (const q of qAll) {
+    if (q && q.id != null) qAllMap.set(String(q.id), q);
+  }
+
+  // 1. Daily Quests
+  const dailyList = questData?.dailyQuests(cache, now) || [];
+  for (const dq of dailyList) {
+    if (!dq || dq.id == null) continue;
+    const qIdStr = String(dq.id);
+    seenIds.add(qIdStr);
+    const qAllEntry = qAllMap.get(qIdStr);
+    
+    const isReady = qAllEntry?.state === 2 || dq.state === 2;
+    const isDone = dq.state === 'completed' || dq.state === 3 || qAllEntry?.state === 3;
+    const state = isReady ? 'ready' : isDone ? 'done' : 'inProgress';
+    
+    const title = questData?.dailyTitle(dq) || qAllEntry?.name || `Daily Quest #${dq.id}`;
+    const reward = qAllEntry?.reward || dq.reward || null;
+    const progress = Number(qAllEntry?.progress ?? dq.progress) || 0;
+    
+    items.push({
+      id: dq.id,
+      category: 'daily',
+      categoryLabel: 'Daily Quest',
+      title,
+      state,
+      progress,
+      reward,
+      subtitle: resetText
+    });
+  }
+
+  // 2. Visible Event Quests
+  const events = questData?.visibleEvents(cache, now) || [];
+  for (const ev of events) {
+    const evTitle = questData?.title(ev) || `Event #${ev.id}`;
+    const evEndText = ev.end ? `Ends ${new Date(ev.end).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : '';
+    
+    for (const group of ev.groups || []) {
+      const groupQuests = Array.isArray(group.quests) ? group.quests : [];
+      if (groupQuests.length === 0) continue;
+
+      const activeQ = groupQuests.find((q) => q.state === 'inProgress' || q.state === 2);
+      const completedCount = groupQuests.filter((q) => q.state === 'completed' || q.state === 3).length;
+      const currentQ = activeQ || groupQuests[groupQuests.length - 1];
+
+      const qIdStr = String(currentQ.id);
+      seenIds.add(qIdStr);
+      const qAllEntry = qAllMap.get(qIdStr);
+
+      const isReady = currentQ.state === 2 || qAllEntry?.state === 2;
+      const isDone = !activeQ && completedCount === groupQuests.length;
+      const state = isReady ? 'ready' : isDone ? 'done' : 'inProgress';
+
+      const repeatLabel = group.repeatType === 'daily' ? 'Event Daily' : 'Event Chain';
+      const questLocMap = globalThis.hwaHelperPopupData?.questLocaleMap || {};
+      const groupTitle = group.localeKey
+        ? (questLocMap[group.localeKey]?.title ||
+           group.localeKey.replace(/^(LIB_SPECIAL_QUEST_EVENT_|LIB_SEASONAL_EVENT_NAME_|QUEST_TAB_|UI_)/, '')
+                          .replace(/_/g, ' ')
+                          .toLowerCase()
+                          .replace(/\b\w/g, (c) => c.toUpperCase()))
+        : 'Special Quest';
+
+      const tierText = `Tier ${completedCount + (activeQ ? 1 : 0)} of ${groupQuests.length}`;
+      const progress = Number(currentQ.progress ?? qAllEntry?.progress) || 0;
+      const reward = currentQ.reward || qAllEntry?.reward || null;
+
+      items.push({
+        id: currentQ.id,
+        category: 'event',
+        categoryLabel: repeatLabel,
+        eventName: evTitle,
+        title: groupTitle,
+        tierInfo: tierText,
+        state,
+        progress,
+        reward,
+        subtitle: `${evTitle}${evEndText ? ' · ' + evEndText : ''}`
+      });
+    }
+  }
+
+  // 3. Any additional ready/active quests in questGetAll
+  for (const q of qAll) {
+    if (!q || q.id == null || seenIds.has(String(q.id))) continue;
+    if (q.state === 3) continue;
+    const isReady = q.state === 2;
+    items.push({
+      id: q.id,
+      category: 'story',
+      categoryLabel: 'Quest',
+      title: q.name || `Quest #${q.id}`,
+      state: isReady ? 'ready' : 'inProgress',
+      progress: Number(q.progress) || 0,
+      reward: q.reward || null,
+      subtitle: isReady ? 'Reward ready to claim in game' : 'General Quest'
+    });
+  }
+
+  return items;
+}
+
+  function openQuestDetailDialog(targetType = 'all', cache = currentCache) {
+  if (targetType === 'daily-quests') {
+    currentQuestFilter = 'daily';
+  } else if (targetType === 'event-daily-quests') {
+    currentQuestFilter = 'event';
+  } else if (targetType === 'ready') {
+    currentQuestFilter = 'ready';
+  } else if (targetType === 'daily' || targetType === 'event') {
+    currentQuestFilter = targetType;
+  } else {
+    currentQuestFilter = 'all';
+  }
+  globalThis.currentQuestFilter = currentQuestFilter;
+
+  renderQuestDetailDialog(currentQuestFilter, cache);
+  const dialog = document.querySelector('#quest-detail-dialog');
+  if (dialog) {
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', '');
+    }
+  }
+}
+
+function renderQuestDetailDialog(filter = currentQuestFilter, cache = currentCache) {
+  const host = document.querySelector('#quest-detail-dialog-body');
+  const statusWrap = document.querySelector('#quest-detail-dialog-status');
+  if (!host) return;
+  host.replaceChildren();
+  statusWrap?.replaceChildren();
+
+  const allItems = getDetailedQuests(cache);
+  const readyCount = allItems.filter((i) => i.state === 'ready').length;
+  const inProgressCount = allItems.filter((i) => i.state === 'inProgress').length;
+  const dailyCount = allItems.filter((i) => i.category === 'daily').length;
+  const eventCount = allItems.filter((i) => i.category === 'event').length;
+
+  if (statusWrap) {
+    if (readyCount > 0) {
+      const readyBadge = document.createElement('span');
+      readyBadge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50';
+      readyBadge.textContent = `🎁 ${readyCount} Ready to Claim`;
+      statusWrap.append(readyBadge);
+    }
+    const countBadge = document.createElement('span');
+    countBadge.className = 'text-xs text-slate-500 dark:text-slate-400 font-medium truncate';
+    countBadge.textContent = `${inProgressCount} in progress · ${allItems.length} total`;
+    statusWrap.append(countBadge);
+  }
+
+  // Header toolbar: Tabs & Search
+  const toolbar = document.createElement('div');
+  toolbar.className = 'flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200 dark:border-slate-800';
+
+  const tabsWrap = document.createElement('div');
+  tabsWrap.className = 'flex flex-wrap items-center gap-1.5';
+
+  const filterTabs = [
+    { key: 'all', label: 'All', count: allItems.length },
+    { key: 'daily', label: 'Daily', count: dailyCount },
+    { key: 'event', label: 'Event', count: eventCount },
+    { key: 'ready', label: 'Ready', count: readyCount }
+  ];
+
+  for (const tab of filterTabs) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    const isActive = filter === tab.key;
+    btn.className = `cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+      isActive
+        ? 'bg-violet-600 text-white dark:bg-violet-600 shadow-xs'
+        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+    }`;
+    btn.textContent = `${tab.label} (${tab.count})`;
+    btn.addEventListener('click', () => {
+      currentQuestFilter = tab.key;
+      globalThis.currentQuestFilter = currentQuestFilter;
+      renderQuestDetailDialog(tab.key, cache);
+    });
+    tabsWrap.append(btn);
+  }
+
+  const searchInput = document.createElement('input');
+  searchInput.id = 'quest-detail-search';
+  searchInput.type = 'text';
+  searchInput.value = questSearchQuery;
+  searchInput.placeholder = 'Search quests...';
+  searchInput.className = 'rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 w-full sm:w-48';
+  searchInput.addEventListener('input', (e) => {
+    questSearchQuery = e.target.value.trim().toLowerCase();
+    updateQuestCardsList();
+  });
+
+  toolbar.append(tabsWrap, searchInput);
+  host.append(toolbar);
+
+  // Cards Container
+  const cardsContainer = document.createElement('div');
+  cardsContainer.id = 'quest-cards-container';
+  host.append(cardsContainer);
+
+  function updateQuestCardsList() {
+    cardsContainer.replaceChildren();
+
+    let list = allItems;
+    if (filter === 'daily') list = list.filter((i) => i.category === 'daily');
+    else if (filter === 'event') list = list.filter((i) => i.category === 'event');
+    else if (filter === 'ready') list = list.filter((i) => i.state === 'ready');
+
+    if (questSearchQuery) {
+      list = list.filter((i) =>
+        i.title.toLowerCase().includes(questSearchQuery) ||
+        (i.eventName && i.eventName.toLowerCase().includes(questSearchQuery)) ||
+        (i.categoryLabel && i.categoryLabel.toLowerCase().includes(questSearchQuery)) ||
+        String(i.id).includes(questSearchQuery)
+      );
+    }
+
+    const statePriority = { ready: 0, inProgress: 1, done: 2 };
+    list.sort((a, b) => (statePriority[a.state] ?? 9) - (statePriority[b.state] ?? 9));
+
+    if (list.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-500';
+      empty.textContent = questSearchQuery ? 'No quests match your search query.' : 'No quests found for the selected filter.';
+      cardsContainer.append(empty);
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-2.5';
+
+    for (const item of list) {
+      const card = document.createElement('div');
+      card.className = `flex flex-col justify-between rounded-xl border p-3 shadow-2xs transition-all ${
+        item.state === 'ready'
+          ? 'border-emerald-200 bg-emerald-50/30 dark:border-emerald-800/60 dark:bg-emerald-950/20'
+          : item.state === 'inProgress'
+          ? 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-800/80'
+          : 'border-slate-200/60 bg-slate-50/50 opacity-70 dark:border-slate-800/50 dark:bg-slate-900/40'
+      }`;
+
+      // 1. Header: Category badge & subtitle & state badge
+      const header = document.createElement('div');
+      header.className = 'flex items-start justify-between gap-2';
+
+      const left = document.createElement('div');
+      left.className = 'min-w-0 flex-1';
+
+      const metaRow = document.createElement('div');
+      metaRow.className = 'flex items-center gap-1.5 flex-wrap';
+
+      const catBadge = document.createElement('span');
+      catBadge.className = `rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+        item.category === 'daily'
+          ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 dark:border dark:border-blue-800/50'
+          : item.category === 'event'
+          ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 dark:border dark:border-violet-800/50'
+          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+      }`;
+      catBadge.textContent = item.categoryLabel;
+
+      const subText = document.createElement('span');
+      subText.className = 'text-[11px] text-slate-500 dark:text-slate-400 truncate';
+      subText.textContent = item.subtitle;
+
+      metaRow.append(catBadge, subText);
+
+      const titleEl = document.createElement('h4');
+      titleEl.className = 'mt-1 font-semibold text-xs sm:text-sm text-slate-900 dark:text-slate-100 leading-snug';
+      titleEl.textContent = item.title;
+
+      left.append(metaRow, titleEl);
+
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+        item.state === 'ready'
+          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50'
+          : item.state === 'done'
+          ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+          : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 dark:border dark:border-amber-700/50'
+      }`;
+      statusBadge.textContent = item.state === 'ready' ? 'Ready to Claim' : item.state === 'done' ? 'Completed' : 'In Progress';
+
+      header.append(left, statusBadge);
+      card.append(header);
+
+      // 2. Middle: Progress / Tier
+      if (item.tierInfo || item.progress > 0) {
+        const progWrap = document.createElement('div');
+        progWrap.className = 'mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/40 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300 font-medium';
+        if (item.tierInfo) {
+          const tierEl = document.createElement('span');
+          tierEl.textContent = item.tierInfo;
+          progWrap.append(tierEl);
+        }
+        if (item.progress > 0) {
+          const progEl = document.createElement('span');
+          progEl.textContent = `Progress: ${item.progress.toLocaleString()}`;
+          progWrap.append(progEl);
+        }
+        card.append(progWrap);
+      }
+
+      // 3. Rewards footer
+      if (item.reward) {
+        const rewardText = towerRewardText(item.reward);
+        if (rewardText && rewardText !== '—') {
+          const rewardRow = document.createElement('div');
+          rewardRow.className = 'mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-700/40 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 truncate';
+          rewardRow.innerHTML = `<span class="shrink-0" aria-hidden="true">🎁</span><span class="truncate">${rewardText}</span>`;
+          card.append(rewardRow);
+        }
+      }
+
+      grid.append(card);
+    }
+    cardsContainer.append(grid);
+  }
+
+  updateQuestCardsList();
+}
+
 function setupBuildingAndResearchDialogs() {
   const buildingBadge = document.querySelector('#building-badge');
   const buildingDialog = document.querySelector('#building-dialog');
   const researchBadge = document.querySelector('#research-badge');
   const researchDialog = document.querySelector('#research-dialog');
+  const questDetailDialog = document.querySelector('#quest-detail-dialog');
 
   if (buildingBadge && buildingDialog) {
     const openBuilding = () => {
@@ -6834,7 +7266,7 @@ function setupBuildingAndResearchDialogs() {
     });
   }
 
-  for (const dlg of [buildingDialog, researchDialog]) {
+  for (const dlg of [buildingDialog, researchDialog, questDetailDialog]) {
     dlg?.addEventListener('click', (e) => {
       if (e.target === dlg) {
         if (typeof dlg.close === 'function') dlg.close();
@@ -6846,6 +7278,9 @@ function setupBuildingAndResearchDialogs() {
 
 globalThis.renderBuildingDialog = renderBuildingDialog;
 globalThis.renderResearchDialog = renderResearchDialog;
+globalThis.renderQuestDetailDialog = renderQuestDetailDialog;
+globalThis.openQuestDetailDialog = openQuestDetailDialog;
+globalThis.getDetailedQuests = getDetailedQuests;
 globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
@@ -6950,6 +7385,7 @@ async function render() {
   if (document.querySelector('#monster-dialog')?.open) renderMonster(cache);
   if (document.querySelector('#building-dialog')?.open) renderBuildingDialog(cache);
   if (document.querySelector('#research-dialog')?.open) renderResearchDialog(cache);
+  if (document.querySelector('#quest-detail-dialog')?.open) renderQuestDetailDialog(currentQuestFilter, cache);
   const draftModal = document.querySelector('#draft-modal');
   if (draftModal && !draftModal.hidden) {
     const modalBody = document.querySelector('#draft-modal-body');

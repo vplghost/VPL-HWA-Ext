@@ -479,3 +479,101 @@ test('recorded match review shows exact defense, attack, and opponent pick posit
   assert.match(viewEl.textContent, /Step 1, choice 2: Guus/);
   assert.match(viewEl.textContent, /Step 5, choice 3: Electra von Grave/);
 });
+
+test('Legend Draft hero picking retains all 5 picks without wipe-out, auto-switches to attack stage 4, and shows RPC guidance', async () => {
+  const viewEl = new MockElement('div');
+  const statusEl = new MockElement('div');
+  const searchEl = new MockElement('input');
+  const context = await createDraftContext(viewEl, statusEl, searchEl);
+
+  const activeDraftCache = {
+    legendDraftStatus: {
+      data: {
+        active: true,
+        stageId: 2, // Defense stage
+        matchId: 358999999,
+        stageFinishTs: Math.floor(Date.now() / 1000) + 90,
+        enemyUser: {
+          id: '1216843033',
+          name: 'EnemyPlayer',
+          level: 80
+        },
+        defenceHeroes: []
+      }
+    }
+  };
+
+  // Initially render defense stage
+  context.renderDraft(activeDraftCache);
+
+  // By default, popupRpcEnabled is false in initial mock, so RPC alert should show
+  assert.match(viewEl.textContent, /Tính năng Popup RPC đang tắt/);
+  const enableRpcBtn = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Bật Popup RPC'));
+  assert.ok(enableRpcBtn, 'Bật Popup RPC button should exist');
+  enableRpcBtn.dispatchEvent('click');
+
+  // Re-render after enabling RPC
+  context.renderDraft(activeDraftCache);
+  assert.doesNotMatch(viewEl.textContent, /Tính năng Popup RPC đang tắt/);
+  // Now Direct RPC advisory shows because default mode is piggyback
+  assert.match(viewEl.textContent, /Chuyển sang Direct RPC/);
+  const switchDirectBtn = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Chuyển Direct RPC'));
+  assert.ok(switchDirectBtn, 'Chuyển Direct RPC button should exist');
+  switchDirectBtn.dispatchEvent('click');
+
+  // Re-render after switching direct mode
+  context.renderDraft(activeDraftCache);
+  assert.doesNotMatch(viewEl.textContent, /Chuyển sang Direct RPC/);
+
+  // Pick 5 heroes sequentially
+  // Pick hero 4 (Astaroth)
+  const heroButtons = viewEl.querySelectorAll('button');
+  const pickHero4 = heroButtons.find((b) => b.textContent.includes('Astaroth'));
+  assert.ok(pickHero4, 'Hero Astaroth button should exist in picker');
+  pickHero4.dispatchEvent('click');
+  context.renderDraft(activeDraftCache);
+  assert.match(statusEl.textContent, /Selected 1\/5 steps/);
+
+  // Pick hero 23 (Kayla)
+  const pickHero23 = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Kayla'));
+  assert.ok(pickHero23, 'Hero Kayla button should exist in picker');
+  pickHero23.dispatchEvent('click');
+  context.renderDraft(activeDraftCache);
+  assert.match(statusEl.textContent, /Selected 2\/5 steps/);
+
+  // Pick hero 24 (Keira)
+  const pickHero24 = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Keira'));
+  assert.ok(pickHero24, 'Hero Keira button should exist in picker');
+  pickHero24.dispatchEvent('click');
+  context.renderDraft(activeDraftCache);
+  assert.match(statusEl.textContent, /Selected 3\/5 steps/);
+
+  // Pick hero 33 (Maya)
+  const pickHero33 = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Maya'));
+  assert.ok(pickHero33, 'Hero Maya button should exist in picker');
+  pickHero33.dispatchEvent('click');
+  context.renderDraft(activeDraftCache);
+  assert.match(statusEl.textContent, /Selected 4\/5 steps/);
+
+  // Pick hero 57 (Tristan) - 5th hero!
+  const pickHero57 = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Tristan'));
+  assert.ok(pickHero57, 'Hero Tristan button should exist in picker');
+  pickHero57.dispatchEvent('click');
+  context.renderDraft(activeDraftCache);
+
+  // Crucial check: all 5 picks must be retained and NOT wiped out on re-render
+  assert.match(statusEl.textContent, /Selected 5\/5 steps/);
+  assert.match(viewEl.textContent, /Lock Defense Lineup \(5 Heroes\)/);
+  assert.match(viewEl.textContent, /Khóa & Gửi Đội hình Thủ \(5\/5 Hero\)/);
+
+  // Now simulate server advancing to Attack stage (stageId = 4)
+  activeDraftCache.legendDraftStatus.data.stageId = 4;
+  activeDraftCache.legendDraftStatus.data.defenceHeroes = [4, 23, 24, 33, 57];
+  activeDraftCache.legendDraftStatus.data.enemyDefenceHeroes = [10, 25, 44, 49, 78];
+  context.renderDraft(activeDraftCache);
+
+  // View mode must have automatically switched to Attack Draft!
+  assert.match(viewEl.textContent, /Your Attack Lineup/);
+  assert.match(viewEl.textContent, /Opponent Defense Lineup/);
+  assert.match(statusEl.textContent, /Attack Draft/);
+});

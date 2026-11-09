@@ -1441,5 +1441,5 @@
     buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, exportTableData,
     getChallengeResourceStock, normalizeGoalKey, extractEventGoals, getUnreadChatCount, isTowerCleared,
     isResourceSelectableForHeader, isDebugOrEventResource, BATTLE_REPORT_CLAIM_TYPES, getPendingClaims, buildAutoClaimCalls,
-    ITEM_GROUP_META, getItemCategoryMeta, getItemAbbr };
+    ITEM_GROUP_META, getItemCategoryMeta, getItemAbbr, questLocaleMap };
 })();

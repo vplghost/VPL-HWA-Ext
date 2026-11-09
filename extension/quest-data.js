@@ -7,8 +7,25 @@
     129: 'Relic Pass', 67: 'Glory Pass'
   };
   const dailyTitles = {
-    346: 'Complete a building upgrade', 356: 'Gather 10,000 stone',
-    363: 'Win 5 camp battles'
+    346: 'Complete a building upgrade',
+    348: 'Complete a personal research',
+    349: 'Train units in barracks',
+    350: 'Heal wounded units',
+    354: 'Gather food on world map',
+    355: 'Gather wood on world map',
+    356: 'Gather 10,000 stone',
+    357: 'Gather gold on world map',
+    358: 'Spend energy on battles',
+    361: 'Defeat monsters on world map',
+    362: 'Help clan members',
+    363: 'Win 5 camp battles',
+    365: 'Open chests in Tower',
+    366: 'Fight in Arena or Grand Arena',
+    367: 'Send heroes on Expeditions',
+    368: 'Level up a hero or skill',
+    369: 'Open free heroic chest',
+    370: 'Complete daily activity goals',
+    2413: 'Fight in Titan Dungeon'
   };
   const nextReset = (cache, now) => {
     const next = cache?.questResetStatus?.data?.nextDayAt;
@@ -53,5 +70,5 @@
   const title = (event) => viewTitles[event?.viewId] || `Special Event #${event?.id}`;
   const dailyTitle = (quest) => dailyTitles[quest?.id] || `Daily Quest #${quest?.id}`;
   globalThis.hwaHelperQuestData = { dailyQuests, visibleEvents, visibleMetadata,
-    visibleGroups, nextReset, title, dailyTitle };
+    visibleGroups, nextReset, title, dailyTitle, dailyTitles };
 })();
