@@ -166,6 +166,13 @@ try {
     popupRpcEnabled = stored?.popupRpcEnabled === true;
     socketRefreshMode = ['direct', 'mqtt-piggyback'].includes(stored?.socketRefreshMode) ? stored?.socketRefreshMode : 'piggyback';
     sendControl();
+    try {
+      const gv = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_game_version') : null) ||
+        (typeof window !== 'undefined' ? window.hwaHelperGameVersion : null);
+      if (gv) {
+        chrome.storage.local.set({ cachedGameVersion: String(gv) }).catch(() => {});
+      }
+    } catch (_) {}
   })?.catch?.(() => {
     currentSettings = {};
     sendControl();

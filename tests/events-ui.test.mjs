@@ -264,12 +264,18 @@ const itemsViewList = new MockElement('button');
 itemsViewList.setAttribute('id', 'items-view-list');
 const rpcQueueCount = new MockElement('span');
 rpcQueueCount.setAttribute('id', 'rpc-queue-count');
+const rpcQueueBadge = new MockElement('span');
+rpcQueueBadge.setAttribute('id', 'rpc-queue-badge');
+const gameHeaderVersion = new MockElement('span');
+gameHeaderVersion.setAttribute('id', 'game-header-version');
 
 const mockDoc = {
   createElement: (tag) => new MockElement(tag),
   createElementNS: (_, tag) => new MockElement(tag),
   elementsById: new Map([
     ['rpc-queue-count', rpcQueueCount],
+    ['rpc-queue-badge', rpcQueueBadge],
+    ['game-header-version', gameHeaderVersion],
     ['table-export-btn', tableExportBtn],
     ['resource-filter-toggle', resourceFilterToggle],
     ['resource-filter-toggle-text', resourceFilterToggleText],
@@ -1632,9 +1638,26 @@ test('renderInventoryGrid renders grouped items with dividers, abbreviations, qu
   assert.equal(spans[1].textContent, '100'); // Quantity 100
 });
 
-test('RPC queue badge reflects current count including an empty queue', () => {
-  context.renderRpcQueue(4);
+test('RPC queue badge reflects current count and visibility based on mode', () => {
+  context.renderRpcQueue(4, 'piggyback');
   assert.equal(rpcQueueCount.textContent, '4');
-  context.renderRpcQueue(0);
+  assert.equal(rpcQueueBadge.hidden, false);
+
+  context.renderRpcQueue(4, 'direct');
+  assert.equal(rpcQueueCount.textContent, '4');
+  assert.equal(rpcQueueBadge.hidden, true);
+
+  context.renderRpcQueue(0, 'piggyback');
   assert.equal(rpcQueueCount.textContent, '0');
+  assert.equal(rpcQueueBadge.hidden, false);
+});
+
+test('renderGameVersion displays game version in header', () => {
+  context.renderGameVersion('1.293.1010');
+  assert.equal(gameHeaderVersion.textContent, '(Game v.1.293.1010)');
+  assert.equal(gameHeaderVersion.hidden, false);
+
+  context.renderGameVersion(null);
+  assert.equal(gameHeaderVersion.hidden, true);
+  assert.equal(gameHeaderVersion.textContent, '');
 });

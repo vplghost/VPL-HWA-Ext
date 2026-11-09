@@ -35,6 +35,9 @@ test('popup.css imports theme.css and defines @variant dark', async () => {
   assert.ok(themeCss.includes('.dark #guild-versus-modal details.border-emerald-300'), 'theme.css should style Guild Versus schedule round details');
   assert.ok(themeCss.includes('.dark #dungeon-modal .bg-white'), 'theme.css should style Titan Dungeon modal card containers');
   assert.ok(themeCss.includes('.dark #dungeon-modal .text-slate-900'), 'theme.css should style Titan Dungeon modal headings');
+  assert.ok(themeCss.includes('.dark [class*="bg-slate-100/"]'), 'theme.css should style slash-opacity slate-100 backgrounds');
+  assert.ok(themeCss.includes('.dark [class*="bg-slate-200/"]'), 'theme.css should style slash-opacity slate-200 backgrounds');
+  assert.ok(themeCss.includes('.dark #view .bg-slate-100\\/90'), 'theme.css should style resource group sticky header backgrounds');
 });
 
 test('applyTheme applies dark by default, toggles light, and supports system preference', async () => {

@@ -48,16 +48,19 @@ html.dark body {
   color: #f1f5f9;
 }
 
-.dark .bg-slate-50 {
+.dark .bg-slate-50,
+.dark [class*="bg-slate-50/"] {
   background-color: #0e1526 !important;
 }
 
-.dark .bg-slate-100 {
+.dark .bg-slate-100,
+.dark [class*="bg-slate-100/"] {
   background-color: #1e293b !important;
   color: #e2e8f0;
 }
 
-.dark .bg-slate-200 {
+.dark .bg-slate-200,
+.dark [class*="bg-slate-200/"] {
   background-color: #334155 !important;
   color: #e2e8f0 !important;
 }
@@ -391,6 +394,28 @@ html.dark body {
 
 .dark #dungeon-modal .text-slate-400 {
   color: #64748b !important;
+}
+
+/* Tab Resources Dark Theme */
+.dark #view .divide-slate-100 {
+  border-color: #1e293b !important;
+}
+
+.dark #view .bg-slate-100\/90,
+.dark #view [class*="bg-slate-100/"] {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+  border-color: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+.dark #view .bg-slate-200\/80,
+.dark #view [class*="bg-slate-200/"] {
+  background-color: rgba(51, 65, 85, 0.85) !important;
+  color: #e2e8f0 !important;
+}
+
+.dark #view label:hover {
+  background-color: rgba(30, 41, 59, 0.5) !important;
 }
 
 /* Status Cards, Badges, Boxes & Alert Banners */

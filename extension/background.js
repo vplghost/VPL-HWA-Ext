@@ -787,6 +787,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const ver = parsed?.results?.find((r) => r.result?.response?.version)?.result?.response?.version;
       if (ver) {
         chrome.storage.session?.set?.({ cachedGameVersion: String(ver) }).catch?.(() => {});
+        chrome.storage.local?.set?.({ cachedGameVersion: String(ver) }).catch?.(() => {});
+      }
+    } catch (_) {}
+  }
+  if (record.requestBody && record.requestBody.includes('"appVersion"')) {
+    try {
+      const match = record.requestBody.match(/"appVersion"\s*:\s*"([^"]+)"/);
+      if (match?.[1]) {
+        chrome.storage.session?.set?.({ cachedGameVersion: match[1] }).catch?.(() => {});
+        chrome.storage.local?.set?.({ cachedGameVersion: match[1] }).catch?.(() => {});
       }
     } catch (_) {}
   }

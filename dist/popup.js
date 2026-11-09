@@ -719,11 +719,11 @@ function renderResources(entries, selection) {
   if (resourceFilterToggle && resourceFilterToggleText) {
     resourceFilterToggle.hidden = false;
     if (showAllResources) {
-      resourceFilterToggle.className = 'inline-flex cursor-pointer items-center gap-1 shrink-0 rounded-md border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 shadow-2xs';
+      resourceFilterToggle.className = 'inline-flex cursor-pointer items-center gap-1 shrink-0 rounded-md border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 shadow-2xs dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300';
       resourceFilterToggleText.textContent = hiddenCount > 0 ? `Hide Inactive (${hiddenCount})` : 'Hide Inactive';
       resourceFilterToggle.title = 'Hide test, debug, and unreleased event resources';
     } else {
-      resourceFilterToggle.className = 'inline-flex cursor-pointer items-center gap-1 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700 shadow-2xs';
+      resourceFilterToggle.className = 'inline-flex cursor-pointer items-center gap-1 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700 shadow-2xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-blue-400';
       resourceFilterToggleText.textContent = hiddenCount > 0 ? `Show All (${hiddenCount})` : 'Show All';
       resourceFilterToggle.title = 'Show test, debug, and unreleased event resources';
     }
@@ -749,7 +749,7 @@ function renderResources(entries, selection) {
   if (!totalVisible) return showEmpty('No matching resources observed yet.');
 
   const list = document.createElement('div');
-  list.className = 'divide-y divide-slate-100';
+  list.className = 'divide-y divide-slate-100 dark:divide-slate-800';
 
   function createResourceRow(entry) {
     const amt = resourceData.amountAt(entry);
@@ -757,7 +757,7 @@ function renderResources(entries, selection) {
     const isCapped = Number.isFinite(amt) && Number.isFinite(cap) && amt >= cap;
 
     const label = document.createElement('label');
-    label.className = `flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-blue-50/50 ${isCapped ? 'bg-amber-50/40' : ''}`;
+    label.className = `flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-blue-50/50 dark:hover:bg-slate-800/60 ${isCapped ? 'bg-amber-50/40 dark:bg-amber-950/30' : ''}`;
     label.tabIndex = 0;
     label.dataset.resourceTooltip = '';
     setResourceTooltip(label, resourceTooltip(entry));
@@ -788,7 +788,7 @@ function renderResources(entries, selection) {
     iconSpan.setAttribute('aria-hidden', 'true');
 
     const name = document.createElement('span');
-    name.className = 'min-w-0 flex-1 truncate text-slate-700 flex items-center gap-1.5';
+    name.className = 'min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200 flex items-center gap-1.5';
     name.textContent = resourceLabel(entry);
     if (isCapped) {
       const fullBadge = document.createElement('span');
@@ -798,7 +798,7 @@ function renderResources(entries, selection) {
     }
 
     const amount = document.createElement('strong');
-    amount.className = 'tabular-nums text-slate-900';
+    amount.className = 'tabular-nums text-slate-900 dark:text-slate-100';
     amount.dataset.resourceAmount = entry.key;
     amount.textContent = resourceData.formatAmount(amt);
 
@@ -808,16 +808,16 @@ function renderResources(entries, selection) {
 
   if (renewableRows.length > 0) {
     const groupHeader = document.createElement('div');
-    groupHeader.className = 'sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-slate-100/90 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 backdrop-blur-xs';
-    groupHeader.innerHTML = `<span>⚡ Renewable Resources</span><span class="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">${renewableRows.length}</span>`;
+    groupHeader.className = 'sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-slate-100/90 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 backdrop-blur-xs dark:border-slate-800 dark:bg-slate-800/95 dark:text-slate-400';
+    groupHeader.innerHTML = `<span>⚡ Renewable Resources</span><span class="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-700/80 dark:text-slate-300">${renewableRows.length}</span>`;
     list.append(groupHeader);
     for (const entry of renewableRows) list.append(createResourceRow(entry));
   }
 
   if (otherRows.length > 0) {
     const groupHeader = document.createElement('div');
-    groupHeader.className = 'sticky top-0 z-10 flex items-center justify-between border-b border-t border-slate-200 bg-slate-100/90 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 backdrop-blur-xs';
-    groupHeader.innerHTML = `<span>📦 Other Resources</span><span class="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">${otherRows.length}</span>`;
+    groupHeader.className = 'sticky top-0 z-10 flex items-center justify-between border-b border-t border-slate-200 bg-slate-100/90 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 backdrop-blur-xs dark:border-slate-800 dark:bg-slate-800/95 dark:text-slate-400';
+    groupHeader.innerHTML = `<span>📦 Other Resources</span><span class="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-700/80 dark:text-slate-300">${otherRows.length}</span>`;
     list.append(groupHeader);
     for (const entry of otherRows) list.append(createResourceRow(entry));
   }
@@ -5149,9 +5149,28 @@ function renderGuildChat(cache, keepScroll = false, previousReadTime = 0) {
   }
 }
 
-function renderRpcQueue(count) {
+function renderRpcQueue(count, mode = currentRpcPolicy?.mode) {
+  const badge = document.querySelector('#rpc-queue-badge');
   const label = document.querySelector('#rpc-queue-count');
-  if (label) label.textContent = String(Number.isInteger(count) && count >= 0 ? count : 0);
+  if (label && count !== undefined) label.textContent = String(Number.isInteger(count) && count >= 0 ? count : 0);
+  if (badge) {
+    badge.hidden = mode !== 'piggyback';
+  }
+}
+
+function renderGameVersion(gameVersion) {
+  const gvEl = document.querySelector('#game-header-version');
+  if (!gvEl) return;
+  if (!gameVersion) {
+    gvEl.hidden = true;
+    gvEl.textContent = '';
+    return;
+  }
+  const cleanVer = String(gameVersion).trim();
+  const displayVer = cleanVer.startsWith('v.') || cleanVer.startsWith('v') ? cleanVer : `v.${cleanVer}`;
+  gvEl.textContent = `(Game ${displayVer})`;
+  gvEl.title = `Game client version: ${cleanVer}`;
+  gvEl.hidden = false;
 }
 
 function renderDraftAlert(cache) {
@@ -6672,7 +6691,7 @@ globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus']), chrome.storage.session.get('recordingState')
+    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
   ]);
   const cache = stored[CACHE_KEY] || {};
   currentCache = cache;
@@ -6710,10 +6729,11 @@ async function render() {
     }
     raidPreferencesLoaded = true;
   }
-  renderRpcQueue(stored.rpcQueueStatus?.count || 0);
   popupRpcEnabled = stored.popupRpcEnabled === true;
   currentRpcPolicy = { mode: ['direct', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'piggyback',
     monitor: stored.captureSettings?.interceptEnabled !== false };
+  renderRpcQueue(stored.rpcQueueStatus?.count || 0, currentRpcPolicy.mode);
+  renderGameVersion(stored.cachedGameVersion || session?.cachedGameVersion || cache.accountStatus?.data?.version);
   claimRpcStatus = stored.claimRpcStatus || null;
   currentGuildChatLastReadTime = Number(stored.guildChatLastReadTime || 0);
   favoriteHeroes = new Set(Array.isArray(stored.favoriteHeroes) ? stored.favoriteHeroes.map(String) : []);
@@ -7523,8 +7543,10 @@ document.querySelector('#setting-theme')?.addEventListener('change', async (even
 });
 
 document.querySelector('#socket-refresh-mode').addEventListener('change', async (event) => {
-  await chrome.storage.local.set({ socketRefreshMode:
-    ['direct', 'mqtt-piggyback'].includes(event.currentTarget.value) ? event.currentTarget.value : 'piggyback' });
+  const newMode = ['direct', 'mqtt-piggyback'].includes(event.currentTarget.value) ? event.currentTarget.value : 'piggyback';
+  currentRpcPolicy = { ...currentRpcPolicy, mode: newMode };
+  renderRpcQueue(undefined, newMode);
+  await chrome.storage.local.set({ socketRefreshMode: newMode });
 });
 
 document.querySelector('#popup-rpc-enabled').addEventListener('change', async (event) => {
@@ -7590,6 +7612,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       renderSettings();
     }
     if ('rpcQueueStatus' in changes) renderRpcQueue(changes.rpcQueueStatus.newValue?.count || 0);
+    if ('cachedGameVersion' in changes) renderGameVersion(changes.cachedGameVersion.newValue);
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
         'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'rpcMqttTelemetry' in changes || 'troopCapacitySettings' in changes || 'theme' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
