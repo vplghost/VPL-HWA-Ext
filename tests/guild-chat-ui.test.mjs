@@ -537,13 +537,15 @@ test('sendGuildChatMessage appends message with loading spinner and clears spinn
   assert.ok(chatMessages.textContent.includes('CommanderHero'), 'Pending message should display account name');
   assert.ok(chatMessages.innerHTML.includes('chat-spinner'), 'Pending message must have a loading spinner');
 
-  // Assert RPC call was constructed properly
+  // Assert RPC call was constructed properly (no feature: chat because root RPCs fail with Unsupported request if feature is passed)
   assert.ok(lastSendMessageCall, 'refresh-rpc must be dispatched');
   assert.equal(lastSendMessageCall.kind, 'refresh-rpc');
   assert.equal(lastSendMessageCall.calls[0].name, 'chatSendText');
+  assert.equal(lastSendMessageCall.calls[0].feature, undefined, 'chatSendText must not include feature: chat');
   assert.equal(lastSendMessageCall.calls[0].args.chatType, 'clan');
   assert.equal(lastSendMessageCall.calls[0].args.text, 'Raid boss level 150 ready!');
   assert.equal(lastSendMessageCall.calls[1].name, 'chatGetAll');
+  assert.equal(lastSendMessageCall.calls[1].feature, undefined, 'chatGetAll must not include feature: chat');
 
   // 2. Simulate game returning success
   replyCallback({ ok: true });

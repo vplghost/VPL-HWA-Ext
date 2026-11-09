@@ -830,6 +830,28 @@ html.dark body {
   color: #cbd5e1 !important;
 }
 
+/* Hero dialog upgrade skill button */
+.btn-upgrade-skill {
+  background-color: #059669;
+  color: #ffffff !important;
+}
+.btn-upgrade-skill:hover {
+  background-color: #10b981;
+}
+.dark .btn-upgrade-skill {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(52, 211, 153, 0.45) !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.35) !important;
+}
+.dark .btn-upgrade-skill:hover {
+  background-color: #10b981 !important;
+  border-color: rgba(52, 211, 153, 0.7) !important;
+}
+.btn-upgrade-skill svg {
+  stroke: #ffffff !important;
+}
+
 .dark #mqtt-trigger-panel {
   background-color: #131b2e !important;
   border-color: #1e293b !important;

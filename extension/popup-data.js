@@ -374,21 +374,49 @@
 
   // Candidate positions transcribed from the recorded match; RPC draft fields are XOR encoded.
   function observedDraftChoices(matchId) {
-    if (Number(matchId) !== 358789279) return null;
-    return {
-      defense: [
-        [4, 500, 8], [62, 19, 55], [501, 52, 25],
-        [70, 22, 10], [12, 26, 67]
-      ],
-      attack: [
-        [11, 1, 5], [24, 502, 70], [56, 33, 45],
-        [57, 62, 23], [3, 50, 73]
-      ],
-      enemyDefence: [
-        [null, 69, null], [10, null, null], [null, null, 53],
-        [75, null, null], [null, null, 71]
-      ]
-    };
+    const id = Number(matchId);
+    if (id === 358789279) {
+      return {
+        defense: [
+          [4, 500, 8], [62, 19, 55], [501, 52, 25],
+          [70, 22, 10], [12, 26, 67]
+        ],
+        attack: [
+          [11, 1, 5], [24, 502, 70], [56, 33, 45],
+          [57, 62, 23], [3, 50, 73]
+        ],
+        enemyDefence: [
+          [null, 69, null], [10, null, null], [null, null, 53],
+          [75, null, null], [null, null, 71]
+        ]
+      };
+    }
+    if (id === 360504765) {
+      return {
+        defense: [
+          [11, 2, 6],
+          [75, 54, 25],
+          [71, 77, 18],
+          [66, 67, 36],
+          [16, 1, 78]
+        ],
+        attack: [
+          [55, 14, 62],
+          [61, 36, 16],
+          [5, 501, 37],
+          [15, 503, 64],
+          [72, 8, 45]
+        ],
+        enemyDefence: [
+          [null, null, null],
+          [null, null, null],
+          [null, null, null],
+          [null, null, null],
+          [null, null, null]
+        ]
+      };
+    }
+    return null;
   }
 
   function validateDraftPicks(picks) {

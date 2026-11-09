@@ -308,9 +308,14 @@
         <h3 class="font-bold text-sm text-slate-900 dark:text-slate-100">Guild Chat</h3>
         <span id="guild-chat-count" class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-300">0</span>
       </div>
-      <button id="guild-chat-close" type="button" class="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-label="Close chat">
-        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
+      <div class="flex items-center gap-1">
+        <button id="guild-chat-refresh" type="button" class="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" title="Refresh messages" aria-label="Refresh messages">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+        <button id="guild-chat-close" type="button" class="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-label="Close chat">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
     </div>
     <div id="guild-chat-messages" class="h-80 overflow-y-auto p-3 space-y-2.5 bg-slate-50/50 dark:bg-slate-900/40">
     </div>

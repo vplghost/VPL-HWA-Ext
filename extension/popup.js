@@ -2023,6 +2023,12 @@ function renderDraft(cache, target = view) {
       defense: steps,
       attack: steps
     };
+  } else if (observedChoices) {
+    draftStepCandidates = {
+      matchId: observedMatchId,
+      defense: observedChoices.defense || globalThis.hwaHelperPopupData.defaultDraftCandidates('defense'),
+      attack: observedChoices.attack || globalThis.hwaHelperPopupData.defaultDraftCandidates('attack')
+    };
   } else if (draft.matchId && draftStepCandidates.matchId !== draft.matchId) {
     draftStepCandidates = {
       matchId: draft.matchId,
@@ -2621,7 +2627,6 @@ function renderDraft(cache, target = view) {
       roleChips.append(rBtn);
     });
     filterRow.append(searchInp, roleChips);
-    pickerCard.append(filterRow);
 
     // Hero List Grid
     const heroGrid = document.createElement('div');
@@ -2720,7 +2725,134 @@ function renderDraft(cache, target = view) {
 
     searchInp.addEventListener('input', (e) => renderHeroGrid(e.target.value));
     renderHeroGrid('');
-    pickerCard.append(heroGrid);
+
+    // Check if candidates for the active step are known (e.g. from observedChoices or hook)
+    const activeCandidatesMode = isViewingAttack ? 'attack' : 'defense';
+    const activeCurrentCandidates = observedChoices?.[activeCandidatesMode] || draftStepCandidates?.[activeCandidatesMode];
+    const activeStepCandidates = (activeCurrentCandidates?.[activeDraftStep] || []).filter((id) => Number.isInteger(id) && id > 0);
+    const hasStepCandidates = activeStepCandidates.length > 0;
+
+    if (hasStepCandidates) {
+      const stepCandidatesWrap = document.createElement('div');
+      stepCandidatesWrap.className = 'space-y-2';
+
+      const stepCandidatesHead = document.createElement('div');
+      stepCandidatesHead.className = 'flex items-center justify-between text-xs pb-1';
+      stepCandidatesHead.innerHTML = `
+        <span class="font-bold text-slate-800 flex items-center gap-1.5">
+          <span class="size-2 rounded-full bg-blue-600"></span>
+          <span>3 Lựa chọn cho Step ${activeDraftStep + 1} (Chọn 1 trong 3):</span>
+        </span>
+        <span class="text-[11px] text-blue-600 font-semibold">Bấm để chọn & tự chuyển bước</span>
+      `;
+      stepCandidatesWrap.append(stepCandidatesHead);
+
+      const candidateCardsGrid = document.createElement('div');
+      candidateCardsGrid.className = 'grid grid-cols-1 sm:grid-cols-3 gap-2.5';
+
+      activeStepCandidates.forEach((cHeroId, cIdx) => {
+        const meta = globalThis.hwaHelperHeroMetadata?.[cHeroId] || {};
+        const snap = draftSnapshot(isViewingAttack ? 'attack' : 'defence', cHeroId);
+        const isChosen = currentPicks[activeDraftStep] === cHeroId;
+        const alreadyPickIdx = currentPicks.findIndex((p) => p === cHeroId);
+        const isPickedInOtherStep = alreadyPickIdx !== -1 && alreadyPickIdx !== activeDraftStep;
+
+        const card = document.createElement('div');
+        card.className = `flex flex-col items-center justify-between p-3 rounded-xl border transition-all text-center relative ${
+          isChosen ? 'border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-400 shadow-sm' :
+          isPickedInOtherStep ? 'border-slate-200 bg-slate-100/70 text-slate-400 opacity-60' :
+          'border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs cursor-pointer'
+        }`;
+
+        const cardTop = document.createElement('div');
+        cardTop.className = 'w-full flex items-center justify-between mb-1 text-[10px]';
+        const tag = document.createElement('span');
+        tag.className = 'font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600';
+        tag.textContent = `Lựa chọn #${cIdx + 1}`;
+        cardTop.append(tag);
+
+        if (Number.isInteger(snap?.star)) {
+          const starTag = document.createElement('span');
+          starTag.className = 'font-bold text-amber-700';
+          starTag.textContent = snap.star >= 6 ? '★6' : `★${snap.star}`;
+          cardTop.append(starTag);
+        }
+        card.append(cardTop);
+
+        const avWrap = document.createElement('div');
+        avWrap.className = 'my-1';
+        const aPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${cHeroId}.webp` : null);
+        const cardGlow = starGlowClass(snap?.star, false);
+        if (aPath) {
+          const aImg = document.createElement('img');
+          aImg.src = aPath;
+          aImg.className = `size-12 rounded-full object-cover shrink-0 ${cardGlow}`;
+          avWrap.append(aImg);
+        } else {
+          avWrap.append(createInitialsBadge(meta.name || `#${cHeroId}`, meta.faction, true));
+        }
+        card.append(avWrap);
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'text-xs font-bold text-slate-900 truncate max-w-[120px]';
+        nameDiv.textContent = meta.name || globalThis.hwaHelperNameMap.hero(cHeroId) || `#${cHeroId}`;
+        card.append(nameDiv);
+
+        if (meta.role) {
+          const roleBadge = document.createElement('span');
+          roleBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium my-1';
+          roleBadge.textContent = meta.role;
+          card.append(roleBadge);
+        }
+
+        const pickActionBtn = document.createElement('button');
+        pickActionBtn.type = 'button';
+        pickActionBtn.disabled = isPickedInOtherStep;
+        pickActionBtn.className = isChosen ?
+          'mt-2 w-full py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-xs' :
+          isPickedInOtherStep ?
+          'mt-2 w-full py-1.5 rounded-lg text-xs font-semibold bg-slate-200 text-slate-500 cursor-not-allowed' :
+          'mt-2 w-full py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-xs';
+        pickActionBtn.textContent = isChosen ? '✓ Đang chọn' : (isPickedInOtherStep ? `Đã chọn ở Step ${alreadyPickIdx + 1}` : 'Chọn Hero này');
+
+        const handlePick = () => {
+          if (isPickedInOtherStep) return;
+          currentPicks[activeDraftStep] = cHeroId;
+          const nextEmpty = currentPicks.findIndex((p, idx) => idx > activeDraftStep && !p);
+          if (nextEmpty !== -1) {
+            activeDraftStep = nextEmpty;
+          } else {
+            const anyEmpty = currentPicks.findIndex((p) => !p);
+            if (anyEmpty !== -1) activeDraftStep = anyEmpty;
+          }
+          render();
+        };
+
+        if (!isPickedInOtherStep) {
+          card.addEventListener('click', handlePick);
+          pickActionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handlePick();
+          });
+        }
+        card.append(pickActionBtn);
+        candidateCardsGrid.append(card);
+      });
+
+      stepCandidatesWrap.append(candidateCardsGrid);
+      pickerCard.append(stepCandidatesWrap);
+
+      const manualDetails = document.createElement('details');
+      manualDetails.className = 'pt-1 border-t border-slate-200/80 text-xs';
+      const manualSummary = document.createElement('summary');
+      manualSummary.className = 'cursor-pointer text-slate-500 hover:text-slate-800 font-medium py-1 select-none';
+      manualSummary.textContent = '🔍 Hoặc tìm kiếm chọn hero khác (Thủ công / Ngoài 3 đề xuất)...';
+      manualDetails.append(manualSummary);
+      manualDetails.append(filterRow, heroGrid);
+      pickerCard.append(manualDetails);
+    } else {
+      pickerCard.append(filterRow, heroGrid);
+    }
 
     // Bottom Action Bar: Clear step pick + Submit Button
     const bottomBar = document.createElement('div');
@@ -5994,8 +6126,8 @@ function sendGuildChatMessage(text, cache = typeof currentCache !== 'undefined' 
   }
 
   const calls = [
-    { name: 'chatSendText', feature: 'chat', args: { chatType: 'clan', text: trimmed } },
-    { name: 'chatGetAll', feature: 'chat', args: { chatType: 'clan' } }
+    { name: 'chatSendText', args: { chatType: 'clan', text: trimmed } },
+    { name: 'chatGetAll', args: { chatType: 'clan' } }
   ];
 
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -9248,10 +9380,10 @@ function renderHeroDialog(heroId, cache) {
     } else {
       const plusBtn = document.createElement('button');
       plusBtn.type = 'button';
-      plusBtn.className = 'btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-transform active:scale-95';
+      plusBtn.className = 'btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-all active:scale-95 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white dark:border dark:border-emerald-400/50';
       plusBtn.title = `Upgrade ${skillName} to Lv. ${curLevel + 1}`;
       plusBtn.setAttribute('aria-label', `Upgrade ${skillName} to Lv. ${curLevel + 1}`);
-      plusBtn.innerHTML = '<span>➕</span>';
+      plusBtn.innerHTML = '<svg class="size-3.5 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 
       plusBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -9723,7 +9855,8 @@ const refreshGroups = {
     { name: 'arenaGetAll' },
     { name: 'clanWarGetBriefInfo' },
     { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
-    { name: 'mailGetAll' }
+    { name: 'mailGetAll' },
+    { name: 'chatGetAll', args: { chatType: 'clan' } }
   ],
   heroes: [
     { name: 'heroGetAll' }
@@ -10398,6 +10531,17 @@ setInterval(refreshTimed, 1000);
 const chatFab = document.querySelector('#guild-chat-fab');
 const chatPanel = document.querySelector('#guild-chat-panel');
 const chatClose = document.querySelector('#guild-chat-close');
+const chatRefresh = document.querySelector('#guild-chat-refresh');
+
+function triggerGuildChatRefresh() {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    if (chatRefresh) chatRefresh.classList.add('animate-spin');
+    chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls: [{ name: 'chatGetAll', args: { chatType: 'clan' } }] }, () => {
+      setTimeout(() => chatRefresh?.classList?.remove('animate-spin'), 600);
+    });
+  }
+}
+
 if (chatFab && chatPanel) {
   chatFab.addEventListener('click', async () => {
     chatPanel.hidden = !chatPanel.hidden;
@@ -10406,12 +10550,20 @@ if (chatFab && chatPanel) {
       const prevRead = currentGuildChatLastReadTime;
       renderGuildChat(currentCache, false, prevRead);
       await markGuildChatAsRead(currentCache);
+      if (popupRpcEnabled) {
+        triggerGuildChatRefresh();
+      }
       const input = document.querySelector('#guild-chat-input');
       if (input && typeof input.focus === 'function') input.focus();
       else chatClose?.focus?.();
     } else {
       updateGuildChatBadge(currentCache, currentGuildChatLastReadTime);
     }
+  });
+}
+if (chatRefresh) {
+  chatRefresh.addEventListener('click', () => {
+    triggerGuildChatRefresh();
   });
 }
 if (chatClose && chatPanel) {

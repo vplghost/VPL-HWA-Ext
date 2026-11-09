@@ -604,3 +604,54 @@ test('Legend Draft displays server rejection error banner and keeps slots editab
   assert.doesNotMatch(viewEl.textContent, /Lineup successfully locked/);
   assert.match(viewEl.textContent, /Step 1/);
 });
+
+test('Legend Draft presents 3 candidate cards per step for match 360504765 and advances step on pick', async () => {
+  const viewEl = new MockElement('div');
+  const statusEl = new MockElement('div');
+  const searchEl = new MockElement('input');
+  const context = await createDraftContext(viewEl, statusEl, searchEl);
+
+  const choices = context.hwaHelperPopupData.observedDraftChoices(360504765);
+  assert.ok(choices, 'Match 360504765 choices should be defined');
+  assert.equal(choices.defense.length, 5);
+  assert.equal(choices.attack.length, 5);
+  assert.deepEqual(Array.from(choices.defense[0]), [11, 2, 6]); // Chabba, Galahad, Phobos
+  assert.deepEqual(Array.from(choices.defense[1]), [75, 54, 25]); // Peech, Iris, Krista
+  assert.deepEqual(Array.from(choices.attack[0]), [55, 14, 62]); // Mushy and Shroom, Ginger, Amira
+
+  const draftCache = {
+    legendDraftStatus: {
+      data: {
+        active: true,
+        stageId: 2, // Defense draft
+        matchId: 360504765,
+        stageFinishTs: Math.floor(Date.now() / 1000) + 90,
+        defenceHeroes: []
+      }
+    },
+    heroGetAll: { data: {} }
+  };
+
+  context.renderDraft(draftCache);
+
+  // Should render 3 choices banner for Step 1
+  assert.match(viewEl.textContent, /3 Lựa chọn cho Step 1 \(Chọn 1 trong 3\)/);
+  assert.match(viewEl.textContent, /Chabba/);
+  assert.match(viewEl.textContent, /Galahad/);
+  assert.match(viewEl.textContent, /Phobos/);
+
+  // Pick Chabba (choice 1)
+  const buttons = viewEl.querySelectorAll('button');
+  const pickChabbaBtn = buttons.find(b => b.textContent === 'Chọn Hero này' || b.textContent.includes('Chabba'));
+  assert.ok(pickChabbaBtn, 'Pick button for candidate should exist');
+  pickChabbaBtn.dispatchEvent('click');
+
+  context.renderDraft(draftCache);
+
+  // Step 1 should be selected, status updated to 1/5, and active step auto-advanced to Step 2
+  assert.match(statusEl.textContent, /Selected 1\/5 steps/);
+  assert.match(viewEl.textContent, /3 Lựa chọn cho Step 2 \(Chọn 1 trong 3\)/);
+  assert.match(viewEl.textContent, /Peech/);
+  assert.match(viewEl.textContent, /Iris/);
+  assert.match(viewEl.textContent, /Krista/);
+});
