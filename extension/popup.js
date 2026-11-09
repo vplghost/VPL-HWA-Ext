@@ -6164,6 +6164,7 @@ let nextBuildingFilterQuery = '';
 let nextBuildingSortOrder = 'level-desc';
 let nextResearchFilterQuery = '';
 let nextResearchSortOrder = 'level-desc';
+let currentBuildingQueue = { enabled: true, items: [] };
 
 function formatRemainingHms(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return '00:00';
@@ -6177,6 +6178,17 @@ function formatRemainingHms(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function saveBuildingQueue() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.set({ buildingQueue: currentBuildingQueue }, () => {
+      try {
+        const p = chrome.runtime?.sendMessage?.({ kind: 'building-queue-action', action: 'sync' });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch {}
+    });
+  }
+}
+
 function renderBuildingDialog(cache) {
   const host = document.querySelector('#building-dialog-body');
   const statusWrap = document.querySelector('#building-dialog-status');
@@ -6187,8 +6199,12 @@ function renderBuildingDialog(cache) {
   const now = Date.now();
   const getBuildingName = (id) => globalThis.hwaHelperNameMap?.building?.(id) || (id ? `Building #${id}` : 'Building');
   const rawQueues = cache?.buildingStatus?.data?.queues || [];
-  const activeQueues = rawQueues.filter((q) =>
+  const inProgressQueues = rawQueues.filter((q) =>
     Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now
+  );
+  const activeQueues = inProgressQueues;
+  const finishedQueues = rawQueues.filter((q) =>
+    Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs <= now
   );
 
   // 1. Title bar status
@@ -6202,6 +6218,14 @@ function renderBuildingDialog(cache) {
       badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
       badge.innerHTML = `<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>Active: <span class="truncate max-w-[140px]">${name}</span>${lvl} · <span data-experimental-until="${q.startDate + q.durationMs}" data-countdown-format="hms">${formatRemainingHms(rem)}</span>`;
       statusWrap.append(badge);
+    } else if (finishedQueues.length > 0) {
+      const q = finishedQueues[0];
+      const name = getBuildingName(q.buildingId);
+      const lvl = q.level ? ` Lv. ${q.level}` : '';
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+      badge.innerHTML = `<span class="size-1.5 rounded-full bg-emerald-500"></span>Ready to finish: <span class="truncate max-w-[140px]">${name}</span>${lvl}`;
+      statusWrap.append(badge);
     } else {
       const badge = document.createElement('span');
       badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
@@ -6214,13 +6238,69 @@ function renderBuildingDialog(cache) {
   const queueSection = document.createElement('section');
   queueSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
   const queueTitle = document.createElement('h3');
-  queueTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2';
-  queueTitle.innerHTML = '<span>🏗️</span> Active Construction Queue';
+  queueTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center justify-between gap-2';
+  queueTitle.innerHTML = '<span class="flex items-center gap-2"><span>🏗️</span> Active Construction Queue</span>';
   queueSection.append(queueTitle);
 
-  if (activeQueues.length > 0) {
+  const hasQueues = activeQueues.length > 0 || finishedQueues.length > 0;
+  if (hasQueues) {
     const queueList = document.createElement('div');
     queueList.className = 'space-y-3';
+
+    // 1. Finished buildings (ready to finalize)
+    for (const f of finishedQueues) {
+      const card = document.createElement('div');
+      card.className = 'rounded-lg border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/30';
+      const name = getBuildingName(f.buildingId);
+
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between gap-2 flex-wrap';
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'flex items-center gap-2 min-w-0';
+      infoDiv.innerHTML = `
+        <span class="text-xl">🎉</span>
+        <div>
+          <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">${name} · Complete</div>
+          <div class="text-xs text-emerald-700 dark:text-emerald-400">Queue #${f.queueNumber ?? 0} · Target Lv. ${f.level ?? '?'} finished</div>
+        </div>
+      `;
+
+      const finishBtn = document.createElement('button');
+      finishBtn.type = 'button';
+      finishBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-colors';
+      finishBtn.innerHTML = '<span>✅</span><span>Finish</span>';
+      finishBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        finishBtn.disabled = true;
+        finishBtn.textContent = 'Finishing...';
+        const calls = [
+          {
+            name: 'completeConstruction',
+            feature: 'building',
+            args: {
+              buildingId: f.buildingId,
+              nextLevel: f.level,
+              completeDate: Date.now()
+            }
+          },
+          { name: 'getSummary', feature: 'building', args: {} }
+        ];
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, () => {
+            setTimeout(() => {
+              if (typeof renderBuildingDialog === 'function' && typeof currentCache !== 'undefined') {
+                renderBuildingDialog(currentCache);
+              }
+            }, 800);
+          });
+        }
+      });
+      row.append(infoDiv, finishBtn);
+      card.append(row);
+      queueList.append(card);
+    }
+
+    // 2. In-progress buildings
     for (const q of activeQueues) {
       const card = document.createElement('div');
       card.className = 'rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/20';
@@ -6266,6 +6346,176 @@ function renderBuildingDialog(cache) {
     emptyBox.innerHTML = '<span class="text-xl">✅</span><div><div class="font-semibold text-slate-700 dark:text-slate-300">Builder is currently idle</div><div>No construction in progress. Ready for new building upgrades.</div></div>';
     queueSection.append(emptyBox);
   }
+
+  // Automation Queue Subsection (inside queueSection to preserve 3-section layout)
+  const autoBox = document.createElement('div');
+  autoBox.className = 'mt-3 pt-3 border-t border-slate-100 dark:border-slate-800';
+
+  const autoHeader = document.createElement('div');
+  autoHeader.className = 'flex items-center justify-between gap-2 flex-wrap mb-2';
+  const autoTitle = document.createElement('div');
+  autoTitle.className = 'flex items-center gap-2';
+  const queuedCount = currentBuildingQueue.items?.length || 0;
+  autoTitle.innerHTML = `<span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><span>⚡</span> Auto-Build Queue</span><span class="text-2xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">${queuedCount} queued</span>`;
+  autoHeader.append(autoTitle);
+
+  const autoControls = document.createElement('div');
+  autoControls.className = 'flex items-center gap-2';
+
+  const autoToggleLabel = document.createElement('label');
+  autoToggleLabel.className = 'inline-flex items-center gap-1.5 text-2xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer select-none';
+  const autoToggleInput = document.createElement('input');
+  autoToggleInput.type = 'checkbox';
+  autoToggleInput.checked = currentBuildingQueue.enabled !== false;
+  autoToggleInput.className = 'rounded border-slate-300 text-amber-500 focus:ring-amber-400 h-3.5 w-3.5';
+  autoToggleInput.addEventListener('change', (e) => {
+    currentBuildingQueue.enabled = e.target.checked;
+    saveBuildingQueue();
+  });
+  const autoText = document.createElement('span');
+  autoText.textContent = 'Auto-advance';
+  autoToggleLabel.append(autoToggleInput, autoText);
+  autoControls.append(autoToggleLabel);
+
+  if (queuedCount > 0) {
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'text-2xs text-rose-500 hover:text-rose-600 dark:text-rose-400 font-medium px-1.5 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer';
+    clearBtn.textContent = 'Clear';
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (globalThis.hwaHelperBuildingQueue?.clearQueue) {
+        currentBuildingQueue = globalThis.hwaHelperBuildingQueue.clearQueue(currentBuildingQueue);
+      } else {
+        currentBuildingQueue.items = [];
+      }
+      saveBuildingQueue();
+      renderBuildingDialog(cache);
+    });
+    autoControls.append(clearBtn);
+  }
+  autoHeader.append(autoControls);
+  autoBox.append(autoHeader);
+
+  const queueTimeline = globalThis.hwaHelperBuildingQueue?.calculateQueueTimeline
+    ? globalThis.hwaHelperBuildingQueue.calculateQueueTimeline(rawQueues, currentBuildingQueue.items, now)
+    : { items: currentBuildingQueue.items || [], totalDurationMs: 0, allDoneAt: now };
+
+  if (queueTimeline.items && queueTimeline.items.length > 0) {
+    const autoList = document.createElement('div');
+    autoList.className = 'space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5';
+
+    queueTimeline.items.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between gap-2 p-2 rounded-lg border border-slate-200/80 bg-slate-50/70 text-xs dark:border-slate-700/60 dark:bg-slate-800/60';
+      const name = getBuildingName(item.buildingId);
+      const estStart = item.estStart ? new Date(item.estStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const estFinish = item.estFinish ? new Date(item.estFinish).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+      const left = document.createElement('div');
+      left.className = 'min-w-0 flex items-center gap-2 flex-1';
+      left.innerHTML = `
+        <span class="inline-flex items-center justify-center size-5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 text-2xs font-bold shrink-0">#${idx + 1}</span>
+        <div class="min-w-0">
+          <div class="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
+            <span>${name}</span>
+            <span class="text-2xs font-normal text-slate-400">(ID: ${item.buildingId})</span>
+          </div>
+          <div class="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
+            <span class="font-bold text-amber-600 dark:text-amber-400">Lv. ${item.currentLevel ?? '?'} ➔ ${item.nextLevel}</span>
+            <span>·</span>
+            <span>⏱ ${formatRemainingHms(item.durationMs || 1000)}</span>
+            ${estFinish ? `<span>·</span><span>Est: ${estStart} ➔ ${estFinish}</span>` : ''}
+          </div>
+        </div>
+      `;
+      row.append(left);
+
+      const right = document.createElement('div');
+      right.className = 'flex items-center gap-1 shrink-0';
+
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.title = 'Move up';
+      upBtn.disabled = idx === 0;
+      upBtn.className = idx === 0
+        ? 'size-6 rounded flex items-center justify-center text-2xs text-slate-300 dark:text-slate-600 cursor-not-allowed'
+        : 'size-6 rounded flex items-center justify-center text-2xs text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer';
+      upBtn.innerHTML = '▲';
+      upBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (idx > 0) {
+          if (globalThis.hwaHelperBuildingQueue?.reorderQueue) {
+            currentBuildingQueue = globalThis.hwaHelperBuildingQueue.reorderQueue(currentBuildingQueue, idx, idx - 1);
+          } else {
+            const removed = currentBuildingQueue.items.splice(idx, 1)[0];
+            currentBuildingQueue.items.splice(idx - 1, 0, removed);
+          }
+          saveBuildingQueue();
+          renderBuildingDialog(cache);
+        }
+      });
+      right.append(upBtn);
+
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.title = 'Move down';
+      downBtn.disabled = idx === queueTimeline.items.length - 1;
+      downBtn.className = idx === queueTimeline.items.length - 1
+        ? 'size-6 rounded flex items-center justify-center text-2xs text-slate-300 dark:text-slate-600 cursor-not-allowed'
+        : 'size-6 rounded flex items-center justify-center text-2xs text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer';
+      downBtn.innerHTML = '▼';
+      downBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (idx < currentBuildingQueue.items.length - 1) {
+          if (globalThis.hwaHelperBuildingQueue?.reorderQueue) {
+            currentBuildingQueue = globalThis.hwaHelperBuildingQueue.reorderQueue(currentBuildingQueue, idx, idx + 1);
+          } else {
+            const removed = currentBuildingQueue.items.splice(idx, 1)[0];
+            currentBuildingQueue.items.splice(idx + 1, 0, removed);
+          }
+          saveBuildingQueue();
+          renderBuildingDialog(cache);
+        }
+      });
+      right.append(downBtn);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.title = 'Remove from queue';
+      removeBtn.className = 'size-6 rounded flex items-center justify-center text-2xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer';
+      removeBtn.innerHTML = '✕';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (globalThis.hwaHelperBuildingQueue?.removeFromQueue) {
+          currentBuildingQueue = globalThis.hwaHelperBuildingQueue.removeFromQueue(currentBuildingQueue, idx);
+        } else {
+          currentBuildingQueue.items.splice(idx, 1);
+        }
+        saveBuildingQueue();
+        renderBuildingDialog(cache);
+      });
+      right.append(removeBtn);
+
+      row.append(right);
+      autoList.append(row);
+    });
+
+    autoBox.append(autoList);
+
+    const autoFooter = document.createElement('div');
+    autoFooter.className = 'mt-2 text-2xs text-slate-400 dark:text-slate-500 flex justify-between items-center';
+    const allDoneStr = queueTimeline.allDoneAt ? new Date(queueTimeline.allDoneAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    autoFooter.innerHTML = `<span>Total time: <span class="font-semibold text-slate-600 dark:text-slate-300">${formatRemainingHms(queueTimeline.totalDurationMs)}</span></span><span>Completion: <span class="font-semibold text-slate-600 dark:text-slate-300">${allDoneStr}</span></span>`;
+    autoBox.append(autoFooter);
+  } else {
+    const queueEmptyP = document.createElement('p');
+    queueEmptyP.className = 'text-2xs text-slate-400 italic py-1';
+    queueEmptyP.textContent = 'Queue is empty. Click "+ Queue" on candidates below to automate next upgrades.';
+    autoBox.append(queueEmptyP);
+  }
+
+  queueSection.append(autoBox);
   host.append(queueSection);
 
   // Extract known city buildings
@@ -6285,7 +6535,7 @@ function renderBuildingDialog(cache) {
     }
   }
 
-  // Flag upgrading buildings
+  // Flag upgrading buildings from active queues
   for (const q of activeQueues) {
     const bId = Number(q.buildingId);
     if (buildingMap.has(bId)) {
@@ -6320,14 +6570,30 @@ function renderBuildingDialog(cache) {
 
   const allBuildings = Array.from(buildingMap.values());
   const builtBuildings = allBuildings.filter((b) => b.isBuilt);
+
+  // Calculate simulated levels including active queue and queued automation items
+  const simulatedLevels = globalThis.hwaHelperBuildingQueue?.getSimulatedLevels
+    ? globalThis.hwaHelperBuildingQueue.getSimulatedLevels(buildingMap, rawQueues, currentBuildingQueue.items)
+    : (() => {
+        const sim = new Map();
+        for (const [id, b] of buildingMap.entries()) sim.set(id, b.level);
+        for (const q of rawQueues) {
+          if (Number.isFinite(q.buildingId) && Number.isFinite(q.level)) {
+            sim.set(Number(q.buildingId), Math.max(sim.get(Number(q.buildingId)) || 0, q.level));
+          }
+        }
+        for (const item of currentBuildingQueue?.items || []) {
+          if (Number.isFinite(item.buildingId) && Number.isFinite(item.nextLevel)) {
+            sim.set(Number(item.buildingId), Math.max(sim.get(Number(item.buildingId)) || 0, item.nextLevel));
+          }
+        }
+        return sim;
+      })();
+
   const hallOfHeroes = buildingMap.get(20);
-  const hallLevel = Number.isFinite(hallOfHeroes?.level) ? hallOfHeroes.level : Infinity;
+  const hallLevel = simulatedLevels.get(20) ?? (Number.isFinite(hallOfHeroes?.level) ? hallOfHeroes.level : Infinity);
 
   const bHelper = globalThis.hwaHelperBuildingData;
-  const buildingLevelsMap = new Map();
-  for (const [id, b] of buildingMap.entries()) {
-    buildingLevelsMap.set(id, b.level);
-  }
   const resourcesMap = new Map([
     [2, cache['resource:material:2']?.data?.amount ?? 0],
     [3, cache['resource:material:3']?.data?.amount ?? 0],
@@ -6336,11 +6602,25 @@ function renderBuildingDialog(cache) {
   ]);
 
   const nextUpgradable = allBuildings
+    .map((b) => {
+      const curLvl = simulatedLevels.get(b.id) ?? (b.isBuilt ? b.level : 0);
+      const nextLvl = (curLvl > 0 || b.isBuilt) ? (curLvl + 1) : 1;
+      const durationMs = bHelper?.calculateEffectiveDurationMs
+        ? bHelper.calculateEffectiveDurationMs(b.id, nextLvl)
+        : 1000;
+      return {
+        ...b,
+        level: curLvl,
+        currentLevel: curLvl,
+        nextLevel: nextLvl,
+        durationMs
+      };
+    })
     .filter((b) => {
       if (!b.isBuilt || b.level <= 0 || b.isUpgrading) return false;
       if (b.id !== 20 && b.level >= hallLevel) return false;
       if (bHelper?.getMissingRequirements) {
-        const missingReqs = bHelper.getMissingRequirements(b.id, b.nextLevel, buildingLevelsMap);
+        const missingReqs = bHelper.getMissingRequirements(b.id, b.nextLevel, simulatedLevels);
         if (missingReqs.length > 0) return false;
       }
       return true;
@@ -6399,6 +6679,8 @@ function renderBuildingDialog(cache) {
   const sortOptions = [
     { value: 'level-desc', label: 'Level: High → Low' },
     { value: 'level-asc', label: 'Level: Low → High' },
+    { value: 'time-asc', label: 'Build Time: Shortest → Longest' },
+    { value: 'time-desc', label: 'Build Time: Longest → Shortest' },
     { value: 'name-asc', label: 'Name: A → Z' }
   ];
   for (const opt of sortOptions) {
@@ -6429,6 +6711,12 @@ function renderBuildingDialog(cache) {
         return name.includes(query) || idStr.includes(query);
       })
       .sort((a, b) => {
+        if (nextBuildingSortOrder === 'time-asc') {
+          return (a.durationMs - b.durationMs) || (b.level - a.level) || (a.id - b.id);
+        }
+        if (nextBuildingSortOrder === 'time-desc') {
+          return (b.durationMs - a.durationMs) || (b.level - a.level) || (a.id - b.id);
+        }
         if (nextBuildingSortOrder === 'level-asc') {
           return (a.level - b.level) || (a.id - b.id);
         }
@@ -6452,33 +6740,65 @@ function renderBuildingDialog(cache) {
         const card = document.createElement('div');
         card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-amber-200 hover:bg-amber-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-amber-900/50';
         const name = getBuildingName(b.id);
-
-        const durationMs = bHelper?.calculateEffectiveDurationMs
+        const durationMs = b.durationMs || (bHelper?.calculateEffectiveDurationMs
           ? bHelper.calculateEffectiveDurationMs(b.id, b.nextLevel)
-          : 1000;
+          : 1000);
         const missingCosts = bHelper?.getMissingCosts
           ? bHelper.getMissingCosts(b.id, b.nextLevel, resourcesMap)
           : [];
         const hasEnoughResources = missingCosts.length === 0;
 
+        const estFinishTs = (queueTimeline.allDoneAt || now) + durationMs;
+        const estFinishDate = new Date(estFinishTs);
+
         const infoCol = document.createElement('div');
         infoCol.className = 'min-w-0 flex-1';
         infoCol.innerHTML = `
           <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
-          <div class="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400">
+          <div class="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400 flex-wrap">
             <span>ID: ${b.id}</span>
             ${durationMs > 0 ? `<span>·</span><span>⏱ ${formatRemainingHms(durationMs)}</span>` : ''}
+            <span>·</span>
+            <span class="text-slate-400">🏁 ${estFinishDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         `;
         card.append(infoCol);
 
         const actionCol = document.createElement('div');
-        actionCol.className = 'flex items-center gap-2 shrink-0';
+        actionCol.className = 'flex items-center gap-1.5 shrink-0';
 
         const levelBadge = document.createElement('div');
         levelBadge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
         levelBadge.textContent = b.isBuilt ? `Lv. ${b.level} ➔ ${b.nextLevel}` : 'Build Lv. 1';
         actionCol.append(levelBadge);
+
+        const queueBtn = document.createElement('button');
+        queueBtn.type = 'button';
+        queueBtn.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600';
+        queueBtn.innerHTML = '<span>➕</span><span>Queue</span>';
+        queueBtn.title = `Add ${name} Lv. ${b.nextLevel} to auto-build queue`;
+        queueBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (globalThis.hwaHelperBuildingQueue?.addToQueue) {
+            currentBuildingQueue = globalThis.hwaHelperBuildingQueue.addToQueue(currentBuildingQueue, {
+              buildingId: b.id,
+              currentLevel: b.currentLevel ?? b.level,
+              nextLevel: b.nextLevel,
+              durationMs
+            });
+          } else {
+            currentBuildingQueue.items = currentBuildingQueue.items || [];
+            currentBuildingQueue.items.push({
+              buildingId: b.id,
+              currentLevel: b.currentLevel ?? b.level,
+              nextLevel: b.nextLevel,
+              durationMs
+            });
+          }
+          saveBuildingQueue();
+          renderBuildingDialog(cache);
+        });
+        actionCol.append(queueBtn);
 
         const isQueueBusy = activeQueues.length > 0;
         const buildBtn = document.createElement('button');
@@ -6506,19 +6826,29 @@ function renderBuildingDialog(cache) {
           if (buildBtn.disabled) return;
           buildBtn.disabled = true;
           buildBtn.textContent = 'Building...';
-          const calls = [
-            {
-              name: 'startConstruction',
+          const calls = [];
+          for (const f of finishedQueues) {
+            calls.push({
+              name: 'completeConstruction',
               feature: 'building',
               args: {
-                buildingId: b.id,
-                nextLevel: b.nextLevel,
-                startDate: Date.now(),
-                durationMs
+                buildingId: f.buildingId,
+                nextLevel: f.level,
+                completeDate: Date.now()
               }
-            },
-            { name: 'getSummary', feature: 'building', args: {} }
-          ];
+            });
+          }
+          calls.push({
+            name: 'startConstruction',
+            feature: 'building',
+            args: {
+              buildingId: b.id,
+              nextLevel: b.nextLevel,
+              startDate: Date.now(),
+              durationMs
+            }
+          });
+          calls.push({ name: 'getSummary', feature: 'building', args: {} });
           if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
             chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
               if (!response?.ok) {
@@ -7560,9 +7890,10 @@ globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
+    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
   ]);
   const cache = stored[CACHE_KEY] || {};
+  if (stored.buildingQueue) currentBuildingQueue = stored.buildingQueue;
   currentCache = cache;
   render.customTeams = stored.customTeams?.[String(cache.accountStatus?.data?.id)] || [];
   towerRunState = stored.towerRun || null;
@@ -8486,7 +8817,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if ('captureSettings' in changes || 'popupRpcEnabled' in changes ||
         'socketRefreshMode' in changes || 'rpcMqttTriggerStatus' in changes || 'rpcMqttTelemetry' in changes || 'troopCapacitySettings' in changes || 'theme' in changes) renderSettings();
     if ('gameEngineStatus' in changes) renderEngineStatus(changes.gameEngineStatus.newValue);
-    if ('troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('buildingQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes || 'rpcMqttTelemetry' in changes || 'rpcMqttTriggerStatus' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {

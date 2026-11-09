@@ -1,0 +1,169 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import vm from 'node:vm';
+
+const queueJs = await readFile(new URL('../extension/building-queue.js', import.meta.url), 'utf8');
+const buildingDataJs = await readFile(new URL('../extension/building-data.js', import.meta.url), 'utf8');
+
+function createContext() {
+  const context = vm.createContext({ globalThis: {} });
+  vm.runInContext(buildingDataJs, context);
+  vm.runInContext(queueJs, context);
+  return context.globalThis;
+}
+
+test('getSimulatedLevels calculates projected levels across current buildings, active queues, and queued items', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+
+  const currentBuildings = [
+    { buildingId: 20, level: 19 },
+    { buildingId: 21, level: 5 }
+  ];
+  const rawQueues = [
+    { buildingId: 20, level: 20, startDate: Date.now(), durationMs: 10000 }
+  ];
+  const queueItems = [
+    { buildingId: 21, nextLevel: 6 },
+    { buildingId: 21, nextLevel: 7 }
+  ];
+
+  const simulated = qHelper.getSimulatedLevels(currentBuildings, rawQueues, queueItems);
+  assert.equal(simulated.get(20), 20, 'Hall of Heroes should project to level 20');
+  assert.equal(simulated.get(21), 7, 'House 1 should project to level 7 (highest queued)');
+});
+
+test('virtual prerequisite projection allows adding dependent buildings when prerequisite is queued', () => {
+  const { hwaHelperBuildingQueue: qHelper, hwaHelperBuildingData: bHelper } = createContext();
+
+  // Initially: Hall 20 is level 19. Archery Barracks (#43) is 19.
+  // Infirmary (#162) requires Hall 20.
+  const currentBuildings = [
+    { id: 20, level: 19, isBuilt: true },
+    { id: 43, level: 19, isBuilt: true },
+    { id: 162, level: 19, isBuilt: true }
+  ];
+
+  // 1. Without Hall 20 in queue: Infirmary (#162) cannot be upgraded to 20
+  const initialSim = qHelper.getSimulatedLevels(currentBuildings, [], []);
+  const initialCandidates = qHelper.getEligibleCandidates(currentBuildings, initialSim, bHelper);
+  assert.ok(!initialCandidates.some((c) => c.id === 162), 'Infirmary should not be eligible before Hall 20 is queued');
+
+  // 2. Queue Hall 20 -> 20
+  const queuedItems = [{ buildingId: 20, nextLevel: 20, durationMs: 12240000 }];
+  const projectedSim = qHelper.getSimulatedLevels(currentBuildings, [], queuedItems);
+  const projectedCandidates = qHelper.getEligibleCandidates(currentBuildings, projectedSim, bHelper);
+
+  // Now Infirmary (#162) must be eligible!
+  const infirmary = projectedCandidates.find((c) => c.id === 162);
+  assert.ok(infirmary, 'Infirmary must become eligible after Hall 20 is added to queue');
+  assert.equal(infirmary.nextLevel, 20);
+});
+
+test('calculateQueueTimeline calculates cumulative start and finish times', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+  const now = 1000000;
+
+  const rawQueues = [
+    { buildingId: 20, level: 20, startDate: now - 5000, durationMs: 15000 } // finishes at now + 10000
+  ];
+  const queueItems = [
+    { buildingId: 162, nextLevel: 20, durationMs: 20000 },
+    { buildingId: 40, nextLevel: 20, durationMs: 30000 }
+  ];
+
+  const timeline = qHelper.calculateQueueTimeline(rawQueues, queueItems, now);
+  assert.equal(timeline.builderFreeAt, now + 10000);
+  assert.equal(timeline.items[0].estStart, now + 10000);
+  assert.equal(timeline.items[0].estFinish, now + 30000);
+  assert.equal(timeline.items[1].estStart, now + 30000);
+  assert.equal(timeline.items[1].estFinish, now + 60000);
+  assert.equal(timeline.totalDurationMs, 50000);
+  assert.equal(timeline.allDoneAt, now + 60000);
+});
+
+test('planNextStep waits while active construction is in progress', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+  const now = 1000000;
+
+  const cache = {
+    buildingStatus: {
+      data: {
+        queues: [
+          { buildingId: 20, level: 20, startDate: now, durationMs: 50000 }
+        ]
+      }
+    }
+  };
+  const queueState = { enabled: true, items: [{ buildingId: 21, nextLevel: 6, durationMs: 10000 }] };
+
+  const step = qHelper.planNextStep(queueState, cache, now);
+  assert.equal(step.action, 'wait');
+  assert.equal(step.wakeAt, now + 50000 + 1000);
+  assert.equal(step.calls.length, 0);
+});
+
+test('planNextStep auto-completes finished building and starts next queued building in one batch', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+  const now = 1000000;
+
+  // Building 170 has finished countdown (startDate 900000, duration 50000 -> finished at 950000 < now)
+  const cache = {
+    buildingStatus: {
+      data: {
+        queues: [
+          { buildingId: 170, level: 13, startDate: 900000, durationMs: 50000 }
+        ]
+      }
+    }
+  };
+  const queueState = {
+    enabled: true,
+    items: [
+      { buildingId: 31, nextLevel: 19, durationMs: 5498400 }
+    ]
+  };
+
+  const step = qHelper.planNextStep(queueState, cache, now);
+  assert.equal(step.action, 'start');
+  assert.equal(step.calls.length, 3);
+
+  // Call 1: completeConstruction for finished building 170
+  assert.equal(step.calls[0].name, 'completeConstruction');
+  assert.equal(step.calls[0].args.buildingId, 170);
+  assert.equal(step.calls[0].args.nextLevel, 13);
+
+  // Call 2: startConstruction for next building 31
+  assert.equal(step.calls[1].name, 'startConstruction');
+  assert.equal(step.calls[1].args.buildingId, 31);
+  assert.equal(step.calls[1].args.nextLevel, 19);
+
+  // Call 3: getSummary
+  assert.equal(step.calls[2].name, 'getSummary');
+
+  assert.equal(step.remainingItems.length, 0);
+  assert.equal(step.wakeAt, now + 5498400 + 1000);
+});
+
+test('addToQueue, removeFromQueue, reorderQueue, and clearQueue manage state immutably', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+
+  let state = qHelper.addToQueue(null, { buildingId: 20, nextLevel: 20, durationMs: 5000 });
+  assert.equal(state.enabled, true);
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].buildingId, 20);
+
+  state = qHelper.addToQueue(state, { buildingId: 21, nextLevel: 6, durationMs: 2000 });
+  assert.equal(state.items.length, 2);
+
+  state = qHelper.reorderQueue(state, 1, 0);
+  assert.equal(state.items[0].buildingId, 21);
+  assert.equal(state.items[1].buildingId, 20);
+
+  state = qHelper.removeFromQueue(state, 0);
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].buildingId, 20);
+
+  state = qHelper.clearQueue(state);
+  assert.equal(state.items.length, 0);
+});

@@ -196,8 +196,9 @@ try {
     if ('raidQueue' in changes) scheduleRaidWake(changes.raidQueue.newValue);
     if ('monsterQueue' in changes) scheduleMonsterWake(changes.monsterQueue.newValue);
     if ('towerRun' in changes) scheduleTowerWake(changes.towerRun.newValue);
+    if ('buildingQueue' in changes) scheduleBuildingWake(changes.buildingQueue.newValue);
     if (('captureSettings' in changes || 'popupRpcEnabled' in changes) && typeof raidWakeTimer !== 'undefined') {
-      chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun']).then((stored) => {
+      chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'buildingQueue']).then((stored) => {
         if (stored.raidQueue && !['stopped', 'complete'].includes(stored.raidQueue.phase)) {
           chrome.runtime.sendMessage({ kind: 'raid-queue-tick' }).catch(() => {});
         }
@@ -206,6 +207,9 @@ try {
         }
         if (stored.towerRun && !['stopped', 'complete'].includes(stored.towerRun.phase)) {
           chrome.runtime.sendMessage({ kind: 'tower-run-tick' }).catch(() => {});
+        }
+        if (stored.buildingQueue && stored.buildingQueue.enabled !== false && Number.isFinite(stored.buildingQueue.wakeAt)) {
+          chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).catch(() => {});
         }
       }).catch(() => {});
     }
@@ -318,6 +322,19 @@ function scheduleTowerWake(state) {
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('towerRun')?.then?.((stored) => scheduleTowerWake(stored.towerRun))?.catch?.(() => {}); } catch {}
+
+let buildingWakeTimer;
+function scheduleBuildingWake(state) {
+  if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
+  clearTimeout(buildingWakeTimer);
+  if (!state || state.enabled === false || !Number.isFinite(state.wakeAt)) return;
+  buildingWakeTimer = setTimeout(() => {
+    chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).then((response) => {
+      if (response?.watch) return chrome.storage.local.get('buildingQueue').then((stored) => scheduleBuildingWake(stored.buildingQueue));
+    }).catch(() => {});
+  }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+}
+try { chrome.storage?.local?.get?.('buildingQueue')?.then?.((stored) => scheduleBuildingWake(stored.buildingQueue))?.catch?.(() => {}); } catch {}
 
 function handleContextInvalidated(err) {
   if (err?.message?.includes('Extension context invalidated')) {

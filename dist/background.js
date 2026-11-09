@@ -9,6 +9,8 @@ importScripts('raid-queue.js');
 importScripts('monster-queue.js');
 importScripts('tower-automation.js');
 importScripts('tower-runner.js');
+importScripts('building-data.js');
+importScripts('building-queue.js');
 
 const RECORD_STATE_KEY = 'recordingState';
 const RECORD_PREFIX = 'record:';
@@ -22,6 +24,18 @@ const isGameUrl = (url) => typeof url === 'string' && (
   url.includes('hero-wars-alliance.com')
 );
 let pending = Promise.resolve();
+
+// Routine storage optimization on worker startup
+try {
+  chrome.storage.local.get('rpcCache').then((stored) => {
+    if (stored?.rpcCache && globalThis.hwaHelperRpcCache?.pruneCache) {
+      const pruned = globalThis.hwaHelperRpcCache.pruneCache(stored.rpcCache);
+      if (pruned.changed) {
+        chrome.storage.local.set({ rpcCache: pruned.cache }).catch(() => {});
+      }
+    }
+  }).catch(() => {});
+} catch (_) {}
 
 async function updateRpcQueueCount(tabId, count) {
   const stored = await chrome.storage.session.get('rpcQueueCounts');
@@ -202,6 +216,42 @@ async function updateTowerRun(record, tabId) {
   if (globalThis.hwaHelperTowerRunner.terminal(stored.towerRun) || stored.towerRun.tabId !== tabId) return stored.towerRun;
   return saveTowerTransition(globalThis.hwaHelperTowerRunner.advance(stored.towerRun,
     record, stored.rpcCache, Date.now()), stored);
+}
+
+async function advanceBuildingQueue(tabId) {
+  const stored = await chrome.storage.local.get(['buildingQueue', 'rpcCache', 'popupRpcEnabled',
+    'socketRefreshMode', 'captureSettings']);
+  const queue = stored.buildingQueue;
+  if (!queue || queue.enabled === false) return queue;
+  const helper = globalThis.hwaHelperBuildingQueue;
+  if (!helper) return queue;
+
+  const plan = helper.planNextStep(queue, stored.rpcCache, Date.now());
+  if (plan.action === 'wait') {
+    if (queue.wakeAt !== plan.wakeAt) {
+      queue.wakeAt = plan.wakeAt;
+      await chrome.storage.local.set({ buildingQueue: queue });
+    }
+    return queue;
+  }
+
+  if (plan.calls && plan.calls.length > 0) {
+    const dispatch = rpcMessageForSettings(stored, plan.calls);
+    if (!dispatch) return queue;
+    try {
+      await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'building-queue',
+        expiresAt: Date.now() + 120000 });
+      if (plan.action === 'start') {
+        queue.items = plan.remainingItems;
+        queue.wakeAt = plan.wakeAt;
+        queue.lastStarted = plan.startedItem;
+      }
+      await chrome.storage.local.set({ buildingQueue: queue });
+    } catch (e) {
+      console.warn('Failed to dispatch building queue to tab', e);
+    }
+  }
+  return queue;
 }
 
 chrome.storage.onChanged?.addListener?.((changes, area) => {
@@ -536,6 +586,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.catch(() => {});
     return true;
   }
+  if (message?.kind === 'building-queue-tick' && isGameUrl(sender.url) && sender.tab?.id) {
+    pending = pending.then(() => advanceBuildingQueue(sender.tab.id));
+    pending.then((queue) => sendResponse({ ok: true, watch: queue?.enabled !== false && Number.isFinite(queue?.wakeAt) }),
+      () => sendResponse({ ok: false }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'building-queue-action') {
+    pending = pending.then(async () => {
+      const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
+      const tab = (tabs || []).find((t) => t.id && isGameUrl(t.url));
+      if (tab) {
+        return advanceBuildingQueue(tab.id).then(() => ({ ok: true }));
+      }
+      return { ok: false, error: 'No active game tab found.' };
+    });
+    pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
   if (message?.kind === 'rpc-queue-status' && isGameUrl(sender.url) && sender.tab?.id &&
       Number.isInteger(message.count) && message.count >= 0 && message.count <= 64) {
     pending = pending.then(() => updateRpcQueueCount(sender.tab.id, message.count));
@@ -846,6 +916,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab?.id) await updateRaidQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateTowerRun(record, sender.tab.id);
+    if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id);
     if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id);
     if (stored.popupRpcEnabled === true && sender.tab?.id) {
       const calls = socketRefreshCalls(record, cacheResult.cache);

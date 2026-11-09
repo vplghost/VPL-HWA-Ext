@@ -1658,8 +1658,8 @@
     return true;
   }
 
-  function merge(cache, records, maxBytes = 2 * 1024 * 1024) {
-    const next = { ...(cache && typeof cache === 'object' ? cache : {}) };
+  function merge(cache, records, maxBytes = 5 * 1024 * 1024) {
+    let next = { ...(cache && typeof cache === 'object' ? cache : {}) };
     let changed = false;
     for (const record of records) {
       const entries = extract(record);
@@ -3389,6 +3389,11 @@
         changed = true;
       }
     }
+    const pruned = pruneCache(next);
+    if (pruned.changed) {
+      next = pruned.cache;
+      changed = true;
+    }
     if (!changed) return { cache: next, changed: false };
     const size = () => new TextEncoder().encode(JSON.stringify(next)).byteLength;
     while (size() > maxBytes && Object.keys(next).length > 1) {
@@ -3398,5 +3403,56 @@
     return { cache: next, changed: true };
   }
 
-  globalThis.hwaHelperRpcCache = { extract, merge, definitions };
+    function pruneCache(cache, now = Date.now()) {
+    if (!cache || typeof cache !== 'object') return { cache: {}, changed: false };
+    const next = { ...cache };
+    let changed = false;
+
+    // 1. Prune guildChat (drop messages older than 3 days relative to last chat update and orphaned users)
+    if (next.guildChat?.data) {
+      const existing = next.guildChat.data;
+      const refTimeMs = Date.parse(next.guildChat.updatedAt) || now;
+      const cutoffSec = Math.floor(refTimeMs / 1000) - (3 * 86400);
+      const msgs = (existing.messages || []).filter((m) => {
+        const ctime = Number(m.ctime || 0);
+        return !ctime || ctime >= cutoffSec;
+      });
+      if (msgs.length !== existing.messages?.length) {
+        const activeUids = new Set(msgs.map((m) => String(m.userId)));
+        const users = Object.fromEntries(
+          Object.entries(existing.users || {}).filter(([uid]) => activeUids.has(String(uid)))
+        );
+        next.guildChat = {
+          ...next.guildChat,
+          data: {
+            ...existing,
+            messages: msgs,
+            users: Object.keys(users).length > 0 ? users : existing.users
+          }
+        };
+        changed = true;
+      }
+    }
+
+    // 2. Prune specialQuestStatus (drop events expired > 30 minutes relative to last update)
+    if (next.specialQuestStatus?.data?.events) {
+      const events = next.specialQuestStatus.data.events;
+      const refTimeMs = Date.parse(next.specialQuestStatus.updatedAt) || now;
+      const validEvents = events.filter((ev) => !Number.isFinite(ev.end) || ev.end >= refTimeMs - 1800000);
+      if (validEvents.length !== events.length) {
+        next.specialQuestStatus = {
+          ...next.specialQuestStatus,
+          data: {
+            ...next.specialQuestStatus.data,
+            events: validEvents
+          }
+        };
+        changed = true;
+      }
+    }
+
+    return { cache: next, changed };
+  }
+
+  globalThis.hwaHelperRpcCache = { extract, merge, definitions, pruneCache };
 })();

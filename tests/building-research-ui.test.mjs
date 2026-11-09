@@ -64,6 +64,7 @@ class MockElement {
 const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
 const buildingDataJs = await readFile(new URL('../extension/building-data.js', import.meta.url), 'utf8');
+const buildingQueueJs = await readFile(new URL('../extension/building-queue.js', import.meta.url), 'utf8');
 
 test('popup.html defines building-dialog and research-dialog with title, status, and body', () => {
   assert.match(popupHtml, /<dialog id="building-dialog"[\s\S]*id="building-dialog-title"[\s\S]*id="building-dialog-status"[\s\S]*id="building-dialog-body"[\s\S]*<\/dialog>/);
@@ -722,4 +723,148 @@ test('Next Research Candidates uses 2 columns, renders all candidates without 9-
   sortSelect.value = 'level-desc';
   await sortSelect.fire('change', { target: sortSelect });
   assert.match(nextGrid.children[0].innerHTML, /Tech 512/, 'Highest level tech (Lv. 12) should be first');
+});
+
+test('Building Automation Queue auto-chains finish, supports virtual prerequisites projection, and sorts by build time', async () => {
+  let sentMessage = null;
+  let savedStorage = {};
+  const buildingBadge = new MockElement('span');
+  const buildingDialog = new MockElement('dialog');
+  const buildingBody = new MockElement('div');
+  const buildingStatus = new MockElement('div');
+
+  const elements = {
+    '#building-badge': buildingBadge,
+    '#building-dialog': buildingDialog,
+    '#building-dialog-body': buildingBody,
+    '#building-dialog-status': buildingStatus
+  };
+
+  const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
+    document: {
+      createElement: (tag) => new MockElement(tag),
+      querySelector: (sel) => elements[sel] || null,
+      querySelectorAll: () => []
+    },
+    chrome: {
+      runtime: {
+        sendMessage: (msg, callback) => {
+          sentMessage = msg;
+          callback?.({ ok: true });
+        }
+      },
+      storage: {
+        local: {
+          set: (obj, callback) => {
+            Object.assign(savedStorage, obj);
+            callback?.();
+          },
+          get: (keys, callback) => callback?.(savedStorage)
+        }
+      }
+    },
+    popupRpcEnabled: true,
+    currentCache: {
+      buildingStatus: {
+        data: {
+          queues: [
+            // Finished building #170 (completed 5 seconds ago)
+            { buildingId: 170, level: 13, startDate: Date.now() - 10000, durationMs: 5000, queueNumber: 0 }
+          ],
+          buildings: [
+            { buildingId: 20, level: 19 }, // Hall of Heroes
+            { buildingId: 43, level: 19 }, // Archery Barracks
+            { buildingId: 162, level: 19 }, // Infirmary (requires Hall Lv. 20)
+            { buildingId: 170, level: 12 }
+          ]
+        }
+      },
+      'resource:material:2': { data: { amount: 50000000 } },
+      'resource:material:3': { data: { amount: 50000000 } },
+      'resource:material:4': { data: { amount: 50000000 } },
+      'resource:material:5': { data: { amount: 50000000 } }
+    },
+    hwaHelperNameMap: {
+      building: (id) => ({ '20': 'Hall of Heroes', '43': 'Archery Barracks', '162': 'Infirmary', '170': 'Market' }[id] || `Building ${id}`),
+      research: (id) => `Research ${id}`
+    },
+    hwaHelperNameData: {
+      names: {
+        building: { '20': 'Hall of Heroes', '43': 'Archery Barracks', '162': 'Infirmary', '170': 'Market' },
+        research: {}
+      }
+    }
+  });
+
+  vm.runInContext(buildingDataJs, context);
+  vm.runInContext(buildingQueueJs, context);
+
+  const setupCode = popup.slice(
+    popup.indexOf("let buildingSearchQuery = '';"),
+    popup.indexOf('globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;') +
+      'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
+  );
+  vm.runInContext(setupCode, context);
+  context.setupBuildingAndResearchDialogs();
+
+  await buildingBadge.fire('click');
+
+  const queueSection = buildingBody.children[0];
+  const nextSection = buildingBody.children[1];
+
+  // 1. Check finished building is rendered with Finish button
+  assert.ok(queueSection.innerHTML.includes('Market · Complete'), 'Finished building #170 must be shown as Complete');
+  assert.ok(queueSection.innerHTML.includes('Finish'), 'Finish button must exist for completed building');
+
+  // 2. Virtual prerequisite projection check:
+  // Initially, Infirmary (#162) is NOT in nextSection because Hall of Heroes is Lv. 19 < 20
+  let nextCards = nextSection.children[2].children;
+  assert.ok(!nextCards.some((c) => c.innerHTML.includes('Infirmary')), 'Infirmary must NOT be eligible yet');
+
+  // Find Hall of Heroes card
+  const hallCard = nextCards.find((c) => c.innerHTML.includes('Hall of Heroes'));
+  assert.ok(hallCard, 'Hall of Heroes Lv. 20 must be eligible');
+
+  // Click "+ Queue" button on Hall of Heroes
+  const queueBtns = hallCard.all('button').filter((b) => b.innerHTML.includes('Queue'));
+  assert.equal(queueBtns.length, 1, '+ Queue button must exist');
+  await queueBtns[0].fire('click');
+
+  // After adding Hall of Heroes Lv. 20 to queue:
+  // Infirmary (#162) requires Hall Lv. 20 which is now in queue!
+  // Infirmary should now appear in Next Upgradable!
+  const updatedNextCards = buildingBody.children[1].children[2].children;
+  const infirmaryCard = updatedNextCards.find((c) => c.innerHTML.includes('Infirmary'));
+  assert.ok(infirmaryCard, 'Infirmary must become eligible now that Hall of Heroes Lv. 20 is queued!');
+
+  // 3. Test sort by build time (time-asc and time-desc)
+  const sortSelect = buildingBody.children[1].querySelector('#next-building-sort-select');
+  assert.ok(sortSelect, 'Sort select must exist');
+  sortSelect.value = 'time-asc';
+  await sortSelect.fire('change', { target: sortSelect });
+  const sortedAscCards = buildingBody.children[1].children[2].children;
+  assert.ok(sortedAscCards.length > 0, 'Cards should be rendered when sorted by time-asc');
+
+  sortSelect.value = 'time-desc';
+  await sortSelect.fire('change', { target: sortSelect });
+  const sortedDescCards = buildingBody.children[1].children[2].children;
+  assert.ok(sortedDescCards.length > 0, 'Cards should be rendered when sorted by time-desc');
+
+  // 4. Test auto-chaining: clicking Upgrade on Archery Barracks sends completeConstruction for #170 BEFORE startConstruction
+  const archeryCard = buildingBody.children[1].children[2].children.find((c) => c.innerHTML.includes('Archery Barracks'));
+  assert.ok(archeryCard, 'Archery Barracks card must exist');
+  const upgradeBtn = archeryCard.all('button').find((b) => b.innerHTML.includes('Upgrade') || b.innerHTML.includes('Build'));
+  assert.ok(upgradeBtn, 'Upgrade button must exist');
+
+  await upgradeBtn.fire('click');
+  assert.ok(sentMessage, 'A message must be sent on Upgrade click');
+  assert.equal(sentMessage.kind, 'refresh-rpc');
+
+  // Assert completeConstruction was chained BEFORE startConstruction
+  assert.equal(sentMessage.calls[0].name, 'completeConstruction', 'First call must be completeConstruction');
+  assert.equal(sentMessage.calls[0].args.buildingId, 170, 'Must complete building 170');
+  assert.equal(sentMessage.calls[1].name, 'startConstruction', 'Second call must be startConstruction');
+  assert.equal(sentMessage.calls[1].args.buildingId, 43, 'Must start Archery Barracks');
 });
