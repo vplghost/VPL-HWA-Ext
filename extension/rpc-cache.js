@@ -970,16 +970,57 @@
             }
             const actions = resourceAction(record, call, 'energy', delta);
             if (call.name === 'missionRaid' && result?.response) {
-              let raidGold = 0;
-              const times = call.args?.times || 1;
+              const resp = result.response;
+              const times = Number(call.args?.times) || 1;
+              const drops = {
+                fragmentGear: {},
+                gear: {},
+                consumable: {},
+                gold: 0,
+                experience: 0
+              };
               for (let i = 0; i < times; i++) {
-                if (Number.isFinite(result.response?.[i]?.gold)) {
-                  raidGold += result.response[i].gold;
+                const run = resp[i];
+                if (!run) continue;
+                if (Number.isFinite(run.gold)) drops.gold += run.gold;
+                if (Number.isFinite(run.experience)) drops.experience += run.experience;
+                if (run.fragmentGear && typeof run.fragmentGear === 'object') {
+                  for (const [gId, count] of Object.entries(run.fragmentGear)) {
+                    drops.fragmentGear[gId] = (drops.fragmentGear[gId] || 0) + Number(count);
+                  }
+                }
+                if (run.gear && typeof run.gear === 'object') {
+                  for (const [gId, count] of Object.entries(run.gear)) {
+                    drops.gear[gId] = (drops.gear[gId] || 0) + Number(count);
+                  }
+                }
+                if (run.consumable && typeof run.consumable === 'object') {
+                  for (const [cId, count] of Object.entries(run.consumable)) {
+                    drops.consumable[cId] = (drops.consumable[cId] || 0) + Number(count);
+                  }
                 }
               }
-              if (raidGold > 0) {
-                actions.push(...resourceAction(record, call, 'gold', raidGold));
+              if (resp.raid?.consumable && typeof resp.raid.consumable === 'object') {
+                for (const [cId, count] of Object.entries(resp.raid.consumable)) {
+                  drops.consumable[cId] = (drops.consumable[cId] || 0) + Number(count);
+                }
               }
+              if (drops.gold > 0) {
+                actions.push(...resourceAction(record, call, 'gold', drops.gold));
+              }
+              actions.push({
+                key: 'lastCampaignRaidResult',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  missionId: call.args?.id,
+                  times,
+                  drops,
+                  raw: resp
+                },
+                updatedAt: record.timestamp
+              });
             }
             return actions;
           }
@@ -1288,6 +1329,20 @@
             group: 'internal', data: { completed }, updatedAt: record.timestamp };
           return group ? [progress, { key, method: call.name, feature: null,
             group, data: result.response, updatedAt: record.timestamp }] : [progress];
+        }
+        if ((call.name === 'inventoryCraftFragments' || call.name === 'inventoryCraftRecipe') && result?.response) {
+          return [{
+            key: 'lastCraftResult',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: {
+              action: call.name,
+              args: call.args,
+              result: result.response
+            },
+            updatedAt: record.timestamp
+          }];
         }
         if (call.name === 'userGetInfo' && result?.response) {
           const info = result.response;
@@ -3283,6 +3338,8 @@
         }
         if (entry.key.startsWith('experimental') && next[entry.key]?.updatedAt === entry.updatedAt &&
             JSON.stringify(next[entry.key].data) === JSON.stringify(entry.data)) continue;
+        if (['lastCampaignRaidResult', 'lastCraftResult'].includes(entry.key) &&
+            next[entry.key] && next[entry.key].updatedAt >= entry.updatedAt) continue;
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
         if (entry.key === 'experimentalMapContext' &&
             next.experimentalMapContext?.data?.mapId === entry.data?.mapId) {

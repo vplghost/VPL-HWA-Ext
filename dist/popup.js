@@ -4352,6 +4352,30 @@ function renderDashboard(cache) {
   intro.append(heading, subtitle, actions);
   container.append(intro);
 
+  const campaignCard = document.createElement('div');
+  campaignCard.className = 'rounded-xl border border-indigo-200 bg-indigo-50/50 p-3.5 shadow-2xs dark:border-indigo-900/40 dark:bg-indigo-950/20 flex items-center justify-between gap-3 flex-wrap';
+  campaignCard.innerHTML = `
+    <div class="space-y-0.5">
+      <div class="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+        <span>⚔️</span> Campaign Raid & Farm Trang Bị
+      </div>
+      <div class="text-2xs text-slate-500 dark:text-slate-400">Raid các ải chiến dịch để farm nhanh trang bị, mảnh ghép và vàng</div>
+    </div>
+  `;
+  const campaignBtn = document.createElement('button');
+  campaignBtn.id = 'open-campaign-dialog';
+  campaignBtn.type = 'button';
+  campaignBtn.className = 'cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xs';
+  campaignBtn.textContent = 'Mở Campaign Farm';
+  campaignBtn.setAttribute('aria-haspopup', 'dialog');
+  campaignBtn.setAttribute('aria-controls', 'campaign-dialog');
+  campaignBtn.addEventListener('click', () => {
+    renderCampaignDialog(currentCache);
+    document.querySelector('#campaign-dialog')?.showModal?.();
+  });
+  campaignCard.append(campaignBtn);
+  container.append(campaignCard);
+
   if (typeof updateDashboardGameStatus === 'function') {
     updateDashboardGameStatus(actions, gameTabAlert);
   }
@@ -9474,6 +9498,432 @@ function renderHeroDialog(heroId, cache) {
     artCard.append(artGrid);
     host.append(artCard);
   }
+
+  // 4. Equipment & Campaign Farm Section
+  const equipCard = document.createElement('div');
+  equipCard.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3';
+
+  const equipHeader = document.createElement('div');
+  equipHeader.className = 'flex items-center justify-between gap-2 flex-wrap';
+  equipHeader.innerHTML = `
+    <div>
+      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+        <span>🛡️</span> Equipment Slots (Trang bị)
+      </h4>
+      <div class="text-2xs text-slate-400 dark:text-slate-500">6 ô trang bị để tăng Rank/Color cho Hero</div>
+    </div>
+  `;
+
+  const farmQuickBtn = document.createElement('button');
+  farmQuickBtn.type = 'button';
+  farmQuickBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5';
+  farmQuickBtn.innerHTML = '<span>⚔️</span> Farm Trang Bị';
+  farmQuickBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openCampaignDialog(135, cache);
+  });
+  equipHeader.append(farmQuickBtn);
+  equipCard.append(equipHeader);
+
+  const slotsGrid = document.createElement('div');
+  slotsGrid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-2';
+
+  const rawSlots = hero.slots || {};
+  for (let sIdx = 1; sIdx <= 6; sIdx++) {
+    const slotVal = rawSlots[sIdx] ?? rawSlots[String(sIdx)];
+    const isEquipped = Number(slotVal) > 0 || (typeof slotVal === 'object' && slotVal !== null);
+
+    const slotBox = document.createElement('div');
+    slotBox.className = `p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 ${
+      isEquipped
+        ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200'
+        : 'border-dashed border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30'
+    }`;
+
+    slotBox.innerHTML = `
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="size-5 rounded-full flex items-center justify-center font-bold text-2xs ${isEquipped ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}">${sIdx}</span>
+        <span class="font-semibold truncate">Slot ${sIdx}</span>
+      </div>
+      <span class="text-2xs font-bold ${isEquipped ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400'}">${isEquipped ? '✓ Đã lắp' : '➕ Trống'}</span>
+    `;
+
+    if (!isEquipped) {
+      slotBox.addEventListener('click', () => {
+        openCampaignDialog(135, cache);
+      });
+    }
+
+    slotsGrid.append(slotBox);
+  }
+
+  equipCard.append(slotsGrid);
+  host.append(equipCard);
+}
+
+let selectedCampaignMissionId = 135;
+let selectedCampaignTimes = 5;
+
+function renderCampaignDialog(cache = currentCache, target = document.querySelector('#campaign-dialog-body')) {
+  if (!target) return;
+  target.replaceChildren();
+
+  const container = document.createElement('div');
+  container.className = 'space-y-4';
+
+  const energyStatus = cache?.energyStatus?.data || {};
+  const curEnergy = Number.isFinite(energyStatus.energy) ? energyStatus.energy : '—';
+  const maxEnergy = Number.isFinite(energyStatus.max) ? energyStatus.max : '—';
+
+  // 1. Energy & Status Banner
+  const statusBanner = document.createElement('div');
+  statusBanner.className = 'rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-800/80 flex items-center justify-between gap-3 flex-wrap';
+
+  const leftInfo = document.createElement('div');
+  leftInfo.className = 'space-y-0.5';
+  leftInfo.innerHTML = `
+    <div class="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+      <span>⚡</span> Chiến dịch (Campaign Mission Raid)
+    </div>
+    <div class="text-2xs text-slate-500 dark:text-slate-400">
+      Raid các ải chiến dịch để farm nhanh trang bị, mảnh ghép và vàng
+    </div>
+  `;
+
+  const energyChip = document.createElement('div');
+  energyChip.className = 'inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 font-bold text-xs text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-800';
+  energyChip.innerHTML = `<span>⚡ Năng lượng:</span> <span class="text-sm font-extrabold">${curEnergy}</span>${maxEnergy !== '—' ? `<span class="text-amber-500">/ ${maxEnergy}</span>` : ''}`;
+
+  statusBanner.append(leftInfo, energyChip);
+  container.append(statusBanner);
+
+  // 2. Raid Mission Configuration Card
+  const raidCard = document.createElement('div');
+  raidCard.className = 'rounded-xl border border-indigo-200 bg-indigo-50/30 p-4 shadow-xs dark:border-indigo-900/40 dark:bg-indigo-950/20 space-y-3';
+
+  const raidCardHead = document.createElement('div');
+  raidCardHead.className = 'flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-indigo-100 dark:border-indigo-900/40';
+  raidCardHead.innerHTML = `
+    <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+      <span>🎯</span> Thiết lập Lượt Raid
+    </h4>
+    <span class="text-2xs text-slate-500 dark:text-slate-400">Chi phí ước tính: ~6-8 Energy / lượt</span>
+  `;
+  raidCard.append(raidCardHead);
+
+  // Mission ID Input & Quick Chips
+  const missionRow = document.createElement('div');
+  missionRow.className = 'space-y-1.5';
+  
+  const missionLabelRow = document.createElement('div');
+  missionLabelRow.className = 'flex items-center justify-between text-xs';
+  missionLabelRow.innerHTML = `
+    <label for="campaign-mission-input" class="font-bold text-slate-800 dark:text-slate-200">Ải Chiến Dịch (Mission ID):</label>
+    <span class="text-2xs text-slate-500">Mặc định: 135 (Map item drop)</span>
+  `;
+  missionRow.append(missionLabelRow);
+
+  const missionInputGroup = document.createElement('div');
+  missionInputGroup.className = 'flex items-center gap-2 flex-wrap';
+
+  const missionInput = document.createElement('input');
+  missionInput.id = 'campaign-mission-input';
+  missionInput.type = 'number';
+  missionInput.min = '1';
+  missionInput.value = String(selectedCampaignMissionId);
+  missionInput.className = 'w-32 px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400';
+  missionInput.addEventListener('input', (e) => {
+    selectedCampaignMissionId = Number(e.target.value) || 135;
+  });
+  missionInputGroup.append(missionInput);
+
+  // Quick Chips
+  const quickChipsWrap = document.createElement('div');
+  quickChipsWrap.className = 'flex items-center gap-1 flex-wrap';
+  const quickMissions = [135, 130, 125, 120, 100, 50];
+  quickMissions.forEach((mId) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'px-2 py-1 rounded text-2xs font-semibold bg-white border border-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 cursor-pointer text-slate-700 dark:text-slate-300';
+    chip.textContent = `#${mId}`;
+    chip.addEventListener('click', () => {
+      selectedCampaignMissionId = mId;
+      missionInput.value = String(mId);
+    });
+    quickChipsWrap.append(chip);
+  });
+  missionInputGroup.append(quickChipsWrap);
+  missionRow.append(missionInputGroup);
+  raidCard.append(missionRow);
+
+  // Times Selector
+  const timesRow = document.createElement('div');
+  timesRow.className = 'flex items-center justify-between flex-wrap gap-2 pt-1';
+
+  const timesLabel = document.createElement('span');
+  timesLabel.className = 'text-xs font-bold text-slate-800 dark:text-slate-200';
+  timesLabel.textContent = 'Số lượt Raid liên tiếp:';
+  timesRow.append(timesLabel);
+
+  const timesBtnsGroup = document.createElement('div');
+  timesBtnsGroup.className = 'inline-flex rounded-lg border border-slate-200 bg-white p-0.5 gap-1 dark:border-slate-700 dark:bg-slate-800';
+  const timesOptions = [1, 5, 10, 20];
+  timesOptions.forEach((t) => {
+    const tBtn = document.createElement('button');
+    tBtn.type = 'button';
+    const isSelected = selectedCampaignTimes === t;
+    tBtn.className = `px-3 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors ${
+      isSelected ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'
+    }`;
+    tBtn.textContent = `${t}x`;
+    tBtn.addEventListener('click', () => {
+      selectedCampaignTimes = t;
+      renderCampaignDialog(cache, target);
+    });
+    timesBtnsGroup.append(tBtn);
+  });
+  timesRow.append(timesBtnsGroup);
+  raidCard.append(timesRow);
+
+  // Raid Action Button & Status
+  const actionRow = document.createElement('div');
+  actionRow.className = 'flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/40';
+
+  const estCost = selectedCampaignTimes * 6;
+  const costHint = document.createElement('span');
+  costHint.className = 'text-2xs text-slate-500 dark:text-slate-400';
+  costHint.textContent = `Ước tính cần ~${estCost} Energy`;
+  actionRow.append(costHint);
+
+  const raidBtn = document.createElement('button');
+  raidBtn.id = 'campaign-raid-submit';
+  raidBtn.type = 'button';
+  raidBtn.className = popupRpcEnabled
+    ? 'px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer shadow-xs transition-all active:scale-95 flex items-center gap-1.5'
+    : 'px-4 py-2 rounded-lg bg-slate-200 text-slate-400 font-bold text-xs cursor-not-allowed border border-slate-300';
+  raidBtn.disabled = !popupRpcEnabled;
+  raidBtn.innerHTML = popupRpcEnabled
+    ? `<span>⚡</span> <span>Raid ${selectedCampaignTimes}x Ải #${selectedCampaignMissionId}</span>`
+    : 'Bật Popup RPC để Raid';
+
+  if (popupRpcEnabled) {
+    raidBtn.addEventListener('click', () => {
+      raidBtn.disabled = true;
+      raidBtn.innerHTML = '<span class="animate-spin">⏳</span> <span>Đang thực hiện Raid...</span>';
+      chrome.runtime?.sendMessage?.(
+        { kind: 'campaign-raid', missionId: selectedCampaignMissionId, times: selectedCampaignTimes },
+        (res) => {
+          if (!res?.ok) {
+            raidBtn.disabled = false;
+            raidBtn.textContent = res?.error || 'Raid thất bại';
+          } else {
+            setTimeout(() => {
+              if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
+            }, 600);
+          }
+        }
+      );
+    });
+  }
+  actionRow.append(raidBtn);
+  raidCard.append(actionRow);
+  container.append(raidCard);
+
+  // 3. Last Raid Results Card (if any)
+  const lastRaid = cache?.lastCampaignRaidResult?.data;
+  if (lastRaid && lastRaid.drops) {
+    const drops = lastRaid.drops;
+    const resCard = document.createElement('div');
+    resCard.className = 'rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-xs dark:border-emerald-900/40 dark:bg-emerald-950/20 space-y-2.5';
+
+    const resHeader = document.createElement('div');
+    resHeader.className = 'flex items-center justify-between text-xs pb-1.5 border-b border-emerald-200/80 dark:border-emerald-800';
+    resHeader.innerHTML = `
+      <span class="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+        <span>🎉</span> Kết quả Raid Ải #${lastRaid.missionId} (${lastRaid.times} lượt)
+      </span>
+      <span class="text-2xs font-semibold text-emerald-700 dark:text-emerald-300">
+        💰 +${formatNumber(drops.gold || 0)} Gold • 🧪 +${drops.experience || 0} EXP
+      </span>
+    `;
+    resCard.append(resHeader);
+
+    const dropsList = document.createElement('div');
+    dropsList.className = 'flex flex-wrap gap-2';
+
+    // Fragment Gear
+    if (drops.fragmentGear && Object.keys(drops.fragmentGear).length > 0) {
+      for (const [gId, count] of Object.entries(drops.fragmentGear)) {
+        const dropTag = document.createElement('span');
+        dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs dark:bg-slate-800 dark:text-indigo-300 dark:border-indigo-800';
+        dropTag.innerHTML = `<span>🧩 Mảnh #${gId}</span> <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+${count}</span>`;
+        dropsList.append(dropTag);
+      }
+    }
+
+    // Whole Gear
+    if (drops.gear && Object.keys(drops.gear).length > 0) {
+      for (const [gId, count] of Object.entries(drops.gear)) {
+        const dropTag = document.createElement('span');
+        dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-2xs dark:bg-slate-800 dark:text-emerald-300 dark:border-emerald-800';
+        dropTag.innerHTML = `<span>🛡️ Gear #${gId}</span> <span class="bg-emerald-100 text-emerald-800 px-1 rounded text-2xs dark:bg-emerald-900 dark:text-emerald-200">+${count}</span>`;
+        dropsList.append(dropTag);
+      }
+    }
+
+    // Consumables
+    if (drops.consumable && Object.keys(drops.consumable).length > 0) {
+      for (const [cId, count] of Object.entries(drops.consumable)) {
+        const dropTag = document.createElement('span');
+        dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-slate-700 border border-slate-200 shadow-2xs dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+        dropTag.innerHTML = `<span>Item #${cId}</span> <span class="bg-slate-100 text-slate-700 px-1 rounded text-2xs dark:bg-slate-700 dark:text-slate-300">+${count}</span>`;
+        dropsList.append(dropTag);
+      }
+    }
+
+    if (dropsList.children.length === 0) {
+      const noDrops = document.createElement('span');
+      noDrops.className = 'text-2xs text-slate-400 italic';
+      noDrops.textContent = 'Không có vật phẩm nào rơi ra trong các lượt vừa raid';
+      dropsList.append(noDrops);
+    }
+
+    resCard.append(dropsList);
+    container.append(resCard);
+  }
+
+  // 4. Equipment Crafting Section (Ghép mảnh & Chế tạo)
+  const craftCard = document.createElement('div');
+  craftCard.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3';
+
+  const craftHead = document.createElement('div');
+  craftHead.className = 'flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800';
+  craftHead.innerHTML = `
+    <div>
+      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+        <span>🛠️</span> Ghép Mảnh & Chế Tạo Trang Bị (Crafting)
+      </h4>
+      <div class="text-2xs text-slate-400 dark:text-slate-500">Ghép các mảnh trang bị hoặc chế tạo Recipe vào kho đồ</div>
+    </div>
+  `;
+  craftCard.append(craftHead);
+
+  // Owned Fragments list
+  const invFrags = cache?.inventoryGet?.data?.fragmentGear || {};
+  const fragEntries = Object.entries(invFrags).filter(([, count]) => Number(count) > 0);
+
+  const fragsSection = document.createElement('div');
+  fragsSection.className = 'space-y-1.5';
+  
+  const fragsTitle = document.createElement('div');
+  fragsTitle.className = 'text-xs font-semibold text-slate-700 dark:text-slate-300';
+  fragsTitle.textContent = 'Mảnh trang bị hiện có trong kho:';
+  fragsSection.append(fragsTitle);
+
+  if (fragEntries.length > 0) {
+    const fragsGrid = document.createElement('div');
+    fragsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[180px] overflow-y-auto p-1 border border-slate-100 dark:border-slate-800 rounded-lg';
+    for (const [fragId, count] of fragEntries) {
+      const fragRow = document.createElement('div');
+      fragRow.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 text-xs';
+      fragRow.innerHTML = `
+        <div class="min-w-0 flex items-center gap-1.5">
+          <span class="font-bold text-slate-800 dark:text-slate-200">Mảnh #${fragId}</span>
+          <span class="text-2xs text-slate-500">(${count} mảnh)</span>
+        </div>
+      `;
+
+      const craftBtn = document.createElement('button');
+      craftBtn.type = 'button';
+      craftBtn.className = 'px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-2xs font-bold cursor-pointer transition-all shrink-0';
+      craftBtn.textContent = 'Ghép';
+      craftBtn.title = `Ghép mảnh #${fragId} thành Gear`;
+      craftBtn.addEventListener('click', () => {
+        craftBtn.disabled = true;
+        craftBtn.textContent = '⏳';
+        chrome.runtime?.sendMessage?.(
+          { kind: 'craft-fragment', libId: Number(fragId), amount: 1 },
+          (res) => {
+            setTimeout(() => {
+              if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
+            }, 600);
+          }
+        );
+      });
+      fragRow.append(craftBtn);
+      fragsGrid.append(fragRow);
+    }
+    fragsSection.append(fragsGrid);
+  } else {
+    const emptyFrags = document.createElement('div');
+    emptyFrags.className = 'text-2xs text-slate-400 italic py-2 text-center bg-slate-50/50 dark:bg-slate-800/40 rounded-lg';
+    emptyFrags.textContent = 'Chưa có mảnh trang bị nào trong kho (hãy raid chiến dịch để nhận mảnh)';
+    fragsSection.append(emptyFrags);
+  }
+  craftCard.append(fragsSection);
+
+  // Manual Craft Toolbar
+  const manualCraftRow = document.createElement('div');
+  manualCraftRow.className = 'pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5';
+  manualCraftRow.innerHTML = `
+    <div class="text-2xs font-semibold text-slate-600 dark:text-slate-400">Chế tạo thủ công theo Item ID:</div>
+  `;
+
+  const manualForm = document.createElement('div');
+  manualForm.className = 'flex items-center gap-2 flex-wrap';
+
+  const craftInput = document.createElement('input');
+  craftInput.type = 'number';
+  craftInput.placeholder = 'Nhập Item ID (VD: 57, 65)...';
+  craftInput.className = 'w-44 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-400';
+  manualForm.append(craftInput);
+
+  const craftFragBtn = document.createElement('button');
+  craftFragBtn.type = 'button';
+  craftFragBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer';
+  craftFragBtn.textContent = 'Ghép Mảnh';
+  craftFragBtn.addEventListener('click', () => {
+    const val = Number(craftInput.value);
+    if (!val) return;
+    chrome.runtime?.sendMessage?.({ kind: 'craft-fragment', libId: val, amount: 1 }, () => {
+      setTimeout(() => {
+        if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
+      }, 600);
+    });
+  });
+
+  const craftRecipeBtn = document.createElement('button');
+  craftRecipeBtn.type = 'button';
+  craftRecipeBtn.className = 'px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold cursor-pointer';
+  craftRecipeBtn.textContent = 'Chế Tạo Recipe';
+  craftRecipeBtn.addEventListener('click', () => {
+    const val = Number(craftInput.value);
+    if (!val) return;
+    chrome.runtime?.sendMessage?.({ kind: 'craft-recipe', libId: val, amount: 1 }, () => {
+      setTimeout(() => {
+        if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
+      }, 600);
+    });
+  });
+
+  manualForm.append(craftFragBtn, craftRecipeBtn);
+  manualCraftRow.append(manualForm);
+  craftCard.append(manualCraftRow);
+
+  container.append(craftCard);
+  target.append(container);
+}
+
+function openCampaignDialog(missionId = null, cache = currentCache) {
+  if (missionId) selectedCampaignMissionId = Number(missionId) || 135;
+  const dialog = document.querySelector('#campaign-dialog');
+  if (!dialog) return;
+  renderCampaignDialog(cache);
+  if (typeof dialog.showModal === 'function') {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute('open', '');
+  }
 }
 
 function openHeroDialog(heroId, cache = currentCache) {
@@ -9494,6 +9944,7 @@ function setupBuildingAndResearchDialogs() {
   const researchDialog = document.querySelector('#research-dialog');
   const questDetailDialog = document.querySelector('#quest-detail-dialog');
   const heroDialog = document.querySelector('#hero-dialog');
+  const campaignDialog = document.querySelector('#campaign-dialog');
 
   if (buildingBadge && buildingDialog) {
     const openBuilding = () => {
@@ -9531,7 +9982,7 @@ function setupBuildingAndResearchDialogs() {
     });
   }
 
-  for (const dlg of [buildingDialog, researchDialog, questDetailDialog, heroDialog]) {
+  for (const dlg of [buildingDialog, researchDialog, questDetailDialog, heroDialog, campaignDialog]) {
     dlg?.addEventListener('click', (e) => {
       if (e.target === dlg) {
         if (typeof dlg.close === 'function') dlg.close();
@@ -9545,6 +9996,8 @@ globalThis.renderBuildingDialog = renderBuildingDialog;
 globalThis.renderResearchDialog = renderResearchDialog;
 globalThis.renderHeroDialog = renderHeroDialog;
 globalThis.openHeroDialog = openHeroDialog;
+globalThis.renderCampaignDialog = renderCampaignDialog;
+globalThis.openCampaignDialog = openCampaignDialog;
 globalThis.renderQuestDetailDialog = renderQuestDetailDialog;
 globalThis.openQuestDetailDialog = openQuestDetailDialog;
 globalThis.getDetailedQuests = getDetailedQuests;

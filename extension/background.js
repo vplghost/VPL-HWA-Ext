@@ -882,6 +882,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
             calls = [{ name: message.action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack',
               args: { heroes: message.heroes } }, { name: 'randomDraft_getInfo' }];
+          } else if (message.kind === 'campaign-raid') {
+            const missionId = Number(message.missionId);
+            const times = Math.max(1, Math.min(100, Number(message.times) || 1));
+            if (!Number.isInteger(missionId) || missionId <= 0) {
+              sendResponse({ ok: false, error: 'Invalid mission ID.' }); return;
+            }
+            calls = [
+              { name: 'missionRaid', args: { id: missionId, times } },
+              { name: 'playable_getAvailable' },
+              { name: 'worldStars_getAvailable' }
+            ];
+          } else if (message.kind === 'craft-fragment') {
+            const libId = Number(message.libId);
+            const amount = Math.max(1, Number(message.amount) || 1);
+            const type = message.type || 'gear';
+            if (!Number.isInteger(libId) || libId <= 0) {
+              sendResponse({ ok: false, error: 'Invalid fragment item ID.' }); return;
+            }
+            calls = [
+              { name: 'inventoryCraftFragments', args: { type, libId, amount } },
+              { name: 'inventoryGet' }
+            ];
+          } else if (message.kind === 'craft-recipe') {
+            const libId = Number(message.libId);
+            const amount = Math.max(1, Number(message.amount) || 1);
+            const type = message.type || 'gear';
+            if (!Number.isInteger(libId) || libId <= 0) {
+              sendResponse({ ok: false, error: 'Invalid recipe item ID.' }); return;
+            }
+            calls = [
+              { name: 'inventoryCraftRecipe', args: { type, libId, amount } },
+              { name: 'inventoryGet' }
+            ];
           }
           const extra = {};
           if (message.trackId) extra.trackId = message.trackId;
