@@ -491,18 +491,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
       const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
       const baseSettings = String(stored.towerAutomationSettings?.accountId) === String(accountId) ?
-        stored.towerAutomationSettings : { buffPriority: [] };
+        stored.towerAutomationSettings : {};
       const teamFromMsg = Array.isArray(message.heroes) && message.heroes.length === 5 && message.heroes.every(Number.isInteger)
         ? message.heroes
         : null;
       const teamFromStored = Array.isArray(baseSettings.heroes) && baseSettings.heroes.length === 5 && baseSettings.heroes.every(Number.isInteger)
         ? baseSettings.heroes
         : null;
+      const buffFromMsg = Array.isArray(message.buffPriority) && message.buffPriority.length > 0
+        ? message.buffPriority
+        : null;
+      const buffFromStored = Array.isArray(baseSettings.buffPriority) && baseSettings.buffPriority.length > 0
+        ? baseSettings.buffPriority
+        : [];
       const settings = {
         ...baseSettings,
-        buffPriority: Array.isArray(baseSettings.buffPriority) ? baseSettings.buffPriority : [],
+        buffPriority: buffFromMsg || buffFromStored,
         heroes: teamFromMsg || teamFromStored || stored.rpcCache?.teamGetAll?.data?.magicTower
       };
+      if (buffFromMsg || teamFromMsg) {
+        await chrome.storage.local.set({
+          towerAutomationSettings: {
+            ...baseSettings,
+            accountId,
+            heroes: settings.heroes,
+            buffPriority: settings.buffPriority
+          }
+        });
+      }
       const transition = runner.start(stored.rpcCache, settings, tab.id, Date.now());
       if (!transition) return { ok: false,
         error: 'Open Tower in game and select a 5-hero team before starting.' };

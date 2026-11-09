@@ -33,6 +33,11 @@ test('Tower selects the route with the highest-priority offered buff', () => {
   assert.equal(choice.call.name, 'magicTower_enterRoom');
   assert.equal(choice.call.args.number, 3);
   assert.equal(planner.plan(snapshot(), [34, 32]).call.args.number, 1);
+
+  // When no preferred buffs given, DEFAULT_BUFF_PRIORITY picks Room 3 (buff 5 is ranked higher than buff 34)
+  const defaultChoice = planner.plan(snapshot(), []);
+  assert.equal(defaultChoice.call.name, 'magicTower_enterRoom');
+  assert.equal(defaultChoice.call.args.number, 3);
 });
 
 test('Tower opens one randomly selected free chest and never chooses paid options', () => {

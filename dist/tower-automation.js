@@ -1,7 +1,14 @@
 (() => {
+  const DEFAULT_BUFF_PRIORITY = [
+    6, 3, 29, 2, 7, 13, 28, 11, 16, 26, 30, 1, 4, 5, 8, 9, 14, 27, 33, 40, 41, 45,
+    10, 25, 38, 39, 46, 34, 35, 37, 17, 18, 31, 32, 12, 36, 42, 43, 15, 44
+  ];
+
   function priorityOrder(ids, preferred = []) {
     const available = [...new Set(ids.filter(Number.isInteger))];
-    return [...new Set([...preferred, ...available])].filter((id) => available.includes(id));
+    const userPrefs = Array.isArray(preferred) ? preferred.filter(Number.isInteger) : [];
+    const fullOrder = [...new Set([...userPrefs, ...DEFAULT_BUFF_PRIORITY, ...available])];
+    return fullOrder.filter((id) => available.includes(id));
   }
 
   function chooseBuff(offered, preferred) {
@@ -10,7 +17,7 @@
     return order[0] ?? null;
   }
 
-  function chooseBattleRoom(rooms, preferred, history = [], floor = null) {
+  function chooseBattleRoom(rooms, preferred = [], history = [], floor = null) {
     const battles = Object.values(rooms).filter((room) => {
       if (!['hero_battle', 'boss_battle'].includes(room?.type)) return false;
       if (room.state !== 'initial') return false;
@@ -20,14 +27,23 @@
     }).sort((a, b) => Number(a.roomNumber) - Number(b.roomNumber));
 
     if (!battles.length) return null;
-    const rank = (room) => {
+
+    const userPrefs = Array.isArray(preferred) ? preferred.filter(Number.isInteger) : [];
+    const priorityList = [...new Set([...userPrefs, ...DEFAULT_BUFF_PRIORITY])];
+
+    const getRoomScore = (room) => {
       const next = rooms[Number(room.roomNumber) + 1];
-      if (next?.type !== 'buffs') return Infinity;
-      const buff = chooseBuff(next.buffs, preferred);
-      const index = preferred.indexOf(buff);
-      return index < 0 ? Infinity : index;
+      if (next?.type !== 'buffs' || !Array.isArray(next.buffs) || !next.buffs.length) return Infinity;
+      let bestRank = Infinity;
+      for (const buffId of next.buffs) {
+        const idx = priorityList.indexOf(buffId);
+        const rank = idx >= 0 ? idx : (priorityList.length + buffId);
+        if (rank < bestRank) bestRank = rank;
+      }
+      return bestRank;
     };
-    return battles.reduce((best, room) => rank(room) < rank(best) ? room : best);
+
+    return battles.reduce((best, room) => getRoomScore(room) < getRoomScore(best) ? room : best);
   }
 
   function plan(cache, preferred = [], random = Math.random, preferredTeam = null) {
@@ -95,5 +111,5 @@
     return { kind: 'stop', reason: `Unsupported Tower room type: ${room.type || 'unknown'}.` };
   }
 
-  globalThis.hwaHelperTowerAutomation = { plan, priorityOrder, chooseBuff, chooseBattleRoom };
+  globalThis.hwaHelperTowerAutomation = { plan, priorityOrder, chooseBuff, chooseBattleRoom, DEFAULT_BUFF_PRIORITY };
 })();

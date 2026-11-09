@@ -4261,6 +4261,12 @@ function renderTowerModal(cache = currentCache) {
     : 'rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800';
   body.replaceChildren();
 
+  const catalog = globalThis.hwaHelperTowerBuffs || {};
+  const buffCatalogIds = Object.keys(catalog).map(Number).sort((a, b) => a - b);
+  const defaultBuffOrder = globalThis.hwaHelperTowerAutomation?.DEFAULT_BUFF_PRIORITY || buffCatalogIds;
+  const savedBuffOrder = towerAutomationSettings?.buffPriority || [];
+  const buffOrder = [...new Set([...savedBuffOrder, ...defaultBuffOrder, ...buffCatalogIds])].filter((id) => catalog[id]);
+
   function section(title) {
     const card = document.createElement('section');
     card.className = 'space-y-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900';
@@ -4286,7 +4292,7 @@ function renderTowerModal(cache = currentCache) {
   }
   function renderBuffPriority() {
     const card = section('Buff priority');
-    line(card, 'Drag a buff to set its priority. The first offered buff in this order is selected.');
+    line(card, 'Drag a buff to set its priority. The first offered buff in this order is selected. Cổng chiến đấu cũng ưu tiên cửa dẫn đến buff cao nhất theo danh sách này.');
     const groups = [
       { label: 'Physical', ids: [8, 14, 26, 30], classes: 'border-rose-300 bg-rose-100 text-rose-950 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200' },
       { label: 'Magic', ids: [9, 15, 27, 33, 45], classes: 'border-indigo-300 bg-indigo-100 text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200' },
@@ -4315,24 +4321,23 @@ function renderTowerModal(cache = currentCache) {
       legend.append(key);
     }
     card.append(legend);
-    const catalog = globalThis.hwaHelperTowerBuffs || {};
-    const ids = Object.keys(catalog).map(Number).sort((a, b) => a - b);
-    const saved = towerAutomationSettings?.buffPriority || [];
-    const order = [...new Set([...saved, ...ids])].filter((id) => catalog[id]);
     const list = document.createElement('div');
     list.className = 'flex flex-wrap gap-2';
     list.setAttribute('aria-label', 'Tower buff priority, highest first');
     const move = (from, to) => {
-      if (!order.includes(from) || !order.includes(to) || from === to) return;
-      const targetIndex = order.indexOf(to);
-      order.splice(order.indexOf(from), 1);
-      order.splice(targetIndex, 0, from);
-      towerAutomationSettings = { accountId: cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id ?? null,
-        buffPriority: order };
-      chrome.storage.local.set({ towerAutomationSettings }).catch(() => {});
+      if (!buffOrder.includes(from) || !buffOrder.includes(to) || from === to) return;
+      const targetIndex = buffOrder.indexOf(to);
+      buffOrder.splice(buffOrder.indexOf(from), 1);
+      buffOrder.splice(targetIndex, 0, from);
+      towerAutomationSettings = {
+        ...(towerAutomationSettings || {}),
+        accountId: cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id ?? null,
+        buffPriority: buffOrder
+      };
+      chrome.storage?.local?.set?.({ towerAutomationSettings }).catch(() => {});
       renderTowerModal(cache);
     };
-    for (const id of order) {
+    for (const id of buffOrder) {
       const pill = document.createElement('button');
       pill.type = 'button'; pill.draggable = true;
       pill.dataset.buffId = String(id);
@@ -4348,7 +4353,7 @@ function renderTowerModal(cache = currentCache) {
         pill.append(icon);
       }
       pill.title = `${group?.label || 'Other'} · ${catalog[id].description}`;
-      pill.setAttribute('aria-label', `Buff ${id}: ${catalog[id].name}, ${group?.label || 'Other'}, priority ${order.indexOf(id) + 1}. Use arrow keys to reorder.`);
+      pill.setAttribute('aria-label', `Buff ${id}: ${catalog[id].name}, ${group?.label || 'Other'}, priority ${buffOrder.indexOf(id) + 1}. Use arrow keys to reorder.`);
       pill.addEventListener('dragstart', (event) => event.dataTransfer?.setData('text/plain', String(id)));
       pill.addEventListener('dragover', (event) => event.preventDefault());
       pill.addEventListener('drop', (event) => {
@@ -4358,7 +4363,7 @@ function renderTowerModal(cache = currentCache) {
       pill.addEventListener('keydown', (event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
-        const target = order[order.indexOf(id) + (event.key === 'ArrowLeft' ? -1 : 1)];
+        const target = buffOrder[buffOrder.indexOf(id) + (event.key === 'ArrowLeft' ? -1 : 1)];
         if (target != null) move(id, target);
       });
       list.append(pill);
@@ -4458,6 +4463,12 @@ function renderTowerModal(cache = currentCache) {
       inputWrap.append(input);
       teamBox.append(inputWrap);
     }
+
+    const buffNote = document.createElement('div');
+    buffNote.className = 'text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pt-1';
+    buffNote.innerHTML = '<span>🚪</span><span>Các lựa chọn cổng sẽ tự động ưu tiên cửa dẫn đến buff theo thứ tự ưu tiên bên dưới.</span>';
+    teamBox.append(buffNote);
+
     card.append(teamBox);
 
     const actionButton = (label, handler, disabled = false) => {
@@ -4481,7 +4492,11 @@ function renderTowerModal(cache = currentCache) {
       });
     } else {
       actionButton('Start Tower automation', async () => {
-        const response = await chrome.runtime.sendMessage({ kind: 'tower-run-start', heroes: selectedHeroes });
+        const response = await chrome.runtime.sendMessage({
+          kind: 'tower-run-start',
+          heroes: selectedHeroes,
+          buffPriority: buffOrder
+        });
         towerAutomationMessage = response?.ok ? 'Tower automation started. Running automatically...' :
           response?.error || 'Could not start Tower automation.';
         render();
@@ -4510,6 +4525,12 @@ function renderTowerModal(cache = currentCache) {
     const current = section('Current choices');
     const rooms = Object.values(session.rooms || {}).sort((a, b) => Number(a.roomNumber) - Number(b.roomNumber));
     if (!rooms.length) line(current, 'Current room options have not been captured.');
+
+    const planner = globalThis.hwaHelperTowerAutomation;
+    const recommendedRoom = (session.roomNumber === 0 && planner?.chooseBattleRoom)
+      ? planner.chooseBattleRoom(session.rooms || {}, buffOrder, session.history || [], session.floorNumber)
+      : null;
+
     for (const room of rooms) {
       const number = room.roomNumber;
       const marker = Number(number) === Number(session.roomNumber) ? ' (current)' : '';
@@ -4528,7 +4549,12 @@ function renderTowerModal(cache = currentCache) {
         }
       } else if (room.type === 'hero_battle' || room.type === 'boss_battle') {
         const units = room.defenders?.units || [];
-        line(current, `Room ${number}${marker} · ${room.type === 'boss_battle' ? 'Boss' : 'Battle'}: ${heroList(units.map((x) => x.id)) || 'opponents unknown'}`, true);
+        const isRecommended = recommendedRoom && Number(recommendedRoom.roomNumber) === Number(number);
+        line(current, `Room ${number}${marker}${isRecommended ? ' · ⭐ Recommended (Best Buff Path)' : ''} · ${room.type === 'boss_battle' ? 'Boss' : 'Battle'}: ${heroList(units.map((x) => x.id)) || 'opponents unknown'}`, true);
+        const nextRoom = session.rooms?.[Number(number) + 1];
+        if (nextRoom?.type === 'buffs' && Array.isArray(nextRoom.buffs) && nextRoom.buffs.length) {
+          line(current, `Leads to Buffs: ${nextRoom.buffs.map((bId) => catalog[bId]?.name ? `${catalog[bId].name} (#${bId})` : `#${bId}`).join(', ')}`);
+        }
         if (room.reward) line(current, `Win reward: ${towerRewardText(room.reward)}`);
       } else {
         line(current, `Room ${number}${marker} · ${room.type || 'unknown'}`);
