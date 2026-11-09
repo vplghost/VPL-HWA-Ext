@@ -1905,6 +1905,8 @@ function renderInventoryGrid(cache) {
         itemImgSrc = `assets/items/fragmentArtifact/${item.id}.png`;
       } else if (item.category === 'artifact') {
         itemImgSrc = `assets/items/artifact/${item.id}.png`;
+      } else if (item.category === 'coin') {
+        itemImgSrc = `assets/items/coin/${item.id}.png`;
       }
 
       const showFallbackIcon = () => {
@@ -9531,7 +9533,22 @@ function renderHeroDialog(heroId, cache) {
   farmQuickBtn.innerHTML = '<span>⚔️</span> Farm Trang Bị';
   farmQuickBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    openCampaignDialog(135, cache);
+    let firstMissingGearId = null;
+    for (let sIdx = 0; sIdx < 6; sIdx++) {
+      let isEquipped = false;
+      if (hero.slots) {
+        if (Array.isArray(hero.slots)) {
+          isEquipped = sIdx < hero.slots.length && hero.slots[sIdx] !== undefined && hero.slots[sIdx] !== null;
+        } else if (typeof hero.slots === 'object') {
+          isEquipped = Object.hasOwn(hero.slots, String(sIdx)) || Object.hasOwn(hero.slots, sIdx);
+        }
+      }
+      if (!isEquipped && colorItems[sIdx]) {
+        firstMissingGearId = colorItems[sIdx];
+        break;
+      }
+    }
+    openCampaignDialog({ gearId: firstMissingGearId || colorItems[0] || null }, cache);
   });
   equipHeader.append(farmQuickBtn);
   equipCard.append(equipHeader);
@@ -9651,7 +9668,7 @@ function renderHeroDialog(heroId, cache) {
       }
 
       slotBox.addEventListener('click', () => {
-        openCampaignDialog(135, cache);
+        openCampaignDialog({ gearId: itemId }, cache);
       });
     }
 
@@ -9664,6 +9681,89 @@ function renderHeroDialog(heroId, cache) {
 
 let selectedCampaignMissionId = 135;
 let selectedCampaignTimes = 5;
+let selectedFarmGearId = null;
+let selectedRecipeNodeId = null;
+
+globalThis.hwaHelperCampaignState = {
+  get selectedCampaignMissionId() { return selectedCampaignMissionId; },
+  set selectedCampaignMissionId(v) { selectedCampaignMissionId = v; },
+  get selectedFarmGearId() { return selectedFarmGearId; },
+  set selectedFarmGearId(v) { selectedFarmGearId = v; },
+  get selectedRecipeNodeId() { return selectedRecipeNodeId; },
+  set selectedRecipeNodeId(v) { selectedRecipeNodeId = v; },
+  buildGearRecipeTree,
+  findFirstUnfulfilledNode
+};
+
+function buildGearRecipeTree(gearId, cache, visited = new Set()) {
+  if (!gearId) return null;
+  const strId = String(gearId);
+  if (visited.has(strId)) return null;
+  visited.add(strId);
+
+  const craftInfo = globalThis.hwaHelperGearCraftData?.[strId] || null;
+  const name = globalThis.hwaHelperNameData?.names?.gear?.[strId] ||
+               globalThis.hwaHelperNameMap?.item?.('gear', strId) ||
+               `Gear #${strId}`;
+  const ownedGear = Number(cache?.inventoryGet?.data?.gear?.[strId] || 0);
+
+  const node = {
+    id: strId,
+    name,
+    owned: ownedGear,
+    craftInfo,
+    fragment: null,
+    children: [],
+    isFulfilled: ownedGear >= 1,
+    canCraft: false
+  };
+
+  if (craftInfo?.fragmentCount) {
+    const fragReq = Number(craftInfo.fragmentCount) || 0;
+    const ownedFrags = Number(cache?.inventoryGet?.data?.fragmentGear?.[strId] || 0);
+    const fragFulfilled = ownedFrags >= fragReq;
+    node.fragment = {
+      id: strId,
+      required: fragReq,
+      owned: ownedFrags,
+      isFulfilled: fragFulfilled,
+      gold: craftInfo.gold || 0
+    };
+    if (ownedGear < 1 && fragFulfilled) {
+      node.canCraft = true;
+    }
+  }
+
+  if (craftInfo?.recipe) {
+    let allSubFulfilled = true;
+    for (const [subId, reqCount] of Object.entries(craftInfo.recipe)) {
+      const child = buildGearRecipeTree(subId, cache, new Set(visited));
+      if (child) {
+        child.requiredCount = Number(reqCount) || 1;
+        child.isFulfilled = child.owned >= child.requiredCount;
+        if (!child.isFulfilled) allSubFulfilled = false;
+        node.children.push(child);
+      }
+    }
+    if (ownedGear < 1 && allSubFulfilled && node.children.length > 0) {
+      node.canCraft = true;
+    }
+  }
+
+  return node;
+}
+
+function findFirstUnfulfilledNode(node) {
+  if (!node) return null;
+  for (const child of node.children) {
+    const unfulfilledChild = findFirstUnfulfilledNode(child);
+    if (unfulfilledChild) return unfulfilledChild;
+  }
+  if (!node.isFulfilled) {
+    return node;
+  }
+  return null;
+}
 
 function renderCampaignDialog(cache = currentCache, target = document.querySelector('#campaign-dialog-body')) {
   if (!target) return;
@@ -9698,7 +9798,180 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   statusBanner.append(leftInfo, energyChip);
   container.append(statusBanner);
 
-  // 2. Raid Mission Configuration Card
+  // 2. Target Equipment & Recipe Tree Section (if selectedFarmGearId is active)
+  const recipeTree = selectedFarmGearId ? buildGearRecipeTree(selectedFarmGearId, cache) : null;
+  if (recipeTree) {
+    if (!selectedRecipeNodeId) {
+      const unfulfilled = findFirstUnfulfilledNode(recipeTree);
+      selectedRecipeNodeId = unfulfilled ? unfulfilled.id : recipeTree.id;
+    }
+
+    const treeCard = document.createElement('div');
+    treeCard.className = 'rounded-xl border border-indigo-200 bg-white p-4 shadow-xs dark:border-indigo-900/40 dark:bg-slate-800/80 space-y-3';
+
+    const treeHead = document.createElement('div');
+    treeHead.className = 'flex items-center justify-between pb-2 border-b border-indigo-100 dark:border-indigo-900/30 flex-wrap gap-2';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'flex items-center gap-2.5 min-w-0';
+
+    const rootImg = document.createElement('img');
+    rootImg.src = `assets/items/gear/${recipeTree.id}.png`;
+    rootImg.alt = recipeTree.name;
+    rootImg.className = 'size-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 object-cover shrink-0';
+    rootImg.onerror = () => { rootImg.style.display = 'none'; };
+
+    const titleInfo = document.createElement('div');
+    titleInfo.className = 'min-w-0';
+    titleInfo.innerHTML = `
+      <div class="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+        <span>🌿 Cây Công Thức Chế Tạo:</span>
+        <span class="text-indigo-600 dark:text-indigo-400 font-extrabold">${recipeTree.name}</span>
+        <span class="text-3xs font-mono text-slate-400">#${recipeTree.id}</span>
+      </div>
+      <div class="text-2xs text-slate-400 dark:text-slate-500">
+        Bấm vào một nhánh hoặc mảnh ghép để giới hạn và tự động fill ải chiến dịch cao nhất (3⭐)
+      </div>
+    `;
+    titleGroup.append(rootImg, titleInfo);
+
+    const clearTargetBtn = document.createElement('button');
+    clearTargetBtn.type = 'button';
+    clearTargetBtn.className = 'text-3xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 cursor-pointer transition-colors';
+    clearTargetBtn.textContent = '✕ Bỏ lọc trang bị';
+    clearTargetBtn.addEventListener('click', () => {
+      selectedFarmGearId = null;
+      selectedRecipeNodeId = null;
+      renderCampaignDialog(cache, target);
+    });
+
+    treeHead.append(titleGroup, clearTargetBtn);
+    treeCard.append(treeHead);
+
+    const treeList = document.createElement('div');
+    treeList.className = 'space-y-1.5';
+
+    function renderTreeNode(node, depth = 0, isRoot = false) {
+      const isSelected = String(selectedRecipeNodeId) === String(node.id);
+      const row = document.createElement('div');
+      row.className = `p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-2 flex-wrap ${
+        isSelected
+          ? 'border-indigo-500 bg-indigo-50/90 dark:border-indigo-500 dark:bg-indigo-950/60 ring-2 ring-indigo-400/60 shadow-xs'
+          : (node.isFulfilled
+              ? 'border-emerald-200/80 bg-emerald-50/40 dark:border-emerald-900/30 dark:bg-emerald-950/20 hover:border-emerald-300'
+              : 'border-slate-200 bg-slate-50/60 dark:border-slate-700 dark:bg-slate-800/40 hover:border-indigo-300 dark:hover:border-indigo-700')
+      }`;
+      if (depth > 0) {
+        row.style.marginLeft = `${depth * 18}px`;
+      }
+
+      const left = document.createElement('div');
+      left.className = 'flex items-center gap-2 min-w-0 flex-1';
+
+      if (depth > 0) {
+        const branchSymbol = document.createElement('span');
+        branchSymbol.className = 'text-slate-400 dark:text-slate-500 text-xs select-none font-mono';
+        branchSymbol.textContent = '↳';
+        left.append(branchSymbol);
+      }
+
+      const icon = document.createElement('img');
+      icon.src = `assets/items/gear/${node.id}.png`;
+      icon.alt = node.name;
+      icon.className = 'size-6 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 object-cover shrink-0';
+      icon.onerror = () => { icon.style.display = 'none'; };
+      left.append(icon);
+
+      const nameInfo = document.createElement('div');
+      nameInfo.className = 'min-w-0';
+
+      const reqLabel = node.requiredCount ? ` (Cần ${node.requiredCount})` : (isRoot ? ' (Mục tiêu)' : '');
+      nameInfo.innerHTML = `
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="font-bold text-xs truncate ${isSelected ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-800 dark:text-slate-200'}">${node.name}</span>
+          <span class="text-3xs font-mono text-slate-400">#${node.id}${reqLabel}</span>
+        </div>
+        <div class="text-3xs text-slate-500 dark:text-slate-400 flex items-center gap-2 flex-wrap">
+          <span>Trong kho: <strong class="${node.owned > 0 ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}">${node.owned}</strong></span>
+          ${node.fragment ? `<span>• Mảnh: <strong class="${node.fragment.isFulfilled ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${node.fragment.owned} / ${node.fragment.required}</strong></span>` : ''}
+        </div>
+      `;
+      left.append(nameInfo);
+      row.append(left);
+
+      const right = document.createElement('div');
+      right.className = 'flex items-center gap-1.5 shrink-0';
+
+      const statusPill = document.createElement('span');
+      if (node.isFulfilled) {
+        statusPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300';
+        statusPill.textContent = '✓ Đã đủ';
+      } else if (node.fragment && !node.fragment.isFulfilled) {
+        const missingFrags = node.fragment.required - node.fragment.owned;
+        statusPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
+        statusPill.textContent = `🧩 Thiếu ${missingFrags} mảnh`;
+      } else {
+        const missingCount = node.requiredCount ? Math.max(1, node.requiredCount - node.owned) : 1;
+        statusPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300';
+        statusPill.textContent = `Thiếu ${missingCount}`;
+      }
+      right.append(statusPill);
+
+      if (node.canCraft) {
+        const quickCraftBtn = document.createElement('button');
+        quickCraftBtn.type = 'button';
+        quickCraftBtn.className = 'px-2 py-0.5 rounded text-3xs font-bold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer shadow-xs';
+        quickCraftBtn.textContent = 'Ghép';
+        quickCraftBtn.title = node.fragment ? `Ghép mảnh #${node.id}` : `Chế tạo recipe #${node.id}`;
+        quickCraftBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          quickCraftBtn.disabled = true;
+          quickCraftBtn.textContent = '...';
+          const kind = node.fragment ? 'craft-fragment' : 'craft-recipe';
+          chrome.runtime?.sendMessage?.({ kind, libId: Number(node.id), amount: 1 }, () => {
+            setTimeout(() => {
+              if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
+            }, 600);
+          });
+        });
+        right.append(quickCraftBtn);
+      }
+
+      if (isSelected) {
+        const targetBadge = document.createElement('span');
+        targetBadge.className = 'inline-flex items-center px-2 py-0.5 rounded text-3xs font-bold bg-indigo-600 text-white shadow-xs';
+        targetBadge.textContent = '🎯 Đang chọn farm';
+        right.append(targetBadge);
+      }
+
+      row.append(right);
+
+      row.addEventListener('click', () => {
+        selectedRecipeNodeId = node.id;
+        const candidates = globalThis.hwaHelperCampaignMissions?.getMissionsForItem?.(node.id) || [];
+        const highest = globalThis.hwaHelperCampaignMissions?.getHighestRaidableMission?.(
+          candidates.map((m) => m.id),
+          cache?.missionGetAll?.data
+        );
+        if (highest) {
+          selectedCampaignMissionId = highest;
+        }
+        renderCampaignDialog(cache, target);
+      });
+
+      treeList.append(row);
+
+      for (const child of node.children) {
+        renderTreeNode(child, depth + 1, false);
+      }
+    }
+
+    renderTreeNode(recipeTree, 0, true);
+    treeCard.append(treeList);
+    container.append(treeCard);
+  }
+
+  // 3. Raid Mission Configuration Card
   const raidCard = document.createElement('div');
   raidCard.className = 'rounded-xl border border-indigo-200 bg-indigo-50/30 p-4 shadow-xs dark:border-indigo-900/40 dark:bg-indigo-950/20 space-y-3';
 
@@ -9720,7 +9993,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   missionLabelRow.className = 'flex items-center justify-between text-xs';
   missionLabelRow.innerHTML = `
     <label for="campaign-mission-input" class="font-bold text-slate-800 dark:text-slate-200">Ải Chiến Dịch (Mission ID):</label>
-    <span class="text-2xs text-slate-500">Mặc định: 135 (Map item drop)</span>
+    <span class="text-2xs text-slate-500">${selectedRecipeNodeId ? `Lọc theo vật phẩm #${selectedRecipeNodeId}` : 'Mặc định: 135 (Map item drop)'}</span>
   `;
   missionRow.append(missionLabelRow);
 
@@ -9738,21 +10011,75 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   });
   missionInputGroup.append(missionInput);
 
-  // Quick Chips
+  // Filtered Mission Chips or Fallback Chips
+  const candidateMissions = selectedRecipeNodeId
+    ? (globalThis.hwaHelperCampaignMissions?.getMissionsForItem?.(selectedRecipeNodeId) || [])
+    : [];
+
   const quickChipsWrap = document.createElement('div');
-  quickChipsWrap.className = 'flex items-center gap-1 flex-wrap';
-  const quickMissions = [135, 130, 125, 120, 100, 50];
-  quickMissions.forEach((mId) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'px-2 py-1 rounded text-2xs font-semibold bg-white border border-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 cursor-pointer text-slate-700 dark:text-slate-300';
-    chip.textContent = `#${mId}`;
-    chip.addEventListener('click', () => {
-      selectedCampaignMissionId = mId;
-      missionInput.value = String(mId);
+  quickChipsWrap.className = 'flex items-center gap-1.5 flex-wrap';
+
+  if (selectedRecipeNodeId && candidateMissions.length > 0) {
+    const sortedCandidates = [...candidateMissions].sort((a, b) => b.id - a.id);
+    const progressData = cache?.missionGetAll?.data || {};
+
+    sortedCandidates.forEach((m) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      const mStars = Number(progressData[String(m.id)]?.stars ?? progressData[Number(m.id)]?.stars ?? 0);
+      const isSelected = Number(selectedCampaignMissionId) === Number(m.id);
+      const is3Star = mStars >= 3;
+
+      let starLabel = '🔒';
+      if (mStars >= 3) starLabel = '⭐3';
+      else if (mStars > 0) starLabel = `⭐${mStars}`;
+
+      let chipClass = 'px-2 py-1 rounded-md text-2xs font-bold cursor-pointer transition-all flex items-center gap-1 border ';
+      if (isSelected) {
+        chipClass += 'bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-400';
+      } else if (is3Star) {
+        chipClass += 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800';
+      } else if (mStars > 0) {
+        chipClass += 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800';
+      } else {
+        chipClass += 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700';
+      }
+
+      chip.className = chipClass;
+      chip.innerHTML = `<span>#${m.id} (${m.chapter}-${m.index}${m.isHeroic ? ' H' : ''})</span><span class="${is3Star && !isSelected ? 'text-amber-500' : ''}">${starLabel}</span>`;
+      chip.title = `Ải #${m.id} (Chương ${m.chapter}-${m.index}) • ${mStars >= 3 ? 'Đủ 3 sao (cho phép raid)' : (mStars > 0 ? `${mStars} sao (chưa đủ raid)` : 'Chưa vượt qua')}`;
+
+      chip.addEventListener('click', () => {
+        selectedCampaignMissionId = m.id;
+        missionInput.value = String(m.id);
+        renderCampaignDialog(cache, target);
+      });
+      quickChipsWrap.append(chip);
     });
-    quickChipsWrap.append(chip);
-  });
+  } else if (selectedRecipeNodeId && candidateMissions.length === 0) {
+    const noDropNotice = document.createElement('span');
+    noDropNotice.className = 'text-2xs text-amber-600 dark:text-amber-400 italic';
+    noDropNotice.textContent = `Không có ải chiến dịch nào rơi vật phẩm #${selectedRecipeNodeId} (có thể nhận từ Shop/Rương)`;
+    quickChipsWrap.append(noDropNotice);
+  } else {
+    const quickMissions = [135, 130, 125, 120, 100, 50];
+    quickMissions.forEach((mId) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      const isSelected = Number(selectedCampaignMissionId) === Number(mId);
+      chip.className = `px-2 py-1 rounded text-2xs font-semibold border cursor-pointer ${
+        isSelected ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs' : 'bg-white border-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+      }`;
+      chip.textContent = `#${mId}`;
+      chip.addEventListener('click', () => {
+        selectedCampaignMissionId = mId;
+        missionInput.value = String(mId);
+        renderCampaignDialog(cache, target);
+      });
+      quickChipsWrap.append(chip);
+    });
+  }
+
   missionInputGroup.append(quickChipsWrap);
   missionRow.append(missionInputGroup);
   raidCard.append(missionRow);
@@ -10015,8 +10342,36 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   target.append(container);
 }
 
-function openCampaignDialog(missionId = null, cache = currentCache) {
-  if (missionId) selectedCampaignMissionId = Number(missionId) || 135;
+function openCampaignDialog(options = null, cache = currentCache) {
+  let missionId = null;
+  let gearId = null;
+  if (typeof options === 'number') {
+    missionId = options;
+  } else if (options && typeof options === 'object') {
+    missionId = options.missionId;
+    gearId = options.gearId;
+  }
+
+  if (gearId != null) {
+    selectedFarmGearId = Number(gearId) || null;
+    const tree = buildGearRecipeTree(selectedFarmGearId, cache);
+    const unfulfilled = findFirstUnfulfilledNode(tree);
+    selectedRecipeNodeId = unfulfilled ? unfulfilled.id : (tree ? tree.id : null);
+
+    if (selectedRecipeNodeId) {
+      const candidates = globalThis.hwaHelperCampaignMissions?.getMissionsForItem?.(selectedRecipeNodeId) || [];
+      const highest = globalThis.hwaHelperCampaignMissions?.getHighestRaidableMission?.(
+        candidates.map((m) => m.id),
+        cache?.missionGetAll?.data
+      );
+      if (highest) {
+        selectedCampaignMissionId = highest;
+      }
+    }
+  } else if (missionId != null) {
+    selectedCampaignMissionId = Number(missionId) || 135;
+  }
+
   const dialog = document.querySelector('#campaign-dialog');
   if (!dialog) return;
   renderCampaignDialog(cache);
