@@ -129,6 +129,8 @@ async function createCampaignContext() {
     console
   });
 
+  const dataNamesSrc = await readFile('extension/data-names.js', 'utf8');
+  const nameMapSrc = await readFile('extension/name-map.js', 'utf8');
   const resourceDataSrc = await readFile('extension/resource-data.js', 'utf8');
   const heroMetaSrc = await readFile('extension/hero-metadata.js', 'utf8');
   const popupDataSrc = await readFile('extension/popup-data.js', 'utf8');
@@ -136,6 +138,8 @@ async function createCampaignContext() {
   const popupSrc = await readFile('extension/popup.js', 'utf8');
   const rpcCacheSrc = await readFile('extension/rpc-cache.js', 'utf8');
 
+  vm.runInContext(dataNamesSrc, context);
+  vm.runInContext(nameMapSrc, context);
   vm.runInContext(resourceDataSrc, context);
   vm.runInContext(heroMetaSrc, context);
   vm.runInContext(popupDataSrc, context);
@@ -144,6 +148,7 @@ async function createCampaignContext() {
   vm.runInContext(rpcCacheSrc, context);
 
   context.hwaHelperNameMap = {
+    ...context.hwaHelperNameMap,
     hero: (id) => context.hwaHelperHeroMetadata?.[id]?.name || `Hero #${id}`,
     building: (id) => `Building #${id}`
   };
@@ -277,4 +282,73 @@ test('renderHeroDialog renders 6 equipment slots and quick farm trigger', async 
   assert.match(text, /Slot 1/);
   assert.match(text, /Slot 6/);
   assert.match(text, /Farm Trang Bị/);
+});
+
+test('renderHeroDialog renders equipment names and availability states (equipped, in inventory, craftable fragments, missing)', async () => {
+  const context = await createCampaignContext();
+  const host = new MockElement('div');
+  context.document.querySelector = (sel) => {
+    if (sel === '#hero-dialog-body') return host;
+    if (sel.startsWith('#')) {
+      const el = new MockElement('div');
+      el.attributes.id = sel.slice(1);
+      return el;
+    }
+    return new MockElement('div');
+  };
+
+  const cache = {
+    heroGetAll: {
+      data: {
+        '1': {
+          id: 1,
+          level: 80,
+          color: 7,
+          power: 45000,
+          star: 4,
+          // Aurora color 7 has items: [ 56, 62, 71, 84, 93, 94 ]
+          // slots with 0 are unequipped: slot 1 (62), 2 (71), 4 (93), 5 (94) are unequipped
+          // slot 0 (56) and slot 3 (84) are equipped
+          slots: { '1': 0, '2': 0, '4': 0, '5': 0 },
+          skills: { '1': 80, '2': 80, '3': 60, '4': 40 }
+        }
+      }
+    },
+    inventoryGet: {
+      data: {
+        // Gear 62 is in inventory:
+        gear: { '62': 2 },
+        // Gear 93 requires 20 fragments. We have 25 -> craftable:
+        // Gear 94 requires 20 fragments. We have 5 -> missing fragments:
+        fragmentGear: { '93': 25, '94': 5 }
+      }
+    }
+  };
+
+  context.renderHeroDialog('1', cache);
+
+  const text = host.textContent;
+
+  // Equipment names should be rendered from data-names
+  assert.match(text, /Dragon[´']s Heart/);
+  assert.match(text, /Portal Gem/);
+  assert.match(text, /Voodoo Staff/);
+  assert.match(text, /Globus Cruciger/);
+  assert.match(text, /Pastor[´']s Seal/);
+  assert.match(text, /Minotaur[´']s Head/);
+
+  // Equipped state
+  assert.match(text, /✓ Đã trang bị/);
+
+  // In-inventory state
+  assert.match(text, /Trong kho \(2\)/);
+  assert.match(text, /Đã có trong kho \(chưa trang bị\)/);
+
+  // Craftable fragments state
+  assert.match(text, /Đủ ghép \(25\/20\)/);
+  assert.match(text, /Đủ mảnh để ghép/);
+
+  // Missing fragments state
+  assert.match(text, /Chưa ghép \(5\/20\)/);
+  assert.match(text, /Thiếu 15 mảnh ghép/);
 });

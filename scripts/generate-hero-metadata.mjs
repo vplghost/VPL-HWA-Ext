@@ -178,6 +178,21 @@ const playableHeroes = Object.entries(splitlibHeroes)
 
 console.log(`Found ${playableHeroes.length} playable heroes.`);
 
+let splitlibGears = {};
+try {
+  splitlibGears = JSON.parse(await readFile(join(root, 'temp/splitlib/inventoryItem_gear.json'), 'utf8'));
+} catch (e) {
+  console.warn('Could not read temp/splitlib/inventoryItem_gear.json:', e.message);
+}
+
+const gearCraftData = {};
+for (const [id, g] of Object.entries(splitlibGears)) {
+  const entry = {};
+  if (g.fragmentMergeCost?.fragmentCount) entry.fragmentCount = g.fragmentMergeCost.fragmentCount;
+  if (g.craftRecipe?.gear) entry.recipe = g.craftRecipe.gear;
+  if (Object.keys(entry).length > 0) gearCraftData[id] = entry;
+}
+
 // Download/convert avatars with assets:sync first; metadata generation stays local.
 const metadata = {};
 for (const [id, h] of playableHeroes) {
@@ -189,6 +204,13 @@ for (const [id, h] of playableHeroes) {
     avatarFile = `assets/heroes/${id}.webp`;
   }
 
+  const equipment = {};
+  for (const [col, cData] of Object.entries(h.color || {})) {
+    if (Array.isArray(cData.items) && cData.items.length === 6) {
+      equipment[col] = cData.items;
+    }
+  }
+
   const skills = HERO_SKILLS[id] || null;
   metadata[id] = {
     name: heroNames[id] || `Hero #${id}`,
@@ -197,12 +219,14 @@ for (const [id, h] of playableHeroes) {
     faction: factionNames[factionId] || 'Unknown',
     hasAvatar: !!avatarFile,
     ...(avatarFile ? { avatarFile } : {}),
-    ...(skills ? { skills } : {})
+    ...(skills ? { skills } : {}),
+    ...(Object.keys(equipment).length > 0 ? { equipment } : {})
   };
 }
 
 const outputJs = `// Generated hero metadata\n` +
-  `globalThis.hwaHelperHeroMetadata = ${JSON.stringify(metadata, null, 2)};\n`;
+  `globalThis.hwaHelperHeroMetadata = ${JSON.stringify(metadata, null, 2)};\n\n` +
+  `globalThis.hwaHelperGearCraftData = ${JSON.stringify(gearCraftData, null, 2)};\n`;
 
 await writeFile(join(root, 'extension/hero-metadata.js'), outputJs, 'utf8');
-console.log(`Wrote hero metadata to extension/hero-metadata.js (${Object.keys(metadata).length} heroes).`);
+console.log(`Wrote hero metadata to extension/hero-metadata.js (${Object.keys(metadata).length} heroes, ${Object.keys(gearCraftData).length} gear craft definitions).`);

@@ -9526,29 +9526,120 @@ function renderHeroDialog(heroId, cache) {
   equipCard.append(equipHeader);
 
   const slotsGrid = document.createElement('div');
-  slotsGrid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-2';
+  slotsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5';
 
-  const rawSlots = hero.slots || {};
-  for (let sIdx = 1; sIdx <= 6; sIdx++) {
-    const slotVal = rawSlots[sIdx] ?? rawSlots[String(sIdx)];
-    const isEquipped = Number(slotVal) > 0 || (typeof slotVal === 'object' && slotVal !== null);
+  const heroColorStr = String(hero.color || 1);
+  const colorItems = meta.equipment?.[heroColorStr] || [];
+
+  for (let sIdx = 0; sIdx < 6; sIdx++) {
+    const slotNum = sIdx + 1;
+    const itemId = colorItems[sIdx] || null;
+    const itemName = itemId
+      ? (globalThis.hwaHelperNameData?.names?.gear?.[itemId] ||
+         globalThis.hwaHelperNameMap?.item?.('gear', itemId) ||
+         `Gear #${itemId}`)
+      : `Slot ${slotNum}`;
+
+    let isUnequipped = false;
+    if (hero.slots) {
+      if (Array.isArray(hero.slots)) {
+        isUnequipped = hero.slots[sIdx] === 0;
+      } else if (typeof hero.slots === 'object') {
+        isUnequipped = hero.slots[sIdx] === 0 || hero.slots[String(sIdx)] === 0;
+      }
+    }
+    const isEquipped = !isUnequipped;
 
     const slotBox = document.createElement('div');
-    slotBox.className = `p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 ${
-      isEquipped
-        ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200'
-        : 'border-dashed border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30'
-    }`;
+    slotBox.className = 'p-2.5 rounded-lg border text-xs flex flex-col justify-between gap-1.5 transition-all';
 
-    slotBox.innerHTML = `
-      <div class="flex items-center gap-2 min-w-0">
-        <span class="size-5 rounded-full flex items-center justify-center font-bold text-2xs ${isEquipped ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}">${sIdx}</span>
-        <span class="font-semibold truncate">Slot ${sIdx}</span>
-      </div>
-      <span class="text-2xs font-bold ${isEquipped ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400'}">${isEquipped ? '✓ Đã lắp' : '➕ Trống'}</span>
-    `;
+    if (isEquipped) {
+      slotBox.className += ' border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200';
+      slotBox.innerHTML = `
+        <div class="flex items-center justify-between gap-1.5 min-w-0">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <span class="size-5 rounded-full flex items-center justify-center font-bold text-2xs bg-emerald-600 text-white shrink-0">${slotNum}</span>
+            <span class="font-bold truncate text-xs text-slate-800 dark:text-slate-100" title="${itemName}">${itemName}</span>
+          </div>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 shrink-0">✓ Đã trang bị</span>
+        </div>
+        <div class="text-3xs text-emerald-600 dark:text-emerald-400 font-medium">Slot ${slotNum} • Đã kích hoạt chỉ số</div>
+      `;
+    } else {
+      const ownedGear = Number(cache?.inventoryGet?.data?.gear?.[itemId] || 0);
+      const craftInfo = itemId ? globalThis.hwaHelperGearCraftData?.[itemId] : null;
+      const fragReq = craftInfo?.fragmentCount || 0;
+      const ownedFrags = Number(cache?.inventoryGet?.data?.fragmentGear?.[itemId] || 0);
+      const hasRecipe = !!craftInfo?.recipe;
 
-    if (!isEquipped) {
+      let badgeHtml = '';
+      let subText = '';
+      let canCraftNow = false;
+
+      if (ownedGear > 0) {
+        slotBox.className += ' border-sky-300 bg-sky-50/70 dark:border-sky-800 dark:bg-sky-950/30 hover:border-sky-400 cursor-pointer';
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300 shrink-0">📦 Trong kho (${ownedGear})</span>`;
+        subText = `Slot ${slotNum} • <span class="text-sky-700 dark:text-sky-300 font-semibold">Đã có trong kho (chưa trang bị)</span>`;
+      } else if (fragReq > 0 && ownedFrags >= fragReq) {
+        canCraftNow = true;
+        slotBox.className += ' border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/30 hover:border-amber-400 cursor-pointer';
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">🧩 Đủ ghép (${ownedFrags}/${fragReq})</span>`;
+        subText = `Slot ${slotNum} • <span class="text-amber-700 dark:text-amber-300 font-semibold">Chưa ghép • Đủ mảnh để ghép</span>`;
+      } else if (fragReq > 0 && ownedFrags > 0) {
+        slotBox.className += ' border-dashed border-amber-200 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/10 hover:border-indigo-400 cursor-pointer';
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">🧩 Chưa ghép (${ownedFrags}/${fragReq})</span>`;
+        subText = `Slot ${slotNum} • <span class="text-slate-500 dark:text-slate-400">Thiếu ${fragReq - ownedFrags} mảnh ghép</span>`;
+      } else if (hasRecipe) {
+        slotBox.className += ' border-dashed border-purple-200 bg-purple-50/30 dark:border-purple-900/30 dark:bg-purple-950/10 hover:border-indigo-400 cursor-pointer';
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 shrink-0">🛠️ Recipe</span>`;
+        subText = `Slot ${slotNum} • <span class="text-purple-600 dark:text-purple-400">Chưa chế tạo (ghép từ Recipe)</span>`;
+      } else {
+        slotBox.className += ' border-dashed border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:bg-indigo-50/20 cursor-pointer';
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0">Chưa có${fragReq > 0 ? ` (0/${fragReq})` : ''}</span>`;
+        subText = `Slot ${slotNum} • <span class="text-slate-400 italic">Bấm để mở Campaign Farm</span>`;
+      }
+
+      slotBox.innerHTML = `
+        <div class="flex items-center justify-between gap-1.5 min-w-0">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <span class="size-5 rounded-full flex items-center justify-center font-bold text-2xs bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0">${slotNum}</span>
+            <span class="font-bold truncate text-xs text-slate-800 dark:text-slate-100" title="${itemName}">${itemName}</span>
+          </div>
+          ${badgeHtml}
+        </div>
+        <div class="flex items-center justify-between gap-1 text-3xs">
+          <div>${subText}</div>
+        </div>
+      `;
+
+      if (canCraftNow) {
+        const craftBtn = document.createElement('button');
+        craftBtn.type = 'button';
+        craftBtn.className = 'px-2 py-0.5 rounded text-3xs font-bold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer shadow-xs shrink-0';
+        craftBtn.textContent = 'Ghép';
+        craftBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          craftBtn.disabled = true;
+          craftBtn.textContent = '...';
+          chrome.runtime?.sendMessage?.(
+            { kind: 'craft-fragment', libId: itemId, amount: 1 },
+            (res) => {
+              if (res?.ok) {
+                setTimeout(() => {
+                  if (typeof renderHeroDialog === 'function' && typeof currentCache !== 'undefined') {
+                    renderHeroDialog(heroId, currentCache);
+                  }
+                }, 500);
+              } else {
+                craftBtn.disabled = false;
+                craftBtn.textContent = 'Lỗi';
+              }
+            }
+          );
+        });
+        slotBox.querySelector('.flex.items-center.justify-between.gap-1.text-3xs')?.append(craftBtn);
+      }
+
       slotBox.addEventListener('click', () => {
         openCampaignDialog(135, cache);
       });
