@@ -11,6 +11,7 @@ importScripts('tower-automation.js');
 importScripts('tower-runner.js');
 importScripts('building-data.js');
 importScripts('building-queue.js');
+importScripts('research-data.js');
 importScripts('research-queue.js');
 
 const RECORD_STATE_KEY = 'recordingState';

@@ -116,6 +116,12 @@ test('runtime quest definitions update, catalog export, and unknown quest filter
   // Fallback humanizer for unmapped localeKey
   assert.equal(data.groupTitle('LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_99'), 'Mission Chain #99');
 
+  // Daily map gather quests accurately identify resources (iron not gold)
+  assert.equal(data.dailyTitle({ id: 354 }), 'Gather food on world map');
+  assert.equal(data.dailyTitle({ id: 355 }), 'Gather wood on world map');
+  assert.equal(data.dailyTitle({ id: 356 }), 'Gather stone on world map');
+  assert.equal(data.dailyTitle({ id: 357 }), 'Gather iron on world map');
+
   // Verify catalog export is valid JSON
   const exported = data.exportCatalogJson();
   assert.ok(typeof exported === 'string');

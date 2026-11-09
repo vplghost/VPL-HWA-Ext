@@ -940,6 +940,12 @@ function createHeroInline(heroId, displayName, heroSnapshot, draftMode = false) 
   container.className = 'hero-hover-trigger group/hero inline-flex items-center gap-1.5 align-middle cursor-pointer';
   container.tabIndex = 0;
   container.setAttribute('aria-label', `${displayName} info`);
+  container.addEventListener('click', (e) => {
+    if (!draftMode && typeof openHeroDialog === 'function') {
+      e.stopPropagation();
+      openHeroDialog(heroId, typeof currentCache !== 'undefined' ? currentCache : {});
+    }
+  });
 
   if (avatarPath) {
     const img = document.createElement('img');
@@ -1513,6 +1519,16 @@ function table(headings, rows) {
         'border-b border-amber-100/80 bg-amber-50/30 hover:bg-amber-100/40 text-slate-800' :
         'border-b border-slate-100 hover:bg-blue-50/50');
     if (canEvolve) line.dataset.canEvolve = 'true';
+    if (activeTab === 'heroes') {
+      line.className += ' cursor-pointer';
+      line.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const heroId = values[0];
+        if (typeof openHeroDialog === 'function') {
+          openHeroDialog(heroId, typeof currentCache !== 'undefined' ? currentCache : {});
+        }
+      });
+    }
     for (const [column, heading] of headings.entries()) {
       const value = values[column];
       const cell = document.createElement('td');
@@ -7686,6 +7702,13 @@ function renderResearchDialog(cache) {
 
   const now = Date.now();
   const getResearchName = (id) => globalThis.hwaHelperNameMap?.research?.(id) || (id ? `Research #${id}` : 'Research');
+  const requiresSpecialResource = (researchId, level = 1) => {
+    const rHelper = globalThis.hwaHelperResearchData;
+    if (!rHelper) return false;
+    const meta = rHelper.getResearchLevelData?.(researchId, level) || rHelper.data?.[researchId]?.['1'];
+    if (!meta || !meta.c) return false;
+    return Object.keys(meta.c).some((m) => Number(m) === 12 || Number(m) > 5);
+  };
   const rawQueues = cache?.researchStatus?.data?.queues || [];
   const inProgressQueues = rawQueues.filter((q) =>
     Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now
@@ -7766,7 +7789,9 @@ function renderResearchDialog(cache) {
             name: 'completeResearch',
             feature: 'personalResearch',
             args: {
-              researchId: f.researchId
+              researchId: f.researchId,
+              level: f.level,
+              completeDate: Date.now()
             }
           },
           { name: 'getSummary', feature: 'personalResearch', args: {} }
@@ -7800,7 +7825,10 @@ function renderResearchDialog(cache) {
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-lg">🔬</span>
             <div>
-              <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">${getResearchName(q.researchId)}</div>
+              <div class="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                <span>${getResearchName(q.researchId)}</span>
+                ${requiresSpecialResource(q.researchId, q.level) ? '<span class="special-resource-icon text-xs select-none cursor-help" title="Requires Honor Marks" aria-label="Requires Honor Marks">🎖️</span>' : ''}
+              </div>
               <div class="text-xs text-slate-500 dark:text-slate-400">Queue #${q.queueNumber ?? 0} · Research ID: ${q.researchId}</div>
             </div>
           </div>
@@ -7905,6 +7933,7 @@ function renderResearchDialog(cache) {
         <div class="min-w-0">
           <div class="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
             <span>${name}</span>
+            ${requiresSpecialResource(item.researchId, item.nextLevel) ? '<span class="special-resource-icon text-xs select-none cursor-help" title="Requires Honor Marks" aria-label="Requires Honor Marks">🎖️</span>' : ''}
             <span class="text-2xs font-normal text-slate-400">(ID: ${item.researchId})</span>
           </div>
           <div class="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
@@ -8052,6 +8081,19 @@ function renderResearchDialog(cache) {
       });
     }
   }
+  const rDataDict = globalThis.hwaHelperResearchData?.data || {};
+  for (const key of Object.keys(rDataDict)) {
+    const rId = Number(key);
+    if (!researchMap.has(rId)) {
+      researchMap.set(rId, {
+        id: rId,
+        level: 0,
+        isCompleted: false,
+        isResearching: false,
+        nextLevel: 1
+      });
+    }
+  }
 
   const allResearches = Array.from(researchMap.values());
   const completedList = allResearches.filter((r) => r.isCompleted);
@@ -8078,19 +8120,47 @@ function renderResearchDialog(cache) {
         return sim;
       })();
 
+  const researchDataHelper = globalThis.hwaHelperResearchData;
+  const resourcesMap = new Map([
+    [1, cache['resource:material:1']?.data?.amount ?? 0],
+    [2, cache['resource:material:2']?.data?.amount ?? 0],
+    [3, cache['resource:material:3']?.data?.amount ?? 0],
+    [4, cache['resource:material:4']?.data?.amount ?? 0],
+    [5, cache['resource:material:5']?.data?.amount ?? 0],
+    [12, cache['resource:material:12']?.data?.amount ?? 0]
+  ]);
+  const hasMaterialTracking = Object.keys(cache || {}).some((k) => k.startsWith('resource:material:'));
+
   const nextAvailable = allResearches
     .map((r) => {
       const curLvl = simulatedLevels.get(r.id) ?? (r.isCompleted ? r.level : 0);
       const nextLvl = (curLvl > 0 || r.isCompleted) ? (curLvl + 1) : 1;
-      const durationMs = 60000;
+      const durationMs = researchDataHelper?.calculateEffectiveDurationMs
+        ? researchDataHelper.calculateEffectiveDurationMs(r.id, nextLvl)
+        : 60000;
+      const maxLvl = researchDataHelper?.getMaxLevel ? researchDataHelper.getMaxLevel(r.id) : 0;
       return {
         ...r,
         currentLevel: curLvl,
         nextLevel: nextLvl,
-        durationMs
+        maxLevel: maxLvl,
+        durationMs: durationMs || 60000
       };
     })
-    .filter((r) => r.isCompleted && !r.isResearching && r.currentLevel > 0 && r.nextLevel <= researchCenterLevel)
+    .filter((r) => {
+      if (r.isResearching) return false;
+      if (researchDataHelper?.getMaxLevel) {
+        const maxLevel = researchDataHelper.getMaxLevel(r.id);
+        if (maxLevel > 0) {
+          if (r.nextLevel > maxLevel) return false;
+          if (!researchDataHelper.isAvailable(r.id, r.nextLevel, simulatedLevels, researchCenterLevel)) {
+            return false;
+          }
+          return true;
+        }
+      }
+      return (r.currentLevel > 0 || r.isCompleted) && r.nextLevel <= researchCenterLevel;
+    })
     .sort((a, b) => (b.currentLevel - a.currentLevel) || (a.id - b.id));
 
   // Section 2: Next Available Research
@@ -8201,21 +8271,42 @@ function renderResearchDialog(cache) {
         const durationMs = r.durationMs || 60000;
         const estFinishDate = new Date(now + durationMs);
 
-        // Top row
+        // Top row: ID pill + full research name (1 line truncate) + Level badge
         const topRow = document.createElement('div');
-        topRow.className = 'flex items-start justify-between gap-2';
-        topRow.innerHTML = `
-          <div class="flex items-center gap-2 min-w-0">
-            <span class="text-lg">🔬</span>
-            <div class="min-w-0">
-              <div class="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate" title="${name}">${name}</div>
-              <div class="text-2xs text-slate-400">ID: ${r.id}</div>
-            </div>
-          </div>
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 shrink-0">
-            Lv. ${r.currentLevel} ➔ ${r.nextLevel}
-          </span>
-        `;
+        topRow.className = 'flex items-center justify-between gap-2 min-w-0';
+
+        const nameGroup = document.createElement('div');
+        nameGroup.className = 'flex items-center gap-1.5 min-w-0 flex-1';
+
+        const idPill = document.createElement('span');
+        idPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-mono font-bold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0';
+        idPill.textContent = `#${r.id}`;
+
+        const nameText = document.createElement('span');
+        nameText.className = 'font-bold text-slate-900 dark:text-slate-100 truncate text-xs sm:text-sm';
+        nameText.textContent = name;
+        nameText.title = name;
+
+        nameGroup.append(idPill, nameText);
+
+        if (requiresSpecialResource(r.id, r.nextLevel)) {
+          const medalIcon = document.createElement('span');
+          medalIcon.className = 'special-resource-icon inline-flex items-center text-xs shrink-0 cursor-help select-none';
+          medalIcon.title = 'Requires Honor Marks / Special Material';
+          if (typeof medalIcon.setAttribute === 'function') {
+            medalIcon.setAttribute('aria-label', 'Requires Honor Marks');
+          }
+          medalIcon.textContent = '🎖️';
+          nameGroup.append(medalIcon);
+        }
+
+        const levelBadge = document.createElement('span');
+        levelBadge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 shrink-0';
+        levelBadge.textContent = r.currentLevel > 0
+          ? `Lv. ${r.currentLevel} ➔ ${r.nextLevel}${r.maxLevel ? ` / ${r.maxLevel}` : ''}`
+          : `Research Lv. 1${r.maxLevel ? ` / ${r.maxLevel}` : ''}`;
+
+        topRow.append(nameGroup, levelBadge);
         card.append(topRow);
 
         // Bottom row
@@ -8266,9 +8357,14 @@ function renderResearchDialog(cache) {
         });
         actionGroup.append(queueBtn);
 
+        const missingCosts = (hasMaterialTracking && researchDataHelper?.getMissingCosts)
+          ? researchDataHelper.getMissingCosts(r.id, r.nextLevel, resourcesMap)
+          : [];
+        const hasEnoughResources = missingCosts.length === 0;
+
         const isQueueBusy = activeQueues.length > 0;
         const isRpcReady = typeof popupRpcEnabled === 'undefined' || popupRpcEnabled !== false;
-        const canResearch = !isQueueBusy && isRpcReady;
+        const canResearch = !isQueueBusy && isRpcReady && hasEnoughResources;
 
         if (canResearch) {
           const researchBtn = document.createElement('button');
@@ -8279,21 +8375,34 @@ function renderResearchDialog(cache) {
           researchBtn.innerHTML = '<span>🔬</span><span>Research</span>';
           researchBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (researchBtn.disabled) return;
             researchBtn.disabled = true;
             researchBtn.textContent = 'Starting...';
-            const calls = [
-              {
-                name: 'startResearch',
+            const calls = [];
+            for (const f of finishedQueues) {
+              calls.push({
+                name: 'completeResearch',
                 feature: 'personalResearch',
                 args: {
-                  researchId: r.id,
-                  level: r.nextLevel,
-                  startDate: Date.now(),
-                  durationMs
+                  researchId: f.researchId,
+                  level: f.level,
+                  queueNumber: f.queueNumber || 0
                 }
-              },
-              { name: 'getSummary', feature: 'personalResearch', args: {} }
-            ];
+              });
+            }
+            calls.push({
+              name: 'startResearch',
+              feature: 'personalResearch',
+              args: {
+                researchId: r.id,
+                nextLevel: r.nextLevel,
+                level: r.nextLevel,
+                startDate: Date.now(),
+                durationMs,
+                queueNumber: 0
+              }
+            });
+            calls.push({ name: 'getSummary', feature: 'personalResearch', args: {} });
             if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
               chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, () => {
                 setTimeout(() => {
@@ -8305,11 +8414,6 @@ function renderResearchDialog(cache) {
             }
           });
           actionGroup.append(researchBtn);
-        } else if (isQueueBusy) {
-          const busyTag = document.createElement('span');
-          busyTag.className = 'text-2xs text-slate-400 dark:text-slate-500 italic px-1';
-          busyTag.textContent = 'Academy busy';
-          actionGroup.append(busyTag);
         }
 
         bottomRow.append(actionGroup);
@@ -8881,12 +8985,383 @@ function renderQuestDetailDialog(filter = currentQuestFilter, cache = currentCac
   updateQuestCardsList();
 }
 
+let currentHeroDialogId = null;
+
+function renderHeroDialog(heroId, cache) {
+  const host = document.querySelector('#hero-dialog-body');
+  const titleEl = document.querySelector('#hero-dialog-title');
+  const statusWrap = document.querySelector('#hero-dialog-status');
+  if (!host) return;
+
+  currentHeroDialogId = heroId;
+  host.replaceChildren();
+  statusWrap?.replaceChildren();
+
+  const strId = String(heroId);
+  const numId = Number(heroId);
+  const heroesData = cache?.heroGetAll?.data || {};
+  const hero = heroesData[strId] || heroesData[numId] || null;
+  const meta = globalThis.hwaHelperHeroMetadata?.[strId] || globalThis.hwaHelperHeroMetadata?.[numId] || {};
+  const heroName = meta.name || globalThis.hwaHelperNameMap?.hero?.(strId) || `Hero #${strId}`;
+
+  if (titleEl) titleEl.textContent = heroName;
+
+  // Title bar status / switcher
+  if (statusWrap) {
+    const idPill = document.createElement('span');
+    idPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-mono font-bold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0';
+    idPill.textContent = `#${strId}`;
+    statusWrap.append(idPill);
+
+    if (hero?.power) {
+      const powerBadge = document.createElement('span');
+      powerBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 shrink-0';
+      powerBadge.textContent = `⚔️ ${formatNumber(hero.power)}`;
+      statusWrap.append(powerBadge);
+    }
+
+    // Hero Switcher Dropdown
+    const heroEntries = Object.entries(heroesData);
+    if (heroEntries.length > 1) {
+      const switcher = document.createElement('select');
+      switcher.id = 'hero-dialog-switcher';
+      switcher.className = 'h-6 rounded border border-slate-300 bg-white px-1.5 text-2xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200';
+      const sortedHeroes = heroEntries
+        .map(([id, h]) => ({
+          id,
+          name: globalThis.hwaHelperHeroMetadata?.[id]?.name || globalThis.hwaHelperNameMap?.hero?.(id) || `Hero #${id}`,
+          power: Number(h?.power) || 0
+        }))
+        .sort((a, b) => b.power - a.power || a.name.localeCompare(b.name));
+
+      for (const h of sortedHeroes) {
+        const opt = document.createElement('option');
+        opt.value = h.id;
+        opt.textContent = `${h.name} (${formatNumber(h.power)})`;
+        if (h.id === strId) opt.selected = true;
+        switcher.append(opt);
+      }
+      switcher.addEventListener('change', (e) => {
+        renderHeroDialog(e.target.value, cache);
+      });
+      statusWrap.append(switcher);
+    }
+  }
+
+  if (!hero) {
+    const emptyBox = document.createElement('div');
+    emptyBox.className = 'flex items-center gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400';
+    emptyBox.innerHTML = '<span class="text-xl">⚠️</span><div><div class="font-semibold text-slate-700 dark:text-slate-300">Hero not found</div><div>This hero data has not been captured yet. Use "Refresh Heroes" to update snapshots.</div></div>';
+    host.append(emptyBox);
+    return;
+  }
+
+  const starCount = hero?.star || 1;
+  const largeGlow = starGlowClass(starCount, true);
+  const avatarPath = meta.avatarFile || (meta.hasAvatar ? `assets/heroes/${strId}.png` : null);
+  const equipmentRank = globalThis.hwaHelperPopupData?.getHeroEquipmentRank?.(hero.color);
+  const soulProgress = globalThis.hwaHelperPopupData?.heroSoulProgress?.(strId, hero, cache.inventoryGet?.data);
+
+  // 1. Hero Overview Header Card
+  const profileCard = document.createElement('div');
+  profileCard.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
+  
+  const profileRow = document.createElement('div');
+  profileRow.className = 'flex items-start gap-4 flex-wrap sm:flex-nowrap';
+
+  // Avatar block
+  const avatarBlock = document.createElement('div');
+  avatarBlock.className = 'flex flex-col items-center gap-1.5 shrink-0';
+  if (avatarPath) {
+    const img = document.createElement('img');
+    img.src = avatarPath;
+    img.alt = heroName;
+    img.className = `size-16 rounded-xl object-cover shrink-0 ${largeGlow}`;
+    img.addEventListener('error', () => {
+      img.replaceWith(createInitialsBadge(heroName, meta.faction, true, largeGlow));
+    }, { once: true });
+    avatarBlock.append(img);
+  } else {
+    avatarBlock.append(createInitialsBadge(heroName, meta.faction, true, largeGlow));
+  }
+  avatarBlock.append(starIcons(starCount));
+  profileRow.append(avatarBlock);
+
+  // Info details block
+  const detailsBlock = document.createElement('div');
+  detailsBlock.className = 'min-w-0 flex-1 space-y-2';
+
+  const titleRow = document.createElement('div');
+  titleRow.className = 'flex items-center gap-2 flex-wrap';
+  const nameEl = document.createElement('h3');
+  nameEl.className = 'font-bold text-slate-900 dark:text-slate-100 text-base';
+  nameEl.textContent = heroName;
+  titleRow.append(nameEl);
+
+  if (meta.role) {
+    const roleBadge = document.createElement('span');
+    roleBadge.className = 'px-1.5 py-0.5 rounded text-2xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
+    roleBadge.textContent = meta.role;
+    titleRow.append(roleBadge);
+  }
+  if (meta.class) {
+    const classBadge = document.createElement('span');
+    classBadge.className = 'px-1.5 py-0.5 rounded text-2xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
+    classBadge.textContent = meta.class;
+    titleRow.append(classBadge);
+  }
+  if (meta.faction) {
+    const factionBadge = document.createElement('span');
+    factionBadge.className = 'px-1.5 py-0.5 rounded text-2xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300';
+    factionBadge.textContent = meta.faction;
+    titleRow.append(factionBadge);
+  }
+  detailsBlock.append(titleRow);
+
+  // Key stats chips
+  const chipsRow = document.createElement('div');
+  chipsRow.className = 'flex items-center gap-2 flex-wrap text-xs';
+
+  // Level
+  const lvlChip = document.createElement('span');
+  lvlChip.className = 'inline-flex items-center gap-1 font-bold text-slate-800 dark:text-slate-200';
+  lvlChip.innerHTML = `<span class="text-slate-400 font-normal">Level:</span> ${hero.level || 1}`;
+  chipsRow.append(lvlChip);
+
+  // Rank
+  if (equipmentRank) {
+    const rankChip = document.createElement('span');
+    rankChip.className = 'inline-flex items-center gap-1 font-semibold';
+    rankChip.innerHTML = `<span class="text-slate-400 font-normal">Rank:</span> <span style="color:${equipmentRank.color};text-shadow:${equipmentRank.textShadow}">${equipmentRank.label}</span>`;
+    chipsRow.append(rankChip);
+  }
+
+  // Power
+  const pwrChip = document.createElement('span');
+  pwrChip.className = 'inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400';
+  pwrChip.innerHTML = `<span class="text-slate-400 font-normal">Power:</span> ⚔️ ${formatNumber(hero.power || 0)}`;
+  chipsRow.append(pwrChip);
+
+  detailsBlock.append(chipsRow);
+
+  // Soul Stones progress
+  if (soulProgress) {
+    const soulWrap = document.createElement('div');
+    soulWrap.className = 'pt-1';
+    const isMaxStars = starCount >= 6;
+    const progressText = isMaxStars ? 'Maximum Evolution' : `${soulProgress.owned} / ${soulProgress.needed}`;
+    const pct = isMaxStars ? 100 : Math.min(100, Math.round((soulProgress.owned / (soulProgress.needed || 1)) * 100));
+
+    soulWrap.innerHTML = `
+      <div class="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
+        <span>Soul Stones:</span>
+        <span class="font-medium ${soulProgress.owned >= soulProgress.needed && !isMaxStars ? 'text-emerald-600 font-bold' : ''}">${progressText}</span>
+      </div>
+      <div class="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+        <div class="h-full rounded-full ${isMaxStars ? 'bg-amber-400' : (soulProgress.owned >= soulProgress.needed ? 'bg-emerald-500' : 'bg-blue-500')}" style="width:${pct}%"></div>
+      </div>
+    `;
+    detailsBlock.append(soulWrap);
+  }
+
+  profileRow.append(detailsBlock);
+  profileCard.append(profileRow);
+  host.append(profileCard);
+
+  // 2. Skills Section with + Upgrade Button
+  const skillsCard = document.createElement('div');
+  skillsCard.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3';
+
+  const skillsHeader = document.createElement('div');
+  skillsHeader.className = 'flex items-center justify-between gap-2 flex-wrap';
+  skillsHeader.innerHTML = `
+    <div>
+      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+        <span>⚡</span> Hero Skills
+      </h4>
+      <div class="text-2xs text-slate-400 dark:text-slate-500">Upgrade hero skills using skill points and gold</div>
+    </div>
+  `;
+  skillsCard.append(skillsHeader);
+
+  const heroLevel = Number(hero.level) || 1;
+  const heroColor = Number(hero.color) || 1;
+  const skillKeys = Object.keys(hero.skills || {}).sort((a, b) => Number(a) - Number(b));
+
+  const skillSlots = [
+    { slot: 1, label: 'Skill 1', tier: 'White', rankReq: 1, rankName: 'White', bg: 'border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300', maxLvl: heroLevel },
+    { slot: 2, label: 'Skill 2', tier: 'Green', rankReq: 2, rankName: 'Green', bg: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20', badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200', maxLvl: heroLevel },
+    { slot: 3, label: 'Skill 3', tier: 'Blue', rankReq: 4, rankName: 'Blue', bg: 'border-sky-200 bg-sky-50/60 dark:border-sky-900/40 dark:bg-sky-950/20', badge: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200', maxLvl: Math.max(0, heroLevel - 20) },
+    { slot: 4, label: 'Skill 4', tier: 'Violet', rankReq: 7, rankName: 'Violet', bg: 'border-purple-200 bg-purple-50/60 dark:border-purple-900/40 dark:bg-purple-950/20', badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200', maxLvl: Math.max(0, heroLevel - 40) }
+  ];
+
+  const skillsList = document.createElement('div');
+  skillsList.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5';
+
+  for (const s of skillSlots) {
+    const isUnlocked = heroColor >= s.rankReq || s.slot <= skillKeys.length;
+    const skillKey = skillKeys[s.slot - 1];
+    const curLevel = isUnlocked ? Number(hero.skills?.[skillKey] ?? hero.skills?.[s.slot] ?? 1) : 0;
+    const maxLevel = s.maxLvl;
+    const isMax = isUnlocked && curLevel >= maxLevel && maxLevel > 0;
+    const pct = maxLevel > 0 ? Math.min(100, Math.round((curLevel / maxLevel) * 100)) : 0;
+    const skillName = meta.skills?.[s.slot - 1] || s.label;
+
+    const row = document.createElement('div');
+    row.className = `flex flex-col justify-between p-2.5 rounded-lg border transition-all ${
+      isUnlocked ? s.bg : 'border-dashed border-slate-200 bg-slate-50/30 text-slate-400 dark:border-slate-800 dark:bg-slate-900/30'
+    }`;
+
+    // Top row: pill + skillName on left, button / badge on right (sát lề phải)
+    const topRow = document.createElement('div');
+    topRow.className = 'flex items-center justify-between gap-1.5 min-w-0';
+
+    const nameGroup = document.createElement('div');
+    nameGroup.className = 'flex items-center gap-1.5 min-w-0 flex-1 mr-1';
+
+    const pill = document.createElement('span');
+    pill.className = `inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold uppercase tracking-wider shrink-0 ${s.badge}`;
+    pill.textContent = s.tier;
+
+    const slotTitle = document.createElement('span');
+    slotTitle.className = `font-bold text-xs truncate ${isUnlocked ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`;
+    slotTitle.textContent = skillName;
+    slotTitle.title = skillName;
+
+    nameGroup.append(pill, slotTitle);
+    topRow.append(nameGroup);
+
+    // Right action button / badge (sát lề phải)
+    const actionWrap = document.createElement('div');
+    actionWrap.className = 'shrink-0 flex items-center';
+
+    if (!isUnlocked) {
+      const lockBadge = document.createElement('span');
+      lockBadge.className = 'px-1.5 py-0.5 rounded text-3xs text-slate-400 bg-slate-100 dark:bg-slate-800 dark:text-slate-500';
+      lockBadge.textContent = 'Locked';
+      actionWrap.append(lockBadge);
+    } else if (isMax) {
+      const maxBadge = document.createElement('span');
+      maxBadge.className = 'px-2 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+      maxBadge.textContent = 'MAX';
+      actionWrap.append(maxBadge);
+    } else {
+      const plusBtn = document.createElement('button');
+      plusBtn.type = 'button';
+      plusBtn.className = 'btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-transform active:scale-95';
+      plusBtn.title = `Upgrade ${skillName} to Lv. ${curLevel + 1}`;
+      plusBtn.setAttribute('aria-label', `Upgrade ${skillName} to Lv. ${curLevel + 1}`);
+      plusBtn.innerHTML = '<span>➕</span>';
+
+      plusBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        plusBtn.disabled = true;
+        plusBtn.innerHTML = '<span class="text-3xs">⏳</span>';
+
+        // Optimistic update
+        if (hero.skills && skillKey) {
+          hero.skills[skillKey] = (Number(hero.skills[skillKey]) || 0) + 1;
+        } else if (hero.skills) {
+          hero.skills[s.slot] = (Number(hero.skills[s.slot]) || 0) + 1;
+        }
+
+        const calls = [
+          {
+            name: 'heroUpgradeSkill',
+            args: {
+              heroId: numId,
+              skill: s.slot
+            }
+          },
+          { name: 'heroGetAll', args: {} }
+        ];
+
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, () => {
+            setTimeout(() => {
+              if (typeof renderHeroDialog === 'function' && typeof currentCache !== 'undefined') {
+                renderHeroDialog(heroId, currentCache);
+              }
+            }, 600);
+          });
+        }
+      });
+      actionWrap.append(plusBtn);
+    }
+
+    topRow.append(actionWrap);
+
+    // Bottom area: level progress bar or unlock condition
+    const bottomDiv = document.createElement('div');
+    bottomDiv.className = 'mt-2 space-y-1';
+
+    if (isUnlocked) {
+      const lvlText = document.createElement('div');
+      lvlText.className = 'flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400';
+      lvlText.innerHTML = `<span>Level: <span class="font-bold text-slate-700 dark:text-slate-200">${curLevel}</span> / ${maxLevel}</span><span>${pct}%</span>`;
+
+      const bar = document.createElement('div');
+      bar.className = 'w-full bg-slate-200/80 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden';
+      bar.innerHTML = `<div class="h-full rounded-full ${isMax ? 'bg-amber-500' : 'bg-emerald-500'} transition-all" style="width:${pct}%"></div>`;
+
+      bottomDiv.append(lvlText, bar);
+    } else {
+      const lockText = document.createElement('div');
+      lockText.className = 'text-2xs text-slate-400 italic';
+      lockText.textContent = `🔒 Unlocks at rank ${s.rankName}`;
+      bottomDiv.append(lockText);
+    }
+
+    row.append(topRow, bottomDiv);
+    skillsList.append(row);
+  }
+
+  skillsCard.append(skillsList);
+  host.append(skillsCard);
+
+  // 3. Artifacts Section (if any)
+  if (Array.isArray(hero.artifacts) && hero.artifacts.length > 0) {
+    const artCard = document.createElement('div');
+    artCard.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-2';
+    artCard.innerHTML = '<h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><span>🛡️</span> Artifacts</h4>';
+
+    const artGrid = document.createElement('div');
+    artGrid.className = 'grid grid-cols-3 gap-2 text-center text-xs';
+
+    for (const art of hero.artifacts) {
+      const artBox = document.createElement('div');
+      artBox.className = 'p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700';
+      const typeLabel = art.artifactType ? art.artifactType.charAt(0).toUpperCase() + art.artifactType.slice(1) : 'Artifact';
+      artBox.innerHTML = `
+        <div class="text-2xs text-slate-400 capitalize">${typeLabel}</div>
+        <div class="font-bold text-slate-800 dark:text-slate-200">Lv. ${art.level || 1}</div>
+        <div class="text-2xs text-amber-500">${'★'.repeat(art.star || 1)}</div>
+      `;
+      artGrid.append(artBox);
+    }
+    artCard.append(artGrid);
+    host.append(artCard);
+  }
+}
+
+function openHeroDialog(heroId, cache = currentCache) {
+  const dialog = document.querySelector('#hero-dialog');
+  if (!dialog) return;
+  renderHeroDialog(heroId, cache);
+  if (typeof dialog.showModal === 'function') {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute('open', '');
+  }
+}
+
 function setupBuildingAndResearchDialogs() {
   const buildingBadge = document.querySelector('#building-badge');
   const buildingDialog = document.querySelector('#building-dialog');
   const researchBadge = document.querySelector('#research-badge');
   const researchDialog = document.querySelector('#research-dialog');
   const questDetailDialog = document.querySelector('#quest-detail-dialog');
+  const heroDialog = document.querySelector('#hero-dialog');
 
   if (buildingBadge && buildingDialog) {
     const openBuilding = () => {
@@ -8924,7 +9399,7 @@ function setupBuildingAndResearchDialogs() {
     });
   }
 
-  for (const dlg of [buildingDialog, researchDialog, questDetailDialog]) {
+  for (const dlg of [buildingDialog, researchDialog, questDetailDialog, heroDialog]) {
     dlg?.addEventListener('click', (e) => {
       if (e.target === dlg) {
         if (typeof dlg.close === 'function') dlg.close();
@@ -8936,6 +9411,8 @@ function setupBuildingAndResearchDialogs() {
 
 globalThis.renderBuildingDialog = renderBuildingDialog;
 globalThis.renderResearchDialog = renderResearchDialog;
+globalThis.renderHeroDialog = renderHeroDialog;
+globalThis.openHeroDialog = openHeroDialog;
 globalThis.renderQuestDetailDialog = renderQuestDetailDialog;
 globalThis.openQuestDetailDialog = openQuestDetailDialog;
 globalThis.getDetailedQuests = getDetailedQuests;
@@ -9047,6 +9524,7 @@ async function render() {
   if (document.querySelector('#monster-dialog')?.open) renderMonster(cache);
   if (document.querySelector('#building-dialog')?.open) renderBuildingDialog(cache);
   if (document.querySelector('#research-dialog')?.open) renderResearchDialog(cache);
+  if (document.querySelector('#hero-dialog')?.open && currentHeroDialogId) renderHeroDialog(currentHeroDialogId, cache);
   if (document.querySelector('#quest-detail-dialog')?.open) renderQuestDetailDialog(currentQuestFilter, cache);
   const draftModal = document.querySelector('#draft-modal');
   if (draftModal && !draftModal.hidden) {

@@ -84,30 +84,38 @@
         name: 'completeResearch',
         feature: 'personalResearch',
         args: {
-          researchId: f.researchId
+          researchId: f.researchId,
+          level: f.level,
+          completeDate: now
         }
       });
     }
 
     if (queueState?.enabled !== false && Array.isArray(queueState?.items) && queueState.items.length > 0) {
       const nextItem = queueState.items[0];
+      const durationMs = Number(nextItem.durationMs) ||
+        (globalThis.hwaHelperResearchData?.calculateEffectiveDurationMs
+          ? globalThis.hwaHelperResearchData.calculateEffectiveDurationMs(nextItem.researchId, nextItem.nextLevel)
+          : 1000) || 1000;
       calls.push({
         name: 'startResearch',
         feature: 'personalResearch',
         args: {
           researchId: nextItem.researchId,
+          nextLevel: nextItem.nextLevel,
           level: nextItem.nextLevel,
           startDate: now,
-          durationMs: nextItem.durationMs || 1000
+          durationMs,
+          queueNumber: 0
         }
       });
       calls.push({ name: 'getSummary', feature: 'personalResearch', args: {} });
 
       return {
         action: 'start',
-        startedItem: nextItem,
+        startedItem: { ...nextItem, durationMs },
         remainingItems: queueState.items.slice(1),
-        wakeAt: now + (nextItem.durationMs || 1000) + 1000,
+        wakeAt: now + durationMs + 1000,
         calls
       };
     }
