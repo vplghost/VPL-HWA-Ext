@@ -6811,6 +6811,7 @@ let nextBuildingSortOrder = 'level-desc';
 let nextResearchFilterQuery = '';
 let nextResearchSortOrder = 'level-desc';
 let currentBuildingQueue = { enabled: true, items: [] };
+let currentResearchQueue = { enabled: true, items: [] };
 
 function formatRemainingHms(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return '00:00';
@@ -6829,6 +6830,17 @@ function saveBuildingQueue() {
     chrome.storage.local.set({ buildingQueue: currentBuildingQueue }, () => {
       try {
         const p = chrome.runtime?.sendMessage?.({ kind: 'building-queue-action', action: 'sync' });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch {}
+    });
+  }
+}
+
+function saveResearchQueue() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.set({ researchQueue: currentResearchQueue }, () => {
+      try {
+        const p = chrome.runtime?.sendMessage?.({ kind: 'research-queue-action', action: 'sync' });
         if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch {}
     });
@@ -7675,8 +7687,12 @@ function renderResearchDialog(cache) {
   const now = Date.now();
   const getResearchName = (id) => globalThis.hwaHelperNameMap?.research?.(id) || (id ? `Research #${id}` : 'Research');
   const rawQueues = cache?.researchStatus?.data?.queues || [];
-  const activeQueues = rawQueues.filter((q) =>
+  const inProgressQueues = rawQueues.filter((q) =>
     Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now
+  );
+  const activeQueues = inProgressQueues;
+  const finishedQueues = rawQueues.filter((q) =>
+    Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs <= now
   );
 
   // 1. Title bar status
@@ -7690,6 +7706,14 @@ function renderResearchDialog(cache) {
       badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300';
       badge.innerHTML = `<span class="size-1.5 rounded-full bg-purple-500 animate-pulse"></span>Active: <span class="truncate max-w-[140px]">${name}</span>${lvl} · <span data-experimental-until="${q.startDate + q.durationMs}" data-countdown-format="hms">${formatRemainingHms(rem)}</span>`;
       statusWrap.append(badge);
+    } else if (finishedQueues.length > 0) {
+      const q = finishedQueues[0];
+      const name = getResearchName(q.researchId);
+      const lvl = q.level ? ` Lv. ${q.level}` : '';
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+      badge.innerHTML = `<span class="size-1.5 rounded-full bg-emerald-500"></span>Ready to finish: <span class="truncate max-w-[140px]">${name}</span>${lvl}`;
+      statusWrap.append(badge);
     } else {
       const badge = document.createElement('span');
       badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
@@ -7702,13 +7726,67 @@ function renderResearchDialog(cache) {
   const queueSection = document.createElement('section');
   queueSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80';
   const queueTitle = document.createElement('h3');
-  queueTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2';
-  queueTitle.innerHTML = '<span>🔬</span> Active Research Queue';
+  queueTitle.className = 'text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center justify-between gap-2';
+  queueTitle.innerHTML = '<span class="flex items-center gap-2"><span>🔬</span> Active Research Queue</span>';
   queueSection.append(queueTitle);
 
-  if (activeQueues.length > 0) {
+  const hasQueues = activeQueues.length > 0 || finishedQueues.length > 0;
+  if (hasQueues) {
     const queueList = document.createElement('div');
     queueList.className = 'space-y-3';
+
+    // 1. Finished research (ready to finalize)
+    for (const f of finishedQueues) {
+      const card = document.createElement('div');
+      card.className = 'rounded-lg border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/30';
+      const name = getResearchName(f.researchId);
+
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between gap-2 flex-wrap';
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'flex items-center gap-2 min-w-0';
+      infoDiv.innerHTML = `
+        <span class="text-xl">🎉</span>
+        <div>
+          <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">${name} · Complete</div>
+          <div class="text-xs text-emerald-700 dark:text-emerald-400">Queue #${f.queueNumber ?? 0} · Target Lv. ${f.level ?? '?'} finished</div>
+        </div>
+      `;
+
+      const finishBtn = document.createElement('button');
+      finishBtn.type = 'button';
+      finishBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-colors';
+      finishBtn.innerHTML = '<span>✅</span><span>Finish</span>';
+      finishBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        finishBtn.disabled = true;
+        finishBtn.textContent = 'Finishing...';
+        const calls = [
+          {
+            name: 'completeResearch',
+            feature: 'personalResearch',
+            args: {
+              researchId: f.researchId
+            }
+          },
+          { name: 'getSummary', feature: 'personalResearch', args: {} }
+        ];
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, () => {
+            setTimeout(() => {
+              if (typeof renderResearchDialog === 'function' && typeof currentCache !== 'undefined') {
+                renderResearchDialog(currentCache);
+              }
+            }, 800);
+          });
+        }
+      });
+      row.append(infoDiv, finishBtn);
+      card.append(row);
+      queueList.append(card);
+    }
+
+    // 2. In-progress research
     for (const q of activeQueues) {
       const card = document.createElement('div');
       card.className = 'rounded-lg border border-purple-200 bg-purple-50/60 p-3.5 dark:border-purple-900/50 dark:bg-purple-950/20';
@@ -7754,6 +7832,176 @@ function renderResearchDialog(cache) {
     emptyBox.innerHTML = '<span class="text-xl">✅</span><div><div class="font-semibold text-slate-700 dark:text-slate-300">Academy is currently idle</div><div>No research in progress. Ready for new technology research.</div></div>';
     queueSection.append(emptyBox);
   }
+
+  // Automation Queue Subsection (inside queueSection to preserve layout)
+  const autoBox = document.createElement('div');
+  autoBox.className = 'mt-3 pt-3 border-t border-slate-100 dark:border-slate-800';
+
+  const autoHeader = document.createElement('div');
+  autoHeader.className = 'flex items-center justify-between gap-2 flex-wrap mb-2';
+  const autoTitle = document.createElement('div');
+  autoTitle.className = 'flex items-center gap-2';
+  const queuedCount = currentResearchQueue.items?.length || 0;
+  autoTitle.innerHTML = `<span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><span>⚡</span> Auto-Research Queue</span><span class="text-2xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">${queuedCount} queued</span>`;
+  autoHeader.append(autoTitle);
+
+  const autoControls = document.createElement('div');
+  autoControls.className = 'flex items-center gap-2';
+
+  const autoToggleLabel = document.createElement('label');
+  autoToggleLabel.className = 'inline-flex items-center gap-1.5 text-2xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer select-none';
+  const autoToggleInput = document.createElement('input');
+  autoToggleInput.type = 'checkbox';
+  autoToggleInput.checked = currentResearchQueue.enabled !== false;
+  autoToggleInput.className = 'rounded border-slate-300 text-purple-600 focus:ring-purple-400 h-3.5 w-3.5';
+  autoToggleInput.addEventListener('change', (e) => {
+    currentResearchQueue.enabled = e.target.checked;
+    saveResearchQueue();
+  });
+  const autoText = document.createElement('span');
+  autoText.textContent = 'Auto-advance';
+  autoToggleLabel.append(autoToggleInput, autoText);
+  autoControls.append(autoToggleLabel);
+
+  if (queuedCount > 0) {
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'text-2xs text-rose-500 hover:text-rose-600 dark:text-rose-400 font-medium px-1.5 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer';
+    clearBtn.textContent = 'Clear';
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (globalThis.hwaHelperResearchQueue?.clearQueue) {
+        currentResearchQueue = globalThis.hwaHelperResearchQueue.clearQueue(currentResearchQueue);
+      } else {
+        currentResearchQueue.items = [];
+      }
+      saveResearchQueue();
+      renderResearchDialog(cache);
+    });
+    autoControls.append(clearBtn);
+  }
+  autoHeader.append(autoControls);
+  autoBox.append(autoHeader);
+
+  const queueTimeline = globalThis.hwaHelperResearchQueue?.calculateQueueTimeline
+    ? globalThis.hwaHelperResearchQueue.calculateQueueTimeline(rawQueues, currentResearchQueue.items, now)
+    : { items: currentResearchQueue.items || [], totalDurationMs: 0, allDoneAt: now };
+
+  if (queueTimeline.items && queueTimeline.items.length > 0) {
+    const autoList = document.createElement('div');
+    autoList.className = 'space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5';
+
+    queueTimeline.items.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between gap-2 p-2 rounded-lg border border-slate-200/80 bg-slate-50/70 text-xs dark:border-slate-700/60 dark:bg-slate-800/60';
+      const name = getResearchName(item.researchId);
+      const estStart = item.estStart ? new Date(item.estStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const estFinish = item.estFinish ? new Date(item.estFinish).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+      const left = document.createElement('div');
+      left.className = 'min-w-0 flex items-center gap-2 flex-1';
+      left.innerHTML = `
+        <span class="inline-flex items-center justify-center size-5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 text-2xs font-bold shrink-0">#${idx + 1}</span>
+        <div class="min-w-0">
+          <div class="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
+            <span>${name}</span>
+            <span class="text-2xs font-normal text-slate-400">(ID: ${item.researchId})</span>
+          </div>
+          <div class="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
+            <span class="font-bold text-purple-600 dark:text-purple-400">Lv. ${item.currentLevel ?? '?'} ➔ ${item.nextLevel}</span>
+            <span>·</span>
+            <span>⏱ ${formatRemainingHms(item.durationMs || 1000)}</span>
+            ${estFinish ? `<span>·</span><span>Est: ${estStart} ➔ ${estFinish}</span>` : ''}
+          </div>
+        </div>
+      `;
+      row.append(left);
+
+      const right = document.createElement('div');
+      right.className = 'flex items-center gap-1 shrink-0';
+
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.title = 'Move up';
+      upBtn.disabled = idx === 0;
+      upBtn.className = idx === 0
+        ? 'size-6 rounded flex items-center justify-center text-2xs text-slate-300 dark:text-slate-600 cursor-not-allowed'
+        : 'size-6 rounded flex items-center justify-center text-2xs text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer';
+      upBtn.innerHTML = '▲';
+      upBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (idx > 0) {
+          if (globalThis.hwaHelperResearchQueue?.reorderQueue) {
+            currentResearchQueue = globalThis.hwaHelperResearchQueue.reorderQueue(currentResearchQueue, idx, idx - 1);
+          } else {
+            const removed = currentResearchQueue.items.splice(idx, 1)[0];
+            currentResearchQueue.items.splice(idx - 1, 0, removed);
+          }
+          saveResearchQueue();
+          renderResearchDialog(cache);
+        }
+      });
+      right.append(upBtn);
+
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.title = 'Move down';
+      downBtn.disabled = idx === queueTimeline.items.length - 1;
+      downBtn.className = idx === queueTimeline.items.length - 1
+        ? 'size-6 rounded flex items-center justify-center text-2xs text-slate-300 dark:text-slate-600 cursor-not-allowed'
+        : 'size-6 rounded flex items-center justify-center text-2xs text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer';
+      downBtn.innerHTML = '▼';
+      downBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (idx < currentResearchQueue.items.length - 1) {
+          if (globalThis.hwaHelperResearchQueue?.reorderQueue) {
+            currentResearchQueue = globalThis.hwaHelperResearchQueue.reorderQueue(currentResearchQueue, idx, idx + 1);
+          } else {
+            const removed = currentResearchQueue.items.splice(idx, 1)[0];
+            currentResearchQueue.items.splice(idx + 1, 0, removed);
+          }
+          saveResearchQueue();
+          renderResearchDialog(cache);
+        }
+      });
+      right.append(downBtn);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.title = 'Remove from queue';
+      removeBtn.className = 'size-6 rounded flex items-center justify-center text-2xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer';
+      removeBtn.innerHTML = '✕';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (globalThis.hwaHelperResearchQueue?.removeFromQueue) {
+          currentResearchQueue = globalThis.hwaHelperResearchQueue.removeFromQueue(currentResearchQueue, idx);
+        } else {
+          currentResearchQueue.items.splice(idx, 1);
+        }
+        saveResearchQueue();
+        renderResearchDialog(cache);
+      });
+      right.append(removeBtn);
+
+      row.append(right);
+      autoList.append(row);
+    });
+
+    autoBox.append(autoList);
+
+    const autoFooter = document.createElement('div');
+    autoFooter.className = 'mt-2 text-2xs text-slate-400 dark:text-slate-500 flex justify-between items-center';
+    const allDoneStr = queueTimeline.allDoneAt ? new Date(queueTimeline.allDoneAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    autoFooter.innerHTML = `<span>Total time: <span class="font-semibold text-slate-600 dark:text-slate-300">${formatRemainingHms(queueTimeline.totalDurationMs)}</span></span><span>Completion: <span class="font-semibold text-slate-600 dark:text-slate-300">${allDoneStr}</span></span>`;
+    autoBox.append(autoFooter);
+  } else {
+    const queueEmptyP = document.createElement('p');
+    queueEmptyP.className = 'text-2xs text-slate-400 italic py-1';
+    queueEmptyP.textContent = 'Queue is empty. Click "+ Queue" on candidates below to automate next research.';
+    autoBox.append(queueEmptyP);
+  }
+
+  queueSection.append(autoBox);
   host.append(queueSection);
 
   // Extract completed researches
@@ -7810,9 +8058,40 @@ function renderResearchDialog(cache) {
   const rawBuildings = cache?.buildingStatus?.data?.buildings || [];
   const researchCenter = rawBuildings.find((b) => b.buildingId === 43 || b.buildingId === 165);
   const researchCenterLevel = Number.isFinite(researchCenter?.level) ? researchCenter.level : Infinity;
+
+  // Calculate simulated levels including active queue and queued automation items
+  const simulatedLevels = globalThis.hwaHelperResearchQueue?.getSimulatedLevels
+    ? globalThis.hwaHelperResearchQueue.getSimulatedLevels(researchMap, rawQueues, currentResearchQueue.items)
+    : (() => {
+        const sim = new Map();
+        for (const [id, r] of researchMap.entries()) sim.set(id, r.level);
+        for (const q of rawQueues) {
+          if (Number.isFinite(q.researchId) && Number.isFinite(q.level)) {
+            sim.set(Number(q.researchId), Math.max(sim.get(Number(q.researchId)) || 0, q.level));
+          }
+        }
+        for (const item of currentResearchQueue?.items || []) {
+          if (Number.isFinite(item.researchId) && Number.isFinite(item.nextLevel)) {
+            sim.set(Number(item.researchId), Math.max(sim.get(Number(item.researchId)) || 0, item.nextLevel));
+          }
+        }
+        return sim;
+      })();
+
   const nextAvailable = allResearches
-    .filter((r) => r.isCompleted && r.level > 0 && !r.isResearching && r.nextLevel <= researchCenterLevel)
-    .sort((a, b) => (b.level - a.level) || (a.id - b.id));
+    .map((r) => {
+      const curLvl = simulatedLevels.get(r.id) ?? (r.isCompleted ? r.level : 0);
+      const nextLvl = (curLvl > 0 || r.isCompleted) ? (curLvl + 1) : 1;
+      const durationMs = 60000;
+      return {
+        ...r,
+        currentLevel: curLvl,
+        nextLevel: nextLvl,
+        durationMs
+      };
+    })
+    .filter((r) => r.isCompleted && !r.isResearching && r.currentLevel > 0 && r.nextLevel <= researchCenterLevel)
+    .sort((a, b) => (b.currentLevel - a.currentLevel) || (a.id - b.id));
 
   // Section 2: Next Available Research
   const nextSection = document.createElement('section');
@@ -7897,14 +8176,14 @@ function renderResearchDialog(cache) {
       })
       .sort((a, b) => {
         if (nextResearchSortOrder === 'level-asc') {
-          return (a.level - b.level) || (a.id - b.id);
+          return (a.currentLevel - b.currentLevel) || (a.id - b.id);
         }
         if (nextResearchSortOrder === 'name-asc') {
           const nameA = getResearchName(a.id);
           const nameB = getResearchName(b.id);
           return nameA.localeCompare(nameB) || (a.id - b.id);
         }
-        return (b.level - a.level) || (a.id - b.id);
+        return (b.currentLevel - a.currentLevel) || (a.id - b.id);
       });
 
     const badge = nextSection.querySelector('#next-research-count-badge');
@@ -7917,19 +8196,124 @@ function renderResearchDialog(cache) {
     if (filtered.length > 0) {
       for (const r of filtered) {
         const card = document.createElement('div');
-        card.className = 'flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs hover:border-purple-200 hover:bg-purple-50/30 transition-colors dark:border-slate-700/60 dark:bg-slate-800/50 dark:hover:border-purple-900/50';
+        card.className = 'rounded-xl border border-slate-200/90 bg-white p-3 space-y-2 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between';
         const name = getResearchName(r.id);
-        card.innerHTML = `
-          <div class="min-w-0">
-            <div class="font-semibold text-slate-900 dark:text-slate-100 truncate" title="${name}">${name}</div>
-            <div class="text-2xs text-slate-500 dark:text-slate-400">ID: ${r.id}</div>
-          </div>
-          <div class="text-right shrink-0">
-            <div class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
-              ${r.isCompleted ? `Lv. ${r.level} ➔ ${r.nextLevel}` : 'Research Lv. 1'}
+        const durationMs = r.durationMs || 60000;
+        const estFinishDate = new Date(now + durationMs);
+
+        // Top row
+        const topRow = document.createElement('div');
+        topRow.className = 'flex items-start justify-between gap-2';
+        topRow.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-lg">🔬</span>
+            <div class="min-w-0">
+              <div class="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate" title="${name}">${name}</div>
+              <div class="text-2xs text-slate-400">ID: ${r.id}</div>
             </div>
           </div>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 shrink-0">
+            Lv. ${r.currentLevel} ➔ ${r.nextLevel}
+          </span>
         `;
+        card.append(topRow);
+
+        // Bottom row
+        const bottomRow = document.createElement('div');
+        bottomRow.className = 'flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/50';
+
+        const timeInfo = document.createElement('div');
+        timeInfo.className = 'flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400 min-w-0';
+        timeInfo.innerHTML = `
+          <span class="inline-flex items-center gap-1 font-mono text-slate-600 dark:text-slate-300" title="Research Duration">
+            <span>⏱</span><span>${formatRemainingHms(durationMs)}</span>
+          </span>
+          <span class="text-slate-300 dark:text-slate-600">·</span>
+          <span class="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500" title="Estimated Finish Time">
+            <span>🏁</span><span>${estFinishDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </span>
+        `;
+        bottomRow.append(timeInfo);
+
+        const actionGroup = document.createElement('div');
+        actionGroup.className = 'flex items-center gap-1.5 shrink-0';
+
+        const queueBtn = document.createElement('button');
+        queueBtn.type = 'button';
+        queueBtn.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600';
+        queueBtn.innerHTML = '<span>➕</span><span>Queue</span>';
+        queueBtn.title = `Add ${name} Lv. ${r.nextLevel} to auto-research queue`;
+        queueBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (globalThis.hwaHelperResearchQueue?.addToQueue) {
+            currentResearchQueue = globalThis.hwaHelperResearchQueue.addToQueue(currentResearchQueue, {
+              researchId: r.id,
+              currentLevel: r.currentLevel,
+              nextLevel: r.nextLevel,
+              durationMs
+            });
+          } else {
+            currentResearchQueue.items = currentResearchQueue.items || [];
+            currentResearchQueue.items.push({
+              researchId: r.id,
+              currentLevel: r.currentLevel,
+              nextLevel: r.nextLevel,
+              durationMs
+            });
+          }
+          saveResearchQueue();
+          renderResearchDialog(cache);
+        });
+        actionGroup.append(queueBtn);
+
+        const isQueueBusy = activeQueues.length > 0;
+        const isRpcReady = typeof popupRpcEnabled === 'undefined' || popupRpcEnabled !== false;
+        const canResearch = !isQueueBusy && isRpcReady;
+
+        if (canResearch) {
+          const researchBtn = document.createElement('button');
+          researchBtn.type = 'button';
+          researchBtn.disabled = false;
+          researchBtn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer transition-colors';
+          researchBtn.title = `Research ${name} to Lv. ${r.nextLevel}`;
+          researchBtn.innerHTML = '<span>🔬</span><span>Research</span>';
+          researchBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            researchBtn.disabled = true;
+            researchBtn.textContent = 'Starting...';
+            const calls = [
+              {
+                name: 'startResearch',
+                feature: 'personalResearch',
+                args: {
+                  researchId: r.id,
+                  level: r.nextLevel,
+                  startDate: Date.now(),
+                  durationMs
+                }
+              },
+              { name: 'getSummary', feature: 'personalResearch', args: {} }
+            ];
+            if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+              chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, () => {
+                setTimeout(() => {
+                  if (typeof renderResearchDialog === 'function' && typeof currentCache !== 'undefined') {
+                    renderResearchDialog(currentCache);
+                  }
+                }, 800);
+              });
+            }
+          });
+          actionGroup.append(researchBtn);
+        } else if (isQueueBusy) {
+          const busyTag = document.createElement('span');
+          busyTag.className = 'text-2xs text-slate-400 dark:text-slate-500 italic px-1';
+          busyTag.textContent = 'Academy busy';
+          actionGroup.append(busyTag);
+        }
+
+        bottomRow.append(actionGroup);
+        card.append(bottomRow);
         nextGrid.append(card);
       }
     } else {
@@ -8559,10 +8943,11 @@ globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
+    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
   ]);
   const cache = stored[CACHE_KEY] || {};
   if (stored.buildingQueue) currentBuildingQueue = stored.buildingQueue;
+  if (stored.researchQueue) currentResearchQueue = stored.researchQueue;
   currentCache = cache;
   render.customTeams = stored.customTeams?.[String(cache.accountStatus?.data?.id)] || [];
   towerRunState = stored.towerRun || null;
@@ -9498,7 +9883,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
         updateDashboardGameStatus();
       }
     }
-    if ('buildingQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('buildingQueue' in changes || 'researchQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes || 'rpcMqttTelemetry' in changes || 'rpcMqttTriggerStatus' in changes) queueRender();
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {

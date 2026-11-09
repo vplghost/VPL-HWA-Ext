@@ -214,8 +214,9 @@ try {
     if ('monsterQueue' in changes) scheduleMonsterWake(changes.monsterQueue.newValue);
     if ('towerRun' in changes) scheduleTowerWake(changes.towerRun.newValue);
     if ('buildingQueue' in changes) scheduleBuildingWake(changes.buildingQueue.newValue);
+    if ('researchQueue' in changes) scheduleResearchWake(changes.researchQueue.newValue);
     if (('captureSettings' in changes || 'popupRpcEnabled' in changes) && typeof raidWakeTimer !== 'undefined') {
-      chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'buildingQueue']).then((stored) => {
+      chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'buildingQueue', 'researchQueue']).then((stored) => {
         if (stored.raidQueue && !['stopped', 'complete'].includes(stored.raidQueue.phase)) {
           chrome.runtime.sendMessage({ kind: 'raid-queue-tick' }).catch(() => {});
         }
@@ -227,6 +228,9 @@ try {
         }
         if (stored.buildingQueue && stored.buildingQueue.enabled !== false && Number.isFinite(stored.buildingQueue.wakeAt)) {
           chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).catch(() => {});
+        }
+        if (stored.researchQueue && stored.researchQueue.enabled !== false && Number.isFinite(stored.researchQueue.wakeAt)) {
+          chrome.runtime.sendMessage({ kind: 'research-queue-tick' }).catch(() => {});
         }
       }).catch(() => {});
     }
@@ -352,6 +356,19 @@ function scheduleBuildingWake(state) {
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('buildingQueue')?.then?.((stored) => scheduleBuildingWake(stored.buildingQueue))?.catch?.(() => {}); } catch {}
+
+let researchWakeTimer;
+function scheduleResearchWake(state) {
+  if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
+  clearTimeout(researchWakeTimer);
+  if (!state || state.enabled === false || !Number.isFinite(state.wakeAt)) return;
+  researchWakeTimer = setTimeout(() => {
+    chrome.runtime.sendMessage({ kind: 'research-queue-tick' }).then((response) => {
+      if (response?.watch) return chrome.storage.local.get('researchQueue').then((stored) => scheduleResearchWake(stored.researchQueue));
+    }).catch(() => {});
+  }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+}
+try { chrome.storage?.local?.get?.('researchQueue')?.then?.((stored) => scheduleResearchWake(stored.researchQueue))?.catch?.(() => {}); } catch {}
 
 function handleContextInvalidated(err) {
   if (err?.message?.includes('Extension context invalidated')) {
