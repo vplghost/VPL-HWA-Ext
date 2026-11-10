@@ -36,9 +36,9 @@
         result: { win: true, stars: 3 },
         progress: [
           {
-            attackers: { heroes: heroMap, input: [] },
             defenders: { heroes: {}, input: [] },
-            duration: 15.0,
+            attackers: { heroes: heroMap, input: [] },
+            duration: Number((15 + Math.random() * 10).toFixed(4)),
             seed: seed || startRes?.seed || 0
           }
         ]
@@ -140,13 +140,15 @@
     if (state.phase === 'starting-battle') {
       const startReply = replies.find(({ call }) => call.name === 'dungeonStartBattle');
       if (!startReply) return { state };
-      if (startReply.result?.error || startReply.result?.response == null) {
-        return { state: stop(state, 'dungeonStartBattle failed. Queue stopped.') };
+      const startRes = startReply.result?.response;
+      if (startReply.result?.error || startRes == null || startRes.error) {
+        const errorReason = startRes?.error || startReply.result?.error || 'dungeonStartBattle failed. Queue stopped.';
+        return { state: stop(state, String(errorReason)) };
       }
       const endCall = makeEndBattleCall(
-        startReply.result?.response,
+        startRes,
         state.currentHeroes,
-        startReply.result?.response?.seed
+        startRes?.seed
       );
       return issue(state, 'ending-battle', endCall, now);
     }
@@ -154,14 +156,16 @@
     if (state.phase === 'ending-battle') {
       const endReply = replies.find(({ call }) => call.name === 'dungeonEndBattle');
       if (!endReply) return { state };
-      if (endReply.result?.error || endReply.call?.args?.result?.win !== true) {
-        return { state: stop(state, 'Dungeon battle was lost or rejected.') };
+      const endRes = endReply.result?.response;
+      if (endReply.result?.error || endRes == null || endRes.error || endReply.call?.args?.result?.win !== true) {
+        const errorReason = endRes?.error || endReply.result?.error || 'Dungeon battle was lost or rejected.';
+        return { state: stop(state, String(errorReason)) };
       }
 
       // Check for casualties in this battle
       const casualties = checkCasualtiesInBattle(
         endReply.call?.args,
-        endReply.result?.response,
+        endRes,
         state.currentHeroes || []
       );
 
@@ -180,7 +184,7 @@
       state.battlesCleared = (state.battlesCleared || 0) + 1;
 
       // Check if checkpoint save progress is needed
-      const rep = endReply.result?.response;
+      const rep = endRes;
       const nextFloor = rep?.dungeon?.floorNumber;
       const respawn = rep?.dungeon?.respawnFloor;
       if (nextFloor && respawn && (nextFloor - 1 === respawn)) {
@@ -193,6 +197,11 @@
     if (state.phase === 'saving-progress') {
       const saveReply = replies.find(({ call }) => call.name === 'dungeonSaveProgress');
       if (!saveReply) return { state };
+      const saveRes = saveReply.result?.response;
+      if (saveReply.result?.error || saveRes?.error) {
+        const errorReason = saveRes?.error || saveReply.result?.error || 'dungeonSaveProgress failed.';
+        return { state: stop(state, String(errorReason)) };
+      }
       return next(state, cache, now);
     }
 

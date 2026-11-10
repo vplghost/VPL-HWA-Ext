@@ -213,6 +213,7 @@ try {
     if ('raidQueue' in changes) scheduleRaidWake(changes.raidQueue.newValue);
     if ('monsterQueue' in changes) scheduleMonsterWake(changes.monsterQueue.newValue);
     if ('towerRun' in changes) scheduleTowerWake(changes.towerRun.newValue);
+    if ('dungeonRun' in changes) scheduleDungeonWake(changes.dungeonRun.newValue);
     if ('buildingQueue' in changes) scheduleBuildingWake(changes.buildingQueue.newValue);
     if ('researchQueue' in changes) scheduleResearchWake(changes.researchQueue.newValue);
     if (('captureSettings' in changes || 'popupRpcEnabled' in changes) && typeof raidWakeTimer !== 'undefined') {
@@ -225,6 +226,9 @@ try {
         }
         if (stored.towerRun && !['stopped', 'complete'].includes(stored.towerRun.phase)) {
           chrome.runtime.sendMessage({ kind: 'tower-run-tick' }).catch(() => {});
+        }
+        if (stored.dungeonRun && !['stopped', 'complete'].includes(stored.dungeonRun.phase)) {
+          chrome.runtime.sendMessage({ kind: 'dungeon-run-tick' }).catch(() => {});
         }
         if (stored.buildingQueue && stored.buildingQueue.enabled !== false && Number.isFinite(stored.buildingQueue.wakeAt)) {
           chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).catch(() => {});
@@ -343,6 +347,19 @@ function scheduleTowerWake(state) {
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('towerRun')?.then?.((stored) => scheduleTowerWake(stored.towerRun))?.catch?.(() => {}); } catch {}
+
+let dungeonWakeTimer;
+function scheduleDungeonWake(state) {
+  if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
+  clearTimeout(dungeonWakeTimer);
+  if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
+  dungeonWakeTimer = setTimeout(() => {
+    chrome.runtime.sendMessage({ kind: 'dungeon-run-tick' }).then((response) => {
+      if (response?.watch) return chrome.storage.local.get('dungeonRun').then((stored) => scheduleDungeonWake(stored.dungeonRun));
+    }).catch(() => {});
+  }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+}
+try { chrome.storage?.local?.get?.('dungeonRun')?.then?.((stored) => scheduleDungeonWake(stored.dungeonRun))?.catch?.(() => {}); } catch {}
 
 let buildingWakeTimer;
 function scheduleBuildingWake(state) {

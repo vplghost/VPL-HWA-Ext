@@ -853,3 +853,114 @@ test('selectBestDoor honors custom attackerPriority and custom titan pools', () 
   assert.deepEqual([...lineupCustom.selectedHeroes], customWaterPool);
 });
 
+test('dungeon runner halts immediately on server error response in dungeonEndBattle', () => {
+  const doors = [{ attackerType: 'earth', defenderType: 'water', power: 20000 }];
+  const cache = {
+    accountStatus: { data: { id: 10 } },
+    dungeonStatus: {
+      data: {
+        floorNumber: 871,
+        currentFloorDoors: doors,
+        states: { titans: {} }
+      }
+    }
+  };
+
+  const now = 1731240000000;
+  const startTransition = dungeonRunner.start(cache, {}, 1, now);
+  assert.equal(startTransition.state.phase, 'starting-battle');
+
+  const startRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(now + 1000).toISOString(),
+    requestBody: JSON.stringify({
+      calls: [{ name: 'dungeonStartBattle', ident: 'call-start', args: { teamNum: 0 } }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{ ident: 'call-start', result: { response: { seed: 12345, attackers: {} } } }]
+    })
+  };
+
+  const endTransition = dungeonRunner.advance(startTransition.state, startRecord, cache, now + 1000);
+  assert.equal(endTransition.state.phase, 'ending-battle');
+
+  // Server returns {"error": "Invalid battle"} in response object
+  const errorEndRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(now + 2000).toISOString(),
+    requestBody: JSON.stringify({
+      calls: [{ name: 'dungeonEndBattle', ident: 'call-end', args: { result: { win: true, stars: 3 } } }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{ ident: 'call-end', result: { response: { error: 'Invalid battle' } } }]
+    })
+  };
+
+  const haltedTransition = dungeonRunner.advance(endTransition.state, errorEndRecord, cache, now + 2000);
+  assert.equal(haltedTransition.state.phase, 'stopped', 'Runner must halt when server returns Invalid battle error');
+  assert.equal(haltedTransition.state.reason, 'Invalid battle', 'Halt reason must reflect the server error string');
+  assert.equal(haltedTransition.calls, undefined, 'Must not dispatch further RPC calls');
+});
+
+test('dungeon runner halts on server error response in dungeonStartBattle', () => {
+  const doors = [{ attackerType: 'earth', defenderType: 'water', power: 20000 }];
+  const cache = {
+    accountStatus: { data: { id: 10 } },
+    dungeonStatus: {
+      data: {
+        floorNumber: 871,
+        currentFloorDoors: doors,
+        states: { titans: {} }
+      }
+    }
+  };
+
+  const now = 1731240000000;
+  const startTransition = dungeonRunner.start(cache, {}, 1, now);
+  assert.equal(startTransition.state.phase, 'starting-battle');
+
+  const errorStartRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(now + 1000).toISOString(),
+    requestBody: JSON.stringify({
+      calls: [{ name: 'dungeonStartBattle', ident: 'call-start', args: { teamNum: 0 } }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{ ident: 'call-start', result: { response: { error: 'Door already completed' } } }]
+    })
+  };
+
+  const haltedTransition = dungeonRunner.advance(startTransition.state, errorStartRecord, cache, now + 1000);
+  assert.equal(haltedTransition.state.phase, 'stopped', 'Runner must halt when dungeonStartBattle fails');
+  assert.equal(haltedTransition.state.reason, 'Door already completed');
+});
+
+test('planDungeon does not block if activeBattle is older than 2 minutes (stale)', () => {
+  const doors = [{ attackerType: 'water', defenderType: 'fire', power: 20000 }];
+  const now = Date.now();
+  const cache = {
+    dungeonStatus: {
+      data: {
+        floorNumber: 800,
+        currentFloorDoors: doors,
+        states: { titans: {} },
+        activeBattle: {
+          teamNum: 0,
+          heroes: [4000, 4001, 4002, 4003, 4004],
+          startTime: now - 130000 // 130 seconds ago (> 120s)
+        }
+      }
+    }
+  };
+
+  const plan = dungeonAuto.planDungeon(cache);
+  assert.equal(plan.kind, 'battle', 'Stale activeBattle must not block planning a new battle');
+});
+
+

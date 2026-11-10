@@ -695,6 +695,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         });
       }
+      if (stored.rpcCache?.dungeonStatus?.data?.activeBattle) {
+        const battleTime = Number(stored.rpcCache.dungeonStatus.data.activeBattle.startTime) ||
+          Date.parse(stored.rpcCache.dungeonStatus.data.activeBattle.startTime) || 0;
+        if (!battleTime || Date.now() - battleTime > 30000 || message.forceRestart) {
+          stored.rpcCache.dungeonStatus.data.activeBattle = null;
+          await chrome.storage.local.set({ [CACHE_KEY]: stored.rpcCache });
+        }
+      }
       const transition = runner.start(stored.rpcCache, settings, tab.id, Date.now());
       if (!transition) return { ok: false,
         error: 'Open Dungeon in game before starting automation.' };

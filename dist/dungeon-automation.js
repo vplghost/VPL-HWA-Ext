@@ -250,11 +250,15 @@
       return { kind: 'need-snapshot', reason: 'Dungeon status cache is missing.' };
     }
     if (dungeonData.activeBattle) {
-      return {
-        kind: 'busy',
-        reason: `Battle currently in progress on door ${dungeonData.activeBattle.teamNum + 1}.`,
-        activeBattle: dungeonData.activeBattle
-      };
+      const startTime = Number(dungeonData.activeBattle.startTime) || Date.parse(dungeonData.activeBattle.startTime) || 0;
+      const isStale = startTime > 0 && (Date.now() - startTime > 120000);
+      if (!isStale) {
+        return {
+          kind: 'busy',
+          reason: `Battle currently in progress on door ${Number(dungeonData.activeBattle.teamNum ?? 0) + 1}.`,
+          activeBattle: dungeonData.activeBattle
+        };
+      }
     }
     const doors = dungeonData.currentFloorDoors;
     if (!Array.isArray(doors) || !doors.length) {

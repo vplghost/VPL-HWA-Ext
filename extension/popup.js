@@ -4487,9 +4487,14 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
           </span>
           <span class="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-100">⚔️ Battle In Progress</span>
         </div>
-        <span class="rounded-full bg-blue-600 text-white px-2.5 py-0.5 text-xs font-bold shadow-xs">
-          Door ${activeDoorIdx}
-        </span>
+        <div class="flex items-center gap-2">
+          <span class="rounded-full bg-blue-600 text-white px-2.5 py-0.5 text-xs font-bold shadow-xs">
+            Door ${activeDoorIdx}
+          </span>
+          <button id="dungeon-clear-active-battle-btn" type="button" class="cursor-pointer inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800 hover:bg-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:hover:bg-rose-900 transition-colors shadow-2xs" title="Clear stuck battle and refresh dungeon from game">
+            Reset Battle
+          </button>
+        </div>
       </div>
       <div class="text-xs text-blue-800 dark:text-blue-200">
         Actively fighting on Floor ${floorNumber} · Door ${activeDoorIdx} with ${heroList.length} titans deployed.
@@ -4509,6 +4514,25 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
         activeTitansBox.append(unitTag);
       }
       battleSec.append(activeTitansBox);
+    }
+    const clearBtn = battleSec.querySelector('#dungeon-clear-active-battle-btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async () => {
+        clearBtn.disabled = true;
+        clearBtn.textContent = 'Resetting...';
+        if (typeof currentCache !== 'undefined' && currentCache?.dungeonStatus?.data) {
+          currentCache.dungeonStatus.data.activeBattle = null;
+          if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+            await chrome.storage.local.set({ [CACHE_KEY]: currentCache });
+          }
+        }
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls: [{ name: 'dungeonGetInfo', args: {} }] });
+        }
+        setTimeout(() => {
+          openDungeonModal(currentCache?.dungeonStatus?.data, dungeonModalReturnFocus);
+        }, 300);
+      });
     }
     body.append(battleSec);
   } else if (data.lastBattleResult) {
@@ -12590,9 +12614,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
         updateDashboardGameStatus();
       }
     }
-    if ('buildingQueue' in changes || 'researchQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('buildingQueue' in changes || 'researchQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || 'dungeonRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
-        'socketRefreshMode' in changes || 'captureSettings' in changes || 'rpcMqttTelemetry' in changes || 'rpcMqttTriggerStatus' in changes) queueRender();
+        'socketRefreshMode' in changes || 'captureSettings' in changes || 'rpcMqttTelemetry' in changes || 'rpcMqttTriggerStatus' in changes) {
+      if ('dungeonRun' in changes) dungeonRunState = changes.dungeonRun.newValue || null;
+      queueRender();
+    }
   } else if (area === 'session' && (activeTab === 'log' || 'recordingState' in changes)) {
     queueRender();
   }
