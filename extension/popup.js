@@ -3346,14 +3346,16 @@ function openGuildVersusModal(vsStatus, cache) {
   // --- SECTION 2: PERSONAL POINTS & STANDINGS ---
   const personalSec = document.createElement('div');
   personalSec.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2.5';
-  const pScore = vsStatus?.score ?? rewards.userRoundPoints ?? 0;
-  const bScore = rewards.userBattlePoints ?? pScore;
+  const isStaleVersusDay = activeCache.clanVersusStatus?.updatedAt &&
+    new Date(activeCache.clanVersusStatus.updatedAt).toDateString() !== new Date().toDateString();
+  const pScore = isStaleVersusDay ? 0 : (vsStatus?.score ?? rewards.userRoundPoints ?? 0);
+  const bScore = isStaleVersusDay ? 0 : (rewards.userBattlePoints ?? pScore);
   const sScore = rewards.userSeasonPoints ?? 0;
   const cRank = rewards.userClanRank ? `#${rewards.userClanRank}` : '—';
   const sRank = rewards.seasonClanRank ? `#${rewards.seasonClanRank}` : '—';
 
   const stats = [
-    { label: 'Round Points', val: pScore.toLocaleString(), sub: 'Current round' },
+    { label: 'Round Points', val: pScore.toLocaleString(), sub: isStaleVersusDay ? 'New round starting' : 'Current round' },
     { label: 'Battle Points', val: bScore.toLocaleString(), sub: 'This battle' },
     { label: 'Season Points', val: resourceData.formatAmount(sScore), sub: `Season Rank ${sRank}` },
     { label: 'Clan Rank', val: cRank, sub: 'Among guild members' }
@@ -3375,7 +3377,7 @@ function openGuildVersusModal(vsStatus, cache) {
     1: 25000, 2: 100000, 3: 400000, 4: 600000, 5: 1000000, 6: 1500000, 7: 2000000, 8: 3000000, 9: 4500000
   };
   const rewardMap = globalThis.hwaHelperClanVersusRewards || {};
-  const claimedSet = new Set(vsStatus?.chestNumbers || []);
+  const claimedSet = new Set(isStaleVersusDay ? [] : (vsStatus?.chestNumbers || []));
 
   let targetChestNum = 1;
   for (let c = 1; c <= 9; c++) {
@@ -4407,21 +4409,46 @@ function renderDashboard(cache) {
     cardGrid.className = 'grid grid-cols-1 min-[480px]:grid-cols-2 gap-2.5';
     for (const item of group.rows) {
       const isQuest = group.title === 'Daily Quests' || item.id === 'daily-quests' || item.id === 'event-daily-quests';
+      const isTower = item.id === 'tower';
+      const isDungeon = item.id === 'dungeon';
+      const isInteractive = isQuest || isTower || isDungeon;
       const card = document.createElement('div');
       card.className = `flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/80 transition-all ${
-        isQuest
+        isInteractive
           ? 'cursor-pointer hover:border-violet-400 hover:bg-violet-50/40 dark:hover:border-violet-500/60 dark:hover:bg-slate-800 shadow-2xs hover:shadow-xs'
           : 'hover:border-slate-300 dark:hover:border-slate-700'
       }`;
-      if (isQuest) {
+      if (isInteractive) {
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
-        card.setAttribute('aria-haspopup', 'dialog');
-        card.setAttribute('aria-controls', 'quest-detail-dialog');
-        card.title = 'Click to view quest details';
+        if (isQuest) {
+          card.setAttribute('aria-haspopup', 'dialog');
+          card.setAttribute('aria-controls', 'quest-detail-dialog');
+          card.title = 'Click to view quest details';
+        } else if (isTower) {
+          card.setAttribute('aria-haspopup', 'dialog');
+          card.setAttribute('aria-controls', 'tower-modal');
+          card.title = 'Click to open Tower automation';
+        } else if (isDungeon) {
+          card.setAttribute('aria-haspopup', 'dialog');
+          card.setAttribute('aria-controls', 'dungeon-modal');
+          card.title = 'Click to open Guild Dungeon';
+        }
 
         const openHandler = () => {
-          openQuestDetailDialog(item.id, typeof currentCache !== 'undefined' ? currentCache : cache);
+          if (isQuest) {
+            openQuestDetailDialog(item.id, typeof currentCache !== 'undefined' ? currentCache : cache);
+          } else if (isTower) {
+            const towerModal = document.querySelector('#tower-modal');
+            const closeBtn = document.querySelector('#tower-modal-close');
+            if (towerModal) {
+              renderTowerModal(typeof currentCache !== 'undefined' ? currentCache : cache);
+              towerModal.hidden = false;
+              closeBtn?.focus();
+            }
+          } else if (isDungeon) {
+            openDungeonModal((typeof currentCache !== 'undefined' ? currentCache : cache)?.dungeonStatus?.data, card);
+          }
         };
         card.addEventListener('click', openHandler);
         card.addEventListener('keydown', (e) => {
@@ -4441,10 +4468,10 @@ function renderDashboard(cache) {
       const name = document.createElement('div');
       name.className = 'font-semibold text-slate-900 dark:text-slate-100 truncate text-xs sm:text-sm flex items-center justify-between gap-1';
       name.textContent = item.title;
-      if (isQuest) {
+      if (isInteractive) {
         const indicator = document.createElement('span');
         indicator.className = 'text-[10px] text-violet-500 dark:text-violet-400 font-normal shrink-0';
-        indicator.textContent = 'Details ›';
+        indicator.textContent = isQuest ? 'Details ›' : 'Open ›';
         name.append(indicator);
       }
       const detail = document.createElement('div');
@@ -4487,8 +4514,10 @@ function renderEvents(cache) {
     const theme = currentRound.theme || 'Radar Training';
     const roundPoints = resourceData.formatAmount(battle.clanRoundPoints ?? currentRound.points ?? 0);
     const enemyRoundPoints = resourceData.formatAmount(battle.enemyClanRoundPoints ?? currentRound.enemyPoints ?? 0);
-    const personalScore = vsStatus.score ?? rewards.userRoundPoints ?? 0;
-    const claimedCount = (vsStatus.chestNumbers || []).length;
+    const isStaleVersusDay = cache.clanVersusStatus?.updatedAt &&
+      new Date(cache.clanVersusStatus.updatedAt).toDateString() !== new Date().toDateString();
+    const personalScore = isStaleVersusDay ? 0 : (vsStatus.score ?? rewards.userRoundPoints ?? 0);
+    const claimedCount = isStaleVersusDay ? 0 : (vsStatus.chestNumbers || []).length;
 
     eventCards.push({
       id: 'clanVersus',
@@ -6371,11 +6400,40 @@ function renderMonster(cache) {
   const monsterTitleStatus = document.querySelector('#monster-dialog-status');
   if (monsterTitleStatus && monsterTitleStatus !== host) {
     monsterTitleStatus.replaceChildren();
+    const now = Date.now();
+    const activeAttacks = (cache.marchStatus?.data?.marches || []).filter((march) =>
+      !march.rally && !march.mineId && (march.kind === 'attack' || march.stage === 'moveToTargetInSolo' || (march.stage === 'returnToOutpost' && march.previousKind === 'attack') || (march.kind === 'return' && !march.mineId && !march.rally)) &&
+      !(globalThis.hwaHelperPopupData?.isMarchExpired ? globalThis.hwaHelperPopupData.isMarchExpired(march, now) : (Number.isFinite(march.endsAt) && now >= march.endsAt)));
+
+    if (activeAttacks.length > 0) {
+      const march = activeAttacks[0];
+      const isReturning = march.kind === 'return' || march.stage === 'returnToOutpost';
+      const stateLabel = isReturning ? (march.result ? `Returning (${march.result})` : 'Returning') :
+        Number.isFinite(march.targetArrivalAt) && now >= march.targetArrivalAt ? 'Fighting' : 'Marching';
+      const until = isReturning ? (march.endsAt || march.returnAt) : (march.targetArrivalAt || march.endsAt);
+      const lvl = data.soloMonsterLevel(march.mobConfigId);
+      const targetLabel = lvl ? `Lv.${lvl} Monster` : (march.mobConfigId ? `Monster #${march.mobConfigId}` : 'Monster');
+
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-300 dark:border-amber-800/50';
+      const dot = document.createElement('span');
+      dot.className = 'size-1.5 rounded-full bg-amber-500 animate-pulse';
+      const text = document.createElement('span');
+      text.textContent = `${targetLabel}: ${stateLabel}`;
+      badge.append(dot, text);
+      if (until && until > now) {
+        const cd = document.createElement('span');
+        cd.dataset.experimentalUntil = String(until);
+        cd.textContent = ` · ${Math.max(0, Math.ceil((until - now) / 1000))}s`;
+        badge.append(cd);
+      }
+      monsterTitleStatus.append(badge);
+    }
     if (running) {
       const queueBadge = document.createElement('span');
-      queueBadge.className = 'inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800 dark:bg-orange-950/40 dark:text-orange-200 border border-orange-300 dark:border-orange-800/50';
+      queueBadge.className = 'inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-950/40 dark:text-blue-200 border border-blue-300 dark:border-blue-800/50';
       const dot = document.createElement('span');
-      dot.className = 'size-1.5 rounded-full bg-orange-500 animate-pulse';
+      dot.className = 'size-1.5 rounded-full bg-blue-500 animate-pulse';
       const text = document.createElement('span');
       const wins = globalThis.hwaHelperMonsterQueue?.confirmedWins?.(monsterQueueState) ?? 0;
       const total = monsterQueueState.options?.count || 0;
@@ -6421,7 +6479,34 @@ function renderMonster(cache) {
     troopCapacitySettings, cache.accountStatus?.data?.id).total;
   const maxTroops = data.teamTroopCapacity(cap, team?.maxTroops);
   const units = data.allocateTroops(cache['getUnitSummary:unit']?.data, maxTroops);
-  note(`Troops: ${formatNumber(units.reduce((sum, unit) => sum + unit.count, 0))} / ${formatNumber(maxTroops || 0)} · World Energy: 10 per attack`);
+
+  const troopHeader = document.createElement('div');
+  troopHeader.className = 'flex items-center gap-2 text-xs leading-5 text-slate-600 dark:text-slate-400';
+  const troopLabel = document.createElement('span');
+  troopLabel.textContent = `Troops: ${formatNumber(units.reduce((sum, unit) => sum + unit.count, 0))} / ${formatNumber(maxTroops || 0)} · World Energy: 10 per attack`;
+  troopLabel.title = team?.maxTroops != null ? 'Custom maximum' : 'Estimated capacity';
+  troopHeader.append(troopLabel);
+  const refreshTroops = button(troopHeader, '↻', () => chrome.runtime.sendMessage({ kind: 'refresh-rpc',
+    calls: [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }] }), !popupRpcEnabled);
+  refreshTroops.className = 'inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-sm leading-5 text-slate-500 hover:bg-slate-100 hover:text-orange-600 disabled:opacity-40';
+  refreshTroops.title = 'Refresh available troops';
+  refreshTroops.setAttribute('aria-label', 'Refresh available troops');
+  section.append(troopHeader);
+
+  const troopSummary = document.createElement('div');
+  troopSummary.className = 'grid grid-cols-3 gap-2';
+  for (let type = 0; type < 3; type++) {
+    const typeUnits = units.filter((unit) => data.unitInfo(unit.unitId)?.type === type);
+    const block = document.createElement('div');
+    block.className = 'rounded-lg bg-slate-50 p-2 text-xs text-slate-700 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700/80';
+    const label = document.createElement('div'); label.className = 'font-semibold';
+    label.textContent = `${data.unitInfo(type * 10 + 1)?.label || `Type ${type}`}: ${formatNumber(typeUnits.reduce((sum, unit) => sum + unit.count, 0))}`;
+    const tiers = document.createElement('div'); tiers.className = 'mt-1 text-slate-500 dark:text-slate-400 text-3xs';
+    tiers.textContent = typeUnits.map((unit) => `Lv${data.unitInfo(unit.unitId)?.level ?? unit.unitId}: ${formatNumber(unit.count)}`).join(' · ') || '0';
+    block.append(label, tiers);
+    troopSummary.append(block);
+  }
+  section.append(troopSummary);
 
   const monsterRow = document.createElement('div');
   monsterRow.className = 'grid grid-cols-2 items-end gap-3';
@@ -6520,9 +6605,6 @@ function renderMonster(cache) {
       `level ${data.soloMonsterLevel(monsterQueueState.current.mobConfigId)} · ` : ''}${globalThis.hwaHelperMonsterQueue.confirmedWins(monsterQueueState)} won / ${monsterQueueState.options?.count || 0} requested${monsterQueueState.reason ? ` · ${monsterQueueState.reason}` : ''}`);
     if (running) {
       note('Cancelling the queue clears pending attacks; an attack already sent continues in game.');
-    }
-    for (const item of monsterQueueState.recentResults || []) {
-      note(`${data.soloMonsterLevel(item.mobConfigId) ? `Level ${data.soloMonsterLevel(item.mobConfigId)}` : 'Monster'} · ${item.result} · ${new Date(item.at).toLocaleString()}`);
     }
   }
   const reports = cache.soloAttackResults?.data || [];

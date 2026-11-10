@@ -915,6 +915,47 @@ test('claimChest in clanVersus extracts rewards and updates energy, resources, a
   assert.equal(withProgress.clanVersusStatus.data.progress, 45000);
 });
 
+test('clanVersusStatus resets opened chests and scores on a new day or when server returns authoritative empty chestNumbers', () => {
+  const day1Progress = record([
+    { name: 'getUserProgress', feature: 'clanVersus', ident: 'prog-1' }
+  ], [
+    { ident: 'prog-1', result: { response: { progress: 450000, chestNumbers: [1, 2, 3] } } }
+  ], '2026-11-02T10:00:00.000Z');
+
+  const cacheDay1 = cache.merge({}, [day1Progress]).cache;
+  assert.deepEqual([...cacheDay1.clanVersusStatus.data.chestNumbers], [1, 2, 3]);
+
+  // Next day: getUserProgress returns empty chests and 0 progress
+  const day2Progress = record([
+    { name: 'getUserProgress', feature: 'clanVersus', ident: 'prog-2' }
+  ], [
+    { ident: 'prog-2', result: { response: { progress: 0, chestNumbers: [] } } }
+  ], '2026-11-03T02:00:00.000Z');
+
+  const cacheDay2 = cache.merge(cacheDay1, [day2Progress]).cache;
+  assert.deepEqual([...cacheDay2.clanVersusStatus.data.chestNumbers], []);
+  assert.equal(cacheDay2.clanVersusStatus.data.progress, 0);
+
+  // Even if incoming data omitted chestNumbers on a new day, it resets
+  const day3Info = record([
+    { name: 'getInfo', feature: 'clanVersus', ident: 'info-3', args: { clanId: 123 } }
+  ], [
+    { ident: 'info-3', result: { response: { eventId: 18, roundNumber: 2 } } }
+  ], '2026-11-04T02:00:00.000Z');
+
+  const cacheWithChests = {
+    ...cacheDay2,
+    clanVersusStatus: {
+      ...cacheDay2.clanVersusStatus,
+      updatedAt: '2026-11-03T02:00:00.000Z',
+      data: { ...cacheDay2.clanVersusStatus.data, chestNumbers: [1, 2], score: 50000 }
+    }
+  };
+  const cacheDay3 = cache.merge(cacheWithChests, [day3Info]).cache;
+  assert.deepEqual([...cacheDay3.clanVersusStatus.data.chestNumbers], []);
+  assert.equal(cacheDay3.clanVersusStatus.data.score, 0);
+});
+
 test('clanVersus multi-call extracts and merges info, battle, rewards, and progress into clanVersusStatus', () => {
   const at = '2026-11-02T04:37:00.000Z';
   const getInfoRecord = record([

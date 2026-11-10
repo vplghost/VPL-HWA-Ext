@@ -4,12 +4,14 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 class Element {
-  constructor(tag) { this.tagName = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.value = ''; this.textContent = ''; }
+  constructor(tag) { this.tagName = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.value = ''; this.textContent = ''; this.attributes = {}; this.hidden = false; }
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this.children = children; }
-  setAttribute(name, value) { (this.attributes ||= {})[name] = String(value); }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+  getAttribute(name) { return this.attributes[name]; }
   addEventListener(name, handler) { this.listeners[name] = handler; }
-  async fire(name) { await this.listeners[name]?.(); }
+  async fire(name, evt = {}) { await this.listeners[name]?.(evt); }
+  focus() {}
   all(tag) { return this.children.flatMap((child) => [ ...(child.tagName === tag ? [child] : []), ...child.all(tag) ]); }
 }
 const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
@@ -179,6 +181,11 @@ test('Dashboard groups Raid, Gathering and Monster buttons and Gathering keeps l
 test('Monster dialog searches by level, starts selected team attack and shows recent results', async () => {
   assert.match(popupHtml, /<dialog id="monster-dialog"[\s\S]*id="monster-dialog-body"[\s\S]*<\/dialog>/);
   const body = new Element('div');
+  const titleStatus = new Element('div');
+  const elements = {
+    '#monster-dialog-body': body,
+    '#monster-dialog-status': titleStatus
+  };
   const sent = []; const saved = {};
   const heroes = Object.fromEntries([1, 2, 3, 4, 5].map((id) => [id, { power: id, troopCapacity: 500 }]));
   const cache = { accountStatus: { data: { id: 10 } }, heroGetAll: { data: heroes },
@@ -186,11 +193,24 @@ test('Monster dialog searches by level, starts selected team attack and shows re
     experimentalMapContext: { data: { mapId: 'map', center: { x: 1, y: 2 } } },
     experimentalSoloSearch: { data: { mapId: 'map', mobConfigIds: [37, 67],
       mobs: [{ mobId: 'mob-1', coordinates: { x: 3, y: 4 } }] } },
-    soloAttackResults: { data: [{ mobConfigId: 67, result: 'win', createdAt: Date.now() }] } };
+    soloAttackResults: { data: [{ mobConfigId: 67, result: 'win', createdAt: Date.now() }] },
+    marchStatus: {
+      data: {
+        marches: [
+          {
+            kind: 'attack',
+            mobConfigId: 37,
+            targetArrivalAt: Date.now() + 5000,
+            endsAt: Date.now() + 10000
+          }
+        ]
+      }
+    } };
   const context = vm.createContext({ document: { createElement: (tag) => new Element(tag),
-    querySelector: () => body }, currentCache: cache, popupRpcEnabled: true, experimentalPending: null,
+    querySelector: (sel) => elements[sel] || body }, currentCache: cache, popupRpcEnabled: true, experimentalPending: null,
     experimentalMessage: '', monsterMessage: '', monsterQueueState: {
-      phase: 'stopped', options: { count: 4 }, reason: 'Stopped by user.' },
+      phase: 'stopped', options: { count: 4 }, reason: 'Stopped by user.',
+      recentResults: [{ mobConfigId: 67, result: 'win', at: Date.now() }] },
     currentRpcPolicy: { mode: 'piggyback', monitor: true },
     monsterSelection: { teamId: '', level: 15, count: 2, targetMobId: '' },
     troopCapacitySettings: { defaultHero: 600, base: 950 },
@@ -203,11 +223,30 @@ test('Monster dialog searches by level, starts selected team attack and shows re
   context.render = () => context.renderMonster(cache);
   vm.runInContext(pendingSync + '\n' + monsterRenderer, context);
   context.render();
+
+  // Title status displays active monster attack march badge with timer
+  const statusText = titleStatus.children.map((c) => c.textContent + c.children.map((k) => k.textContent).join(' ')).join(' ');
+  assert.match(statusText, /Lv\.15 Monster: Marching/);
+
   const section = () => body.children[0];
   const text = (node) => node.textContent + node.children.map(text).join(' ');
+
+  // Troops breakdown: Infantry, Marksmen, Spearmen with counts and Lv tiers
+  assert.match(text(section()), /Infantry:/);
+  assert.match(text(section()), /Marksmen:/);
+  assert.match(text(section()), /Spearmen:/);
+  const refreshTroopsBtn = section().all('button').find((item) => item.textContent === '↻');
+  assert.ok(refreshTroopsBtn, 'Troops refresh button must exist');
+  await refreshTroopsBtn.fire('click');
+  assert.equal(sent.at(-1).kind, 'refresh-rpc');
+  assert.deepEqual(JSON.parse(JSON.stringify(sent.at(-1).calls)), [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }]);
+
+  // Only Recent attack results is used; monsterQueueState.recentResults does not render duplicates
   assert.match(text(section()), /Recent attack results/);
   assert.match(text(section()), /Level 15 · win/);
   assert.match(text(section()), /Previous queue: stopped/);
+  assert.doesNotMatch(text(section()), /Previous queue[\s\S]*Level 15 · win[\s\S]*Recent attack results/);
+
   await section().all('button').find((item) => item.textContent === 'Find monsters').fire('click');
   assert.deepEqual(Array.from(sent.at(-1).calls[0].args.mobConfigIds), [37, 67]);
   context.experimentalPending = { name: 'searchMob', sentAt: Date.now() - 1000, queued: true };
@@ -242,6 +281,74 @@ test('Monster dialog searches by level, starts selected team attack and shows re
   assert.ok(stopQueueBtn, 'Stop queue button must be visible inline when running');
   await stopQueueBtn.fire('click');
   assert.equal(sent.at(-1).kind, 'monster-queue-stop');
+});
+
+test('Dashboard tower and dungeon cards are interactive and open respective modals', async () => {
+  const questSource = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
+  const dashDataSrc = await readFile(new URL('../extension/dashboard-data.js', import.meta.url), 'utf8');
+  const dashRenderer = popup.slice(popup.indexOf('function renderDashboard('), popup.indexOf('function renderEvents('));
+
+  const dashboardContainer = new Element('div');
+  const towerModal = new Element('div');
+  towerModal.hidden = true;
+  const towerCloseBtn = new Element('button');
+  const dungeonModal = new Element('div');
+
+  const elements = {
+    '#dashboard': dashboardContainer,
+    '#tower-modal': towerModal,
+    '#tower-modal-close': towerCloseBtn,
+    '#dungeon-modal': dungeonModal
+  };
+
+  let renderedTower = false;
+  let openedDungeon = false;
+
+  const context = vm.createContext({
+    Date,
+    Number,
+    Array,
+    String,
+    globalThis: {},
+    status: new Element('div'),
+    view: dashboardContainer,
+    document: {
+      createElement: (tag) => new Element(tag),
+      querySelector: (sel) => elements[sel] || null
+    },
+    renderTowerModal: () => { renderedTower = true; },
+    openDungeonModal: () => { openedDungeon = true; },
+    openQuestDetailDialog: () => {},
+    renderCampaignDialog: () => {},
+    updateDashboardGameStatus: () => {}
+  });
+
+  vm.runInContext(questSource, context);
+  vm.runInContext(dashDataSrc, context);
+  vm.runInContext(dashRenderer, context);
+
+  const cache = {
+    towerStatus: { data: { floorNumber: 10 } },
+    dungeonStatus: { data: { dungeonActivity: 50, floorNumber: 25 } }
+  };
+
+  context.renderDashboard(cache);
+
+  const cards = dashboardContainer.all('div').filter((d) => d.attributes?.role === 'button');
+  const towerCard = cards.find((c) => c.attributes?.['aria-controls'] === 'tower-modal');
+  const dungeonCard = cards.find((c) => c.attributes?.['aria-controls'] === 'dungeon-modal');
+
+  assert.ok(towerCard, 'Tower card must have role=button and aria-controls=tower-modal');
+  assert.ok(dungeonCard, 'Dungeon card must have role=button and aria-controls=dungeon-modal');
+
+  // Click tower card opens tower modal
+  await towerCard.fire('click');
+  assert.equal(renderedTower, true, 'Clicking tower card must call renderTowerModal');
+  assert.equal(towerModal.hidden, false, 'Tower modal must become unhidden');
+
+  // Click dungeon card opens dungeon modal
+  await dungeonCard.fire('click');
+  assert.equal(openedDungeon, true, 'Clicking dungeon card must call openDungeonModal');
 });
 
 test('Raid rally shows Stop queue inline when queue is running, hides Start queue, and updates title status', async () => {

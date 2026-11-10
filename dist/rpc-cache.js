@@ -2171,27 +2171,41 @@
         if (entry.key === 'clanVersusStatus') {
           const existing = next.clanVersusStatus?.data || {};
           const incoming = entry.data || {};
-          const chestSet = new Set([
-            ...(existing.chestNumbers || []),
-            ...(incoming.chestNumbers || [])
-          ]);
+          const isNewDay = next.clanVersusStatus?.updatedAt && entry.updatedAt &&
+            new Date(next.clanVersusStatus.updatedAt).toDateString() !== new Date(entry.updatedAt).toDateString();
+          const isNewRound = existing.info?.roundNumber && incoming.info?.roundNumber &&
+            existing.info.roundNumber !== incoming.info.roundNumber;
+
+          let chestNumbers;
+          if (incoming.chestNumbers !== undefined) {
+            chestNumbers = Array.isArray(incoming.chestNumbers) ? [...incoming.chestNumbers].sort((a, b) => a - b) : [];
+          } else if (isNewDay || isNewRound) {
+            chestNumbers = [];
+          } else {
+            chestNumbers = existing.chestNumbers || [];
+          }
+
           const mergedData = {
             ...existing,
             ...incoming,
             info: incoming.info ? { ...existing.info, ...incoming.info } : existing.info,
             battle: incoming.battle ? { ...existing.battle, ...incoming.battle } : existing.battle,
             rewards: incoming.rewards ? { ...existing.rewards, ...incoming.rewards } : existing.rewards,
-            chestNumbers: Array.from(chestSet).sort((a, b) => a - b)
+            chestNumbers
           };
           if (incoming.score !== undefined) {
             mergedData.score = incoming.score;
           } else if (incoming.rewards?.userRoundPoints !== undefined) {
             mergedData.score = incoming.rewards.userRoundPoints;
+          } else if (isNewDay || isNewRound) {
+            mergedData.score = 0;
           } else if (existing.score !== undefined) {
             mergedData.score = existing.score;
           }
           if (incoming.progress !== undefined) {
             mergedData.progress = incoming.progress;
+          } else if (isNewDay || isNewRound) {
+            mergedData.progress = 0;
           }
           const latestTime = entry.updatedAt > (next.clanVersusStatus?.updatedAt || '') ?
             entry.updatedAt : (next.clanVersusStatus?.updatedAt || entry.updatedAt);
@@ -2207,7 +2221,9 @@
           continue;
         }
         if (entry.key === 'clanVersusChestAction') {
-          const status = next.clanVersusStatus ? { ...next.clanVersusStatus.data } : { progress: 0, chestNumbers: [] };
+          const isNewDay = next.clanVersusStatus?.updatedAt && entry.updatedAt &&
+            new Date(next.clanVersusStatus.updatedAt).toDateString() !== new Date(entry.updatedAt).toDateString();
+          const status = (next.clanVersusStatus && !isNewDay) ? { ...next.clanVersusStatus.data } : { progress: 0, chestNumbers: [] };
           const chests = new Set(status.chestNumbers || []);
           if (entry.data.chestNumber && !chests.has(entry.data.chestNumber)) {
             chests.add(entry.data.chestNumber);
