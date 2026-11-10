@@ -95,6 +95,8 @@ let towerAutomationSettings = { accountId: null, buffPriority: [] };
 let towerSettingsLoadedFor = null;
 let towerRunState = null;
 let towerAutomationMessage = '';
+let dungeonRunState = null;
+let dungeonAutomationMessage = '';
 let troopCapacitySettings = { defaultHero: 600, base: 950 };
 let experimentalMessage = '';
 
@@ -509,6 +511,82 @@ function isMarchExpired(march, now = Date.now()) {
   return globalThis.hwaHelperPopupData.isMarchExpired(march, now);
 }
 
+function getMarchBadgeInfo(march, now = Date.now()) {
+  const isAutoJoin = Boolean(march?.rally?.isAutoJoin);
+  const isRaid = Boolean(march?.rally) || march?.kind === 'raid' || march?.previousKind === 'raid';
+  const isMine = Boolean(march?.mineId) ||
+    ['food', 'wood', 'stone', 'iron', 'mine'].includes(march?.kind) ||
+    ['food', 'wood', 'stone', 'iron', 'mine'].includes(march?.previousKind);
+  const isMonster = !isRaid && !isMine && (
+    march?.kind === 'attack' ||
+    march?.previousKind === 'attack' ||
+    Boolean(march?.mobConfigId)
+  );
+  const isReturning = march?.kind === 'return' || march?.stage === 'returnToOutpost';
+
+  let category = 'other';
+  let icon = '⚔️';
+  let classes = 'bg-slate-100 text-slate-800 ring-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700';
+  let isPulse = false;
+
+  if (isRaid) {
+    category = 'raid';
+    classes = 'bg-indigo-100 text-indigo-900 ring-indigo-400 dark:bg-indigo-950/70 dark:text-indigo-200 dark:ring-indigo-700';
+    isPulse = true;
+
+    const expData = globalThis.hwaHelperExperimentalData;
+    const phase = expData?.rallyPhase ? expData.rallyPhase(march, now) : null;
+    const pName = phase?.phase;
+
+    if (isReturning || pName === 'Returning' || pName === 'Battle complete') {
+      icon = '↩️';
+    } else if (pName === 'Battle / awaiting result' || march?.stage === 'battle') {
+      icon = '💥';
+    } else if (pName === 'Traveling to boss' || march?.stage === 'moveToTargetInRally' || march?.stage === 'moveToTarget') {
+      icon = '🏹';
+    } else if (pName === 'Waiting' || march?.stage === 'waitingForRallyStart' || (march?.rally?.waitUntil && now < march.rally.waitUntil)) {
+      icon = isAutoJoin ? '⚡' : '⏳';
+    } else if (isAutoJoin) {
+      icon = '⚡';
+    } else {
+      icon = '⚔️';
+    }
+  } else if (isMine) {
+    category = 'gather';
+    classes = 'bg-emerald-100 text-emerald-900 ring-emerald-400 dark:bg-emerald-950/70 dark:text-emerald-200 dark:ring-emerald-700';
+
+    if (isReturning) {
+      icon = '↩️';
+    } else if (march?.stage === 'moveToTargetInSolo' && Number.isFinite(march?.targetArrivalAt) && now < march.targetArrivalAt) {
+      icon = '🚶‍♂️';
+    } else {
+      icon = '⛏️';
+    }
+  } else if (isMonster) {
+    category = 'monster';
+    classes = 'bg-amber-100 text-amber-900 ring-amber-400 dark:bg-amber-950/70 dark:text-amber-200 dark:ring-amber-700';
+
+    const isFighting = !isReturning && Number.isFinite(march?.targetArrivalAt) && now >= march.targetArrivalAt;
+    if (isReturning) {
+      icon = '↩️';
+    } else if (isFighting) {
+      icon = '💥';
+    } else if (march?.stage === 'moveToTargetInSolo' || (Number.isFinite(march?.targetArrivalAt) && now < march.targetArrivalAt)) {
+      icon = '🏃‍♂️';
+    } else {
+      icon = '👾';
+    }
+  } else if (march?.kind === 'scout') {
+    category = 'scout';
+    classes = 'bg-violet-100 text-violet-900 ring-violet-400 dark:bg-violet-950/70 dark:text-violet-200 dark:ring-violet-700';
+    icon = isReturning ? '↩️' : '⌖';
+  } else if (isReturning) {
+    icon = '↩️';
+  }
+
+  return { category, icon, classes, isPulse };
+}
+
 function renderMarches(cache, wrap = document.querySelector('#marches')) {
   if (!wrap) return;
   wrap.replaceChildren();
@@ -524,19 +602,15 @@ function renderMarches(cache, wrap = document.querySelector('#marches')) {
     const keys = identities(march);
     if (keys.some((key) => seen.has(key) || expired.has(key))) continue;
     keys.forEach((key) => seen.add(key));
-    const isAutoJoin = Boolean(march.rally?.isAutoJoin);
-    const isRaid = march.kind === 'raid' || isAutoJoin || Boolean(march.rally);
-    const style = isAutoJoin ?
-      { label: 'Auto Raid', icon: '⚡', classes: 'bg-amber-100 text-amber-900 ring-amber-400' } :
-      (marchStyles[march.kind] || marchStyles.attack);
+    const info = getMarchBadgeInfo(march, now);
     const badge = document.createElement('span');
-    const pulseClass = isRaid ? 'animate-pulse march-raid-pulse' : '';
-    badge.className = ('inline-flex size-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ' + style.classes + (pulseClass ? ' ' + pulseClass : '')).trim();
+    const pulseClass = info.isPulse ? 'animate-pulse march-raid-pulse' : '';
+    badge.className = ('inline-flex size-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ' + info.classes + (pulseClass ? ' ' + pulseClass : '')).trim();
     badge.dataset.marchIndex = String(index);
     badge.dataset.resourceTooltip = '';
     badge.dataset.tooltipBelow = '';
     badge.tabIndex = 0;
-    badge.textContent = style.icon;
+    badge.textContent = info.icon;
     wrap.append(badge);
   }
   wrap.hidden = wrap.children.length === 0;
@@ -544,12 +618,66 @@ function renderMarches(cache, wrap = document.querySelector('#marches')) {
 
 let dashboardStatusPollCounter = 0;
 
+function updateActionQueueBadges(root = document) {
+  const raidBtn = root.querySelector ? root.querySelector('#open-raid-dialog') : null;
+  if (raidBtn) {
+    const currentRaidQueue = typeof raidQueueState !== 'undefined' ? raidQueueState : null;
+    const raidQueueRunning = currentRaidQueue && !['stopped', 'complete'].includes(currentRaidQueue.phase);
+    const count = raidQueueRunning ?
+      (currentRaidQueue.bossQueue?.remain_raid_count ??
+       Math.max(0, (currentRaidQueue.options?.count || 0) - (globalThis.hwaHelperRaidQueue?.confirmedWins?.(currentRaidQueue) ?? 0))) : 0;
+    let badge = raidBtn.querySelector ? raidBtn.querySelector('#open-raid-dialog-badge') :
+      raidBtn.children?.find?.((c) => c.id === 'open-raid-dialog-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.id = 'open-raid-dialog-badge';
+        badge.className = 'absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-2xs font-bold leading-none text-white shadow-xs ring-2 ring-slate-900 animate-pulse pointer-events-none';
+        raidBtn.append(badge);
+      }
+      badge.textContent = String(count);
+      badge.dataset.queueCount = String(count);
+      badge.title = `${count} queued remaining`;
+      badge.setAttribute?.('aria-label', `${count} queued remaining`);
+    } else if (badge) {
+      if (typeof badge.remove === 'function') badge.remove();
+      else if (raidBtn.children) raidBtn.children = raidBtn.children.filter((c) => c !== badge);
+    }
+  }
+
+  const monsterBtn = root.querySelector ? root.querySelector('#open-monster-dialog') : null;
+  if (monsterBtn) {
+    const currentMonsterQueue = typeof monsterQueueState !== 'undefined' ? monsterQueueState : null;
+    const monsterQueueRunning = currentMonsterQueue && !['stopped', 'complete'].includes(currentMonsterQueue.phase);
+    const count = monsterQueueRunning ?
+      Math.max(0, (currentMonsterQueue.options?.count || 0) - (globalThis.hwaHelperMonsterQueue?.confirmedWins?.(currentMonsterQueue) ?? currentMonsterQueue.completed ?? 0)) : 0;
+    let badge = monsterBtn.querySelector ? monsterBtn.querySelector('#open-monster-dialog-badge') :
+      monsterBtn.children?.find?.((c) => c.id === 'open-monster-dialog-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.id = 'open-monster-dialog-badge';
+        badge.className = 'absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-2xs font-bold leading-none text-white shadow-xs ring-2 ring-slate-900 animate-pulse pointer-events-none';
+        monsterBtn.append(badge);
+      }
+      badge.textContent = String(count);
+      badge.dataset.queueCount = String(count);
+      badge.title = `${count} queued remaining`;
+      badge.setAttribute?.('aria-label', `${count} queued remaining`);
+    } else if (badge) {
+      if (typeof badge.remove === 'function') badge.remove();
+      else if (monsterBtn.children) monsterBtn.children = monsterBtn.children.filter((c) => c !== badge);
+    }
+  }
+}
+
 function refreshTimed() {
   const now = Date.now();
   if (typeof activeTab !== 'undefined' && activeTab === 'dashboard') {
     if (++dashboardStatusPollCounter % 3 === 0 && typeof updateDashboardGameStatus === 'function') {
       updateDashboardGameStatus();
     }
+    updateActionQueueBadges();
   }
   for (const countdown of document.querySelectorAll('[data-experimental-until]')) {
     const until = Number(countdown.dataset.experimentalUntil);
@@ -583,6 +711,11 @@ function refreshTimed() {
       const tooltip = marchTooltip(march, now);
       setResourceTooltip(badge, tooltip);
       if (badge.getAttribute('aria-label') !== tooltip) badge.setAttribute('aria-label', tooltip);
+      const info = getMarchBadgeInfo(march, now);
+      if (badge.textContent !== info.icon) badge.textContent = info.icon;
+      const pulseClass = info.isPulse ? 'animate-pulse march-raid-pulse' : '';
+      const targetClassName = ('inline-flex size-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ' + info.classes + (pulseClass ? ' ' + pulseClass : '')).trim();
+      if (badge.className !== targetClassName) badge.className = targetClassName;
     }
   }
   marchesWrap.hidden = ![...marchesWrap.children].some((badge) => !badge.hidden);
@@ -3985,8 +4118,44 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       typeof currentCache !== 'undefined' ? currentCache : { dungeonStatus: { data } }
     );
 
+    const currentRunState = (typeof dungeonRunState !== 'undefined' ? dungeonRunState : null);
+    const isRunning = currentRunState && !['stopped', 'complete'].includes(currentRunState.phase);
+    const hasCasualtyHalt = currentRunState?.casualty || (currentRunState?.phase === 'stopped' && currentRunState?.reason?.includes('casualty'));
+
+    const autoBtn = document.querySelector('#dungeon-auto-btn');
+    const autoLabel = autoBtn?.querySelector('.dungeon-auto-label');
+    if (autoBtn) {
+      if (isRunning) {
+        autoBtn.className = 'cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-rose-500 bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs';
+        if (autoLabel) autoLabel.textContent = 'Stop Auto';
+        autoBtn.title = 'Stop dungeon auto attack';
+      } else {
+        autoBtn.className = 'cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-blue-500 bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs';
+        if (autoLabel) autoLabel.textContent = hasCasualtyHalt ? 'Continue Auto' : 'Auto Attack';
+        autoBtn.title = hasCasualtyHalt ? 'Continue auto attack round with remaining alive titans' : 'Auto attack dungeon floor by floor';
+      }
+    }
+
     const autoStatusBox = document.createElement('div');
-    if (plan && !plan.canAttack) {
+    if (isRunning) {
+      autoStatusBox.className = 'rounded-lg border border-blue-300 bg-blue-50/70 p-2.5 text-xs text-blue-800 dark:border-blue-800/70 dark:bg-blue-950/40 dark:text-blue-300 flex items-center justify-between';
+      autoStatusBox.innerHTML = `
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold">⚔️ Auto-Attack Active:</span>
+          <span>Phase: ${currentRunState.phase}${currentRunState.floorNumber ? ` · Floor ${currentRunState.floorNumber}` : ''}</span>
+        </div>
+        <span class="rounded bg-blue-200/80 px-2 py-0.5 text-[10px] font-bold text-blue-900 dark:bg-blue-900/60 dark:text-blue-200 shrink-0 animate-pulse">Running</span>
+      `;
+    } else if (currentRunState?.phase === 'stopped' && currentRunState?.reason) {
+      autoStatusBox.className = 'rounded-lg border border-rose-300 bg-rose-50/70 p-2.5 text-xs text-rose-800 dark:border-rose-800/70 dark:bg-rose-950/40 dark:text-rose-300 flex items-center justify-between';
+      autoStatusBox.innerHTML = `
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold">⛔ Auto-Attack Halted:</span>
+          <span>${currentRunState.reason}</span>
+        </div>
+        <span class="rounded bg-rose-200/80 px-2 py-0.5 text-[10px] font-bold text-rose-900 dark:bg-rose-900/60 dark:text-rose-200 shrink-0">Halted</span>
+      `;
+    } else if (plan && !plan.canAttack) {
       autoStatusBox.className = 'rounded-lg border border-rose-300 bg-rose-50/70 p-2.5 text-xs text-rose-800 dark:border-rose-800/70 dark:bg-rose-950/40 dark:text-rose-300 flex items-center justify-between';
       autoStatusBox.innerHTML = `
         <div class="flex items-center gap-1.5">
@@ -3997,10 +4166,13 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       `;
     } else if (plan && plan.canAttack && plan.chosen) {
       autoStatusBox.className = 'rounded-lg border border-emerald-300 bg-emerald-50/70 p-2.5 text-xs text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center justify-between';
+      const statusNote = plan.chosen.deadCount === 0
+        ? 'Lineup intact'
+        : `${plan.chosen.deadCount} fallen, ${plan.chosen.heroes.length} alive`;
       autoStatusBox.innerHTML = `
         <div class="flex items-center gap-1.5">
           <span class="font-bold">⚡ Auto-Attack Target:</span>
-          <span>Door ${plan.chosen.teamNum + 1} (${plan.chosen.attackerType}) · Lineup intact</span>
+          <span>Door ${plan.chosen.teamNum + 1} (${plan.chosen.attackerType}) · ${statusNote}</span>
         </div>
         <span class="rounded bg-emerald-200/80 px-2 py-0.5 text-[10px] font-bold text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200 shrink-0">Ready</span>
       `;
@@ -4350,23 +4522,45 @@ function renderDashboard(cache) {
   const actions = document.createElement('div');
   actions.id = 'dashboard-actions';
   actions.className = 'mt-3 flex flex-wrap gap-2';
-  const dialogButton = (id, label, dialogId, color, open) => {
+
+  const currentRaidQueue = typeof raidQueueState !== 'undefined' ? raidQueueState : null;
+  const raidQueueRunning = currentRaidQueue && !['stopped', 'complete'].includes(currentRaidQueue.phase);
+  const remainingRaidCount = raidQueueRunning ?
+    (currentRaidQueue.bossQueue?.remain_raid_count ??
+     Math.max(0, (currentRaidQueue.options?.count || 0) - (globalThis.hwaHelperRaidQueue?.confirmedWins?.(currentRaidQueue) ?? 0))) : 0;
+
+  const currentMonsterQueue = typeof monsterQueueState !== 'undefined' ? monsterQueueState : null;
+  const monsterQueueRunning = currentMonsterQueue && !['stopped', 'complete'].includes(currentMonsterQueue.phase);
+  const remainingMonsterCount = monsterQueueRunning ?
+    Math.max(0, (currentMonsterQueue.options?.count || 0) - (globalThis.hwaHelperMonsterQueue?.confirmedWins?.(currentMonsterQueue) ?? currentMonsterQueue.completed ?? 0)) : 0;
+
+  const dialogButton = (id, label, dialogId, color, open, badgeCount = 0) => {
     const control = document.createElement('button');
     control.id = id; control.type = 'button'; control.textContent = label;
-    control.className = `cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-white ${color}`;
+    control.className = `relative cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-white ${color}`;
     control.setAttribute('aria-haspopup', 'dialog');
     control.setAttribute('aria-controls', dialogId);
+    if (badgeCount > 0) {
+      const badge = document.createElement('span');
+      badge.id = `${id}-badge`;
+      badge.dataset.queueCount = String(badgeCount);
+      badge.className = 'absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-2xs font-bold leading-none text-white shadow-xs ring-2 ring-slate-900 animate-pulse pointer-events-none';
+      badge.textContent = String(badgeCount);
+      badge.title = `${badgeCount} queued remaining`;
+      badge.setAttribute('aria-label', `${badgeCount} queued remaining`);
+      control.append(badge);
+    }
     control.addEventListener('click', () => {
       open(); document.querySelector(`#${dialogId}`).showModal();
     });
     actions.append(control);
   };
   dialogButton('open-raid-dialog', 'Raid', 'raid-dialog', 'bg-blue-600 hover:bg-blue-500',
-    () => renderExperimental(currentCache, true));
+    () => renderExperimental(currentCache, true), remainingRaidCount);
   dialogButton('open-gather-dialog', 'Gathering', 'gather-dialog', 'bg-teal-600 hover:bg-teal-500',
     () => renderExperimental(currentCache));
   dialogButton('open-monster-dialog', 'Monster', 'monster-dialog', 'bg-orange-600 hover:bg-orange-500',
-    () => renderMonster(currentCache));
+    () => renderMonster(currentCache), remainingMonsterCount);
   intro.append(heading, subtitle, actions);
   container.append(intro);
 
@@ -5524,6 +5718,69 @@ function setupDungeonModal() {
       }
     });
   }
+  const autoBtn = document.querySelector('#dungeon-auto-btn');
+  if (autoBtn) {
+    const defaultAutoHtml = autoBtn.innerHTML;
+    autoBtn.addEventListener('click', async () => {
+      if (autoBtn.disabled) return;
+      if (!popupRpcEnabled) {
+        autoBtn.innerHTML = `
+          <span class="text-amber-300">⚠️</span>
+          <span class="dungeon-auto-label text-amber-200">RPC Disabled</span>
+        `;
+        setTimeout(() => {
+          autoBtn.innerHTML = defaultAutoHtml;
+        }, 2000);
+        return;
+      }
+
+      const currentRunState = (typeof dungeonRunState !== 'undefined' ? dungeonRunState : null);
+      const isRunning = currentRunState && !['stopped', 'complete'].includes(currentRunState.phase);
+      if (isRunning) {
+        autoBtn.disabled = true;
+        const resp = await new Promise((resolve) => {
+          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({ kind: 'dungeon-run-stop' }, resolve);
+          } else {
+            resolve({ ok: true });
+          }
+        });
+        autoBtn.disabled = false;
+        dungeonAutomationMessage = resp?.ok ? 'Dungeon auto attack stopped.' : (resp?.error || 'Failed to stop.');
+        openDungeonModal(currentCache?.dungeonStatus?.data, dungeonModalReturnFocus);
+      } else {
+        autoBtn.disabled = true;
+        autoBtn.innerHTML = `
+          <svg class="size-3.5 animate-spin text-white shrink-0" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+          <span class="dungeon-auto-label">Starting...</span>
+        `;
+        const resp = await new Promise((resolve) => {
+          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({ kind: 'dungeon-run-start' }, resolve);
+          } else {
+            resolve({ ok: true });
+          }
+        });
+        autoBtn.disabled = false;
+        if (!resp?.ok) {
+          dungeonAutomationMessage = resp?.error || 'Could not start dungeon automation.';
+          autoBtn.innerHTML = `
+            <span class="text-rose-200">✕</span>
+            <span class="dungeon-auto-label">${resp?.error ? 'Failed' : 'Unavailable'}</span>
+          `;
+          setTimeout(() => {
+            openDungeonModal(currentCache?.dungeonStatus?.data, dungeonModalReturnFocus);
+          }, 2000);
+        } else {
+          dungeonAutomationMessage = 'Dungeon auto attack started.';
+          openDungeonModal(currentCache?.dungeonStatus?.data, dungeonModalReturnFocus);
+        }
+      }
+    });
+  }
 }
 
 function openDraftModal(cache) {
@@ -6396,7 +6653,8 @@ function renderMonster(cache) {
   const team = teams.find((item) => item.id === monsterSelection.teamId);
   const running = monsterQueueState && !['stopped', 'complete'].includes(monsterQueueState.phase);
 
-  // Update title bar status for Monster dialog
+  // Update title bar status and header icon for Monster dialog
+  const monsterIcon = document.querySelector('#monster-dialog-icon');
   const monsterTitleStatus = document.querySelector('#monster-dialog-status');
   if (monsterTitleStatus && monsterTitleStatus !== host) {
     monsterTitleStatus.replaceChildren();
@@ -6405,22 +6663,28 @@ function renderMonster(cache) {
       !march.rally && !march.mineId && (march.kind === 'attack' || march.stage === 'moveToTargetInSolo' || (march.stage === 'returnToOutpost' && march.previousKind === 'attack') || (march.kind === 'return' && !march.mineId && !march.rally)) &&
       !(globalThis.hwaHelperPopupData?.isMarchExpired ? globalThis.hwaHelperPopupData.isMarchExpired(march, now) : (Number.isFinite(march.endsAt) && now >= march.endsAt)));
 
+    let currentStageIcon = '👾';
+
     if (activeAttacks.length > 0) {
       const march = activeAttacks[0];
       const isReturning = march.kind === 'return' || march.stage === 'returnToOutpost';
+      const isFighting = !isReturning && Number.isFinite(march.targetArrivalAt) && now >= march.targetArrivalAt;
       const stateLabel = isReturning ? (march.result ? `Returning (${march.result})` : 'Returning') :
-        Number.isFinite(march.targetArrivalAt) && now >= march.targetArrivalAt ? 'Fighting' : 'Marching';
+        isFighting ? 'Fighting' : 'Marching';
+      currentStageIcon = isReturning ? '↩️' : (isFighting ? '💥' : '🏃‍♂️');
       const until = isReturning ? (march.endsAt || march.returnAt) : (march.targetArrivalAt || march.endsAt);
       const lvl = data.soloMonsterLevel(march.mobConfigId);
       const targetLabel = lvl ? `Lv.${lvl} Monster` : (march.mobConfigId ? `Monster #${march.mobConfigId}` : 'Monster');
 
       const badge = document.createElement('span');
-      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-300 dark:border-amber-800/50';
+      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800/60';
+      const badgeIcon = document.createElement('span');
+      badgeIcon.textContent = currentStageIcon;
       const dot = document.createElement('span');
       dot.className = 'size-1.5 rounded-full bg-amber-500 animate-pulse';
       const text = document.createElement('span');
       text.textContent = `${targetLabel}: ${stateLabel}`;
-      badge.append(dot, text);
+      badge.append(badgeIcon, dot, text);
       if (until && until > now) {
         const cd = document.createElement('span');
         cd.dataset.experimentalUntil = String(until);
@@ -6428,17 +6692,26 @@ function renderMonster(cache) {
         badge.append(cd);
       }
       monsterTitleStatus.append(badge);
+    } else if (running) {
+      currentStageIcon = '⏱️';
     }
+
+    if (monsterIcon) {
+      monsterIcon.textContent = currentStageIcon;
+    }
+
     if (running) {
       const queueBadge = document.createElement('span');
-      queueBadge.className = 'inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-950/40 dark:text-blue-200 border border-blue-300 dark:border-blue-800/50';
+      queueBadge.className = 'inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-900 border border-orange-300 dark:bg-orange-950/60 dark:text-orange-200 dark:border-orange-800/60';
+      const qIcon = document.createElement('span');
+      qIcon.textContent = '⏱️';
       const dot = document.createElement('span');
-      dot.className = 'size-1.5 rounded-full bg-blue-500 animate-pulse';
+      dot.className = 'size-1.5 rounded-full bg-orange-500 animate-pulse';
       const text = document.createElement('span');
       const wins = globalThis.hwaHelperMonsterQueue?.confirmedWins?.(monsterQueueState) ?? 0;
       const total = monsterQueueState.options?.count || 0;
       text.textContent = `Queue: ${monsterQueueState.phase} (${wins}/${total} won)`;
-      queueBadge.append(dot, text);
+      queueBadge.append(qIcon, dot, text);
       monsterTitleStatus.append(queueBadge);
     }
   }
@@ -6857,21 +7130,37 @@ function renderExperimental(cache, raidOnly = false) {
     render();
   };
   const activeRallies = (cache.marchStatus?.data?.marches || []).filter((march) => march.rally &&
-    !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
+    !(globalThis.hwaHelperPopupData?.isMarchExpired ? globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()) : (Number.isFinite(march.endsAt) && Date.now() >= march.endsAt)));
 
+  const raidIcon = document.querySelector('#raid-dialog-icon');
   const raidTitleStatus = document.querySelector('#raid-dialog-status');
   if (raidTitleStatus) {
     raidTitleStatus.replaceChildren();
+    let currentRaidStageIcon = '⚔️';
     if (activeRallies.length > 0) {
       const march = activeRallies[0];
       const phase = data.rallyPhase(march);
+      if (phase.phase === 'Waiting') {
+        currentRaidStageIcon = '⏳';
+      } else if (phase.phase === 'Traveling to boss') {
+        currentRaidStageIcon = '🏹';
+      } else if (phase.phase === 'Battle / awaiting result') {
+        currentRaidStageIcon = '💥';
+      } else if (phase.phase === 'Returning' || phase.phase === 'Battle complete') {
+        currentRaidStageIcon = '↩️';
+      } else {
+        currentRaidStageIcon = '⚔️';
+      }
+
       const badge = document.createElement('span');
-      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-300 dark:border-amber-800/50';
+      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-900 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-200 dark:border-indigo-800/60';
+      const badgeIcon = document.createElement('span');
+      badgeIcon.textContent = currentRaidStageIcon;
       const dot = document.createElement('span');
-      dot.className = 'size-1.5 rounded-full bg-amber-500 animate-pulse';
+      dot.className = 'size-1.5 rounded-full bg-indigo-500 animate-pulse';
       const text = document.createElement('span');
       text.textContent = `${march.rally?.target || 'Rally'}: ${phase.phase}${phase.result ? ` (${phase.result})` : ''}`;
-      badge.append(dot, text);
+      badge.append(badgeIcon, dot, text);
       if (phase.until) {
         const cd = document.createElement('span');
         cd.dataset.experimentalUntil = String(phase.until);
@@ -6879,16 +7168,25 @@ function renderExperimental(cache, raidOnly = false) {
         badge.append(cd);
       }
       raidTitleStatus.append(badge);
+    } else if (queueRunning) {
+      currentRaidStageIcon = '⏱️';
     }
+
+    if (raidIcon) {
+      raidIcon.textContent = currentRaidStageIcon;
+    }
+
     if (queueRunning) {
       const queueBadge = document.createElement('span');
-      queueBadge.className = 'inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-950/40 dark:text-blue-200 border border-blue-300 dark:border-blue-800/50';
+      queueBadge.className = 'inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-900 border border-blue-300 dark:bg-blue-950/60 dark:text-blue-200 dark:border-blue-800/60';
+      const qIcon = document.createElement('span');
+      qIcon.textContent = '⏱️';
       const dot = document.createElement('span');
       dot.className = 'size-1.5 rounded-full bg-blue-500 animate-pulse';
       const text = document.createElement('span');
       const pending = raidQueueState?.bossQueue;
       text.textContent = `Queue: ${raidQueueState.phase}${pending?.remain_raid_count != null ? ` (${pending.remain_raid_count} left)` : ''}`;
-      queueBadge.append(dot, text);
+      queueBadge.append(qIcon, dot, text);
       raidTitleStatus.append(queueBadge);
     }
   }
@@ -7023,21 +7321,45 @@ function renderExperimental(cache, raidOnly = false) {
   }, !popupRpcEnabled || !!experimentalPending || !context?.mapId || !experimentalSelection.mineId || gatherTeam?.heroIds.length !== 5);
   sendBtn.className = 'inline-flex h-10 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-teal-600 hover:bg-teal-700 px-4 text-sm font-semibold leading-5 text-white disabled:cursor-not-allowed disabled:opacity-40';
 
-  const activeMines = (cache.marchStatus?.data?.marches || []).filter((march) => march.mineId &&
-    march.stage !== 'returnToOutpost' && !globalThis.hwaHelperPopupData.isMarchExpired(march, Date.now()));
+  const now = Date.now();
+  const allGatherMarches = (cache.marchStatus?.data?.marches || []).filter((march) =>
+    (march.mineId || march.previousKind === 'gather' || ['wood', 'stone', 'iron', 'gold', 'food'].includes(march.kind) || ['wood', 'stone', 'iron', 'gold', 'food'].includes(march.previousKind)) &&
+    !(globalThis.hwaHelperPopupData?.isMarchExpired ? globalThis.hwaHelperPopupData.isMarchExpired(march, now) : (Number.isFinite(march.endsAt) && now >= march.endsAt)));
+
+  const activeMines = allGatherMarches.filter((march) => march.stage !== 'returnToOutpost' && march.kind !== 'return');
+  const returningMines = allGatherMarches.filter((march) => march.stage === 'returnToOutpost' || march.kind === 'return');
+
+  let currentGatherStageIcon = '⛏️';
+  if (returningMines.length > 0 && activeMines.length === 0) {
+    currentGatherStageIcon = '↩️';
+  } else if (activeMines.some((m) => Number.isFinite(m.targetArrivalAt) && now < m.targetArrivalAt)) {
+    currentGatherStageIcon = '🚶‍♂️';
+  } else if (activeMines.length > 0) {
+    currentGatherStageIcon = '⛏️';
+  }
+
+  const gatherIcon = document.querySelector('#gather-dialog-icon');
+  if (gatherIcon) {
+    gatherIcon.textContent = currentGatherStageIcon;
+  }
 
   // Title bar status for Gathering dialog
   const gatherTitleStatus = document.querySelector('#gather-dialog-status');
   if (gatherTitleStatus) {
     gatherTitleStatus.replaceChildren();
-    if (activeMines.length > 0) {
+    if (activeMines.length > 0 || returningMines.length > 0) {
       const badge = document.createElement('span');
-      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-950/40 dark:text-teal-200 border border-teal-300 dark:border-teal-800/50';
+      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-900 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800/60';
+      const iconSpan = document.createElement('span');
+      iconSpan.textContent = currentGatherStageIcon;
       const dot = document.createElement('span');
-      dot.className = 'size-1.5 rounded-full bg-teal-500 animate-pulse';
+      dot.className = 'size-1.5 rounded-full bg-emerald-500 animate-pulse';
       const text = document.createElement('span');
-      text.textContent = `${activeMines.length} team(s) gathering`;
-      badge.append(dot, text);
+      const details = [];
+      if (activeMines.length > 0) details.push(`${activeMines.length} team(s) gathering`);
+      if (returningMines.length > 0) details.push(`${returningMines.length} returning`);
+      text.textContent = details.join(', ');
+      badge.append(iconSpan, dot, text);
       gatherTitleStatus.append(badge);
     }
   }
@@ -10781,6 +11103,7 @@ async function render() {
   currentCache = cache;
   render.customTeams = stored.customTeams?.[String(cache.accountStatus?.data?.id)] || [];
   towerRunState = stored.towerRun || null;
+  dungeonRunState = stored.dungeonRun || null;
   const towerAccountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id ?? null;
   if (towerSettingsLoadedFor !== String(towerAccountId)) {
     towerAutomationSettings = String(stored.towerAutomationSettings?.accountId) === String(towerAccountId) ?

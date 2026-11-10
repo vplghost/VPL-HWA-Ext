@@ -1220,8 +1220,10 @@ test("header march icon renders gathering and return badges and hides upon retur
   const gatherBadge = marchesWrap.children[0];
   const returnBadge = marchesWrap.children[1];
 
-  assert.equal(gatherBadge.textContent, "🌲");
-  assert.equal(returnBadge.textContent, "↩");
+  assert.equal(gatherBadge.textContent, "🚶‍♂️");
+  assert.equal(returnBadge.textContent, "↩️");
+  assert.ok(gatherBadge.className.includes('bg-emerald-100'));
+  assert.ok(returnBadge.className.includes('bg-emerald-100'));
   assert.equal(gatherBadge.className.includes('march-raid-pulse'), false);
   assert.equal(returnBadge.className.includes('march-raid-pulse'), false);
 

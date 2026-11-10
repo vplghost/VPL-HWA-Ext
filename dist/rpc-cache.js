@@ -3316,6 +3316,25 @@
 
         if (entry.key === 'dungeonStatus') {
           const previous = next.dungeonStatus?.data || {};
+          const isNewDay = next.dungeonStatus?.updatedAt && entry.updatedAt &&
+            new Date(next.dungeonStatus.updatedAt).toDateString() !== new Date(entry.updatedAt).toDateString();
+          const isGetInfo = entry.method === 'dungeonGetInfo';
+
+          let mergedTitans;
+          if (isNewDay) {
+            // Daily rest reset: clear fallen titan states and restore fresh HP/energy
+            mergedTitans = entry.data.states?.titans ? { ...entry.data.states.titans } : {};
+          } else if (isGetInfo && entry.data.states?.titans !== undefined) {
+            // Full snapshot from dungeonGetInfo
+            mergedTitans = { ...entry.data.states.titans };
+          } else {
+            // Battle progress update: merge titan state deltas
+            mergedTitans = {
+              ...(previous.states?.titans || {}),
+              ...(entry.data.states?.titans || {})
+            };
+          }
+
           next.dungeonStatus = {
             key: 'dungeonStatus',
             method: entry.method,
@@ -3327,10 +3346,7 @@
               states: {
                 ...previous.states,
                 ...entry.data.states,
-                titans: {
-                  ...(previous.states?.titans || {}),
-                  ...(entry.data.states?.titans || {})
-                }
+                titans: mergedTitans
               }
             },
             updatedAt: entry.updatedAt

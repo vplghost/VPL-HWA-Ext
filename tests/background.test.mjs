@@ -12,6 +12,8 @@ const raidSource = await readFile(new URL('../extension/raid-queue.js', import.m
 const monsterSource = await readFile(new URL('../extension/monster-queue.js', import.meta.url), 'utf8');
 const towerAutomationSource = await readFile(new URL('../extension/tower-automation.js', import.meta.url), 'utf8');
 const towerRunnerSource = await readFile(new URL('../extension/tower-runner.js', import.meta.url), 'utf8');
+const dungeonAutomationSource = await readFile(new URL('../extension/dungeon-automation.js', import.meta.url), 'utf8');
+const dungeonRunnerSource = await readFile(new URL('../extension/dungeon-runner.js', import.meta.url), 'utf8');
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
 const popupSender = { url: 'chrome-extension://test-extension/popup.html' };
 
@@ -57,7 +59,7 @@ function setup(quota = Infinity) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
@@ -743,6 +745,35 @@ test('Tower start dispatches a saved-team run to one game tab and stop clears pe
   assert.equal(forwardedMessages[0].msg.calls[0].name, 'magicTower_enterRoom');
   assert.equal((await invoke({ kind: 'tower-run-stop' })).ok, true);
   assert.equal(local.towerRun.phase, 'stopped');
+  assert.equal(forwardedMessages.at(-1).msg.kind, 'drop-rpc-group');
+});
+
+test('Dungeon start dispatches automation to game tab and stop clears pending state', async () => {
+  const { local, tabsList, forwardedMessages, listener } = setup();
+  const invoke = (message) => new Promise((resolve) => listener(message, popupSender, resolve));
+  local.popupRpcEnabled = true;
+  local.captureSettings = { monitor: true };
+  local.socketRefreshMode = 'piggyback';
+  local.rpcCache = {
+    accountStatus: { data: { id: 10 } },
+    dungeonStatus: {
+      data: {
+        floorNumber: 800,
+        currentFloorDoors: [
+          { attackerType: 'water', defenderType: 'fire', power: 30000 }
+        ],
+        states: { titans: {} }
+      }
+    }
+  };
+  tabsList.push({ id: 1, url: gameSender.url });
+  assert.equal((await invoke({ kind: 'dungeon-run-start' })).ok, true);
+  assert.equal(local.dungeonRun.phase, 'starting-battle');
+  assert.equal(local.dungeonRun.tabId, 1);
+  assert.equal(forwardedMessages[0].tabId, 1);
+  assert.equal(forwardedMessages[0].msg.calls[0].name, 'dungeonStartBattle');
+  assert.equal((await invoke({ kind: 'dungeon-run-stop' })).ok, true);
+  assert.equal(local.dungeonRun.phase, 'stopped');
   assert.equal(forwardedMessages.at(-1).msg.kind, 'drop-rpc-group');
 });
 

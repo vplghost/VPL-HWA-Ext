@@ -360,6 +360,12 @@
           <span id="dungeon-floor-badge" class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 dark:border dark:border-blue-700/50">Floor 1</span>
         </div>
         <div class="flex items-center gap-2">
+          <button id="dungeon-auto-btn" type="button" class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-blue-500 bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs" title="Auto attack dungeon floor by floor">
+            <svg class="size-3.5 text-white shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span class="dungeon-auto-label">Auto Attack</span>
+          </button>
           <button id="dungeon-refresh-btn" type="button" class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80 shadow-2xs" title="Refresh dungeon data from game (dungeonGetInfo)">
             <svg class="size-3.5 text-slate-500 dark:text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -394,9 +400,10 @@
       </div>
     </div>
   </div>
-  <dialog id="raid-dialog" aria-labelledby="raid-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60 dark:bg-slate-900 dark:border-slate-800">
-    <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+  <dialog id="raid-dialog" aria-labelledby="raid-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-indigo-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60 dark:bg-slate-900 dark:border-indigo-900/50">
+    <div id="raid-dialog-header" class="sticky top-0 z-10 flex items-center justify-between border-b border-indigo-200 bg-indigo-50/80 px-4 py-3 dark:border-indigo-900/60 dark:bg-indigo-950/50">
       <div class="flex items-center gap-2 min-w-0">
+        <span id="raid-dialog-icon" class="text-xl shrink-0" aria-hidden="true">⚔️</span>
         <h2 id="raid-dialog-title" class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">Rally raid</h2>
         <div id="raid-dialog-status" class="flex items-center gap-2 truncate"></div>
       </div>
@@ -404,9 +411,10 @@
     </div>
     <div id="raid-dialog-body"></div>
   </dialog>
-  <dialog id="gather-dialog" aria-labelledby="gather-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60 dark:bg-slate-900 dark:border-slate-800">
-    <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+  <dialog id="gather-dialog" aria-labelledby="gather-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-emerald-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60 dark:bg-slate-900 dark:border-emerald-900/50">
+    <div id="gather-dialog-header" class="sticky top-0 z-10 flex items-center justify-between border-b border-emerald-200 bg-emerald-50/80 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/50">
       <div class="flex items-center gap-2 min-w-0">
+        <span id="gather-dialog-icon" class="text-xl shrink-0" aria-hidden="true">⛏️</span>
         <h2 id="gather-dialog-title" class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">Gathering</h2>
         <div id="gather-dialog-status" class="flex items-center gap-2 truncate"></div>
       </div>
@@ -414,9 +422,10 @@
     </div>
     <div id="gather-dialog-body"></div>
   </dialog>
-  <dialog id="monster-dialog" aria-labelledby="monster-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60 dark:bg-slate-900 dark:border-slate-800">
-    <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+  <dialog id="monster-dialog" aria-labelledby="monster-dialog-title" class="m-auto w-[calc(100%_-_1.5rem)] max-w-3xl max-h-[90vh] rounded-2xl border border-amber-200 bg-slate-50 p-0 shadow-xl backdrop:bg-slate-900/60 dark:bg-slate-900 dark:border-amber-900/50">
+    <div id="monster-dialog-header" class="sticky top-0 z-10 flex items-center justify-between border-b border-amber-200 bg-amber-50/80 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/50">
       <div class="flex items-center gap-2 min-w-0">
+        <span id="monster-dialog-icon" class="text-xl shrink-0" aria-hidden="true">👾</span>
         <h2 id="monster-dialog-title" class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">Monster attack</h2>
         <div id="monster-dialog-status" class="flex items-center gap-2 truncate"></div>
       </div>
@@ -483,6 +492,7 @@
   <script src="tower-buffs.js"></script>
   <script src="tower-automation.js"></script>
   <script src="dungeon-automation.js"></script>
+  <script src="dungeon-runner.js"></script>
   <script src="hero-metadata.js"></script>
   <script src="hero-stat-data.js"></script>
   <script src="march-rules.js"></script>

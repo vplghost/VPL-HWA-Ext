@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const rpcCacheJs = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
 const dungeonAutoJs = await readFile(new URL('../extension/dungeon-automation.js', import.meta.url), 'utf8');
+const dungeonRunnerJs = await readFile(new URL('../extension/dungeon-runner.js', import.meta.url), 'utf8');
 const titanMetaJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
 
 const rpcContext = {
@@ -21,7 +22,9 @@ const autoContext = {
 };
 vm.runInNewContext(titanMetaJs, autoContext);
 vm.runInNewContext(dungeonAutoJs, autoContext);
+vm.runInNewContext(dungeonRunnerJs, autoContext);
 const dungeonAuto = autoContext.globalThis.hwaHelperDungeonAutomation;
+const dungeonRunner = autoContext.globalThis.hwaHelperDungeonRunner;
 
 test('rpc-cache extracts dungeonStartBattle activeBattle state and dungeonEndBattle clears it', () => {
   const startRecord = {
@@ -149,7 +152,7 @@ test('dungeonAutomation evaluates lineups and titan health properly', () => {
   assert.equal(defective.aliveCount, 2);
 });
 
-test('dungeonAutomation selects intact door and halts when all doors have casualties', () => {
+test('dungeonAutomation prioritizes intact doors and supports requireIntactLineup option', () => {
   const doors = [
     { attackerType: 'water', defenderType: 'fire', power: 42000 },
     { attackerType: 'fire', defenderType: 'earth', power: 14000 }
@@ -182,12 +185,19 @@ test('dungeonAutomation selects intact door and halts when all doors have casual
     }
   };
 
-  // Case 1: Door 0 is intact (water), Door 1 is defective (fire has 4013 fallen)
+  // Case 1: Door 0 has 0 dead titans (water), Door 1 has 1 dead titan (fire has 4013 fallen)
+  // Auto door priority selects Door 0 (water) because 0 casualties < 1 casualty
   const selection1 = dungeonAuto.selectBestDoor(doors, cache);
   assert.equal(selection1.canAttack, true);
-  assert.equal(selection1.chosen.teamNum, 0, 'Should select Door 0 (water) because water is intact');
-  assert.equal(selection1.evaluations[1].canAttack, false, 'Door 1 must be disqualified due to casualty');
-  assert.ok(selection1.evaluations[1].disqualificationReason.includes('4013'));
+  assert.equal(selection1.chosen.teamNum, 0, 'Should select Door 0 (water) because water has fewest casualties (0 vs 1)');
+  assert.equal(selection1.evaluations[0].deadCount, 0);
+  assert.equal(selection1.evaluations[1].deadCount, 1);
+  assert.deepEqual([...selection1.evaluations[1].intactness.deadTitans], [4013]);
+
+  // With requireIntactLineup: true, Door 1 is disqualified due to casualty
+  const selectionIntactOnly = dungeonAuto.selectBestDoor(doors, cache, { requireIntactLineup: true });
+  assert.equal(selectionIntactOnly.evaluations[1].canAttack, false, 'Door 1 must be disqualified when requireIntactLineup is true');
+  assert.ok(selectionIntactOnly.evaluations[1].disqualificationReason.includes('4013'));
 
   // Test planDungeon in Case 1
   const plan1 = dungeonAuto.planDungeon(cache);
@@ -195,17 +205,39 @@ test('dungeonAutomation selects intact door and halts when all doors have casual
   assert.equal(plan1.teamNum, 0);
   assert.deepEqual([...plan1.heroes], [4000, 4001, 4052, 4004, 4002]);
 
-  // Case 2: Water titan also falls! Both lineups now have casualties -> HALT
+  // Case 2: Water titan 4000 also falls! Both doors now have 1 casualty.
+  // When casualties are equal (1 == 1), element priority selects water before fire (water -> mixed -> earth -> fire)
   cache.dungeonStatus.data.states.titans['4000'] = { isDead: true, hp: 0 };
-  const selection2 = dungeonAuto.selectBestDoor(doors, cache);
-  assert.equal(selection2.canAttack, false, 'Must not attack when all doors have casualties');
-  assert.equal(selection2.chosen, null);
-  assert.ok(selection2.reason.includes('Halting dungeon automation'));
+  const selectionEqualDeaths = dungeonAuto.selectBestDoor(doors, cache);
+  assert.equal(selectionEqualDeaths.canAttack, true);
+  assert.equal(selectionEqualDeaths.chosen.teamNum, 0, 'Should select water when casualties are equal because water has higher element priority than fire');
+  // Dead titan 4000 must NOT be in the chosen lineup!
+  assert.ok(!selectionEqualDeaths.chosen.heroes.includes(4000), 'Dead titan 4000 must not be included in chosen lineup');
 
-  // Test planDungeon in Case 2
-  const plan2 = dungeonAuto.planDungeon(cache);
-  assert.equal(plan2.kind, 'stop');
-  assert.ok(plan2.reason.includes('Halting dungeon automation'));
+  // When requireIntactLineup is true and both doors have casualties -> halt
+  const selectionHalt = dungeonAuto.selectBestDoor(doors, cache, { requireIntactLineup: true });
+  assert.equal(selectionHalt.canAttack, false);
+  assert.equal(selectionHalt.chosen, null);
+  assert.ok(selectionHalt.reason.includes('Halting dungeon automation'));
+
+  // When all titans in all doors are dead, normal mode also halts
+  cache.dungeonStatus.data.states.titans = {
+    '4000': { isDead: true, hp: 0 },
+    '4001': { isDead: true, hp: 0 },
+    '4052': { isDead: true, hp: 0 },
+    '4004': { isDead: true, hp: 0 },
+    '4002': { isDead: true, hp: 0 },
+    '4003': { isDead: true, hp: 0 },
+    '4010': { isDead: true, hp: 0 },
+    '4011': { isDead: true, hp: 0 },
+    '4013': { isDead: true, hp: 0 },
+    '4012': { isDead: true, hp: 0 },
+    '4014': { isDead: true, hp: 0 },
+    '4051': { isDead: true, hp: 0 }
+  };
+  const selectionAllDead = dungeonAuto.selectBestDoor(doors, cache);
+  assert.equal(selectionAllDead.canAttack, false);
+  assert.ok(selectionAllDead.reason.includes('no viable alive titans'));
 });
 
 test('dungeonAutomation respects door priority ordering', () => {
@@ -467,7 +499,8 @@ test('setupDungeonModal dispatches dungeonGetInfo, teamGetAll, and titanGetAll w
     '#dungeon-modal': new MockElement('dungeon-modal'),
     '#dungeon-fab': new MockElement('dungeon-fab'),
     '#dungeon-modal-close': new MockElement('dungeon-modal-close'),
-    '#dungeon-refresh-btn': new MockElement('dungeon-refresh-btn')
+    '#dungeon-refresh-btn': new MockElement('dungeon-refresh-btn'),
+    '#dungeon-auto-btn': new MockElement('dungeon-auto-btn')
   };
 
   let dispatchedMessage = null;
@@ -532,4 +565,257 @@ test('setupDungeonModal dispatches dungeonGetInfo, teamGetAll, and titanGetAll w
   // Drain restore timeout
   while (pendingTimeouts.length > 0) pendingTimeouts.shift()();
   assert.ok(!elements['#dungeon-refresh-btn'].innerHTML.includes('RPC Disabled'));
+
+  // Test Auto Attack button click when idle -> dispatches dungeon-run-start
+  sandbox.popupRpcEnabled = true;
+  dispatchedMessage = null;
+  elements['#dungeon-auto-btn'].click();
+  assert.ok(dispatchedMessage, 'sendMessage should be called on auto button click');
+  assert.equal(dispatchedMessage.kind, 'dungeon-run-start');
+
+  // Test Auto Attack button click when running -> dispatches dungeon-run-stop
+  await Promise.resolve();
+  elements['#dungeon-auto-btn'].disabled = false;
+  sandbox.dungeonRunState = { phase: 'starting-battle' };
+  dispatchedMessage = null;
+  elements['#dungeon-auto-btn'].click();
+  assert.ok(dispatchedMessage, 'sendMessage should be called to stop auto');
+  assert.equal(dispatchedMessage.kind, 'dungeon-run-stop');
+});
+
+test('pickLineupFromPool picks top 5 alive titans according to pool order and counts fallen titans', () => {
+  // Water pool: [4000, 4001, 4052, 4004, 4002, 4003]
+  // Sigurd (4000) and Orm (4052) are fallen
+  const titanStates = {
+    '4000': { isDead: true, hp: 0 },
+    '4001': { isDead: false, hp: 600000 },
+    '4052': { isDead: true, hp: 0 },
+    '4004': { isDead: false, hp: 700000 },
+    '4002': { isDead: false, hp: 800000 },
+    '4003': { isDead: false, hp: 900000 }
+  };
+
+  const result = dungeonAuto.pickLineupFromPool('water', titanStates);
+  assert.equal(result.canAttack, true);
+  assert.equal(result.deadCount, 2);
+  assert.equal(result.aliveCount, 4);
+  assert.deepEqual([...result.deadTitans], [4000, 4052]);
+  // Selected heroes must be the 4 alive titans in order
+  assert.deepEqual([...result.selectedHeroes], [4001, 4004, 4002, 4003]);
+
+  // Mixed / neutral pool picking top 5 alive
+  const neutralResult = dungeonAuto.pickLineupFromPool('mixed', titanStates);
+  assert.equal(neutralResult.canAttack, true);
+  assert.equal(neutralResult.selectedHeroes.length, 5);
+  assert.ok(!neutralResult.selectedHeroes.includes(4000));
+  assert.ok(!neutralResult.selectedHeroes.includes(4052));
+});
+
+test('door selection priority: fewest dead titans, then attacker element order, then enemy power', () => {
+  // Test 1: 0 dead vs 1 dead -> 0 dead wins regardless of element
+  const doors1 = [
+    { attackerType: 'fire', defenderType: 'water', power: 30000 },
+    { attackerType: 'water', defenderType: 'earth', power: 20000 }
+  ];
+  const cache1 = {
+    dungeonStatus: {
+      data: {
+        floorNumber: 800,
+        currentFloorDoors: doors1,
+        states: {
+          titans: {
+            '4000': { isDead: true, hp: 0 } // water has 1 dead titan
+            // fire has 0 dead titans
+          }
+        }
+      }
+    }
+  };
+  const sel1 = dungeonAuto.selectBestDoor(doors1, cache1);
+  assert.equal(sel1.chosen.teamNum, 0, 'Fire door (0 dead) must be preferred over Water door (1 dead)');
+
+  // Test 2: When dead counts are equal (0 == 0), element priority applies: water -> mixed -> earth -> fire
+  const doors2 = [
+    { attackerType: 'earth', defenderType: 'water', power: 20000 },
+    { attackerType: 'water', defenderType: 'fire', power: 30000 }
+  ];
+  const cache2 = {
+    dungeonStatus: {
+      data: {
+        floorNumber: 801,
+        currentFloorDoors: doors2,
+        states: { titans: {} } // 0 dead for both
+      }
+    }
+  };
+  const sel2 = dungeonAuto.selectBestDoor(doors2, cache2);
+  assert.equal(sel2.chosen.teamNum, 1, 'Water door must be preferred over Earth door when casualties are equal');
+
+  // Test 3: Mixed vs Earth when casualties are equal -> Mixed preferred
+  const doors3 = [
+    { attackerType: 'earth', defenderType: 'water', power: 20000 },
+    { attackerType: 'mixed', defenderType: 'water', power: 30000 }
+  ];
+  const sel3 = dungeonAuto.selectBestDoor(doors3, cache2);
+  assert.equal(sel3.chosen.teamNum, 1, 'Mixed door must be preferred over Earth door when casualties are equal');
+
+  // Test 4: When element and casualties are equal -> lower enemy power wins
+  const doors4 = [
+    { attackerType: 'water', defenderType: 'fire', power: 50000 },
+    { attackerType: 'water', defenderType: 'earth', power: 25000 }
+  ];
+  const sel4 = dungeonAuto.selectBestDoor(doors4, cache2);
+  assert.equal(sel4.chosen.teamNum, 1, 'Door with lower enemy power (25k vs 50k) must be preferred');
+});
+
+test('dungeonRunner halts on titan casualty at a floor and allows next round to continue', () => {
+  const doors = [
+    { attackerType: 'water', defenderType: 'fire', power: 35000 }
+  ];
+  const cache = {
+    accountStatus: { data: { id: 12345 } },
+    dungeonStatus: {
+      data: {
+        floorNumber: 810,
+        currentFloorDoors: doors,
+        states: { titans: {} }
+      }
+    }
+  };
+
+  const now = 1731230000000;
+  // 1. Start automation
+  const startTransition = dungeonRunner.start(cache, {}, 1, now);
+  assert.ok(startTransition, 'Runner start should produce transition');
+  assert.equal(startTransition.state.phase, 'starting-battle');
+  assert.equal(startTransition.calls[0].name, 'dungeonStartBattle');
+
+  // 2. Advance with startBattle response
+  const startRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(now + 1000).toISOString(),
+    requestBody: JSON.stringify({
+      calls: [{ name: 'dungeonStartBattle', ident: 'call-1', args: { teamNum: 0 } }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{ ident: 'call-1', result: { response: { seed: 9999, attackers: {} } } }]
+    })
+  };
+  const endTransition = dungeonRunner.advance(startTransition.state, startRecord, cache, now + 1000);
+  assert.equal(endTransition.state.phase, 'ending-battle');
+  assert.equal(endTransition.calls[0].name, 'dungeonEndBattle');
+
+  // 3. Battle ends, but titan 4000 died during this battle!
+  const endWithCasualtyRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(now + 2000).toISOString(),
+    requestBody: JSON.stringify({
+      calls: [
+        {
+          name: 'dungeonEndBattle',
+          ident: 'call-2',
+          args: {
+            result: { win: true, stars: 3 },
+            progress: [
+              {
+                attackers: {
+                  heroes: {
+                    '4000': { isDead: true, hp: 0, energy: 0 }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }),
+    responseBody: JSON.stringify({
+      results: [
+        {
+          ident: 'call-2',
+          result: {
+            response: {
+              reward: {},
+              dungeon: {
+                floorNumber: 811,
+                floor: { userData: doors },
+                states: {
+                  titans: {
+                    '4000': { isDead: true, hp: 0 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    })
+  };
+
+  const haltedTransition = dungeonRunner.advance(endTransition.state, endWithCasualtyRecord, cache, now + 2000);
+  assert.equal(haltedTransition.state.phase, 'stopped', 'Runner must halt when a titan casualty occurs');
+  assert.ok(haltedTransition.state.reason.includes('Titan casualty'), 'Halt reason must specify titan casualty');
+  assert.deepEqual([...haltedTransition.state.casualty.fallen], [4000]);
+
+  // 4. User can continue auto by pressing button again to start a new round!
+  // In the new round, cache reflects 4000 dead, but 4 other water titans are alive
+  cache.dungeonStatus.data.floorNumber = 811;
+  cache.dungeonStatus.data.states.titans['4000'] = { isDead: true, hp: 0 };
+  const nextRoundTransition = dungeonRunner.start(cache, {}, 1, now + 5000);
+  assert.ok(nextRoundTransition, 'Starting next round must succeed');
+  assert.equal(nextRoundTransition.state.phase, 'starting-battle');
+  assert.ok(!nextRoundTransition.calls[0].args.heroes.includes(4000), 'Next round must pick alive titans excluding dead 4000');
+});
+
+test('rpc-cache resets titan HP and energy on new day rest', () => {
+  const yesterdayCache = {
+    dungeonStatus: {
+      key: 'dungeonStatus',
+      data: {
+        floorNumber: 785,
+        states: {
+          titans: {
+            '4000': { isDead: true, hp: 0, energy: 0 },
+            '4013': { isDead: true, hp: 0, energy: 0 }
+          }
+        }
+      },
+      updatedAt: '2026-11-09T10:00:00.000Z'
+    }
+  };
+
+  // Today is 2026-11-10 (new day). dungeonGetInfo returns empty/fresh states
+  const newDayRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-10T05:00:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{ name: 'dungeonGetInfo', ident: 'call-new-day', args: {} }]
+    }),
+    responseBody: JSON.stringify({
+      results: [
+        {
+          ident: 'call-new-day',
+          result: {
+            response: {
+              floorNumber: 785,
+              states: { titans: {} }
+            }
+          }
+        }
+      ]
+    })
+  };
+
+  const { cache: updatedCache } = cacheModule.merge(yesterdayCache, [newDayRecord]);
+  assert.equal(
+    Object.keys(updatedCache.dungeonStatus.data.states.titans).length,
+    0,
+    'Dead titans from yesterday must be cleared on daily rest reset'
+  );
 });

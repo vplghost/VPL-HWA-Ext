@@ -10,6 +10,8 @@ importScripts('raid-queue.js');
 importScripts('monster-queue.js');
 importScripts('tower-automation.js');
 importScripts('tower-runner.js');
+importScripts('dungeon-automation.js');
+importScripts('dungeon-runner.js');
 importScripts('building-data.js');
 importScripts('building-queue.js');
 importScripts('research-data.js');
@@ -68,6 +70,10 @@ chrome.tabs?.onRemoved?.addListener?.((tabId) => {
     const tower = await chrome.storage.local.get('towerRun');
     if (tower.towerRun?.tabId === tabId && !globalThis.hwaHelperTowerRunner.terminal(tower.towerRun)) {
       await chrome.storage.local.set({ towerRun: globalThis.hwaHelperTowerRunner.stop(tower.towerRun, 'Game tab closed.') });
+    }
+    const dungeon = await chrome.storage.local.get('dungeonRun');
+    if (dungeon.dungeonRun?.tabId === tabId && !globalThis.hwaHelperDungeonRunner?.terminal(dungeon.dungeonRun)) {
+      await chrome.storage.local.set({ dungeonRun: globalThis.hwaHelperDungeonRunner.stop(dungeon.dungeonRun, 'Game tab closed.') });
     }
   }).catch(() => {});
 });
@@ -221,6 +227,34 @@ async function updateTowerRun(record, tabId) {
     record, stored.rpcCache, Date.now()), stored);
 }
 
+async function saveDungeonTransition(transition, stored) {
+  let state = transition.state;
+  if (!globalThis.hwaHelperDungeonRunner?.terminal(state) && !rpcMessageForSettings(stored, [])) {
+    state = globalThis.hwaHelperDungeonRunner?.stop(state, 'RPC settings disabled. Dungeon stopped.');
+  }
+  await chrome.storage.local.set({ dungeonRun: state });
+  if (globalThis.hwaHelperDungeonRunner?.terminal(state)) {
+    await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: state.id }).catch(() => {});
+  } else if (transition.calls?.length) {
+    try {
+      const msg = rpcMessageForSettings(stored, transition.calls, { group: state.id, expiresAt: transition.expiresAt });
+      await chrome.tabs.sendMessage(state.tabId, msg);
+    } catch {
+      state = globalThis.hwaHelperDungeonRunner?.stop(state, 'Game tab disconnected. Dungeon stopped.');
+      await chrome.storage.local.set({ dungeonRun: state });
+    }
+  }
+  return state;
+}
+
+async function updateDungeonRun(record, tabId) {
+  const stored = await chrome.storage.local.get(['dungeonRun', 'rpcCache', 'popupRpcEnabled',
+    'socketRefreshMode', 'captureSettings']);
+  if (!globalThis.hwaHelperDungeonRunner || globalThis.hwaHelperDungeonRunner.terminal(stored.dungeonRun) || stored.dungeonRun.tabId !== tabId) return stored.dungeonRun;
+  return saveDungeonTransition(globalThis.hwaHelperDungeonRunner.advance(stored.dungeonRun,
+    record, stored.rpcCache, Date.now()), stored);
+}
+
 async function advanceBuildingQueue(tabId) {
   const stored = await chrome.storage.local.get(['buildingQueue', 'rpcCache', 'popupRpcEnabled',
     'socketRefreshMode', 'captureSettings']);
@@ -296,7 +330,7 @@ async function advanceResearchQueue(tabId) {
 chrome.storage.onChanged?.addListener?.((changes, area) => {
   if (area !== 'local' || !['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) return;
   pending = pending.then(async () => {
-    const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+    const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'dungeonRun', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
     const modeChanged = changes.socketRefreshMode && changes.socketRefreshMode.oldValue !== changes.socketRefreshMode.newValue;
     if (!globalThis.hwaHelperRaidQueue.terminal(stored.raidQueue)) {
       const state = modeChanged ? globalThis.hwaHelperRaidQueue.stop(stored.raidQueue, 'RPC mode changed. Queue stopped.') : stored.raidQueue;
@@ -309,6 +343,10 @@ chrome.storage.onChanged?.addListener?.((changes, area) => {
     if (!globalThis.hwaHelperTowerRunner.terminal(stored.towerRun)) {
       const state = modeChanged ? globalThis.hwaHelperTowerRunner.stop(stored.towerRun, 'RPC mode changed. Tower stopped.') : stored.towerRun;
       await saveTowerTransition({ state }, stored);
+    }
+    if (!globalThis.hwaHelperDungeonRunner?.terminal(stored.dungeonRun)) {
+      const state = modeChanged ? globalThis.hwaHelperDungeonRunner.stop(stored.dungeonRun, 'RPC mode changed. Dungeon stopped.') : stored.dungeonRun;
+      await saveDungeonTransition({ state }, stored);
     }
   }).catch(() => {});
 });
@@ -622,6 +660,55 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.then(() => updateTowerRun(null, sender.tab.id));
     pending.then((state) => sendResponse({ ok: true, watch: state?.tabId === sender.tab.id &&
       !globalThis.hwaHelperTowerRunner.terminal(state) }), () => sendResponse({ ok: false }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (['dungeon-run-start', 'dungeon-run-stop'].includes(message?.kind) &&
+      sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
+    pending = pending.then(async () => {
+      const stored = await chrome.storage.local.get(['dungeonRun', 'rpcCache', 'popupRpcEnabled',
+        'socketRefreshMode', 'captureSettings', 'dungeonAutomationSettings']);
+      const runner = globalThis.hwaHelperDungeonRunner;
+      if (message.kind === 'dungeon-run-stop') {
+        if (!runner.terminal(stored.dungeonRun)) await saveDungeonTransition({ state: runner.stop(stored.dungeonRun,
+          'Stopped by user. Any Dungeon battle already sent continues in game.') }, stored);
+        return { ok: true };
+      }
+      if (!runner.terminal(stored.dungeonRun)) return { ok: false, error: 'Dungeon automation is already running.' };
+      if (!rpcMessageForSettings(stored, [])) return { ok: false, error: 'Enable RPC and Monitor API for Piggyback mode.' };
+      const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
+      const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
+      if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
+      const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
+      const baseSettings = String(stored.dungeonAutomationSettings?.accountId) === String(accountId) ?
+        stored.dungeonAutomationSettings : {};
+      const settings = {
+        ...baseSettings,
+        ...(message.settings || {})
+      };
+      if (message.settings) {
+        await chrome.storage.local.set({
+          dungeonAutomationSettings: {
+            ...baseSettings,
+            accountId,
+            ...message.settings
+          }
+        });
+      }
+      const transition = runner.start(stored.rpcCache, settings, tab.id, Date.now());
+      if (!transition) return { ok: false,
+        error: 'Open Dungeon in game before starting automation.' };
+      const state = await saveDungeonTransition(transition, stored);
+      return { ok: state.phase !== 'stopped', error: state.reason };
+    });
+    pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'dungeon-run-tick' && isGameUrl(sender.url) && sender.tab?.id) {
+    pending = pending.then(() => updateDungeonRun(null, sender.tab.id));
+    pending.then((state) => sendResponse({ ok: true, watch: state?.tabId === sender.tab.id &&
+      !globalThis.hwaHelperDungeonRunner?.terminal(state) }), () => sendResponse({ ok: false }));
     pending = pending.catch(() => {});
     return true;
   }
@@ -1035,6 +1122,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab?.id) await updateRaidQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateTowerRun(record, sender.tab.id);
+    if (sender.tab?.id) await updateDungeonRun(record, sender.tab.id);
     if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id);
     if (sender.tab?.id) await advanceResearchQueue(sender.tab.id);
     if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id);
