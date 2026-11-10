@@ -234,6 +234,12 @@
         <label class="block text-xs text-slate-600">Minimum boss level (1–30)
           <input id="setting-priority-autojoin-min-level" type="number" min="1" max="30" step="1" value="10" class="mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm">
         </label>
+        <label class="block text-xs text-slate-600">Raid team
+          <select id="setting-priority-autojoin-team" class="mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm">
+            <option value="highest">⭐ Top 5 highest power heroes (Default)</option>
+          </select>
+          <span class="mt-1 block text-[11px] text-slate-400">Fallback: If chosen lineup is not ready, heroes with highest power are automatically picked.</span>
+        </label>
       </div>
     </div>
     <div id="config-autoclaim-section" class="mt-5 border-t border-slate-200 pt-4">

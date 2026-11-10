@@ -11736,7 +11736,7 @@ async function render() {
   document.querySelector('#account-name').textContent = cache.accountStatus?.data?.name || '—';
   renderMarches(cache);
   renderAutoClaim(cache, currentAutoClaimSettings);
-  renderPriorityAutoJoin(stored.priorityAutoJoin);
+  renderPriorityAutoJoin(stored.priorityAutoJoin, cache, render.customTeams);
   if (popupRpcEnabled && currentAutoClaimSettings.onOpen && !hasAutoClaimedThisSession &&
       !isClaimQueued()) {
     const pending = globalThis.hwaHelperPopupData?.getPendingClaims?.(cache);
@@ -12301,31 +12301,79 @@ function setupAutoClaimListeners() {
   });
 }
 
-function renderPriorityAutoJoin(settings) {
+function renderPriorityAutoJoin(settings, cache = (typeof currentCache !== 'undefined' ? currentCache : null), customTeams = (typeof render !== 'undefined' ? render.customTeams : [])) {
   const chk = document.querySelector('#setting-priority-autojoin-enabled');
   const num = document.querySelector('#setting-priority-autojoin-min-level');
+  const teamSelect = document.querySelector('#setting-priority-autojoin-team');
   const badge = document.querySelector('#priority-autojoin-status');
   if (chk) chk.checked = Boolean(settings?.enabled);
   if (num && settings?.minLevel != null) num.value = settings.minLevel;
   if (badge) {
     badge.textContent = settings?.enabled ? `Active (≥ Lv${settings.minLevel ?? 10})` : 'Disabled';
   }
+  if (teamSelect) {
+    const data = globalThis.hwaHelperExperimentalData;
+    const heroes = cache?.heroGetAll?.data || {};
+    const summary = cache?.['getUnitSummary:unit']?.data;
+    const marches = cache?.marchStatus?.data?.marches;
+    const available = data?.availableHeroIds ? data.availableHeroIds(heroes, summary, marches) : Object.keys(heroes).map(Number);
+    const teams = data?.autoJoinTeamOptions ?
+      data.autoJoinTeamOptions(cache?.teamGetAll?.data, heroes, customTeams || [], available) :
+      [{ id: 'highest', label: '⭐ Top 5 highest power heroes (Default)' }];
+
+    const selectedTeamId = settings?.teamId || 'highest';
+    if (typeof document.createElement === 'function') {
+      teamSelect.replaceChildren?.();
+      for (const team of teams) {
+        const opt = document.createElement('option');
+        opt.value = team.id;
+        opt.textContent = team.label;
+        if (team.id === selectedTeamId) opt.selected = true;
+        teamSelect.append?.(opt);
+      }
+    }
+    if (teams.some((t) => t.id === selectedTeamId)) {
+      teamSelect.value = selectedTeamId;
+    } else {
+      teamSelect.value = 'highest';
+    }
+  }
 }
 
 function setupPriorityAutoJoinListeners() {
   const chk = document.querySelector('#setting-priority-autojoin-enabled');
   const num = document.querySelector('#setting-priority-autojoin-min-level');
+  const teamSelect = document.querySelector('#setting-priority-autojoin-team');
   const save = async () => {
     const enabled = Boolean(chk?.checked);
     const minLevel = Math.max(1, Math.min(30, parseInt(num?.value, 10) || 10));
+    const teamId = teamSelect?.value || 'highest';
     if (num) num.value = minLevel;
-    renderPriorityAutoJoin({ enabled, minLevel });
+
+    let heroIds = null;
+    const data = globalThis.hwaHelperExperimentalData;
+    const cache = typeof currentCache !== 'undefined' ? currentCache : null;
+    const customTeams = typeof render !== 'undefined' ? render.customTeams : [];
+    const heroes = cache?.heroGetAll?.data || {};
+    const summary = cache?.['getUnitSummary:unit']?.data;
+    const marches = cache?.marchStatus?.data?.marches;
+    const available = data?.availableHeroIds ? data.availableHeroIds(heroes, summary, marches) : Object.keys(heroes).map(Number);
+    const teams = data?.autoJoinTeamOptions ?
+      data.autoJoinTeamOptions(cache?.teamGetAll?.data, heroes, customTeams || [], available) : [];
+    const matched = teams.find((t) => t.id === teamId);
+    if (matched && Array.isArray(matched.heroIds)) {
+      heroIds = matched.heroIds;
+    }
+
+    const nextSettings = { enabled, minLevel, teamId, ...(heroIds ? { heroIds } : {}) };
+    renderPriorityAutoJoin(nextSettings, cache, customTeams);
     if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
-      await chrome.storage.local.set({ priorityAutoJoin: { enabled, minLevel } });
+      await chrome.storage.local.set({ priorityAutoJoin: nextSettings });
     }
   };
   chk?.addEventListener('change', save);
   num?.addEventListener('change', save);
+  teamSelect?.addEventListener('change', save);
 }
 
 globalThis.renderPriorityAutoJoin = renderPriorityAutoJoin;
@@ -12615,7 +12663,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
         updateDashboardGameStatus();
       }
     }
-    if ('buildingQueue' in changes || 'researchQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || 'dungeonRun' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('buildingQueue' in changes || 'researchQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || 'dungeonRun' in changes || 'priorityAutoJoin' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes || 'rpcMqttTelemetry' in changes || 'rpcMqttTriggerStatus' in changes) {
       if ('dungeonRun' in changes) dungeonRunState = changes.dungeonRun.newValue || null;

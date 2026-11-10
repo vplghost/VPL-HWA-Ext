@@ -246,3 +246,38 @@ test('hero troop capacity is estimated from power with a safe -2 margin to preve
   assert.equal(data.teamTroopCapacity(model.total, undefined), 4515);
   assert.equal(data.teamTroopCapacity(model.total, null), 4515);
 });
+
+test('highestPowerHeroes sorts available heroes by power descending', () => {
+  const heroes = {
+    1: { power: 1000 },
+    2: { power: 5000 },
+    3: { power: 3000 },
+    4: { power: 9000 },
+    5: { power: 2000 },
+    6: { power: 8000 }
+  };
+  assert.deepEqual(Array.from(data.highestPowerHeroes(heroes)), [4, 6, 2, 3, 5]);
+  assert.deepEqual(Array.from(data.highestPowerHeroes(heroes, [1, 2, 3, 5, 6])), [6, 2, 3, 5, 1]);
+});
+
+test('autoJoinTeamOptions includes highest power default, custom teams, in-game teams and weakest option', () => {
+  const heroes = {
+    1: { power: 1000 },
+    2: { power: 5000 },
+    3: { power: 3000 },
+    4: { power: 9000 },
+    5: { power: 2000 },
+    6: { power: 8000 }
+  };
+  const custom = [{ id: 'alpha', name: 'Alpha Squad', heroIds: [1, 2, 3, 4, 5] }];
+  const inGame = { arena: [[2, 3, 4, 5, 6]] };
+  const options = data.autoJoinTeamOptions(inGame, heroes, custom);
+  assert.equal(options[0].id, 'highest');
+  assert.deepEqual(Array.from(options[0].heroIds), [4, 6, 2, 3, 5]);
+  assert.equal(options[1].id, 'custom:alpha');
+  assert.deepEqual(Array.from(options[1].heroIds), [1, 2, 3, 4, 5]);
+  assert.equal(options[2].id, 'arena:0');
+  assert.deepEqual(Array.from(options[2].heroIds), [2, 3, 4, 5, 6]);
+  assert.equal(options[3].id, 'weakest');
+  assert.deepEqual(Array.from(options[3].heroIds), [1, 5, 3, 2, 6]);
+});

@@ -646,6 +646,67 @@ test('priority auto-join joins guild rally when boss level meets or exceeds thre
   assert.equal(forwardedMessages.length, 2);
 });
 
+test('priority auto-join uses selected team and falls back to highest power heroes if lineup is not ready', async () => {
+  const { local, send, forwardedMessages } = setup();
+  local.popupRpcEnabled = true;
+  local.priorityAutoJoin = { enabled: true, minLevel: 10, teamId: 'custom:elite' };
+  local.troopCapacitySettings = { defaultHero: 700, base: 1000 };
+  local.customTeams = {
+    '10': [{ id: 'elite', name: 'Elite 5', heroIds: [1, 2, 3, 4, 5] }]
+  };
+  const heroes = {
+    1: { level: 30, star: 2, power: 100 },
+    2: { level: 30, star: 2, power: 200 },
+    3: { level: 30, star: 2, power: 300 },
+    4: { level: 30, star: 2, power: 400 },
+    5: { level: 30, star: 2, power: 500 },
+    6: { level: 30, star: 2, power: 6000 },
+    7: { level: 30, star: 2, power: 7000 },
+    8: { level: 30, star: 2, power: 8000 },
+    9: { level: 30, star: 2, power: 9000 },
+    10: { level: 30, star: 2, power: 10000 },
+  };
+  local.rpcCache = {
+    accountStatus: { data: { id: 10 } },
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': { data: { squads: [], available: [7, 17, 27].map((unitId) => ({ unitId, count: 5000 })) } },
+    marchStatus: { data: { marches: [] } }
+  };
+  const sender = { ...gameSender, tab: { id: 42 } };
+
+  // 1. All custom team heroes available: uses [1, 2, 3, 4, 5]
+  const rally1 = rpc(
+    [{ name: 'getRallyById', feature: 'rally', ident: 1, args: { rallyId: 'rally-t1' } }],
+    [{ ident: 1, result: { response: { rally: {
+      rallyId: 'rally-t1', mapId: 'map-1',
+      mob: { mobId: 'm1', mobConfigId: 74 },
+      leader: { userId: 999 }, members: [], membersCapacityLeft: 5,
+      plannedStartTime: Date.now() + 60000
+    } } } }]
+  );
+  await send('api-record', rally1, sender);
+  assert.equal(forwardedMessages.length, 1);
+  const pickedHeroes1 = forwardedMessages[0].msg.calls[0].args.squad.heroes.map((h) => h.heroId);
+  assert.deepEqual(Array.from(pickedHeroes1), [1, 2, 3, 4, 5]);
+
+  // 2. Hero 1 is busy on a march -> custom lineup is not ready!
+  // Should fall back to highest power available heroes: [10, 9, 8, 7, 6]
+  local.rpcCache.marchStatus.data.marches = [{ team: { heroIds: [1] } }];
+  const rally2 = rpc(
+    [{ name: 'getRallyById', feature: 'rally', ident: 2, args: { rallyId: 'rally-t2' } }],
+    [{ ident: 2, result: { response: { rally: {
+      rallyId: 'rally-t2', mapId: 'map-1',
+      mob: { mobId: 'm2', mobConfigId: 74 },
+      leader: { userId: 999 }, members: [], membersCapacityLeft: 5,
+      plannedStartTime: Date.now() + 60000
+    } } } }]
+  );
+  await send('api-record', rally2, sender);
+  assert.equal(forwardedMessages.length, 2);
+  const pickedHeroes2 = forwardedMessages[1].msg.calls[0].args.squad.heroes.map((h) => h.heroId);
+  assert.deepEqual(Array.from(pickedHeroes2), [10, 9, 8, 7, 6]);
+});
+
 test('recorded POST bodies remain bounded and tracking endpoints stay excluded', async () => {
   const { session, send, listener } = setup();
   await send('record-start');

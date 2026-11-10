@@ -175,6 +175,33 @@
       .slice(0, 5).map(([id]) => Number(id));
   }
 
+  function highestPowerHeroes(heroes, availableIds = Object.keys(heroes || {}).map(Number)) {
+    return Object.entries(heroes || {})
+      .filter(([id, hero]) => Number.isInteger(Number(id)) && availableIds.includes(Number(id)) && Number.isFinite(hero?.power))
+      .sort((a, b) => b[1].power - a[1].power || Number(a[0]) - Number(b[0]))
+      .slice(0, 5).map(([id]) => Number(id));
+  }
+
+  function autoJoinTeamOptions(teams, heroes, customTeams = [], availableIds) {
+    const list = [
+      { id: 'highest', label: '⭐ Top 5 highest power heroes (Default)', heroIds: highestPowerHeroes(heroes, availableIds) }
+    ];
+    list.push(...customTeams.map((team) => normalizeCustomTeam(team, heroes)).filter(Boolean)
+      .map((team) => ({ id: `custom:${team.id}`, label: `Custom · ${team.name}`, heroIds: team.heroIds, maxTroops: team.maxTroops })));
+    for (const [mode, members] of Object.entries(teams || {})) {
+      if (!Array.isArray(members)) continue;
+      const groups = members.some(Array.isArray) ? members : [members];
+      groups.forEach((group, index) => {
+        const heroIds = (Array.isArray(group) ? group : []).filter((id) =>
+          Number.isInteger(id) && heroes?.[id]).slice(0, 5);
+        if (heroIds.length) list.push({ id: `${mode}:${index}`,
+          label: `${mode}${groups.length > 1 ? ` #${index + 1}` : ''}`, heroIds });
+      });
+    }
+    list.push({ id: 'weakest', label: '5 lowest power heroes', heroIds: lowestPowerHeroes(heroes, availableIds) });
+    return list;
+  }
+
   function teamOptions(teams, heroes, customTeams = [], availableIds) {
     const options = customTeams.map((team) => normalizeCustomTeam(team, heroes)).filter(Boolean)
       .map((team) => ({ id: `custom:${team.id}`, label: `Custom · ${team.name}`, heroIds: team.heroIds, maxTroops: team.maxTroops }));
@@ -264,7 +291,7 @@
 
   globalThis.hwaHelperExperimentalData = { rallyWaitOptions, capacitySignature, heroCapacity,
     estimateHeroTroopCapacity,
-    squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, bossLevel, soloMonsterConfigIds, soloMonsterLevel, lowestPowerHeroes,
-    mineConfigId, mineTypeLevel, availableHeroIds, normalizeCustomTeam, teamOptions, teamTroopCapacity, buildSquad, buildRallyCall, buildJoinRallyCall,
+    squadCapacity, normalizeCapacitySettings, capacityModel, unitInfo, allocateTroops, rallyMembers, bossConfigId, bossLevel, soloMonsterConfigIds, soloMonsterLevel, lowestPowerHeroes, highestPowerHeroes,
+    mineConfigId, mineTypeLevel, availableHeroIds, normalizeCustomTeam, teamOptions, autoJoinTeamOptions, teamTroopCapacity, buildSquad, buildRallyCall, buildJoinRallyCall,
     buildGatherCall, buildMineSearchCall, rallyPhase };
 })();

@@ -399,12 +399,38 @@ async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
     if (!heroes || !summary) continue;
 
     const availableHeroIds = globalThis.hwaHelperExperimentalData.availableHeroIds(heroes, summary, marches);
-    let heroIds = null;
-    if (Array.isArray(stored.raidPreferences?.heroIds) && stored.raidPreferences.heroIds.length === 5 &&
-        stored.raidPreferences.heroIds.every((id) => availableHeroIds.includes(id))) {
-      heroIds = stored.raidPreferences.heroIds;
+    const teamSetting = stored.priorityAutoJoin?.teamId || stored.raidPreferences?.teamId || 'highest';
+    let targetTeamHeroes = null;
+
+    if (teamSetting === 'highest') {
+      targetTeamHeroes = globalThis.hwaHelperExperimentalData.highestPowerHeroes(heroes, availableHeroIds);
+    } else if (teamSetting === 'weakest') {
+      const weakest = globalThis.hwaHelperExperimentalData.lowestPowerHeroes(heroes);
+      if (weakest.length === 5 && weakest.every((id) => availableHeroIds.includes(id))) {
+        targetTeamHeroes = weakest;
+      }
     } else {
-      heroIds = globalThis.hwaHelperExperimentalData.lowestPowerHeroes(heroes, availableHeroIds);
+      let teamHeroIds = null;
+      const allTeams = globalThis.hwaHelperExperimentalData.autoJoinTeamOptions(
+        cache.teamGetAll?.data, heroes, stored.customTeams?.[String(myId)] || [], availableHeroIds
+      );
+      const matched = allTeams.find((t) => t.id === teamSetting);
+      if (matched && Array.isArray(matched.heroIds) && matched.heroIds.length === 5) {
+        teamHeroIds = matched.heroIds;
+      } else if (Array.isArray(stored.priorityAutoJoin?.heroIds) && stored.priorityAutoJoin.heroIds.length === 5) {
+        teamHeroIds = stored.priorityAutoJoin.heroIds;
+      } else if (Array.isArray(stored.raidPreferences?.heroIds) && stored.raidPreferences.heroIds.length === 5) {
+        teamHeroIds = stored.raidPreferences.heroIds;
+      }
+      if (Array.isArray(teamHeroIds) && teamHeroIds.length === 5 &&
+          teamHeroIds.every((id) => availableHeroIds.includes(id))) {
+        targetTeamHeroes = teamHeroIds;
+      }
+    }
+
+    let heroIds = targetTeamHeroes;
+    if (!heroIds || heroIds.length !== 5) {
+      heroIds = globalThis.hwaHelperExperimentalData.highestPowerHeroes(heroes, availableHeroIds);
     }
     if (!heroIds || heroIds.length !== 5) continue;
 
@@ -1130,7 +1156,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   pending = pending.then(async () => {
     const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings',
-      'popupRpcEnabled', 'socketRefreshMode', 'priorityAutoJoin', 'troopCapacitySettings', 'raidPreferences']);
+      'popupRpcEnabled', 'socketRefreshMode', 'priorityAutoJoin', 'troopCapacitySettings', 'raidPreferences', 'customTeams']);
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
     if (cacheResult.changed) {
