@@ -6,7 +6,12 @@ Tài liệu này mô tả chi tiết kiến trúc, thuật toán và cách tùy 
 
 ## 1. Tổng Quan
 
-Chức năng tự động Dungeon cho phép extension tự động leo tầng Dungeon theo từng ải một cách an toàn, thông minh và tối ưu hóa việc giữ máu/sinh mệnh của các Titan.
+> [!NOTE]
+> **Cập nhật chính sách**: Tính năng chạy auto tự động tấn công (auto battle runner) đã được **shelf (tạm dừng/ẩn)** khỏi giao diện người dùng do cơ chế đồng bộ client-server animation của game có độ trễ động không cố định.
+> Trọng tâm hiện tại của hệ thống chuyển sang **Ghi nhận thông tin & Log chiến đấu trong ngày (Daily Combat Log)**:
+> 1. Tự động thống kê các trận thắng hoàn mỹ không thương vong (flawless victories) chỉ bằng số lượng để giao diện tinh gọn.
+> 2. Highlight đặc biệt và chi tiết các trận đánh có thương vong Titan (Casualties): tầng xảy ra, thời gian, tên và avatar các Titan hy sinh.
+> 3. Cung cấp thông tin trực quan về cửa ải hiện tại, máu & năng lượng của từng Titan để người chơi chủ động đưa ra quyết định khi đánh tay.
 
 Các điểm cốt lõi bao gồm:
 1. **Reset trạng thái Titan mỗi ngày mới (Daily Rest Reset)**: Đảm bảo thông tin máu (HP) và năng lượng (Energy) của Titan được làm mới tinh tươm khi qua ngày mới.

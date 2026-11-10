@@ -4459,6 +4459,139 @@ function renderDungeonStrategySection(data, body) {
   body.append(details);
 }
 
+function renderDungeonCombatLogSection(data, container) {
+  const log = data?.dailyCombatLog || { flawlessCount: 0, totalBattles: 0, casualtyBattles: [] };
+  const total = log.totalBattles || 0;
+  const flawless = log.flawlessCount || 0;
+  const casualties = Array.isArray(log.casualtyBattles) ? log.casualtyBattles : [];
+
+  const logSec = document.createElement('div');
+  logSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
+
+  logSec.innerHTML = `
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-bold text-slate-900 dark:text-slate-100">⚔️ Daily Combat Log</span>
+        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+          Total: ${total}
+        </span>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-800/60">
+          ✨ ${flawless} Flawless Wins (0 casualties)
+        </span>
+        ${casualties.length > 0 ? `
+          <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 dark:border dark:border-rose-800/60">
+            ⚠️ ${casualties.length} with Casualties
+          </span>
+        ` : ''}
+      </div>
+    </div>
+  `;
+
+  if (casualties.length > 0) {
+    const list = document.createElement('div');
+    list.className = 'space-y-2.5 pt-1';
+
+    const title = document.createElement('div');
+    title.className = 'text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400 flex items-center gap-1.5';
+    title.innerHTML = `<span>⚠️ Highlighted Battles with Titan Casualties (${casualties.length})</span>`;
+    list.append(title);
+
+    for (const b of casualties) {
+      const card = document.createElement('div');
+      card.className = 'rounded-xl border-2 border-rose-300 bg-rose-50/70 p-3.5 space-y-2.5 shadow-xs dark:border-rose-800/80 dark:bg-rose-950/40';
+
+      const timeStr = b.timestamp ? new Date(b.timestamp).toLocaleTimeString() : '';
+      const floorStr = b.floorNumber ? `Floor ${b.floorNumber}` : 'Dungeon Battle';
+      const outcomeBadge = b.win
+        ? '<span class="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 px-2 py-0.5 text-[10px] font-bold border border-amber-300 dark:border-amber-700">Victory (with Casualties)</span>'
+        : '<span class="rounded-full bg-rose-600 text-white px-2 py-0.5 text-[10px] font-bold">Defeat</span>';
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2">
+            <span class="rounded-md bg-rose-800 px-2 py-0.5 text-xs font-bold text-white shadow-2xs">${floorStr}</span>
+            ${outcomeBadge}
+          </div>
+          ${timeStr ? `<span class="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">${timeStr}</span>` : ''}
+        </div>
+      `;
+
+      // Highlight the fallen titans prominently
+      const fallenBox = document.createElement('div');
+      fallenBox.className = 'rounded-lg border border-rose-200 bg-white/90 p-2.5 space-y-1.5 dark:border-rose-900/60 dark:bg-slate-900/80';
+      const fallenCount = Array.isArray(b.casualties) ? b.casualties.length : 0;
+      fallenBox.innerHTML = `
+        <div class="text-[11px] font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1">
+          <span>💀 Fallen Titans (${fallenCount}):</span>
+        </div>
+      `;
+      const fallenTitansList = document.createElement('div');
+      fallenTitansList.className = 'flex flex-wrap items-center gap-2';
+
+      for (const cas of (b.casualties || [])) {
+        const idStr = String(cas?.id ?? cas);
+        const meta = globalThis.hwaHelperTitanMetadata?.[idStr];
+        const name = meta?.name || `Titan ${idStr}`;
+        const elem = meta?.element || '';
+
+        const tag = document.createElement('span');
+        tag.className = 'inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-100/70 px-2 py-1 text-xs font-semibold text-rose-900 shadow-2xs dark:border-rose-800 dark:bg-rose-950/80 dark:text-rose-200';
+        tag.innerHTML = `
+          <img src="assets/titans/${idStr}.png" class="size-5 rounded-full object-cover shrink-0 border border-rose-300 dark:border-rose-700">
+          <span>${name}</span>
+          ${elem ? `<span class="text-[10px] text-rose-700/80 dark:text-rose-400 font-normal">(${elem})</span>` : ''}
+          <span class="rounded bg-rose-200 text-rose-800 dark:bg-rose-900 dark:text-rose-200 px-1 py-0.2 text-[9px] font-bold uppercase">Dead</span>
+        `;
+        tag.querySelector('img')?.addEventListener('error', (e) => { e.currentTarget.hidden = true; });
+        fallenTitansList.append(tag);
+      }
+      fallenBox.append(fallenTitansList);
+      card.append(fallenBox);
+
+      // Deployed lineup
+      if (Array.isArray(b.deployed) && b.deployed.length > 0) {
+        const teamBox = document.createElement('div');
+        teamBox.className = 'flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-500 dark:text-slate-400';
+        const teamLabel = document.createElement('span');
+        teamLabel.className = 'font-semibold text-[10px] uppercase tracking-wider mr-1';
+        teamLabel.textContent = 'Deployed:';
+        teamBox.append(teamLabel);
+        for (const depId of b.deployed) {
+          const tId = String(depId);
+          const meta = globalThis.hwaHelperTitanMetadata?.[tId];
+          const name = meta?.name || `Titan ${tId}`;
+          const isCasualty = (b.casualties || []).some((c) => String(c?.id ?? c) === tId);
+          const tTag = document.createElement('span');
+          tTag.className = `inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] ${isCasualty ? 'line-through text-rose-700 font-bold bg-rose-100/60 dark:bg-rose-950/40 dark:text-rose-400' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`;
+          tTag.textContent = name;
+          teamBox.append(tTag);
+        }
+        card.append(teamBox);
+      }
+
+      list.append(card);
+    }
+    logSec.append(list);
+  } else if (flawless > 0) {
+    const flawlessBox = document.createElement('div');
+    flawlessBox.className = 'rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 flex items-center gap-2';
+    flawlessBox.innerHTML = `
+      <span class="text-base shrink-0">🛡️</span>
+      <span>All <strong>${flawless}</strong> dungeon battles recorded today were flawless victories with zero titan casualties!</span>
+    `;
+    logSec.append(flawlessBox);
+  } else {
+    const emptyBox = document.createElement('div');
+    emptyBox.className = 'rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-500 text-center';
+    emptyBox.textContent = 'No dungeon battles recorded today yet. Battle in dungeon to track combat logs and titan casualties.';
+    logSec.append(emptyBox);
+  }
+
+  container.append(logSec);
+}
+
 function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   const modal = document.querySelector('#dungeon-modal');
   const body = document.querySelector('#dungeon-modal-body');
@@ -4556,11 +4689,29 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   }
 
   // --- SECTION 1: OVERVIEW STATS ---
+  const todayTitanite = (() => {
+    if (Number.isFinite(data.todayTitanite)) return data.todayTitanite;
+    if (Number.isFinite(data.dailyCombatLog?.todayTitanite)) return data.dailyCombatLog.todayTitanite;
+    const quests = (typeof currentCache !== 'undefined' ? currentCache?.questGetAll?.data : null);
+    if (quests) {
+      const q = (Array.isArray(quests) ? quests.find((item) => [10031, 10032, 10108].includes(Number(item?.id))) : null) ||
+                quests[10031] || quests[10032] || quests[10108];
+      if (q && Number.isFinite(Number(q.progress))) return Number(q.progress);
+    }
+    const dailyQuests = (typeof currentCache !== 'undefined' ? currentCache?.['getDailyQuests:quest']?.data?.events : null);
+    if (dailyQuests) {
+      const q = (Array.isArray(dailyQuests) ? dailyQuests.find((item) => [10031, 10032, 10108].includes(Number(item?.id))) : null) ||
+                dailyQuests[10031] || dailyQuests[10032] || dailyQuests[10108];
+      if (q && Number.isFinite(Number(q.progress))) return Number(q.progress);
+    }
+    return 0;
+  })();
+
   const overviewSec = document.createElement('div');
   overviewSec.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2.5';
   const stats = [
     { label: 'Current Floor', val: `Floor ${floorNumber}`, sub: 'In progress' },
-    { label: 'Cleared Floors', val: String(data.maxFloorPassed ?? 0), sub: 'Total passed' },
+    { label: 'Personal Titanite', val: `${todayTitanite.toLocaleString()}`, sub: 'Earned today' },
     { label: 'Checkpoint', val: `Floor ${data.respawnFloor || 0}`, sub: 'Respawn point' },
     { label: 'Guild Activity', val: `${(data.dungeonActivity ?? 0).toLocaleString()} pts`, sub: 'Dungeon score' }
   ];
@@ -4600,10 +4751,13 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   `;
   body.append(elemSec);
 
-  // --- SECTION 3: STRATEGY & LINEUP POOLS (CUSTOMIZABLE) ---
+  // --- SECTION 3: DAILY COMBAT LOG & TITAN CASUALTY TRACKING ---
+  renderDungeonCombatLogSection(data, body);
+
+  // --- SECTION 4: STRATEGY & LINEUP POOLS (CUSTOMIZABLE) ---
   renderDungeonStrategySection(data, body);
 
-  // --- SECTION 4: CURRENT FLOOR DOORS ---
+  // --- SECTION 5: CURRENT FLOOR DOORS ---
   const doors = Array.isArray(data.currentFloorDoors) ? data.currentFloorDoors : [];
   if (doors.length > 0) {
     const doorsSec = document.createElement('div');
@@ -4620,65 +4774,8 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       dungeonOptions
     );
 
-    const currentRunState = (typeof dungeonRunState !== 'undefined' ? dungeonRunState : null);
-    const isRunning = currentRunState && !['stopped', 'complete'].includes(currentRunState.phase);
-    const hasCasualtyHalt = currentRunState?.casualty || (currentRunState?.phase === 'stopped' && currentRunState?.reason?.includes('casualty'));
-
     const autoBtn = document.querySelector('#dungeon-auto-btn');
-    const autoLabel = autoBtn?.querySelector('.dungeon-auto-label');
-    if (autoBtn) {
-      if (isRunning) {
-        autoBtn.className = 'cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-rose-500 bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs';
-        if (autoLabel) autoLabel.textContent = 'Stop Auto';
-        autoBtn.title = 'Stop dungeon auto attack';
-      } else {
-        autoBtn.className = 'cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-blue-500 bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs';
-        if (autoLabel) autoLabel.textContent = hasCasualtyHalt ? 'Continue Auto' : 'Auto Attack';
-        autoBtn.title = hasCasualtyHalt ? 'Continue auto attack round with remaining alive titans' : 'Auto attack dungeon floor by floor';
-      }
-    }
-
-    const autoStatusBox = document.createElement('div');
-    if (isRunning) {
-      autoStatusBox.className = 'rounded-lg border border-blue-300 bg-blue-50/70 p-2.5 text-xs text-blue-800 dark:border-blue-800/70 dark:bg-blue-950/40 dark:text-blue-300 flex items-center justify-between';
-      autoStatusBox.innerHTML = `
-        <div class="flex items-center gap-1.5">
-          <span class="font-bold">⚔️ Auto-Attack Active:</span>
-          <span>${escapeHtml(currentRunState.statusText || `Phase: ${currentRunState.phase}${currentRunState.floorNumber ? ` · Floor ${currentRunState.floorNumber}` : ''}`)}</span>
-        </div>
-        <span class="rounded bg-blue-200/80 px-2 py-0.5 text-[10px] font-bold text-blue-900 dark:bg-blue-900/60 dark:text-blue-200 shrink-0 animate-pulse">Running</span>
-      `;
-    } else if (currentRunState?.phase === 'stopped' && currentRunState?.reason) {
-      autoStatusBox.className = 'rounded-lg border border-rose-300 bg-rose-50/70 p-2.5 text-xs text-rose-800 dark:border-rose-800/70 dark:bg-rose-950/40 dark:text-rose-300 flex items-center justify-between';
-      autoStatusBox.innerHTML = `
-        <div class="flex items-center gap-1.5">
-          <span class="font-bold">⛔ Auto-Attack Halted:</span>
-          <span>${currentRunState.reason}</span>
-        </div>
-        <span class="rounded bg-rose-200/80 px-2 py-0.5 text-[10px] font-bold text-rose-900 dark:bg-rose-900/60 dark:text-rose-200 shrink-0">Halted</span>
-      `;
-    } else if (plan && !plan.canAttack) {
-      autoStatusBox.className = 'rounded-lg border border-rose-300 bg-rose-50/70 p-2.5 text-xs text-rose-800 dark:border-rose-800/70 dark:bg-rose-950/40 dark:text-rose-300 flex items-center justify-between';
-      autoStatusBox.innerHTML = `
-        <div class="flex items-center gap-1.5">
-          <span class="font-bold">⛔ Auto-Attack Halted:</span>
-          <span>${plan.reason}</span>
-        </div>
-        <span class="rounded bg-rose-200/80 px-2 py-0.5 text-[10px] font-bold text-rose-900 dark:bg-rose-900/60 dark:text-rose-200 shrink-0">Halted</span>
-      `;
-    } else if (plan && plan.canAttack && plan.chosen) {
-      autoStatusBox.className = 'rounded-lg border border-emerald-300 bg-emerald-50/70 p-2.5 text-xs text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center justify-between';
-      const statusNote = plan.chosen.deadCount === 0
-        ? 'Lineup intact'
-        : `${plan.chosen.deadCount} fallen, ${plan.chosen.heroes.length} alive`;
-      autoStatusBox.innerHTML = `
-        <div class="flex items-center gap-1.5">
-          <span class="font-bold">⚡ Auto-Attack Target:</span>
-          <span>Door ${plan.chosen.teamNum + 1} (${plan.chosen.attackerType}) · ${statusNote}</span>
-        </div>
-        <span class="rounded bg-emerald-200/80 px-2 py-0.5 text-[10px] font-bold text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200 shrink-0">Ready</span>
-      `;
-    }
+    if (autoBtn) autoBtn.hidden = true;
 
     doorsSec.innerHTML = `
       <div class="flex items-center justify-between">
@@ -4686,10 +4783,6 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
         <span class="text-xs text-slate-500 dark:text-slate-400">${doors.length} battle choices</span>
       </div>
     `;
-
-    if (autoStatusBox.children?.length > 0 || autoStatusBox.innerHTML) {
-      doorsSec.append(autoStatusBox);
-    }
 
     const doorsGrid = document.createElement('div');
     doorsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
@@ -4743,7 +4836,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       if (evaluation && !evaluation.canAttack) {
         const warningDiv = document.createElement('div');
         warningDiv.className = 'text-[11px] text-rose-600 dark:text-rose-400 bg-rose-100/60 dark:bg-rose-950/50 rounded-md px-2 py-1 font-medium';
-        warningDiv.textContent = `Casualties in lineup: Titan(s) ${evaluation.intactness.deadTitans.join(', ')} fallen. Auto-attack skipped.`;
+        warningDiv.textContent = `Casualties in lineup: Titan(s) ${evaluation.intactness.deadTitans.join(', ')} fallen.`;
         doorCard.append(warningDiv);
       }
 

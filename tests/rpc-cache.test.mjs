@@ -1360,6 +1360,109 @@ test('dungeonEndBattle and dungeonSaveProgress extract status and merge rewards'
   assert.equal(afterSave['resource:gold']?.data?.amount, 49900);
 });
 
+test('rpc-cache tracks dailyCombatLog: flawless wins aggregated by count, titan casualties highlighted', () => {
+  const at = '2026-11-10T10:00:00.000Z';
+  // 1. Flawless battle (no dead titans)
+  const flawlessRec = record([
+    {
+      name: 'dungeonEndBattle',
+      ident: 'b-1',
+      args: {
+        result: { win: true, stars: 3 },
+        progress: [{
+          attackers: {
+            heroes: {
+              '4000': { isDead: false, hp: 800000 },
+              '4001': { isDead: false, hp: 600000 }
+            }
+          }
+        }]
+      }
+    }
+  ], [
+    {
+      ident: 'b-1',
+      result: {
+        response: {
+          dungeon: { floorNumber: 501, maxFloorPassed: 500, states: { titans: { '4000': { isDead: false, hp: 800000 } } } }
+        }
+      }
+    }
+  ], at);
+
+  const { cache: c1 } = cache.merge({}, [flawlessRec]);
+  const log1 = c1.dungeonStatus.data.dailyCombatLog;
+  assert.equal(log1.totalBattles, 1);
+  assert.equal(log1.flawlessCount, 1);
+  assert.equal(log1.casualtyBattles.length, 0);
+
+  // 2. Battle with titan casualty (titan 4001 isDead: true)
+  const casualtyRec = record([
+    {
+      name: 'dungeonEndBattle',
+      ident: 'b-2',
+      args: {
+        result: { win: true, stars: 2 },
+        progress: [{
+          attackers: {
+            heroes: {
+              '4000': { isDead: false, hp: 200000 },
+              '4001': { isDead: true, hp: 0 }
+            }
+          }
+        }]
+      }
+    }
+  ], [
+    {
+      ident: 'b-2',
+      result: {
+        response: {
+          dungeon: { floorNumber: 502, maxFloorPassed: 501, states: { titans: { '4001': { isDead: true, hp: 0 } } } }
+        }
+      }
+    }
+  ], '2026-11-10T10:05:00.000Z');
+
+  const { cache: c2 } = cache.merge(c1, [casualtyRec]);
+  const log2 = c2.dungeonStatus.data.dailyCombatLog;
+  assert.equal(log2.totalBattles, 2);
+  assert.equal(log2.flawlessCount, 1);
+  assert.equal(log2.casualtyBattles.length, 1);
+  assert.equal(log2.casualtyBattles[0].floorNumber, 502);
+  assert.deepEqual(Array.from(log2.casualtyBattles[0].casualties), [4001]);
+  assert.deepEqual(Array.from(log2.casualtyBattles[0].deployed), [4000, 4001]);
+
+  // 3. Next day rolls over and resets dailyCombatLog
+  const nextDayRec = record([
+    {
+      name: 'dungeonEndBattle',
+      ident: 'b-3',
+      args: {
+        result: { win: true, stars: 3 },
+        progress: [{
+          attackers: { heroes: { '4000': { isDead: false, hp: 800000 } } }
+        }]
+      }
+    }
+  ], [
+    {
+      ident: 'b-3',
+      result: {
+        response: {
+          dungeon: { floorNumber: 503, maxFloorPassed: 502, states: { titans: { '4000': { isDead: false, hp: 800000 } } } }
+        }
+      }
+    }
+  ], '2026-11-11T10:00:00.000Z');
+
+  const { cache: c3 } = cache.merge(c2, [nextDayRec]);
+  const log3 = c3.dungeonStatus.data.dailyCombatLog;
+  assert.equal(log3.totalBattles, 1);
+  assert.equal(log3.flawlessCount, 1);
+  assert.equal(log3.casualtyBattles.length, 0);
+});
+
 test('inventory_use spends titan potions and updates titan xp', () => {
   const useRecord = record([
     { name: 'inventory_use', ident: 'use-potions-1', args: { libId: 20, amount: 590, params: { unitId: 4052 } } }

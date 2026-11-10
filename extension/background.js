@@ -235,21 +235,13 @@ async function saveDungeonTransition(transition, stored) {
   await chrome.storage.local.set({ dungeonRun: state });
   if (globalThis.hwaHelperDungeonRunner?.terminal(state)) {
     await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: state.id }).catch(() => {});
-  } else {
-    if (transition.canvasAction) {
-      chrome.tabs.sendMessage(state.tabId, {
-        kind: 'dungeon-canvas-action',
-        action: transition.canvasAction
-      }).catch(() => {});
-    }
-    if (transition.calls?.length) {
-      try {
-        const msg = rpcMessageForSettings(stored, transition.calls, { group: state.id, expiresAt: transition.expiresAt });
-        await chrome.tabs.sendMessage(state.tabId, msg);
-      } catch {
-        state = globalThis.hwaHelperDungeonRunner?.stop(state, 'Game tab disconnected. Dungeon stopped.');
-        await chrome.storage.local.set({ dungeonRun: state });
-      }
+  } else if (transition.calls?.length) {
+    try {
+      const msg = rpcMessageForSettings(stored, transition.calls, { group: state.id, expiresAt: transition.expiresAt });
+      await chrome.tabs.sendMessage(state.tabId, msg);
+    } catch {
+      state = globalThis.hwaHelperDungeonRunner?.stop(state, 'Game tab disconnected. Dungeon stopped.');
+      await chrome.storage.local.set({ dungeonRun: state });
     }
   }
   return state;

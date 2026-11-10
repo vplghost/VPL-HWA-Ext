@@ -890,7 +890,7 @@ test('openDungeonModal populates overview, elements, doors, and titan states', (
 
   // Overview stats
   assert.ok(text.includes('Floor 581'));
-  assert.ok(text.includes('580'));
+  assert.ok(text.includes('Personal Titanite'));
   assert.ok(text.includes('Floor 576'));
   assert.ok(text.includes('738 pts'));
 
@@ -954,6 +954,49 @@ test('openDungeonModal renders configurable element priority and titan pools str
   // Verify details element is present
   const details = dungeonModalBody.querySelector('details');
   assert.ok(details, 'Strategy section must be enclosed in a details element');
+});
+
+test('openDungeonModal renders daily combat log with flawless wins count and highlighted titan casualties', () => {
+  dungeonModal.hidden = true;
+  dungeonModalBody.replaceChildren();
+
+  const dungeonData = {
+    floorNumber: 620,
+    maxFloorPassed: 619,
+    respawnFloor: 601,
+    dungeonActivity: 1200,
+    dailyCombatLog: {
+      date: 'Tue Nov 10 2026',
+      totalBattles: 15,
+      flawlessCount: 14,
+      casualtyBattles: [
+        {
+          floorNumber: 618,
+          timestamp: '2026-11-10T14:30:00.000Z',
+          win: true,
+          stars: 2,
+          casualties: [4001],
+          deployed: [4000, 4001, 4002, 4004, 4052]
+        }
+      ]
+    },
+    currentFloorDoors: [
+      { attackerType: 'water', defenderType: 'fire', power: 30000 }
+    ],
+    states: { titans: {} }
+  };
+
+  context.openDungeonModal(dungeonData);
+
+  const text = dungeonModalBody.textContent;
+  assert.ok(text.includes('Daily Combat Log'));
+  assert.ok(text.includes('Total: 15'));
+  assert.ok(text.includes('14 Flawless Wins (0 casualties)'));
+  assert.ok(text.includes('1 with Casualties'));
+  assert.ok(text.includes('Highlighted Battles with Titan Casualties'));
+  assert.ok(text.includes('Floor 618'));
+  assert.ok(text.includes('Nova'));
+  assert.ok(text.includes('Fallen Titans (1)'));
 });
 
 

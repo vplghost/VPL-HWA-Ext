@@ -743,6 +743,29 @@
             const dungeon = rep.dungeon || {};
             const floor = Number.isFinite(Number(dungeon.floorNumber)) ? Number(dungeon.floorNumber) :
               (Number.isFinite(Number(dungeon.maxFloorPassed)) ? Number(dungeon.maxFloorPassed) + 1 : null);
+            const progressAttackers = call.args?.progress?.[0]?.attackers?.heroes || {};
+            const casualties = [];
+            for (const [idStr, titan] of Object.entries(progressAttackers)) {
+              if (titan && (titan.isDead === true || (typeof titan.hp === 'number' && titan.hp <= 0))) {
+                casualties.push(Number(idStr));
+              }
+            }
+            const serverTitans = dungeon.states?.titans || rep.states?.titans || {};
+            for (const idStr of Object.keys(progressAttackers)) {
+              const s = serverTitans[idStr];
+              if (s && (s.isDead === true || (typeof s.hp === 'number' && s.hp <= 0))) {
+                const numId = Number(idStr);
+                if (!casualties.includes(numId)) casualties.push(numId);
+              }
+            }
+            // Extract personal titanite progress if returned in quests
+            let todayTitanite = null;
+            if (Array.isArray(rep.quests)) {
+              const tq = rep.quests.find((q) => [10031, 10032, 10108].includes(Number(q.id)));
+              if (tq && Number.isFinite(Number(tq.progress))) {
+                todayTitanite = Number(tq.progress);
+              }
+            }
             actions.push({
               key: 'dungeonStatus',
               method: call.name,
@@ -761,10 +784,13 @@
                   : {}),
                 ...(Array.isArray(dungeon.floor?.userData) ? { currentFloorDoors: dungeon.floor.userData } : {}),
                 activeBattle: null,
+                ...(todayTitanite != null ? { todayTitanite } : {}),
                 lastBattleResult: {
                   win: Boolean(call.args?.result?.win ?? true),
                   stars: Number(call.args?.result?.stars) || 3,
-                  reward: rep.reward || null
+                  reward: rep.reward || null,
+                  casualties,
+                  deployed: Object.keys(progressAttackers).map(Number)
                 }
               },
               updatedAt: record.timestamp
@@ -3335,6 +3361,53 @@
             };
           }
 
+          // Daily combat log tracking
+          const todayDate = entry.updatedAt ? new Date(entry.updatedAt).toDateString() : new Date().toDateString();
+          let dailyCombatLog;
+          if (isNewDay || !previous.dailyCombatLog || previous.dailyCombatLog.date !== todayDate) {
+            dailyCombatLog = {
+              date: todayDate,
+              todayTitanite: entry.data.todayTitanite ?? 0,
+              flawlessCount: 0,
+              totalBattles: 0,
+              casualtyBattles: []
+            };
+          } else {
+            dailyCombatLog = {
+              ...previous.dailyCombatLog,
+              todayTitanite: entry.data.todayTitanite ?? previous.dailyCombatLog.todayTitanite ?? 0,
+              casualtyBattles: [...(previous.dailyCombatLog.casualtyBattles || [])]
+            };
+          }
+
+          if (entry.method === 'dungeonEndBattle' && entry.data.lastBattleResult) {
+            const res = entry.data.lastBattleResult;
+            dailyCombatLog.totalBattles = (dailyCombatLog.totalBattles || 0) + 1;
+            if (entry.data.todayTitanite != null) {
+              dailyCombatLog.todayTitanite = entry.data.todayTitanite;
+            } else if (res.reward?.dungeonActivity != null) {
+              dailyCombatLog.todayTitanite = (dailyCombatLog.todayTitanite || 0) + Number(res.reward.dungeonActivity);
+            }
+            const casualties = Array.isArray(res.casualties) ? res.casualties : [];
+            if (casualties.length === 0 && res.win) {
+              dailyCombatLog.flawlessCount = (dailyCombatLog.flawlessCount || 0) + 1;
+            } else {
+              // Battle with titan casualties or defeat: record detailed entry
+              const floor = entry.data.floorNumber || previous.floorNumber || null;
+              dailyCombatLog.casualtyBattles.unshift({
+                floorNumber: floor,
+                timestamp: entry.updatedAt,
+                win: res.win,
+                stars: res.stars,
+                casualties,
+                deployed: res.deployed || []
+              });
+              if (dailyCombatLog.casualtyBattles.length > 50) {
+                dailyCombatLog.casualtyBattles = dailyCombatLog.casualtyBattles.slice(0, 50);
+              }
+            }
+          }
+
           next.dungeonStatus = {
             key: 'dungeonStatus',
             method: entry.method,
@@ -3343,6 +3416,8 @@
             data: {
               ...previous,
               ...entry.data,
+              todayTitanite: dailyCombatLog.todayTitanite,
+              dailyCombatLog,
               states: {
                 ...previous.states,
                 ...entry.data.states,

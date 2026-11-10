@@ -248,60 +248,7 @@ try {
   });
 } catch {}
 
-function clickGameCanvas(ratioX, ratioY, label = '') {
-  const canvas = document.querySelector('canvas#gameCanvas, canvas#unity-canvas, canvas#canvas, canvas');
-  if (!canvas) {
-    console.warn('[HWA-DUNGEON] Game canvas not found for action:', label);
-    return false;
-  }
-  const rect = canvas.getBoundingClientRect();
-  if (!rect.width || !rect.height) {
-    console.warn('[HWA-DUNGEON] Game canvas not visible for action:', label);
-    return false;
-  }
-
-  const clientX = Math.round(rect.left + Math.max(0, Math.min(1, ratioX)) * rect.width);
-  const clientY = Math.round(rect.top + Math.max(0, Math.min(1, ratioY)) * rect.height);
-
-  const eventInit = {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    clientX,
-    clientY,
-    screenX: clientX + (window.screenX || 0),
-    screenY: clientY + (window.screenY || 0),
-    button: 0,
-    buttons: 1,
-    pointerId: 1,
-    pointerType: 'mouse',
-    isPrimary: true
-  };
-
-  try {
-    canvas.focus?.();
-    canvas.dispatchEvent(new PointerEvent('pointerdown', eventInit));
-    canvas.dispatchEvent(new MouseEvent('mousedown', eventInit));
-  } catch (_) {}
-
-  setTimeout(() => {
-    try {
-      const upInit = { ...eventInit, buttons: 0 };
-      canvas.dispatchEvent(new PointerEvent('pointerup', upInit));
-      canvas.dispatchEvent(new MouseEvent('mouseup', upInit));
-      canvas.dispatchEvent(new MouseEvent('click', upInit));
-    } catch (_) {}
-  }, 70);
-
-  return true;
-}
-
 chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
-  if (message?.kind === 'dungeon-canvas-action' && message.action) {
-    clickGameCanvas(message.action.ratioX, message.action.ratioY, message.action.label);
-    sendResponse?.({ ok: true });
-    return true;
-  }
   if (message?.kind === 'drop-rpc-group') {
     window.postMessage({ source: 'hwa-helper-control', kind: message.kind, group: message.group }, location.origin);
     sendResponse?.({ ok: true });
