@@ -4644,7 +4644,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       autoStatusBox.innerHTML = `
         <div class="flex items-center gap-1.5">
           <span class="font-bold">⚔️ Auto-Attack Active:</span>
-          <span>Phase: ${currentRunState.phase}${currentRunState.floorNumber ? ` · Floor ${currentRunState.floorNumber}` : ''}</span>
+          <span>${escapeHtml(currentRunState.statusText || `Phase: ${currentRunState.phase}${currentRunState.floorNumber ? ` · Floor ${currentRunState.floorNumber}` : ''}`)}</span>
         </div>
         <span class="rounded bg-blue-200/80 px-2 py-0.5 text-[10px] font-bold text-blue-900 dark:bg-blue-900/60 dark:text-blue-200 shrink-0 animate-pulse">Running</span>
       `;
@@ -6281,11 +6281,12 @@ function setupDungeonModal() {
         `;
         const autoSettings = (typeof getEffectiveAttackerPriority === 'function' && typeof getEffectiveDungeonPools === 'function')
           ? {
+              executionMode: 'canvas',
               attackerPriority: getEffectiveAttackerPriority(),
               pools: getEffectiveDungeonPools()
             }
-          : (typeof dungeonAutomationSettings !== 'undefined' && dungeonAutomationSettings ? dungeonAutomationSettings : undefined);
-        const startMsg = autoSettings ? { kind: 'dungeon-run-start', settings: autoSettings } : { kind: 'dungeon-run-start' };
+          : { executionMode: 'canvas', ...(typeof dungeonAutomationSettings !== 'undefined' && dungeonAutomationSettings ? dungeonAutomationSettings : {}) };
+        const startMsg = { kind: 'dungeon-run-start', settings: autoSettings };
         const resp = await new Promise((resolve) => {
           if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
             chrome.runtime.sendMessage(startMsg, resolve);

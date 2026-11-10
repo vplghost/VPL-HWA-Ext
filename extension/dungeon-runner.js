@@ -4,10 +4,12 @@
   const stop = (state, reason, casualty = null) => ({
     ...state,
     phase: 'stopped',
+    statusText: reason,
     reason,
     casualty: casualty || null,
     wakeAt: null
   });
+
   const issue = (state, phase, call, now) => ({
     state: { ...state, phase, expected: call, sentAt: now, wakeAt: now + 120000 },
     calls: [call],
@@ -70,10 +72,27 @@
     return casualties;
   }
 
+  function getGateCoordinates(doorCount, teamNum) {
+    // Single door floor: Center gate
+    if (doorCount <= 1) {
+      return { ratioX: 0.50, ratioY: 0.79, label: 'Center Gate' };
+    }
+    // 2 doors floor: Door 0 is Left, Door 1 is Right
+    if (teamNum === 0) {
+      return { ratioX: 0.34, ratioY: 0.79, label: 'Door 1 (Left Gate)' };
+    }
+    return { ratioX: 0.69, ratioY: 0.79, label: 'Door 2 (Right Gate)' };
+  }
+
   function next(state, cache, now) {
+    const dungeon = cache?.dungeonStatus?.data;
+    if (!dungeon || !Array.isArray(dungeon.currentFloorDoors) || !dungeon.currentFloorDoors.length) {
+      return { state: stop(state, 'Dungeon interface is not open in game. Please open Titan Dungeon.') };
+    }
+
     const decision = planner.planDungeon(cache, state.options || {});
     if (decision.kind === 'complete') {
-      return { state: { ...state, phase: 'complete', wakeAt: null } };
+      return { state: { ...state, phase: 'complete', statusText: 'Dungeon cleared.', wakeAt: null } };
     }
     if (decision.kind === 'stop' || decision.kind === 'need-snapshot') {
       return { state: stop(state, decision.reason || 'Dungeon snapshot is missing. Open Dungeon in game.') };
@@ -87,7 +106,35 @@
     state.currentHeroes = decision.heroes;
     state.attackerType = decision.attackerType;
 
-    return issue(state, 'starting-battle', decision.call, now);
+    // Check execution mode: 'canvas' (In-game UI trigger) vs 'rpc' (legacy direct RPC)
+    const isCanvasMode = state.options?.executionMode === 'canvas';
+
+    if (!isCanvasMode) {
+      // Legacy RPC mode
+      return issue(state, 'starting-battle', decision.call, now);
+    }
+
+    // Direction 2: In-Game Canvas Automation
+    const doorCoords = getGateCoordinates(dungeon.currentFloorDoors.length, decision.teamNum);
+    state.gateCoords = doorCoords;
+    const updated = {
+      ...state,
+      phase: 'opening-gate',
+      statusText: `Selecting Door ${decision.teamNum + 1} (${decision.attackerType})...`,
+      sentAt: now,
+      wakeAt: now + 1500
+    };
+
+    return {
+      state: updated,
+      canvasAction: {
+        action: 'click',
+        ratioX: doorCoords.ratioX,
+        ratioY: doorCoords.ratioY,
+        label: doorCoords.label
+      },
+      expiresAt: now + 120000
+    };
   }
 
   function start(cache, settings, tabId, now) {
@@ -131,12 +178,186 @@
       return { state: stop(state, 'Game account changed.') };
     }
     if (!record && now >= state.wakeAt) {
-      return { state: stop(state, 'Dungeon battle RPC timed out.') };
+      if (['opening-gate', 'skipping-battle', 'dismissing-victory', 'walking-animation'].includes(state.phase)) {
+        // Normal timer progression for canvas/animation phases - handled below
+      } else {
+        return { state: stop(state, 'Dungeon automation timed out.') };
+      }
     }
-    if (!record || Date.parse(record.timestamp) < state.sentAt) return { state };
+    if (record && Date.parse(record.timestamp) < state.sentAt) return { state };
 
-    const replies = responses(record);
+    const replies = record ? responses(record) : [];
+    const isCanvasMode = state.options?.executionMode === 'canvas';
 
+    // ==========================================
+    // DIRECTION 2: IN-GAME CANVAS PHASES
+    // ==========================================
+    if (isCanvasMode) {
+      // 1. Gate clicked -> 1.5s elapsed -> Popup open -> Click "Fight" button (ratioX: 0.85, ratioY: 0.75)
+      if (state.phase === 'opening-gate') {
+        const updated = {
+          ...state,
+          phase: 'waiting-battle-start',
+          statusText: `Starting Battle on Floor ${state.floorNumber}...`,
+          sentAt: now,
+          wakeAt: now + 10000 // 10s timeout waiting for battle start
+        };
+        return {
+          state: updated,
+          canvasAction: {
+            action: 'click',
+            ratioX: 0.85,
+            ratioY: 0.75,
+            label: 'Fight Button'
+          },
+          expiresAt: now + 120000
+        };
+      }
+
+      // 2. Waiting for battle to start (observed via dungeonStartBattle API record)
+      if (state.phase === 'waiting-battle-start') {
+        const startReply = replies.find(({ call }) => call.name === 'dungeonStartBattle');
+        if (!startReply) {
+          if (!record && now >= state.wakeAt) {
+            return { state: stop(state, 'Battle did not start in game. Make sure Dungeon window is open.') };
+          }
+          return { state };
+        }
+        const startRes = startReply.result?.response;
+        if (startReply.result?.error || startRes == null || startRes.error) {
+          const errorReason = startRes?.error || startReply.result?.error || 'dungeonStartBattle failed.';
+          return { state: stop(state, String(errorReason)) };
+        }
+
+        // Battle started in Unity! Transition to skipping-battle after 1.2s combat screen load
+        const updated = {
+          ...state,
+          phase: 'skipping-battle',
+          statusText: `Combat loading on Floor ${state.floorNumber}...`,
+          battleStartedAt: now,
+          sentAt: now,
+          wakeAt: now + 1200
+        };
+        return { state: updated };
+      }
+
+      // 3. Combat loaded -> Click "Skip" button (ratioX: 0.69, ratioY: 0.81)
+      if (state.phase === 'skipping-battle') {
+        const updated = {
+          ...state,
+          phase: 'waiting-battle-end',
+          statusText: `Fast-forwarding combat on Floor ${state.floorNumber}...`,
+          sentAt: now,
+          wakeAt: now + 15000 // 15s timeout for combat completion
+        };
+        return {
+          state: updated,
+          canvasAction: {
+            action: 'click',
+            ratioX: 0.69,
+            ratioY: 0.81,
+            label: 'Skip Button'
+          },
+          expiresAt: now + 120000
+        };
+      }
+
+      // 4. Waiting for combat end (observed via genuine dungeonEndBattle sent by Unity)
+      if (state.phase === 'waiting-battle-end') {
+        const endReply = replies.find(({ call }) => call.name === 'dungeonEndBattle');
+        if (!endReply) {
+          if (!record && now >= state.wakeAt) {
+            return { state: stop(state, 'Dungeon battle did not finish in time.') };
+          }
+          return { state };
+        }
+        const endRes = endReply.result?.response;
+        if (endReply.result?.error || endRes == null || endRes.error || endReply.call?.args?.result?.win !== true) {
+          const errorReason = endRes?.error || endReply.result?.error || 'Dungeon battle was lost or rejected.';
+          return { state: stop(state, String(errorReason)) };
+        }
+
+        // Safety Casualty Check
+        const casualties = checkCasualtiesInBattle(
+          endReply.call?.args,
+          endRes,
+          state.currentHeroes || []
+        );
+
+        if (casualties.length > 0) {
+          const meta = globalThis.hwaHelperTitanMetadata || {};
+          const fallenNames = casualties.map((id) => meta[id]?.name || `Titan #${id}`).join(', ');
+          return {
+            state: stop(
+              state,
+              `Titan casualty (${fallenNames}) at floor ${state.floorNumber}. Halting dungeon automation. Press Continue Auto to proceed with remaining titans.`,
+              { fallen: casualties, floor: state.floorNumber }
+            )
+          };
+        }
+
+        state.battlesCleared = (state.battlesCleared || 0) + 1;
+
+        // Checkpoint save check
+        const nextFloor = endRes?.dungeon?.floorNumber;
+        const respawn = endRes?.dungeon?.respawnFloor;
+        const needsSave = nextFloor && respawn && (nextFloor - 1 === respawn);
+
+        // Transition to dismissing victory popup after 1.0s
+        const updated = {
+          ...state,
+          phase: 'dismissing-victory',
+          statusText: `Floor ${state.floorNumber} cleared! Claiming rewards...`,
+          needsSave,
+          nextFloor,
+          sentAt: now,
+          wakeAt: now + 1000
+        };
+        return { state: updated };
+      }
+
+      // 5. Dismiss victory/reward dialog by clicking center (ratioX: 0.50, ratioY: 0.38)
+      // and begin walking animation delay (4.5s)
+      if (state.phase === 'dismissing-victory') {
+        const updated = {
+          ...state,
+          phase: 'walking-animation',
+          statusText: `Titans moving to Floor ${state.nextFloor || state.floorNumber + 1} (walking animation)...`,
+          sentAt: now,
+          wakeAt: now + 4500 // 4.5 seconds walking animation!
+        };
+        const result = {
+          state: updated,
+          canvasAction: {
+            action: 'click',
+            ratioX: 0.50,
+            ratioY: 0.38,
+            label: 'Dismiss Victory'
+          },
+          expiresAt: now + 120000
+        };
+        if (state.needsSave) {
+          result.calls = [{ name: 'dungeonSaveProgress', args: {} }];
+        }
+        return result;
+      }
+
+      // 6. Walking animation completed!
+      if (state.phase === 'walking-animation') {
+        // If a saveProgress reply arrived while walking, verify it
+        const saveReply = replies.find(({ call }) => call.name === 'dungeonSaveProgress');
+        if (saveReply && (saveReply.result?.error || saveReply.result?.response?.error)) {
+          const errorReason = saveReply.result?.response?.error || saveReply.result?.error || 'dungeonSaveProgress failed.';
+          return { state: stop(state, String(errorReason)) };
+        }
+        // Advance to next floor
+        return next(state, cache, now);
+      }
+    }
+
+    // ==========================================
+    // LEGACY RPC MODE PHASES
+    // ==========================================
     if (state.phase === 'starting-battle') {
       const startReply = replies.find(({ call }) => call.name === 'dungeonStartBattle');
       if (!startReply) return { state };
@@ -214,7 +435,8 @@
     stop,
     terminal,
     checkCasualtiesInBattle,
-    makeEndBattleCall
+    makeEndBattleCall,
+    getGateCoordinates
   };
 
   globalThis.hwaHelperDungeonRunner = dungeonRunner;

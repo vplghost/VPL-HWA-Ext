@@ -94,36 +94,55 @@ Mỗi tầng thường có 2 cửa lựa chọn (Door 1 tại `teamNum = 0` và 
 
 ---
 
-## 5. Vòng Đời Auto Runner & Dừng An Toàn Khi Có Thương Vong
+## 5. Vòng Đời In-Game Canvas Runner & Dừng An Toàn Khi Có Thương Vong
 
-Quá trình chạy tự động được quản lý bởi `hwaHelperDungeonRunner` trong Service Worker ([`extension/dungeon-runner.js`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/extension/dungeon-runner.js)):
+Quá trình chạy tự động được quản lý bởi `hwaHelperDungeonRunner` trong Service Worker ([`extension/dungeon-runner.js`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/extension/dungeon-runner.js)) và tương tác bản xứ với Canvas game qua Content Script ([`extension/bridge.js`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/extension/bridge.js)):
 
-### 5.1. Sơ đồ trạng thái (State Flow)
+### 5.1. Cơ chế chống lỗi "Invalid battle" qua In-Game Canvas Trigger (Hướng 2)
+Do server Hero Wars Alliance chạy hệ thống kiểm tra mô phỏng replay (Deterministic Server Simulation) đối chiếu với `seed`, việc gửi lệnh `dungeonEndBattle` giả mạo bằng RPC chay sẽ luôn bị từ chối với mã lỗi `{"error": "Invalid battle"}`.
+
+Vì vậy, hệ thống sử dụng **Cơ chế mô phỏng thao tác người dùng (In-Game Canvas Trigger)**:
+1. **Xác nhận giao diện Dungeon**: Kiểm tra tab game đang hoạt động và snapshot cửa tầng hiện tại (`currentFloorDoors`) khả dụng.
+2. **Tọa độ cổng tương đối (Normalized Gate Ratios)**:
+   - Tầng 1 cửa (Neutral/Boss): Cổng trung tâm `ratioX: 0.50, ratioY: 0.79`.
+   - Tầng 2 cửa: Cửa 1 (Trái) `ratioX: 0.34, ratioY: 0.79`; Cửa 2 (Phải) `ratioX: 0.69, ratioY: 0.79`.
+   - Dispatch chuỗi sự kiện `pointerdown` -> `mousedown` -> `pointerup` -> `mouseup` -> `click` trực tiếp vào Canvas game.
+3. **Trigger Fight & Skip**:
+   - Sau 1.5s mở popup tầng: Tự động click nút **Fight** (`ratioX: 0.85, ratioY: 0.75`). Unity sẽ tự gửi `dungeonStartBattle` chính thức.
+   - Khi vào đấu trường combat: Chờ 1.2s rồi tự động click nút **Skip** (`ratioX: 0.69, ratioY: 0.81`). WebAssembly của game sẽ tự chạy mô phỏng combat và gửi `dungeonEndBattle` với đầy đủ HP/Energy chuẩn xác lên server.
+4. **Animation di chuyển qua cửa / tầng (Walking Animation Delay - 4.5s)**:
+   - Sau khi kết thúc trận và thu thập thưởng (`Dismiss Victory` tại `ratioX: 0.50, ratioY: 0.38`), hệ thống chuyển sang trạng thái `walking-animation` và chờ **4.5 giây** cho các Titan hoàn tất hoạt ảnh bước qua cổng và camera cuộn tới tầng tiếp theo trước khi thực hiện chọn cửa mới.
+
+### 5.2. Sơ đồ trạng thái (State Flow)
 
 ```mermaid
 flowchart TD
     Idle["Nghỉ / Chờ lệnh"] -->|Bấm Auto Attack| Plan["Lập kế hoạch tầng (planDungeon)"]
-    Plan -->|Chọn được cửa| StartBattle["Gửi dungeonStartBattle"]
-    StartBattle -->|Nhận Seed & Attackers| EndBattle["Gửi dungeonEndBattle"]
-    EndBattle --> CheckCasualty{"Có Titan chết tại ải?"}
+    Plan -->|Xác nhận cửa| ClickGate["Click Cổng trên Canvas<br>(ratioX: 0.34 / 0.50 / 0.69)"]
+    ClickGate -->|Chờ 1.5s mở popup| ClickFight["Click nút Fight trong Popup<br>(ratioX: 0.85, ratioY: 0.75)"]
+    ClickFight -->|Unity gửi dungeonStartBattle| ArenaWait["Vào đấu trường combat (1.2s)"]
+    ArenaWait --> ClickSkip["Click nút Skip trên Canvas<br>(ratioX: 0.69, ratioY: 0.81)"]
+    ClickSkip -->|Unity gửi dungeonEndBattle| CheckCasualty{"Có Titan chết tại ải?"}
     CheckCasualty -- Có --> Halt["DỪNG AUTO (Casualty Halt)<br>Báo Titan hy sinh & số tầng"]
-    Halt -->|Người dùng bấm nút lại| Plan
-    CheckCasualty -- Không --> Checkpoint{"Đến mốc Checkpoint?"}
+    Halt -->|Người dùng bấm Continue Auto| Plan
+    CheckCasualty -- Không --> Dismiss["Click thu nhận thưởng<br>(ratioX: 0.50, ratioY: 0.38)"]
+    Dismiss --> Walking["Chờ Walking Animation (4.5s)<br>Titans bước qua cổng sang tầng mới"]
+    Walking --> Checkpoint{"Đến mốc Checkpoint?"}
     Checkpoint -- Có --> Save["Gửi dungeonSaveProgress"]
     Save --> Plan
     Checkpoint -- Không --> Plan
 ```
 
-### 5.2. Điều kiện dừng an toàn:
+### 5.3. Điều kiện dừng an toàn:
 1. **Có Titan hy sinh (`checkCasualtiesInBattle`)**:
    - Nếu trong `progress[0].attackers.heroes` hoặc `states.titans` của 5 tướng ra trận có bất kỳ tướng nào `isDead === true` hoặc `hp <= 0`:
      - Trạng thái chuyển thành `phase: 'stopped'`.
-     - Lý do dừng: `Titan casualty (Tên Titan) at floor <Số Tầng>. Halting dungeon automation. Press Auto Attack to start next round.`
-     - Cập nhật nút trên giao diện thành: **Continue Auto** (hoặc Auto Attack).
+     - Lý do dừng: `Titan casualty (Tên Titan) at floor <Số Tầng>. Halting dungeon automation. Press Continue Auto to proceed with remaining titans.`
+     - Cập nhật nút trên giao diện thành: **Continue Auto**.
 2. **Không còn cửa nào có Titan sống**:
    - Dừng lại khi toàn bộ Titan của các hệ cửa khả dụng đều đã ngã xuống.
-3. **Thất bại hoặc mất kết nối tab**:
-   - Nếu server báo lỗi hoặc tab game bị đóng.
+3. **Thất bại hoặc mất kết nối tab / Rời khỏi giao diện Dungeon**:
+   - Nếu server báo lỗi, tab game bị đóng, hoặc giao diện Dungeon chưa được mở.
 
 ---
 

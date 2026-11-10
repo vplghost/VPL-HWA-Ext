@@ -963,4 +963,146 @@ test('planDungeon does not block if activeBattle is older than 2 minutes (stale)
   assert.equal(plan.kind, 'battle', 'Stale activeBattle must not block planning a new battle');
 });
 
+test('dungeonRunner.getGateCoordinates computes accurate normalized ratios for single and double doors', () => {
+  // Single door floor
+  const center = dungeonRunner.getGateCoordinates(1, 0);
+  assert.equal(center.ratioX, 0.50);
+  assert.equal(center.ratioY, 0.79);
+  assert.equal(center.label, 'Center Gate');
+
+  // Double doors floor: Door 1 (Left)
+  const left = dungeonRunner.getGateCoordinates(2, 0);
+  assert.equal(left.ratioX, 0.34);
+  assert.equal(left.ratioY, 0.79);
+  assert.equal(left.label, 'Door 1 (Left Gate)');
+
+  // Double doors floor: Door 2 (Right)
+  const right = dungeonRunner.getGateCoordinates(2, 1);
+  assert.equal(right.ratioX, 0.69);
+  assert.equal(right.ratioY, 0.79);
+  assert.equal(right.label, 'Door 2 (Right Gate)');
+});
+
+test('dungeonRunner canvas mode: full gate click, fight click, skip click, walking animation, and floor progression', () => {
+  const doors = [
+    { attackerType: 'water', defenderType: 'fire', power: 30000 },
+    { attackerType: 'earth', defenderType: 'water', power: 35000 }
+  ];
+  const cache = {
+    accountStatus: { data: { id: 999 } },
+    dungeonStatus: {
+      data: {
+        floorNumber: 871,
+        currentFloorDoors: doors,
+        elements: { prime: 'water' },
+        states: {
+          titans: {
+            '4000': { isDead: false, hp: 1000000, energy: 0 },
+            '4001': { isDead: false, hp: 800000, energy: 0 },
+            '4002': { isDead: false, hp: 850000, energy: 0 },
+            '4004': { isDead: false, hp: 800000, energy: 0 },
+            '4052': { isDead: false, hp: 350000, energy: 0 }
+          }
+        }
+      }
+    }
+  };
+
+  const now = 1731230000000;
+  // 1. Start in canvas mode
+  const startTransition = dungeonRunner.start(cache, { executionMode: 'canvas' }, 1, now);
+  assert.ok(startTransition, 'Runner start should produce transition');
+  assert.equal(startTransition.state.phase, 'opening-gate');
+  assert.ok(startTransition.canvasAction, 'Must emit canvasAction for gate click');
+  assert.equal(startTransition.canvasAction.ratioX, 0.34, 'Must target Door 1 left gate');
+  assert.equal(startTransition.state.wakeAt, now + 1500, 'Must wait 1.5s for popup to appear');
+
+  // 2. 1.5s timer fires -> Floor popup is open -> Click Fight button
+  const fightTransition = dungeonRunner.advance(startTransition.state, null, cache, now + 1500);
+  assert.equal(fightTransition.state.phase, 'waiting-battle-start');
+  assert.ok(fightTransition.canvasAction, 'Must emit canvasAction for Fight button');
+  assert.equal(fightTransition.canvasAction.ratioX, 0.85);
+  assert.equal(fightTransition.canvasAction.ratioY, 0.75);
+
+  // 3. Unity sends dungeonStartBattle -> Combat screen loads
+  const startRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(now + 2000).toISOString(),
+    requestBody: JSON.stringify({
+      calls: [{ name: 'dungeonStartBattle', ident: 'start-1', args: { teamNum: 0 } }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{ ident: 'start-1', result: { response: { seed: 12345678, attackers: {} } } }]
+    })
+  };
+  const combatLoadingTransition = dungeonRunner.advance(fightTransition.state, startRecord, cache, now + 2000);
+  assert.equal(combatLoadingTransition.state.phase, 'skipping-battle');
+  assert.equal(combatLoadingTransition.state.wakeAt, now + 2000 + 1200, 'Must wait 1.2s for combat screen to load');
+
+  // 4. 1.2s timer fires -> Click Skip button
+  const skipTransition = dungeonRunner.advance(combatLoadingTransition.state, null, cache, now + 3200);
+  assert.equal(skipTransition.state.phase, 'waiting-battle-end');
+  assert.ok(skipTransition.canvasAction, 'Must emit canvasAction for Skip button');
+  assert.equal(skipTransition.canvasAction.ratioX, 0.69);
+  assert.equal(skipTransition.canvasAction.ratioY, 0.81);
+
+  // 5. Unity finishes simulation and sends dungeonEndBattle -> Dismiss victory screen
+  const endRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(now + 4500).toISOString(),
+    requestBody: JSON.stringify({
+      calls: [{
+        name: 'dungeonEndBattle',
+        ident: 'end-1',
+        args: {
+          result: { win: true, stars: 3 },
+          progress: [{
+            attackers: {
+              heroes: {
+                '4000': { isDead: false, hp: 850000, energy: 600 }
+              }
+            }
+          }]
+        }
+      }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'end-1',
+        result: {
+          response: {
+            dungeon: {
+              floorNumber: 872,
+              respawnFloor: 870
+            }
+          }
+        }
+      }]
+    })
+  };
+  const victoryTransition = dungeonRunner.advance(skipTransition.state, endRecord, cache, now + 4500);
+  assert.equal(victoryTransition.state.phase, 'dismissing-victory');
+  assert.equal(victoryTransition.state.battlesCleared, 1);
+  assert.equal(victoryTransition.state.wakeAt, now + 4500 + 1000, 'Must wait 1.0s before dismissing victory dialog');
+
+  // 6. 1.0s timer fires -> Click center to dismiss -> Enter 4.5s walking animation!
+  const walkingTransition = dungeonRunner.advance(victoryTransition.state, null, cache, now + 5500);
+  assert.equal(walkingTransition.state.phase, 'walking-animation');
+  assert.ok(walkingTransition.canvasAction, 'Must emit canvasAction to dismiss victory popup');
+  assert.equal(walkingTransition.canvasAction.ratioX, 0.50);
+  assert.equal(walkingTransition.canvasAction.ratioY, 0.38);
+  assert.equal(walkingTransition.state.wakeAt, now + 5500 + 4500, 'Must wait 4.5s for Titans walking animation');
+  assert.ok(walkingTransition.state.statusText.includes('walking animation'), 'Status text must inform user of walking animation');
+
+  // 7. 4.5s walking animation completes -> Loop back to next floor gate selection!
+  const nextFloorTransition = dungeonRunner.advance(walkingTransition.state, null, cache, now + 10000);
+  assert.equal(nextFloorTransition.state.phase, 'opening-gate', 'Must advance to opening-gate for next floor');
+  assert.equal(nextFloorTransition.state.battlesCleared, 1);
+});
+
+
 

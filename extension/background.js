@@ -235,13 +235,21 @@ async function saveDungeonTransition(transition, stored) {
   await chrome.storage.local.set({ dungeonRun: state });
   if (globalThis.hwaHelperDungeonRunner?.terminal(state)) {
     await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: state.id }).catch(() => {});
-  } else if (transition.calls?.length) {
-    try {
-      const msg = rpcMessageForSettings(stored, transition.calls, { group: state.id, expiresAt: transition.expiresAt });
-      await chrome.tabs.sendMessage(state.tabId, msg);
-    } catch {
-      state = globalThis.hwaHelperDungeonRunner?.stop(state, 'Game tab disconnected. Dungeon stopped.');
-      await chrome.storage.local.set({ dungeonRun: state });
+  } else {
+    if (transition.canvasAction) {
+      chrome.tabs.sendMessage(state.tabId, {
+        kind: 'dungeon-canvas-action',
+        action: transition.canvasAction
+      }).catch(() => {});
+    }
+    if (transition.calls?.length) {
+      try {
+        const msg = rpcMessageForSettings(stored, transition.calls, { group: state.id, expiresAt: transition.expiresAt });
+        await chrome.tabs.sendMessage(state.tabId, msg);
+      } catch {
+        state = globalThis.hwaHelperDungeonRunner?.stop(state, 'Game tab disconnected. Dungeon stopped.');
+        await chrome.storage.local.set({ dungeonRun: state });
+      }
     }
   }
   return state;
@@ -679,6 +687,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
       const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
       if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
+      try {
+        if (typeof chrome?.tabs?.update === 'function') {
+          chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+        }
+      } catch (_) {}
+      const dungeonData = stored.rpcCache?.dungeonStatus?.data;
+      if (!dungeonData || !Array.isArray(dungeonData.currentFloorDoors) || !dungeonData.currentFloorDoors.length) {
+        return { ok: false, error: 'Open Titan Dungeon interface in the game before starting automation.' };
+      }
       const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
       const baseSettings = String(stored.dungeonAutomationSettings?.accountId) === String(accountId) ?
         stored.dungeonAutomationSettings : {};
@@ -705,7 +722,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       const transition = runner.start(stored.rpcCache, settings, tab.id, Date.now());
       if (!transition) return { ok: false,
-        error: 'Open Dungeon in game before starting automation.' };
+        error: 'Open Titan Dungeon interface in game before starting automation.' };
       const state = await saveDungeonTransition(transition, stored);
       return { ok: state.phase !== 'stopped', error: state.reason };
     });
