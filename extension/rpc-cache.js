@@ -18,6 +18,12 @@
     getUnitSummary: 'teams',
     getTrainings: 'teams',
     getHealing: 'teams',
+    'startTraining:unit': 'teams',
+    'completeTraining:unit': 'teams',
+    'startHealing:unit': 'teams',
+    startTraining: 'teams',
+    completeTraining: 'teams',
+    startHealing: 'teams',
     questGetAll: 'other',
     arenaGetAll: 'other',
     expeditionGet: 'other',
@@ -1758,6 +1764,57 @@
             updatedAt: record.timestamp
           }];
         }
+        if ((key === 'completeTraining:unit' || call.name === 'completeTraining') && result?.response) {
+          const unitId = Number(call.args?.unitId);
+          if (Number.isInteger(unitId)) {
+            return [{
+              key: 'completeTrainingAction',
+              method: call.name,
+              feature: call.feature || null,
+              group: 'internal',
+              data: { unitId, token: call.ident },
+              updatedAt: record.timestamp
+            }];
+          }
+        }
+        if ((key === 'startTraining:unit' || call.name === 'startTraining') && result?.response) {
+          const unitId = Number(call.args?.unitId);
+          if (Number.isInteger(unitId)) {
+            return [{
+              key: 'startTrainingAction',
+              method: call.name,
+              feature: call.feature || null,
+              group: 'internal',
+              data: {
+                unitId,
+                count: Number(call.args?.count) || 0,
+                startDate: Number(call.args?.startDate) || Date.parse(record.timestamp) || Date.now(),
+                duration: Number(call.args?.duration) || 0,
+                token: call.ident
+              },
+              updatedAt: record.timestamp
+            }];
+          }
+        }
+        if ((key === 'startHealing:unit' || call.name === 'startHealing') && result?.response) {
+          const units = Array.isArray(call.args?.units) ? call.args.units.map((u) => ({
+            unitId: Number(u?.unitId),
+            count: Number(u?.count) || 0
+          })) : [];
+          return [{
+            key: 'startHealingAction',
+            method: call.name,
+            feature: call.feature || null,
+            group: 'internal',
+            data: {
+              startDate: Number(call.args?.startDate) || Date.parse(record.timestamp) || Date.now(),
+              duration: Number(call.args?.duration) || 0,
+              units,
+              token: call.ident
+            },
+            updatedAt: record.timestamp
+          }];
+        }
         if (!group || !result || !Object.hasOwn(result, 'response') || result.response == null) return [];
         return [{ key, method: call.name, feature: call.feature || null,
           group, data: result.response, updatedAt: record.timestamp }];
@@ -2323,12 +2380,6 @@
           }
           const rawResKey = entry.data.resourceKey.replace(/^resource:/, '');
           if (rawResKey === 'gold') {
-            if (next.inventoryGet?.data?.coin) {
-              next.inventoryGet = {
-                ...next.inventoryGet,
-                data: { ...next.inventoryGet.data, coin: { ...next.inventoryGet.data.coin, '1': data.amount } }
-              };
-            }
             if (next.userGetInfo?.data) {
               next.userGetInfo = {
                 ...next.userGetInfo,
@@ -2665,18 +2716,6 @@
                 updatedAt: entry.updatedAt
               };
             }
-            if (next.inventoryGet?.data?.coin?.['1'] !== undefined) {
-              next.inventoryGet = {
-                ...next.inventoryGet,
-                data: {
-                  ...next.inventoryGet.data,
-                  coin: {
-                    ...next.inventoryGet.data.coin,
-                    '1': Math.max(0, (next.inventoryGet.data.coin['1'] ?? 0) - goldCost)
-                  }
-                }
-              };
-            }
             if (next.userGetInfo?.data?.gold !== undefined) {
               next.userGetInfo = {
                 ...next.userGetInfo,
@@ -2768,18 +2807,6 @@
                       amount: Math.max(0, (next['resource:gold'].data.amount ?? 0) - goldCost)
                     },
                     updatedAt: entry.updatedAt
-                  };
-                }
-                if (next.inventoryGet?.data?.coin?.['1'] !== undefined) {
-                  next.inventoryGet = {
-                    ...next.inventoryGet,
-                    data: {
-                      ...next.inventoryGet.data,
-                      coin: {
-                        ...next.inventoryGet.data.coin,
-                        '1': Math.max(0, (next.inventoryGet.data.coin['1'] ?? 0) - goldCost)
-                      }
-                    }
                   };
                 }
                 if (next.userGetInfo?.data?.gold !== undefined) {
@@ -2977,18 +3004,6 @@
                 updatedAt: entry.updatedAt
               };
             }
-            if (next.inventoryGet?.data?.coin?.['1'] !== undefined) {
-              next.inventoryGet = {
-                ...next.inventoryGet,
-                data: {
-                  ...next.inventoryGet.data,
-                  coin: {
-                    ...next.inventoryGet.data.coin,
-                    '1': Math.max(0, (next.inventoryGet.data.coin['1'] ?? 0) - goldCost)
-                  }
-                }
-              };
-            }
             if (next.userGetInfo?.data?.gold !== undefined) {
               next.userGetInfo = {
                 ...next.userGetInfo,
@@ -3080,16 +3095,6 @@
 
           if (reward.gold) {
             const numAmt = Number(reward.gold) || 0;
-            if (next.inventoryGet) {
-              const cur = next.inventoryGet.data?.coin?.['1'] ?? 0;
-              next.inventoryGet = {
-                ...next.inventoryGet,
-                data: {
-                  ...next.inventoryGet.data,
-                  coin: { ...(next.inventoryGet.data?.coin || {}), '1': cur + numAmt }
-                }
-              };
-            }
             const resKey = 'resource:gold';
             next[resKey] = {
               key: resKey,
@@ -3736,6 +3741,83 @@
           changed = true;
           continue;
         }
+
+        if (entry.key === 'completeTrainingAction') {
+          const unitId = entry.data.unitId;
+          let trainedCount = 0;
+          for (const trainKey of ['getTrainings:unit', 'getTrainings']) {
+            if (next[trainKey]?.data?.trainingQueues) {
+              const queues = [...next[trainKey].data.trainingQueues];
+              const idx = queues.findIndex((q) => Number(q.unitId) === unitId);
+              if (idx >= 0) {
+                trainedCount = Number(queues[idx].unitCount) || 0;
+                queues.splice(idx, 1);
+                next[trainKey] = {
+                  ...next[trainKey],
+                  data: { ...next[trainKey].data, trainingQueues: queues },
+                  updatedAt: entry.updatedAt
+                };
+                changed = true;
+              }
+            }
+          }
+          for (const sumKey of ['getUnitSummary:unit', 'getUnitSummary']) {
+            if (next[sumKey]?.data?.available) {
+              const available = next[sumKey].data.available.map((item) => ({ ...item }));
+              const idx = available.findIndex((item) => Number(item.unitId) === unitId);
+              if (idx >= 0) {
+                available[idx].count = (Number(available[idx].count) || 0) + trainedCount;
+              } else if (trainedCount > 0) {
+                available.push({ unitId, count: trainedCount });
+              }
+              next[sumKey] = {
+                ...next[sumKey],
+                data: { ...next[sumKey].data, available },
+                updatedAt: entry.updatedAt
+              };
+              changed = true;
+            }
+          }
+          continue;
+        }
+
+        if (entry.key === 'startTrainingAction') {
+          const { unitId, count, startDate, duration } = entry.data;
+          const trainKey = next['getTrainings:unit'] ? 'getTrainings:unit' : 'getTrainings';
+          const prevData = next[trainKey]?.data || { trainingQueues: [], upgradeQueues: [] };
+          const queues = [...(prevData.trainingQueues || [])];
+          const idx = queues.findIndex((q) => Number(q.unitId) === unitId);
+          const queueItem = { unitId, unitCount: count, startDate, duration };
+          if (idx >= 0) {
+            queues[idx] = queueItem;
+          } else {
+            queues.push(queueItem);
+          }
+          next[trainKey] = {
+            ...(next[trainKey] || { key: trainKey, method: 'getTrainings', feature: 'unit', group: 'teams' }),
+            data: { ...prevData, trainingQueues: queues },
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+
+        if (entry.key === 'startHealingAction') {
+          const { startDate, duration, units } = entry.data;
+          const healKey = next['getHealing:unit'] ? 'getHealing:unit' : 'getHealing';
+          const prevData = next[healKey]?.data || { injuredUnits: [], healing: null };
+          next[healKey] = {
+            ...(next[healKey] || { key: healKey, method: 'getHealing', feature: 'unit', group: 'teams' }),
+            data: {
+              ...prevData,
+              healing: { startDate, duration, units }
+            },
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+
         if (entry.key.startsWith('experimental') && next[entry.key]?.updatedAt === entry.updatedAt &&
             JSON.stringify(next[entry.key].data) === JSON.stringify(entry.data)) continue;
         if (entry.key === 'lastCampaignRaidResult') {

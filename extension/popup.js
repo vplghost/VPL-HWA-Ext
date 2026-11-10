@@ -74,6 +74,7 @@ const DEFAULT_TAB_CONFIG = [
 
 let currentTabConfig = DEFAULT_TAB_CONFIG.map((t) => ({ id: t.id, visible: true }));
 let currentAutoClaimSettings = { mail: true, reports: true, quests: true, onOpen: false };
+let currentAutoGatherSettings = { enabled: false, maxMarches: 3, mineLevel: 5, mineType: 'rotate', lastAutoMineType: null };
 let popupRpcEnabled = false;
 let claimRpcStatus = null;
 let hasAutoClaimedThisSession = false;
@@ -4775,6 +4776,9 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
     </div>
   `;
 
+  const headerActions = document.createElement('div');
+  headerActions.className = 'flex items-center gap-2';
+
   const refreshBtn = document.createElement('button');
   refreshBtn.id = 'dashboard-troops-refresh-btn';
   refreshBtn.type = 'button';
@@ -4801,13 +4805,100 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
       });
     }
   });
-  header.append(refreshBtn);
-  section.append(header);
 
   // Extract troop stats
   const unitSummary = cache?.['getUnitSummary:unit']?.data || cache?.getUnitSummary?.data;
   const healing = cache?.['getHealing:unit']?.data || cache?.getHealing?.data;
   const trainings = cache?.['getTrainings:unit']?.data || cache?.getTrainings?.data;
+
+  // Header Heal Action
+  const totalInjured = (healing?.injuredUnits || []).reduce((sum, u) => sum + (Number(u?.count) || 0), 0);
+  const isHealingActive = Boolean(
+    healing?.healing &&
+    Number.isFinite(healing.healing.startDate) &&
+    Number.isFinite(healing.healing.duration) &&
+    (healing.healing.startDate + healing.healing.duration > now)
+  );
+  const isHealingReady = Boolean(
+    healing?.healing &&
+    Number.isFinite(healing.healing.startDate) &&
+    Number.isFinite(healing.healing.duration) &&
+    (healing.healing.startDate + healing.healing.duration <= now)
+  );
+
+  if (isHealingReady) {
+    const syncHealBtn = document.createElement('button');
+    syncHealBtn.id = 'dashboard-troops-heal-sync-btn';
+    syncHealBtn.type = 'button';
+    syncHealBtn.className = 'cursor-pointer inline-flex items-center gap-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors';
+    syncHealBtn.innerHTML = '<span>✓</span> <span>Sync Healed</span>';
+    syncHealBtn.addEventListener('click', () => {
+      syncHealBtn.disabled = true;
+      const healKey = cache?.['getHealing:unit'] ? 'getHealing:unit' : (cache?.getHealing ? 'getHealing' : 'getHealing:unit');
+      if (cache?.[healKey]?.data) {
+        cache[healKey].data = { ...cache[healKey].data, healing: null };
+      }
+      if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+        chrome.storage.local.set({ rpcCache: cache }).catch(() => {});
+      }
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          kind: 'refresh-rpc',
+          calls: [
+            { name: 'getUnitSummary', feature: 'unit' },
+            { name: 'getHealing', feature: 'unit' }
+          ]
+        });
+      }
+      container.innerHTML = '';
+      renderDashboardTroops(cache, container, Date.now());
+    });
+    headerActions.append(syncHealBtn);
+  } else if (totalInjured > 0 && !isHealingActive) {
+    const healAllBtn = document.createElement('button');
+    healAllBtn.id = 'dashboard-troops-heal-all-btn';
+    healAllBtn.type = 'button';
+    healAllBtn.className = 'cursor-pointer inline-flex items-center gap-1 rounded bg-rose-600 hover:bg-rose-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors';
+    healAllBtn.innerHTML = `<span>🏥</span> <span>Heal All (${totalInjured.toLocaleString()})</span>`;
+    healAllBtn.addEventListener('click', () => {
+      healAllBtn.disabled = true;
+      const unitsToHeal = (healing?.injuredUnits || [])
+        .filter((u) => Number(u?.count) > 0)
+        .map((u) => ({ unitId: Number(u.unitId), count: Number(u.count) }));
+      const countSum = unitsToHeal.reduce((s, u) => s + u.count, 0);
+      const duration = Math.max(60000, countSum * 8000);
+      const startDate = Date.now();
+      const healKey = cache?.['getHealing:unit'] ? 'getHealing:unit' : (cache?.getHealing ? 'getHealing' : 'getHealing:unit');
+      if (cache?.[healKey]?.data) {
+        cache[healKey].data = {
+          ...cache[healKey].data,
+          healing: { startDate, duration, units: unitsToHeal }
+        };
+      }
+      if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+        chrome.storage.local.set({ rpcCache: cache }).catch(() => {});
+      }
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          kind: 'refresh-rpc',
+          calls: [
+            {
+              name: 'startHealing',
+              args: { startDate, duration, units: unitsToHeal },
+              feature: 'unit'
+            }
+          ]
+        });
+      }
+      container.innerHTML = '';
+      renderDashboardTroops(cache, container, Date.now());
+    });
+    headerActions.append(healAllBtn);
+  }
+
+  headerActions.append(refreshBtn);
+  header.append(headerActions);
+  section.append(header);
 
   const troopDefs = [
     { type: 0, label: 'Marksmen', icon: '🏹', badgeCls: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' },
@@ -4938,6 +5029,13 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
     const card = document.createElement('div');
     card.className = 'rounded-xl border border-slate-200 bg-white p-3 space-y-2 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs';
 
+    const queuesForType = (trainings?.trainingQueues || []).filter((q) => {
+      const info = getTroopType(q?.unitId);
+      return info && info.type === t.type;
+    });
+    const completedQueue = queuesForType.find((q) => Number.isFinite(q.startDate) && Number.isFinite(q.duration) && (q.startDate + q.duration <= now));
+    const activeQueue = queuesForType.find((q) => Number.isFinite(q.startDate) && Number.isFinite(q.duration) && (q.startDate + q.duration > now));
+
     card.innerHTML = `
       <div class="flex items-center justify-between text-xs">
         <div class="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
@@ -4987,6 +5085,105 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
         </div>
       </div>
     `;
+
+    const actionRow = document.createElement('div');
+    actionRow.className = 'pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs';
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'text-[11px] font-medium text-slate-500 dark:text-slate-400';
+    statusSpan.innerHTML = completedQueue
+      ? '<span class="text-emerald-600 dark:text-emerald-400 font-semibold">Training finished</span>'
+      : (activeQueue ? '<span class="text-indigo-600 dark:text-indigo-400 font-medium">In training</span>' : 'Idle');
+    actionRow.append(statusSpan);
+
+    const actionHost = document.createElement('div');
+    actionHost.className = 'troop-card-action';
+    actionRow.append(actionHost);
+    card.append(actionRow);
+    if (completedQueue && actionHost) {
+      const collectBtn = document.createElement('button');
+      collectBtn.type = 'button';
+      collectBtn.className = 'cursor-pointer inline-flex items-center gap-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 text-[11px] font-semibold shadow-2xs transition-colors';
+      collectBtn.innerHTML = '<span>✓</span> <span>Ready / Collect</span>';
+      collectBtn.addEventListener('click', () => {
+        collectBtn.disabled = true;
+        const qUnitId = Number(completedQueue.unitId);
+        const qCount = Number(completedQueue.unitCount) || 0;
+        const trainKey = cache?.['getTrainings:unit'] ? 'getTrainings:unit' : (cache?.getTrainings ? 'getTrainings' : 'getTrainings:unit');
+        if (cache?.[trainKey]?.data?.trainingQueues) {
+          cache[trainKey].data.trainingQueues = cache[trainKey].data.trainingQueues.filter((q) => q !== completedQueue);
+        }
+        const sumKey = cache?.['getUnitSummary:unit'] ? 'getUnitSummary:unit' : (cache?.getUnitSummary ? 'getUnitSummary' : 'getUnitSummary:unit');
+        if (cache?.[sumKey]?.data?.available) {
+          const avail = cache[sumKey].data.available;
+          const match = avail.find((item) => Number(item.unitId) === qUnitId);
+          if (match) {
+            match.count = (Number(match.count) || 0) + qCount;
+          } else {
+            avail.push({ unitId: qUnitId, count: qCount });
+          }
+        }
+        if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+          chrome.storage.local.set({ rpcCache: cache }).catch(() => {});
+        }
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({
+            kind: 'refresh-rpc',
+            calls: [
+              { name: 'completeTraining', args: { unitId: qUnitId }, feature: 'unit' },
+              { name: 'getUnitSummary', feature: 'unit' },
+              { name: 'getTrainings', feature: 'unit' }
+            ]
+          });
+        }
+        container.innerHTML = '';
+        renderDashboardTroops(cache, container, Date.now());
+      });
+      actionHost.append(collectBtn);
+    } else if (!activeQueue && actionHost) {
+      const trainBtn = document.createElement('button');
+      trainBtn.type = 'button';
+      trainBtn.className = 'cursor-pointer inline-flex items-center gap-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-0.5 text-[11px] font-semibold shadow-2xs transition-colors';
+      trainBtn.innerHTML = '<span>⚔️</span> <span>Train (26)</span>';
+      trainBtn.addEventListener('click', () => {
+        trainBtn.disabled = true;
+        const defaultTier = 7;
+        const highestTier = levelsSorted.length > 0 ? levelsSorted[levelsSorted.length - 1][0] : defaultTier;
+        const targetUnitId = t.type === 0 ? highestTier : (t.type === 1 ? 10 + highestTier : 20 + highestTier);
+        const count = 26;
+        const duration = 1204892;
+        const startDate = Date.now();
+        const trainKey = cache?.['getTrainings:unit'] ? 'getTrainings:unit' : (cache?.getTrainings ? 'getTrainings' : 'getTrainings:unit');
+        if (cache?.[trainKey]?.data) {
+          const queues = [...(cache[trainKey].data.trainingQueues || [])];
+          queues.push({ unitId: targetUnitId, unitCount: count, startDate, duration });
+          cache[trainKey].data.trainingQueues = queues;
+        }
+        if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+          chrome.storage.local.set({ rpcCache: cache }).catch(() => {});
+        }
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({
+            kind: 'refresh-rpc',
+            calls: [
+              {
+                name: 'startTraining',
+                args: { unitId: targetUnitId, count, startDate, duration },
+                feature: 'unit'
+              },
+              { name: 'getTrainings', feature: 'unit' }
+            ]
+          });
+        }
+        container.innerHTML = '';
+        renderDashboardTroops(cache, container, Date.now());
+      });
+      actionHost.append(trainBtn);
+    } else if (actionHost) {
+      const inProgressBadge = document.createElement('span');
+      inProgressBadge.className = 'text-[10px] text-slate-400 dark:text-slate-500';
+      inProgressBadge.textContent = trainingTimerText ? `Ends in ${trainingTimerText}` : 'Training';
+      actionHost.append(inProgressBadge);
+    }
 
     grid.append(card);
   }
@@ -7631,6 +7828,137 @@ function renderExperimental(cache, raidOnly = false) {
     await experimentalRpc([call], 'Sending gathering team...');
   }, !popupRpcEnabled || !!experimentalPending || !context?.mapId || !experimentalSelection.mineId || gatherTeam?.heroIds.length !== 5);
   sendBtn.className = 'inline-flex h-10 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-teal-600 hover:bg-teal-700 px-4 text-sm font-semibold leading-5 text-white disabled:cursor-not-allowed disabled:opacity-40';
+
+  // Auto-Gathering Automation Section
+  const autoGatherSection = document.createElement('div');
+  autoGatherSection.className = 'rounded-xl border border-teal-200 bg-teal-50/50 p-3.5 space-y-3 dark:border-teal-900/60 dark:bg-teal-950/20';
+
+  const autoHeader = document.createElement('div');
+  autoHeader.className = 'flex items-center justify-between gap-2';
+
+  const autoTitle = document.createElement('div');
+  autoTitle.className = 'flex items-center gap-2';
+  const autoIcon = document.createElement('span');
+  autoIcon.textContent = '🤖';
+  const autoLabel = document.createElement('h3');
+  autoLabel.className = 'text-xs font-bold uppercase tracking-wide text-teal-900 dark:text-teal-200';
+  autoLabel.textContent = 'Auto-Gathering Automation';
+  autoTitle.append(autoIcon, autoLabel);
+
+  const autoSettings = typeof currentAutoGatherSettings !== 'undefined'
+    ? currentAutoGatherSettings
+    : (globalThis.hwaHelperAutoGather?.normalizeAutoGatherSettings?.({}) || { enabled: false, maxMarches: 3, mineLevel: 5, mineType: 'rotate', lastAutoMineType: null });
+
+  const statusBadge = document.createElement('span');
+  const isAutoEnabled = autoSettings.enabled === true;
+  statusBadge.className = `inline-flex items-center px-2 py-0.5 rounded text-3xs font-bold ${
+    isAutoEnabled
+      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+  }`;
+  statusBadge.textContent = isAutoEnabled ? '🟢 Enabled' : '⚪ Disabled';
+  autoHeader.append(autoTitle, statusBadge);
+  autoGatherSection.append(autoHeader);
+
+  // Toggle & Thresholds Row
+  const autoControlsRow = document.createElement('div');
+  autoControlsRow.className = 'grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end';
+
+  // 1. Enable checkbox
+  const enableWrap = document.createElement('label');
+  enableWrap.className = 'flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer h-9';
+  const enableCheckbox = document.createElement('input');
+  enableCheckbox.type = 'checkbox';
+  enableCheckbox.checked = isAutoEnabled;
+  enableCheckbox.className = 'rounded text-teal-600 focus:ring-teal-500';
+  enableCheckbox.addEventListener('change', async () => {
+    autoSettings.enabled = enableCheckbox.checked;
+    if (typeof currentAutoGatherSettings !== 'undefined') currentAutoGatherSettings = autoSettings;
+    await chrome.storage?.local?.set?.({ autoGatherSettings: autoSettings });
+    render();
+  });
+  const enableText = document.createElement('span');
+  enableText.textContent = 'Enable Auto-Gather';
+  enableWrap.append(enableCheckbox, enableText);
+  autoControlsRow.append(enableWrap);
+
+  // 2. Max marches threshold (< 3)
+  const maxMarchesSelect = document.createElement('select');
+  maxMarchesSelect.className = 'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  for (let n = 1; n <= 5; n++) {
+    const opt = document.createElement('option');
+    opt.value = String(n);
+    opt.textContent = `< ${n} active marches`;
+    maxMarchesSelect.append(opt);
+  }
+  maxMarchesSelect.value = String(autoSettings.maxMarches || 3);
+  maxMarchesSelect.addEventListener('change', async () => {
+    autoSettings.maxMarches = Number(maxMarchesSelect.value);
+    if (typeof currentAutoGatherSettings !== 'undefined') currentAutoGatherSettings = autoSettings;
+    await chrome.storage?.local?.set?.({ autoGatherSettings: autoSettings });
+    render();
+  });
+  field(autoControlsRow, 'Trigger when', maxMarchesSelect);
+
+  // 3. Resource type (Rotate or specific)
+  const autoTypeSelect = document.createElement('select');
+  autoTypeSelect.className = 'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  const rotOpt = document.createElement('option');
+  rotOpt.value = 'rotate';
+  rotOpt.textContent = 'Rotate (Food → Wood → Stone → Iron)';
+  autoTypeSelect.append(rotOpt);
+  for (const t of ['food', 'wood', 'stone', 'iron']) {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+    autoTypeSelect.append(opt);
+  }
+  autoTypeSelect.value = autoSettings.mineType || 'rotate';
+  autoTypeSelect.addEventListener('change', async () => {
+    autoSettings.mineType = autoTypeSelect.value;
+    if (typeof currentAutoGatherSettings !== 'undefined') currentAutoGatherSettings = autoSettings;
+    await chrome.storage?.local?.set?.({ autoGatherSettings: autoSettings });
+    render();
+  });
+  field(autoControlsRow, 'Resource type', autoTypeSelect);
+
+  // 4. Mine level
+  const autoLevelSelect = document.createElement('select');
+  autoLevelSelect.className = 'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  for (let lvl = 1; lvl <= 10; lvl++) {
+    const opt = document.createElement('option');
+    opt.value = String(lvl);
+    opt.textContent = `Level ${lvl}`;
+    autoLevelSelect.append(opt);
+  }
+  autoLevelSelect.value = String(autoSettings.mineLevel || 5);
+  autoLevelSelect.addEventListener('change', async () => {
+    autoSettings.mineLevel = Number(autoLevelSelect.value);
+    if (typeof currentAutoGatherSettings !== 'undefined') currentAutoGatherSettings = autoSettings;
+    await chrome.storage?.local?.set?.({ autoGatherSettings: autoSettings });
+    render();
+  });
+  field(autoControlsRow, 'Target level', autoLevelSelect);
+
+  autoGatherSection.append(autoControlsRow);
+
+  const nextTargetType = globalThis.hwaHelperAutoGather?.resolveNextMineType?.(
+    autoSettings.mineType,
+    autoSettings.lastAutoMineType
+  ) || 'food';
+  const helperNote = document.createElement('p');
+  helperNote.className = 'text-2xs text-slate-500 dark:text-slate-400';
+  if (isAutoEnabled) {
+    const rotationInfo = autoSettings.mineType === 'rotate'
+      ? `Cycling: Next target is <strong>${nextTargetType.toUpperCase()}</strong>${autoSettings.lastAutoMineType ? ` (last sent: ${autoSettings.lastAutoMineType})` : ''}`
+      : `Target: <strong>${autoSettings.mineType.toUpperCase()}</strong>`;
+    helperNote.innerHTML = `Dispatches automatically on game load or when marches return to base if active marches &lt; ${autoSettings.maxMarches}. ${rotationInfo}.`;
+  } else {
+    helperNote.textContent = 'Auto-gathering is currently paused. Check the box above to automatically search and send teams.';
+  }
+  autoGatherSection.append(helperNote);
+
+  gather.append(autoGatherSection);
 
   const now = Date.now();
   const allGatherMarches = (cache.marchStatus?.data?.marches || []).filter((march) =>
@@ -11447,9 +11775,12 @@ globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'dungeonAutomationSettings', 'dungeonRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion', 'campaignRaidSequential']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
+    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'autoGatherSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'dungeonAutomationSettings', 'dungeonRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion', 'campaignRaidSequential']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
   ]);
   const cache = stored[CACHE_KEY] || {};
+  if (stored.autoGatherSettings) {
+    currentAutoGatherSettings = globalThis.hwaHelperAutoGather?.normalizeAutoGatherSettings?.(stored.autoGatherSettings) || stored.autoGatherSettings;
+  }
   if (stored.campaignRaidSequential !== undefined) campaignRaidSequential = stored.campaignRaidSequential === true;
   if (stored.buildingQueue) currentBuildingQueue = stored.buildingQueue;
   if (stored.researchQueue) currentResearchQueue = stored.researchQueue;

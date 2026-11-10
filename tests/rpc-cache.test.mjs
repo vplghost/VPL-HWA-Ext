@@ -1960,7 +1960,7 @@ testWithTraces('replaying titan evolve trace updates star, power, fragments, gol
   assert.equal(afterEvolve['resource:fragmentTitan:4040'].data.amount, 14);
   // Gold: 1,000,000 - 300,000 = 700,000
   assert.equal(afterEvolve['resource:gold'].data.amount, 700000);
-  assert.equal(afterEvolve.inventoryGet.data.coin['1'], 700000);
+  assert.equal(afterEvolve.inventoryGet.data.coin['1'], 1000000, 'coin[1] Arena coin is untouched by gold spend');
   assert.equal(afterEvolve.userGetInfo.data.gold, 700000);
   // Consumable 24 set to 1250
   assert.equal(afterEvolve.inventoryGet.data.consumable['24'], 1250);
@@ -2247,7 +2247,7 @@ test('heroUpgradeSkill deducts gold and skill points while upgrading target skil
   assert.equal(afterMerge.heroGetAll.data['1'].skills['2'], 2, 'skill 1 upgraded to level 2');
   assert.equal(afterMerge['resource:gold'].data.amount, 49900, 'gold deducted by 100');
   assert.equal(afterMerge.userGetInfo.data.gold, 49900, 'userGetInfo gold deducted');
-  assert.equal(afterMerge.inventoryGet.data.coin['1'], 49900, 'coin[1] gold deducted');
+  assert.equal(afterMerge.inventoryGet.data.coin['1'], 50000, 'coin[1] Arena coin is untouched by gold spend');
   assert.equal(afterMerge['resource:refillable:2'].data.amount, 9, 'skill point decremented');
 
   // Upgrade skill 1 from level 2 to level 3: cost is 550 gold
@@ -2301,7 +2301,7 @@ test('inventoryCraftFragments deducts fragments and gold, adds crafted gear', ()
   assert.equal(afterMerge.inventoryGet.data.fragmentGear['57'], 5, 'fragments deducted (10 - 5 = 5)');
   assert.equal(afterMerge['resource:gold'].data.amount, 77500, 'gold deducted (100000 - 22500 = 77500)');
   assert.equal(afterMerge.userGetInfo.data.gold, 77500, 'userGetInfo gold deducted');
-  assert.equal(afterMerge.inventoryGet.data.coin['1'], 77500, 'inventoryGet coin[1] deducted');
+  assert.equal(afterMerge.inventoryGet.data.coin['1'], 100000, 'coin[1] Arena coin is untouched by gold spend');
 });
 
 test('inventoryCraftRecipe deducts component gears and gold, adds crafted gear', () => {
@@ -2340,4 +2340,45 @@ test('inventoryCraftRecipe deducts component gears and gold, adds crafted gear',
   assert.equal(afterMerge.inventoryGet.data.gear['60'], 2, 'ingredient gear 60 deducted (3 - 1 = 2)');
   assert.equal(afterMerge['resource:gold'].data.amount, 77500, 'gold deducted (100000 - 22500 = 77500)');
   assert.equal(afterMerge.userGetInfo.data.gold, 77500, 'userGetInfo gold deducted');
+});
+
+test('Arena coin (coin[1]) is distinct from gold and preserved across resource:gold updates', () => {
+  const initialCache = {
+    inventoryGet: {
+      key: 'inventoryGet',
+      data: {
+        coin: { '1': 1420 } // 1,420 Arena coins
+      },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    'resource:gold': {
+      key: 'resource:gold',
+      data: { amount: 5000000 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    userGetInfo: {
+      key: 'userGetInfo',
+      data: { gold: 5000000 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    }
+  };
+
+  // Simulate incoming resource:gold snapshot from server
+  const goldRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-01T10:05:00.000Z',
+    requestBody: JSON.stringify({ calls: [{ ident: 'c1', name: 'userGetInfo' }] }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'c1',
+        result: { response: { gold: 6500000 } }
+      }]
+    })
+  };
+
+  const afterMerge = cache.merge(initialCache, [goldRecord]).cache;
+  assert.equal(afterMerge['resource:gold'].data.amount, 6500000, 'resource:gold updated to 6.5M');
+  assert.equal(afterMerge.inventoryGet.data.coin['1'], 1420, 'Arena coin remains 1,420 and not overwritten by gold');
 });

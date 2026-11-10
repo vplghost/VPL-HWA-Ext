@@ -16,6 +16,7 @@ importScripts('building-data.js');
 importScripts('building-queue.js');
 importScripts('research-data.js');
 importScripts('research-queue.js');
+importScripts('auto-gather.js');
 
 const RECORD_STATE_KEY = 'recordingState';
 const RECORD_PREFIX = 'record:';
@@ -441,6 +442,56 @@ async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
     const dispatch = rpcMessageForSettings(stored, [joinCall]);
     if (dispatch) {
       chrome.tabs?.sendMessage?.(tabId, dispatch)?.catch?.(() => {});
+    }
+  }
+}
+
+let lastAutoGatherSearchAt = 0;
+let lastAutoGatherPendingType = null;
+let lastAutoGatherPendingLevel = null;
+
+async function evaluateAutoGather(record, currentCache, stored, tabId) {
+  if (stored.popupRpcEnabled !== true || !stored.autoGatherSettings?.enabled || !tabId) return;
+
+  const helper = globalThis.hwaHelperAutoGather;
+  if (!helper) return;
+
+  const now = Date.now();
+  const isLoad = helper.isGameLoadRecord(record);
+  const isReturn = helper.isMarchReturnRecord(record, stored.rpcCache, currentCache, now);
+  const isMineSearch = typeof record?.responseBody === 'string' &&
+    record.responseBody.includes('"mines"') &&
+    typeof record?.requestBody === 'string' &&
+    record.requestBody.includes('"searchMine"');
+
+  if (!isLoad && !isReturn && !isMineSearch) return;
+
+  const plan = helper.planAutoGather(currentCache, stored, now);
+  if (plan.action === 'search') {
+    if (now - lastAutoGatherSearchAt < 10000 &&
+        lastAutoGatherPendingType === plan.mineType &&
+        lastAutoGatherPendingLevel === plan.mineLevel) {
+      return;
+    }
+    const dispatch = rpcMessageForSettings(stored, [plan.call]);
+    if (dispatch) {
+      lastAutoGatherSearchAt = now;
+      lastAutoGatherPendingType = plan.mineType;
+      lastAutoGatherPendingLevel = plan.mineLevel;
+      chrome.tabs?.sendMessage?.(tabId, dispatch)?.catch?.(() => {});
+    }
+  } else if (plan.action === 'gather') {
+    const dispatch = rpcMessageForSettings(stored, [plan.call]);
+    if (dispatch) {
+      chrome.tabs?.sendMessage?.(tabId, dispatch)?.catch?.(() => {});
+      const updatedSettings = {
+        ...helper.normalizeAutoGatherSettings(stored.autoGatherSettings),
+        lastAutoMineType: plan.nextLastAutoMineType
+      };
+      stored.autoGatherSettings = updatedSettings;
+      await chrome.storage.local.set({ autoGatherSettings: updatedSettings });
+      lastAutoGatherPendingType = null;
+      lastAutoGatherPendingLevel = null;
     }
   }
 }
@@ -1148,7 +1199,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   pending = pending.then(async () => {
     const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings',
-      'popupRpcEnabled', 'socketRefreshMode', 'priorityAutoJoin', 'troopCapacitySettings', 'raidPreferences', 'customTeams']);
+      'popupRpcEnabled', 'socketRefreshMode', 'priorityAutoJoin', 'troopCapacitySettings', 'raidPreferences', 'customTeams', 'autoGatherSettings']);
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
     if (cacheResult.changed) {
@@ -1169,6 +1220,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id);
     if (sender.tab?.id) await advanceResearchQueue(sender.tab.id);
     if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id);
+    if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id);
     if (stored.popupRpcEnabled === true && sender.tab?.id) {
       const calls = socketRefreshCalls(record, cacheResult.cache);
       const dispatch = rpcMessageForSettings(stored, calls);
@@ -1188,6 +1240,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         globalThis.hwaHelperRpcCache.extract(record).some((entry) => entry.key === 'skinUpgradeAction')) {
       const dispatch = rpcMessageForSettings(stored, [
         { name: 'heroGetAll' }, { name: 'inventoryGet' }
+      ]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+    }
+    if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
+        globalThis.hwaHelperRpcCache.extract(record).some((entry) =>
+          ['completeTrainingAction', 'startTrainingAction', 'startHealingAction'].includes(entry.key))) {
+      const dispatch = rpcMessageForSettings(stored, [
+        { name: 'getUnitSummary', feature: 'unit' },
+        { name: 'getTrainings', feature: 'unit' },
+        { name: 'getHealing', feature: 'unit' }
       ]);
       if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
