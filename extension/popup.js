@@ -97,6 +97,12 @@ let towerRunState = null;
 let towerAutomationMessage = '';
 let dungeonRunState = null;
 let dungeonAutomationMessage = '';
+let dungeonAutomationSettings = {
+  accountId: null,
+  attackerPriority: ['water', 'neutral', 'earth', 'fire'],
+  pools: null
+};
+let dungeonSettingsLoadedFor = null;
 let troopCapacitySettings = { defaultHero: 600, base: 950 };
 let experimentalMessage = '';
 
@@ -3988,6 +3994,470 @@ function openGuildVersusModal(vsStatus, cache) {
 }
 
 let dungeonModalReturnFocus = null;
+let activeDungeonPoolTab = 'water';
+let isDungeonStrategyExpanded = false;
+
+function getEffectiveDungeonPools() {
+  const defaults = globalThis.hwaHelperDungeonAutomation?.DEFAULT_TITAN_POOLS || {
+    water: [4000, 4001, 4052, 4004, 4002, 4003],
+    earth: [4020, 4022, 4024, 4023, 4021],
+    fire: [4010, 4011, 4013, 4012, 4014, 4051],
+    neutral: [4000, 4001, 4052, 4004, 4002, 4020, 4023, 4013, 4022, 4021, 4010, 4011, 4012, 4053]
+  };
+  const settings = (typeof dungeonAutomationSettings !== 'undefined' ? dungeonAutomationSettings : null);
+  const pools = settings?.pools || {};
+  return {
+    water: Array.isArray(pools.water) && pools.water.length ? [...pools.water] : [...defaults.water],
+    earth: Array.isArray(pools.earth) && pools.earth.length ? [...pools.earth] : [...defaults.earth],
+    fire: Array.isArray(pools.fire) && pools.fire.length ? [...pools.fire] : [...defaults.fire],
+    neutral: Array.isArray(pools.neutral) && pools.neutral.length ? [...pools.neutral] : (
+      Array.isArray(pools.mixed) && pools.mixed.length ? [...pools.mixed] : [...defaults.neutral]
+    )
+  };
+}
+
+function getEffectiveAttackerPriority() {
+  const settings = (typeof dungeonAutomationSettings !== 'undefined' ? dungeonAutomationSettings : null);
+  const prio = settings?.attackerPriority;
+  if (Array.isArray(prio) && prio.length) {
+    return [...prio];
+  }
+  return ['water', 'neutral', 'earth', 'fire'];
+}
+
+function saveDungeonAutomationSettings() {
+  const accountId = (typeof currentCache !== 'undefined' ? currentCache?.accountStatus?.data?.id ?? currentCache?.userGetInfo?.data?.id : null) ?? null;
+  const settings = (typeof dungeonAutomationSettings !== 'undefined' ? dungeonAutomationSettings : {});
+  const nextSettings = {
+    ...settings,
+    accountId,
+    attackerPriority: getEffectiveAttackerPriority(),
+    pools: getEffectiveDungeonPools()
+  };
+  if (nextSettings.pools.neutral) {
+    nextSettings.pools.mixed = [...nextSettings.pools.neutral];
+  }
+  if (typeof dungeonAutomationSettings !== 'undefined') {
+    dungeonAutomationSettings = nextSettings;
+  }
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    chrome.storage.local.set({ dungeonAutomationSettings: nextSettings }).catch(() => {});
+  }
+}
+
+function renderDungeonStrategySection(data, body) {
+  const details = document.createElement('details');
+  details.className = 'group rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-800/60 transition-all';
+  if (isDungeonStrategyExpanded) details.open = true;
+  details.addEventListener('toggle', () => {
+    isDungeonStrategyExpanded = Boolean(details.open);
+  });
+
+  const summary = document.createElement('summary');
+  summary.className = 'cursor-pointer list-none flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-100 select-none';
+  summary.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span class="text-sm">⚙️</span>
+      <span>Lineup Pools & Element Priority</span>
+      <span class="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">Configurable</span>
+    </div>
+    <div class="flex items-center gap-1 text-[11px] font-normal text-slate-400 group-open:rotate-180 transition-transform">
+      ▼
+    </div>
+  `;
+  details.append(summary);
+
+  const contentWrap = document.createElement('div');
+  contentWrap.className = 'pt-3 space-y-4 border-t border-slate-100 dark:border-slate-700/60 mt-3';
+
+  // --- SUB-SECTION 1: ATTACKER ELEMENT PRIORITY ---
+  const elemMeta = {
+    water: { label: 'Water (Nước)', icon: '💧', badgeClass: 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200' },
+    neutral: { label: 'Mixed / Neutral (Hỗn hợp)', icon: '⚡', badgeClass: 'border-purple-300 bg-purple-50 text-purple-900 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200' },
+    earth: { label: 'Earth (Đất)', icon: '🌿', badgeClass: 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200' },
+    fire: { label: 'Fire (Lửa)', icon: '🔥', badgeClass: 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200' }
+  };
+
+  const prioHeader = document.createElement('div');
+  prioHeader.className = 'flex items-center justify-between flex-wrap gap-2';
+  prioHeader.innerHTML = `
+    <div>
+      <div class="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">🎯 Attacker Element Priority (Ưu tiên nguyên tố)</div>
+      <div class="text-[11px] text-slate-500 dark:text-slate-400">Thứ tự ưu tiên chọn cửa khi số titan tử trận bằng nhau.</div>
+    </div>
+  `;
+  const resetElemBtn = document.createElement('button');
+  resetElemBtn.type = 'button';
+  resetElemBtn.className = 'cursor-pointer text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium';
+  resetElemBtn.textContent = '↺ Reset Priority';
+  resetElemBtn.addEventListener('click', () => {
+    if (typeof dungeonAutomationSettings !== 'undefined') {
+      dungeonAutomationSettings.attackerPriority = ['water', 'neutral', 'earth', 'fire'];
+    }
+    saveDungeonAutomationSettings();
+    openDungeonModal(data, dungeonModalReturnFocus);
+  });
+  prioHeader.append(resetElemBtn);
+  contentWrap.append(prioHeader);
+
+  const prioList = getEffectiveAttackerPriority();
+  const prioGrid = document.createElement('div');
+  prioGrid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2';
+
+  prioList.forEach((elemKey, idx) => {
+    const norm = (elemKey === 'mixed') ? 'neutral' : elemKey;
+    const info = elemMeta[norm] || { label: norm, icon: '⚔️', badgeClass: 'border-slate-300 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200' };
+    const card = document.createElement('div');
+    card.className = `rounded-lg border p-2 flex items-center justify-between gap-1.5 ${info.badgeClass}`;
+
+    const left = document.createElement('div');
+    left.className = 'flex items-center gap-1.5 min-w-0';
+    left.innerHTML = `
+      <span class="rounded bg-black/10 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-bold font-mono">#${idx + 1}</span>
+      <span class="text-xs font-bold truncate">${info.icon} ${info.label}</span>
+    `;
+
+    const btns = document.createElement('div');
+    btns.className = 'flex items-center gap-1 shrink-0';
+
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.className = 'cursor-pointer p-1 text-[11px] rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed';
+    upBtn.textContent = '◀';
+    upBtn.title = 'Move priority higher';
+    upBtn.disabled = idx === 0;
+    upBtn.addEventListener('click', () => {
+      if (idx > 0) {
+        const arr = [...prioList];
+        [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+        if (typeof dungeonAutomationSettings !== 'undefined') {
+          dungeonAutomationSettings.attackerPriority = arr;
+        }
+        saveDungeonAutomationSettings();
+        openDungeonModal(data, dungeonModalReturnFocus);
+      }
+    });
+
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.className = 'cursor-pointer p-1 text-[11px] rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed';
+    downBtn.textContent = '▶';
+    downBtn.title = 'Move priority lower';
+    downBtn.disabled = idx === prioList.length - 1;
+    downBtn.addEventListener('click', () => {
+      if (idx < prioList.length - 1) {
+        const arr = [...prioList];
+        [arr[idx + 1], arr[idx]] = [arr[idx], arr[idx + 1]];
+        if (typeof dungeonAutomationSettings !== 'undefined') {
+          dungeonAutomationSettings.attackerPriority = arr;
+        }
+        saveDungeonAutomationSettings();
+        openDungeonModal(data, dungeonModalReturnFocus);
+      }
+    });
+
+    btns.append(upBtn, downBtn);
+    card.append(left, btns);
+    prioGrid.append(card);
+  });
+  contentWrap.append(prioGrid);
+
+  // --- SUB-SECTION 2: TITAN LINEUP POOLS ---
+  const pools = getEffectiveDungeonPools();
+  const poolTabs = [
+    { key: 'water', label: 'Water', icon: '💧', count: pools.water?.length || 0 },
+    { key: 'earth', label: 'Earth', icon: '🌿', count: pools.earth?.length || 0 },
+    { key: 'fire', label: 'Fire', icon: '🔥', count: pools.fire?.length || 0 },
+    { key: 'neutral', label: 'Mixed', icon: '⚡', count: pools.neutral?.length || 0 }
+  ];
+
+  const poolHeader = document.createElement('div');
+  poolHeader.className = 'flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60';
+  poolHeader.innerHTML = `
+    <div>
+      <div class="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">👥 Titan Lineup Pools (Pools theo nguyên tố)</div>
+      <div class="text-[11px] text-slate-500 dark:text-slate-400">Top 5 Titan còn sống đầu tiên trong pool sẽ được điều động tấn công.</div>
+    </div>
+  `;
+  const resetPoolsBtn = document.createElement('button');
+  resetPoolsBtn.type = 'button';
+  resetPoolsBtn.className = 'cursor-pointer text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium';
+  resetPoolsBtn.textContent = '↺ Reset All Pools';
+  resetPoolsBtn.addEventListener('click', () => {
+    const defaults = globalThis.hwaHelperDungeonAutomation?.DEFAULT_TITAN_POOLS;
+    if (defaults) {
+      if (typeof dungeonAutomationSettings !== 'undefined') {
+        dungeonAutomationSettings.pools = {
+          water: [...defaults.water],
+          earth: [...defaults.earth],
+          fire: [...defaults.fire],
+          neutral: [...defaults.neutral],
+          mixed: [...defaults.mixed]
+        };
+      }
+      saveDungeonAutomationSettings();
+      openDungeonModal(data, dungeonModalReturnFocus);
+    }
+  });
+  poolHeader.append(resetPoolsBtn);
+  contentWrap.append(poolHeader);
+
+  // Pool switcher pills
+  const poolTabsBar = document.createElement('div');
+  poolTabsBar.className = 'flex items-center gap-1.5 flex-wrap';
+  for (const tab of poolTabs) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    const isActive = activeDungeonPoolTab === tab.key;
+    btn.className = `cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold border transition-all ${
+      isActive
+        ? 'border-blue-500 bg-blue-600 text-white shadow-2xs'
+        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+    }`;
+    btn.innerHTML = `${tab.icon} ${tab.label} <span class="text-[10px] opacity-80 font-normal">(${tab.count})</span>`;
+    btn.addEventListener('click', () => {
+      activeDungeonPoolTab = tab.key;
+      openDungeonModal(data, dungeonModalReturnFocus);
+    });
+    poolTabsBar.append(btn);
+  }
+  contentWrap.append(poolTabsBar);
+
+  // Active pool list
+  const activePoolList = pools[activeDungeonPoolTab] || [];
+  const titansState = data.states?.titans || {};
+
+  const titanListBox = document.createElement('div');
+  titanListBox.className = 'space-y-1.5 rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 dark:border-slate-700/60 dark:bg-slate-900/40';
+
+  if (activePoolList.length === 0) {
+    const emptyNotice = document.createElement('div');
+    emptyNotice.className = 'text-center text-xs text-slate-400 py-3';
+    emptyNotice.textContent = 'No titans in this pool.';
+    titanListBox.append(emptyNotice);
+  } else {
+    activePoolList.forEach((tId, idx) => {
+      const titanId = String(tId);
+      const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
+      const name = meta?.name || `Titan ${titanId}`;
+      const role = meta?.role || '';
+      const elem = meta?.element || '';
+      const st = titansState[titanId] || titansState[Number(titanId)];
+      const isDead = st ? (st.isDead === true || (typeof st.hp === 'number' && st.hp <= 0)) : false;
+
+      const row = document.createElement('div');
+      row.className = `flex items-center justify-between p-2 rounded-lg border text-xs gap-2 transition-all ${
+        isDead
+          ? 'border-rose-200 bg-rose-50/40 opacity-75 dark:border-rose-900/50 dark:bg-rose-950/20'
+          : (idx < 5
+            ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/20'
+            : 'border-slate-200 bg-white dark:border-slate-700/60 dark:bg-slate-800/80')
+      }`;
+
+      const left = document.createElement('div');
+      left.className = 'flex items-center gap-2 min-w-0';
+
+      const rankBadge = document.createElement('span');
+      rankBadge.className = `size-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+        idx < 5
+          ? 'bg-emerald-600 text-white'
+          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+      }`;
+      rankBadge.textContent = String(idx + 1);
+
+      const avatar = document.createElement('img');
+      avatar.src = `assets/titans/${titanId}.png`;
+      avatar.className = 'size-7 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700';
+      avatar.addEventListener('error', (e) => { e.currentTarget.hidden = true; });
+
+      const infoBox = document.createElement('div');
+      infoBox.className = 'min-w-0';
+
+      const nameRow = document.createElement('div');
+      nameRow.className = 'flex items-center gap-1.5 flex-wrap';
+      nameRow.innerHTML = `
+        <span class="font-bold text-slate-900 dark:text-slate-100 truncate">${name}</span>
+        ${role ? `<span class="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.2 text-[9px] font-medium text-slate-600 dark:text-slate-300">${role}</span>` : ''}
+        ${idx < 5
+          ? '<span class="rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 px-1 py-0.2 text-[9px] font-bold">Starter</span>'
+          : '<span class="rounded bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400 px-1 py-0.2 text-[9px]">Reserve</span>'}
+      `;
+
+      const statusRow = document.createElement('div');
+      statusRow.className = 'text-[10px] text-slate-500 dark:text-slate-400';
+      if (st) {
+        if (isDead) {
+          statusRow.innerHTML = '<span class="text-rose-600 dark:text-rose-400 font-bold">❌ Fallen</span>';
+        } else {
+          const hpPct = Math.round(((st.hp || 0) / (st.maxHp || 1)) * 100);
+          statusRow.innerHTML = `<span class="text-emerald-600 dark:text-emerald-400 font-medium">✓ Alive (HP: ${hpPct}%)</span>`;
+        }
+      } else {
+        statusRow.textContent = elem ? `Element: ${elem}` : 'Ready';
+      }
+
+      infoBox.append(nameRow, statusRow);
+      left.append(rankBadge, avatar, infoBox);
+
+      // Action buttons
+      const actions = document.createElement('div');
+      actions.className = 'flex items-center gap-1 shrink-0';
+
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.className = 'cursor-pointer p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] disabled:opacity-30 disabled:cursor-not-allowed';
+      upBtn.textContent = '⬆️';
+      upBtn.title = 'Move up';
+      upBtn.disabled = idx === 0;
+      upBtn.addEventListener('click', () => {
+        if (idx > 0) {
+          const poolArr = [...activePoolList];
+          [poolArr[idx - 1], poolArr[idx]] = [poolArr[idx], poolArr[idx - 1]];
+          if (typeof dungeonAutomationSettings !== 'undefined') {
+            dungeonAutomationSettings.pools = {
+              ...getEffectiveDungeonPools(),
+              [activeDungeonPoolTab]: poolArr
+            };
+          }
+          saveDungeonAutomationSettings();
+          openDungeonModal(data, dungeonModalReturnFocus);
+        }
+      });
+
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.className = 'cursor-pointer p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] disabled:opacity-30 disabled:cursor-not-allowed';
+      downBtn.textContent = '⬇️';
+      downBtn.title = 'Move down';
+      downBtn.disabled = idx === activePoolList.length - 1;
+      downBtn.addEventListener('click', () => {
+        if (idx < activePoolList.length - 1) {
+          const poolArr = [...activePoolList];
+          [poolArr[idx + 1], poolArr[idx]] = [poolArr[idx], poolArr[idx + 1]];
+          if (typeof dungeonAutomationSettings !== 'undefined') {
+            dungeonAutomationSettings.pools = {
+              ...getEffectiveDungeonPools(),
+              [activeDungeonPoolTab]: poolArr
+            };
+          }
+          saveDungeonAutomationSettings();
+          openDungeonModal(data, dungeonModalReturnFocus);
+        }
+      });
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'cursor-pointer p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-950 text-rose-500 text-[11px] disabled:opacity-30 disabled:cursor-not-allowed';
+      removeBtn.textContent = '✖';
+      removeBtn.title = activePoolList.length <= 5 ? 'Pool requires at least 5 titans' : 'Remove titan from pool';
+      removeBtn.disabled = activePoolList.length <= 5;
+      removeBtn.addEventListener('click', () => {
+        if (activePoolList.length > 5) {
+          const poolArr = activePoolList.filter((_, i) => i !== idx);
+          if (typeof dungeonAutomationSettings !== 'undefined') {
+            dungeonAutomationSettings.pools = {
+              ...getEffectiveDungeonPools(),
+              [activeDungeonPoolTab]: poolArr
+            };
+          }
+          saveDungeonAutomationSettings();
+          openDungeonModal(data, dungeonModalReturnFocus);
+        }
+      });
+
+      actions.append(upBtn, downBtn, removeBtn);
+      row.append(left, actions);
+      titanListBox.append(row);
+    });
+  }
+  contentWrap.append(titanListBox);
+
+  // Candidate Titans to Add
+  const allTitanMeta = globalThis.hwaHelperTitanMetadata || {};
+  const currentSet = new Set(activePoolList.map(Number));
+  const candidateTitans = Object.entries(allTitanMeta)
+    .filter(([idStr, tMeta]) => {
+      const numId = Number(idStr);
+      if (!Number.isInteger(numId)) return false;
+      if (currentSet.has(numId)) return false;
+      const elemLower = (tMeta?.element || '').toLowerCase();
+      if (activeDungeonPoolTab === 'water') return elemLower === 'water' || elemLower === 'spirit';
+      if (activeDungeonPoolTab === 'earth') return elemLower === 'earth' || elemLower === 'spirit';
+      if (activeDungeonPoolTab === 'fire') return elemLower === 'fire' || elemLower === 'spirit';
+      if (activeDungeonPoolTab === 'neutral') return true;
+      return true;
+    })
+    .map(([idStr, tMeta]) => ({
+      id: Number(idStr),
+      name: tMeta?.name || `Titan ${idStr}`,
+      role: tMeta?.role || '',
+      element: tMeta?.element || ''
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const addRow = document.createElement('div');
+  addRow.className = 'flex items-center gap-2 pt-1 flex-wrap';
+
+  if (candidateTitans.length > 0) {
+    const select = document.createElement('select');
+    select.className = 'rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 grow max-w-xs';
+    for (const cand of candidateTitans) {
+      const opt = document.createElement('option');
+      opt.value = String(cand.id);
+      opt.textContent = `${cand.name} (${cand.element || 'Titan'}${cand.role ? ` · ${cand.role}` : ''})`;
+      select.append(opt);
+    }
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'cursor-pointer rounded-lg border border-blue-500 bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 shadow-2xs';
+    addBtn.textContent = '+ Add to Pool';
+    addBtn.addEventListener('click', () => {
+      const val = Number(select.value);
+      if (val && !activePoolList.includes(val)) {
+        const poolArr = [...activePoolList, val];
+        if (typeof dungeonAutomationSettings !== 'undefined') {
+          dungeonAutomationSettings.pools = {
+            ...getEffectiveDungeonPools(),
+            [activeDungeonPoolTab]: poolArr
+          };
+        }
+        saveDungeonAutomationSettings();
+        openDungeonModal(data, dungeonModalReturnFocus);
+      }
+    });
+
+    addRow.append(select, addBtn);
+  } else {
+    const allAdded = document.createElement('span');
+    allAdded.className = 'text-[11px] text-slate-400 italic';
+    allAdded.textContent = 'All candidate titans for this element are in the pool.';
+    addRow.append(allAdded);
+  }
+
+  const resetCurrentBtn = document.createElement('button');
+  resetCurrentBtn.type = 'button';
+  resetCurrentBtn.className = 'cursor-pointer text-[11px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 ml-auto hover:underline';
+  resetCurrentBtn.textContent = `↺ Reset ${poolTabs.find((t) => t.key === activeDungeonPoolTab)?.label || ''} Pool`;
+  resetCurrentBtn.addEventListener('click', () => {
+    const defaults = globalThis.hwaHelperDungeonAutomation?.DEFAULT_TITAN_POOLS;
+    if (defaults && defaults[activeDungeonPoolTab]) {
+      if (typeof dungeonAutomationSettings !== 'undefined') {
+        dungeonAutomationSettings.pools = {
+          ...getEffectiveDungeonPools(),
+          [activeDungeonPoolTab]: [...defaults[activeDungeonPoolTab]]
+        };
+      }
+      saveDungeonAutomationSettings();
+      openDungeonModal(data, dungeonModalReturnFocus);
+    }
+  });
+  addRow.append(resetCurrentBtn);
+
+  contentWrap.append(addRow);
+  details.append(contentWrap);
+  body.append(details);
+}
 
 function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   const modal = document.querySelector('#dungeon-modal');
@@ -4106,16 +4576,24 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   `;
   body.append(elemSec);
 
-  // --- SECTION 3: CURRENT FLOOR DOORS ---
+  // --- SECTION 3: STRATEGY & LINEUP POOLS (CUSTOMIZABLE) ---
+  renderDungeonStrategySection(data, body);
+
+  // --- SECTION 4: CURRENT FLOOR DOORS ---
   const doors = Array.isArray(data.currentFloorDoors) ? data.currentFloorDoors : [];
   if (doors.length > 0) {
     const doorsSec = document.createElement('div');
     doorsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
 
     const dungeonAuto = globalThis.hwaHelperDungeonAutomation;
+    const dungeonOptions = {
+      attackerPriority: getEffectiveAttackerPriority(),
+      pools: getEffectiveDungeonPools()
+    };
     const plan = dungeonAuto?.selectBestDoor?.(
       doors,
-      typeof currentCache !== 'undefined' ? currentCache : { dungeonStatus: { data } }
+      typeof currentCache !== 'undefined' ? currentCache : { dungeonStatus: { data } },
+      dungeonOptions
     );
 
     const currentRunState = (typeof dungeonRunState !== 'undefined' ? dungeonRunState : null);
@@ -4243,6 +4721,26 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
         warningDiv.className = 'text-[11px] text-rose-600 dark:text-rose-400 bg-rose-100/60 dark:bg-rose-950/50 rounded-md px-2 py-1 font-medium';
         warningDiv.textContent = `Casualties in lineup: Titan(s) ${evaluation.intactness.deadTitans.join(', ')} fallen. Auto-attack skipped.`;
         doorCard.append(warningDiv);
+      }
+
+      if (Array.isArray(evaluation?.heroes) && evaluation.heroes.length > 0) {
+        const ourLineupBox = document.createElement('div');
+        ourLineupBox.className = 'flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200 dark:border-slate-700/60';
+        const label = document.createElement('span');
+        label.className = 'text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider mr-1';
+        label.textContent = 'Deploy:';
+        ourLineupBox.append(label);
+        for (const hId of evaluation.heroes) {
+          const titanId = String(hId);
+          const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
+          const name = meta?.name || `Titan ${titanId}`;
+          const unitTag = document.createElement('span');
+          unitTag.className = 'inline-flex items-center gap-1 rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-700/80 dark:border-slate-600 dark:text-slate-200';
+          unitTag.innerHTML = `<img src="assets/titans/${titanId}.png" class="size-3.5 rounded-full object-cover shrink-0"><span>${name}</span>`;
+          unitTag.querySelector('img')?.addEventListener('error', (event) => { event.currentTarget.hidden = true; });
+          ourLineupBox.append(unitTag);
+        }
+        doorCard.append(ourLineupBox);
       }
 
       if (Array.isArray(door.team) && door.team.length > 0) {
@@ -5757,9 +6255,16 @@ function setupDungeonModal() {
           </svg>
           <span class="dungeon-auto-label">Starting...</span>
         `;
+        const autoSettings = (typeof getEffectiveAttackerPriority === 'function' && typeof getEffectiveDungeonPools === 'function')
+          ? {
+              attackerPriority: getEffectiveAttackerPriority(),
+              pools: getEffectiveDungeonPools()
+            }
+          : (typeof dungeonAutomationSettings !== 'undefined' && dungeonAutomationSettings ? dungeonAutomationSettings : undefined);
+        const startMsg = autoSettings ? { kind: 'dungeon-run-start', settings: autoSettings } : { kind: 'dungeon-run-start' };
         const resp = await new Promise((resolve) => {
           if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-            chrome.runtime.sendMessage({ kind: 'dungeon-run-start' }, resolve);
+            chrome.runtime.sendMessage(startMsg, resolve);
           } else {
             resolve({ ok: true });
           }
@@ -8791,6 +9296,8 @@ function renderResearchDialog(cache) {
   const sortOptions = [
     { value: 'level-desc', label: 'Level: High → Low' },
     { value: 'level-asc', label: 'Level: Low → High' },
+    { value: 'time-asc', label: 'Research Time: Shortest → Longest' },
+    { value: 'time-desc', label: 'Research Time: Longest → Shortest' },
     { value: 'name-asc', label: 'Name: A → Z' }
   ];
   for (const opt of sortOptions) {
@@ -8821,6 +9328,12 @@ function renderResearchDialog(cache) {
         return name.includes(query) || idStr.includes(query);
       })
       .sort((a, b) => {
+        if (nextResearchSortOrder === 'time-asc') {
+          return (a.durationMs - b.durationMs) || (b.currentLevel - a.currentLevel) || (a.id - b.id);
+        }
+        if (nextResearchSortOrder === 'time-desc') {
+          return (b.durationMs - a.durationMs) || (b.currentLevel - a.currentLevel) || (a.id - b.id);
+        }
         if (nextResearchSortOrder === 'level-asc') {
           return (a.currentLevel - b.currentLevel) || (a.id - b.id);
         }
@@ -11094,7 +11607,7 @@ globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion', 'campaignRaidSequential']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
+    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'dungeonAutomationSettings', 'dungeonRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion', 'campaignRaidSequential']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
   ]);
   const cache = stored[CACHE_KEY] || {};
   if (stored.campaignRaidSequential !== undefined) campaignRaidSequential = stored.campaignRaidSequential === true;
@@ -11109,6 +11622,44 @@ async function render() {
     towerAutomationSettings = String(stored.towerAutomationSettings?.accountId) === String(towerAccountId) ?
       stored.towerAutomationSettings : { accountId: towerAccountId, buffPriority: [] };
     towerSettingsLoadedFor = String(towerAccountId);
+  }
+  const dungeonAccountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id ?? null;
+  if (dungeonSettingsLoadedFor !== String(dungeonAccountId)) {
+    const saved = stored.dungeonAutomationSettings;
+    const defaultPools = globalThis.hwaHelperDungeonAutomation?.DEFAULT_TITAN_POOLS || {
+      water: [4000, 4001, 4052, 4004, 4002, 4003],
+      earth: [4020, 4022, 4024, 4023, 4021],
+      fire: [4010, 4011, 4013, 4012, 4014, 4051],
+      neutral: [4000, 4001, 4052, 4004, 4002, 4020, 4023, 4013, 4022, 4021, 4010, 4011, 4012, 4053]
+    };
+    if (saved && String(saved.accountId) === String(dungeonAccountId)) {
+      dungeonAutomationSettings = {
+        accountId: dungeonAccountId,
+        attackerPriority: Array.isArray(saved.attackerPriority) && saved.attackerPriority.length
+          ? [...saved.attackerPriority]
+          : ['water', 'neutral', 'earth', 'fire'],
+        pools: {
+          water: Array.isArray(saved.pools?.water) ? [...saved.pools.water] : [...defaultPools.water],
+          earth: Array.isArray(saved.pools?.earth) ? [...saved.pools.earth] : [...defaultPools.earth],
+          fire: Array.isArray(saved.pools?.fire) ? [...saved.pools.fire] : [...defaultPools.fire],
+          neutral: Array.isArray(saved.pools?.neutral)
+            ? [...saved.pools.neutral]
+            : (Array.isArray(saved.pools?.mixed) ? [...saved.pools.mixed] : [...defaultPools.neutral])
+        }
+      };
+    } else {
+      dungeonAutomationSettings = {
+        accountId: dungeonAccountId,
+        attackerPriority: ['water', 'neutral', 'earth', 'fire'],
+        pools: {
+          water: [...defaultPools.water],
+          earth: [...defaultPools.earth],
+          fire: [...defaultPools.fire],
+          neutral: [...defaultPools.neutral]
+        }
+      };
+    }
+    dungeonSettingsLoadedFor = String(dungeonAccountId);
   }
   raidQueueState = stored.raidQueue || null;
   monsterQueueState = stored.monsterQueue || null;

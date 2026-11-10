@@ -127,7 +127,38 @@ flowchart TD
 
 ---
 
-## 6. Hướng Dẫn Tùy Chỉnh Chi Tiết Cho Người Dùng
+## 6. Giao Diện Tùy Chỉnh Trực Quan Trong Dungeon Dialog (Visual Strategy Customization)
+
+Người dùng có thể trực tiếp xem và điều chỉnh chiến lược ngay trong **Dungeon Dialog** của extension mà không cần chỉnh sửa code thủ công:
+
+### 6.1. Tùy chỉnh Thứ tự Ưu tiên Nguyên tố (Attacker Element Priority)
+- Khung **Lineup Pools & Element Priority** có thể đóng/mở linh hoạt (`details/summary`).
+- Hiển thị thứ hạng 4 nguyên tố: `💧 Water (Nước)`, `⚡ Mixed / Neutral (Hỗn hợp)`, `🌿 Earth (Đất)`, `🔥 Fire (Lửa)`.
+- Sử dụng nút điều hướng **◀** (tăng bậc ưu tiên) và **▶** (giảm bậc ưu tiên) để thay đổi thứ tự.
+- Nút **↺ Reset Priority** giúp khôi phục nhanh về thứ tự chuẩn: `Water -> Mixed -> Earth -> Fire`.
+- Đánh giá cửa gợi ý (`⭐ Recommended`) tại mục Doors bên dưới sẽ lập tức được tính toán lại theo thứ tự mới.
+
+### 6.2. Xem và Điều chỉnh Pools Titan (Titan Lineup Pools)
+- **Tab nguyên tố**: Chuyển đổi linh hoạt giữa 4 pool `💧 Water`, `🌿 Earth`, `🔥 Fire`, `⚡ Mixed`.
+- **Thứ tự điều động ra trận**:
+  - Top 5 tướng đầu tiên có nhãn **Starter** (Đội hình xuất trận chính).
+  - Các tướng từ vị trí #6 trở đi có nhãn **Reserve** (Dự bị - sẽ được đôn lên khi có Starter ngã xuống).
+- **Trạng thái sinh mệnh trực quan**:
+  - Hiển thị Avatar, tên Titan, vai trò (Tank, Marksman, Supertitan...).
+  - Hiển thị trạng thái HP thực tế hoặc nhãn `❌ Fallen` nếu Titan đã tử trận.
+- **Các thao tác điều chỉnh**:
+  - Nút **⬆️ / ⬇️**: Thay đổi thứ tự ưu tiên pick của từng tướng.
+  - Nút **✖**: Xóa tướng khỏi pool (chỉ cho phép khi pool có > 5 tướng để luôn đảm bảo đủ đội hình 5 người).
+  - Menu **+ Add to Pool**: Cho phép bổ sung thêm các Titan khả dụng thuộc hệ tương ứng (hoặc bất kỳ Titan nào đối với hệ Mixed).
+  - Nút **↺ Reset Pool**: Khôi phục pool của hệ đang chọn hoặc toàn bộ pools về mặc định.
+
+### 6.3. Lưu trữ & Tự Động Đồng Bộ (Settings Persistence)
+- Toàn bộ cấu hình được lưu vào `chrome.storage.local` dưới key `dungeonAutomationSettings` gắn với ID tài khoản game (`accountId`).
+- Khi nhấn nút **Auto Attack**, popup sẽ tự động gửi kèm cấu hình `settings` (bao gồm `attackerPriority` và `pools`) sang background runner để thực hiện tấn công theo đúng chiến thuật đã thiết lập.
+
+---
+
+## 7. Hướng Dẫn Tùy Chỉnh Trong Code (Dành Cho Lập Trình Viên)
 
 Bạn có thể dễ dàng điều chỉnh cấu hình theo sở thích cá nhân trong code:
 

@@ -1025,3 +1025,89 @@ test('Building dialog excludes system landmarks and displays card with #ID pill,
   assert.equal(eligible.length, 2, 'Only building 170 and 171 should be eligible in building-queue');
   assert.ok(!eligible.some((e) => e.id === 44 || e.id === 160), 'Landmarks must not be in eligible queue candidates');
 });
+
+test('renderResearchDialog supports sorting next research candidates by research time (time-asc and time-desc)', async () => {
+  const researchBody = new MockElement('div');
+  const researchStatus = new MockElement('div');
+
+  const elements = {
+    '#research-dialog-body': researchBody,
+    '#research-dialog-status': researchStatus
+  };
+
+  const context = vm.createContext({
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
+    document: {
+      createElement: (tag) => new MockElement(tag),
+      querySelector: (sel) => elements[sel] || null
+    },
+    hwaHelperNameMap: {
+      research: (id) => id === 512 ? 'Short Tech' : (id === 513 ? 'Medium Tech' : 'Long Tech')
+    },
+    hwaHelperNameData: {
+      names: {
+        research: {
+          '512': 'Short Tech',
+          '513': 'Medium Tech',
+          '514': 'Long Tech'
+        }
+      }
+    },
+    hwaHelperResearchData: {
+      getMaxLevel: () => 10,
+      isAvailable: () => true,
+      calculateEffectiveDurationMs: (id) => {
+        if (id === 512) return 60000;    // 1m (shortest)
+        if (id === 513) return 300000;   // 5m (medium)
+        if (id === 514) return 1800000;  // 30m (longest)
+        return 60000;
+      }
+    }
+  });
+
+  const setupCode = popup.slice(
+    popup.indexOf("let buildingSearchQuery = '';"),
+    popup.indexOf('globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;') +
+      'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
+  );
+  vm.runInContext(setupCode, context);
+
+  context.renderResearchDialog({
+    buildingStatus: { data: { buildings: [{ buildingId: 43, level: 10 }] } },
+    researchStatus: {
+      data: {
+        queues: [],
+        completedResearches: [
+          { researchId: 512, level: 1 },
+          { researchId: 513, level: 1 },
+          { researchId: 514, level: 1 }
+        ]
+      }
+    }
+  });
+
+  // Verify sort select exists and has time options
+  const sortSelect = researchBody.querySelector('#next-research-sort-select');
+  assert.ok(sortSelect, 'Sort select must exist');
+  const sortOptions = sortSelect.children.map((c) => c.value);
+  assert.ok(sortOptions.includes('time-asc'), 'Sort select must include time-asc option');
+  assert.ok(sortOptions.includes('time-desc'), 'Sort select must include time-desc option');
+
+  // Test 1: Sort by shortest time (time-asc) -> 512, then 513, then 514
+  await sortSelect.fire('change', { target: { value: 'time-asc' } });
+  const gridAsc = researchBody.querySelector('#next-research-grid');
+  assert.equal(gridAsc.children.length, 3);
+  assert.ok(gridAsc.children[0].innerHTML.includes('Short Tech'));
+  assert.ok(gridAsc.children[1].innerHTML.includes('Medium Tech'));
+  assert.ok(gridAsc.children[2].innerHTML.includes('Long Tech'));
+
+  // Test 2: Sort by longest time (time-desc) -> 514, then 513, then 512
+  await sortSelect.fire('change', { target: { value: 'time-desc' } });
+  const gridDesc = researchBody.querySelector('#next-research-grid');
+  assert.equal(gridDesc.children.length, 3);
+  assert.ok(gridDesc.children[0].innerHTML.includes('Long Tech'));
+  assert.ok(gridDesc.children[1].innerHTML.includes('Medium Tech'));
+  assert.ok(gridDesc.children[2].innerHTML.includes('Short Tech'));
+});
+

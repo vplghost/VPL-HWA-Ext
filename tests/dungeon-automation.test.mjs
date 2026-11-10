@@ -819,3 +819,37 @@ test('rpc-cache resets titan HP and energy on new day rest', () => {
     'Dead titans from yesterday must be cleared on daily rest reset'
   );
 });
+
+test('selectBestDoor honors custom attackerPriority and custom titan pools', () => {
+  const doors = [
+    { attackerType: 'fire', defenderType: 'water', power: 25000 },
+    { attackerType: 'water', defenderType: 'earth', power: 25000 }
+  ];
+  const cache = {
+    dungeonStatus: {
+      data: {
+        floorNumber: 900,
+        currentFloorDoors: doors,
+        states: { titans: {} }
+      }
+    }
+  };
+
+  // 1. By default: water priority rank 0 < fire priority rank 4 -> Door 1 (water) is chosen
+  const defaultSel = dungeonAuto.selectBestDoor(doors, cache);
+  assert.equal(defaultSel.chosen.teamNum, 1, 'Default priority prefers water door over fire door');
+
+  // 2. Custom priority: fire first -> Door 0 (fire) is chosen
+  const customSel = dungeonAuto.selectBestDoor(doors, cache, {
+    attackerPriority: ['fire', 'earth', 'neutral', 'water']
+  });
+  assert.equal(customSel.chosen.teamNum, 0, 'Custom priority prefers fire door over water door');
+
+  // 3. Custom titan pools: custom water pool order alters selectedHeroes lineup
+  const customWaterPool = [4003, 4004, 4002, 4001, 4000]; // Hyperion first instead of Sigurd
+  const lineupCustom = dungeonAuto.pickLineupFromPool('water', {}, cache, {
+    pools: { water: customWaterPool }
+  });
+  assert.deepEqual([...lineupCustom.selectedHeroes], customWaterPool);
+});
+
