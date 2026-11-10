@@ -170,8 +170,8 @@ test('Tower progress UI groups traversed floors into an accordion with single-fl
   assert.ok(floor1Card && floor2Card, 'Both floor 1 and floor 2 cards must exist');
 
   // Verify compact header summaries
-  assert.match(floor1Card.textContent, /Tầng 1/);
-  assert.match(floor1Card.textContent, /Ải 1 \(Thắng\)/);
+  assert.match(floor1Card.textContent, /Floor 1/);
+  assert.match(floor1Card.textContent, /Room 1 \(Victory\)/);
   assert.match(floor1Card.textContent, /Hypno-Staff/);
 
   // Both detail panels collapsed initially

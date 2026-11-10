@@ -185,7 +185,7 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   // When draft candidates cannot be auto-probed, 15-hero planner matrix is NOT rendered
   assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
   // Instead, error notification and step-by-step picker are shown
-  assert.match(viewEl.textContent, /Không tìm thấy danh sách hero đề xuất/);
+  assert.match(viewEl.textContent, /Offered heroes not found in game payload/);
   assert.match(viewEl.textContent, /Step 1/);
   assert.match(viewEl.textContent, /Step 5/);
 
@@ -236,7 +236,7 @@ test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => 
   assert.match(viewEl.textContent, /Cleaver/);
   assert.match(viewEl.textContent, /Attack Draft/);
   // When candidates cannot be auto-probed, 15-hero planner is replaced by error notice
-  assert.match(viewEl.textContent, /Không tìm thấy danh sách hero đề xuất/);
+  assert.match(viewEl.textContent, /Offered heroes not found in game payload/);
   assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
 });
 
@@ -394,7 +394,7 @@ test('Legend Draft UI does NOT lock defense at match start and shows step picker
 
   // 15 Candidate Heroes Matrix MUST NOT be rendered; warning and step picker are shown
   assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
-  assert.match(viewEl.textContent, /Không tìm thấy danh sách hero đề xuất/);
+  assert.match(viewEl.textContent, /Offered heroes not found in game payload/);
   assert.match(viewEl.textContent, /Step 1/);
   assert.match(viewEl.textContent, /Step 5/);
 });
@@ -430,7 +430,7 @@ test('Legend Draft dialog preserves tab content and status on open and refresh',
 
   const draftModalBody = context.document.querySelector('#draft-modal-body');
   assert.ok(draftModalBody.children.length > 0, 'Modal body should contain rendered draft');
-  assert.match(draftModalBody.textContent, /Không tìm thấy danh sách hero đề xuất/);
+  assert.match(draftModalBody.textContent, /Offered heroes not found in game payload/);
   assert.doesNotMatch(draftModalBody.textContent, /Manual Candidate Planner/);
   context.renderDraft(activeCache, draftModalBody);
   assert.equal(viewEl.children[0], sentinel);
@@ -507,23 +507,23 @@ test('Legend Draft hero picking retains all 5 picks without wipe-out, auto-switc
   context.renderDraft(activeDraftCache);
 
   // By default, popupRpcEnabled is false in initial mock, so RPC alert should show
-  assert.match(viewEl.textContent, /Tính năng Popup RPC đang tắt/);
-  const enableRpcBtn = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Bật Popup RPC'));
-  assert.ok(enableRpcBtn, 'Bật Popup RPC button should exist');
+  assert.match(viewEl.textContent, /Popup RPC is currently disabled/);
+  const enableRpcBtn = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Enable Popup RPC'));
+  assert.ok(enableRpcBtn, 'Enable Popup RPC button should exist');
   enableRpcBtn.dispatchEvent('click');
 
   // Re-render after enabling RPC
   context.renderDraft(activeDraftCache);
-  assert.doesNotMatch(viewEl.textContent, /Tính năng Popup RPC đang tắt/);
+  assert.doesNotMatch(viewEl.textContent, /Popup RPC is currently disabled/);
   // Now Direct RPC advisory shows because default mode is piggyback
-  assert.match(viewEl.textContent, /Chuyển sang Direct RPC/);
-  const switchDirectBtn = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Chuyển Direct RPC'));
-  assert.ok(switchDirectBtn, 'Chuyển Direct RPC button should exist');
+  assert.match(viewEl.textContent, /Switch to Direct RPC/);
+  const switchDirectBtn = viewEl.querySelectorAll('button').find((b) => b.textContent.includes('Switch to Direct RPC'));
+  assert.ok(switchDirectBtn, 'Switch to Direct RPC button should exist');
   switchDirectBtn.dispatchEvent('click');
 
   // Re-render after switching direct mode
   context.renderDraft(activeDraftCache);
-  assert.doesNotMatch(viewEl.textContent, /Chuyển sang Direct RPC/);
+  assert.doesNotMatch(viewEl.textContent, /Switch to Direct RPC/);
 
   // Pick 5 heroes sequentially
   // Pick hero 4 (Astaroth)
@@ -564,7 +564,7 @@ test('Legend Draft hero picking retains all 5 picks without wipe-out, auto-switc
   // Crucial check: all 5 picks must be retained and NOT wiped out on re-render
   assert.match(statusEl.textContent, /Selected 5\/5 steps/);
   assert.match(viewEl.textContent, /Lock Defense Lineup \(5 Heroes\)/);
-  assert.match(viewEl.textContent, /Khóa & Gửi Đội hình Thủ \(5\/5 Hero\)/);
+  assert.match(viewEl.textContent, /Lock & Submit Defense Lineup \(5\/5 Heroes\)/);
 
   // Now simulate server advancing to Attack stage (stageId = 4)
   activeDraftCache.legendDraftStatus.data.stageId = 4;
@@ -599,8 +599,8 @@ test('Legend Draft displays server rejection error banner and keeps slots editab
   };
 
   context.renderDraft(errorCache);
-  assert.match(viewEl.textContent, /Máy chủ từ chối đội hình: "Invalid heroes list"/);
-  assert.match(viewEl.textContent, /Mã lỗi: 5/);
+  assert.match(viewEl.textContent, /Server rejected lineup: "Invalid heroes list"/);
+  assert.match(viewEl.textContent, /Error code: 5/);
   assert.doesNotMatch(viewEl.textContent, /Lineup successfully locked/);
   assert.match(viewEl.textContent, /Step 1/);
 });
@@ -635,14 +635,14 @@ test('Legend Draft presents 3 candidate cards per step for match 360504765 and a
   context.renderDraft(draftCache);
 
   // Should render 3 choices banner for Step 1
-  assert.match(viewEl.textContent, /3 Lựa chọn cho Step 1 \(Chọn 1 trong 3\)/);
+  assert.match(viewEl.textContent, /3 Choices for Step 1 \(Pick 1 of 3\)/);
   assert.match(viewEl.textContent, /Chabba/);
   assert.match(viewEl.textContent, /Galahad/);
   assert.match(viewEl.textContent, /Phobos/);
 
   // Pick Chabba (choice 1)
   const buttons = viewEl.querySelectorAll('button');
-  const pickChabbaBtn = buttons.find(b => b.textContent === 'Chọn Hero này' || b.textContent.includes('Chabba'));
+  const pickChabbaBtn = buttons.find(b => b.textContent === 'Pick this Hero' || b.textContent.includes('Chabba'));
   assert.ok(pickChabbaBtn, 'Pick button for candidate should exist');
   pickChabbaBtn.dispatchEvent('click');
 
@@ -650,7 +650,7 @@ test('Legend Draft presents 3 candidate cards per step for match 360504765 and a
 
   // Step 1 should be selected, status updated to 1/5, and active step auto-advanced to Step 2
   assert.match(statusEl.textContent, /Selected 1\/5 steps/);
-  assert.match(viewEl.textContent, /3 Lựa chọn cho Step 2 \(Chọn 1 trong 3\)/);
+  assert.match(viewEl.textContent, /3 Choices for Step 2 \(Pick 1 of 3\)/);
   assert.match(viewEl.textContent, /Peech/);
   assert.match(viewEl.textContent, /Iris/);
   assert.match(viewEl.textContent, /Krista/);

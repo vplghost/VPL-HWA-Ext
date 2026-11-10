@@ -339,9 +339,9 @@ test('openCampaignDialog with gearId renders recipe tree and auto-fills highest 
   context.renderCampaignDialog(cache, target);
 
   const text = target.textContent;
-  assert.match(text, /Cây Công Thức Chế Tạo/);
-  assert.match(text, /Thiếu 3 mảnh/);
-  assert.match(text, /Đang chọn farm/);
+  assert.match(text, /Crafting Recipe Tree/);
+  assert.match(text, /Missing 3 fragments/);
+  assert.match(text, /Selected for farming/);
 
   // Check auto-filled mission ID is the highest 3-star mission for gear 62
   const cacheWith62 = {
@@ -384,10 +384,10 @@ test('renderCampaignDialog displays both fragmentGear and fragmentScroll in craf
   context.renderCampaignDialog(cache, target);
   const text = target.textContent;
 
-  assert.match(text, /Mảnh trang bị & Bản vẽ hiện có trong kho/);
-  assert.match(text, /8 mảnh/);
-  assert.match(text, /Mảnh bản vẽ/);
-  assert.match(text, /6 mảnh/);
+  assert.match(text, /Fragments & Recipes in Inventory/);
+  assert.match(text, /8 fragments/);
+  assert.match(text, /Recipe Fragment/);
+  assert.match(text, /6 fragments/);
 });
 
 test('hero dialog equipment slot click passes gearId to openCampaignDialog', async () => {

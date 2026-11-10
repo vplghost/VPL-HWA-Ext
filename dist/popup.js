@@ -2360,13 +2360,13 @@ function renderDraft(cache, target = view) {
     rpcAlert.innerHTML = `
       <div class="flex items-center gap-2">
         <span class="text-base leading-none">⚠️</span>
-        <span>Tính năng Popup RPC đang tắt. Cần bật để khóa/gửi đội hình Legend Draft.</span>
+        <span>Popup RPC is currently disabled. Enable it to submit your Legend Draft lineup.</span>
       </div>
     `;
     const enableBtn = document.createElement('button');
     enableBtn.type = 'button';
     enableBtn.className = 'px-2.5 py-1 rounded bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 cursor-pointer shrink-0';
-    enableBtn.textContent = 'Bật Popup RPC';
+    enableBtn.textContent = 'Enable Popup RPC';
     enableBtn.addEventListener('click', async () => {
       popupRpcEnabled = true;
       await chrome.storage?.local?.set?.({ popupRpcEnabled: true });
@@ -2380,13 +2380,13 @@ function renderDraft(cache, target = view) {
     modeAlert.innerHTML = `
       <div class="flex items-center gap-2">
         <span class="text-base leading-none">⚡</span>
-        <span>Khuyến nghị: Chuyển sang <strong>Direct RPC</strong> để gửi đội hình lập tức (tránh bị hoãn do game không tự gửi RPC khi đang chọn hero).</span>
+        <span>Recommended: Switch to <strong>Direct RPC</strong> to submit your lineup immediately (avoids delays from native game queues).</span>
       </div>
     `;
     const switchDirectBtn = document.createElement('button');
     switchDirectBtn.type = 'button';
     switchDirectBtn.className = 'px-2.5 py-1 rounded bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 cursor-pointer shrink-0';
-    switchDirectBtn.textContent = 'Chuyển Direct RPC';
+    switchDirectBtn.textContent = 'Switch to Direct RPC';
     switchDirectBtn.addEventListener('click', async () => {
       currentRpcPolicy = { ...currentRpcPolicy, mode: 'direct' };
       await chrome.storage?.local?.set?.({ socketRefreshMode: 'direct' });
@@ -2695,9 +2695,9 @@ function renderDraft(cache, target = view) {
       errorAlert.innerHTML = `
         <span class="text-base leading-none">❌</span>
         <div class="space-y-0.5">
-          <div class="font-bold">Máy chủ từ chối đội hình: "${draft.lastError}"${draft.lastErrorCode ? ` (Mã lỗi: ${draft.lastErrorCode})` : ''}</div>
+          <div class="font-bold">Server rejected lineup: "${draft.lastError}"${draft.lastErrorCode ? ` (Error code: ${draft.lastErrorCode})` : ''}</div>
           <div class="text-[11px] text-red-800">
-            Trong Legend Draft, máy chủ chỉ chấp nhận hero nằm trong 3 lựa chọn đề xuất của từng bước (Step 1 → Step 5) hiển thị trên màn hình game. Đội hình vừa gửi chứa hero không hợp lệ. Vui lòng nhìn màn hình game để chọn đúng hero tương ứng cho từng Step.
+            In Legend Draft, the server only accepts heroes offered in the 3 choices for each step (Step 1 → Step 5) shown on screen. The submitted lineup contains an invalid hero. Please consult the game screen to select the matching hero for each step.
           </div>
         </div>
       `;
@@ -2710,9 +2710,9 @@ function renderDraft(cache, target = view) {
       unprobedAlert.innerHTML = `
         <span class="text-base leading-none">⚠️</span>
         <div class="space-y-0.5">
-          <div class="font-bold">Không tìm thấy danh sách hero đề xuất từ gói tin game (encrypted draft payload).</div>
+          <div class="font-bold">Offered heroes not found in game payload (encrypted draft payload).</div>
           <div class="text-[11px] text-amber-800">
-            Dữ liệu 15 hero đề xuất được mã hóa và xử lý nội bộ trong game client. Máy chủ chỉ chấp nhận hero nằm trong 3 lựa chọn của từng lượt (Step 1 → Step 5) đang hiển thị trên màn hình game. Vui lòng nhìn màn hình game để chọn đúng hero tương ứng cho từng Step trước khi khóa và gửi.
+            The 15 offered heroes are processed within the game client. The server only accepts heroes from the 3 choices for each step (Step 1 → Step 5) displayed on screen. Please consult the game screen to select the corresponding hero for each step before locking and submitting.
           </div>
         </div>
       `;
@@ -2728,7 +2728,7 @@ function renderDraft(cache, target = view) {
 
     const pickerTitle = document.createElement('div');
     pickerTitle.className = 'text-xs font-bold text-slate-800 flex items-center gap-1.5';
-    pickerTitle.innerHTML = `<span>🎯 Chọn Hero cho <strong>Step ${activeDraftStep + 1}</strong>:</span> <span class="text-[11px] font-normal text-slate-500">(${isViewingAttack ? 'Đội hình Công' : 'Đội hình Thủ'})</span>`;
+    pickerTitle.innerHTML = `<span>🎯 Select Hero for <strong>Step ${activeDraftStep + 1}</strong>:</span> <span class="text-[11px] font-normal text-slate-500">(${isViewingAttack ? 'Attack Lineup' : 'Defense Lineup'})</span>`;
     pickerTop.append(pickerTitle);
 
     const stepPills = document.createElement('div');
@@ -2759,7 +2759,7 @@ function renderDraft(cache, target = view) {
 
     const searchInp = document.createElement('input');
     searchInp.type = 'text';
-    searchInp.placeholder = 'Tìm kiếm hero theo tên, role, ID...';
+    searchInp.placeholder = 'Search hero by name, role, ID...';
     searchInp.className = 'flex-1 min-w-[150px] px-2.5 py-1 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500';
 
     const roleChips = document.createElement('div');
@@ -2774,7 +2774,7 @@ function renderDraft(cache, target = view) {
         'bg-slate-800 text-white' :
         'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
       }`;
-      rBtn.textContent = r === 'all' ? 'Tất cả' : r;
+      rBtn.textContent = r === 'all' ? 'All' : r;
       rBtn.addEventListener('click', () => {
         selectedRoleFilter = r.toLowerCase();
         renderHeroGrid(searchInp.value);
@@ -2810,7 +2810,7 @@ function renderDraft(cache, target = view) {
       if (filtered.length === 0) {
         const emptyMsg = document.createElement('div');
         emptyMsg.className = 'col-span-full py-4 text-center text-xs text-slate-400';
-        emptyMsg.textContent = 'Không tìm thấy hero phù hợp với bộ lọc';
+        emptyMsg.textContent = 'No heroes match the filter';
         heroGrid.append(emptyMsg);
         return;
       }
@@ -2852,10 +2852,10 @@ function renderDraft(cache, target = view) {
         const subRow = document.createElement('div');
         subRow.className = 'text-[9px] text-slate-500 truncate';
         if (isAlreadyPickedInOtherStep) {
-          subRow.textContent = `Đã chọn (Step ${alreadyPickIdx + 1})`;
+          subRow.textContent = `Selected (Step ${alreadyPickIdx + 1})`;
           subRow.className = 'text-[9px] text-amber-700 font-medium truncate';
         } else if (isCurrentStepPick) {
-          subRow.textContent = '✓ Đang chọn';
+          subRow.textContent = '✓ Selected';
           subRow.className = 'text-[9px] text-emerald-700 font-bold truncate';
         } else {
           subRow.textContent = meta.role || (snap?.star ? `★${snap.star}` : '');
@@ -2896,9 +2896,9 @@ function renderDraft(cache, target = view) {
       stepCandidatesHead.innerHTML = `
         <span class="font-bold text-slate-800 flex items-center gap-1.5">
           <span class="size-2 rounded-full bg-blue-600"></span>
-          <span>3 Lựa chọn cho Step ${activeDraftStep + 1} (Chọn 1 trong 3):</span>
+          <span>3 Choices for Step ${activeDraftStep + 1} (Pick 1 of 3):</span>
         </span>
-        <span class="text-[11px] text-blue-600 font-semibold">Bấm để chọn & tự chuyển bước</span>
+        <span class="text-[11px] text-blue-600 font-semibold">Click to select & advance step</span>
       `;
       stepCandidatesWrap.append(stepCandidatesHead);
 
@@ -2923,7 +2923,7 @@ function renderDraft(cache, target = view) {
         cardTop.className = 'w-full flex items-center justify-between mb-1 text-[10px]';
         const tag = document.createElement('span');
         tag.className = 'font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600';
-        tag.textContent = `Lựa chọn #${cIdx + 1}`;
+        tag.textContent = `Choice #${cIdx + 1}`;
         cardTop.append(tag);
 
         if (Number.isInteger(snap?.star)) {
@@ -2968,7 +2968,7 @@ function renderDraft(cache, target = view) {
           isPickedInOtherStep ?
           'mt-2 w-full py-1.5 rounded-lg text-xs font-semibold bg-slate-200 text-slate-500 cursor-not-allowed' :
           'mt-2 w-full py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-xs';
-        pickActionBtn.textContent = isChosen ? '✓ Đang chọn' : (isPickedInOtherStep ? `Đã chọn ở Step ${alreadyPickIdx + 1}` : 'Chọn Hero này');
+        pickActionBtn.textContent = isChosen ? '✓ Selected' : (isPickedInOtherStep ? `Selected in Step ${alreadyPickIdx + 1}` : 'Pick this Hero');
 
         const handlePick = () => {
           if (isPickedInOtherStep) return;
@@ -3001,7 +3001,7 @@ function renderDraft(cache, target = view) {
       manualDetails.className = 'pt-1 border-t border-slate-200/80 text-xs';
       const manualSummary = document.createElement('summary');
       manualSummary.className = 'cursor-pointer text-slate-500 hover:text-slate-800 font-medium py-1 select-none';
-      manualSummary.textContent = '🔍 Hoặc tìm kiếm chọn hero khác (Thủ công / Ngoài 3 đề xuất)...';
+      manualSummary.textContent = '🔍 Or search and pick another hero (Manual / Custom)...';
       manualDetails.append(manualSummary);
       manualDetails.append(filterRow, heroGrid);
       pickerCard.append(manualDetails);
@@ -3020,7 +3020,7 @@ function renderDraft(cache, target = view) {
       const clearStepBtn = document.createElement('button');
       clearStepBtn.type = 'button';
       clearStepBtn.className = 'px-2.5 py-1 rounded-md text-[11px] text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 cursor-pointer';
-      clearStepBtn.textContent = `Xóa chọn Step ${activeDraftStep + 1}`;
+      clearStepBtn.textContent = `Clear Step ${activeDraftStep + 1}`;
       clearStepBtn.addEventListener('click', () => {
         currentPicks[activeDraftStep] = null;
         render();
@@ -3032,7 +3032,7 @@ function renderDraft(cache, target = view) {
       const resetAllBtn = document.createElement('button');
       resetAllBtn.type = 'button';
       resetAllBtn.className = 'px-2.5 py-1 rounded-md text-[11px] text-slate-500 hover:text-red-700 hover:bg-red-50 cursor-pointer';
-      resetAllBtn.textContent = 'Reset 5 bước';
+      resetAllBtn.textContent = 'Reset All 5 Steps';
       resetAllBtn.addEventListener('click', () => {
         if (isViewingAttack) localDraftAttackPicks = [null, null, null, null, null];
         else localDraftDefencePicks = [null, null, null, null, null];
@@ -3051,8 +3051,8 @@ function renderDraft(cache, target = view) {
         'px-4 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-400 cursor-not-allowed border border-slate-200';
       submitDirectBtn.disabled = !popupRpcEnabled;
       submitDirectBtn.textContent = popupRpcEnabled ?
-        `✓ Khóa & Gửi ${isViewingAttack ? 'Đội hình Công' : 'Đội hình Thủ'} (5/5 Hero)` :
-        'Bật Popup RPC để gửi';
+        `✓ Lock & Submit ${isViewingAttack ? 'Attack Lineup' : 'Defense Lineup'} (5/5 Heroes)` :
+        'Enable Popup RPC to Submit';
       if (popupRpcEnabled) {
         submitDirectBtn.addEventListener('click', () => {
           submitDirectBtn.disabled = true;
@@ -5439,7 +5439,7 @@ function renderTowerModal(cache = currentCache) {
   }
   function renderBuffPriority() {
     const card = section('Buff priority');
-    line(card, 'Drag a buff to set its priority. The first offered buff in this order is selected. Cổng chiến đấu cũng ưu tiên cửa dẫn đến buff cao nhất theo danh sách này.');
+    line(card, 'Drag a buff to set its priority. The first offered buff in this order is selected. Combat routes also prioritize doors leading to the highest buff in this list.');
     const groups = [
       { label: 'Physical', ids: [8, 14, 26, 30], classes: 'border-rose-300 bg-rose-100 text-rose-950 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200' },
       { label: 'Magic', ids: [9, 15, 27, 33, 45], classes: 'border-indigo-300 bg-indigo-100 text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200' },
@@ -5613,7 +5613,7 @@ function renderTowerModal(cache = currentCache) {
 
     const buffNote = document.createElement('div');
     buffNote.className = 'text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pt-1';
-    buffNote.innerHTML = '<span>🚪</span><span>Các lựa chọn cổng sẽ tự động ưu tiên cửa dẫn đến buff theo thứ tự ưu tiên bên dưới.</span>';
+    buffNote.innerHTML = '<span>🚪</span><span>Battle choices automatically prioritize doors leading to buffs following the priority order below.</span>';
     teamBox.append(buffNote);
 
     card.append(teamBox);
@@ -5751,15 +5751,15 @@ function renderTowerModal(cache = currentCache) {
       const isExpanded = expandedTowerFloor === f;
 
       // 1. Battle summary
-      let battleSummary = 'Chưa đấu';
+      let battleSummary = 'Not fought';
       if (group.battle) {
-        const roomNum = group.battle.room != null ? `Ải ${group.battle.room}` : 'Ải';
-        const result = group.battle.win ? 'Thắng' : 'Thua';
+        const roomNum = group.battle.room != null ? `Room ${group.battle.room}` : 'Room';
+        const result = group.battle.win ? 'Victory' : 'Defeat';
         battleSummary = `${roomNum} (${result})`;
       }
 
       // 2. Buff summary
-      let buffSummary = 'Không buff';
+      let buffSummary = 'No buff';
       if (group.buff) {
         const buffObj = catalog[group.buff.buffId];
         buffSummary = buffObj?.name || `Buff #${group.buff.buffId}`;
@@ -5788,7 +5788,7 @@ function renderTowerModal(cache = currentCache) {
       headerBtn.innerHTML = `
         <div class="flex items-center gap-2.5 flex-wrap flex-1 min-w-0 text-xs">
           <span class="rounded-lg bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800 dark:bg-violet-950/80 dark:text-violet-300 dark:border dark:border-violet-800/60 shrink-0">
-            Tầng ${f}
+            Floor ${f}
           </span>
           <span class="inline-flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200 shrink-0">
             <span>⚔️</span>
@@ -10107,7 +10107,7 @@ function renderHeroDialog(heroId, cache) {
       isUnlocked ? s.bg : 'border-dashed border-slate-200 bg-slate-50/30 text-slate-400 dark:border-slate-800 dark:bg-slate-900/30'
     }`;
 
-    // Top row: pill + skillName on left, button / badge on right (sát lề phải)
+    // Top row: pill + skillName on left, button / badge on right (flush right)
     const topRow = document.createElement('div');
     topRow.className = 'flex items-center justify-between gap-1.5 min-w-0';
 
@@ -10126,7 +10126,7 @@ function renderHeroDialog(heroId, cache) {
     nameGroup.append(pill, slotTitle);
     topRow.append(nameGroup);
 
-    // Right action button / badge (sát lề phải)
+    // Right action button / badge (flush right)
     const actionWrap = document.createElement('div');
     actionWrap.className = 'shrink-0 flex items-center';
 
@@ -10247,16 +10247,16 @@ function renderHeroDialog(heroId, cache) {
   equipHeader.innerHTML = `
     <div>
       <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-        <span>🛡️</span> Equipment Slots (Trang bị)
+        <span>🛡️</span> Equipment Slots
       </h4>
-      <div class="text-2xs text-slate-400 dark:text-slate-500">6 ô trang bị để tăng Rank/Color cho Hero</div>
+      <div class="text-2xs text-slate-400 dark:text-slate-500">6 equipment slots to advance Hero Rank/Color</div>
     </div>
   `;
 
   const farmQuickBtn = document.createElement('button');
   farmQuickBtn.type = 'button';
   farmQuickBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5';
-  farmQuickBtn.innerHTML = '<span>⚔️</span> Farm Trang Bị';
+  farmQuickBtn.innerHTML = '<span>⚔️</span> Farm Equipment';
   farmQuickBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     let firstMissingGearId = null;
@@ -10314,9 +10314,9 @@ function renderHeroDialog(heroId, cache) {
             <span class="size-5 rounded-full flex items-center justify-center font-bold text-2xs bg-emerald-600 text-white shrink-0">${slotNum}</span>
             <span class="font-bold truncate text-xs text-slate-800 dark:text-slate-100" title="${itemName}">${itemName}</span>
           </div>
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 shrink-0">✓ Đã trang bị</span>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 shrink-0">✓ Equipped</span>
         </div>
-        <div class="text-3xs text-emerald-600 dark:text-emerald-400 font-medium">Slot ${slotNum} • Đã kích hoạt chỉ số</div>
+        <div class="text-3xs text-emerald-600 dark:text-emerald-400 font-medium">Slot ${slotNum} • Stats active</div>
       `;
     } else {
       const ownedGear = Number(cache?.inventoryGet?.data?.gear?.[itemId] || 0);
@@ -10331,25 +10331,25 @@ function renderHeroDialog(heroId, cache) {
 
       if (ownedGear > 0) {
         slotBox.className += ' border-sky-300 bg-sky-50/70 dark:border-sky-800 dark:bg-sky-950/30 hover:border-sky-400 cursor-pointer';
-        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300 shrink-0">📦 Trong kho (${ownedGear})</span>`;
-        subText = `Slot ${slotNum} • <span class="text-sky-700 dark:text-sky-300 font-semibold">Đã có trong kho (chưa trang bị)</span>`;
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300 shrink-0">📦 In Inventory (${ownedGear})</span>`;
+        subText = `Slot ${slotNum} • <span class="text-sky-700 dark:text-sky-300 font-semibold">In Inventory (not equipped)</span>`;
       } else if (fragReq > 0 && ownedFrags >= fragReq) {
         canCraftNow = true;
         slotBox.className += ' border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/30 hover:border-amber-400 cursor-pointer';
-        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">🧩 Đủ ghép (${ownedFrags}/${fragReq})</span>`;
-        subText = `Slot ${slotNum} • <span class="text-amber-700 dark:text-amber-300 font-semibold">Chưa ghép • Đủ mảnh để ghép</span>`;
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">🧩 Ready to craft (${ownedFrags}/${fragReq})</span>`;
+        subText = `Slot ${slotNum} • <span class="text-amber-700 dark:text-amber-300 font-semibold">Not crafted • Fragments ready</span>`;
       } else if (fragReq > 0 && ownedFrags > 0) {
         slotBox.className += ' border-dashed border-amber-200 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/10 hover:border-indigo-400 cursor-pointer';
-        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">🧩 Chưa ghép (${ownedFrags}/${fragReq})</span>`;
-        subText = `Slot ${slotNum} • <span class="text-slate-500 dark:text-slate-400">Thiếu ${fragReq - ownedFrags} mảnh ghép</span>`;
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">🧩 Incomplete (${ownedFrags}/${fragReq})</span>`;
+        subText = `Slot ${slotNum} • <span class="text-slate-500 dark:text-slate-400">Missing ${fragReq - ownedFrags} fragments</span>`;
       } else if (hasRecipe) {
         slotBox.className += ' border-dashed border-purple-200 bg-purple-50/30 dark:border-purple-900/30 dark:bg-purple-950/10 hover:border-indigo-400 cursor-pointer';
         badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 shrink-0">🛠️ Recipe</span>`;
-        subText = `Slot ${slotNum} • <span class="text-purple-600 dark:text-purple-400">Chưa chế tạo (ghép từ Recipe)</span>`;
+        subText = `Slot ${slotNum} • <span class="text-purple-600 dark:text-purple-400">Uncrafted (assembled from Recipe)</span>`;
       } else {
         slotBox.className += ' border-dashed border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:bg-indigo-50/20 cursor-pointer';
-        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0">Chưa có${fragReq > 0 ? ` (0/${fragReq})` : ''}</span>`;
-        subText = `Slot ${slotNum} • <span class="text-slate-400 italic">Bấm để mở Campaign Farm</span>`;
+        badgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0">Missing${fragReq > 0 ? ` (0/${fragReq})` : ''}</span>`;
+        subText = `Slot ${slotNum} • <span class="text-slate-400 italic">Click to open Campaign Farm</span>`;
       }
 
       slotBox.innerHTML = `
@@ -10369,7 +10369,7 @@ function renderHeroDialog(heroId, cache) {
         const craftBtn = document.createElement('button');
         craftBtn.type = 'button';
         craftBtn.className = 'px-2 py-0.5 rounded text-3xs font-bold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer shadow-xs shrink-0';
-        craftBtn.textContent = 'Ghép';
+        craftBtn.textContent = 'Craft';
         craftBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           craftBtn.disabled = true;
@@ -10379,7 +10379,7 @@ function renderHeroDialog(heroId, cache) {
             (res) => {
               if (chrome.runtime?.lastError) {
                 craftBtn.disabled = false;
-                craftBtn.textContent = 'Lỗi';
+                craftBtn.textContent = 'Error';
                 return;
               }
               if (res?.ok) {
@@ -10390,7 +10390,7 @@ function renderHeroDialog(heroId, cache) {
                 }, 500);
               } else {
                 craftBtn.disabled = false;
-                craftBtn.textContent = res?.error || 'Lỗi';
+                craftBtn.textContent = res?.error || 'Error';
               }
             }
           );
@@ -10489,7 +10489,7 @@ function buildGearRecipeTree(gearId, cache, visited = new Set()) {
       const scrollCraft = globalThis.hwaHelperScrollCraftData?.[scrollStr] || null;
       const scrollName = globalThis.hwaHelperNameData?.names?.scroll?.[scrollStr] ||
                          globalThis.hwaHelperNameMap?.item?.('scroll', scrollStr) ||
-                         `Bản vẽ #${scrollStr}`;
+                         `Recipe #${scrollStr}`;
       const ownedScroll = Number(cache?.inventoryGet?.data?.scroll?.[scrollStr] || 0);
       const reqNum = Number(reqCount) || 1;
       const isScrollFulfilled = ownedScroll >= reqNum;
@@ -10568,16 +10568,16 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   leftInfo.className = 'space-y-0.5';
   leftInfo.innerHTML = `
     <div class="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-      <span>⚡</span> Chiến dịch (Campaign Mission Raid)
+      <span>⚡</span> Campaign Mission Raid
     </div>
     <div class="text-2xs text-slate-500 dark:text-slate-400">
-      Raid các ải chiến dịch để farm nhanh trang bị, mảnh ghép và vàng
+      Raid campaign missions to farm equipment, fragments, and gold
     </div>
   `;
 
   const energyChip = document.createElement('div');
   energyChip.className = 'inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 font-bold text-xs text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-800';
-  energyChip.innerHTML = `<span>⚡ Năng lượng:</span> <span class="text-sm font-extrabold">${curEnergy}</span>${maxEnergy !== '—' ? `<span class="text-amber-500">/ ${maxEnergy}</span>` : ''}`;
+  energyChip.innerHTML = `<span>⚡ Energy:</span> <span class="text-sm font-extrabold">${curEnergy}</span>${maxEnergy !== '—' ? `<span class="text-amber-500">/ ${maxEnergy}</span>` : ''}`;
 
   statusBanner.append(leftInfo, energyChip);
   container.append(statusBanner);
@@ -10609,12 +10609,12 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
     titleInfo.className = 'min-w-0';
     titleInfo.innerHTML = `
       <div class="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
-        <span>🌿 Cây Công Thức Chế Tạo:</span>
+        <span>🌿 Crafting Recipe Tree:</span>
         <span class="text-indigo-600 dark:text-indigo-400 font-extrabold">${recipeTree.name}</span>
         <span class="text-3xs font-mono text-slate-400">#${recipeTree.id}</span>
       </div>
       <div class="text-2xs text-slate-400 dark:text-slate-500">
-        Bấm vào một nhánh hoặc mảnh ghép để giới hạn và tự động fill ải chiến dịch cao nhất (3⭐)
+        Click a branch or fragment to filter and select the highest campaign mission (3⭐)
       </div>
     `;
     titleGroup.append(rootImg, titleInfo);
@@ -10622,7 +10622,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
     const clearTargetBtn = document.createElement('button');
     clearTargetBtn.type = 'button';
     clearTargetBtn.className = 'text-3xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 cursor-pointer transition-colors';
-    clearTargetBtn.textContent = '✕ Bỏ lọc trang bị';
+    clearTargetBtn.textContent = '✕ Clear Gear Filter';
     clearTargetBtn.addEventListener('click', () => {
       selectedFarmGearId = null;
       selectedRecipeNodeId = null;
@@ -10671,15 +10671,15 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       const nameInfo = document.createElement('div');
       nameInfo.className = 'min-w-0';
 
-      const reqLabel = node.requiredCount ? ` (Cần ${node.requiredCount})` : (isRoot ? ' (Mục tiêu)' : '');
+      const reqLabel = node.requiredCount ? ` (Need ${node.requiredCount})` : (isRoot ? ' (Target)' : '');
       nameInfo.innerHTML = `
         <div class="flex items-center gap-1.5 flex-wrap">
           <span class="font-bold text-xs truncate ${isSelected ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-800 dark:text-slate-200'}">${node.isScroll ? '📜 ' : ''}${node.name}</span>
           <span class="text-3xs font-mono text-slate-400">#${node.id}${reqLabel}</span>
         </div>
         <div class="text-3xs text-slate-500 dark:text-slate-400 flex items-center gap-2 flex-wrap">
-          <span>Trong kho: <strong class="${node.owned > 0 ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}">${node.owned}</strong></span>
-          ${node.fragment ? `<span>• Mảnh: <strong class="${node.fragment.isFulfilled ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${node.fragment.owned} / ${node.fragment.required}</strong></span>` : ''}
+          <span>In Inventory: <strong class="${node.owned > 0 ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}">${node.owned}</strong></span>
+          ${node.fragment ? `<span>• Fragments: <strong class="${node.fragment.isFulfilled ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${node.fragment.owned} / ${node.fragment.required}</strong></span>` : ''}
         </div>
       `;
       left.append(nameInfo);
@@ -10691,15 +10691,15 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       const statusPill = document.createElement('span');
       if (node.isFulfilled) {
         statusPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300';
-        statusPill.textContent = '✓ Đã đủ';
+        statusPill.textContent = '✓ Complete';
       } else if (node.fragment && !node.fragment.isFulfilled) {
         const missingFrags = node.fragment.required - node.fragment.owned;
         statusPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
-        statusPill.textContent = node.isScroll ? `📜 Thiếu ${missingFrags} mảnh bản vẽ` : `🧩 Thiếu ${missingFrags} mảnh`;
+        statusPill.textContent = node.isScroll ? `📜 Missing ${missingFrags} recipe fragments` : `🧩 Missing ${missingFrags} fragments`;
       } else {
         const missingCount = node.requiredCount ? Math.max(1, node.requiredCount - node.owned) : 1;
         statusPill.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300';
-        statusPill.textContent = `Thiếu ${missingCount}`;
+        statusPill.textContent = `Missing ${missingCount}`;
       }
       right.append(statusPill);
 
@@ -10707,10 +10707,10 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
         const quickCraftBtn = document.createElement('button');
         quickCraftBtn.type = 'button';
         quickCraftBtn.className = 'px-2 py-0.5 rounded text-3xs font-bold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer shadow-xs';
-        quickCraftBtn.textContent = 'Ghép';
+        quickCraftBtn.textContent = 'Craft';
         quickCraftBtn.title = node.isScroll
-          ? `Ghép mảnh bản vẽ #${node.id}`
-          : (node.fragment ? `Ghép mảnh #${node.id}` : `Chế tạo recipe #${node.id}`);
+          ? `Craft recipe fragments #${node.id}`
+          : (node.fragment ? `Craft fragments #${node.id}` : `Craft recipe #${node.id}`);
         quickCraftBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           quickCraftBtn.disabled = true;
@@ -10720,7 +10720,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
           chrome.runtime?.sendMessage?.({ kind, type, libId: Number(node.id), amount: 1 }, (res) => {
             if (chrome.runtime?.lastError) {
               quickCraftBtn.disabled = false;
-              quickCraftBtn.textContent = 'Lỗi';
+              quickCraftBtn.textContent = 'Error';
               return;
             }
             setTimeout(() => {
@@ -10734,7 +10734,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       if (isSelected) {
         const targetBadge = document.createElement('span');
         targetBadge.className = 'inline-flex items-center px-2 py-0.5 rounded text-3xs font-bold bg-indigo-600 text-white shadow-xs';
-        targetBadge.textContent = '🎯 Đang chọn farm';
+        targetBadge.textContent = '🎯 Selected for farming';
         right.append(targetBadge);
       }
 
@@ -10773,9 +10773,9 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   raidCardHead.className = 'flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-indigo-100 dark:border-indigo-900/40';
   raidCardHead.innerHTML = `
     <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
-      <span>🎯</span> Thiết lập Lượt Raid
+      <span>🎯</span> Campaign Raid Setup
     </h4>
-    <span class="text-2xs text-slate-500 dark:text-slate-400">Chi phí ước tính: ~6-8 Energy / lượt</span>
+    <span class="text-2xs text-slate-500 dark:text-slate-400">Estimated cost: ~6-8 Energy / raid</span>
   `;
   raidCard.append(raidCardHead);
 
@@ -10786,8 +10786,8 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   const missionLabelRow = document.createElement('div');
   missionLabelRow.className = 'flex items-center justify-between text-xs';
   missionLabelRow.innerHTML = `
-    <label for="campaign-mission-input" class="font-bold text-slate-800 dark:text-slate-200">Ải Chiến Dịch (Mission ID):</label>
-    <span class="text-2xs text-slate-500">${selectedRecipeNodeId ? `Lọc theo vật phẩm #${selectedRecipeNodeId}` : 'Mặc định: 135 (Map item drop)'}</span>
+    <label for="campaign-mission-input" class="font-bold text-slate-800 dark:text-slate-200">Campaign Mission (Mission ID):</label>
+    <span class="text-2xs text-slate-500">${selectedRecipeNodeId ? `Filtered by item #${selectedRecipeNodeId}` : 'Default: 135 (Map item drop)'}</span>
   `;
   missionRow.append(missionLabelRow);
 
@@ -10841,7 +10841,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
 
       chip.className = chipClass;
       chip.innerHTML = `<span>#${m.id} (${m.chapter}-${m.index}${m.isHeroic ? ' H' : ''})</span><span class="${is3Star && !isSelected ? 'text-amber-500' : ''}">${starLabel}</span>`;
-      chip.title = `Ải #${m.id} (Chương ${m.chapter}-${m.index}) • ${mStars >= 3 ? 'Đủ 3 sao (cho phép raid)' : (mStars > 0 ? `${mStars} sao (chưa đủ raid)` : 'Chưa vượt qua')}`;
+      chip.title = `Mission #${m.id} (Chapter ${m.chapter}-${m.index}) • ${mStars >= 3 ? '3 Stars (Raid available)' : (mStars > 0 ? `${mStars} Stars (Cannot raid)` : 'Not cleared')}`;
 
       chip.addEventListener('click', () => {
         selectedCampaignMissionId = m.id;
@@ -10853,7 +10853,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   } else if (selectedRecipeNodeId && candidateMissions.length === 0) {
     const noDropNotice = document.createElement('span');
     noDropNotice.className = 'text-2xs text-amber-600 dark:text-amber-400 italic';
-    noDropNotice.textContent = `Không có ải chiến dịch nào rơi vật phẩm #${selectedRecipeNodeId} (có thể nhận từ Shop/Rương)`;
+    noDropNotice.textContent = `No campaign mission drops item #${selectedRecipeNodeId} (available in Shop / Chests)`;
     quickChipsWrap.append(noDropNotice);
   } else {
     const quickMissions = [135, 130, 125, 120, 100, 50];
@@ -10884,7 +10884,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
 
   const timesLabel = document.createElement('span');
   timesLabel.className = 'text-xs font-bold text-slate-800 dark:text-slate-200';
-  timesLabel.textContent = 'Số lượt Raid liên tiếp:';
+  timesLabel.textContent = 'Consecutive Raid Count:';
   timesRow.append(timesLabel);
 
   const timesBtnsGroup = document.createElement('div');
@@ -10925,7 +10925,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   });
   seqLabel.append(seqCheck);
   const seqText = document.createElement('span');
-  seqText.textContent = 'Loop tuần tự 1x (Hỗ trợ VIP 0 / F2P)';
+  seqText.textContent = 'Sequential 1x loop (VIP 0 / F2P friendly)';
   seqLabel.append(seqText);
   modeRow.append(seqLabel);
   raidCard.append(modeRow);
@@ -10939,7 +10939,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   const estCost = selectedCampaignTimes * unitCost;
   const costHint = document.createElement('span');
   costHint.className = 'text-2xs text-slate-500 dark:text-slate-400';
-  costHint.textContent = `Ước tính cần ~${estCost} Energy (${unitCost}/lượt)`;
+  costHint.textContent = `Estimated ~${estCost} Energy (${unitCost}/raid)`;
   actionRow.append(costHint);
 
   const raidBtn = document.createElement('button');
@@ -10948,10 +10948,10 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
 
   if (isCampaignRaidLoopRunning) {
     raidBtn.className = 'px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5';
-    raidBtn.innerHTML = '<span>🛑</span> <span>Dừng Raid Loop</span>';
+    raidBtn.innerHTML = '<span>🛑</span> <span>Stop Raid Loop</span>';
     raidBtn.addEventListener('click', () => {
       abortCampaignRaidLoop = true;
-      raidBtn.textContent = 'Đang dừng...';
+      raidBtn.textContent = 'Stopping...';
     });
   } else {
     raidBtn.className = popupRpcEnabled
@@ -10960,9 +10960,9 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
     raidBtn.disabled = !popupRpcEnabled;
     raidBtn.innerHTML = popupRpcEnabled
       ? (campaignRaidSequential && selectedCampaignTimes > 1
-          ? `<span>⚡</span> <span>Raid tuần tự ${selectedCampaignTimes}x Ải #${selectedCampaignMissionId}</span>`
-          : `<span>⚡</span> <span>Raid ${selectedCampaignTimes}x Ải #${selectedCampaignMissionId}</span>`)
-      : 'Bật Popup RPC để Raid';
+          ? `<span>⚡</span> <span>Sequential ${selectedCampaignTimes}x Raid Mission #${selectedCampaignMissionId}</span>`
+          : `<span>⚡</span> <span>Raid ${selectedCampaignTimes}x Mission #${selectedCampaignMissionId}</span>`)
+      : 'Enable Popup RPC to Raid';
 
     if (popupRpcEnabled) {
       const executeSequentialLoop = async (missionId, totalTimes) => {
@@ -10973,15 +10973,15 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
 
         for (let i = 1; i <= totalTimes; i++) {
           if (abortCampaignRaidLoop) {
-            raidBtn.textContent = `Đã dừng ở lượt ${completed}/${totalTimes}`;
+            raidBtn.textContent = `Stopped at raid ${completed}/${totalTimes}`;
             break;
           }
 
-          raidBtn.innerHTML = `<span class="animate-spin">⏳</span> <span>Đang Raid ${i}/${totalTimes}... (Click để Dừng)</span>`;
+          raidBtn.innerHTML = `<span class="animate-spin">⏳</span> <span>Raiding ${i}/${totalTimes}... (Click to Stop)</span>`;
 
           const currentEnergy = currentCache?.energyStatus?.data?.energy ?? currentCache?.['resource:energy']?.data?.amount;
           if (typeof currentEnergy === 'number' && currentEnergy < unitCost) {
-            raidBtn.textContent = `Hết Energy (${currentEnergy}/${unitCost}) ở lượt ${completed}/${totalTimes}`;
+            raidBtn.textContent = `Out of Energy (${currentEnergy}/${unitCost}) at raid ${completed}/${totalTimes}`;
             break;
           }
 
@@ -11000,7 +11000,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
 
           if (!res.ok) {
             raidBtn.disabled = false;
-            raidBtn.textContent = res.error || `Lỗi ở lượt ${i}`;
+            raidBtn.textContent = res.error || `Error at raid ${i}`;
             break;
           }
 
@@ -11024,19 +11024,19 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
         }
 
         raidBtn.disabled = true;
-        raidBtn.innerHTML = '<span class="animate-spin">⏳</span> <span>Đang thực hiện Raid...</span>';
+        raidBtn.innerHTML = '<span class="animate-spin">⏳</span> <span>Executing Raid...</span>';
         chrome.runtime?.sendMessage?.(
           { kind: 'campaign-raid', missionId: selectedCampaignMissionId, times: selectedCampaignTimes },
           (res) => {
             if (chrome.runtime?.lastError) {
               raidBtn.disabled = false;
-              raidBtn.textContent = chrome.runtime.lastError.message || 'Lỗi kết nối';
+              raidBtn.textContent = chrome.runtime.lastError.message || 'Connection error';
               return;
             }
             if (!res?.ok) {
               const errLower = String(res?.error || '').toLowerCase();
               if (errLower.includes('vip') || errLower.includes('notenough')) {
-                raidBtn.textContent = 'Chưa đủ VIP, tự động chuyển sang loop tuần tự...';
+                raidBtn.textContent = 'VIP insufficient, switching to sequential loop...';
                 campaignRaidSequential = true;
                 chrome.storage.local.set({ campaignRaidSequential: true });
                 setTimeout(() => {
@@ -11045,7 +11045,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
                 return;
               }
               raidBtn.disabled = false;
-              raidBtn.textContent = res?.error || 'Raid thất bại';
+              raidBtn.textContent = res?.error || 'Raid failed';
             } else {
               setTimeout(() => {
                 if (typeof currentCache !== 'undefined') renderCampaignDialog(currentCache, target);
@@ -11071,7 +11071,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
     resHeader.className = 'flex items-center justify-between text-xs pb-1.5 border-b border-emerald-200/80 dark:border-emerald-800';
     resHeader.innerHTML = `
       <span class="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
-        <span>🎉</span> Kết quả Raid Ải #${lastRaid.missionId} (${lastRaid.times} lượt)
+        <span>🎉</span> Raid Results: Mission #${lastRaid.missionId} (${lastRaid.times} ${lastRaid.times > 1 ? 'raids' : 'raid'})
       </span>
       <span class="text-2xs font-semibold text-emerald-700 dark:text-emerald-300">
         💰 +${formatNumber(drops.gold || 0)} Gold • 🧪 +${drops.experience || 0} EXP
@@ -11097,7 +11097,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
         const dropTag = document.createElement('span');
         dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs dark:bg-slate-800 dark:text-indigo-300 dark:border-indigo-800';
         const name = getItemName('gear', gId) || getItemName('scroll', gId) || `#${gId}`;
-        dropTag.innerHTML = `<span>🧩 Mảnh ${name}</span> <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+${count}</span>`;
+        dropTag.innerHTML = `<span>🧩 ${name} Fragment</span> <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+${count}</span>`;
         dropsList.append(dropTag);
       }
     }
@@ -11108,7 +11108,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
         const dropTag = document.createElement('span');
         dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs dark:bg-slate-800 dark:text-indigo-300 dark:border-indigo-800';
         const name = getItemName('scroll', sId) || getItemName('gear', sId) || `#${sId}`;
-        dropTag.innerHTML = `<span>📜 Mảnh ${name}</span> <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+${count}</span>`;
+        dropTag.innerHTML = `<span>📜 ${name} Fragment</span> <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+${count}</span>`;
         dropsList.append(dropTag);
       }
     }
@@ -11149,7 +11149,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
     if (dropsList.children.length === 0) {
       const noDrops = document.createElement('span');
       noDrops.className = 'text-2xs text-slate-400 italic';
-      noDrops.textContent = 'Không có vật phẩm nào rơi ra trong các lượt vừa raid';
+      noDrops.textContent = 'No items dropped in recent raids';
       dropsList.append(noDrops);
     }
 
@@ -11157,7 +11157,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
     container.append(resCard);
   }
 
-  // 4. Equipment Crafting Section (Ghép mảnh & Chế tạo)
+  // 4. Equipment Crafting Section
   const craftCard = document.createElement('div');
   craftCard.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3';
 
@@ -11166,9 +11166,9 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   craftHead.innerHTML = `
     <div>
       <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-        <span>🛠️</span> Ghép Mảnh & Chế Tạo Trang Bị (Crafting)
+        <span>🛠️</span> Equipment Crafting & Fragment Fusion
       </h4>
-      <div class="text-2xs text-slate-400 dark:text-slate-500">Ghép các mảnh trang bị hoặc chế tạo Recipe vào kho đồ</div>
+      <div class="text-2xs text-slate-400 dark:text-slate-500">Craft equipment fragments or assemble recipes into inventory</div>
     </div>
   `;
   craftCard.append(craftHead);
@@ -11186,7 +11186,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   
   const fragsTitle = document.createElement('div');
   fragsTitle.className = 'text-xs font-semibold text-slate-700 dark:text-slate-300';
-  fragsTitle.textContent = 'Mảnh trang bị & Bản vẽ hiện có trong kho:';
+  fragsTitle.textContent = 'Fragments & Recipes in Inventory:';
   fragsSection.append(fragsTitle);
 
   if (fragEntries.length > 0) {
@@ -11197,7 +11197,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       const itemName = isScroll
         ? (globalThis.hwaHelperNameData?.names?.scroll?.[fragItem.id] ||
            globalThis.hwaHelperNameMap?.item?.('scroll', fragItem.id) ||
-           `Bản vẽ #${fragItem.id}`)
+           `Recipe #${fragItem.id}`)
         : (globalThis.hwaHelperNameData?.names?.gear?.[fragItem.id] ||
            globalThis.hwaHelperNameMap?.item?.('gear', fragItem.id) ||
            `Gear #${fragItem.id}`);
@@ -11220,7 +11220,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       infoDiv.className = 'min-w-0';
       infoDiv.innerHTML = `
         <div class="font-bold text-slate-800 dark:text-slate-200 truncate" title="${itemName}">${isScroll ? '📜 ' : '🧩 '}${itemName}</div>
-        <div class="text-3xs text-slate-500">${isScroll ? 'Mảnh bản vẽ' : 'Mảnh trang bị'} • ${fragItem.count} mảnh</div>
+        <div class="text-3xs text-slate-500">${isScroll ? 'Recipe Fragment' : 'Gear Fragment'} • ${fragItem.count} fragments</div>
       `;
       leftWrap.append(infoDiv);
       fragRow.append(leftWrap);
@@ -11228,8 +11228,8 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       const craftBtn = document.createElement('button');
       craftBtn.type = 'button';
       craftBtn.className = 'px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-2xs font-bold cursor-pointer transition-all shrink-0';
-      craftBtn.textContent = 'Ghép';
-      craftBtn.title = isScroll ? `Ghép mảnh bản vẽ #${fragItem.id}` : `Ghép mảnh trang bị #${fragItem.id}`;
+      craftBtn.textContent = 'Craft';
+      craftBtn.title = isScroll ? `Craft recipe fragment #${fragItem.id}` : `Craft gear fragment #${fragItem.id}`;
       craftBtn.addEventListener('click', () => {
         craftBtn.disabled = true;
         craftBtn.textContent = '⏳';
@@ -11238,7 +11238,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
           (res) => {
             if (chrome.runtime?.lastError) {
               craftBtn.disabled = false;
-              craftBtn.textContent = 'Lỗi';
+              craftBtn.textContent = 'Error';
               return;
             }
             setTimeout(() => {
@@ -11254,7 +11254,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   } else {
     const emptyFrags = document.createElement('div');
     emptyFrags.className = 'text-2xs text-slate-400 italic py-2 text-center bg-slate-50/50 dark:bg-slate-800/40 rounded-lg';
-    emptyFrags.textContent = 'Chưa có mảnh trang bị nào trong kho (hãy raid chiến dịch để nhận mảnh)';
+    emptyFrags.textContent = 'No gear fragments in inventory (raid campaign missions to obtain fragments)';
     fragsSection.append(emptyFrags);
   }
   craftCard.append(fragsSection);
@@ -11263,7 +11263,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   const manualCraftRow = document.createElement('div');
   manualCraftRow.className = 'pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5';
   manualCraftRow.innerHTML = `
-    <div class="text-2xs font-semibold text-slate-600 dark:text-slate-400">Chế tạo thủ công theo Item ID:</div>
+    <div class="text-2xs font-semibold text-slate-600 dark:text-slate-400">Manual Craft by Item ID:</div>
   `;
 
   const manualForm = document.createElement('div');
@@ -11271,14 +11271,14 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
 
   const craftInput = document.createElement('input');
   craftInput.type = 'number';
-  craftInput.placeholder = 'Nhập Item ID (VD: 57, 146)...';
+  craftInput.placeholder = 'Enter Item ID (e.g. 57, 146)...';
   craftInput.className = 'w-44 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-400';
   manualForm.append(craftInput);
 
   const craftFragBtn = document.createElement('button');
   craftFragBtn.type = 'button';
   craftFragBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer';
-  craftFragBtn.textContent = 'Ghép Mảnh Gear';
+  craftFragBtn.textContent = 'Craft Gear Fragment';
   craftFragBtn.addEventListener('click', () => {
     const val = Number(craftInput.value);
     if (!val) return;
@@ -11293,7 +11293,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   const craftScrollBtn = document.createElement('button');
   craftScrollBtn.type = 'button';
   craftScrollBtn.className = 'px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold cursor-pointer';
-  craftScrollBtn.textContent = 'Ghép Mảnh Bản Vẽ';
+  craftScrollBtn.textContent = 'Craft Recipe Fragment';
   craftScrollBtn.addEventListener('click', () => {
     const val = Number(craftInput.value);
     if (!val) return;
@@ -11308,7 +11308,7 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
   const craftRecipeBtn = document.createElement('button');
   craftRecipeBtn.type = 'button';
   craftRecipeBtn.className = 'px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold cursor-pointer';
-  craftRecipeBtn.textContent = 'Chế Tạo Recipe Gear';
+  craftRecipeBtn.textContent = 'Craft Gear Recipe';
   craftRecipeBtn.addEventListener('click', () => {
     const val = Number(craftInput.value);
     if (!val) return;

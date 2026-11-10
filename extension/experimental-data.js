@@ -20,7 +20,7 @@
     } else {
       troop = Math.floor(695.0 + power / 315.0);
     }
-    // Giảm 2 đơn vị để tránh vượt ngưỡng (zero overflow margin)
+    // Decrease by 2 units to prevent threshold overflow (zero overflow margin)
     return Math.max(1, troop - 2);
   }
 

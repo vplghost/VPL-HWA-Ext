@@ -230,21 +230,21 @@ test('renderCampaignDialog displays energy, mission selector, last raid drops, a
   context.renderCampaignDialog(cache, target);
 
   const text = target.textContent;
-  assert.match(text, /Chiến dịch \(Campaign Mission Raid\)/);
+  assert.match(text, /Campaign Mission Raid/);
   assert.match(text, /120/);
-  assert.match(text, /Ải Chiến Dịch/);
-  assert.match(text, /Kết quả Raid Ải #135 \(5 lượt\)/);
+  assert.match(text, /Campaign Mission/);
+  assert.match(text, /Raid Results: Mission #135 \(5 raids\)/);
   assert.match(text, /7,?605 Gold/);
-  assert.match(text, /Mảnh Needle/);
+  assert.match(text, /Needle Fragment/);
   assert.match(text, /Lucky Dice/);
-  assert.match(text, /14 mảnh/);
-  assert.match(text, /5 mảnh/);
+  assert.match(text, /14 fragments/);
+  assert.match(text, /5 fragments/);
 
   // Check buttons exist
   const buttons = target.querySelectorAll('button');
   const raidBtn = target.querySelector('#campaign-raid-submit');
   assert.ok(raidBtn, 'Raid action button should exist');
-  const craftBtn = buttons.find(b => b.textContent === 'Ghép');
+  const craftBtn = buttons.find(b => b.textContent === 'Craft');
   assert.ok(craftBtn, 'Craft fragment button should exist');
 });
 
@@ -281,10 +281,10 @@ test('renderHeroDialog renders 6 equipment slots and quick farm trigger', async 
   context.renderHeroDialog('1', cache);
 
   const text = host.textContent;
-  assert.match(text, /Equipment Slots \(Trang bị\)/);
+  assert.match(text, /Equipment Slots/);
   assert.match(text, /Slot 1/);
   assert.match(text, /Slot 6/);
-  assert.match(text, /Farm Trang Bị/);
+  assert.match(text, /Farm Equipment/);
 });
 
 test('renderHeroDialog renders equipment names and availability states (equipped, in inventory, craftable fragments, missing)', async () => {
@@ -341,19 +341,19 @@ test('renderHeroDialog renders equipment names and availability states (equipped
   assert.match(text, /Minotaur[´']s Head/);
 
   // Equipped state
-  assert.match(text, /✓ Đã trang bị/);
+  assert.match(text, /✓ Equipped/);
 
   // In-inventory state
-  assert.match(text, /Trong kho \(2\)/);
-  assert.match(text, /Đã có trong kho \(chưa trang bị\)/);
+  assert.match(text, /In Inventory \(2\)/);
+  assert.match(text, /In Inventory \(not equipped\)/);
 
   // Craftable fragments state
-  assert.match(text, /Đủ ghép \(25\/20\)/);
-  assert.match(text, /Đủ mảnh để ghép/);
+  assert.match(text, /Ready to craft \(25\/20\)/);
+  assert.match(text, /Fragments ready/);
 
   // Missing fragments state
-  assert.match(text, /Chưa ghép \(5\/20\)/);
-  assert.match(text, /Thiếu 15 mảnh ghép/);
+  assert.match(text, /Incomplete \(5\/20\)/);
+  assert.match(text, /Missing 15 fragments/);
 });
 
 test('renderHeroDialog equipment slot equipped states correctly identify unequipped vs equipped slots', async () => {
@@ -379,7 +379,7 @@ test('renderHeroDialog equipment slot equipped states correctly identify unequip
   };
   context.renderHeroDialog('1', cacheEmpty);
   let text = host.textContent;
-  assert.doesNotMatch(text, /✓ Đã trang bị/, 'empty slots array must have no equipped slots');
+  assert.doesNotMatch(text, /✓ Equipped/, 'empty slots array must have no equipped slots');
 
   // Test 2: hero with sparse object slots: { "1": 0 } (only slot 1 equipped)
   host = new MockElement('div');
@@ -392,7 +392,7 @@ test('renderHeroDialog equipment slot equipped states correctly identify unequip
   };
   context.renderHeroDialog('1', cacheObject);
   text = host.textContent;
-  const equippedCountObj = (text.match(/✓ Đã trang bị/g) || []).length;
+  const equippedCountObj = (text.match(/✓ Equipped/g) || []).length;
   assert.equal(equippedCountObj, 1, 'only slot 1 should be equipped');
 
   // Test 3: hero with array slots: [0, 0] (slots 0 and 1 equipped)
@@ -406,7 +406,7 @@ test('renderHeroDialog equipment slot equipped states correctly identify unequip
   };
   context.renderHeroDialog('1', cacheArray);
   text = host.textContent;
-  const equippedCountArr = (text.match(/✓ Đã trang bị/g) || []).length;
+  const equippedCountArr = (text.match(/✓ Equipped/g) || []).length;
   assert.equal(equippedCountArr, 2, 'slots 0 and 1 should be equipped');
 });
 
@@ -455,6 +455,6 @@ test('renderCampaignDialog includes sequential loop checkbox and accurate missio
   assert.equal(seqCheck.checked, true, 'Sequential mode should default to true');
 
   const text = target.textContent;
-  assert.match(text, /Loop tuần tự 1x \(Hỗ trợ VIP 0 \/ F2P\)/);
-  assert.match(text, /Raid tuần tự \d+x Ải/);
+  assert.match(text, /Sequential 1x loop \(VIP 0 \/ F2P friendly\)/);
+  assert.match(text, /Sequential \d+x Raid Mission/);
 });
