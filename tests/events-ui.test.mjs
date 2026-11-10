@@ -922,7 +922,7 @@ test('openDungeonModal populates overview, elements, doors, and titan states', (
   assert.ok(text.includes('Fallen'));
 });
 
-test('openDungeonModal renders configurable element priority and titan pools strategy section', () => {
+test('openDungeonModal does not render shelved lineup pools or element priority strategy section', () => {
   dungeonModal.hidden = true;
   dungeonModalBody.replaceChildren();
 
@@ -939,21 +939,11 @@ test('openDungeonModal renders configurable element priority and titan pools str
   context.openDungeonModal(dungeonData);
 
   const text = dungeonModalBody.textContent;
-  assert.ok(text.includes('Lineup Pools & Element Priority'), 'Modal must contain strategy header');
-  assert.ok(text.includes('Attacker Element Priority'), 'Modal must contain element priority section');
-  assert.ok(text.includes('Water (Nước)'), 'Element priority must list Water');
-  assert.ok(text.includes('Mixed / Neutral'), 'Element priority must list Mixed/Neutral');
-  assert.ok(text.includes('Earth (Đất)'), 'Element priority must list Earth');
-  assert.ok(text.includes('Fire (Lửa)'), 'Element priority must list Fire');
-
-  assert.ok(text.includes('Titan Lineup Pools'), 'Modal must contain Titan Lineup Pools section');
-  assert.ok(text.includes('Starter'), 'Pool must mark top 5 titans as Starters');
-  assert.ok(text.includes('Sigurd'), 'Default water pool must display Sigurd');
-  assert.ok(text.includes('Nova'), 'Default water pool must display Nova');
-
-  // Verify details element is present
-  const details = dungeonModalBody.querySelector('details');
-  assert.ok(details, 'Strategy section must be enclosed in a details element');
+  assert.equal(text.includes('Lineup Pools & Element Priority'), false, 'Modal must not contain strategy header');
+  assert.equal(text.includes('Attacker Element Priority'), false, 'Modal must not contain element priority section');
+  assert.equal(text.includes('Titan Lineup Pools'), false, 'Modal must not contain Titan Lineup Pools section');
+  assert.equal(text.includes('Recommended'), false, 'Doors must not contain Recommended label');
+  assert.equal(text.includes('Lineup Defective'), false, 'Doors must not contain Lineup Defective label');
 });
 
 test('openDungeonModal renders daily combat log with flawless wins count and highlighted titan casualties', () => {

@@ -3994,471 +3994,6 @@ function openGuildVersusModal(vsStatus, cache) {
 }
 
 let dungeonModalReturnFocus = null;
-let activeDungeonPoolTab = 'water';
-let isDungeonStrategyExpanded = false;
-
-function getEffectiveDungeonPools() {
-  const defaults = globalThis.hwaHelperDungeonAutomation?.DEFAULT_TITAN_POOLS || {
-    water: [4000, 4001, 4052, 4004, 4002, 4003],
-    earth: [4020, 4022, 4024, 4023, 4021],
-    fire: [4010, 4011, 4013, 4012, 4014, 4051],
-    neutral: [4000, 4001, 4052, 4004, 4002, 4020, 4023, 4013, 4022, 4021, 4010, 4011, 4012, 4053]
-  };
-  const settings = (typeof dungeonAutomationSettings !== 'undefined' ? dungeonAutomationSettings : null);
-  const pools = settings?.pools || {};
-  return {
-    water: Array.isArray(pools.water) && pools.water.length ? [...pools.water] : [...defaults.water],
-    earth: Array.isArray(pools.earth) && pools.earth.length ? [...pools.earth] : [...defaults.earth],
-    fire: Array.isArray(pools.fire) && pools.fire.length ? [...pools.fire] : [...defaults.fire],
-    neutral: Array.isArray(pools.neutral) && pools.neutral.length ? [...pools.neutral] : (
-      Array.isArray(pools.mixed) && pools.mixed.length ? [...pools.mixed] : [...defaults.neutral]
-    )
-  };
-}
-
-function getEffectiveAttackerPriority() {
-  const settings = (typeof dungeonAutomationSettings !== 'undefined' ? dungeonAutomationSettings : null);
-  const prio = settings?.attackerPriority;
-  if (Array.isArray(prio) && prio.length) {
-    return [...prio];
-  }
-  return ['water', 'neutral', 'earth', 'fire'];
-}
-
-function saveDungeonAutomationSettings() {
-  const accountId = (typeof currentCache !== 'undefined' ? currentCache?.accountStatus?.data?.id ?? currentCache?.userGetInfo?.data?.id : null) ?? null;
-  const settings = (typeof dungeonAutomationSettings !== 'undefined' ? dungeonAutomationSettings : {});
-  const nextSettings = {
-    ...settings,
-    accountId,
-    attackerPriority: getEffectiveAttackerPriority(),
-    pools: getEffectiveDungeonPools()
-  };
-  if (nextSettings.pools.neutral) {
-    nextSettings.pools.mixed = [...nextSettings.pools.neutral];
-  }
-  if (typeof dungeonAutomationSettings !== 'undefined') {
-    dungeonAutomationSettings = nextSettings;
-  }
-  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
-    chrome.storage.local.set({ dungeonAutomationSettings: nextSettings }).catch(() => {});
-  }
-}
-
-function renderDungeonStrategySection(data, body) {
-  const details = document.createElement('details');
-  details.className = 'group rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-800/60 transition-all';
-  if (isDungeonStrategyExpanded) details.open = true;
-  details.addEventListener('toggle', () => {
-    isDungeonStrategyExpanded = Boolean(details.open);
-  });
-
-  const summary = document.createElement('summary');
-  summary.className = 'cursor-pointer list-none flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-100 select-none';
-  summary.innerHTML = `
-    <div class="flex items-center gap-2">
-      <span class="text-sm">⚙️</span>
-      <span>Lineup Pools & Element Priority</span>
-      <span class="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">Configurable</span>
-    </div>
-    <div class="flex items-center gap-1 text-[11px] font-normal text-slate-400 group-open:rotate-180 transition-transform">
-      ▼
-    </div>
-  `;
-  details.append(summary);
-
-  const contentWrap = document.createElement('div');
-  contentWrap.className = 'pt-3 space-y-4 border-t border-slate-100 dark:border-slate-700/60 mt-3';
-
-  // --- SUB-SECTION 1: ATTACKER ELEMENT PRIORITY ---
-  const elemMeta = {
-    water: { label: 'Water (Nước)', icon: '💧', badgeClass: 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200' },
-    neutral: { label: 'Mixed / Neutral (Hỗn hợp)', icon: '⚡', badgeClass: 'border-purple-300 bg-purple-50 text-purple-900 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200' },
-    earth: { label: 'Earth (Đất)', icon: '🌿', badgeClass: 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200' },
-    fire: { label: 'Fire (Lửa)', icon: '🔥', badgeClass: 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200' }
-  };
-
-  const prioHeader = document.createElement('div');
-  prioHeader.className = 'flex items-center justify-between flex-wrap gap-2';
-  prioHeader.innerHTML = `
-    <div>
-      <div class="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">🎯 Attacker Element Priority (Ưu tiên nguyên tố)</div>
-      <div class="text-[11px] text-slate-500 dark:text-slate-400">Thứ tự ưu tiên chọn cửa khi số titan tử trận bằng nhau.</div>
-    </div>
-  `;
-  const resetElemBtn = document.createElement('button');
-  resetElemBtn.type = 'button';
-  resetElemBtn.className = 'cursor-pointer text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium';
-  resetElemBtn.textContent = '↺ Reset Priority';
-  resetElemBtn.addEventListener('click', () => {
-    if (typeof dungeonAutomationSettings !== 'undefined') {
-      dungeonAutomationSettings.attackerPriority = ['water', 'neutral', 'earth', 'fire'];
-    }
-    saveDungeonAutomationSettings();
-    openDungeonModal(data, dungeonModalReturnFocus);
-  });
-  prioHeader.append(resetElemBtn);
-  contentWrap.append(prioHeader);
-
-  const prioList = getEffectiveAttackerPriority();
-  const prioGrid = document.createElement('div');
-  prioGrid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2';
-
-  prioList.forEach((elemKey, idx) => {
-    const norm = (elemKey === 'mixed') ? 'neutral' : elemKey;
-    const info = elemMeta[norm] || { label: norm, icon: '⚔️', badgeClass: 'border-slate-300 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200' };
-    const card = document.createElement('div');
-    card.className = `rounded-lg border p-2 flex items-center justify-between gap-1.5 ${info.badgeClass}`;
-
-    const left = document.createElement('div');
-    left.className = 'flex items-center gap-1.5 min-w-0';
-    left.innerHTML = `
-      <span class="rounded bg-black/10 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-bold font-mono">#${idx + 1}</span>
-      <span class="text-xs font-bold truncate">${info.icon} ${info.label}</span>
-    `;
-
-    const btns = document.createElement('div');
-    btns.className = 'flex items-center gap-1 shrink-0';
-
-    const upBtn = document.createElement('button');
-    upBtn.type = 'button';
-    upBtn.className = 'cursor-pointer p-1 text-[11px] rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed';
-    upBtn.textContent = '◀';
-    upBtn.title = 'Move priority higher';
-    upBtn.disabled = idx === 0;
-    upBtn.addEventListener('click', () => {
-      if (idx > 0) {
-        const arr = [...prioList];
-        [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
-        if (typeof dungeonAutomationSettings !== 'undefined') {
-          dungeonAutomationSettings.attackerPriority = arr;
-        }
-        saveDungeonAutomationSettings();
-        openDungeonModal(data, dungeonModalReturnFocus);
-      }
-    });
-
-    const downBtn = document.createElement('button');
-    downBtn.type = 'button';
-    downBtn.className = 'cursor-pointer p-1 text-[11px] rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed';
-    downBtn.textContent = '▶';
-    downBtn.title = 'Move priority lower';
-    downBtn.disabled = idx === prioList.length - 1;
-    downBtn.addEventListener('click', () => {
-      if (idx < prioList.length - 1) {
-        const arr = [...prioList];
-        [arr[idx + 1], arr[idx]] = [arr[idx], arr[idx + 1]];
-        if (typeof dungeonAutomationSettings !== 'undefined') {
-          dungeonAutomationSettings.attackerPriority = arr;
-        }
-        saveDungeonAutomationSettings();
-        openDungeonModal(data, dungeonModalReturnFocus);
-      }
-    });
-
-    btns.append(upBtn, downBtn);
-    card.append(left, btns);
-    prioGrid.append(card);
-  });
-  contentWrap.append(prioGrid);
-
-  // --- SUB-SECTION 2: TITAN LINEUP POOLS ---
-  const pools = getEffectiveDungeonPools();
-  const poolTabs = [
-    { key: 'water', label: 'Water', icon: '💧', count: pools.water?.length || 0 },
-    { key: 'earth', label: 'Earth', icon: '🌿', count: pools.earth?.length || 0 },
-    { key: 'fire', label: 'Fire', icon: '🔥', count: pools.fire?.length || 0 },
-    { key: 'neutral', label: 'Mixed', icon: '⚡', count: pools.neutral?.length || 0 }
-  ];
-
-  const poolHeader = document.createElement('div');
-  poolHeader.className = 'flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60';
-  poolHeader.innerHTML = `
-    <div>
-      <div class="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">👥 Titan Lineup Pools (Pools theo nguyên tố)</div>
-      <div class="text-[11px] text-slate-500 dark:text-slate-400">Top 5 Titan còn sống đầu tiên trong pool sẽ được điều động tấn công.</div>
-    </div>
-  `;
-  const resetPoolsBtn = document.createElement('button');
-  resetPoolsBtn.type = 'button';
-  resetPoolsBtn.className = 'cursor-pointer text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium';
-  resetPoolsBtn.textContent = '↺ Reset All Pools';
-  resetPoolsBtn.addEventListener('click', () => {
-    const defaults = globalThis.hwaHelperDungeonAutomation?.DEFAULT_TITAN_POOLS;
-    if (defaults) {
-      if (typeof dungeonAutomationSettings !== 'undefined') {
-        dungeonAutomationSettings.pools = {
-          water: [...defaults.water],
-          earth: [...defaults.earth],
-          fire: [...defaults.fire],
-          neutral: [...defaults.neutral],
-          mixed: [...defaults.mixed]
-        };
-      }
-      saveDungeonAutomationSettings();
-      openDungeonModal(data, dungeonModalReturnFocus);
-    }
-  });
-  poolHeader.append(resetPoolsBtn);
-  contentWrap.append(poolHeader);
-
-  // Pool switcher pills
-  const poolTabsBar = document.createElement('div');
-  poolTabsBar.className = 'flex items-center gap-1.5 flex-wrap';
-  for (const tab of poolTabs) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    const isActive = activeDungeonPoolTab === tab.key;
-    btn.className = `cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold border transition-all ${
-      isActive
-        ? 'border-blue-500 bg-blue-600 text-white shadow-2xs'
-        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-    }`;
-    btn.innerHTML = `${tab.icon} ${tab.label} <span class="text-[10px] opacity-80 font-normal">(${tab.count})</span>`;
-    btn.addEventListener('click', () => {
-      activeDungeonPoolTab = tab.key;
-      openDungeonModal(data, dungeonModalReturnFocus);
-    });
-    poolTabsBar.append(btn);
-  }
-  contentWrap.append(poolTabsBar);
-
-  // Active pool list
-  const activePoolList = pools[activeDungeonPoolTab] || [];
-  const titansState = data.states?.titans || {};
-
-  const titanListBox = document.createElement('div');
-  titanListBox.className = 'space-y-1.5 rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 dark:border-slate-700/60 dark:bg-slate-900/40';
-
-  if (activePoolList.length === 0) {
-    const emptyNotice = document.createElement('div');
-    emptyNotice.className = 'text-center text-xs text-slate-400 py-3';
-    emptyNotice.textContent = 'No titans in this pool.';
-    titanListBox.append(emptyNotice);
-  } else {
-    activePoolList.forEach((tId, idx) => {
-      const titanId = String(tId);
-      const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
-      const name = meta?.name || `Titan ${titanId}`;
-      const role = meta?.role || '';
-      const elem = meta?.element || '';
-      const st = titansState[titanId] || titansState[Number(titanId)];
-      const isDead = st ? (st.isDead === true || (typeof st.hp === 'number' && st.hp <= 0)) : false;
-
-      const row = document.createElement('div');
-      row.className = `flex items-center justify-between p-2 rounded-lg border text-xs gap-2 transition-all ${
-        isDead
-          ? 'border-rose-200 bg-rose-50/40 opacity-75 dark:border-rose-900/50 dark:bg-rose-950/20'
-          : (idx < 5
-            ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/20'
-            : 'border-slate-200 bg-white dark:border-slate-700/60 dark:bg-slate-800/80')
-      }`;
-
-      const left = document.createElement('div');
-      left.className = 'flex items-center gap-2 min-w-0';
-
-      const rankBadge = document.createElement('span');
-      rankBadge.className = `size-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-        idx < 5
-          ? 'bg-emerald-600 text-white'
-          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-      }`;
-      rankBadge.textContent = String(idx + 1);
-
-      const avatar = document.createElement('img');
-      avatar.src = `assets/titans/${titanId}.png`;
-      avatar.className = 'size-7 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700';
-      avatar.addEventListener('error', (e) => { e.currentTarget.hidden = true; });
-
-      const infoBox = document.createElement('div');
-      infoBox.className = 'min-w-0';
-
-      const nameRow = document.createElement('div');
-      nameRow.className = 'flex items-center gap-1.5 flex-wrap';
-      nameRow.innerHTML = `
-        <span class="font-bold text-slate-900 dark:text-slate-100 truncate">${name}</span>
-        ${role ? `<span class="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.2 text-[9px] font-medium text-slate-600 dark:text-slate-300">${role}</span>` : ''}
-        ${idx < 5
-          ? '<span class="rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 px-1 py-0.2 text-[9px] font-bold">Starter</span>'
-          : '<span class="rounded bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400 px-1 py-0.2 text-[9px]">Reserve</span>'}
-      `;
-
-      const statusRow = document.createElement('div');
-      statusRow.className = 'text-[10px] text-slate-500 dark:text-slate-400';
-      if (st) {
-        if (isDead) {
-          statusRow.innerHTML = '<span class="text-rose-600 dark:text-rose-400 font-bold">❌ Fallen</span>';
-        } else {
-          const hpPct = Math.round(((st.hp || 0) / (st.maxHp || 1)) * 100);
-          statusRow.innerHTML = `<span class="text-emerald-600 dark:text-emerald-400 font-medium">✓ Alive (HP: ${hpPct}%)</span>`;
-        }
-      } else {
-        statusRow.textContent = elem ? `Element: ${elem}` : 'Ready';
-      }
-
-      infoBox.append(nameRow, statusRow);
-      left.append(rankBadge, avatar, infoBox);
-
-      // Action buttons
-      const actions = document.createElement('div');
-      actions.className = 'flex items-center gap-1 shrink-0';
-
-      const upBtn = document.createElement('button');
-      upBtn.type = 'button';
-      upBtn.className = 'cursor-pointer p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] disabled:opacity-30 disabled:cursor-not-allowed';
-      upBtn.textContent = '⬆️';
-      upBtn.title = 'Move up';
-      upBtn.disabled = idx === 0;
-      upBtn.addEventListener('click', () => {
-        if (idx > 0) {
-          const poolArr = [...activePoolList];
-          [poolArr[idx - 1], poolArr[idx]] = [poolArr[idx], poolArr[idx - 1]];
-          if (typeof dungeonAutomationSettings !== 'undefined') {
-            dungeonAutomationSettings.pools = {
-              ...getEffectiveDungeonPools(),
-              [activeDungeonPoolTab]: poolArr
-            };
-          }
-          saveDungeonAutomationSettings();
-          openDungeonModal(data, dungeonModalReturnFocus);
-        }
-      });
-
-      const downBtn = document.createElement('button');
-      downBtn.type = 'button';
-      downBtn.className = 'cursor-pointer p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] disabled:opacity-30 disabled:cursor-not-allowed';
-      downBtn.textContent = '⬇️';
-      downBtn.title = 'Move down';
-      downBtn.disabled = idx === activePoolList.length - 1;
-      downBtn.addEventListener('click', () => {
-        if (idx < activePoolList.length - 1) {
-          const poolArr = [...activePoolList];
-          [poolArr[idx + 1], poolArr[idx]] = [poolArr[idx], poolArr[idx + 1]];
-          if (typeof dungeonAutomationSettings !== 'undefined') {
-            dungeonAutomationSettings.pools = {
-              ...getEffectiveDungeonPools(),
-              [activeDungeonPoolTab]: poolArr
-            };
-          }
-          saveDungeonAutomationSettings();
-          openDungeonModal(data, dungeonModalReturnFocus);
-        }
-      });
-
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'cursor-pointer p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-950 text-rose-500 text-[11px] disabled:opacity-30 disabled:cursor-not-allowed';
-      removeBtn.textContent = '✖';
-      removeBtn.title = activePoolList.length <= 5 ? 'Pool requires at least 5 titans' : 'Remove titan from pool';
-      removeBtn.disabled = activePoolList.length <= 5;
-      removeBtn.addEventListener('click', () => {
-        if (activePoolList.length > 5) {
-          const poolArr = activePoolList.filter((_, i) => i !== idx);
-          if (typeof dungeonAutomationSettings !== 'undefined') {
-            dungeonAutomationSettings.pools = {
-              ...getEffectiveDungeonPools(),
-              [activeDungeonPoolTab]: poolArr
-            };
-          }
-          saveDungeonAutomationSettings();
-          openDungeonModal(data, dungeonModalReturnFocus);
-        }
-      });
-
-      actions.append(upBtn, downBtn, removeBtn);
-      row.append(left, actions);
-      titanListBox.append(row);
-    });
-  }
-  contentWrap.append(titanListBox);
-
-  // Candidate Titans to Add
-  const allTitanMeta = globalThis.hwaHelperTitanMetadata || {};
-  const currentSet = new Set(activePoolList.map(Number));
-  const candidateTitans = Object.entries(allTitanMeta)
-    .filter(([idStr, tMeta]) => {
-      const numId = Number(idStr);
-      if (!Number.isInteger(numId)) return false;
-      if (currentSet.has(numId)) return false;
-      const elemLower = (tMeta?.element || '').toLowerCase();
-      if (activeDungeonPoolTab === 'water') return elemLower === 'water' || elemLower === 'spirit';
-      if (activeDungeonPoolTab === 'earth') return elemLower === 'earth' || elemLower === 'spirit';
-      if (activeDungeonPoolTab === 'fire') return elemLower === 'fire' || elemLower === 'spirit';
-      if (activeDungeonPoolTab === 'neutral') return true;
-      return true;
-    })
-    .map(([idStr, tMeta]) => ({
-      id: Number(idStr),
-      name: tMeta?.name || `Titan ${idStr}`,
-      role: tMeta?.role || '',
-      element: tMeta?.element || ''
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  const addRow = document.createElement('div');
-  addRow.className = 'flex items-center gap-2 pt-1 flex-wrap';
-
-  if (candidateTitans.length > 0) {
-    const select = document.createElement('select');
-    select.className = 'rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 grow max-w-xs';
-    for (const cand of candidateTitans) {
-      const opt = document.createElement('option');
-      opt.value = String(cand.id);
-      opt.textContent = `${cand.name} (${cand.element || 'Titan'}${cand.role ? ` · ${cand.role}` : ''})`;
-      select.append(opt);
-    }
-
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'cursor-pointer rounded-lg border border-blue-500 bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 shadow-2xs';
-    addBtn.textContent = '+ Add to Pool';
-    addBtn.addEventListener('click', () => {
-      const val = Number(select.value);
-      if (val && !activePoolList.includes(val)) {
-        const poolArr = [...activePoolList, val];
-        if (typeof dungeonAutomationSettings !== 'undefined') {
-          dungeonAutomationSettings.pools = {
-            ...getEffectiveDungeonPools(),
-            [activeDungeonPoolTab]: poolArr
-          };
-        }
-        saveDungeonAutomationSettings();
-        openDungeonModal(data, dungeonModalReturnFocus);
-      }
-    });
-
-    addRow.append(select, addBtn);
-  } else {
-    const allAdded = document.createElement('span');
-    allAdded.className = 'text-[11px] text-slate-400 italic';
-    allAdded.textContent = 'All candidate titans for this element are in the pool.';
-    addRow.append(allAdded);
-  }
-
-  const resetCurrentBtn = document.createElement('button');
-  resetCurrentBtn.type = 'button';
-  resetCurrentBtn.className = 'cursor-pointer text-[11px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 ml-auto hover:underline';
-  resetCurrentBtn.textContent = `↺ Reset ${poolTabs.find((t) => t.key === activeDungeonPoolTab)?.label || ''} Pool`;
-  resetCurrentBtn.addEventListener('click', () => {
-    const defaults = globalThis.hwaHelperDungeonAutomation?.DEFAULT_TITAN_POOLS;
-    if (defaults && defaults[activeDungeonPoolTab]) {
-      if (typeof dungeonAutomationSettings !== 'undefined') {
-        dungeonAutomationSettings.pools = {
-          ...getEffectiveDungeonPools(),
-          [activeDungeonPoolTab]: [...defaults[activeDungeonPoolTab]]
-        };
-      }
-      saveDungeonAutomationSettings();
-      openDungeonModal(data, dungeonModalReturnFocus);
-    }
-  });
-  addRow.append(resetCurrentBtn);
-
-  contentWrap.append(addRow);
-  details.append(contentWrap);
-  body.append(details);
-}
-
 function renderDungeonCombatLogSection(data, container) {
   const log = data?.dailyCombatLog || { flawlessCount: 0, totalBattles: 0, casualtyBattles: [] };
   const total = log.totalBattles || 0;
@@ -4754,25 +4289,11 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
   // --- SECTION 3: DAILY COMBAT LOG & TITAN CASUALTY TRACKING ---
   renderDungeonCombatLogSection(data, body);
 
-  // --- SECTION 4: STRATEGY & LINEUP POOLS (CUSTOMIZABLE) ---
-  renderDungeonStrategySection(data, body);
-
-  // --- SECTION 5: CURRENT FLOOR DOORS ---
+  // --- SECTION 4: CURRENT FLOOR DOORS ---
   const doors = Array.isArray(data.currentFloorDoors) ? data.currentFloorDoors : [];
   if (doors.length > 0) {
     const doorsSec = document.createElement('div');
     doorsSec.className = 'rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60';
-
-    const dungeonAuto = globalThis.hwaHelperDungeonAutomation;
-    const dungeonOptions = {
-      attackerPriority: getEffectiveAttackerPriority(),
-      pools: getEffectiveDungeonPools()
-    };
-    const plan = dungeonAuto?.selectBestDoor?.(
-      doors,
-      typeof currentCache !== 'undefined' ? currentCache : { dungeonStatus: { data } },
-      dungeonOptions
-    );
 
     const autoBtn = document.querySelector('#dungeon-auto-btn');
     if (autoBtn) autoBtn.hidden = true;
@@ -4788,18 +4309,10 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
     doorsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
 
     doors.forEach((door, idx) => {
-      const evaluation = plan?.evaluations?.[idx];
-      const isChosen = plan?.chosen?.teamNum === idx;
       const isAttacking = Boolean(data.activeBattle && data.activeBattle.teamNum === idx);
-
-      let cardBorder = 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70';
-      if (isAttacking) {
-        cardBorder = 'border-blue-400 bg-blue-50/60 ring-2 ring-blue-400 dark:border-blue-600 dark:bg-blue-950/40';
-      } else if (evaluation && !evaluation.canAttack) {
-        cardBorder = 'border-rose-200 bg-rose-50/30 dark:border-rose-900/50 dark:bg-rose-950/20';
-      } else if (isChosen) {
-        cardBorder = 'border-emerald-300 bg-emerald-50/30 dark:border-emerald-800/50 dark:bg-emerald-950/20';
-      }
+      const cardBorder = isAttacking
+        ? 'border-blue-400 bg-blue-50/60 ring-2 ring-blue-400 dark:border-blue-600 dark:bg-blue-950/40'
+        : 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70';
 
       const doorCard = document.createElement('div');
       doorCard.className = `rounded-xl border ${cardBorder} p-3.5 space-y-2.5`;
@@ -4807,17 +4320,9 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       const attackerType = door.attackerType ? door.attackerType.charAt(0).toUpperCase() + door.attackerType.slice(1) : 'Any';
       const defenderType = door.defenderType ? door.defenderType.charAt(0).toUpperCase() + door.defenderType.slice(1) : 'Unknown';
       const powerStr = door.power ? Number(door.power).toLocaleString() : '—';
-
-      let statusBadge = '';
-      if (isAttacking) {
-        statusBadge = '<span class="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-bold animate-pulse">⚔️ In Combat</span>';
-      } else if (evaluation && !evaluation.canAttack) {
-        statusBadge = '<span class="rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 px-2 py-0.5 text-[10px] font-bold">⚠️ Lineup Defective</span>';
-      } else if (isChosen) {
-        statusBadge = '<span class="rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-bold">⭐ Recommended</span>';
-      } else if (evaluation?.canAttack) {
-        statusBadge = '<span class="rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 px-2 py-0.5 text-[10px] font-semibold">✓ Intact</span>';
-      }
+      const statusBadge = isAttacking
+        ? '<span class="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-bold animate-pulse">⚔️ In Combat</span>'
+        : '';
 
       doorCard.innerHTML = `
         <div class="flex items-center justify-between">
@@ -4833,33 +4338,6 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
         </div>
       `;
 
-      if (evaluation && !evaluation.canAttack) {
-        const warningDiv = document.createElement('div');
-        warningDiv.className = 'text-[11px] text-rose-600 dark:text-rose-400 bg-rose-100/60 dark:bg-rose-950/50 rounded-md px-2 py-1 font-medium';
-        warningDiv.textContent = `Casualties in lineup: Titan(s) ${evaluation.intactness.deadTitans.join(', ')} fallen.`;
-        doorCard.append(warningDiv);
-      }
-
-      if (Array.isArray(evaluation?.heroes) && evaluation.heroes.length > 0) {
-        const ourLineupBox = document.createElement('div');
-        ourLineupBox.className = 'flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200 dark:border-slate-700/60';
-        const label = document.createElement('span');
-        label.className = 'text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider mr-1';
-        label.textContent = 'Deploy:';
-        ourLineupBox.append(label);
-        for (const hId of evaluation.heroes) {
-          const titanId = String(hId);
-          const meta = globalThis.hwaHelperTitanMetadata?.[titanId];
-          const name = meta?.name || `Titan ${titanId}`;
-          const unitTag = document.createElement('span');
-          unitTag.className = 'inline-flex items-center gap-1 rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-700 dark:bg-slate-700/80 dark:border-slate-600 dark:text-slate-200';
-          unitTag.innerHTML = `<img src="assets/titans/${titanId}.png" class="size-3.5 rounded-full object-cover shrink-0"><span>${name}</span>`;
-          unitTag.querySelector('img')?.addEventListener('error', (event) => { event.currentTarget.hidden = true; });
-          ourLineupBox.append(unitTag);
-        }
-        doorCard.append(ourLineupBox);
-      }
-
       if (Array.isArray(door.team) && door.team.length > 0) {
         const teamBox = document.createElement('div');
         teamBox.className = 'flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200 dark:border-slate-700/60';
@@ -4871,7 +4349,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
           const unitTag = document.createElement('span');
           unitTag.className = 'inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 shadow-2xs dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200';
           const avatarImg = `<img src="assets/titans/${titanId}.png" class="size-4 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700">`;
-          unitTag.innerHTML = `${avatarImg}<span>${name}</span> <span class="text-slate-400 dark:text-slate-500 font-normal">(Lv.${unit.level || '?'}${starStr ? ` ${starStr}` : ''})</span>`;
+          unitTag.innerHTML = `${avatarImg}<span>${name}</span> <span class="text-slate-400 dark:text-slate-500 font-normal">(Lv.${unit.level || '?'}${starStr ? ' ' + starStr : ''})</span>`;
           unitTag.querySelector('img')?.addEventListener('error', (event) => { event.currentTarget.hidden = true; });
           teamBox.append(unitTag);
         }
@@ -4890,7 +4368,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
     body.append(emptyDoors);
   }
 
-  // --- SECTION 4: TITANS HEALTH & ENERGY STATUS ---
+  // --- SECTION 5: TITANS HEALTH & ENERGY STATUS ---
   const titansState = data.states?.titans || {};
   const titanEntries = Object.entries(titansState);
   if (titanEntries.length > 0) {
@@ -4904,7 +4382,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
     `;
 
     const titansList = document.createElement('div');
-    titansList.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5';
+    titansList.className = 'grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 gap-2';
 
     for (const [tId, state] of titanEntries) {
       const meta = globalThis.hwaHelperTitanMetadata?.[tId];
@@ -4918,25 +4396,25 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
       const energyPct = Math.min(100, Math.round((energy / 1000) * 100));
 
       const row = document.createElement('div');
-      row.className = `rounded-xl border p-3 ${isDead ? 'border-rose-200 bg-rose-50/40 opacity-70 dark:border-rose-900/60 dark:bg-rose-950/30' : 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70'}`;
+      row.className = `rounded-xl border p-2.5 ${isDead ? 'border-rose-200 bg-rose-50/40 opacity-70 dark:border-rose-900/60 dark:bg-rose-950/30' : 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70'}`;
 
-      const avatarImg = `<img src="assets/titans/${tId}.png" class="size-8 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700">`;
+      const avatarImg = `<img src="assets/titans/${tId}.png" class="size-7 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700">`;
       row.innerHTML = `
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2 min-w-0">
+        <div class="flex items-center justify-between mb-1.5">
+          <div class="flex items-center gap-1.5 min-w-0">
             ${avatarImg}
             <div class="min-w-0">
-              <div class="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate">${name}</div>
-              ${elem ? `<span class="rounded bg-slate-200 dark:bg-slate-700 px-1.5 py-0.2 text-[10px] font-semibold text-slate-600 dark:text-slate-300">${elem}</span>` : ''}
+              <div class="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">${name}</div>
+              ${elem ? `<span class="rounded bg-slate-200 dark:bg-slate-700 px-1 py-0.2 text-[9px] font-semibold text-slate-600 dark:text-slate-300">${elem}</span>` : ''}
             </div>
           </div>
-          <span class="rounded-full px-2 py-0.5 text-[10px] font-bold ${isDead ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 dark:border dark:border-rose-800/60' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-800/60'}">
+          <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold ${isDead ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 dark:border dark:border-rose-800/60' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-800/60'}">
             ${isDead ? 'Fallen' : 'Alive'}
           </span>
         </div>
-        <div class="space-y-1.5">
+        <div class="space-y-1">
           <div>
-            <div class="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
+            <div class="flex justify-between text-[9px] text-slate-500 dark:text-slate-400 mb-0.5">
               <span>HP</span>
               <span class="tabular-nums font-semibold text-slate-700 dark:text-slate-300">${hp.toLocaleString()} / ${maxHp.toLocaleString()} (${hpPct}%)</span>
             </div>
@@ -4945,7 +4423,7 @@ function openDungeonModal(dungeonStatus, returnFocusTarget = null) {
             </div>
           </div>
           <div>
-            <div class="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
+            <div class="flex justify-between text-[9px] text-slate-500 dark:text-slate-400 mb-0.5">
               <span>Energy</span>
               <span class="tabular-nums font-semibold text-slate-700 dark:text-slate-300">${energy.toLocaleString()} / 1,000 (${energyPct}%)</span>
             </div>
@@ -5179,33 +4657,12 @@ function renderDashboard(cache) {
   intro.append(heading, subtitle, actions);
   container.append(intro);
 
-  const campaignCard = document.createElement('div');
-  campaignCard.className = 'rounded-xl border border-indigo-200 bg-indigo-50/50 p-3.5 shadow-2xs dark:border-indigo-900/40 dark:bg-indigo-950/20 flex items-center justify-between gap-3 flex-wrap';
-  campaignCard.innerHTML = `
-    <div class="space-y-0.5">
-      <div class="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
-        <span>⚔️</span> Campaign Raid & Farm Trang Bị
-      </div>
-      <div class="text-2xs text-slate-500 dark:text-slate-400">Raid các ải chiến dịch để farm nhanh trang bị, mảnh ghép và vàng</div>
-    </div>
-  `;
-  const campaignBtn = document.createElement('button');
-  campaignBtn.id = 'open-campaign-dialog';
-  campaignBtn.type = 'button';
-  campaignBtn.className = 'cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xs';
-  campaignBtn.textContent = 'Mở Campaign Farm';
-  campaignBtn.setAttribute('aria-haspopup', 'dialog');
-  campaignBtn.setAttribute('aria-controls', 'campaign-dialog');
-  campaignBtn.addEventListener('click', () => {
-    renderCampaignDialog(currentCache);
-    document.querySelector('#campaign-dialog')?.showModal?.();
-  });
-  campaignCard.append(campaignBtn);
-  container.append(campaignCard);
-
   if (typeof updateDashboardGameStatus === 'function') {
     updateDashboardGameStatus(actions, gameTabAlert);
   }
+
+  // --- TROOPS OVERVIEW SECTION ---
+  renderDashboardTroops(cache, container);
 
   for (const group of groups) {
     const section = document.createElement('section');
@@ -5300,6 +4757,242 @@ function renderDashboard(cache) {
     container.append(section);
   }
   view.append(container);
+}
+
+function renderDashboardTroops(cache, container, now = Date.now()) {
+  const section = document.createElement('div');
+  section.id = 'dashboard-troops-section';
+  section.className = 'space-y-2';
+
+  const header = document.createElement('div');
+  header.className = 'flex items-center justify-between';
+  header.innerHTML = `
+    <div class="flex items-center gap-1.5">
+      <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+        <span>🪖</span> Troops
+      </h3>
+      <span class="text-xs text-slate-400 dark:text-slate-500 font-normal">· Forces & Hospital</span>
+    </div>
+  `;
+
+  const refreshBtn = document.createElement('button');
+  refreshBtn.id = 'dashboard-troops-refresh-btn';
+  refreshBtn.type = 'button';
+  refreshBtn.title = 'Refresh troops, hospital, and training status';
+  refreshBtn.className = 'cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors';
+  refreshBtn.innerHTML = '<span class="text-sm">↻</span> <span class="hidden sm:inline">Refresh</span>';
+  refreshBtn.addEventListener('click', () => {
+    refreshBtn.disabled = true;
+    const spinner = refreshBtn.querySelector('span');
+    if (spinner) spinner.classList.add('inline-block', 'animate-spin');
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({
+        kind: 'refresh-rpc',
+        calls: [
+          { name: 'getUnitSummary', feature: 'unit' },
+          { name: 'getTrainings', feature: 'unit' },
+          { name: 'getHealing', feature: 'unit' }
+        ]
+      }, () => {
+        setTimeout(() => {
+          refreshBtn.disabled = false;
+          if (spinner) spinner.classList.remove('inline-block', 'animate-spin');
+        }, 600);
+      });
+    }
+  });
+  header.append(refreshBtn);
+  section.append(header);
+
+  // Extract troop stats
+  const unitSummary = cache?.['getUnitSummary:unit']?.data || cache?.getUnitSummary?.data;
+  const healing = cache?.['getHealing:unit']?.data || cache?.getHealing?.data;
+  const trainings = cache?.['getTrainings:unit']?.data || cache?.getTrainings?.data;
+
+  const troopDefs = [
+    { type: 0, label: 'Marksmen', icon: '🏹', badgeCls: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' },
+    { type: 1, label: 'Spearmen', icon: '🔱', badgeCls: 'bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300' },
+    { type: 2, label: 'Infantry', icon: '🛡️', badgeCls: 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' }
+  ];
+
+  function getTroopType(unitId) {
+    const id = Number(unitId);
+    if (id >= 1 && id <= 9) return { type: 0, level: id };
+    if (id >= 11 && id <= 19) return { type: 1, level: id - 10 };
+    if (id >= 21 && id <= 29) return { type: 2, level: id - 20 };
+    return null;
+  }
+
+  const troopStats = troopDefs.map((def) => ({
+    ...def,
+    readyByLevel: new Map(),
+    readyCount: 0,
+    hospitalCount: 0,
+    healingActiveCount: 0,
+    healingEndsAt: null,
+    trainingCount: 0,
+    trainingEndsAt: null,
+    maxTroops: 0
+  }));
+
+  // 1. Available troops
+  for (const item of unitSummary?.available || []) {
+    const info = getTroopType(item?.unitId);
+    const count = Number(item?.count) || 0;
+    if (info && count > 0) {
+      troopStats[info.type].readyByLevel.set(info.level, (troopStats[info.type].readyByLevel.get(info.level) || 0) + count);
+      troopStats[info.type].readyCount += count;
+    }
+  }
+
+  // 2. Troops in squads
+  for (const sq of unitSummary?.squads || []) {
+    for (const u of sq?.units || []) {
+      const info = getTroopType(u?.id);
+      const count = Number(u?.state?.survived) || 0;
+      if (info && count > 0) {
+        troopStats[info.type].readyByLevel.set(info.level, (troopStats[info.type].readyByLevel.get(info.level) || 0) + count);
+        troopStats[info.type].readyCount += count;
+      }
+    }
+  }
+
+  // 3. Hospital / Injured units
+  for (const item of healing?.injuredUnits || []) {
+    const info = getTroopType(item?.unitId);
+    const count = Number(item?.count) || 0;
+    if (info && count > 0) {
+      troopStats[info.type].hospitalCount += count;
+    }
+  }
+
+  // 4. Healing active & timer
+  if (Array.isArray(healing?.healing?.units) && Number.isFinite(healing.healing.startDate) && Number.isFinite(healing.healing.duration)) {
+    const endsAt = healing.healing.startDate + healing.healing.duration;
+    for (const item of healing.healing.units) {
+      const info = getTroopType(item?.unitId);
+      const count = Number(item?.count) || 0;
+      if (info && count > 0) {
+        troopStats[info.type].healingActiveCount += count;
+        troopStats[info.type].healingEndsAt = endsAt;
+        if (troopStats[info.type].hospitalCount < count) {
+          troopStats[info.type].hospitalCount = count;
+        }
+      }
+    }
+  }
+
+  // 5. Training queues & timer
+  for (const q of trainings?.trainingQueues || []) {
+    const info = getTroopType(q?.unitId);
+    const count = Number(q?.unitCount) || 0;
+    if (info && count > 0) {
+      troopStats[info.type].trainingCount += count;
+      if (Number.isFinite(q.startDate) && Number.isFinite(q.duration)) {
+        const endsAt = q.startDate + q.duration;
+        if (!troopStats[info.type].trainingEndsAt || endsAt < troopStats[info.type].trainingEndsAt) {
+          troopStats[info.type].trainingEndsAt = endsAt;
+        }
+      }
+    }
+  }
+
+  function formatDuration(sec) {
+    if (sec <= 0) return 'Ready';
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'grid grid-cols-1 md:grid-cols-3 gap-2.5';
+
+  for (const t of troopStats) {
+    t.maxTroops = t.readyCount + t.hospitalCount + t.trainingCount;
+
+    const levelsSorted = [...t.readyByLevel.entries()].sort((a, b) => a[0] - b[0]);
+    const levelStr = levelsSorted.length > 0
+      ? levelsSorted.map(([lvl, cnt]) => `Lv.${lvl}: ${cnt.toLocaleString()}`).join(' · ')
+      : '0';
+
+    const healingSec = t.healingEndsAt ? Math.max(0, Math.ceil((t.healingEndsAt - now) / 1000)) : null;
+    const healingTimerText = healingSec !== null && healingSec > 0 ? formatDuration(healingSec) : (healingSec !== null && healingSec <= 0 ? 'Ready' : null);
+    const healingTooltip = t.healingEndsAt
+      ? `Healing: ${t.healingActiveCount.toLocaleString()} units · Ends in ${formatDuration(healingSec)} (${new Date(t.healingEndsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
+      : (t.hospitalCount > 0 ? `Injured in hospital: ${t.hospitalCount.toLocaleString()} (idle)` : 'No injured units');
+
+    const trainingSec = t.trainingEndsAt ? Math.max(0, Math.ceil((t.trainingEndsAt - now) / 1000)) : null;
+    const trainingTimerText = trainingSec !== null && trainingSec > 0 ? formatDuration(trainingSec) : (trainingSec !== null && trainingSec <= 0 ? 'Ready' : null);
+    const trainingTooltip = t.trainingEndsAt
+      ? `Training: ${t.trainingCount.toLocaleString()} units · Ends in ${formatDuration(trainingSec)} (${new Date(t.trainingEndsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
+      : (t.trainingCount > 0 ? `Training: ${t.trainingCount.toLocaleString()} units` : 'No active training');
+
+    const max = t.maxTroops;
+    const readyPct = max > 0 ? (t.readyCount / max) * 100 : 0;
+    const hospitalPct = max > 0 ? (t.hospitalCount / max) * 100 : 0;
+    const trainingPct = max > 0 ? (t.trainingCount / max) * 100 : 0;
+
+    const card = document.createElement('div');
+    card.className = 'rounded-xl border border-slate-200 bg-white p-3 space-y-2 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs';
+
+    card.innerHTML = `
+      <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
+          <span class="text-sm">${t.icon}</span>
+          <span>${t.label}</span>
+        </div>
+        <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          Max: <strong class="text-slate-900 dark:text-white tabular-nums">${max.toLocaleString()}</strong>
+        </div>
+      </div>
+
+      <!-- Segmented Visual Bar -->
+      <div class="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden flex dark:bg-slate-700/60 ring-1 ring-slate-200/50 dark:ring-slate-800" title="Ready: ${t.readyCount.toLocaleString()} · Hospital: ${t.hospitalCount.toLocaleString()} · Training: ${t.trainingCount.toLocaleString()} · Max: ${max.toLocaleString()}">
+        ${readyPct > 0 ? `<div style="width: ${readyPct.toFixed(1)}%" class="h-full bg-emerald-500 transition-all duration-300" title="Ready: ${t.readyCount.toLocaleString()} (${readyPct.toFixed(1)}%) · ${levelStr}"></div>` : ''}
+        ${hospitalPct > 0 ? `<div style="width: ${hospitalPct.toFixed(1)}%" class="h-full bg-rose-500 transition-all duration-300" title="${healingTooltip}"></div>` : ''}
+        ${trainingPct > 0 ? `<div style="width: ${trainingPct.toFixed(1)}%" class="h-full bg-indigo-500 transition-all duration-300" title="${trainingTooltip}"></div>` : ''}
+        ${max === 0 ? `<div class="h-full w-full bg-slate-200 dark:bg-slate-700" title="No troops recorded"></div>` : ''}
+      </div>
+
+      <!-- Detailed Breakdown & Timers -->
+      <div class="space-y-1 text-[11px]">
+        <div class="flex items-center justify-between text-slate-600 dark:text-slate-300">
+          <span class="flex items-center gap-1 truncate" title="${levelStr}">
+            <span class="size-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+            <span>Ready:</span>
+            <strong class="text-slate-900 dark:text-white tabular-nums">${t.readyCount.toLocaleString()}</strong>
+          </span>
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title="${levelStr}">${levelStr}</span>
+        </div>
+
+        <div class="flex items-center justify-between text-slate-600 dark:text-slate-300">
+          <span class="flex items-center gap-1" title="${healingTooltip}">
+            <span class="size-1.5 rounded-full bg-rose-500 shrink-0"></span>
+            <span>Hospital:</span>
+            <strong class="${t.hospitalCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'} tabular-nums">${t.hospitalCount.toLocaleString()}</strong>
+          </span>
+          ${healingTimerText ? `<span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/60 cursor-help" title="${healingTooltip}">⏳ ${healingTimerText}</span>` : ''}
+        </div>
+
+        <div class="flex items-center justify-between text-slate-600 dark:text-slate-300">
+          <span class="flex items-center gap-1" title="${trainingTooltip}">
+            <span class="size-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+            <span>Training:</span>
+            <strong class="${t.trainingCount > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'} tabular-nums">${t.trainingCount.toLocaleString()}</strong>
+          </span>
+          ${trainingTimerText ? `<span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200/80 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-900/60 cursor-help" title="${trainingTooltip}">⏳ ${trainingTimerText}</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    grid.append(card);
+  }
+
+  section.append(grid);
+  container.append(section);
 }
 
 function renderEvents(cache) {
@@ -6335,6 +6028,7 @@ function setupDungeonModal() {
   }
   const autoBtn = document.querySelector('#dungeon-auto-btn');
   if (autoBtn) {
+    autoBtn.hidden = true;
     const defaultAutoHtml = autoBtn.innerHTML;
     autoBtn.addEventListener('click', async () => {
       if (autoBtn.disabled) return;
@@ -6372,13 +6066,7 @@ function setupDungeonModal() {
           </svg>
           <span class="dungeon-auto-label">Starting...</span>
         `;
-        const autoSettings = (typeof getEffectiveAttackerPriority === 'function' && typeof getEffectiveDungeonPools === 'function')
-          ? {
-              executionMode: 'canvas',
-              attackerPriority: getEffectiveAttackerPriority(),
-              pools: getEffectiveDungeonPools()
-            }
-          : { executionMode: 'canvas', ...(typeof dungeonAutomationSettings !== 'undefined' && dungeonAutomationSettings ? dungeonAutomationSettings : {}) };
+        const autoSettings = { executionMode: 'canvas' };
         const startMsg = { kind: 'dungeon-run-start', settings: autoSettings };
         const resp = await new Promise((resolve) => {
           if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -11394,12 +11082,33 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
     const dropsList = document.createElement('div');
     dropsList.className = 'flex flex-wrap gap-2';
 
+    const getItemName = (category, id) => {
+      const numId = String(id);
+      return (
+        globalThis.hwaHelperNameData?.names?.[category]?.[numId] ||
+        globalThis.hwaHelperNameMap?.item?.(category, id) ||
+        null
+      );
+    };
+
     // Fragment Gear
     if (drops.fragmentGear && Object.keys(drops.fragmentGear).length > 0) {
       for (const [gId, count] of Object.entries(drops.fragmentGear)) {
         const dropTag = document.createElement('span');
         dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs dark:bg-slate-800 dark:text-indigo-300 dark:border-indigo-800';
-        dropTag.innerHTML = `<span>🧩 Mảnh #${gId}</span> <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+${count}</span>`;
+        const name = getItemName('gear', gId) || getItemName('scroll', gId) || `#${gId}`;
+        dropTag.innerHTML = `<span>🧩 Mảnh ${name}</span> <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+${count}</span>`;
+        dropsList.append(dropTag);
+      }
+    }
+
+    // Fragment Scroll
+    if (drops.fragmentScroll && Object.keys(drops.fragmentScroll).length > 0) {
+      for (const [sId, count] of Object.entries(drops.fragmentScroll)) {
+        const dropTag = document.createElement('span');
+        dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs dark:bg-slate-800 dark:text-indigo-300 dark:border-indigo-800';
+        const name = getItemName('scroll', sId) || getItemName('gear', sId) || `#${sId}`;
+        dropTag.innerHTML = `<span>📜 Mảnh ${name}</span> <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+${count}</span>`;
         dropsList.append(dropTag);
       }
     }
@@ -11409,7 +11118,19 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       for (const [gId, count] of Object.entries(drops.gear)) {
         const dropTag = document.createElement('span');
         dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-2xs dark:bg-slate-800 dark:text-emerald-300 dark:border-emerald-800';
-        dropTag.innerHTML = `<span>🛡️ Gear #${gId}</span> <span class="bg-emerald-100 text-emerald-800 px-1 rounded text-2xs dark:bg-emerald-900 dark:text-emerald-200">+${count}</span>`;
+        const name = getItemName('gear', gId) || `Gear #${gId}`;
+        dropTag.innerHTML = `<span>🛡️ ${name}</span> <span class="bg-emerald-100 text-emerald-800 px-1 rounded text-2xs dark:bg-emerald-900 dark:text-emerald-200">+${count}</span>`;
+        dropsList.append(dropTag);
+      }
+    }
+
+    // Whole Scroll
+    if (drops.scroll && Object.keys(drops.scroll).length > 0) {
+      for (const [sId, count] of Object.entries(drops.scroll)) {
+        const dropTag = document.createElement('span');
+        dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-2xs dark:bg-slate-800 dark:text-emerald-300 dark:border-emerald-800';
+        const name = getItemName('scroll', sId) || `Scroll #${sId}`;
+        dropTag.innerHTML = `<span>📜 ${name}</span> <span class="bg-emerald-100 text-emerald-800 px-1 rounded text-2xs dark:bg-emerald-900 dark:text-emerald-200">+${count}</span>`;
         dropsList.append(dropTag);
       }
     }
@@ -11419,7 +11140,8 @@ function renderCampaignDialog(cache = currentCache, target = document.querySelec
       for (const [cId, count] of Object.entries(drops.consumable)) {
         const dropTag = document.createElement('span');
         dropTag.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-slate-700 border border-slate-200 shadow-2xs dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
-        dropTag.innerHTML = `<span>Item #${cId}</span> <span class="bg-slate-100 text-slate-700 px-1 rounded text-2xs dark:bg-slate-700 dark:text-slate-300">+${count}</span>`;
+        const name = getItemName('consumable', cId) || `Item #${cId}`;
+        dropTag.innerHTML = `<span>📦 ${name}</span> <span class="bg-slate-100 text-slate-700 px-1 rounded text-2xs dark:bg-slate-700 dark:text-slate-300">+${count}</span>`;
         dropsList.append(dropTag);
       }
     }

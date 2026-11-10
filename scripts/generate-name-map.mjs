@@ -78,6 +78,7 @@ const englishCorrections = {
   consumable: { 2001: "Captain's Coin" },
   coin: { 40094: 'Ancient Coin' },
   building: {
+    163: 'Garrison Wall',
     166: 'Zeppelin',
     167: 'Hero Chest',
     168: 'Events Area',

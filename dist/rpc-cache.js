@@ -14,6 +14,10 @@
     teamGetAll: 'teams',
     'getUnitSummary:unit': 'teams',
     'getTrainings:unit': 'teams',
+    'getHealing:unit': 'teams',
+    getUnitSummary: 'teams',
+    getTrainings: 'teams',
+    getHealing: 'teams',
     questGetAll: 'other',
     arenaGetAll: 'other',
     expeditionGet: 'other',
@@ -1032,9 +1036,21 @@
                     drops.fragmentGear[gId] = (drops.fragmentGear[gId] || 0) + Number(count);
                   }
                 }
+                if (run.fragmentScroll && typeof run.fragmentScroll === 'object') {
+                  if (!drops.fragmentScroll) drops.fragmentScroll = {};
+                  for (const [sId, count] of Object.entries(run.fragmentScroll)) {
+                    drops.fragmentScroll[sId] = (drops.fragmentScroll[sId] || 0) + Number(count);
+                  }
+                }
                 if (run.gear && typeof run.gear === 'object') {
                   for (const [gId, count] of Object.entries(run.gear)) {
                     drops.gear[gId] = (drops.gear[gId] || 0) + Number(count);
+                  }
+                }
+                if (run.scroll && typeof run.scroll === 'object') {
+                  if (!drops.scroll) drops.scroll = {};
+                  for (const [sId, count] of Object.entries(run.scroll)) {
+                    drops.scroll[sId] = (drops.scroll[sId] || 0) + Number(count);
                   }
                 }
                 if (run.consumable && typeof run.consumable === 'object') {

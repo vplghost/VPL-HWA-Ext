@@ -235,8 +235,8 @@ test('renderCampaignDialog displays energy, mission selector, last raid drops, a
   assert.match(text, /Ải Chiến Dịch/);
   assert.match(text, /Kết quả Raid Ải #135 \(5 lượt\)/);
   assert.match(text, /7,?605 Gold/);
-  assert.match(text, /Mảnh #57/);
-  assert.match(text, /Gear #9/);
+  assert.match(text, /Mảnh Needle/);
+  assert.match(text, /Lucky Dice/);
   assert.match(text, /14 mảnh/);
   assert.match(text, /5 mảnh/);
 
