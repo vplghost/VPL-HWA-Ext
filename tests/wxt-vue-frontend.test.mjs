@@ -97,6 +97,7 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     'src/components/dialogs/HeroDetailModal.vue',
     'src/components/dialogs/TowerModal.vue',
     'src/components/dialogs/DungeonModal.vue',
+    'src/components/dialogs/QuestDetailModal.vue',
   ];
 
   for (const comp of components) {
@@ -104,6 +105,25 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     assert.ok(s.isFile(), `${comp} must be a file`);
     assert.ok(s.size > 50, `${comp} must not be empty`);
   }
+});
+
+test('QuestDetailModal and CampaignRaidModal have 1:1 ID parity with HTML dialogs', async () => {
+  const questContent = await readFile(join(root, 'src/components/dialogs/QuestDetailModal.vue'), 'utf8');
+  assert.match(questContent, /id="quest-detail-dialog"/, 'Must have #quest-detail-dialog');
+  assert.match(questContent, /id="quest-detail-dialog-title"/, 'Must have #quest-detail-dialog-title');
+  assert.match(questContent, /id="quest-detail-dialog-status"/, 'Must have #quest-detail-dialog-status');
+  assert.match(questContent, /id="quest-detail-dialog-body"/, 'Must have #quest-detail-dialog-body');
+  assert.match(questContent, /id="quest-detail-search"/, 'Must have search input');
+  assert.match(questContent, /id="quest-detail-refresh"/, 'Must have refresh button');
+  assert.match(questContent, /id="quest-detail-export"/, 'Must have export button');
+  assert.match(questContent, /id="quest-cards-container"/, 'Must have cards container');
+
+  const campContent = await readFile(join(root, 'src/components/dialogs/CampaignRaidModal.vue'), 'utf8');
+  assert.match(campContent, /id="campaign-dialog"/, 'Must have #campaign-dialog');
+  assert.match(campContent, /id="campaign-dialog-title"/, 'Must have #campaign-dialog-title');
+  assert.match(campContent, /id="campaign-dialog-status"/, 'Must have #campaign-dialog-status');
+  assert.match(campContent, /id="campaign-dialog-body"/, 'Must have #campaign-dialog-body');
+  assert.match(campContent, /id="campaign-mission-input"/, 'Must have mission input');
 });
 
 test('DungeonModal has 1:1 ID parity and controls matching HTML dungeon-modal', async () => {

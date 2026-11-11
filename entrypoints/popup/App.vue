@@ -23,6 +23,7 @@ import CampaignRaidModal from '@/src/components/dialogs/CampaignRaidModal.vue';
 import HeroDetailModal from '@/src/components/dialogs/HeroDetailModal.vue';
 import TowerModal from '@/src/components/dialogs/TowerModal.vue';
 import DungeonModal from '@/src/components/dialogs/DungeonModal.vue';
+import QuestDetailModal from '@/src/components/dialogs/QuestDetailModal.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -69,5 +70,6 @@ const { modalState, modalContext } = useModals();
     <HeroDetailModal v-model="modalState.hero" :hero="modalContext.selectedHero" />
     <TowerModal v-model="modalState.tower" />
     <DungeonModal v-model="modalState.dungeon" />
+    <QuestDetailModal v-model="modalState.questDetail" :initial-filter="modalContext.selectedQuestFilter" />
   </div>
 </template>
