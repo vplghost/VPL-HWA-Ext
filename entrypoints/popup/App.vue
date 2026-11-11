@@ -17,6 +17,7 @@ import { useModals } from '@/src/composables/useModals';
 import BuildingModal from '@/src/components/dialogs/BuildingModal.vue';
 import ResearchModal from '@/src/components/dialogs/ResearchModal.vue';
 import RaidModal from '@/src/components/dialogs/RaidModal.vue';
+import GatheringModal from '@/src/components/dialogs/GatheringModal.vue';
 import MonsterModal from '@/src/components/dialogs/MonsterModal.vue';
 import CampaignRaidModal from '@/src/components/dialogs/CampaignRaidModal.vue';
 import HeroDetailModal from '@/src/components/dialogs/HeroDetailModal.vue';
@@ -60,6 +61,7 @@ const { modalState, modalContext } = useModals();
     <BuildingModal v-model="modalState.building" />
     <ResearchModal v-model="modalState.research" />
     <RaidModal v-model="modalState.raid" />
+    <GatheringModal v-model="modalState.gathering" />
     <MonsterModal v-model="modalState.monster" />
     <CampaignRaidModal v-model="modalState.campaign" />
     <HeroDetailModal v-model="modalState.hero" :hero="modalContext.selectedHero" />
