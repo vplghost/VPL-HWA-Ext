@@ -24,6 +24,9 @@ import HeroDetailModal from '@/src/components/dialogs/HeroDetailModal.vue';
 import TowerModal from '@/src/components/dialogs/TowerModal.vue';
 import DungeonModal from '@/src/components/dialogs/DungeonModal.vue';
 import QuestDetailModal from '@/src/components/dialogs/QuestDetailModal.vue';
+import DraftModal from '@/src/components/dialogs/DraftModal.vue';
+import GuildVersusModal from '@/src/components/dialogs/GuildVersusModal.vue';
+import GuildChatPanel from '@/src/components/common/GuildChatPanel.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -71,5 +74,8 @@ const { modalState, modalContext } = useModals();
     <TowerModal v-model="modalState.tower" />
     <DungeonModal v-model="modalState.dungeon" />
     <QuestDetailModal v-model="modalState.questDetail" :initial-filter="modalContext.selectedQuestFilter" />
+    <DraftModal v-model="modalState.draft" />
+    <GuildVersusModal v-model="modalState.guildVersus" />
+    <GuildChatPanel v-model="modalState.guildChat" />
   </div>
 </template>

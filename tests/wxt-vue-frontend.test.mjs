@@ -98,6 +98,9 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     'src/components/dialogs/TowerModal.vue',
     'src/components/dialogs/DungeonModal.vue',
     'src/components/dialogs/QuestDetailModal.vue',
+    'src/components/dialogs/DraftModal.vue',
+    'src/components/dialogs/GuildVersusModal.vue',
+    'src/components/common/GuildChatPanel.vue',
   ];
 
   for (const comp of components) {
@@ -105,6 +108,32 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     assert.ok(s.isFile(), `${comp} must be a file`);
     assert.ok(s.size > 50, `${comp} must not be empty`);
   }
+});
+
+test('DraftModal, GuildVersusModal, and GuildChatPanel have 1:1 ID parity with HTML', async () => {
+  const draft = await readFile(join(root, 'src/components/dialogs/DraftModal.vue'), 'utf8');
+  assert.match(draft, /id="draft-modal"/, 'Must have #draft-modal');
+  assert.match(draft, /id="draft-modal-title"/, 'Must have #draft-modal-title');
+  assert.match(draft, /id="draft-modal-stage-badge"/, 'Must have #draft-modal-stage-badge');
+  assert.match(draft, /id="draft-modal-close"/, 'Must have #draft-modal-close');
+  assert.match(draft, /id="draft-modal-body"/, 'Must have #draft-modal-body');
+
+  const gvs = await readFile(join(root, 'src/components/dialogs/GuildVersusModal.vue'), 'utf8');
+  assert.match(gvs, /id="guild-versus-modal"/, 'Must have #guild-versus-modal');
+  assert.match(gvs, /id="gvs-modal-title"/, 'Must have #gvs-modal-title');
+  assert.match(gvs, /id="gvs-league-badge"/, 'Must have #gvs-league-badge');
+  assert.match(gvs, /id="gvs-modal-close"/, 'Must have #gvs-modal-close');
+  assert.match(gvs, /id="gvs-modal-body"/, 'Must have #gvs-modal-body');
+
+  const chat = await readFile(join(root, 'src/components/common/GuildChatPanel.vue'), 'utf8');
+  assert.match(chat, /id="guild-chat-panel"/, 'Must have #guild-chat-panel');
+  assert.match(chat, /id="guild-chat-count"/, 'Must have #guild-chat-count');
+  assert.match(chat, /id="guild-chat-refresh"/, 'Must have #guild-chat-refresh');
+  assert.match(chat, /id="guild-chat-close"/, 'Must have #guild-chat-close');
+  assert.match(chat, /id="guild-chat-messages"/, 'Must have #guild-chat-messages');
+  assert.match(chat, /id="guild-chat-form"/, 'Must have #guild-chat-form');
+  assert.match(chat, /id="guild-chat-input"/, 'Must have #guild-chat-input');
+  assert.match(chat, /id="guild-chat-send"/, 'Must have #guild-chat-send');
 });
 
 test('QuestDetailModal and CampaignRaidModal have 1:1 ID parity with HTML dialogs', async () => {

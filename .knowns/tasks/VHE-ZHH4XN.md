@@ -1,12 +1,13 @@
 ---
 id: VHE-ZHH4XN
 title: 'Synchronize Extension 1:1 with Legacy HTML Layout and Dialogs'
-status: in-progress
+status: done
 priority: high
 labels:
   - wxt,vue,parity,ui
 createdAt: '2026-11-11T04:17:44.986Z'
-updatedAt: '2026-11-11T04:19:19.484Z'
+updatedAt: '2026-11-11T06:31:54.199Z'
+completedAt: '2026-11-11T06:31:54.199Z'
 timeSpent: 0
 assignee: '@me'
 ---
