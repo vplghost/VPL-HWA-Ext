@@ -1,4 +1,6 @@
 node_modules/
+.output/
+.wxt/
 
 # Knowns sync regenerates these platform skill copies.
 /.agents/skills/kn-*/

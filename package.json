@@ -1,6 +1,6 @@
 {
   "name": "hwa-helper",
-  "version": "0.9.244",
+  "version": "0.9.246",
   "private": true,
   "description": "Personal Chrome extension for Hero Wars: Alliance",
   "scripts": {
@@ -17,11 +17,21 @@
     "rules:production": "node scripts/generate-production-rules.mjs",
     "titans:metadata": "node scripts/generate-titan-metadata.mjs",
     "quests:update": "node scripts/generate-quest-data.mjs",
-    "version:bump": "node scripts/bump-version.mjs"
+    "version:bump": "node scripts/bump-version.mjs",
+    "wxt:build": "wxt build",
+    "wxt:dev": "wxt"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/chrome": "^0.3.7",
+    "@wxt-dev/module-vue": "^1.0.3",
     "tailwindcss": "^4.3.3",
-    "tex-decoder": "^2.0.0"
+    "tex-decoder": "^2.0.0",
+    "typescript": "^7.0.2",
+    "wxt": "^0.21.5"
+  },
+  "dependencies": {
+    "vue": "^3.5.45"
   }
 }
