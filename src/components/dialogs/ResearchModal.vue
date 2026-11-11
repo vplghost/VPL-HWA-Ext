@@ -79,6 +79,7 @@ onMounted(async () => {
       chrome.storage?.onChanged?.addListener(onStorageChanged);
     } catch (_) {}
   }
+  dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'personalResearch' }]).catch(() => {});
 });
 
 onUnmounted(() => {
@@ -160,7 +161,7 @@ async function finishResearch(f: any) {
         args: {
           researchId: f.researchId,
           level: f.level,
-          queueNumber: f.queueNumber || 0,
+          completeDate: Date.now(),
         },
       },
       { name: 'getSummary', feature: 'personalResearch', args: {} },
@@ -528,7 +529,7 @@ async function startResearchUpgrade(candidate: any) {
         args: {
           researchId: f.researchId,
           level: f.level,
-          queueNumber: f.queueNumber || 0,
+          completeDate: Date.now(),
         },
       });
     }

@@ -9,6 +9,7 @@ const { recordingState } = useRpcCache();
 
 const dispatchMode = ref<'piggyback' | 'direct' | 'mqtt-piggyback'>('direct');
 const popupRpcEnabled = ref(true);
+const interceptEnabled = ref(true);
 const mqttCaptureEnabled = ref(true);
 
 const DEFAULT_TAB_ITEMS = [
@@ -41,6 +42,7 @@ onMounted(async () => {
         'socketRefreshMode',
         'popupRpcEnabled',
         'mqttCaptureEnabled',
+        'captureSettings',
         'tabConfig',
       ]);
       if (stored.socketRefreshMode) {
@@ -49,7 +51,14 @@ onMounted(async () => {
         dispatchMode.value = stored.dispatchMode;
       }
       popupRpcEnabled.value = stored.popupRpcEnabled !== false;
-      if (stored.mqttCaptureEnabled !== undefined) mqttCaptureEnabled.value = stored.mqttCaptureEnabled;
+      if (stored.captureSettings?.interceptEnabled !== undefined) {
+        interceptEnabled.value = stored.captureSettings.interceptEnabled !== false;
+      }
+      if (stored.mqttCaptureEnabled !== undefined) {
+        mqttCaptureEnabled.value = stored.mqttCaptureEnabled !== false;
+      } else {
+        mqttCaptureEnabled.value = interceptEnabled.value;
+      }
       if (Array.isArray(stored.tabConfig) && stored.tabConfig.length > 0) {
         const labelMap = new Map(DEFAULT_TAB_ITEMS.map((t) => [t.id, t.label]));
         const result: TabSettingItem[] = [];
@@ -132,17 +141,38 @@ async function togglePopupRpc() {
   }
 }
 
+async function toggleIntercept() {
+  interceptEnabled.value = !interceptEnabled.value;
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    const stored = await chrome.storage.local.get('captureSettings');
+    await chrome.storage.local.set({
+      captureSettings: {
+        ...(stored.captureSettings || {}),
+        interceptEnabled: interceptEnabled.value,
+      },
+    });
+  }
+}
+
 async function toggleMqtt() {
   mqttCaptureEnabled.value = !mqttCaptureEnabled.value;
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
-    await chrome.storage.local.set({ mqttCaptureEnabled: mqttCaptureEnabled.value });
+    const stored = await chrome.storage.local.get('captureSettings');
+    await chrome.storage.local.set({
+      mqttCaptureEnabled: mqttCaptureEnabled.value,
+      captureSettings: {
+        ...(stored.captureSettings || {}),
+        interceptEnabled: mqttCaptureEnabled.value,
+      },
+    });
+    interceptEnabled.value = mqttCaptureEnabled.value;
   }
 }
 
 async function toggleRecording() {
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     chrome.runtime.sendMessage({
-      kind: recordingState.value?.active ? 'stop-recording' : 'start-recording',
+      kind: recordingState.value?.active ? 'record-stop' : 'record-start',
     });
   }
 }
@@ -273,6 +303,24 @@ async function toggleRecording() {
           <option value="piggyback">🛡️ Piggyback (Safe Stealth)</option>
           <option value="mqtt-piggyback">📡 MQTT-Assisted Piggyback</option>
         </select>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div>
+          <div class="font-semibold text-slate-700 dark:text-slate-200">Network & API Intercept</div>
+          <div class="text-[11px] text-slate-400">
+            Captures game RPC fetch responses to keep heroes, queues, and resources in sync.
+          </div>
+        </div>
+        <button
+          id="intercept-enabled"
+          type="button"
+          class="cursor-pointer px-3 py-1 rounded-lg font-semibold transition-colors text-xs"
+          :class="interceptEnabled ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'"
+          @click="toggleIntercept"
+        >
+          {{ interceptEnabled ? 'Enabled' : 'Disabled' }}
+        </button>
       </div>
 
       <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">

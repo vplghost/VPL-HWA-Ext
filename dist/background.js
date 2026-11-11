@@ -582,13 +582,13 @@ async function handleControl(kind) {
     }
     const next = { active: true, nextIndex: 0, nextInteractionIndex: 0, error: null };
     await chrome.storage.session.set({ [RECORD_STATE_KEY]: next });
-    await chrome.storage.local.set({ gameRecordingActive: true });
+    await chrome.storage.local.set({ gameRecordingActive: true, recordingState: next });
     return next;
   }
   if (kind === 'record-stop') {
     const next = { ...state, active: false };
     await chrome.storage.session.set({ [RECORD_STATE_KEY]: next });
-    await chrome.storage.local.set({ gameRecordingActive: false });
+    await chrome.storage.local.set({ gameRecordingActive: false, recordingState: next });
     return next;
   }
   if (kind === 'record-clear') {
@@ -596,7 +596,7 @@ async function handleControl(kind) {
     await clearInteractions();
     const next = { active: false, nextIndex: 0, nextInteractionIndex: 0, error: null };
     await chrome.storage.session.set({ [RECORD_STATE_KEY]: next });
-    await chrome.storage.local.set({ gameRecordingActive: false });
+    await chrome.storage.local.set({ gameRecordingActive: false, recordingState: next });
     return next;
   }
   return state;
@@ -882,8 +882,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   const isAllowedOrigin = sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`) || isGameUrl(sender.url);
-  if (['record-start', 'record-stop', 'record-clear'].includes(message?.kind) && isAllowedOrigin) {
-    pending = pending.then(() => handleControl(message.kind));
+  const recordKinds = ['record-start', 'record-stop', 'record-clear', 'start-recording', 'stop-recording'];
+  if (recordKinds.includes(message?.kind) && isAllowedOrigin) {
+    let mappedKind = message.kind;
+    if (mappedKind === 'start-recording') mappedKind = 'record-start';
+    if (mappedKind === 'stop-recording') mappedKind = 'record-stop';
+    pending = pending.then(() => handleControl(mappedKind));
     pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
     pending = pending.catch(() => {});
     return true;
@@ -1227,6 +1231,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const calls = socketRefreshCalls(record, cacheResult.cache);
       const dispatch = rpcMessageForSettings(stored, calls);
       if (calls.length && dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+    }
+    if (stored.popupRpcEnabled === true && sender.tab?.id && record.requestBody &&
+        (record.requestBody.includes('"userGetInfo"') || record.requestBody.includes('"mobileLogin"'))) {
+      const dispatch = rpcMessageForSettings(stored, [
+        { name: 'getSummary', feature: 'building' },
+        { name: 'getSummary', feature: 'personalResearch' }
+      ]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
     const latestClaim = cacheResult.cache.questClaimStatus?.data?.claims?.at(-1);
     if (stored.popupRpcEnabled === true && cacheResult.changed && latestClaim?.needsSync &&

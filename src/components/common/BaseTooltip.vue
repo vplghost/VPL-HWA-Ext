@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -19,8 +19,15 @@ const triggerRef = ref<HTMLElement | null>(null);
 const tooltipEl = ref<HTMLElement | null>(null);
 const coords = ref<{ left: number; top?: number; bottom?: number }>({ left: 0 });
 let showTimeout: any = null;
+let hideTimeout: any = null;
 
 const hasContent = computed(() => Boolean(props.content && props.content.trim().length > 0));
+
+watch(() => props.content, () => {
+  if (isVisible.value) {
+    nextTick(updatePosition);
+  }
+});
 
 function updatePosition() {
   if (!triggerRef.value || typeof window === 'undefined') return;
@@ -52,17 +59,42 @@ function updatePosition() {
 }
 
 function handleMouseEnter() {
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
+    hideTimeout = null;
+  }
   if (!hasContent.value) return;
   if (showTimeout) clearTimeout(showTimeout);
+  if (isVisible.value) {
+    nextTick(updatePosition);
+    return;
+  }
   showTimeout = setTimeout(() => {
     isVisible.value = true;
     nextTick(updatePosition);
   }, props.delay);
 }
 
-function handleMouseLeave() {
-  if (showTimeout) clearTimeout(showTimeout);
-  isVisible.value = false;
+function handleMouseLeave(e?: MouseEvent) {
+  if (showTimeout) {
+    clearTimeout(showTimeout);
+    showTimeout = null;
+  }
+  if (e && triggerRef.value) {
+    const rect = triggerRef.value.getBoundingClientRect();
+    if (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    ) {
+      return;
+    }
+  }
+  if (hideTimeout) clearTimeout(hideTimeout);
+  hideTimeout = setTimeout(() => {
+    isVisible.value = false;
+  }, 100);
 }
 
 function handleScroll() {

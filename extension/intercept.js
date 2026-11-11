@@ -39,7 +39,7 @@
     'userGetInfo', 'inventoryGet', 'heroGetAll', 'titanGetAll', 'teamGetAll',
     'refillableGetAll', 'missionGetAll', 'artifact_getAll', 'titan_artifactGetCounters',
     'skin_getAll', 'rune_getAll', 'arenaGetAll', 'clanWarGetBriefInfo', 'mailGetAll',
-    'searchMob', 'searchMine', 'getTrainings', 'getHealing', 'clan_getSummary']);
+    'searchMob', 'searchMine', 'getTrainings', 'getHealing', 'clan_getSummary', 'getSummary']);
   const helperActionMethods = new Set(['createRally', 'cancelRally', 'joinRally', 'attackMob', 'attackMine', 'stopMineGathering',
     'randomDraft_saveDefence', 'randomDraft_saveAttack',
     'magicTower_enterRoom', 'magicTower_startBattle', 'magicTower_activateBuff',
@@ -207,7 +207,7 @@
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
-      captureEnabled = event.data.interceptEnabled === true;
+      captureEnabled = event.data.interceptEnabled !== false;
       popupRpcEnabled = event.data.popupRpcEnabled === true;
       rpcDispatchMode = ['direct', 'mqtt-piggyback'].includes(event.data.socketRefreshMode) ? event.data.socketRefreshMode : 'piggyback';
       recordingActive = event.data.recordingActive === true;

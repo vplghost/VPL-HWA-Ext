@@ -22,6 +22,7 @@ import {
   formatAutoGatherTooltip,
 } from '@/src/utils/marchTooltip';
 import { normalizeArray } from '@/src/utils/troops';
+import { getBuildingName, getResearchName } from '@/src/utils/metadata';
 import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 
 const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
@@ -162,16 +163,92 @@ const hasActiveMonsterMarch = computed(() => {
   return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value).category === 'monster');
 });
 
-// Building remaining time
+// Building remaining time & tooltip
+const buildingQueues = computed(() => {
+  const q = cache.value.buildingStatus?.data?.queues;
+  return Array.isArray(q) ? q : [];
+});
+
+const researchQueues = computed(() => {
+  const q = cache.value.researchStatus?.data?.queues;
+  return Array.isArray(q) ? q : [];
+});
+
 const buildingRemaining = computed(() => {
-  const minutes = remainingMinutes(cache.value.buildingStatus, now.value);
+  const queues = buildingQueues.value;
+  if (!queues.length) return '—';
+  const ends = queues
+    .map((q: any) => q.startDate + q.durationMs)
+    .filter((end: number) => Number.isFinite(end) && end > now.value);
+  if (!ends.length) return 'Ready';
+  const minutes = Math.ceil((Math.min(...ends) - now.value) / 60000);
   return hoursMinutes(minutes);
 });
 
-// Research remaining time
+const buildingTooltipText = computed(() => {
+  const queues = buildingQueues.value;
+  if (!queues.length) return 'Construction: Idle (Click to view Buildings)';
+  const active = queues.filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now.value);
+  const finished = queues.filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs <= now.value);
+  const lines: string[] = [];
+  if (active.length > 0) {
+    lines.push('Construction in progress:');
+    for (const q of active) {
+      const name = getBuildingName(q.buildingId);
+      const level = q.level ? ` (Lv. ${q.level})` : '';
+      const mins = Math.ceil((q.startDate + q.durationMs - now.value) / 60000);
+      lines.push(`• ${name}${level} · ${hoursMinutes(mins)} remaining`);
+    }
+  }
+  if (finished.length > 0) {
+    lines.push(active.length > 0 ? '\nReady to finish:' : 'Ready to finish:');
+    for (const q of finished) {
+      const name = getBuildingName(q.buildingId);
+      const level = q.level ? ` (Lv. ${q.level})` : '';
+      lines.push(`• ${name}${level} · Ready!`);
+    }
+  }
+  lines.push('\n(Click to view Buildings)');
+  return lines.join('\n');
+});
+
+// Research remaining time & tooltip
 const researchRemaining = computed(() => {
-  const minutes = remainingMinutes(cache.value.researchStatus, now.value);
+  const queues = researchQueues.value;
+  if (!queues.length) return '—';
+  const ends = queues
+    .map((q: any) => q.startDate + q.durationMs)
+    .filter((end: number) => Number.isFinite(end) && end > now.value);
+  if (!ends.length) return 'Ready';
+  const minutes = Math.ceil((Math.min(...ends) - now.value) / 60000);
   return hoursMinutes(minutes);
+});
+
+const researchTooltipText = computed(() => {
+  const queues = researchQueues.value;
+  if (!queues.length) return 'Research: Idle (Click to view Personal Research)';
+  const active = queues.filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now.value);
+  const finished = queues.filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs <= now.value);
+  const lines: string[] = [];
+  if (active.length > 0) {
+    lines.push('Research in progress:');
+    for (const q of active) {
+      const name = getResearchName(q.researchId);
+      const level = q.level ? ` (Lv. ${q.level})` : '';
+      const mins = Math.ceil((q.startDate + q.durationMs - now.value) / 60000);
+      lines.push(`• ${name}${level} · ${hoursMinutes(mins)} remaining`);
+    }
+  }
+  if (finished.length > 0) {
+    lines.push(active.length > 0 ? '\nReady to finish:' : 'Ready to finish:');
+    for (const q of finished) {
+      const name = getResearchName(q.researchId);
+      const level = q.level ? ` (Lv. ${q.level})` : '';
+      lines.push(`• ${name}${level} · Ready!`);
+    }
+  }
+  lines.push('\n(Click to view Personal Research)');
+  return lines.join('\n');
 });
 
 // Legend Draft Alert
@@ -439,7 +516,7 @@ function toggleTheme() {
         </div>
 
         <!-- Building Badge -->
-        <BaseTooltip content="Building time remaining (Click to view City Buildings)">
+        <BaseTooltip :content="buildingTooltipText">
           <span
             id="building-badge"
             tabindex="0"
@@ -453,7 +530,7 @@ function toggleTheme() {
         </BaseTooltip>
 
         <!-- Research Badge -->
-        <BaseTooltip content="Research time remaining (Click to view Personal Research)">
+        <BaseTooltip :content="researchTooltipText">
           <span
             id="research-badge"
             tabindex="0"

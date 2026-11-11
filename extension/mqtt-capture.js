@@ -7,7 +7,7 @@
   const MQTT_ENDPOINT = 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt';
   const MAX_FRAME_BYTES = 1024 * 1024;
   const MAX_PAYLOAD_BYTES = 128 * 1024;
-  let captureEnabled = false;
+  let captureEnabled = true;
   let popupRpcEnabled = false;
   let assistedMode = false;
   let recordingActive = false;
@@ -23,7 +23,7 @@
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
-      captureEnabled = event.data.interceptEnabled === true;
+      captureEnabled = event.data.interceptEnabled !== false;
       popupRpcEnabled = event.data.popupRpcEnabled === true;
       assistedMode = event.data.socketRefreshMode === 'mqtt-piggyback';
       recordingActive = event.data.recordingActive === true;
@@ -368,11 +368,15 @@
     construct(target, args, newTarget) {
       const socket = Reflect.construct(target, args, newTarget);
       let endpoint;
+      let url;
       try {
-        const url = new URL(String(args[0]), location.href);
+        url = new URL(String(args[0]), location.href);
         endpoint = `${url.origin}${url.pathname}`;
       } catch (_) { return socket; }
-      if (endpoint !== MQTT_ENDPOINT) return socket;
+      const isMqtt = endpoint === MQTT_ENDPOINT ||
+        (url && url.pathname.includes('/mqtt') && (url.hostname.includes('nextersglobal.com') || url.hostname.includes('emqx'))) ||
+        (url && url.hostname.includes('emqx'));
+      if (!isMqtt) return socket;
       const state = { version: 4, pending: Promise.resolve(), socket, closed: false };
       socket.addEventListener('close', () => { state.closed = true; });
       socket.addEventListener('message', (event) => {

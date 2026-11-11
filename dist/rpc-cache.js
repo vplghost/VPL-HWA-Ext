@@ -1496,8 +1496,9 @@
             data: result.response, updatedAt: record.timestamp }, ...entries];
         }
         if (call.name === 'getSummary' && ['building', 'personalResearch'].includes(call.feature) &&
-            Array.isArray(result?.response?.queues)) {
-          const queues = result.response.queues.filter((queue) =>
+            result?.response) {
+          const rawQueues = Array.isArray(result.response.queues) ? result.response.queues : [];
+          const queues = rawQueues.filter((queue) =>
             Number.isFinite(queue.startDate) && Number.isFinite(queue.durationMs) && queue.durationMs >= 0)
             .map((queue, index) => ({
               startDate: queue.startDate,
@@ -1519,7 +1520,8 @@
             },
             updatedAt: record.timestamp }];
         }
-        if (key === 'startConstruction:building' && result?.response &&
+        if ((key === 'startConstruction:building' || (call.name === 'startConstruction' && (!call.feature || call.feature === 'building'))) &&
+            result?.response &&
             Number.isFinite(call.args?.startDate) && Number.isFinite(call.args?.durationMs) &&
             call.args.durationMs >= 0) {
           return [{ key: 'buildingStatus', method: call.name, feature: call.feature,
@@ -1529,12 +1531,14 @@
               startDate: call.args.startDate, durationMs: call.args.durationMs
             } }, updatedAt: record.timestamp }];
         }
-        if (key === 'completeConstruction:building' && result?.response) {
+        if ((key === 'completeConstruction:building' || (call.name === 'completeConstruction' && (!call.feature || call.feature === 'building'))) &&
+            result?.response) {
           return [{ key: 'buildingStatus', method: call.name, feature: call.feature,
             group: 'header', data: { action: 'complete', buildingId: call.args?.buildingId },
             updatedAt: record.timestamp }];
         }
-        if (key === 'startResearch:personalResearch' && result?.response &&
+        if ((key === 'startResearch:personalResearch' || (call.name === 'startResearch' && (!call.feature || call.feature === 'personalResearch'))) &&
+            result?.response &&
             Number.isFinite(call.args?.startDate) && Number.isFinite(call.args?.durationMs) &&
             call.args.durationMs >= 0) {
           return [{ key: 'researchStatus', method: call.name, feature: call.feature,
@@ -1544,7 +1548,8 @@
               startDate: call.args.startDate, durationMs: call.args.durationMs
             } }, updatedAt: record.timestamp }];
         }
-        if (key === 'completeResearch:personalResearch' && result?.response) {
+        if ((key === 'completeResearch:personalResearch' || (call.name === 'completeResearch' && (!call.feature || call.feature === 'personalResearch'))) &&
+            result?.response) {
           return [{ key: 'researchStatus', method: call.name, feature: call.feature,
             group: 'header', data: { action: 'complete', researchId: call.args?.researchId },
             updatedAt: record.timestamp }];

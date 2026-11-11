@@ -59,6 +59,7 @@ onMounted(async () => {
       }
     } catch (_) {}
   }
+  dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'building' }]).catch(() => {});
 });
 
 onUnmounted(() => {

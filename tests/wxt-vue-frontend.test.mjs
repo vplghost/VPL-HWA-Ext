@@ -1148,5 +1148,27 @@ test('ResearchModal accurately loads completedResearches and excludes max-level 
   assert.match(troopsUtil, /cache\?\.researchStatus\?\.data\?\.completedResearches/, 'troops.ts must query completedResearches');
 });
 
+test('Session recording, MQTT capture, and building/research controls operate seamlessly', async () => {
+  const researchModal = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
+  assert.match(researchModal, /completeDate:\s*Date\.now\(\)/, 'ResearchModal must pass completeDate: Date.now() to completeResearch');
+
+  const settingsTab = await readFile(join(root, 'src/components/tabs/SettingsTab.vue'), 'utf8');
+  assert.match(settingsTab, /'record-stop'\s*:\s*'record-start'/, 'SettingsTab must send record-start / record-stop');
+  assert.match(settingsTab, /interceptEnabled/, 'SettingsTab must support interceptEnabled toggle');
+
+  const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
+  assert.match(header, /:content="buildingTooltipText"/, 'Header must use dynamic buildingTooltipText');
+  assert.match(header, /:content="researchTooltipText"/, 'Header must use dynamic researchTooltipText');
+  assert.match(header, /return 'Ready'/, 'Header countdown must display Ready when completed queues exist');
+
+  const bg = await readFile(join(root, 'extension/background.js'), 'utf8');
+  assert.match(bg, /start-recording/, 'Background must support start-recording alias');
+  assert.match(bg, /recordingState:\s*next/, 'Background must persist recordingState to local storage for reactive UI');
+
+  const mqtt = await readFile(join(root, 'extension/mqtt-capture.js'), 'utf8');
+  assert.match(mqtt, /interceptEnabled\s*!==\s*false/, 'MQTT capture must activate when interceptEnabled is not false');
+});
+
+
 
 

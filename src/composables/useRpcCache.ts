@@ -14,8 +14,13 @@ function handleStorageChange(changes: { [key: string]: chrome.storage.StorageCha
     }
     if (changes.recordingState?.newValue) {
       recordingState.value = changes.recordingState.newValue;
+    } else if ('gameRecordingActive' in changes) {
+      recordingState.value = { ...recordingState.value, active: changes.gameRecordingActive.newValue === true };
     }
   } else if (areaName === 'session') {
+    if (changes.recordingState?.newValue) {
+      recordingState.value = changes.recordingState.newValue;
+    }
     if (changes.rpcQueueCounts?.newValue) {
       const counts = changes.rpcQueueCounts.newValue || {};
       rpcQueueCount.value = Object.values(counts).reduce((sum: number, c: any) => sum + (Number(c) || 0), 0);
@@ -35,12 +40,14 @@ export function useRpcCache() {
   async function loadInitial() {
     if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
     try {
-      const stored = await chrome.storage.local.get(['rpcCache', 'recordingState']);
+      const stored = await chrome.storage.local.get(['rpcCache', 'recordingState', 'gameRecordingActive']);
       if (stored.rpcCache) {
         cache.value = stored.rpcCache;
       }
       if (stored.recordingState) {
         recordingState.value = stored.recordingState;
+      } else if (stored.gameRecordingActive !== undefined) {
+        recordingState.value = { active: stored.gameRecordingActive === true };
       }
     } catch (e) {
       console.warn('Failed to load storage in useRpcCache:', e);
@@ -48,7 +55,10 @@ export function useRpcCache() {
 
     try {
       if (chrome.storage?.session?.get) {
-        const sessionData = await chrome.storage.session.get('rpcQueueCounts');
+        const sessionData = await chrome.storage.session.get(['rpcQueueCounts', 'recordingState']);
+        if (sessionData.recordingState) {
+          recordingState.value = sessionData.recordingState;
+        }
         const counts = sessionData.rpcQueueCounts || {};
         rpcQueueCount.value = Object.values(counts).reduce((sum: number, c: any) => sum + (Number(c) || 0), 0);
       }
