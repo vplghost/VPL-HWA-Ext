@@ -21,6 +21,7 @@ import GatheringModal from '@/src/components/dialogs/GatheringModal.vue';
 import MonsterModal from '@/src/components/dialogs/MonsterModal.vue';
 import CampaignRaidModal from '@/src/components/dialogs/CampaignRaidModal.vue';
 import HeroDetailModal from '@/src/components/dialogs/HeroDetailModal.vue';
+import TowerModal from '@/src/components/dialogs/TowerModal.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -65,5 +66,6 @@ const { modalState, modalContext } = useModals();
     <MonsterModal v-model="modalState.monster" />
     <CampaignRaidModal v-model="modalState.campaign" />
     <HeroDetailModal v-model="modalState.hero" :hero="modalContext.selectedHero" />
+    <TowerModal v-model="modalState.tower" />
   </div>
 </template>
