@@ -1106,3 +1106,22 @@ test('Raid queue allows creation during active guild raid and Dashboard displays
   assert.equal(advance2.calls[0].name, 'heroGetAll', 'Must request fresh heroGetAll');
   assert.equal(advance2.calls[1].name, 'getUnitSummary', 'Must request fresh getUnitSummary');
 });
+
+test('ResourceSummary and HeroDetailModal use accurate RPC keys and payload conventions', async () => {
+  const resourceSummaryContent = await readFile(join(root, 'src/components/dashboard/ResourceSummary.vue'), 'utf8');
+  assert.match(resourceSummaryContent, /resource:starMoney/, 'Must query resource:starMoney for emeralds');
+  assert.match(resourceSummaryContent, /resource:material:5/, 'Must query resource:material:5 for food');
+  assert.match(resourceSummaryContent, /resource:material:4/, 'Must query resource:material:4 for wood');
+  assert.match(resourceSummaryContent, /resource:material:3/, 'Must query resource:material:3 for stone');
+  assert.match(resourceSummaryContent, /resource:material:2/, 'Must query resource:material:2 for iron');
+  assert.match(resourceSummaryContent, /cache\.value\.userGetInfo\?\.data\?\.user\?\.starMoney/, 'Must have starMoney fallback');
+  assert.match(resourceSummaryContent, /cache\.value\.inventoryGet\?\.data\?\.material\?\.\[['"]5['"]\]/, 'Must have food fallback');
+
+  const heroDetailModalContent = await readFile(join(root, 'src/components/dialogs/HeroDetailModal.vue'), 'utf8');
+  assert.match(heroDetailModalContent, /name:\s*['"]heroUpgradeSkill['"]/, 'Must dispatch heroUpgradeSkill');
+  assert.doesNotMatch(heroDetailModalContent, /name:\s*['"]heroUpgradeSkill['"][\s\S]*?feature:\s*['"]hero['"]/, 'heroUpgradeSkill must not contain feature: hero');
+
+  const interceptContent = await readFile(join(root, 'extension/intercept.js'), 'utf8');
+  assert.match(interceptContent, /'heroUpgradeSkill'/, 'intercept.js helperActionMethods must include heroUpgradeSkill');
+});
+

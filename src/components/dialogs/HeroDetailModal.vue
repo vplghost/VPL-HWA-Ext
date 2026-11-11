@@ -201,7 +201,6 @@ async function upgradeSkill(s: SkillSlotConfig) {
       {
         name: 'heroUpgradeSkill',
         args: { heroId: numId, skill: s.slot },
-        feature: 'hero',
       },
       { name: 'heroGetAll' },
     ]);

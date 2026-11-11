@@ -47,7 +47,7 @@
     'startConstruction', 'completeConstruction',
     'startResearch', 'completeResearch',
     'startHealing', 'startTraining', 'completeTraining',
-    'missionRaid', 'mission_raid']);
+    'missionRaid', 'mission_raid', 'heroUpgradeSkill']);
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok, error = null) => window.postMessage({

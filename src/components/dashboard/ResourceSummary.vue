@@ -21,7 +21,7 @@ onUnmounted(() => {
 const energyEntry = computed(() => cache.value['resource:energy']);
 const worldEnergyEntry = computed(() => cache.value['resource:world-energy']);
 const goldEntry = computed(() => cache.value['resource:gold']);
-const diamondEntry = computed(() => cache.value['resource:diamond']);
+const starMoneyEntry = computed(() => cache.value['resource:starMoney'] || cache.value['resource:diamond']);
 
 const energyVal = computed(() => getAmountAt(energyEntry.value, now.value) ?? cache.value.energyStatus?.data?.energy ?? 0);
 const energyCap = computed(() => energyEntry.value?.data?.cap ?? 0);
@@ -31,14 +31,50 @@ const worldEnergyVal = computed(() => getAmountAt(worldEnergyEntry.value, now.va
 const worldEnergyCap = computed(() => worldEnergyEntry.value?.data?.cap ?? 200);
 const worldEnergyRefillSec = computed(() => getNextRefillSeconds(worldEnergyEntry.value, now.value));
 
-const goldVal = computed(() => goldEntry.value?.data?.amount ?? 0);
-const diamondVal = computed(() => diamondEntry.value?.data?.amount ?? 0);
+const goldVal = computed(
+  () =>
+    goldEntry.value?.data?.amount ??
+    cache.value.userGetInfo?.data?.user?.gold ??
+    cache.value.userGetInfo?.data?.gold ??
+    0
+);
+const diamondVal = computed(
+  () =>
+    starMoneyEntry.value?.data?.amount ??
+    cache.value.userGetInfo?.data?.user?.starMoney ??
+    cache.value.userGetInfo?.data?.starMoney ??
+    0
+);
 
-// Basic resources
-const foodVal = computed(() => cache.value['resource:food']?.data?.amount ?? 0);
-const woodVal = computed(() => cache.value['resource:wood']?.data?.amount ?? 0);
-const stoneVal = computed(() => cache.value['resource:stone']?.data?.amount ?? 0);
-const ironVal = computed(() => cache.value['resource:iron']?.data?.amount ?? 0);
+// Basic resources: 5 = Food, 4 = Wood, 3 = Stone, 2 = Iron
+const foodVal = computed(
+  () =>
+    cache.value['resource:material:5']?.data?.amount ??
+    cache.value.inventoryGet?.data?.material?.['5'] ??
+    cache.value['resource:food']?.data?.amount ??
+    0
+);
+const woodVal = computed(
+  () =>
+    cache.value['resource:material:4']?.data?.amount ??
+    cache.value.inventoryGet?.data?.material?.['4'] ??
+    cache.value['resource:wood']?.data?.amount ??
+    0
+);
+const stoneVal = computed(
+  () =>
+    cache.value['resource:material:3']?.data?.amount ??
+    cache.value.inventoryGet?.data?.material?.['3'] ??
+    cache.value['resource:stone']?.data?.amount ??
+    0
+);
+const ironVal = computed(
+  () =>
+    cache.value['resource:material:2']?.data?.amount ??
+    cache.value.inventoryGet?.data?.material?.['2'] ??
+    cache.value['resource:iron']?.data?.amount ??
+    0
+);
 </script>
 
 <template>
