@@ -2,10 +2,12 @@
 import { ref, onMounted } from 'vue';
 import { useTheme } from '@/src/composables/useTheme';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useGameConnection } from '@/src/composables/useGameConnection';
 import type { ThemeMode } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
 const { recordingState } = useRpcCache();
+const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab } = useGameConnection();
 
 const dispatchMode = ref<'piggyback' | 'direct' | 'mqtt-piggyback'>('direct');
 const popupRpcEnabled = ref(true);
@@ -337,6 +339,25 @@ async function toggleRecording() {
           @click="toggleMqtt"
         >
           {{ mqttCaptureEnabled ? 'Active' : 'Disabled' }}
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div>
+          <div class="font-semibold text-slate-700 dark:text-slate-200">Game Tab Connection</div>
+          <div class="text-[11px] text-slate-400">
+            {{ !hasGameTab ? 'No Hero Wars game tab found in browser.' : isHealthy ? 'Connected to active game tab and engine hooks.' : alertMessage?.body || 'Refresh recommended.' }}
+          </div>
+        </div>
+        <button
+          type="button"
+          class="cursor-pointer px-3 py-1 rounded-lg font-semibold transition-all text-xs inline-flex items-center gap-1.5"
+          :class="isHealthy ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700' : 'bg-emerald-600 hover:bg-emerald-500 text-white'"
+          :disabled="isRefreshing"
+          @click="reloadGameTab"
+        >
+          <span :class="{ 'animate-spin': isRefreshing }">↻</span>
+          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh Game Tab' }}</span>
         </button>
       </div>
     </div>

@@ -23,12 +23,30 @@ import {
 } from '@/src/utils/marchTooltip';
 import { normalizeArray } from '@/src/utils/troops';
 import { getBuildingName, getResearchName } from '@/src/utils/metadata';
+import { useGameConnection } from '@/src/composables/useGameConnection';
 import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 
 const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
 const { theme, applyTheme } = useTheme();
 const { openModal } = useModals();
 const { resourceSelection } = useResourceSelection();
+const { hasGameTab, isHealthy, needsRefresh, isRefreshing, alertMessage, reloadGameTab, checkStatus } = useGameConnection();
+
+const headerConnectionTooltip = computed(() => {
+  if (isRefreshing.value) return 'Refreshing game tab...';
+  if (alertMessage.value) {
+    return `${alertMessage.value.title} ${alertMessage.value.body}\n\n(Click to refresh game browser)`;
+  }
+  return 'Game Connected: Live hooks and WebSockets are active.\n\n(Click to reload game tab)';
+});
+
+function handleConnectionClick() {
+  if (hasGameTab.value) {
+    reloadGameTab();
+  } else {
+    checkStatus();
+  }
+}
 
 // Current time refreshed every second for live countdowns
 const now = ref(Date.now());
@@ -447,6 +465,39 @@ function toggleTheme() {
 
       <!-- Right: Status Badges -->
       <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5" aria-label="Current status">
+        <!-- Game Connection Status & Refresh Button -->
+        <BaseTooltip :content="headerConnectionTooltip">
+          <button
+            id="game-connection-badge"
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-all cursor-pointer shadow-2xs"
+            :class="
+              isHealthy
+                ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                : !hasGameTab
+                ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 ring-1 ring-amber-400'
+                : 'text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 ring-1 ring-sky-400 animate-pulse'
+            "
+            :aria-label="headerConnectionTooltip"
+            :disabled="isRefreshing"
+            @click="handleConnectionClick"
+          >
+            <span
+              class="size-1.5 rounded-full"
+              :class="
+                isHealthy
+                  ? 'bg-emerald-500'
+                  : !hasGameTab
+                  ? 'bg-amber-500'
+                  : 'bg-sky-500 animate-ping'
+              "
+            />
+            <span class="text-[11px] font-semibold">
+              {{ isRefreshing ? 'Refreshing...' : isHealthy ? 'Live' : !hasGameTab ? 'No Game Tab' : 'Refresh Game' }}
+            </span>
+          </button>
+        </BaseTooltip>
+
         <!-- Active Marches & Standing Queues -->
         <div id="marches" class="flex items-center gap-1" aria-label="Active marches and queues">
           <!-- Active March Badges with Full Tooltip -->

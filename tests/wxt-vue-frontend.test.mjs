@@ -1169,6 +1169,30 @@ test('Session recording, MQTT capture, and building/research controls operate se
   assert.match(mqtt, /interceptEnabled\s*!==\s*false/, 'MQTT capture must activate when interceptEnabled is not false');
 });
 
+test('Game connection monitoring, warning banner, and browser refresh button operate across Dashboard and Header', async () => {
+  const dashboard = await readFile(join(root, 'src/components/dashboard/DashboardTab.vue'), 'utf8');
+  assert.match(dashboard, /id="dashboard-game-status-alert"/, 'Dashboard must render #dashboard-game-status-alert');
+  assert.match(dashboard, /id="dashboard-actions"/, 'Dashboard must have #dashboard-actions container');
+  assert.match(dashboard, /id="btn-refresh-browser"/, 'Dashboard must render #btn-refresh-browser when refresh needed');
+  assert.match(dashboard, /reloadGameTab/, 'Dashboard must bind reloadGameTab to refresh buttons');
+
+  const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
+  assert.match(header, /id="game-connection-badge"/, 'Header must feature #game-connection-badge');
+  assert.match(header, /headerConnectionTooltip/, 'Header must provide dynamic connection tooltip');
+  assert.match(header, /handleConnectionClick/, 'Header must support click to reload or check game tab');
+
+  const connectionComposable = await readFile(join(root, 'src/composables/useGameConnection.ts'), 'utf8');
+  assert.match(connectionComposable, /get-game-tab-status/, 'Must query get-game-tab-status');
+  assert.match(connectionComposable, /reload-game-tab/, 'Must dispatch reload-game-tab');
+  assert.match(connectionComposable, /isVersionChanged/, 'Must detect extension version changes');
+  assert.match(connectionComposable, /isRefreshRequired/, 'Must detect refreshRequired and needsRefresh');
+
+  const settingsTab = await readFile(join(root, 'src/components/tabs/SettingsTab.vue'), 'utf8');
+  assert.match(settingsTab, /Game Tab Connection/, 'SettingsTab must feature Game Tab Connection diagnostic');
+  assert.match(settingsTab, /Refresh Game Tab/, 'SettingsTab must feature Refresh Game Tab button');
+});
+
+
 
 
 

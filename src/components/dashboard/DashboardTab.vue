@@ -6,9 +6,11 @@ import QueuesOverview from './QueuesOverview.vue';
 import ActivityGoals from './ActivityGoals.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
+import { useGameConnection } from '@/src/composables/useGameConnection';
 
 const { dispatchRpc, cache } = useRpcCache();
 const { openModal } = useModals();
+const { hasGameTab, alertMessage, needsRefresh, isRefreshing, reloadGameTab } = useGameConnection();
 
 const raidQueueState = ref<any>(null);
 const monsterQueueState = ref<any>(null);
@@ -74,6 +76,40 @@ async function refreshAllDashboard() {
 
 <template>
   <div class="space-y-4">
+    <!-- Game Connection Alert Banner -->
+    <div
+      v-if="alertMessage"
+      id="dashboard-game-status-alert"
+      class="dashboard-game-alert flex items-start sm:items-center justify-between gap-3 rounded-xl p-3.5 shadow-2xs transition-all"
+      :class="
+        !hasGameTab
+          ? 'border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200'
+          : 'border border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-700/50 dark:bg-sky-950/40 dark:text-sky-200'
+      "
+    >
+      <div class="flex items-start sm:items-center gap-3 flex-1">
+        <span class="text-lg select-none shrink-0 leading-none">
+          {{ !hasGameTab ? '⚠️' : '🔄' }}
+        </span>
+        <div class="flex-1 text-xs leading-relaxed">
+          <strong class="font-semibold block sm:inline text-slate-900 dark:text-slate-100 mb-0.5 sm:mb-0 sm:mr-1">
+            {{ alertMessage.title }}
+          </strong>
+          <span>{{ alertMessage.body }}</span>
+        </div>
+      </div>
+      <button
+        v-if="hasGameTab"
+        type="button"
+        class="cursor-pointer shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all shadow-xs inline-flex items-center gap-1.5"
+        :disabled="isRefreshing"
+        @click="reloadGameTab"
+      >
+        <span :class="{ 'animate-spin': isRefreshing }">↻</span>
+        <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh browser' }}</span>
+      </button>
+    </div>
+
     <!-- Quick Actions Banner -->
     <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
       <div class="flex items-center gap-2">
@@ -84,7 +120,26 @@ async function refreshAllDashboard() {
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
+      <div id="dashboard-actions" class="flex flex-wrap items-center gap-2">
+        <!-- Refresh Browser Button -->
+        <button
+          v-if="needsRefresh"
+          id="btn-refresh-browser"
+          type="button"
+          class="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all shadow-xs inline-flex items-center gap-1.5"
+          title="Refresh the active game tab"
+          aria-label="Refresh browser"
+          :disabled="isRefreshing"
+          @click="reloadGameTab"
+        >
+          <svg class="size-4 shrink-0" :class="{ 'animate-spin': isRefreshing }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 21h5v-5"/>
+          </svg>
+          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh browser' }}</span>
+        </button>
         <!-- Guild Raid -->
         <button
           id="open-raid-dialog"
