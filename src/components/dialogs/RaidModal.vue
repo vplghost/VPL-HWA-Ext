@@ -85,6 +85,7 @@ watch(
 
 const now = ref(Date.now());
 let timer: number | null = null;
+const raidQueueState = ref<any>(null);
 
 const activeRallies = computed(() => {
   const marches = normalizeArray(cache.value?.marchStatus?.data?.marches);
@@ -100,6 +101,11 @@ const currentRaidPhase = computed(() => {
   return expData?.rallyPhase ? expData.rallyPhase(march, now.value) : null;
 });
 
+const currentRaidCountdown = computed(() => {
+  if (!currentRaidPhase.value?.until) return null;
+  return Math.max(0, Math.ceil((currentRaidPhase.value.until - now.value) / 1000));
+});
+
 const currentRaidStageIcon = computed(() => {
   if (currentRaidPhase.value) {
     const p = currentRaidPhase.value.phase;
@@ -110,6 +116,11 @@ const currentRaidStageIcon = computed(() => {
   }
   if (isRunning.value) return '⏱️';
   return '⚔️';
+});
+
+const remainRaidCount = computed(() => {
+  if (!isRunning.value || !raidQueueState.value) return null;
+  return raidQueueState.value.bossQueue?.remain_raid_count ?? null;
 });
 
 const queueStatusLabel = computed(() => {
@@ -144,6 +155,7 @@ onMounted(async () => {
         await chrome.storage.local.set({ popupRpcEnabled: true });
       }
       if (stored.raidQueue) {
+        raidQueueState.value = stored.raidQueue;
         isRunning.value = !['stopped', 'complete'].includes(stored.raidQueue.phase);
         queueStatusText.value = stored.raidQueue.phase || 'Idle';
       }
@@ -152,6 +164,7 @@ onMounted(async () => {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.raidQueue) {
         const q = changes.raidQueue.newValue;
+        raidQueueState.value = q;
         isRunning.value = q ? !['stopped', 'complete'].includes(q.phase) : false;
         queueStatusText.value = q?.phase || 'Idle';
       }
@@ -173,6 +186,7 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      now.value = Date.now();
       document.addEventListener('keydown', handleKeydown);
       loadSquadData();
     } else {
@@ -377,13 +391,24 @@ async function stopRaidQueue() {
           <div id="raid-dialog-status" class="flex items-center gap-2 truncate">
             <span
               v-if="currentRaidPhase"
-              class="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-0.5 text-2xs font-semibold text-indigo-900 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-200 dark:border-indigo-800/60 shrink-0"
+              class="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-0.5 text-2xs sm:text-xs font-semibold text-indigo-900 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-200 dark:border-indigo-800/60 shrink-0"
             >
               <span>{{ currentRaidStageIcon }}</span>
               <span class="size-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-              <span>{{ activeRallies[0]?.rally?.target || 'Rally' }}: {{ currentRaidPhase.phase }}</span>
+              <span>
+                {{ activeRallies[0]?.rally?.target || 'Rally' }}: {{ currentRaidPhase.phase }}<template v-if="currentRaidPhase.result"> ({{ currentRaidPhase.result }})</template>
+              </span>
+              <span
+                v-if="currentRaidCountdown !== null"
+                id="raid-dialog-timer"
+                :data-experimental-until="currentRaidPhase?.until ? String(currentRaidPhase.until) : undefined"
+                class="font-mono"
+              >
+                · {{ currentRaidCountdown }}s
+              </span>
             </span>
             <span
+              v-if="isRunning || !currentRaidPhase"
               class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0"
               :class="
                 isRunning
@@ -394,7 +419,7 @@ async function stopRaidQueue() {
               "
             >
               <span class="size-1.5 rounded-full" :class="isRunning ? 'bg-indigo-500 animate-pulse' : 'bg-emerald-500'"></span>
-              <span>{{ isRunning ? `Queue: ${queueStatusLabel}` : queueStatusText }}</span>
+              <span>{{ isRunning ? `Queue: ${queueStatusLabel}${remainRaidCount != null ? ` (${remainRaidCount} left)` : ''}` : queueStatusText }}</span>
             </span>
           </div>
         </div>

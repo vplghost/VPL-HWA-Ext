@@ -76,8 +76,40 @@ watch(
   { immediate: true }
 );
 
+const now = ref(Date.now());
+let timer: number | null = null;
+
+const activeAttacks = computed(() => {
+  const marches = normalizeArray(cache.value?.marchStatus?.data?.marches);
+  return marches.filter(
+    (m: any) =>
+      (m.kind === 'attack' || Boolean(m.mobConfigId)) &&
+      !(Number.isFinite(m.endsAt) && now.value >= m.endsAt)
+  );
+});
+
+const currentMonsterAttack = computed(() => {
+  if (activeAttacks.value.length === 0) return null;
+  const march = activeAttacks.value[0];
+  const isReturning = march.kind === 'return' || march.stage === 'returnToOutpost';
+  const stageName = isReturning ? 'Returning' : (march.stage === 'moveToTarget' ? 'Attacking' : 'In combat');
+  const stageIcon = isReturning ? '↩️' : '⚔️';
+  const countdown = march.endsAt && march.endsAt > now.value ? Math.max(0, Math.ceil((march.endsAt - now.value) / 1000)) : null;
+  return {
+    march,
+    stageName,
+    stageIcon,
+    countdown,
+    endsAt: march.endsAt,
+  };
+});
+
 onMounted(async () => {
   await loadSquadData();
+
+  timer = window.setInterval(() => {
+    now.value = Date.now();
+  }, 1000);
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
@@ -120,6 +152,7 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      now.value = Date.now();
       document.addEventListener('keydown', handleKeydown);
       loadSquadData();
     } else {
@@ -129,6 +162,7 @@ watch(
 );
 
 onUnmounted(() => {
+  if (timer) clearInterval(timer);
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -308,21 +342,38 @@ async function stopMonsterQueue() {
         class="sticky top-0 z-10 flex items-center justify-between border-b border-amber-200 bg-amber-50/80 px-4 py-3 backdrop-blur dark:border-amber-900/60 dark:bg-amber-950/50 shrink-0"
       >
         <div class="flex items-center gap-2 min-w-0 flex-1">
-          <span id="monster-dialog-icon" class="text-xl shrink-0" aria-hidden="true">👾</span>
+          <span id="monster-dialog-icon" class="text-xl shrink-0" aria-hidden="true">{{ currentMonsterAttack?.stageIcon || (isRunning ? '⏱️' : '👾') }}</span>
           <h2 id="monster-dialog-title" class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">
             Monster attack
           </h2>
           <div id="monster-dialog-status" class="flex items-center gap-2 truncate">
             <span
-              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+              v-if="currentMonsterAttack"
+              class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800/60 shrink-0"
+            >
+              <span>{{ currentMonsterAttack.stageIcon }}</span>
+              <span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+              <span>Monster: {{ currentMonsterAttack.stageName }}</span>
+              <span
+                v-if="currentMonsterAttack.countdown !== null"
+                id="monster-dialog-timer"
+                :data-experimental-until="currentMonsterAttack.endsAt ? String(currentMonsterAttack.endsAt) : undefined"
+                class="font-mono"
+              >
+                · {{ currentMonsterAttack.countdown }}s
+              </span>
+            </span>
+            <span
+              v-if="isRunning || !currentMonsterAttack"
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0"
               :class="
                 isRunning
-                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60'
+                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60'
               "
             >
               <span class="size-1.5 rounded-full" :class="isRunning ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'"></span>
-              {{ queueStatusText }}
+              <span>{{ isRunning ? `Queue: ${queueStatusText}` : queueStatusText }}</span>
             </span>
           </div>
         </div>

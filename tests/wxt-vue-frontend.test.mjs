@@ -1125,3 +1125,17 @@ test('ResourceSummary and HeroDetailModal use accurate RPC keys and payload conv
   assert.match(interceptContent, /'heroUpgradeSkill'/, 'intercept.js helperActionMethods must include heroUpgradeSkill');
 });
 
+test('RaidModal and MonsterModal update title status with dynamic timer countdown and data-experimental-until', async () => {
+  const raidModal = await readFile(join(root, 'src/components/dialogs/RaidModal.vue'), 'utf8');
+  assert.match(raidModal, /currentRaidCountdown/, 'RaidModal must compute currentRaidCountdown');
+  assert.match(raidModal, /id="raid-dialog-timer"/, 'RaidModal must feature #raid-dialog-timer on title bar');
+  assert.match(raidModal, /:data-experimental-until="currentRaidPhase\?\.until/, 'RaidModal timer must bind data-experimental-until');
+  assert.match(raidModal, /remainRaidCount/, 'RaidModal must compute remainRaidCount for queue');
+
+  const monsterModal = await readFile(join(root, 'src/components/dialogs/MonsterModal.vue'), 'utf8');
+  assert.match(monsterModal, /currentMonsterAttack/, 'MonsterModal must compute currentMonsterAttack');
+  assert.match(monsterModal, /id="monster-dialog-timer"/, 'MonsterModal must feature #monster-dialog-timer on title bar');
+  assert.match(monsterModal, /:data-experimental-until="currentMonsterAttack\.endsAt/, 'MonsterModal timer must bind data-experimental-until');
+});
+
+
