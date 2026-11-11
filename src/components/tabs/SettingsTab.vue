@@ -7,7 +7,8 @@ import type { ThemeMode } from '@/src/types';
 const { theme, applyTheme } = useTheme();
 const { recordingState } = useRpcCache();
 
-const dispatchMode = ref<'piggyback' | 'direct'>('piggyback');
+const dispatchMode = ref<'piggyback' | 'direct' | 'mqtt-piggyback'>('direct');
+const popupRpcEnabled = ref(true);
 const mqttCaptureEnabled = ref(true);
 
 const DEFAULT_TAB_ITEMS = [
@@ -35,8 +36,19 @@ const tabSettings = ref<TabSettingItem[]>(
 onMounted(async () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
-      const stored = await chrome.storage.local.get(['dispatchMode', 'mqttCaptureEnabled', 'tabConfig']);
-      if (stored.dispatchMode) dispatchMode.value = stored.dispatchMode;
+      const stored = await chrome.storage.local.get([
+        'dispatchMode',
+        'socketRefreshMode',
+        'popupRpcEnabled',
+        'mqttCaptureEnabled',
+        'tabConfig',
+      ]);
+      if (stored.socketRefreshMode) {
+        dispatchMode.value = stored.socketRefreshMode;
+      } else if (stored.dispatchMode) {
+        dispatchMode.value = stored.dispatchMode;
+      }
+      popupRpcEnabled.value = stored.popupRpcEnabled !== false;
       if (stored.mqttCaptureEnabled !== undefined) mqttCaptureEnabled.value = stored.mqttCaptureEnabled;
       if (Array.isArray(stored.tabConfig) && stored.tabConfig.length > 0) {
         const labelMap = new Map(DEFAULT_TAB_ITEMS.map((t) => [t.id, t.label]));
@@ -98,9 +110,25 @@ function handleThemeChange(event: Event) {
 
 async function handleModeChange(event: Event) {
   const target = event.target as HTMLSelectElement;
-  dispatchMode.value = target.value as 'piggyback' | 'direct';
+  const newMode = target.value as 'piggyback' | 'direct' | 'mqtt-piggyback';
+  dispatchMode.value = newMode;
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
-    await chrome.storage.local.set({ dispatchMode: dispatchMode.value });
+    const updates: Record<string, any> = {
+      dispatchMode: newMode,
+      socketRefreshMode: newMode,
+    };
+    if (newMode === 'direct') {
+      updates.popupRpcEnabled = true;
+      popupRpcEnabled.value = true;
+    }
+    await chrome.storage.local.set(updates);
+  }
+}
+
+async function togglePopupRpc() {
+  popupRpcEnabled.value = !popupRpcEnabled.value;
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    await chrome.storage.local.set({ popupRpcEnabled: popupRpcEnabled.value });
   }
 }
 
@@ -209,20 +237,41 @@ async function toggleRecording() {
         <span>⚡</span> Network & RPC Dispatch
       </h3>
 
+      <!-- Popup RPC Master Toggle -->
       <div class="flex items-center justify-between pt-1">
+        <div>
+          <div class="font-semibold text-slate-700 dark:text-slate-200">Allow Popup RPC Calls</div>
+          <div class="text-[11px] text-slate-400">
+            Enables background queues, battle rallies, solo monster attacks, and gathering automation.
+          </div>
+        </div>
+        <button
+          id="popup-rpc-enabled"
+          type="button"
+          class="cursor-pointer px-3 py-1 rounded-lg font-semibold transition-colors text-xs"
+          :class="popupRpcEnabled ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'"
+          @click="togglePopupRpc"
+        >
+          {{ popupRpcEnabled ? 'Enabled' : 'Disabled' }}
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
         <div>
           <div class="font-semibold text-slate-700 dark:text-slate-200">RPC Dispatch Mode</div>
           <div class="text-[11px] text-slate-400">
-            Piggyback rides alongside legitimate user interactions; Direct dispatches immediately to active game tab.
+            Direct dispatches immediately to active game tab; Piggyback rides alongside game interaction.
           </div>
         </div>
         <select
+          id="socket-refresh-mode"
           :value="dispatchMode"
           class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-hidden"
           @change="handleModeChange"
         >
-          <option value="piggyback">🛡️ Piggyback (Safe Stealth)</option>
           <option value="direct">⚡ Direct (Fast RPC)</option>
+          <option value="piggyback">🛡️ Piggyback (Safe Stealth)</option>
+          <option value="mqtt-piggyback">📡 MQTT-Assisted Piggyback</option>
         </select>
       </div>
 

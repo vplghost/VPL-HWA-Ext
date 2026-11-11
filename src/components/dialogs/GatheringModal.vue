@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useSquadTeams } from '@/src/composables/useSquadTeams';
+import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber, formatDuration } from '@/src/utils/formatters';
 
 const props = defineProps<{
@@ -12,7 +14,27 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { cache, dispatchRpc } = useRpcCache();
+const { cache } = useRpcCache();
+
+const {
+  selectedTeamId,
+  selectedTeam,
+  teams,
+  squadCapacity,
+  allocatedTroops,
+  totalAllocatedTroops,
+  troopTypeSummaries,
+  isRefreshingTroops,
+  mapContext,
+  mapCenter,
+  loadSquadData,
+  refreshTroops,
+  handleTeamChange,
+  getHeroSnapshot,
+  getHeroName,
+  getHeroAvatarUrl,
+  getHeroGlow,
+} = useSquadTeams('autoGatherSettings' as any, 'selectedTeam' as any);
 
 interface AutoGatherSettings {
   enabled: boolean;
@@ -25,19 +47,17 @@ interface AutoGatherSettings {
 const autoSettings = ref<AutoGatherSettings>({
   enabled: false,
   maxMarches: 3,
-  mineLevel: 5,
+  mineLevel: 10,
   mineType: 'rotate',
   lastAutoMineType: null,
 });
 
-const selectedLineup = ref<string>('weakest');
-const customTeams = ref<Array<{ id: string; name: string; heroIds: number[] }>>([]);
-
 // Manual search
-const manualMineType = ref('food');
-const manualMineLevel = ref(5);
+const manualMineType = ref<'food' | 'wood' | 'stone' | 'iron'>('food');
+const manualMineLevel = ref<number>(10);
 const isSearching = ref(false);
-const searchResult = ref<any>(null);
+const searchStatus = ref<string>('');
+const isDispatching = ref<string | null>(null);
 
 const now = ref(Date.now());
 let timer: number | null = null;
@@ -47,15 +67,16 @@ onMounted(async () => {
     now.value = Date.now();
   }, 1000);
 
+  await loadSquadData();
+
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
-      const stored = await chrome.storage.local.get(['autoGatherSettings', 'customTeams']);
+      const stored = await chrome.storage.local.get(['autoGatherSettings', 'popupRpcEnabled', 'socketRefreshMode']);
       if (stored.autoGatherSettings) {
         autoSettings.value = { ...autoSettings.value, ...stored.autoGatherSettings };
       }
-      const accountId = cache.value.accountStatus?.data?.id;
-      if (stored.customTeams && accountId) {
-        customTeams.value = stored.customTeams[String(accountId)] || [];
+      if (stored.popupRpcEnabled !== true) {
+        await chrome.storage.local.set({ popupRpcEnabled: true });
       }
     } catch (_) {}
   }
@@ -65,7 +86,20 @@ onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
+async function ensureRpcEnabled() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const stored = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode']);
+    const updates: Record<string, any> = {};
+    if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
+    if (!stored.socketRefreshMode) updates.socketRefreshMode = 'direct';
+    if (Object.keys(updates).length > 0) {
+      await chrome.storage.local.set(updates);
+    }
+  }
+}
+
 async function saveAutoSettings() {
+  await ensureRpcEnabled();
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     await chrome.storage.local.set({ autoGatherSettings: autoSettings.value });
   }
@@ -107,6 +141,7 @@ const gatheringMarches = computed(() => {
       const remainingSec = m.endsAt ? Math.max(0, Math.ceil((m.endsAt - now.value) / 1000)) : 0;
       return {
         id: m.id || m.squadId,
+        squadId: m.squadId || m.id,
         kind: m.kind,
         stage: m.stage || (m.kind === 'return' ? 'Returning' : 'Gathering'),
         remainingSec,
@@ -115,24 +150,127 @@ const gatheringMarches = computed(() => {
     });
 });
 
+// Found full mines matching search criteria
+const foundMines = computed(() => {
+  const exp = (globalThis as any).hwaHelperExperimentalData;
+  const search = cache.value.experimentalMineSearch?.data;
+  if (!search || !Array.isArray(search.mines)) return [];
+  const expectedConfig = exp?.mineConfigId?.(manualMineType.value, manualMineLevel.value);
+  if (expectedConfig && search.mineConfigId !== expectedConfig) return [];
+  return search.mines;
+});
+
 async function handleManualSearch() {
+  await ensureRpcEnabled();
   isSearching.value = true;
-  searchResult.value = null;
+  searchStatus.value = 'Searching for full resource mines on world map...';
+
+  const exp = (globalThis as any).hwaHelperExperimentalData;
+  const mapId = mapContext.value?.mapId;
+  const center = mapCenter.value;
+
+  if (!mapId || !center) {
+    isSearching.value = false;
+    searchStatus.value = '⚠️ World map not loaded yet. Open map in-game once to capture coordinates.';
+    return;
+  }
+
+  const call = exp?.buildMineSearchCall?.(mapId, center, manualMineType.value, manualMineLevel.value) || {
+    name: 'searchMine',
+    feature: 'mine',
+    args: {
+      mapId,
+      mineConfigIds: [exp?.mineConfigId?.(manualMineType.value, manualMineLevel.value)],
+      fullOnly: true,
+      center: { x: center.x, y: center.y },
+    },
+  };
+
   try {
-    await dispatchRpc([
-      {
-        name: 'findResourceMines',
-        args: { type: manualMineType.value, level: manualMineLevel.value },
-        feature: 'world',
-      },
-    ]);
-    searchResult.value = {
-      type: manualMineType.value,
-      level: manualMineLevel.value,
-      status: 'Search packet sent. Check game tab for target destination.',
-    };
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      const res = await chrome.runtime.sendMessage({
+        kind: 'experimental-rpc',
+        calls: [call],
+      });
+      if (res?.error) {
+        searchStatus.value = `Error: ${res.error}`;
+      } else {
+        searchStatus.value = res?.queued
+          ? 'Search packet queued for next game RPC. Results will appear shortly.'
+          : 'Search packet sent. Checking map results...';
+      }
+    }
+  } catch (err: any) {
+    searchStatus.value = `Error sending search: ${err?.message || err}`;
   } finally {
     isSearching.value = false;
+  }
+}
+
+async function dispatchSquadToMine(mine: any) {
+  await ensureRpcEnabled();
+  const exp = (globalThis as any).hwaHelperExperimentalData;
+  const team = selectedTeam.value;
+  if (!team || team.heroIds.length !== 5) {
+    searchStatus.value = '⚠️ Please select a complete 5-hero lineup first.';
+    return;
+  }
+
+  const squad = exp?.buildSquad?.(team.heroIds, allocatedTroops.value) || {
+    heroes: team.heroIds.map((heroId) => ({ heroId })),
+    units: allocatedTroops.value,
+  };
+
+  const mapId = mapContext.value?.mapId;
+  if (!mapId || !mine?.mineId) {
+    searchStatus.value = '⚠️ Missing map ID or mine ID.';
+    return;
+  }
+
+  const call = exp?.buildGatherCall?.(mapId, mine.mineId, squad) || {
+    name: 'attackMine',
+    feature: 'mine',
+    args: { mapId, mineId: mine.mineId, battleType: 'pve', squad },
+  };
+
+  isDispatching.value = mine.mineId;
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      const res = await chrome.runtime.sendMessage({
+        kind: 'experimental-rpc',
+        calls: [call],
+      });
+      if (res?.error) {
+        searchStatus.value = `Dispatch error: ${res.error}`;
+      } else {
+        searchStatus.value = res?.queued
+          ? 'Gathering march queued for next game RPC.'
+          : 'Gathering march dispatched! March will appear in active list.';
+      }
+    }
+  } catch (err: any) {
+    searchStatus.value = `Failed to send gathering march: ${err?.message || err}`;
+  } finally {
+    isDispatching.value = null;
+  }
+}
+
+async function recallMarch(march: any) {
+  await ensureRpcEnabled();
+  const squadId = march.squadId || march.id;
+  if (!squadId) return;
+
+  const call = {
+    name: 'stopMineGathering',
+    feature: 'mine',
+    args: { squadId },
+  };
+
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    await chrome.runtime.sendMessage({
+      kind: 'experimental-rpc',
+      calls: [call],
+    });
   }
 }
 </script>
@@ -147,42 +285,93 @@ async function handleManualSearch() {
     <div class="space-y-4 text-xs">
       <!-- Section 1: Lineup & Squad Parameters -->
       <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span>👥</span> Lineup & Troop Capacity
-        </h3>
+        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <span>👥</span> Gathering Squad Lineup & Troop Capacity
+          </h3>
+          <span v-if="selectedTeam" class="text-2xs font-mono text-slate-400">
+            ID: {{ selectedTeam.id }}
+          </span>
+        </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label class="block font-medium text-slate-700 dark:text-slate-300">
-            Gathering Squad Lineup
-            <select
-              v-model="selectedLineup"
-              class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200"
-            >
-              <option value="weakest">⭐ Weakest 5 available heroes (Default)</option>
-              <option
-                v-for="team in customTeams"
-                :key="team.id"
-                :value="team.id"
-              >
-                {{ team.name }} ({{ team.heroIds.length }}/5 heroes)
-              </option>
-            </select>
+        <div>
+          <label for="gather-team-select" class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Select Lineup
           </label>
+          <select
+            id="gather-team-select"
+            v-model="selectedTeamId"
+            class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200"
+            @change="handleTeamChange(selectedTeamId)"
+          >
+            <option v-for="t in teams" :key="t.id" :value="t.id">
+              {{ t.label }} ({{ t.heroIds.length }}/5)
+            </option>
+          </select>
+        </div>
 
-          <div>
-            <span class="block font-medium text-slate-700 dark:text-slate-300">Troop Allocation</span>
-            <div class="mt-1 flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
-              <span class="rounded bg-slate-100 dark:bg-slate-800 px-2 py-1 font-mono text-[11px]">
-                Automatic balanced troops
-              </span>
-              <span class="text-[11px]">Fills to maximum hero capacity</span>
+        <!-- Lineup Chips Preview -->
+        <div v-if="selectedTeam && selectedTeam.heroIds.length > 0" class="flex flex-wrap items-center gap-2">
+          <span
+            v-for="hid in selectedTeam.heroIds"
+            :key="hid"
+            class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+          >
+            <span
+              class="relative size-5 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
+              :class="getHeroGlow(hid)"
+            >
+              <img
+                v-if="getHeroAvatarUrl(hid)"
+                :src="getHeroAvatarUrl(hid)"
+                :alt="getHeroName(hid)"
+                class="size-full object-cover"
+                loading="lazy"
+              />
+              <span v-else class="text-[9px]">👤</span>
+            </span>
+            <span class="font-medium truncate max-w-[110px]">{{ getHeroName(hid) }}</span>
+            <HeroHoverCard
+              :hero-id="hid"
+              :hero="getHeroSnapshot(hid)"
+              :inventory="cache.inventoryGet?.data"
+            />
+          </span>
+        </div>
+
+        <!-- Troop Allocation Summary -->
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+            <span class="font-semibold">
+              Troops: <strong class="text-slate-800 dark:text-slate-200">{{ formatNumber(totalAllocatedTroops) }}</strong> / {{ formatNumber(squadCapacity) }}
+            </span>
+            <button
+              type="button"
+              :disabled="isRefreshingTroops"
+              class="cursor-pointer text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 flex items-center gap-1 text-xs"
+              title="Refresh available troops"
+              @click="refreshTroops"
+            >
+              <span :class="{ 'inline-block animate-spin': isRefreshingTroops }">↻</span>
+              <span>Refresh troops</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <div
+              v-for="b in troopTypeSummaries"
+              :key="b.type"
+              class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800"
+            >
+              <div class="font-semibold text-slate-800 dark:text-slate-200">
+                {{ b.label }}: {{ formatNumber(b.total) }}
+              </div>
+              <div class="text-[10px] text-slate-400 mt-1 truncate" :title="b.tiersText">
+                {{ b.tiersText }}
+              </div>
             </div>
           </div>
         </div>
-
-        <p class="text-[11px] text-slate-400">
-          Note: Default lineup selects the 5 available heroes with lowest power to preserve top heroes for combat.
-        </p>
       </section>
 
       <!-- Section 2: Auto-Gather Automation Settings -->
@@ -227,18 +416,17 @@ async function handleManualSearch() {
             </select>
           </label>
 
+          <!-- Mine Level (1 to 10) -->
           <label class="block font-medium text-slate-700 dark:text-slate-300">
-            Preferred Mine Level
+            Preferred Mine Level (Max 10)
             <select
               v-model.number="autoSettings.mineLevel"
               class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               @change="saveAutoSettings"
             >
-              <option :value="5">Level 5 (Highest Yield)</option>
-              <option :value="4">Level 4</option>
-              <option :value="3">Level 3</option>
-              <option :value="2">Level 2</option>
-              <option :value="1">Level 1</option>
+              <option v-for="lvl in 10" :key="lvl" :value="11 - lvl">
+                Level {{ 11 - lvl }}{{ lvl === 1 ? ' (Highest Yield)' : '' }}
+              </option>
             </select>
           </label>
 
@@ -248,7 +436,7 @@ async function handleManualSearch() {
               v-model.number="autoSettings.maxMarches"
               type="number"
               min="1"
-              max="5"
+              max="10"
               class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               @change="saveAutoSettings"
             />
@@ -259,10 +447,10 @@ async function handleManualSearch() {
           <template v-if="autoSettings.enabled">
             <span>Dispatches automatically on game load or when marches return to base if active marches &lt; {{ autoSettings.maxMarches }}. </span>
             <span v-if="autoSettings.mineType === 'rotate'">
-              Cycling: Next target is <strong>{{ nextTargetType.toUpperCase() }}</strong>.
+              Cycling: Next target is <strong>{{ nextTargetType.toUpperCase() }} (Lv.{{ autoSettings.mineLevel }})</strong>.
             </span>
             <span v-else>
-              Target: <strong>{{ autoSettings.mineType.toUpperCase() }}</strong>.
+              Target: <strong>{{ autoSettings.mineType.toUpperCase() }} (Lv.{{ autoSettings.mineLevel }})</strong>.
             </span>
           </template>
           <template v-else>
@@ -274,7 +462,7 @@ async function handleManualSearch() {
       <!-- Section 3: Manual Search & Dispatch -->
       <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs">
         <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span>🔍</span> Manual Mine Search
+          <span>🔍</span> Manual Mine Search & Dispatch
         </h3>
 
         <div class="flex flex-wrap items-center gap-2.5">
@@ -288,15 +476,14 @@ async function handleManualSearch() {
             <option value="iron">⚙ Iron Mine</option>
           </select>
 
+          <!-- Mine Level 1 to 10 -->
           <select
             v-model.number="manualMineLevel"
             class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200"
           >
-            <option :value="5">Level 5</option>
-            <option :value="4">Level 4</option>
-            <option :value="3">Level 3</option>
-            <option :value="2">Level 2</option>
-            <option :value="1">Level 1</option>
+            <option v-for="lvl in 10" :key="lvl" :value="11 - lvl">
+              Level {{ 11 - lvl }}{{ lvl === 1 ? ' (Max)' : '' }}
+            </option>
           </select>
 
           <button
@@ -305,12 +492,45 @@ async function handleManualSearch() {
             :disabled="isSearching"
             @click="handleManualSearch"
           >
-            <span>{{ isSearching ? 'Searching...' : 'Find Mine' }}</span>
+            <span>{{ isSearching ? 'Searching...' : 'Find Full Mines' }}</span>
           </button>
         </div>
 
-        <div v-if="searchResult" class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[11px]">
-          {{ searchResult.status }}
+        <div v-if="searchStatus" class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[11px]">
+          {{ searchStatus }}
+        </div>
+
+        <!-- Found Mines List -->
+        <div v-if="foundMines.length > 0" class="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div class="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Available Targets ({{ foundMines.length }} full mines found):
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div
+              v-for="(mine, idx) in foundMines"
+              :key="mine.mineId || idx"
+              class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"
+            >
+              <div>
+                <div class="font-bold text-slate-800 dark:text-slate-200">
+                  Mine #{{ idx + 1 }} · ({{ mine.coordinates?.x ?? '?' }}, {{ mine.coordinates?.y ?? '?' }})
+                </div>
+                <div class="text-[11px] text-slate-400">
+                  Resource: {{ formatNumber(mine.resourceCount || mine.resAmount || 0) }}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                :disabled="isDispatching === mine.mineId"
+                class="cursor-pointer px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold disabled:opacity-50 transition-colors"
+                @click="dispatchSquadToMine(mine)"
+              >
+                {{ isDispatching === mine.mineId ? 'Sending...' : 'Send Squad' }}
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -339,9 +559,19 @@ async function handleManualSearch() {
               </div>
             </div>
 
-            <span class="font-mono text-xs font-semibold text-teal-600 dark:text-teal-400">
-              {{ march.timerText }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-xs font-semibold text-teal-600 dark:text-teal-400">
+                {{ march.timerText }}
+              </span>
+              <button
+                type="button"
+                class="cursor-pointer px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950/60 dark:hover:text-red-300 text-xs font-medium transition-colors"
+                title="Recall this gathering squad back to outpost"
+                @click="recallMarch(march)"
+              >
+                Recall
+              </button>
+            </div>
           </div>
         </div>
       </section>

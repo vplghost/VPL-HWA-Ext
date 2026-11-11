@@ -485,6 +485,8 @@ test('RaidModal and MonsterModal support team selection, lineup previews, troop 
   // Verify RaidModal team selection & troops
   assert.match(raidModal, /useSquadTeams/, 'RaidModal must use useSquadTeams');
   assert.match(raidModal, /id="raid-team-select"/, 'RaidModal must feature #raid-team-select');
+  assert.match(raidModal, /id="raid-target-select"/, 'RaidModal must feature #raid-target-select');
+  assert.match(raidModal, /firstMobId/, 'RaidModal must pass firstMobId in raid-queue-start');
   assert.match(raidModal, /HeroHoverCard/, 'RaidModal must import and render HeroHoverCard');
   assert.match(raidModal, /getHeroGlow/, 'RaidModal must render hero star glow');
   assert.match(raidModal, /troopTypeSummaries/, 'RaidModal must render troop type summary cards');
@@ -494,9 +496,42 @@ test('RaidModal and MonsterModal support team selection, lineup previews, troop 
   // Verify MonsterModal team selection & troops
   assert.match(monsterModal, /useSquadTeams/, 'MonsterModal must use useSquadTeams');
   assert.match(monsterModal, /id="monster-team-select"/, 'MonsterModal must feature #monster-team-select');
+  assert.match(monsterModal, /id="monster-target-select"/, 'MonsterModal must feature #monster-target-select');
+  assert.match(monsterModal, /firstMobId/, 'MonsterModal must pass firstMobId in monster-queue-start');
   assert.match(monsterModal, /HeroHoverCard/, 'MonsterModal must import and render HeroHoverCard');
   assert.match(monsterModal, /getHeroGlow/, 'MonsterModal must render hero star glow');
   assert.match(monsterModal, /troopTypeSummaries/, 'MonsterModal must render troop type summary cards');
   assert.match(monsterModal, /heroIds,/, 'MonsterModal must pass heroIds in monster-queue-start options');
   assert.match(monsterModal, /teamId,/, 'MonsterModal must pass teamId in monster-queue-start options');
+});
+
+test('GatheringModal supports mine levels up to 10, real searchMine, found targets dispatch, and march recall', async () => {
+  const gather = await readFile(join(root, 'src/components/dialogs/GatheringModal.vue'), 'utf8');
+
+  // Verify 10 mine levels
+  assert.match(gather, /v-for="lvl in 10"/, 'GatheringModal must support 10 mine levels');
+  assert.match(gather, /11 - lvl/, 'GatheringModal must render descending levels up to 10');
+
+  // Verify searchMine via experimental-rpc
+  assert.match(gather, /searchMine/, 'GatheringModal must call searchMine');
+  assert.match(gather, /experimental-rpc/, 'GatheringModal must dispatch experimental-rpc');
+
+  // Verify found mines and squad dispatch
+  assert.match(gather, /foundMines/, 'GatheringModal must track foundMines');
+  assert.match(gather, /dispatchSquadToMine/, 'GatheringModal must implement dispatchSquadToMine');
+  assert.match(gather, /attackMine/, 'GatheringModal must call attackMine');
+
+  // Verify march recall
+  assert.match(gather, /recallMarch/, 'GatheringModal must implement recallMarch');
+  assert.match(gather, /stopMineGathering/, 'GatheringModal must call stopMineGathering');
+});
+
+test('SettingsTab supports popupRpcEnabled toggle, socketRefreshMode direct, and piggyback modes', async () => {
+  const settings = await readFile(join(root, 'src/components/tabs/SettingsTab.vue'), 'utf8');
+
+  assert.match(settings, /popupRpcEnabled/, 'SettingsTab must track popupRpcEnabled');
+  assert.match(settings, /togglePopupRpc/, 'SettingsTab must implement togglePopupRpc');
+  assert.match(settings, /id="popup-rpc-enabled"/, 'SettingsTab must feature #popup-rpc-enabled');
+  assert.match(settings, /socketRefreshMode/, 'SettingsTab must synchronize socketRefreshMode in chrome.storage');
+  assert.match(settings, /id="socket-refresh-mode"/, 'SettingsTab must feature #socket-refresh-mode');
 });

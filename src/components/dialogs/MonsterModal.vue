@@ -39,15 +39,49 @@ const mobCount = ref(2);
 const isRunning = ref(false);
 const queueStatusText = ref('Idle');
 
+const selectedMobId = ref<string>('');
+const isSearchingMonsters = ref(false);
+const statusMessage = ref<string>('');
+
+// Monster targets found from map search
+const searchData = computed(() => cache.value.experimentalSoloSearch?.data);
+const expData = computed(() => (globalThis as any).hwaHelperExperimentalData);
+
+const matchingMonsterConfigs = computed(() => {
+  const exp = expData.value;
+  const cfgs = exp?.soloMonsterConfigIds?.(mobLevel.value) || [mobLevel.value];
+  const mobCfgs = searchData.value?.mobConfigIds;
+  return Array.isArray(mobCfgs) && cfgs.length === mobCfgs.length && cfgs.every((c: any, i: number) => c === mobCfgs[i]);
+});
+
+const foundMonsters = computed(() => {
+  if (!matchingMonsterConfigs.value || !Array.isArray(searchData.value?.mobs)) return [];
+  return searchData.value.mobs;
+});
+
+watch(
+  foundMonsters,
+  (monsters) => {
+    if (monsters.length > 0 && (!selectedMobId.value || !monsters.some((m: any) => m.mobId === selectedMobId.value))) {
+      selectedMobId.value = monsters[0].mobId;
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(async () => {
   await loadSquadData();
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['monsterPreferences', 'monsterQueue']);
+      const stored = await chrome.storage.local.get(['monsterPreferences', 'monsterQueue', 'popupRpcEnabled', 'socketRefreshMode']);
       if (stored.monsterPreferences) {
         if (stored.monsterPreferences.mobLevel) mobLevel.value = stored.monsterPreferences.mobLevel;
         if (stored.monsterPreferences.teamId) selectedTeamId.value = stored.monsterPreferences.teamId;
+        if (stored.monsterPreferences.targetMobId) selectedMobId.value = stored.monsterPreferences.targetMobId;
+      }
+      if (stored.popupRpcEnabled !== true) {
+        await chrome.storage.local.set({ popupRpcEnabled: true });
       }
       if (stored.monsterQueue) {
         isRunning.value = stored.monsterQueue.running || false;
@@ -91,20 +125,81 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
 });
 
+async function ensureRpcEnabled() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const stored = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode']);
+    const updates: Record<string, any> = {};
+    if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
+    if (!stored.socketRefreshMode) updates.socketRefreshMode = 'direct';
+    if (Object.keys(updates).length > 0) {
+      await chrome.storage.local.set(updates);
+    }
+  }
+}
+
 async function savePreferences() {
+  await ensureRpcEnabled();
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await chrome.storage.local.set({
       monsterPreferences: {
         mobLevel: mobLevel.value,
         teamId: selectedTeamId.value,
+        targetMobId: selectedMobId.value,
       },
     });
   }
 }
 
-async function startMonsterQueue() {
-  isRunning.value = true;
-  queueStatusText.value = 'Searching...';
+async function findMonsters() {
+  await ensureRpcEnabled();
+  const mapId = mapContext.value?.mapId;
+  const center = mapCenter.value;
+
+  if (!mapId || !center) {
+    statusMessage.value = '⚠️ World map not captured yet. Open the world map in game to locate coordinates.';
+    return;
+  }
+
+  isSearchingMonsters.value = true;
+  statusMessage.value = `Searching for Level ${mobLevel.value} monsters on world map...`;
+
+  const exp = expData.value;
+  const configs = exp?.soloMonsterConfigIds?.(mobLevel.value) || [mobLevel.value];
+
+  const call = {
+    name: 'searchMob',
+    feature: 'mob',
+    args: {
+      mapId,
+      center,
+      mobType: 'solo',
+      mobConfigIds: configs,
+    },
+  };
+
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      const res = await chrome.runtime.sendMessage({
+        kind: 'experimental-rpc',
+        calls: [call],
+      });
+      if (res?.error) {
+        statusMessage.value = `Search error: ${res.error}`;
+      } else {
+        statusMessage.value = res?.queued
+          ? 'Monster search queued for next game RPC. Results will appear shortly.'
+          : 'Monster search sent. Checking map...';
+      }
+    }
+  } catch (err: any) {
+    statusMessage.value = `Error searching monsters: ${err?.message || err}`;
+  } finally {
+    isSearchingMonsters.value = false;
+  }
+}
+
+async function startMonsterQueue(count = mobCount.value) {
+  await ensureRpcEnabled();
   await savePreferences();
 
   const heroIds = selectedTeam.value?.heroIds || [];
@@ -113,25 +208,64 @@ async function startMonsterQueue() {
   const mapId = mapContext.value?.mapId;
   const center = mapCenter.value;
 
+  if (!mapId || !center) {
+    statusMessage.value = '⚠️ World map not captured yet. Open the world map in game first.';
+    return;
+  }
+
+  if (heroIds.length !== 5) {
+    statusMessage.value = '⚠️ Select a complete 5-hero lineup first.';
+    return;
+  }
+
+  let firstMobId = selectedMobId.value;
+  if (!firstMobId && foundMonsters.value.length > 0) {
+    firstMobId = foundMonsters.value[0].mobId;
+    selectedMobId.value = firstMobId;
+  }
+
+  if (!firstMobId) {
+    statusMessage.value = '⚠️ No target selected. Please click "Find" first to locate monsters.';
+    await findMonsters();
+    return;
+  }
+
+  isRunning.value = true;
+  queueStatusText.value = 'Starting...';
+  statusMessage.value = 'Dispatching monster attack to game...';
+
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    chrome.runtime.sendMessage({
+    const res = await chrome.runtime.sendMessage({
       kind: 'monster-queue-start',
       options: {
         mapId,
         center,
+        firstMobId,
         level: mobLevel.value,
-        count: mobCount.value,
+        count,
         heroIds,
         teamId,
         maxTroops,
       },
-    });
+    }).catch((err) => ({ error: String(err) }));
+
+    if (res?.ok) {
+      queueStatusText.value = res.queued ? 'Queued' : 'Attacking';
+      statusMessage.value = res.queued
+        ? 'Attack queued for next game interaction.'
+        : `Attack dispatched against monster! Queue rounds: ${count}.`;
+    } else {
+      isRunning.value = false;
+      queueStatusText.value = 'Idle';
+      statusMessage.value = res?.error || 'Could not start monster attack.';
+    }
   }
 }
 
 async function stopMonsterQueue() {
   isRunning.value = false;
   queueStatusText.value = 'Stopped';
+  statusMessage.value = 'Monster queue stopped.';
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     chrome.runtime.sendMessage({ kind: 'monster-queue-stop' });
   }
@@ -294,41 +428,77 @@ async function stopMonsterQueue() {
           </div>
         </section>
 
-        <!-- Section 2: Attack Parameters -->
+        <!-- Section 2: Monster Search & Attack Parameters -->
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span>⚙️</span> Monster Parameters
+            <span>⚙️</span> Monster Search & Attack Parameters
           </h3>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <!-- Monster Level (1-30) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+            <!-- Monster Level with Find Button -->
             <div>
               <label for="monster-mob-level" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Monster Level
               </label>
+              <div class="flex items-stretch overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+                <select
+                  id="monster-mob-level"
+                  v-model.number="mobLevel"
+                  class="flex-1 min-w-0 border-0 bg-transparent px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                  @change="savePreferences"
+                >
+                  <option v-for="lvl in 30" :key="lvl" :value="lvl">
+                    Monster level {{ lvl }}
+                  </option>
+                </select>
+
+                <button
+                  type="button"
+                  :disabled="isSearchingMonsters"
+                  class="cursor-pointer px-3.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50"
+                  title="Search map for wild monsters at this level"
+                  @click="findMonsters"
+                >
+                  <span>{{ isSearchingMonsters ? 'Searching...' : 'Find' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Target Monster Select -->
+            <div>
+              <label for="monster-target-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Target ({{ matchingMonsterConfigs ? `${foundMonsters.length} target(s) found` : 'Search level first' }})
+              </label>
               <select
-                id="monster-mob-level"
-                v-model.number="mobLevel"
+                id="monster-target-select"
+                v-model="selectedMobId"
                 class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 @change="savePreferences"
               >
-                <option v-for="lvl in 30" :key="lvl" :value="lvl">
-                  Monster level {{ lvl }}
+                <option v-if="foundMonsters.length === 0" value="">
+                  No targets found (Click "Find")
+                </option>
+                <option
+                  v-for="(target, idx) in foundMonsters"
+                  :key="target.mobId || idx"
+                  :value="target.mobId"
+                >
+                  Monster {{ idx + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
                 </option>
               </select>
             </div>
 
             <!-- Attack Count -->
-            <div>
+            <div class="sm:col-span-2">
               <label for="monster-queue-count" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Attack Count
+                Attack Count (for queue)
               </label>
               <input
                 id="monster-queue-count"
                 v-model.number="mobCount"
                 type="number"
                 min="1"
-                max="50"
+                max="100"
                 class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
               />
             </div>
@@ -339,16 +509,32 @@ async function stopMonsterQueue() {
           </p>
         </section>
 
-        <!-- Section 3: Queue Controls -->
+        <!-- Status Message Banner -->
+        <div v-if="statusMessage" class="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200">
+          {{ statusMessage }}
+        </div>
+
+        <!-- Section 3: Actions & Queue Controls -->
         <div class="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            :disabled="isRunning || isSearchingMonsters"
+            class="cursor-pointer px-3.5 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors disabled:opacity-50"
+            @click="startMonsterQueue(1)"
+          >
+            👾 Attack Once
+          </button>
+
           <button
             v-if="!isRunning"
             type="button"
-            class="cursor-pointer px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-xs transition-colors"
-            @click="startMonsterQueue"
+            :disabled="isSearchingMonsters"
+            class="cursor-pointer px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+            @click="startMonsterQueue(mobCount)"
           >
             👾 Start Monster Queue ({{ mobCount }} Attacks)
           </button>
+
           <button
             v-else
             type="button"

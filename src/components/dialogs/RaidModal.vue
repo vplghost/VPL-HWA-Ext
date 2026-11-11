@@ -42,18 +42,51 @@ const autoCancel = ref(true);
 const isRunning = ref(false);
 const queueStatusText = ref('Idle');
 
+const selectedMobId = ref<string>('');
+const isSearchingBosses = ref(false);
+const statusMessage = ref<string>('');
+
+// Boss targets found from map search
+const searchData = computed(() => cache.value.experimentalRallySearch?.data);
+const expData = computed(() => (globalThis as any).hwaHelperExperimentalData);
+
+const matchingBossConfig = computed(() => {
+  const exp = expData.value;
+  const configId = exp?.bossConfigId?.(bossLevel.value) ?? (bossLevel.value + 59);
+  return searchData.value?.mobConfigIds?.includes(configId);
+});
+
+const foundBosses = computed(() => {
+  if (!matchingBossConfig.value || !Array.isArray(searchData.value?.mobs)) return [];
+  return searchData.value.mobs;
+});
+
+watch(
+  foundBosses,
+  (bosses) => {
+    if (bosses.length > 0 && (!selectedMobId.value || !bosses.some((b: any) => b.mobId === selectedMobId.value))) {
+      selectedMobId.value = bosses[0].mobId;
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(async () => {
   await loadSquadData();
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['raidPreferences', 'raidQueue']);
+      const stored = await chrome.storage.local.get(['raidPreferences', 'raidQueue', 'popupRpcEnabled', 'socketRefreshMode']);
       if (stored.raidPreferences) {
         if (stored.raidPreferences.bossLevel) bossLevel.value = stored.raidPreferences.bossLevel;
         if (stored.raidPreferences.waitSeconds) waitSeconds.value = stored.raidPreferences.waitSeconds;
         if (stored.raidPreferences.minMembers) minMembers.value = stored.raidPreferences.minMembers;
         if (stored.raidPreferences.autoCancel !== undefined) autoCancel.value = stored.raidPreferences.autoCancel;
         if (stored.raidPreferences.rallyTeam) selectedTeamId.value = stored.raidPreferences.rallyTeam;
+        if (stored.raidPreferences.targetMobId) selectedMobId.value = stored.raidPreferences.targetMobId;
+      }
+      if (stored.popupRpcEnabled !== true) {
+        await chrome.storage.local.set({ popupRpcEnabled: true });
       }
       if (stored.raidQueue) {
         isRunning.value = stored.raidQueue.running || false;
@@ -97,7 +130,20 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
 });
 
+async function ensureRpcEnabled() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const stored = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode']);
+    const updates: Record<string, any> = {};
+    if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
+    if (!stored.socketRefreshMode) updates.socketRefreshMode = 'direct';
+    if (Object.keys(updates).length > 0) {
+      await chrome.storage.local.set(updates);
+    }
+  }
+}
+
 async function savePreferences() {
+  await ensureRpcEnabled();
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await chrome.storage.local.set({
       raidPreferences: {
@@ -106,14 +152,62 @@ async function savePreferences() {
         minMembers: minMembers.value,
         autoCancel: autoCancel.value,
         rallyTeam: selectedTeamId.value,
+        targetMobId: selectedMobId.value,
       },
     });
   }
 }
 
-async function startRaidQueue() {
-  isRunning.value = true;
-  queueStatusText.value = 'Searching...';
+async function findBosses() {
+  await ensureRpcEnabled();
+  const mapId = mapContext.value?.mapId;
+  const center = mapCenter.value;
+
+  if (!mapId || !center) {
+    statusMessage.value = '⚠️ World map not captured yet. Open the world map in game to locate coordinates.';
+    return;
+  }
+
+  isSearchingBosses.value = true;
+  statusMessage.value = `Searching for Level ${bossLevel.value} Boss targets on world map...`;
+
+  const exp = expData.value;
+  const configId = exp?.bossConfigId?.(bossLevel.value) ?? (bossLevel.value + 59);
+
+  const call = {
+    name: 'searchMob',
+    feature: 'mob',
+    args: {
+      mapId,
+      center,
+      mobType: 'rally',
+      mobConfigIds: [configId],
+    },
+  };
+
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      const res = await chrome.runtime.sendMessage({
+        kind: 'experimental-rpc',
+        calls: [call],
+      });
+      if (res?.error) {
+        statusMessage.value = `Search error: ${res.error}`;
+      } else {
+        statusMessage.value = res?.queued
+          ? 'Boss search queued for next game RPC. Results will appear shortly.'
+          : 'Boss search sent. Checking map...';
+      }
+    }
+  } catch (err: any) {
+    statusMessage.value = `Error searching: ${err?.message || err}`;
+  } finally {
+    isSearchingBosses.value = false;
+  }
+}
+
+async function startRaidQueue(count = raidCount.value) {
+  await ensureRpcEnabled();
   await savePreferences();
 
   const heroIds = selectedTeam.value?.heroIds || [];
@@ -122,28 +216,67 @@ async function startRaidQueue() {
   const mapId = mapContext.value?.mapId;
   const center = mapCenter.value;
 
+  if (!mapId || !center) {
+    statusMessage.value = '⚠️ World map not captured yet. Open the world map in game first.';
+    return;
+  }
+
+  if (heroIds.length !== 5) {
+    statusMessage.value = '⚠️ Select a complete 5-hero lineup first.';
+    return;
+  }
+
+  let firstMobId = selectedMobId.value;
+  if (!firstMobId && foundBosses.value.length > 0) {
+    firstMobId = foundBosses.value[0].mobId;
+    selectedMobId.value = firstMobId;
+  }
+
+  if (!firstMobId) {
+    statusMessage.value = '⚠️ No boss target selected. Please click "Find Bosses" first to locate a target.';
+    await findBosses();
+    return;
+  }
+
+  isRunning.value = true;
+  queueStatusText.value = 'Starting...';
+  statusMessage.value = 'Dispatching rally raid to game...';
+
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    chrome.runtime.sendMessage({
+    const res = await chrome.runtime.sendMessage({
       kind: 'raid-queue-start',
       options: {
         mapId,
         center,
+        firstMobId,
         level: bossLevel.value,
         waitSeconds: waitSeconds.value,
         minMembers: minMembers.value,
-        count: raidCount.value,
+        count,
         autoCancel: autoCancel.value,
         heroIds,
         teamId,
         maxTroops,
       },
-    });
+    }).catch((err) => ({ error: String(err) }));
+
+    if (res?.ok) {
+      queueStatusText.value = res.queued ? 'Queued' : 'Active';
+      statusMessage.value = res.queued
+        ? 'Rally queued for next game interaction.'
+        : `Raid started against boss! Active rounds: ${count}.`;
+    } else {
+      isRunning.value = false;
+      queueStatusText.value = 'Idle';
+      statusMessage.value = res?.error || 'Could not start rally raid.';
+    }
   }
 }
 
 async function stopRaidQueue() {
   isRunning.value = false;
   queueStatusText.value = 'Stopped';
+  statusMessage.value = 'Raid queue stopped.';
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     chrome.runtime.sendMessage({ kind: 'raid-queue-stop' });
   }
@@ -306,43 +439,64 @@ async function stopRaidQueue() {
           </div>
         </section>
 
-        <!-- Section 2: Raid Settings -->
+        <!-- Section 2: Target & Raid Settings -->
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span>⚙️</span> Raid Parameters
+            <span>⚙️</span> Boss Search & Raid Parameters
           </h3>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <!-- Boss Level (1-30) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+            <!-- Boss Level with Find Button -->
             <div>
               <label for="raid-boss-level" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Boss Level
               </label>
+              <div class="flex items-stretch overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+                <select
+                  id="raid-boss-level"
+                  v-model.number="bossLevel"
+                  class="flex-1 min-w-0 border-0 bg-transparent px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                  @change="savePreferences"
+                >
+                  <option v-for="lvl in 30" :key="lvl" :value="lvl">
+                    Boss level {{ lvl }}
+                  </option>
+                </select>
+
+                <button
+                  type="button"
+                  :disabled="isSearchingBosses"
+                  class="cursor-pointer px-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50"
+                  title="Search map for bosses at this level"
+                  @click="findBosses"
+                >
+                  <span>{{ isSearchingBosses ? 'Searching...' : 'Find' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Target Boss Select -->
+            <div>
+              <label for="raid-target-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Target ({{ matchingBossConfig ? `${foundBosses.length} target(s) found` : 'Search level first' }})
+              </label>
               <select
-                id="raid-boss-level"
-                v-model.number="bossLevel"
+                id="raid-target-select"
+                v-model="selectedMobId"
                 class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 @change="savePreferences"
               >
-                <option v-for="lvl in 30" :key="lvl" :value="lvl">
-                  Boss level {{ lvl }}
+                <option v-if="foundBosses.length === 0" value="">
+                  No targets found (Click "Find")
+                </option>
+                <option
+                  v-for="(target, idx) in foundBosses"
+                  :key="target.mobId || idx"
+                  :value="target.mobId"
+                >
+                  Boss {{ idx + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
                 </option>
               </select>
-            </div>
-
-            <!-- Raid Count -->
-            <div>
-              <label for="raid-queue-count" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Raid Count
-              </label>
-              <input
-                id="raid-queue-count"
-                v-model.number="raidCount"
-                type="number"
-                min="1"
-                max="50"
-                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
-              />
             </div>
 
             <!-- Rally Wait Seconds -->
@@ -378,6 +532,21 @@ async function stopRaidQueue() {
             </div>
           </div>
 
+          <!-- Raid Count -->
+          <div>
+            <label for="raid-queue-count" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+              Rounds / Attack Count (for queue)
+            </label>
+            <input
+              id="raid-queue-count"
+              v-model.number="raidCount"
+              type="number"
+              min="1"
+              max="100"
+              class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+            />
+          </div>
+
           <!-- Auto Cancel Checkbox -->
           <label class="flex items-center gap-2 cursor-pointer pt-1">
             <input
@@ -392,16 +561,32 @@ async function stopRaidQueue() {
           </label>
         </section>
 
-        <!-- Section 3: Queue Controls -->
+        <!-- Status Message Banner -->
+        <div v-if="statusMessage" class="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200">
+          {{ statusMessage }}
+        </div>
+
+        <!-- Section 3: Actions & Queue Controls -->
         <div class="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            :disabled="isRunning || isSearchingBosses"
+            class="cursor-pointer px-3.5 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors disabled:opacity-50"
+            @click="startRaidQueue(1)"
+          >
+            ⚔️ Attack Once
+          </button>
+
           <button
             v-if="!isRunning"
             type="button"
-            class="cursor-pointer px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-xs transition-colors"
-            @click="startRaidQueue"
+            :disabled="isSearchingBosses"
+            class="cursor-pointer px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+            @click="startRaidQueue(raidCount)"
           >
             ⚔️ Start Raid Queue ({{ raidCount }} Rounds)
           </button>
+
           <button
             v-else
             type="button"
