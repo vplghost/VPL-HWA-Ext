@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stat } from 'node:fs/promises';
+import { stat, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { getTroopType } from '../src/utils/troops.ts';
 import { formatDuration, formatNumber, formatCompact } from '../src/utils/formatters.ts';
@@ -96,6 +96,7 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     'src/components/dialogs/CampaignRaidModal.vue',
     'src/components/dialogs/HeroDetailModal.vue',
     'src/components/dialogs/TowerModal.vue',
+    'src/components/dialogs/DungeonModal.vue',
   ];
 
   for (const comp of components) {
@@ -103,4 +104,18 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     assert.ok(s.isFile(), `${comp} must be a file`);
     assert.ok(s.size > 50, `${comp} must not be empty`);
   }
+});
+
+test('DungeonModal has 1:1 ID parity and controls matching HTML dungeon-modal', async () => {
+  const content = await readFile(join(root, 'src/components/dialogs/DungeonModal.vue'), 'utf8');
+  assert.match(content, /id="dungeon-modal"/, 'Must have #dungeon-modal dialog');
+  assert.match(content, /id="dungeon-modal-title"/, 'Must have #dungeon-modal-title');
+  assert.match(content, /id="dungeon-floor-badge"/, 'Must have #dungeon-floor-badge');
+  assert.match(content, /id="dungeon-auto-btn"/, 'Must have #dungeon-auto-btn');
+  assert.match(content, /id="dungeon-refresh-btn"/, 'Must have #dungeon-refresh-btn');
+  assert.match(content, /id="dungeon-modal-close"/, 'Must have #dungeon-modal-close');
+  assert.match(content, /id="dungeon-modal-body"/, 'Must have #dungeon-modal-body');
+  assert.match(content, /dungeon-auto-label/, 'Must have .dungeon-auto-label');
+  assert.match(content, /dungeon-refresh-label/, 'Must have .dungeon-refresh-label');
+  assert.match(content, /dungeon-clear-active-battle-btn/, 'Must have reset battle button');
 });
