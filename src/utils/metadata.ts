@@ -9,6 +9,10 @@ import '~/extension/research-data.js';
 import '~/extension/research-queue.js';
 import '~/extension/campaign-missions.js';
 import '~/extension/quest-data.js';
+import '~/extension/experimental-data.js';
+import '~/extension/tower-buffs.js';
+import '~/extension/tower-automation.js';
+import '~/extension/clan-versus-rules.js';
 
 export interface HeroMeta {
   name: string;

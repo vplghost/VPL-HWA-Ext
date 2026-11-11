@@ -2,6 +2,14 @@ import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata, starGlowClass } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import {
+  availableHeroIds as getAvailableHeroIds,
+  teamOptions as getTeamOptions,
+  capacityModel as getCapacityModel,
+  teamTroopCapacity as getTeamTroopCapacity,
+  allocateTroops as getAllocateTroops,
+  unitInfo as getUnitInfoData,
+} from '@/src/utils/experimentalData';
 
 export interface SquadTeamOption {
   id: string;
@@ -68,27 +76,19 @@ export function useSquadTeams(
 
   // Available hero IDs not committed in active non-returned marches
   const availableHeroIds = computed<number[]>(() => {
-    const exp = (globalThis as any).hwaHelperExperimentalData;
-    if (exp && typeof exp.availableHeroIds === 'function') {
-      return exp.availableHeroIds(heroesData.value, unitSummaryData.value, marchData.value);
-    }
-    // Fallback: all heroes from heroesData
-    return Object.keys(heroesData.value).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    return getAvailableHeroIds(heroesData.value, unitSummaryData.value, marchData.value);
   });
 
   // Teams options
   const teams = computed<SquadTeamOption[]>(() => {
-    const exp = (globalThis as any).hwaHelperExperimentalData;
-    if (exp && typeof exp.teamOptions === 'function') {
-      const opts = exp.teamOptions(
-        cache.value.teamGetAll?.data,
-        heroesData.value,
-        customTeams.value,
-        availableHeroIds.value
-      );
-      if (Array.isArray(opts) && opts.length > 0) {
-        return opts;
-      }
+    const opts = getTeamOptions(
+      cache.value.teamGetAll?.data,
+      heroesData.value,
+      customTeams.value,
+      availableHeroIds.value
+    );
+    if (Array.isArray(opts) && opts.length > 0) {
+      return opts;
     }
 
     // Pure fallback implementation
@@ -165,29 +165,21 @@ export function useSquadTeams(
   const squadCapacity = computed<number>(() => {
     const team = selectedTeam.value;
     if (!team) return 0;
-    const exp = (globalThis as any).hwaHelperExperimentalData;
-    if (exp && typeof exp.capacityModel === 'function' && typeof exp.teamTroopCapacity === 'function') {
-      const model = exp.capacityModel(
-        team.heroIds,
-        heroesData.value,
-        cache.value.troopCapacityEvidence?.data,
-        undefined,
-        accountId.value
-      );
-      return exp.teamTroopCapacity(model?.total ?? 0, team.maxTroops);
-    }
-    return team.maxTroops && team.maxTroops > 0 ? team.maxTroops : 150000;
+    const model = getCapacityModel(
+      team.heroIds,
+      heroesData.value,
+      cache.value.troopCapacityEvidence?.data,
+      undefined,
+      accountId.value
+    );
+    return getTeamTroopCapacity(model?.total ?? 0, team.maxTroops);
   });
 
   // Unit allocation
   const allocatedTroops = computed<Array<{ unitId: number; count: number }>>(() => {
     const cap = squadCapacity.value;
     if (!cap || cap <= 0) return [];
-    const exp = (globalThis as any).hwaHelperExperimentalData;
-    if (exp && typeof exp.allocateTroops === 'function') {
-      return exp.allocateTroops(unitSummaryData.value, cap) || [];
-    }
-    return [];
+    return getAllocateTroops(unitSummaryData.value, cap) || [];
   });
 
   const totalAllocatedTroops = computed<number>(() => {
@@ -196,11 +188,8 @@ export function useSquadTeams(
 
   // Helper for unit info
   function getUnitInfo(unitId: number): { type: number; level: number; label: string } {
-    const exp = (globalThis as any).hwaHelperExperimentalData;
-    if (exp && typeof exp.unitInfo === 'function') {
-      const info = exp.unitInfo(unitId);
-      if (info) return info;
-    }
+    const info = getUnitInfoData(unitId);
+    if (info) return info;
     const level = unitId % 10;
     const type = Math.floor(unitId / 10);
     const labels = ['Marksmen', 'Spearmen', 'Infantry'];

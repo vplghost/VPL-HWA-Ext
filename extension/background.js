@@ -625,7 +625,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
       const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
       if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
-      const transition = controller.start(message.options, tab.id, stored.rpcCache?.accountStatus?.data?.id,
+      const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
+      const transition = controller.start(message.options, tab.id, accountId,
         Date.now(), stored.rpcCache || {}, globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
       if (!transition) return { ok: false, error: 'Refresh troops and search for this boss before starting. Check the selected lineup and target.' };
       const state = await saveRaidTransition(transition, stored);
@@ -659,7 +660,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
       const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
       if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
-      const transition = controller.start(message.options, tab.id, stored.rpcCache?.accountStatus?.data?.id,
+      const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
+      const transition = controller.start(message.options, tab.id, accountId,
         Date.now(), stored.rpcCache || {},
         globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
       if (!transition) return { ok: false, error: 'Refresh troops and search for this monster before starting. Check the lineup and target.' };

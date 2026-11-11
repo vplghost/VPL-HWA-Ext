@@ -5,6 +5,12 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber, formatDuration } from '@/src/utils/formatters';
+import {
+  getMineConfigId,
+  buildSquad,
+  buildGatherCall,
+  buildMineSearchCall,
+} from '@/src/utils/experimentalData';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -152,10 +158,9 @@ const gatheringMarches = computed(() => {
 
 // Found full mines matching search criteria
 const foundMines = computed(() => {
-  const exp = (globalThis as any).hwaHelperExperimentalData;
   const search = cache.value.experimentalMineSearch?.data;
   if (!search || !Array.isArray(search.mines)) return [];
-  const expectedConfig = exp?.mineConfigId?.(manualMineType.value, manualMineLevel.value);
+  const expectedConfig = getMineConfigId(manualMineType.value, manualMineLevel.value);
   if (expectedConfig && search.mineConfigId !== expectedConfig) return [];
   return search.mines;
 });
@@ -165,7 +170,6 @@ async function handleManualSearch() {
   isSearching.value = true;
   searchStatus.value = 'Searching for full resource mines on world map...';
 
-  const exp = (globalThis as any).hwaHelperExperimentalData;
   const mapId = mapContext.value?.mapId;
   const center = mapCenter.value;
 
@@ -175,12 +179,19 @@ async function handleManualSearch() {
     return;
   }
 
-  const call = exp?.buildMineSearchCall?.(mapId, center, manualMineType.value, manualMineLevel.value) || {
+  const configId = getMineConfigId(manualMineType.value, manualMineLevel.value);
+  if (!configId) {
+    isSearching.value = false;
+    searchStatus.value = '⚠️ Invalid mine level or type.';
+    return;
+  }
+
+  const call = buildMineSearchCall(mapId, center, manualMineType.value, manualMineLevel.value) || {
     name: 'searchMine',
     feature: 'mine',
     args: {
       mapId,
-      mineConfigIds: [exp?.mineConfigId?.(manualMineType.value, manualMineLevel.value)],
+      mineConfigIds: [configId],
       fullOnly: true,
       center: { x: center.x, y: center.y },
     },
@@ -209,14 +220,13 @@ async function handleManualSearch() {
 
 async function dispatchSquadToMine(mine: any) {
   await ensureRpcEnabled();
-  const exp = (globalThis as any).hwaHelperExperimentalData;
   const team = selectedTeam.value;
   if (!team || team.heroIds.length !== 5) {
     searchStatus.value = '⚠️ Please select a complete 5-hero lineup first.';
     return;
   }
 
-  const squad = exp?.buildSquad?.(team.heroIds, allocatedTroops.value) || {
+  const squad = buildSquad(team.heroIds, allocatedTroops.value) || {
     heroes: team.heroIds.map((heroId) => ({ heroId })),
     units: allocatedTroops.value,
   };
@@ -227,7 +237,7 @@ async function dispatchSquadToMine(mine: any) {
     return;
   }
 
-  const call = exp?.buildGatherCall?.(mapId, mine.mineId, squad) || {
+  const call = buildGatherCall(mapId, mine.mineId, squad) || {
     name: 'attackMine',
     feature: 'mine',
     args: { mapId, mineId: mine.mineId, battleType: 'pve', squad },

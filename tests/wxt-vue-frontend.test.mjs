@@ -579,3 +579,72 @@ test('App.vue and tab toolbars use responsive container widths and balanced tool
   assert.match(resources, /btn-toolbar-export-resources/, 'ResourcesTab must keep export button');
   assert.match(resources, /btn-toolbar-refresh-resources/, 'ResourcesTab must keep refresh button');
 });
+
+test('Experimental data helpers, mine configurations, and RPC payloads are robust and non-null', async () => {
+  const {
+    getMineConfigId,
+    mineConfigs,
+    buildMineSearchCall,
+    bossConfigId,
+    soloMonsterConfigIds,
+    rallyWaitOptions,
+    allocateTroops,
+  } = await import('../src/utils/experimentalData.ts');
+
+  // Mine levels 1 to 10 for all 4 resources
+  for (const type of ['wood', 'food', 'stone', 'iron', 'gold']) {
+    for (let lvl = 1; lvl <= 10; lvl++) {
+      const cfgId = getMineConfigId(type, lvl);
+      assert.ok(Number.isInteger(cfgId) && cfgId > 0, `Mine config for ${type} lvl ${lvl} must be positive integer`);
+    }
+  }
+
+  // Specifically verify Level 10
+  assert.equal(getMineConfigId('food', 10), 68);
+  assert.equal(getMineConfigId('gold', 10), 68, 'Gold must map to food configs');
+  assert.equal(getMineConfigId('wood', 10), 58);
+  assert.equal(getMineConfigId('stone', 10), 78);
+  assert.equal(getMineConfigId('iron', 10), 88);
+
+  // buildMineSearchCall must never have [null] in mineConfigIds
+  const searchCall = buildMineSearchCall('map-123', { x: 100, y: 200 }, 'gold', 10);
+  assert.deepEqual(searchCall, {
+    name: 'searchMine',
+    feature: 'mine',
+    args: {
+      mapId: 'map-123',
+      mineConfigIds: [68],
+      fullOnly: true,
+      center: { x: 100, y: 200 },
+    },
+  });
+
+  // Boss config ID
+  assert.equal(bossConfigId(1), 60);
+  assert.equal(bossConfigId(30), 89);
+  assert.equal(bossConfigId(0), null);
+
+  // Solo monster configs
+  assert.deepEqual(soloMonsterConfigIds(1), [23, 53]);
+  assert.deepEqual(soloMonsterConfigIds(30), [52, 88]);
+
+  // Rally wait options
+  assert.deepEqual(rallyWaitOptions, [60, 300, 900, 1800]);
+
+  // Verify GatheringModal, RaidModal, MonsterModal don't access undefined globals for RPC building
+  const gather = await readFile(join(root, 'src/components/dialogs/GatheringModal.vue'), 'utf8');
+  assert.doesNotMatch(gather, /\[exp\?\.mineConfigId/, 'GatheringModal must not produce [null] config IDs');
+  assert.match(gather, /getMineConfigId\(manualMineType\.value,\s*manualMineLevel\.value\)/);
+
+  const raid = await readFile(join(root, 'src/components/dialogs/RaidModal.vue'), 'utf8');
+  assert.match(raid, /bossConfigId\(bossLevel\.value\)/);
+  assert.match(raid, /15 minutes \(900s\)/, 'RaidModal must offer valid 15m (900s) rally wait option');
+  assert.doesNotMatch(raid, /10 minutes \(600s\)/, 'RaidModal must not offer invalid 600s option');
+
+  const bg = await readFile(join(root, 'extension/background.js'), 'utf8');
+  assert.match(
+    bg,
+    /stored\.rpcCache\?\.accountStatus\?\.data\?\.id\s*\?\?\s*stored\.rpcCache\?\.userGetInfo\?\.data\?\.id/,
+    'Background controller.start must fall back to userGetInfo.data.id'
+  );
+});

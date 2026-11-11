@@ -4,6 +4,10 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber } from '@/src/utils/formatters';
+import {
+  soloMonsterConfigIds,
+  soloMonsterLevel,
+} from '@/src/utils/experimentalData';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -45,11 +49,9 @@ const statusMessage = ref<string>('');
 
 // Monster targets found from map search
 const searchData = computed(() => cache.value.experimentalSoloSearch?.data);
-const expData = computed(() => (globalThis as any).hwaHelperExperimentalData);
 
 const matchingMonsterConfigs = computed(() => {
-  const exp = expData.value;
-  const cfgs = exp?.soloMonsterConfigIds?.(mobLevel.value) || [mobLevel.value];
+  const cfgs = soloMonsterConfigIds(mobLevel.value) || [mobLevel.value];
   const mobCfgs = searchData.value?.mobConfigIds;
   return Array.isArray(mobCfgs) && cfgs.length === mobCfgs.length && cfgs.every((c: any, i: number) => c === mobCfgs[i]);
 });
@@ -57,6 +59,10 @@ const matchingMonsterConfigs = computed(() => {
 const foundMonsters = computed(() => {
   if (!matchingMonsterConfigs.value || !Array.isArray(searchData.value?.mobs)) return [];
   return searchData.value.mobs;
+});
+
+watch(mobLevel, () => {
+  selectedMobId.value = '';
 });
 
 watch(
@@ -160,11 +166,14 @@ async function findMonsters() {
     return;
   }
 
+  const configs = soloMonsterConfigIds(mobLevel.value);
+  if (!configs) {
+    statusMessage.value = '⚠️ Invalid monster level (must be 1–30).';
+    return;
+  }
+
   isSearchingMonsters.value = true;
   statusMessage.value = `Searching for Level ${mobLevel.value} monsters on world map...`;
-
-  const exp = expData.value;
-  const configs = exp?.soloMonsterConfigIds?.(mobLevel.value) || [mobLevel.value];
 
   const call = {
     name: 'searchMob',
@@ -218,16 +227,23 @@ async function startMonsterQueue(count = mobCount.value) {
     return;
   }
 
-  let firstMobId = selectedMobId.value;
-  if (!firstMobId && foundMonsters.value.length > 0) {
-    firstMobId = foundMonsters.value[0].mobId;
-    selectedMobId.value = firstMobId;
+  // Refresh troop roster if missing
+  if (!cache.value.heroGetAll?.data || !cache.value['getUnitSummary:unit']?.data) {
+    statusMessage.value = 'Refreshing troops and roster data...';
+    await refreshTroops();
   }
 
-  if (!firstMobId) {
-    statusMessage.value = '⚠️ No target selected. Please click "Find" first to locate monsters.';
-    await findMonsters();
-    return;
+  let firstMobId = selectedMobId.value;
+  const isTargetInFound = foundMonsters.value.some((m: any) => m.mobId === firstMobId);
+  if (!isTargetInFound) {
+    if (foundMonsters.value.length > 0) {
+      firstMobId = foundMonsters.value[0].mobId;
+      selectedMobId.value = firstMobId;
+    } else {
+      statusMessage.value = `⚠️ Searching for Level ${mobLevel.value} monsters on world map...`;
+      await findMonsters();
+      return;
+    }
   }
 
   isRunning.value = true;

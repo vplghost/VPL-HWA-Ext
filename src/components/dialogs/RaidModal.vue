@@ -4,6 +4,11 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber } from '@/src/utils/formatters';
+import {
+  bossConfigId,
+  bossLevel as getBossLevel,
+  rallyWaitOptions,
+} from '@/src/utils/experimentalData';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -48,17 +53,19 @@ const statusMessage = ref<string>('');
 
 // Boss targets found from map search
 const searchData = computed(() => cache.value.experimentalRallySearch?.data);
-const expData = computed(() => (globalThis as any).hwaHelperExperimentalData);
 
 const matchingBossConfig = computed(() => {
-  const exp = expData.value;
-  const configId = exp?.bossConfigId?.(bossLevel.value) ?? (bossLevel.value + 59);
-  return searchData.value?.mobConfigIds?.includes(configId);
+  const configId = bossConfigId(bossLevel.value);
+  return Boolean(configId && searchData.value?.mobConfigIds?.includes(configId));
 });
 
 const foundBosses = computed(() => {
   if (!matchingBossConfig.value || !Array.isArray(searchData.value?.mobs)) return [];
   return searchData.value.mobs;
+});
+
+watch(bossLevel, () => {
+  selectedMobId.value = '';
 });
 
 watch(
@@ -168,11 +175,14 @@ async function findBosses() {
     return;
   }
 
+  const configId = bossConfigId(bossLevel.value);
+  if (!configId) {
+    statusMessage.value = '⚠️ Invalid boss level (must be 1–30).';
+    return;
+  }
+
   isSearchingBosses.value = true;
   statusMessage.value = `Searching for Level ${bossLevel.value} Boss targets on world map...`;
-
-  const exp = expData.value;
-  const configId = exp?.bossConfigId?.(bossLevel.value) ?? (bossLevel.value + 59);
 
   const call = {
     name: 'searchMob',
@@ -226,16 +236,23 @@ async function startRaidQueue(count = raidCount.value) {
     return;
   }
 
-  let firstMobId = selectedMobId.value;
-  if (!firstMobId && foundBosses.value.length > 0) {
-    firstMobId = foundBosses.value[0].mobId;
-    selectedMobId.value = firstMobId;
+  // Refresh troop roster if missing
+  if (!cache.value.heroGetAll?.data || !cache.value['getUnitSummary:unit']?.data) {
+    statusMessage.value = 'Refreshing troops and roster data...';
+    await refreshTroops();
   }
 
-  if (!firstMobId) {
-    statusMessage.value = '⚠️ No boss target selected. Please click "Find Bosses" first to locate a target.';
-    await findBosses();
-    return;
+  let firstMobId = selectedMobId.value;
+  const isTargetInFound = foundBosses.value.some((b: any) => b.mobId === firstMobId);
+  if (!isTargetInFound) {
+    if (foundBosses.value.length > 0) {
+      firstMobId = foundBosses.value[0].mobId;
+      selectedMobId.value = firstMobId;
+    } else {
+      statusMessage.value = `⚠️ Searching for Level ${bossLevel.value} Boss targets on world map...`;
+      await findBosses();
+      return;
+    }
   }
 
   isRunning.value = true;
@@ -511,7 +528,8 @@ async function stopRaidQueue() {
               >
                 <option :value="60">1 minute (60s)</option>
                 <option :value="300">5 minutes (300s)</option>
-                <option :value="600">10 minutes (600s)</option>
+                <option :value="900">15 minutes (900s)</option>
+                <option :value="1800">30 minutes (1800s)</option>
               </select>
             </div>
 
