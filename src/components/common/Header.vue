@@ -3,6 +3,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useTheme } from '@/src/composables/useTheme';
 import { useModals } from '@/src/composables/useModals';
+import { useResourceSelection } from '@/src/composables/useResourceSelection';
 import {
   formatResourceAmount,
   getAmountAt,
@@ -18,25 +19,15 @@ import {
 const { cache, rpcQueueCount } = useRpcCache();
 const { theme, applyTheme } = useTheme();
 const { openModal } = useModals();
+const { resourceSelection } = useResourceSelection();
 
 // Current time refreshed every second for live countdowns
 const now = ref(Date.now());
 let timer: number | null = null;
 
 // Storage state
-const resourceSelection = ref<string[]>([]);
 const cachedGameVersion = ref<string>('');
 const isTabOpenButtonVisible = ref(true);
-
-function normalizeResourceSelection(val: unknown): string[] {
-  if (Array.isArray(val)) {
-    return val.filter((item): item is string => typeof item === 'string');
-  }
-  if (val && typeof val === 'object') {
-    return Object.keys(val).filter((k) => Boolean((val as Record<string, unknown>)[k]));
-  }
-  return [];
-}
 
 onMounted(async () => {
   timer = window.setInterval(() => {
@@ -57,22 +48,16 @@ onMounted(async () => {
     });
   }
 
-  // Load resourceSelection and cachedGameVersion
+  // Load cachedGameVersion
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['resourceSelection', 'cachedGameVersion']);
-      if (stored.resourceSelection !== undefined) {
-        resourceSelection.value = normalizeResourceSelection(stored.resourceSelection);
-      }
+      const stored = await chrome.storage.local.get(['cachedGameVersion']);
       if (stored.cachedGameVersion) cachedGameVersion.value = stored.cachedGameVersion;
     } catch (_) {}
 
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local') {
-        if (changes.resourceSelection) {
-          resourceSelection.value = normalizeResourceSelection(changes.resourceSelection.newValue);
-        }
-        if (changes.cachedGameVersion) cachedGameVersion.value = changes.cachedGameVersion.newValue || '';
+      if (area === 'local' && changes.cachedGameVersion) {
+        cachedGameVersion.value = changes.cachedGameVersion.newValue || '';
       }
     });
   }

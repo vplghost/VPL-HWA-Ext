@@ -84,25 +84,21 @@ const visibleTabs = computed(() => {
 
 // Badges
 const heroesBadge = computed(() => {
-  const heroes = cache.value.heroGetAll?.data || {};
-  let count = 0;
-  for (const h of Object.values(heroes) as any[]) {
-    if (h && Number(h.star) < 6 && Number(h.fragment) >= Number(h.fragmentNext)) {
-      count++;
-    }
+  const popupData = (globalThis as any).hwaHelperPopupData;
+  if (popupData?.countEvolvableHeroes) {
+    const count = popupData.countEvolvableHeroes(cache.value.heroGetAll?.data, cache.value.inventoryGet?.data);
+    return count > 0 ? count : null;
   }
-  return count > 0 ? count : null;
+  return null;
 });
 
 const titansBadge = computed(() => {
-  const titans = cache.value.titanGetAll?.data || {};
-  let count = 0;
-  for (const t of Object.values(titans) as any[]) {
-    if (t && Number(t.star) < 6 && Number(t.fragment) >= Number(t.fragmentNext)) {
-      count++;
-    }
+  const popupData = (globalThis as any).hwaHelperPopupData;
+  if (popupData?.countEvolvableTitans) {
+    const count = popupData.countEvolvableTitans(cache.value.titanGetAll?.data, cache.value.inventoryGet?.data);
+    return count > 0 ? count : null;
   }
-  return count > 0 ? count : null;
+  return null;
 });
 
 const hasActiveEvents = computed(() => {
@@ -148,6 +144,7 @@ function selectTab(id: string) {
       <!-- Heroes Badge -->
       <span
         v-if="t.id === 'heroes' && heroesBadge"
+        id="heroes-tab-badge"
         class="ml-0.5 rounded-full bg-emerald-600 px-1.5 py-0.2 text-[9px] font-bold text-white"
       >
         {{ heroesBadge }}
@@ -156,6 +153,7 @@ function selectTab(id: string) {
       <!-- Titans Badge -->
       <span
         v-if="t.id === 'titans' && titansBadge"
+        id="titans-tab-badge"
         class="ml-0.5 rounded-full bg-emerald-600 px-1.5 py-0.2 text-[9px] font-bold text-white"
       >
         {{ titansBadge }}

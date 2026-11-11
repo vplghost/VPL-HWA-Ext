@@ -1,10 +1,35 @@
-import { ref, onMounted, onUnmounted, readonly } from 'vue';
+import { ref, onMounted, readonly } from 'vue';
 import type { RpcCache } from '@/src/types';
 
 const cache = ref<RpcCache>({});
 const recordingState = ref<any>({ active: false });
 const rpcQueueCount = ref<number>(0);
 const isInitialized = ref(false);
+let listenerAttached = false;
+
+function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) {
+  if (areaName === 'local') {
+    if (changes.rpcCache?.newValue) {
+      cache.value = changes.rpcCache.newValue;
+    }
+    if (changes.recordingState?.newValue) {
+      recordingState.value = changes.recordingState.newValue;
+    }
+  } else if (areaName === 'session') {
+    if (changes.rpcQueueCounts?.newValue) {
+      const counts = changes.rpcQueueCounts.newValue || {};
+      rpcQueueCount.value = Object.values(counts).reduce((sum: number, c: any) => sum + (Number(c) || 0), 0);
+    }
+  }
+}
+
+function ensureStorageListener() {
+  if (listenerAttached) return;
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    listenerAttached = true;
+  }
+}
 
 export function useRpcCache() {
   async function loadInitial() {
@@ -32,35 +57,11 @@ export function useRpcCache() {
     isInitialized.value = true;
   }
 
-  function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) {
-    if (areaName === 'local') {
-      if (changes.rpcCache?.newValue) {
-        cache.value = changes.rpcCache.newValue;
-      }
-      if (changes.recordingState?.newValue) {
-        recordingState.value = changes.recordingState.newValue;
-      }
-    } else if (areaName === 'session') {
-      if (changes.rpcQueueCounts?.newValue) {
-        const counts = changes.rpcQueueCounts.newValue || {};
-        rpcQueueCount.value = Object.values(counts).reduce((sum: number, c: any) => sum + (Number(c) || 0), 0);
-      }
-    }
-  }
-
   onMounted(() => {
     if (!isInitialized.value) {
       loadInitial();
     }
-    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
-      chrome.storage.onChanged.addListener(handleStorageChange);
-    }
-  });
-
-  onUnmounted(() => {
-    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
-      chrome.storage.onChanged.removeListener(handleStorageChange);
-    }
+    ensureStorageListener();
   });
 
   async function updateCacheLocally(updater: (draft: RpcCache) => void) {

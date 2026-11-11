@@ -71,6 +71,7 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     'src/components/common/Header.vue',
     'src/components/common/TabNav.vue',
     'src/components/common/FabDial.vue',
+    'src/components/common/HeroHoverCard.vue',
     'src/components/dashboard/DashboardTab.vue',
     'src/components/dashboard/TroopsOverview.vue',
     'src/components/dashboard/ResourceSummary.vue',
@@ -186,13 +187,17 @@ test('TroopsOverview and resourceSelection have robust runtime guards against Ty
   assert.ok(!troops.includes('v-with='), 'TroopsOverview must not use unsupported v-with');
   assert.match(troops, /troopCards/, 'TroopsOverview must compute troopCards');
 
+  const composable = await readFile(join(root, 'src/composables/useResourceSelection.ts'), 'utf8');
+  assert.match(composable, /normalizeResourceSelection/, 'useResourceSelection must normalize resourceSelection');
+  assert.match(composable, /Array\.isArray\(val\)/, 'useResourceSelection must guard Array.isArray');
+
   const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
-  assert.match(header, /normalizeResourceSelection/, 'Header must normalize resourceSelection');
-  assert.match(header, /Array\.isArray\(resourceSelection\.value\)/, 'Header must guard Array.isArray');
+  assert.match(header, /useResourceSelection/, 'Header must use useResourceSelection');
+  assert.match(header, /resourceSelection\.value/, 'Header must reference resourceSelection.value');
 
   const resTab = await readFile(join(root, 'src/components/tabs/ResourcesTab.vue'), 'utf8');
-  assert.match(resTab, /normalizeResourceSelection/, 'ResourcesTab must normalize resourceSelection');
-  assert.match(resTab, /Array\.isArray\(resourceSelection\.value\)/, 'ResourcesTab must guard Array.isArray');
+  assert.match(resTab, /useResourceSelection/, 'ResourcesTab must use useResourceSelection');
+  assert.match(resTab, /togglePin/, 'ResourcesTab must provide togglePin');
 });
 
 test('HeroDetailModal has 1:1 parity with legacy HTML hero-dialog', async () => {
@@ -287,4 +292,31 @@ test('EventsTab and GoalsTab have 1:1 parity with HTML events and goals renderin
 
   const tabNav = await readFile(join(root, 'src/components/common/TabNav.vue'), 'utf8');
   assert.match(tabNav, /id="events-tab-badge"/, 'TabNav must have #events-tab-badge');
+});
+
+test('HeroesTab and HeroHoverCard provide full HTML parity: table view, favorites, hover cards, and tab badge', async () => {
+  const heroesTab = await readFile(join(root, 'src/components/tabs/HeroesTab.vue'), 'utf8');
+  assert.match(heroesTab, /viewMode/, 'HeroesTab must support viewMode');
+  assert.match(heroesTab, /favoriteHeroes/, 'HeroesTab must manage favoriteHeroes');
+  assert.match(heroesTab, /toggleFavorite/, 'HeroesTab must provide toggleFavorite');
+  assert.match(heroesTab, /handleSort/, 'HeroesTab must provide column sorting');
+  assert.match(heroesTab, /HeroHoverCard/, 'HeroesTab must embed HeroHoverCard');
+  assert.match(heroesTab, /canEvolve/, 'HeroesTab must track canEvolve status');
+  assert.match(heroesTab, /getHeroEquipmentRank/, 'HeroesTab must use getHeroEquipmentRank');
+  assert.match(heroesTab, /hero-hover-trigger/, 'HeroesTab must use hero-hover-trigger class');
+
+  const hoverCard = await readFile(join(root, 'src/components/common/HeroHoverCard.vue'), 'utf8');
+  assert.match(hoverCard, /hero-hover-card/, 'HeroHoverCard must have hero-hover-card class');
+  assert.match(hoverCard, /starGlowClass/, 'HeroHoverCard must use starGlowClass');
+  assert.match(hoverCard, /getHeroSoulProgress/, 'HeroHoverCard must calculate soul stone progress');
+  assert.match(hoverCard, /equipmentRank/, 'HeroHoverCard must show equipmentRank');
+  assert.match(hoverCard, /skillsList/, 'HeroHoverCard must show skills');
+  assert.match(hoverCard, /skinsList/, 'HeroHoverCard must show skins');
+  assert.match(hoverCard, /glyphsList/, 'HeroHoverCard must show glyphs');
+  assert.match(hoverCard, /artifactsList/, 'HeroHoverCard must show artifacts');
+  assert.match(hoverCard, /equipmentSlots/, 'HeroHoverCard must show 6 equipment slots');
+
+  const nav = await readFile(join(root, 'src/components/common/TabNav.vue'), 'utf8');
+  assert.match(nav, /id="heroes-tab-badge"/, 'TabNav must have id="heroes-tab-badge"');
+  assert.match(nav, /countEvolvableHeroes/, 'TabNav must calculate countEvolvableHeroes');
 });

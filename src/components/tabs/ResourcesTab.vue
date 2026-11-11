@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useResourceSelection } from '@/src/composables/useResourceSelection';
 import {
   formatResourceAmount,
   getAmountAt,
@@ -10,50 +11,11 @@ import {
 } from '@/src/utils/resourceData';
 
 const { cache } = useRpcCache();
+const { resourceSelection, togglePin, isPinned } = useResourceSelection();
 
 const now = ref(Date.now());
 const search = ref('');
-const showAll = ref(false);
-const resourceSelection = ref<string[]>([]);
-
-function normalizeResourceSelection(val: unknown): string[] {
-  if (Array.isArray(val)) {
-    return val.filter((item): item is string => typeof item === 'string');
-  }
-  if (val && typeof val === 'object') {
-    return Object.keys(val).filter((k) => Boolean((val as Record<string, unknown>)[k]));
-  }
-  return [];
-}
-
-onMounted(async () => {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    try {
-      const stored = await chrome.storage.local.get('resourceSelection');
-      if (stored.resourceSelection !== undefined) {
-        resourceSelection.value = normalizeResourceSelection(stored.resourceSelection);
-      }
-    } catch (_) {}
-
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes.resourceSelection) {
-        resourceSelection.value = normalizeResourceSelection(changes.resourceSelection.newValue);
-      }
-    });
-  }
-});
-
-async function togglePin(key: string) {
-  const currentList = Array.isArray(resourceSelection.value) ? resourceSelection.value : [];
-  const next = new Set(currentList);
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
-  resourceSelection.value = [...next];
-
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    await chrome.storage.local.set({ resourceSelection: resourceSelection.value });
-  }
-}
+const filterPinnedOnly = ref(false);
 
 const allResources = computed(() => {
   const list: any[] = [];
@@ -71,7 +33,7 @@ const allResources = computed(() => {
         cap: val.data.cap,
         appearance,
         isSelectable,
-        isPinned: Array.isArray(resourceSelection.value) && resourceSelection.value.includes(key),
+        isPinned: isPinned(key),
       });
     }
   }
@@ -81,6 +43,9 @@ const allResources = computed(() => {
 const filteredResources = computed(() => {
   const q = search.value.trim().toLowerCase();
   return allResources.value.filter((r) => {
+    if (filterPinnedOnly.value && !r.isPinned) {
+      return false;
+    }
     if (q && !r.label.toLowerCase().includes(q) && !r.key.toLowerCase().includes(q)) {
       return false;
     }
@@ -102,8 +67,21 @@ const filteredResources = computed(() => {
         />
       </div>
 
-      <div class="flex items-center gap-2 text-xs text-slate-500">
-        <span>Check box to pin resource to the top header</span>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          :class="filterPinnedOnly
+            ? 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800'
+            : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'"
+          class="cursor-pointer inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+          @click="filterPinnedOnly = !filterPinnedOnly"
+        >
+          <span>📌 Pinned only</span>
+          <span v-if="resourceSelection.length > 0" class="rounded-full bg-blue-600 px-1.5 text-[10px] text-white">
+            {{ resourceSelection.length }}
+          </span>
+        </button>
+        <span class="text-xs text-slate-400">Select resources for the top header</span>
       </div>
     </div>
 
@@ -137,19 +115,29 @@ const filteredResources = computed(() => {
           </div>
         </div>
 
-        <!-- Pin to Header Checkbox -->
-        <label
-          v-if="r.isSelectable"
-          class="cursor-pointer inline-flex items-center p-1.5 text-xs text-slate-400 hover:text-blue-600 transition-colors"
-          title="Pin to Header"
-        >
-          <input
-            type="checkbox"
-            :checked="r.isPinned"
-            class="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            @change="togglePin(r.key)"
-          />
-        </label>
+        <!-- Pin to Header Toggle Button -->
+        <div v-if="r.isSelectable" class="shrink-0 flex items-center">
+          <button
+            type="button"
+            :aria-checked="r.isPinned"
+            role="checkbox"
+            :title="r.isPinned ? 'Unpin from header' : 'Pin to header'"
+            :aria-label="`${r.isPinned ? 'Unpin' : 'Pin'} ${r.label} to header`"
+            class="cursor-pointer inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors"
+            :class="r.isPinned
+              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 ring-1 ring-blue-300 dark:ring-blue-800'
+              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            @click.stop="togglePin(r.key)"
+          >
+            <input
+              type="checkbox"
+              tabindex="-1"
+              :checked="r.isPinned"
+              class="size-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
+            />
+            <span class="text-[11px]">{{ r.isPinned ? 'Pinned' : 'Pin' }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
