@@ -46,7 +46,8 @@
     'magicTower_openChest', 'magicTower_enterNextFloor',
     'startConstruction', 'completeConstruction',
     'startResearch', 'completeResearch',
-    'startHealing', 'startTraining', 'completeTraining']);
+    'startHealing', 'startTraining', 'completeTraining',
+    'missionRaid', 'mission_raid']);
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok, error = null) => window.postMessage({

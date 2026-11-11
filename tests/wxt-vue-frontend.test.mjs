@@ -291,7 +291,7 @@ test('RaidModal and MonsterModal have 1:1 ID parity and queue controls matching 
   assert.match(mob, /id="monster-queue-count"/, 'Must have #monster-queue-count');
 });
 
-test('CampaignRaidModal has Recipe Tree hierarchy and candidate mission chips matching HTML', async () => {
+test('CampaignRaidModal has Recipe Tree hierarchy, loop controls, auto-stop, max button, and drops sync', async () => {
   const camp = await readFile(join(root, 'src/components/dialogs/CampaignRaidModal.vue'), 'utf8');
   assert.match(camp, /id="campaign-dialog"/, 'Must have #campaign-dialog');
   assert.match(camp, /id="campaign-dialog-title"/, 'Must have #campaign-dialog-title');
@@ -301,6 +301,35 @@ test('CampaignRaidModal has Recipe Tree hierarchy and candidate mission chips ma
   assert.match(camp, /buildGearRecipeTree/, 'Must use buildGearRecipeTree');
   assert.match(camp, /candidateMissions/, 'Must compute candidate missions');
   assert.match(camp, /Crafting Recipe Tree/, 'Must have Crafting Recipe Tree');
+
+  // Loop & Max & Stop controls
+  assert.match(camp, /id="campaign-raid-sequential"/, 'Must feature #campaign-raid-sequential checkbox');
+  assert.match(camp, /campaignRaidSequential/, 'Must track campaignRaidSequential');
+  assert.match(camp, /id="campaign-raid-max"/, 'Must feature #campaign-raid-max button');
+  assert.match(camp, /maxPossibleTimes/, 'Must calculate maxPossibleTimes based on current energy and unit cost');
+  assert.match(camp, /id="campaign-raid-stop"/, 'Must feature #campaign-raid-stop button when loop is running');
+  assert.match(camp, /abortCampaignRaidLoop/, 'Must support abortCampaignRaidLoop flag');
+
+  // RPC method and arguments
+  assert.match(camp, /name:\s*'missionRaid'/, 'Must dispatch missionRaid RPC name');
+  assert.match(camp, /id:\s*Number\(missionId\.value\)/, 'Must specify id argument instead of missionId');
+
+  // Target item stop logic
+  assert.match(camp, /wasInitiallyFulfilled/, 'Must check wasInitiallyFulfilled to permit intentional extra raids');
+  assert.match(camp, /isNodeRequirementMet/, 'Must check isNodeRequirementMet for recipe target');
+
+  // Rewards card matching HTML
+  assert.match(camp, /id="campaign-raid-results"/, 'Must feature #campaign-raid-results card');
+  assert.match(camp, /latestRaidResult/, 'Must evaluate latestRaidResult from cache and local results');
+  assert.match(camp, /mergeDropsToInventory/, 'Must merge raid drops into inventory locally');
+
+  // Intercept & RPC cache verification
+  const intercept = await readFile(join(root, 'extension/intercept.js'), 'utf8');
+  assert.match(intercept, /'missionRaid'/, 'intercept.js helperActionMethods must include missionRaid');
+  assert.match(intercept, /'mission_raid'/, 'intercept.js helperActionMethods must include mission_raid');
+
+  const rpcCache = await readFile(join(root, 'extension/rpc-cache.js'), 'utf8');
+  assert.match(rpcCache, /entry\.key === 'lastCampaignRaidResult'[\s\S]*?next\.inventoryGet/, 'rpc-cache must synchronize lastCampaignRaidResult drops into next.inventoryGet');
 });
 
 test('EventsTab and GoalsTab have 1:1 parity with HTML events and goals rendering', async () => {

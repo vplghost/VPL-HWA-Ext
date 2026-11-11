@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import {
@@ -17,16 +17,38 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { cache, dispatchRpc } = useRpcCache();
+const { cache, dispatchRpc, updateCacheLocally } = useRpcCache();
 const { modalContext } = useModals();
 
 const missionId = ref(135);
-const raidResults = ref<any[]>([]);
 const isRaidRunning = ref(false);
+const abortCampaignRaidLoop = ref(false);
+const loopStatusMsg = ref('');
+const campaignRaidSequential = ref(false);
+const localRaidResult = ref<any>(null);
+
 const quickMissions = [135, 10, 20, 50, 80, 100, 120, 150];
 
 const selectedGearId = ref<number | string | null>(null);
 const selectedRecipeNodeId = ref<string | null>(null);
+
+onMounted(async () => {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const stored = await chrome.storage.local.get('campaignRaidSequential');
+      if (typeof stored.campaignRaidSequential === 'boolean') {
+        campaignRaidSequential.value = stored.campaignRaidSequential;
+      }
+    } catch (_) {}
+  }
+});
+
+function toggleSequential(val: boolean) {
+  campaignRaidSequential.value = val;
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    chrome.storage.local.set({ campaignRaidSequential: val }).catch(() => {});
+  }
+}
 
 watch(
   [() => modalContext.selectedCampaignGearId, () => props.modelValue],
@@ -55,12 +77,23 @@ watch(
 
 const energyStatus = computed(() => cache.value?.energyStatus?.data || {});
 const currentEnergy = computed(() => {
-  const e = energyStatus.value.energy;
+  const e = energyStatus.value.energy ?? cache.value?.['resource:energy']?.data?.amount;
   return Number.isFinite(e) ? Number(e) : '—';
 });
 const maxEnergy = computed(() => {
-  const m = energyStatus.value.max;
+  const m = energyStatus.value.max ?? cache.value?.['resource:energy']?.data?.cap;
   return Number.isFinite(m) ? Number(m) : '—';
+});
+
+const missionCost = computed(() => {
+  const cMissions = (globalThis as any).hwaHelperMissionCosts;
+  const pair = cMissions?.[missionId.value];
+  return pair ? (Number(pair[0]) + Number(pair[1])) : 6;
+});
+
+const maxPossibleTimes = computed(() => {
+  const cur = typeof currentEnergy.value === 'number' ? currentEnergy.value : 0;
+  return Math.max(1, Math.floor(cur / missionCost.value));
 });
 
 function close() {
@@ -146,29 +179,223 @@ async function craftNode(node: any) {
   }
 }
 
-async function executeRaid(times: number) {
-  isRaidRunning.value = true;
+function findNodeInTree(node: any, targetId: string | number): any {
+  if (!node) return null;
+  if (String(node.id) === String(targetId)) return node;
+  if (Array.isArray(node.children)) {
+    for (const c of node.children) {
+      const found = findNodeInTree(c, targetId);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function isNodeRequirementMet(node: any): boolean {
+  if (!node) return false;
+  if (node.fragment) {
+    return Number(node.fragment.owned) >= Number(node.fragment.required);
+  }
+  return Number(node.owned) >= Number(node.requiredCount || 1);
+}
+
+function mergeDropsIntoAccumulator(acc: any, drops: any) {
+  if (!drops) return;
+  acc.gold = (acc.gold || 0) + (drops.gold || 0);
+  acc.experience = (acc.experience || 0) + (drops.experience || 0);
+  for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable']) {
+    if (drops[cat]) {
+      acc[cat] = acc[cat] || {};
+      for (const [id, count] of Object.entries(drops[cat])) {
+        acc[cat][id] = (acc[cat][id] || 0) + Number(count);
+      }
+    }
+  }
+}
+
+function mergeDropsToInventory(drops: any) {
+  if (!drops) return;
+  updateCacheLocally((draft) => {
+    if (!draft.inventoryGet?.data) return;
+    const inv = draft.inventoryGet.data;
+    for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable']) {
+      if (drops[cat]) {
+        inv[cat] = { ...(inv[cat] || {}) };
+        for (const [id, count] of Object.entries(drops[cat])) {
+          inv[cat][id] = (Number(inv[cat][id]) || 0) + Number(count);
+        }
+      }
+    }
+  });
+}
+
+async function executeRaidCall(times: number): Promise<{ ok: boolean; drops?: any; error?: string }> {
+  // If extension runtime is available, try background 'campaign-raid'
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    const res: any = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { kind: 'campaign-raid', missionId: Number(missionId.value), times: Number(times) },
+        (resp) => {
+          if (chrome.runtime?.lastError) {
+            resolve({ ok: false, error: chrome.runtime.lastError.message });
+          } else {
+            resolve(resp || { ok: true });
+          }
+        }
+      );
+    });
+    if (res?.ok) {
+      const drops = res.drops || cache.value?.lastCampaignRaidResult?.data?.drops;
+      mergeDropsToInventory(drops);
+      return { ok: true, drops };
+    }
+    if (res?.error) {
+      return { ok: false, error: res.error };
+    }
+  }
+
+  // Direct RPC fallback with standard game argument { id, times }
   try {
-    const res = await dispatchRpc([
+    const resp: any = await dispatchRpc([
       {
-        name: 'mission_raid',
-        args: { missionId: missionId.value, times },
+        name: 'missionRaid',
+        args: { id: Number(missionId.value), times: Number(times) },
         feature: 'campaign',
       },
       { name: 'inventoryGet' },
     ]);
-    if (res?.data?.drops) {
-      raidResults.value = res.data.drops;
-    }
-  } finally {
-    isRaidRunning.value = false;
+    const drops = resp?.data?.drops || cache.value?.lastCampaignRaidResult?.data?.drops;
+    mergeDropsToInventory(drops);
+    return { ok: true, drops };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Raid RPC failed' };
   }
 }
 
-function handleImgError(e: Event) {
-  const target = e.target as HTMLImageElement;
-  if (target) target.style.display = 'none';
+async function executeSequentialLoop(totalTimes: number) {
+  isRaidRunning.value = true;
+  abortCampaignRaidLoop.value = false;
+  let completed = 0;
+
+  // Determine target requirement state BEFORE starting the loop
+  const targetId = selectedRecipeNodeId.value || selectedGearId.value;
+  let wasInitiallyFulfilled = false;
+  if (targetId && recipeTree.value) {
+    const targetNode = findNodeInTree(recipeTree.value, targetId);
+    wasInitiallyFulfilled = isNodeRequirementMet(targetNode);
+  }
+
+  const accumulatedDrops: any = {
+    fragmentGear: {},
+    fragmentScroll: {},
+    gear: {},
+    scroll: {},
+    consumable: {},
+    gold: 0,
+    experience: 0,
+  };
+
+  try {
+    for (let i = 1; i <= totalTimes; i++) {
+      if (abortCampaignRaidLoop.value) {
+        loopStatusMsg.value = `Raid loop stopped by user at ${completed}/${totalTimes}`;
+        break;
+      }
+
+      const curEnergy = Number(currentEnergy.value);
+      if (Number.isFinite(curEnergy) && curEnergy < missionCost.value) {
+        loopStatusMsg.value = `Out of Energy (${curEnergy}/${missionCost.value}) at raid ${completed}/${totalTimes}`;
+        break;
+      }
+
+      loopStatusMsg.value = `Raiding ${i}/${totalTimes}...`;
+
+      const res = await executeRaidCall(1);
+      if (!res.ok) {
+        loopStatusMsg.value = res.error || `Error at raid ${i}`;
+        break;
+      }
+
+      completed++;
+
+      if (res.drops) {
+        mergeDropsIntoAccumulator(accumulatedDrops, res.drops);
+        localRaidResult.value = {
+          missionId: missionId.value,
+          times: completed,
+          drops: accumulatedDrops,
+        };
+      }
+
+      // Check auto-stop condition for target item:
+      // If was not initially fulfilled, and is now fulfilled, stop automatically!
+      if (targetId && !wasInitiallyFulfilled && selectedGearId.value) {
+        const freshTree = buildGearRecipeTree(selectedGearId.value, cache.value);
+        const freshNode = findNodeInTree(freshTree, targetId);
+        if (freshNode && isNodeRequirementMet(freshNode)) {
+          loopStatusMsg.value = `Target requirement reached (${freshNode.name})! Stopped raid loop automatically at ${completed}/${totalTimes}.`;
+          break;
+        }
+      }
+
+      if (i < totalTimes && !abortCampaignRaidLoop.value) {
+        await new Promise((r) => setTimeout(r, 650));
+      }
+    }
+  } finally {
+    isRaidRunning.value = false;
+    abortCampaignRaidLoop.value = false;
+  }
 }
+
+async function startRaid(times: number) {
+  loopStatusMsg.value = '';
+
+  if (campaignRaidSequential.value && times > 1) {
+    await executeSequentialLoop(times);
+  } else {
+    isRaidRunning.value = true;
+    try {
+      const res = await executeRaidCall(times);
+      if (res.ok) {
+        if (res.drops) {
+          localRaidResult.value = {
+            missionId: missionId.value,
+            times,
+            drops: res.drops,
+          };
+        }
+      } else {
+        const errLower = String(res.error || '').toLowerCase();
+        if (errLower.includes('vip') || errLower.includes('notenough')) {
+          loopStatusMsg.value = 'VIP limit detected, switching to sequential loop...';
+          toggleSequential(true);
+          await executeSequentialLoop(times);
+          return;
+        }
+        loopStatusMsg.value = res.error || 'Raid failed';
+      }
+    } finally {
+      isRaidRunning.value = false;
+    }
+  }
+}
+
+const latestRaidResult = computed(() => {
+  return localRaidResult.value || cache.value?.lastCampaignRaidResult?.data || null;
+});
+
+const hasDropItems = computed(() => {
+  const d = latestRaidResult.value?.drops;
+  if (!d) return false;
+  return Boolean(
+    (d.fragmentGear && Object.keys(d.fragmentGear).length > 0) ||
+    (d.fragmentScroll && Object.keys(d.fragmentScroll).length > 0) ||
+    (d.gear && Object.keys(d.gear).length > 0) ||
+    (d.scroll && Object.keys(d.scroll).length > 0) ||
+    (d.consumable && Object.keys(d.consumable).length > 0)
+  );
+});
 </script>
 
 <template>
@@ -394,58 +621,141 @@ function handleImgError(e: Event) {
               </button>
             </div>
 
+            <!-- Sequential Loop Option -->
+            <div class="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <label class="inline-flex items-center gap-1.5 text-2xs cursor-pointer select-none text-slate-600 dark:text-slate-300 font-medium">
+                <input
+                  id="campaign-raid-sequential"
+                  type="checkbox"
+                  :checked="campaignRaidSequential"
+                  class="rounded border-slate-300 text-indigo-600 dark:border-slate-700 dark:bg-slate-800 focus:ring-indigo-500"
+                  @change="toggleSequential(($event.target as HTMLInputElement).checked)"
+                />
+                <span>Sequential 1x loop (VIP 0 / F2P friendly)</span>
+              </label>
+
+              <span class="text-2xs text-slate-500 dark:text-slate-400">
+                Cost: ~{{ missionCost }} Energy/raid
+              </span>
+            </div>
+
+            <!-- Status message / Loop status -->
+            <div v-if="loopStatusMsg" class="rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-900 p-2 text-2xs font-medium text-indigo-700 dark:text-indigo-300 flex items-center justify-between gap-2">
+              <span>{{ loopStatusMsg }}</span>
+              <span v-if="isRaidRunning" class="animate-spin text-sm">⏳</span>
+            </div>
+
             <!-- Raid Controls -->
             <div class="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <!-- Stop button when loop is actively running -->
               <button
+                v-if="isRaidRunning && campaignRaidSequential"
+                id="campaign-raid-stop"
                 type="button"
-                :disabled="isRaidRunning"
-                class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
-                @click="executeRaid(1)"
+                class="cursor-pointer flex-1 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5"
+                @click="abortCampaignRaidLoop = true"
               >
-                ⚔️ Raid 1x
+                <span>🛑</span> <span>Stop Raid Loop</span>
               </button>
-              <button
-                type="button"
-                :disabled="isRaidRunning"
-                class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
-                @click="executeRaid(10)"
-              >
-                ⚔️ Raid 10x
-              </button>
+
+              <template v-else>
+                <button
+                  id="campaign-raid-1"
+                  type="button"
+                  :disabled="isRaidRunning"
+                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
+                  @click="startRaid(1)"
+                >
+                  ⚔️ Raid 1x
+                </button>
+                <button
+                  id="campaign-raid-10"
+                  type="button"
+                  :disabled="isRaidRunning"
+                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
+                  @click="startRaid(10)"
+                >
+                  ⚔️ Raid 10x
+                </button>
+                <button
+                  id="campaign-raid-max"
+                  type="button"
+                  :disabled="isRaidRunning || maxPossibleTimes < 1"
+                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
+                  :title="`Raid maximum possible times (${maxPossibleTimes}x) based on energy`"
+                  @click="startRaid(maxPossibleTimes)"
+                >
+                  ⚔️ Max ({{ maxPossibleTimes }}x)
+                </button>
+              </template>
             </div>
           </div>
 
-          <!-- Raid Results Drops -->
-          <div v-if="raidResults.length > 0" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs">
-            <h4 class="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-              <span>🎁</span> Raid Loot Results ({{ raidResults.length }} items)
-            </h4>
+          <!-- Last Raid Results Drops Card (Matching HTML version) -->
+          <div
+            v-if="latestRaidResult"
+            id="campaign-raid-results"
+            class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-xs dark:border-emerald-900/40 dark:bg-emerald-950/20 space-y-2.5"
+          >
+            <div class="flex items-center justify-between text-xs pb-1.5 border-b border-emerald-200/80 dark:border-emerald-800 flex-wrap gap-1">
+              <span class="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                <span>🎉</span> Raid Results: Mission #{{ latestRaidResult.missionId }} ({{ latestRaidResult.times }} {{ latestRaidResult.times > 1 ? 'raids' : 'raid' }})
+              </span>
+              <span class="text-2xs font-semibold text-emerald-700 dark:text-emerald-300">
+                💰 +{{ formatNumber(latestRaidResult.drops?.gold || 0) }} Gold • 🧪 +{{ latestRaidResult.drops?.experience || 0 }} EXP
+              </span>
+            </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <div
-                v-for="(drop, dIdx) in raidResults"
-                :key="dIdx"
-                class="p-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center gap-2"
+            <div v-if="hasDropItems" class="flex flex-wrap gap-2">
+              <!-- Fragment Gear -->
+              <span
+                v-for="(count, gId) in (latestRaidResult.drops?.fragmentGear || {})"
+                :key="`fg-${gId}`"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs dark:bg-slate-800 dark:text-indigo-300 dark:border-indigo-800"
               >
-                <div class="size-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0">
-                  <img
-                    v-if="drop.icon"
-                    :src="drop.icon"
-                    alt="drop"
-                    class="size-full object-contain"
-                    @error="handleImgError"
-                  />
-                  <span v-else class="text-sm">💎</span>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="font-semibold text-slate-800 dark:text-slate-100 truncate text-[11px]" :title="getItemName(drop.category || 'gear', drop.id) || drop.name">
-                    {{ getItemName(drop.category || 'gear', drop.id) || drop.name || `Item #${drop.id}` }}
-                  </div>
-                  <div class="text-2xs text-slate-400">
-                    Qty: <strong class="text-indigo-600 dark:text-indigo-400">{{ formatNumber(drop.amount || drop.count || 1) }}</strong>
-                  </div>
-                </div>
-              </div>
+                <span>🧩 {{ getItemName('gear', gId) || getItemName('scroll', gId) || `#${gId}` }} Fragment</span>
+                <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+{{ count }}</span>
+              </span>
+
+              <!-- Fragment Scroll -->
+              <span
+                v-for="(count, sId) in (latestRaidResult.drops?.fragmentScroll || {})"
+                :key="`fs-${sId}`"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs dark:bg-slate-800 dark:text-indigo-300 dark:border-indigo-800"
+              >
+                <span>📜 {{ getItemName('scroll', sId) || getItemName('gear', sId) || `#${sId}` }} Fragment</span>
+                <span class="bg-indigo-100 text-indigo-800 px-1 rounded text-2xs dark:bg-indigo-900 dark:text-indigo-200">+{{ count }}</span>
+              </span>
+
+              <!-- Whole Gear -->
+              <span
+                v-for="(count, gId) in (latestRaidResult.drops?.gear || {})"
+                :key="`g-${gId}`"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-2xs dark:bg-slate-800 dark:text-emerald-300 dark:border-emerald-800"
+              >
+                <span>🛡️ {{ getItemName('gear', gId) || `Gear #${gId}` }}</span>
+                <span class="bg-emerald-100 text-emerald-800 px-1 rounded text-2xs dark:bg-emerald-900 dark:text-emerald-200">+{{ count }}</span>
+              </span>
+
+              <!-- Whole Scroll -->
+              <span
+                v-for="(count, sId) in (latestRaidResult.drops?.scroll || {})"
+                :key="`s-${sId}`"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-2xs dark:bg-slate-800 dark:text-emerald-300 dark:border-emerald-800"
+              >
+                <span>📜 {{ getItemName('scroll', sId) || `Scroll #${sId}` }}</span>
+                <span class="bg-emerald-100 text-emerald-800 px-1 rounded text-2xs dark:bg-emerald-900 dark:text-emerald-200">+{{ count }}</span>
+              </span>
+
+              <!-- Consumables -->
+              <span
+                v-for="(count, cId) in (latestRaidResult.drops?.consumable || {})"
+                :key="`c-${cId}`"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-slate-700 border border-slate-200 shadow-2xs dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+              >
+                <span>📦 {{ getItemName('consumable', cId) || `Item #${cId}` }}</span>
+                <span class="bg-slate-100 text-slate-700 px-1 rounded text-2xs dark:bg-slate-700 dark:text-slate-300">+{{ count }}</span>
+              </span>
             </div>
           </div>
         </div>

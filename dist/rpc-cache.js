@@ -3823,12 +3823,56 @@
         if (entry.key === 'lastCampaignRaidResult') {
           const prev = next.lastCampaignRaidResult;
           if (prev && prev.updatedAt >= entry.updatedAt) continue;
+
+          // Merge newly dropped items directly into inventoryGet
+          const currentDrops = entry.data?.drops;
+          if (next.inventoryGet?.data && currentDrops) {
+            const inv = { ...next.inventoryGet.data };
+            if (currentDrops.fragmentGear) {
+              inv.fragmentGear = { ...(inv.fragmentGear || {}) };
+              for (const [id, count] of Object.entries(currentDrops.fragmentGear)) {
+                inv.fragmentGear[id] = (Number(inv.fragmentGear[id]) || 0) + Number(count);
+              }
+            }
+            if (currentDrops.fragmentScroll) {
+              inv.fragmentScroll = { ...(inv.fragmentScroll || {}) };
+              for (const [id, count] of Object.entries(currentDrops.fragmentScroll)) {
+                inv.fragmentScroll[id] = (Number(inv.fragmentScroll[id]) || 0) + Number(count);
+              }
+            }
+            if (currentDrops.gear) {
+              inv.gear = { ...(inv.gear || {}) };
+              for (const [id, count] of Object.entries(currentDrops.gear)) {
+                inv.gear[id] = (Number(inv.gear[id]) || 0) + Number(count);
+              }
+            }
+            if (currentDrops.scroll) {
+              inv.scroll = { ...(inv.scroll || {}) };
+              for (const [id, count] of Object.entries(currentDrops.scroll)) {
+                inv.scroll[id] = (Number(inv.scroll[id]) || 0) + Number(count);
+              }
+            }
+            if (currentDrops.consumable) {
+              inv.consumable = { ...(inv.consumable || {}) };
+              for (const [id, count] of Object.entries(currentDrops.consumable)) {
+                inv.consumable[id] = (Number(inv.consumable[id]) || 0) + Number(count);
+              }
+            }
+            next.inventoryGet = {
+              ...next.inventoryGet,
+              data: inv,
+              updatedAt: entry.updatedAt || new Date().toISOString()
+            };
+          }
+
           const prevTime = prev?.updatedAt ? Date.parse(prev.updatedAt) : 0;
           const currTime = entry.updatedAt ? Date.parse(entry.updatedAt) : 0;
           if (prev && prev.data?.missionId === entry.data?.missionId && currTime - prevTime < 15000 && currTime > prevTime) {
             const combinedDrops = {
               fragmentGear: { ...(prev.data?.drops?.fragmentGear || {}) },
+              fragmentScroll: { ...(prev.data?.drops?.fragmentScroll || {}) },
               gear: { ...(prev.data?.drops?.gear || {}) },
+              scroll: { ...(prev.data?.drops?.scroll || {}) },
               consumable: { ...(prev.data?.drops?.consumable || {}) },
               gold: (prev.data?.drops?.gold || 0) + (entry.data?.drops?.gold || 0),
               experience: (prev.data?.drops?.experience || 0) + (entry.data?.drops?.experience || 0)
@@ -3838,9 +3882,19 @@
                 combinedDrops.fragmentGear[k] = (combinedDrops.fragmentGear[k] || 0) + v;
               }
             }
+            if (entry.data?.drops?.fragmentScroll) {
+              for (const [k, v] of Object.entries(entry.data.drops.fragmentScroll)) {
+                combinedDrops.fragmentScroll[k] = (combinedDrops.fragmentScroll[k] || 0) + v;
+              }
+            }
             if (entry.data?.drops?.gear) {
               for (const [k, v] of Object.entries(entry.data.drops.gear)) {
                 combinedDrops.gear[k] = (combinedDrops.gear[k] || 0) + v;
+              }
+            }
+            if (entry.data?.drops?.scroll) {
+              for (const [k, v] of Object.entries(entry.data.drops.scroll)) {
+                combinedDrops.scroll[k] = (combinedDrops.scroll[k] || 0) + v;
               }
             }
             if (entry.data?.drops?.consumable) {
