@@ -2,12 +2,15 @@
 import { computed } from 'vue';
 import { getTitanMetadata, getTitanSoulProgress, starGlowClass } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import { useHoverCardPosition } from '@/src/composables/useHoverCardPosition';
 
 const props = defineProps<{
   titanId: number | string;
   titan: any;
   inventory?: any;
 }>();
+
+const { isVisible, cardPositionStyle, anchorRef } = useHoverCardPosition();
 
 const meta = computed(() => getTitanMetadata(props.titanId));
 
@@ -98,8 +101,14 @@ const artifactsList = computed(() => {
 </script>
 
 <template>
-  <div class="hero-hover-card text-left select-none pointer-events-none">
-    <!-- Header: Avatar + Identity + Star + Power -->
+  <span ref="anchorRef" class="hidden" aria-hidden="true"></span>
+  <Teleport to="body">
+    <div
+      v-if="isVisible"
+      class="hero-hover-card text-left select-none pointer-events-none"
+      :style="cardPositionStyle"
+    >
+      <!-- Header: Avatar + Identity + Star + Power -->
     <div class="flex items-center gap-3">
       <!-- Big Avatar with Star Glow -->
       <div class="relative size-14 shrink-0 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center" :class="largeGlow">
@@ -243,4 +252,5 @@ const artifactsList = computed(() => {
       </div>
     </div>
   </div>
+</Teleport>
 </template>

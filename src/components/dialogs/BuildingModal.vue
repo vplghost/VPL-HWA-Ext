@@ -367,6 +367,14 @@ const filteredNextBuildings = computed(() => {
     });
 });
 
+function locateBuilding(b: any) {
+  const name = b.name || getBuildingName(b.id);
+  buildingSearchQuery.value = name;
+  const el = document.getElementById('building-search-input');
+  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el?.focus();
+}
+
 function addToQueue(candidate: any) {
   buildingQueue.value.items.push({
     buildingId: Number(candidate.id),
@@ -824,26 +832,38 @@ async function refreshBuildings() {
                   </span>
                 </div>
 
-                <div class="flex items-center gap-1.5 shrink-0">
+                <div class="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600"
+                    class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600 shrink-0"
+                    :title="`Locate ${b.name || getBuildingName(b.id)} in city buildings directory`"
+                    :aria-label="`Locate ${b.name || getBuildingName(b.id)}`"
+                    @click="locateBuilding(b)"
+                  >
+                    <span>🔍</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600 shrink-0"
                     :title="`Add ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel} to auto-build queue`"
+                    :aria-label="`Queue ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel}`"
                     @click="addToQueue(b)"
                   >
-                    <span>➕</span><span>Queue</span>
+                    <span>➕</span>
                   </button>
 
                   <button
                     v-if="activeQueues.length === 0 && hasEnoughBuildingResources(b)"
                     type="button"
                     :disabled="isStarting[`${b.id}-${b.nextLevel}`]"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50"
-                    :title="`Build ${b.name || getBuildingName(b.id)} to Lv. ${b.nextLevel}`"
+                    class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50 shrink-0"
+                    :title="`${isStarting[`${b.id}-${b.nextLevel}`] ? 'Building...' : ((b.currentLevel ?? b.level ?? 0) > 0 ? 'Upgrade' : 'Build')} ${b.name || getBuildingName(b.id)} to Lv. ${b.nextLevel}`"
+                    :aria-label="`${((b.currentLevel ?? b.level ?? 0) > 0 ? 'Upgrade' : 'Build')} ${b.name || getBuildingName(b.id)} to Lv. ${b.nextLevel}`"
                     @click="startBuildingUpgrade(b)"
                   >
-                    <span>🔨</span>
-                    <span>{{ isStarting[`${b.id}-${b.nextLevel}`] ? 'Building...' : ((b.currentLevel ?? b.level ?? 0) > 0 ? 'Upgrade' : 'Build') }}</span>
+                    <span v-if="isStarting[`${b.id}-${b.nextLevel}`]" class="animate-spin text-3xs">⏳</span>
+                    <span v-else>🔨</span>
                   </button>
                 </div>
               </div>

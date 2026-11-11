@@ -765,3 +765,35 @@ test('Header march tooltips provide comprehensive details on time, stage, heroes
   assert.match(header, /formatMonsterQueueTooltip/, 'Header must bind formatMonsterQueueTooltip on standing monster queue');
   assert.match(header, /formatAutoGatherTooltip/, 'Header must bind formatAutoGatherTooltip on standing auto gather');
 });
+
+test('Hover cards teleport to body with viewport-aware positioning and next candidate cards use icon-only buttons', async () => {
+  // 1. Hover cards teleport and composable integration
+  const heroHoverCard = await readFile(join(root, 'src/components/common/HeroHoverCard.vue'), 'utf8');
+  assert.match(heroHoverCard, /<Teleport to="body">/, 'HeroHoverCard must teleport to body to escape dialog overflow');
+  assert.match(heroHoverCard, /useHoverCardPosition/, 'HeroHoverCard must use useHoverCardPosition');
+
+  const titanHoverCard = await readFile(join(root, 'src/components/common/TitanHoverCard.vue'), 'utf8');
+  assert.match(titanHoverCard, /<Teleport to="body">/, 'TitanHoverCard must teleport to body to escape dialog overflow');
+  assert.match(titanHoverCard, /useHoverCardPosition/, 'TitanHoverCard must use useHoverCardPosition');
+
+  const usePos = await readFile(join(root, 'src/composables/useHoverCardPosition.ts'), 'utf8');
+  assert.match(usePos, /spaceBelow < 340 && spaceAbove > spaceBelow/, 'useHoverCardPosition must flip upward when bottom space is constrained');
+  assert.match(usePos, /position:\s*'fixed'/, 'useHoverCardPosition must position with fixed coordinates');
+  assert.match(usePos, /Math\.max\(8,\s*Math\.min\(winW - cardWidth/, 'useHoverCardPosition must clamp within viewport horizontally');
+
+  // 2. Building next candidate icon-only buttons
+  const buildingModal = await readFile(join(root, 'src/components/dialogs/BuildingModal.vue'), 'utf8');
+  assert.match(buildingModal, /locateBuilding/, 'BuildingModal must define locateBuilding');
+  assert.match(buildingModal, /<span[^>]*>🔍<\/span>/, 'BuildingModal must provide icon-only search/locate button');
+  assert.match(buildingModal, /<span[^>]*>➕<\/span>/, 'BuildingModal must provide icon-only queue button');
+  assert.match(buildingModal, /<span[^>]*>🔨<\/span>/, 'BuildingModal must provide icon-only upgrade button');
+
+  // 3. Research next candidate icon-only buttons and label
+  const researchModal = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
+  assert.match(researchModal, /locateResearch/, 'ResearchModal must define locateResearch');
+  assert.match(researchModal, /<span[^>]*>🔍<\/span>/, 'ResearchModal must provide icon-only search/locate button');
+  assert.match(researchModal, /<span[^>]*>➕<\/span>/, 'ResearchModal must provide icon-only queue button');
+  assert.match(researchModal, /<span[^>]*>🔬<\/span>/, 'ResearchModal must provide icon-only research button');
+  assert.match(researchModal, /:\s*`Lv\.\s*1\$\{r\.maxLevel/, 'ResearchModal candidate label must omit the word Research');
+  assert.doesNotMatch(researchModal, /:\s*`Research Lv\.\s*1/, 'ResearchModal candidate label must not contain "Research Lv."');
+});

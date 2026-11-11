@@ -12,32 +12,27 @@
   cursor: pointer;
 }
 .hero-hover-card {
-  display: none;
-  position: absolute;
-  left: 0;
-  top: calc(100% + 0.35rem);
-  z-index: 50;
+  position: fixed;
+  z-index: 99999;
   width: 19rem;
-  max-width: calc(100vw - 2rem);
+  max-width: calc(100vw - 1.5rem);
   padding: 0.75rem;
   border-radius: 0.75rem;
   background: #0f172a;
   color: #ffffff;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-  outline: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+  outline: 1px solid rgba(255, 255, 255, 0.15);
   cursor: default;
   pointer-events: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
-.hero-hover-trigger:hover .hero-hover-card,
-.hero-hover-trigger:focus-within .hero-hover-card,
-.hero-hover-trigger:focus-visible .hero-hover-card {
+.hero-hover-trigger:hover > .hero-hover-card,
+.hero-hover-trigger:focus-within > .hero-hover-card,
+.hero-hover-trigger:focus-visible > .hero-hover-card {
   display: block;
-}
-td:last-child .hero-hover-trigger:last-child .hero-hover-card,
-td:last-child .hero-hover-trigger:nth-last-child(2) .hero-hover-card,
-.hero-card-right .hero-hover-card {
-  left: auto;
-  right: 0;
 }
 
 /* Star border colors and glowing auras for small avatars (16px - 24px) */

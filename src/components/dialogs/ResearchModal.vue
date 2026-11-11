@@ -397,6 +397,14 @@ const filteredNextResearch = computed(() => {
     });
 });
 
+function locateResearch(r: any) {
+  const name = r.name || getResearchName(r.id);
+  researchSearchQuery.value = name;
+  const el = document.getElementById('research-search-input');
+  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el?.focus();
+}
+
 function addToQueue(candidate: any) {
   researchQueue.value.items.push({
     researchId: Number(candidate.id),
@@ -862,7 +870,7 @@ async function refreshResearch() {
                   </span>
                 </div>
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 shrink-0">
-                  {{ (r.currentLevel ?? r.level ?? 0) > 0 ? `Lv. ${r.currentLevel ?? r.level} ➔ ${r.nextLevel}${r.maxLevel ? ` / ${r.maxLevel}` : ''}` : `Research Lv. 1${r.maxLevel ? ` / ${r.maxLevel}` : ''}` }}
+                  {{ (r.currentLevel ?? r.level ?? 0) > 0 ? `Lv. ${r.currentLevel ?? r.level} ➔ ${r.nextLevel}${r.maxLevel ? ` / ${r.maxLevel}` : ''}` : `Lv. 1${r.maxLevel ? ` / ${r.maxLevel}` : ''}` }}
                 </span>
               </div>
 
@@ -877,26 +885,38 @@ async function refreshResearch() {
                   </span>
                 </div>
 
-                <div class="flex items-center gap-1.5 shrink-0">
+                <div class="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600"
+                    class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600 shrink-0"
+                    :title="`Locate ${r.name || getResearchName(r.id)} in academy technologies directory`"
+                    :aria-label="`Locate ${r.name || getResearchName(r.id)}`"
+                    @click="locateResearch(r)"
+                  >
+                    <span>🔍</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600 shrink-0"
                     :title="`Add ${r.name || getResearchName(r.id)} Lv. ${r.nextLevel} to auto-research queue`"
+                    :aria-label="`Queue ${r.name || getResearchName(r.id)} Lv. ${r.nextLevel}`"
                     @click="addToQueue(r)"
                   >
-                    <span>➕</span><span>Queue</span>
+                    <span>➕</span>
                   </button>
 
                   <button
                     v-if="activeQueues.length === 0 && hasEnoughResearchResources(r)"
                     type="button"
                     :disabled="isStarting[`${r.id}-${r.nextLevel}`]"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50"
-                    :title="`Research ${r.name || getResearchName(r.id)} to Lv. ${r.nextLevel}`"
+                    class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50 shrink-0"
+                    :title="`${isStarting[`${r.id}-${r.nextLevel}`] ? 'Starting research...' : 'Research'} ${r.name || getResearchName(r.id)} to Lv. ${r.nextLevel}`"
+                    :aria-label="`Research ${r.name || getResearchName(r.id)} to Lv. ${r.nextLevel}`"
                     @click="startResearchUpgrade(r)"
                   >
-                    <span>🔬</span>
-                    <span>{{ isStarting[`${r.id}-${r.nextLevel}`] ? 'Starting...' : 'Research' }}</span>
+                    <span v-if="isStarting[`${r.id}-${r.nextLevel}`]" class="animate-spin text-3xs">⏳</span>
+                    <span v-else>🔬</span>
                   </button>
                 </div>
               </div>
