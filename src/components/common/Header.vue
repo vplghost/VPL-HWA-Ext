@@ -213,11 +213,9 @@ const mailStatus = computed(() => {
   const mail = cache.value.mailStatus?.data;
 
   // 1. Check letters with unclaimed rewards
-  const letters = Array.isArray(mail?.letters)
-    ? mail.letters
-    : (Array.isArray(cache.value.mailGetAll?.data?.letters)
-      ? cache.value.mailGetAll.data.letters
-      : (Array.isArray(cache.value.mailGetAll?.letters) ? cache.value.mailGetAll.letters : []));
+  const letters = normalizeArray(
+    mail?.letters ?? cache.value.mailGetAll?.data?.letters ?? cache.value.mailGetAll?.letters
+  );
 
   const unclaimedLetters = letters.filter((l: any) =>
     l && !l.deleted && (l.reward || l.q_reward || l.items) &&
@@ -225,7 +223,7 @@ const mailStatus = computed(() => {
   );
 
   // 2. Check battle reports with unclaimed rewards
-  const reports = Array.isArray(mail?.reports) ? mail.reports : [];
+  const reports = normalizeArray(mail?.reports);
   const unclaimedReports = reports.filter((r: any) => r && r.claimedReward === false);
 
   let letterCount = unclaimedLetters.length;

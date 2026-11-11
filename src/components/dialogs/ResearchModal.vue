@@ -311,12 +311,12 @@ const simulatedResearchLevels = computed(() => {
   }
   const sim = new Map<number, number>();
   for (const [id, r] of researchMap.entries()) sim.set(id, r);
-  for (const q of rawQueues.value || []) {
+  for (const q of normalizeArray(rawQueues.value)) {
     if (Number.isFinite(q.researchId) && Number.isFinite(q.level)) {
       sim.set(Number(q.researchId), Math.max(sim.get(Number(q.researchId)) || 0, q.level));
     }
   }
-  for (const item of researchQueue.value.items || []) {
+  for (const item of normalizeArray(researchQueue.value?.items)) {
     if (Number.isFinite(item.researchId) && Number.isFinite(item.nextLevel)) {
       sim.set(Number(item.researchId), Math.max(sim.get(Number(item.researchId)) || 0, item.nextLevel));
     }
@@ -445,7 +445,7 @@ async function startResearchUpgrade(candidate: any) {
   isStarting.value[key] = true;
   try {
     const calls: any[] = [];
-    for (const f of finishedQueues.value) {
+    for (const f of normalizeArray(finishedQueues.value)) {
       calls.push({
         name: 'completeResearch',
         feature: 'personalResearch',

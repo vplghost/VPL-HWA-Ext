@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { normalizeArray } from '@/src/utils/troops';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -102,11 +103,8 @@ const allItems = computed<QuestCardItem[]>(() => {
     ? `Resets ${new Date(nextResetTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : 'Daily reset';
 
-  const qAll = Array.isArray(c?.questGetAll?.data)
-    ? c.questGetAll.data
-    : Array.isArray(c?.quest_getAll?.data)
-    ? c.quest_getAll.data
-    : [];
+  const rawQAll = c?.questGetAll?.data ?? c?.quest_getAll?.data;
+  const qAll = normalizeArray(rawQAll);
 
   const qAllMap = new Map<string, any>();
   for (const q of qAll) {
@@ -114,7 +112,7 @@ const allItems = computed<QuestCardItem[]>(() => {
   }
 
   // 1. Daily Quests
-  const dailyList = questData?.dailyQuests?.(c, Date.now()) || [];
+  const dailyList = normalizeArray(questData?.dailyQuests?.(c, Date.now()));
   for (const dq of dailyList) {
     if (!dq || dq.id == null) continue;
     const qIdStr = String(dq.id);
@@ -142,14 +140,14 @@ const allItems = computed<QuestCardItem[]>(() => {
   }
 
   // 2. Visible Event Quests
-  const events = questData?.visibleEvents?.(c, Date.now()) || [];
+  const events = normalizeArray(questData?.visibleEvents?.(c, Date.now()));
   for (const ev of events) {
     const evTitle = questData?.title?.(ev) || `Event #${ev.id}`;
     const evEndText = ev.end
       ? `Ends ${new Date(ev.end).toLocaleDateString([], { month: 'short', day: 'numeric' })}`
       : '';
 
-    for (const group of ev.groups || []) {
+    for (const group of normalizeArray(ev.groups)) {
       const groupQuests = Array.isArray(group.quests) ? group.quests : [];
       if (groupQuests.length === 0) continue;
 
@@ -250,7 +248,7 @@ const filteredQuests = computed(() => {
   }
 
   const statePriority: Record<string, number> = { ready: 0, inProgress: 1, done: 2 };
-  return [...list].sort((a, b) => (statePriority[a.state] ?? 9) - (statePriority[b.state] ?? 9));
+  return [...normalizeArray(list)].sort((a, b) => (statePriority[a.state] ?? 9) - (statePriority[b.state] ?? 9));
 });
 
 async function refreshQuests() {

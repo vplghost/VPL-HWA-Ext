@@ -848,3 +848,41 @@ test('Resilient object-array handling and healing RPC dispatch permissions preve
   const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
   assert.match(header, /normalizeArray\(cache\.value\.marchStatus\?\.data\?\.marches\)/, 'Header must use normalizeArray for marchStatus.data.marches');
 });
+
+test('Prevent TypeError Symbol(Symbol.iterator) regressions on startup with object-shaped storage/cache', async () => {
+  // 1. GuildVersusModal chestNumbers safe normalization
+  const guildVersusModal = await readFile(join(root, 'src/components/dialogs/GuildVersusModal.vue'), 'utf8');
+  assert.match(guildVersusModal, /const raw = vsStatus\.value\.chestNumbers;/, 'GuildVersusModal must safely extract raw chestNumbers');
+  assert.match(guildVersusModal, /Object\.keys\(raw\)\.map\(Number\)/, 'GuildVersusModal must handle object dictionary chestNumbers');
+
+  // 2. TowerModal buff order safe normalization
+  const towerModal = await readFile(join(root, 'src/components/dialogs/TowerModal.vue'), 'utf8');
+  assert.match(towerModal, /Array\.isArray\(\(globalThis as any\)\.hwaHelperTowerAutomation\?\.DEFAULT_BUFF_PRIORITY\)/, 'TowerModal must verify DEFAULT_BUFF_PRIORITY is array');
+  assert.match(towerModal, /const savedList = Array\.isArray\(saved\) \? saved : \[\];/, 'TowerModal must ensure savedList is array');
+
+  // 3. useSquadTeams availableHeroIds safe spread
+  const squadTeams = await readFile(join(root, 'src/composables/useSquadTeams.ts'), 'utf8');
+  assert.match(squadTeams, /\[\.\.\.normalizeArray\(availableHeroIds\.value\)\]/, 'useSquadTeams must normalize availableHeroIds before spread');
+
+  // 4. QueuesOverview must not mount duplicate dialog instances
+  const queuesOverview = await readFile(join(root, 'src/components/dashboard/QueuesOverview.vue'), 'utf8');
+  assert.doesNotMatch(queuesOverview, /<BuildingModal/, 'QueuesOverview must not duplicate BuildingModal instance');
+  assert.doesNotMatch(queuesOverview, /<ResearchModal/, 'QueuesOverview must not duplicate ResearchModal instance');
+  assert.match(queuesOverview, /openModal\('building'\)/, 'QueuesOverview must use openModal for building dialog');
+  assert.match(queuesOverview, /openModal\('research'\)/, 'QueuesOverview must use openModal for research dialog');
+
+  // 5. BuildingModal & ResearchModal queue iterations
+  const buildingModal = await readFile(join(root, 'src/components/dialogs/BuildingModal.vue'), 'utf8');
+  assert.match(buildingModal, /for \(const q of normalizeArray\(rawQueues\.value\)\)/, 'BuildingModal must normalize rawQueues');
+  assert.match(buildingModal, /for \(const item of normalizeArray\(buildingQueue\.value\?\.items\)\)/, 'BuildingModal must normalize buildingQueue.items');
+
+  const researchModal = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
+  assert.match(researchModal, /for \(const q of normalizeArray\(rawQueues\.value\)\)/, 'ResearchModal must normalize rawQueues');
+  assert.match(researchModal, /for \(const item of normalizeArray\(researchQueue\.value\?\.items\)\)/, 'ResearchModal must normalize researchQueue.items');
+
+  // 6. QuestDetailModal safe normalization
+  const questDetailModal = await readFile(join(root, 'src/components/dialogs/QuestDetailModal.vue'), 'utf8');
+  assert.match(questDetailModal, /normalizeArray\(rawQAll\)/, 'QuestDetailModal must normalize rawQAll');
+  assert.match(questDetailModal, /normalizeArray\(ev\.groups\)/, 'QuestDetailModal must normalize ev.groups');
+  assert.match(questDetailModal, /\[\.\.\.normalizeArray\(list\)\]/, 'QuestDetailModal must normalize list before spread');
+});

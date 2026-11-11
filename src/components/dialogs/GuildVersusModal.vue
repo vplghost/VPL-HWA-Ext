@@ -85,7 +85,14 @@ function formatRewardItem(key: string, amount: number) {
   return `+${amount} ${key}`;
 }
 
-const claimedChests = computed<number[]>(() => vsStatus.value.chestNumbers || []);
+const claimedChests = computed<number[]>(() => {
+  const raw = vsStatus.value.chestNumbers;
+  if (Array.isArray(raw)) return raw.map(Number).filter(Number.isFinite);
+  if (raw && typeof raw === 'object') {
+    return Object.keys(raw).map(Number).filter(Number.isFinite);
+  }
+  return [];
+});
 const claimedCount = computed(() => claimedChests.value.length);
 
 const targetChestNum = computed(() => {

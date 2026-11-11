@@ -281,13 +281,13 @@ const simulatedBuildingLevels = computed(() => {
   }
   const sim = new Map<number, number>();
   for (const [id, lvl] of buildingMap.entries()) sim.set(id, lvl);
-  for (const q of rawQueues.value || []) {
+  for (const q of normalizeArray(rawQueues.value)) {
     const bId = Number(q.buildingId);
     if (Number.isFinite(bId) && Number.isFinite(q.level)) {
       sim.set(bId, Math.max(sim.get(bId) || 0, q.level));
     }
   }
-  for (const item of buildingQueue.value.items || []) {
+  for (const item of normalizeArray(buildingQueue.value?.items)) {
     const bId = Number(item.buildingId);
     if (Number.isFinite(bId) && Number.isFinite(item.nextLevel)) {
       sim.set(bId, Math.max(sim.get(bId) || 0, item.nextLevel));
@@ -407,7 +407,7 @@ async function startBuildingUpgrade(candidate: any) {
   isStarting.value[key] = true;
   try {
     const calls: any[] = [];
-    for (const f of finishedQueues.value) {
+    for (const f of normalizeArray(finishedQueues.value)) {
       calls.push({
         name: 'completeConstruction',
         feature: 'building',

@@ -80,8 +80,11 @@ function getBuffInfo(id: number) {
 function initBuffOrder(saved?: number[]) {
   const cat = getCatalog();
   const allIds = Object.keys(cat).map(Number).sort((a, b) => a - b);
-  const defaultOrder = (globalThis as any).hwaHelperTowerAutomation?.DEFAULT_BUFF_PRIORITY || allIds;
-  const merged = [...new Set([...(saved || []), ...defaultOrder, ...allIds])].filter((id) => cat[id] != null);
+  const defaultOrder = Array.isArray((globalThis as any).hwaHelperTowerAutomation?.DEFAULT_BUFF_PRIORITY)
+    ? (globalThis as any).hwaHelperTowerAutomation.DEFAULT_BUFF_PRIORITY
+    : allIds;
+  const savedList = Array.isArray(saved) ? saved : [];
+  const merged = [...new Set([...savedList, ...defaultOrder, ...allIds])].filter((id) => cat[id] != null);
   buffOrder.value = merged.length > 0 ? merged : defaultOrder;
 }
 

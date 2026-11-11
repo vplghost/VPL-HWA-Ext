@@ -109,7 +109,7 @@ export function useSquadTeams(
     });
 
     // 5 Lowest power heroes
-    const sortedAvailable = [...availableHeroIds.value]
+    const sortedAvailable = [...normalizeArray(availableHeroIds.value)]
       .filter((id) => heroesData.value[String(id)])
       .sort((a, b) => {
         const pa = Number(heroesData.value[String(a)]?.power) || 0;

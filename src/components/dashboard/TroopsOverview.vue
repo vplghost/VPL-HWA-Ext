@@ -58,7 +58,9 @@ function getCardState(t: any) {
     (q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.duration) && q.startDate + q.duration > now.value
   );
 
-  const levelsSorted = [...t.readyByLevel.entries()].sort((a: any, b: any) => a[0] - b[0]);
+  const levelsSorted = (t?.readyByLevel instanceof Map)
+    ? [...t.readyByLevel.entries()].sort((a: any, b: any) => a[0] - b[0])
+    : [];
   const levelStr =
     levelsSorted.length > 0
       ? levelsSorted.map(([lvl, cnt]: [number, number]) => `Lv.${lvl}: ${formatNumber(cnt)}`).join(' · ')

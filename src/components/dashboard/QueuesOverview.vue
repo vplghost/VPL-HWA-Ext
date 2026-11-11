@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useModals } from '@/src/composables/useModals';
 import { formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
-import BuildingModal from '@/src/components/dialogs/BuildingModal.vue';
-import ResearchModal from '@/src/components/dialogs/ResearchModal.vue';
 
-const { cache, dispatchRpc } = useRpcCache();
+const { cache } = useRpcCache();
+const { openModal } = useModals();
 const now = ref(Date.now());
 let timer: any = null;
-
-const showBuildingModal = ref(false);
-const showResearchModal = ref(false);
 
 onMounted(() => {
   timer = setInterval(() => {
@@ -101,7 +98,7 @@ const marches = computed(() => {
         <div
           class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
           title="Click to view city buildings and upgrade queues"
-          @click="showBuildingModal = true"
+          @click="openModal('building')"
         >
           <div class="flex items-center gap-2">
             <span class="text-base">🏗️</span>
@@ -126,7 +123,7 @@ const marches = computed(() => {
         <div
           class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
           title="Click to view academy research tree and upgrades"
-          @click="showResearchModal = true"
+          @click="openModal('research')"
         >
           <div class="flex items-center gap-2">
             <span class="text-base">🔬</span>
@@ -181,9 +178,5 @@ const marches = computed(() => {
         </div>
       </div>
     </div>
-
-    <!-- Building & Research Modals -->
-    <BuildingModal v-model="showBuildingModal" />
-    <ResearchModal v-model="showResearchModal" />
   </div>
 </template>
