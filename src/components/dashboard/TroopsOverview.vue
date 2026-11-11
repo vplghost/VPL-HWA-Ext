@@ -14,7 +14,6 @@ const {
   isHealLoading,
   now,
   trainings,
-  setMaxTarget,
   setTrainLevel,
   refreshTroops,
   collectTraining,
@@ -22,14 +21,6 @@ const {
   healAll,
   syncHealed,
 } = useTroopTraining();
-
-function handleMaxChange(type: number, event: Event) {
-  const target = event.target as HTMLInputElement;
-  const val = parseInt(target.value, 10);
-  if (!isNaN(val) && val >= 0) {
-    setMaxTarget(type, val);
-  }
-}
 
 function handleLevelChange(type: number, event: Event) {
   const target = event.target as HTMLSelectElement;
@@ -176,20 +167,15 @@ const troopCards = computed(() => {
               <span>{{ t.icon }}</span> <span>{{ t.label }}</span>
             </span>
 
-            <div class="flex items-center gap-2">
-              <label class="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                <span>Max:</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  :value="st.maxTarget"
-                  class="troop-max-input w-16 px-1 py-0.2 text-right text-xs rounded border border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 focus:outline-hidden"
-                  @change="handleMaxChange(t.type, $event)"
-                />
-              </label>
-
-              <span class="text-xs font-bold text-slate-700 dark:text-slate-200 tabular-nums">
+            <div class="flex items-center gap-1.5 text-xs">
+              <span
+                class="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
+                title="Troop limit based on Camp level and researches"
+              >
+                Cap: <strong class="text-slate-700 dark:text-slate-200 font-bold tabular-nums">{{ formatNumber(st.maxTarget) }}</strong>
+              </span>
+              <span class="text-slate-300 dark:text-slate-600">·</span>
+              <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums">
                 {{ formatNumber(st.currentTotal) }}
               </span>
             </div>

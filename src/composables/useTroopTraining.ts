@@ -1,9 +1,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from './useRpcCache';
-import { getTroopType, TROOP_DEFS, normalizeArray } from '@/src/utils/troops';
+import { getTroopType, TROOP_DEFS, normalizeArray, calculateTroopMax, CAMP_BUILDING_IDS } from '@/src/utils/troops';
 import type { TroopTrainSettings, TroopUnitState } from '@/src/types';
 
-export { getTroopType, TROOP_DEFS, normalizeArray };
+export { getTroopType, TROOP_DEFS, normalizeArray, calculateTroopMax, CAMP_BUILDING_IDS };
 
 export function useTroopTraining() {
   const { cache, updateCacheLocally, dispatchRpc } = useRpcCache();
@@ -173,11 +173,10 @@ export function useTroopTraining() {
       }
     }
 
-    // Calculate maxTroops per type
+    // Calculate maxTroops per type dynamically from Drill Grounds / Camps and researches
     for (const t of stats) {
       const currentTotal = t.readyCount + t.hospitalCount + t.trainingCount;
-      const configuredMax = trainSettings.value?.maxTargets?.[t.type];
-      t.maxTroops = (typeof configuredMax === 'number' && configuredMax >= 0) ? configuredMax : Math.max(10000, currentTotal);
+      t.maxTroops = calculateTroopMax(t.type, cache.value, currentTotal);
     }
 
     return stats;

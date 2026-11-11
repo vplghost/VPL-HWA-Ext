@@ -358,16 +358,52 @@ test('HeroesTab and HeroHoverCard provide full HTML parity: table view, favorite
 });
 
 test('useTroopTraining exports normalizeArray and guards against non-array payloads', async () => {
-  const { normalizeArray } = await import('../src/utils/troops.ts');
+  const { normalizeArray, calculateTroopMax, CAMP_BUILDING_IDS } = await import('../src/utils/troops.ts');
   assert.deepEqual(normalizeArray(null), []);
   assert.deepEqual(normalizeArray(undefined), []);
   assert.deepEqual(normalizeArray([1, 2, 3]), [1, 2, 3]);
   assert.deepEqual(normalizeArray({ a: 1, b: 2 }), [1, 2]);
 
+  // Camp Building mappings
+  assert.equal(CAMP_BUILDING_IDS[0], 41, 'Marksmen Camp is building 41');
+  assert.equal(CAMP_BUILDING_IDS[1], 42, 'Spearmen Camp is building 42');
+  assert.equal(CAMP_BUILDING_IDS[2], 40, 'Infantry Camp is building 40');
+
+  // Dynamic capacity from Camp Level + Expansion Researches
+  const mockCache = {
+    buildingStatus: {
+      data: {
+        buildings: [
+          { buildingId: 41, level: 10 }, // Marksmen Camp Lv.10
+          { buildingId: 42, level: 5 },  // Spearmen Camp Lv.5
+          { buildingId: 40, level: 8 },  // Infantry Camp Lv.8
+        ]
+      }
+    },
+    researchStatus: {
+      data: {
+        researches: [
+          { researchId: 3, level: 4 }, // Camp Expansion I Lv.4 (+2000)
+        ]
+      }
+    }
+  };
+
+  // Marksmen: 5000 + 10 * 1500 + 4 * 500 = 22,000
+  assert.equal(calculateTroopMax(0, mockCache, 12000), 22000);
+  // Spearmen: 5000 + 5 * 1500 + 4 * 500 = 14,500
+  assert.equal(calculateTroopMax(1, mockCache, 5000), 14500);
+  // Fallback when current total exceeds capacity:
+  assert.equal(calculateTroopMax(1, mockCache, 18000), 18000);
+  // Fallback when no buildings:
+  assert.equal(calculateTroopMax(0, {}, 3000), 10000);
+
   const overview = await readFile(join(root, 'src/components/dashboard/TroopsOverview.vue'), 'utf8');
   assert.match(overview, /normalizeArray/, 'TroopsOverview must use normalizeArray');
   assert.match(overview, /isSyncLoading/, 'TroopsOverview must handle isSyncLoading');
   assert.match(overview, /isHealLoading/, 'TroopsOverview must handle isHealLoading');
+  assert.doesNotMatch(overview, /<input[\s\S]*?troop-max-input/, 'TroopsOverview must not have user input for troop max target');
+  assert.match(overview, /Cap:\s*<strong/, 'TroopsOverview must render read-only Cap limit');
 });
 
 test('resourceData resolves human-readable worldMaterialNames instead of raw material codes', async () => {
