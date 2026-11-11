@@ -94,6 +94,9 @@ async function saveBuildingQueue() {
         items: buildingQueue.value.items,
       },
     });
+    try {
+      chrome.runtime?.sendMessage?.({ kind: 'building-queue-action', action: 'sync' });
+    } catch {}
   }
 }
 
@@ -189,44 +192,147 @@ function clearQueue() {
   saveBuildingQueue();
 }
 
-// Candidate upgrades
+// Raw buildings from cache
 const rawBuildings = computed(() => {
   const data = cache.value?.buildingStatus?.data?.buildings || cache.value?.clan_getSummary?.data?.buildings || [];
-  if (Array.isArray(data)) return data;
-  return Object.entries(data).map(([id, b]: [string, any]) => ({
-    id: Number(id),
-    level: Number(b.level) || 0,
-    isBuilt: true,
-  }));
+  if (Array.isArray(data)) {
+    return data
+      .map((b: any) => ({
+        id: Number(b.buildingId ?? b.id),
+        level: Number(b.level) || 0,
+        initialBuildDate: b.initialBuildDate,
+        isBuilt: true,
+      }))
+      .filter((b: any) => Number.isFinite(b.id));
+  }
+  return Object.entries(data)
+    .map(([id, b]: [string, any]) => ({
+      id: Number(id),
+      level: Number(b?.level) || 0,
+      initialBuildDate: b?.initialBuildDate,
+      isBuilt: true,
+    }))
+    .filter((b: any) => Number.isFinite(b.id));
 });
 
-const upgradeCandidates = computed(() => {
-  const bHelper = (globalThis as any).hwaHelperBuildingData;
-  const bQueueHelper = (globalThis as any).hwaHelperBuildingQueue;
+// Section 3: All City Buildings Directory
+const allBuildingsList = computed(() => {
+  const buildingMap = new Map<number, any>();
+  const raw = rawBuildings.value;
+  for (const b of raw) {
+    const bId = Number(b.id);
+    if (Number.isFinite(bId)) {
+      buildingMap.set(bId, {
+        id: bId,
+        level: b.level ?? 1,
+        initialBuildDate: b.initialBuildDate,
+        isBuilt: true,
+        isUpgrading: false,
+        nextLevel: (b.level ?? 1) + 1,
+      });
+    }
+  }
 
-  const buildingMap = new Map();
-  for (const b of rawBuildings.value) {
+  for (const q of activeQueues.value) {
+    const bId = Number(q.buildingId);
+    if (buildingMap.has(bId)) {
+      const item = buildingMap.get(bId)!;
+      item.isUpgrading = true;
+      item.nextLevel = q.level ?? (item.level + 1);
+    } else {
+      buildingMap.set(bId, {
+        id: bId,
+        level: q.level ? q.level - 1 : 1,
+        isBuilt: true,
+        isUpgrading: true,
+        nextLevel: q.level ?? 2,
+      });
+    }
+  }
+
+  const allDict = (globalThis as any).hwaHelperNameData?.names?.building || {};
+  for (const key of Object.keys(allDict)) {
+    const bId = Number(key);
+    if (!buildingMap.has(bId)) {
+      buildingMap.set(bId, {
+        id: bId,
+        level: 0,
+        isBuilt: false,
+        isUpgrading: false,
+        nextLevel: 1,
+      });
+    }
+  }
+
+  return Array.from(buildingMap.values());
+});
+
+// Calculate simulated levels including active queue and queued automation items
+const simulatedBuildingLevels = computed(() => {
+  const bQueueHelper = (globalThis as any).hwaHelperBuildingQueue;
+  const buildingMap = new Map<number, number>();
+  for (const b of allBuildingsList.value) {
     buildingMap.set(Number(b.id), Number(b.level) || 0);
   }
-
-  if (bQueueHelper?.getSimulatedLevels && bQueueHelper?.getEligibleCandidates && bHelper) {
-    const simulated = bQueueHelper.getSimulatedLevels(buildingMap, rawQueues.value, buildingQueue.value.items);
-    return bQueueHelper.getEligibleCandidates(rawBuildings.value, simulated, bHelper);
+  if (bQueueHelper?.getSimulatedLevels) {
+    return bQueueHelper.getSimulatedLevels(buildingMap, rawQueues.value, buildingQueue.value.items);
   }
+  const sim = new Map<number, number>();
+  for (const [id, lvl] of buildingMap.entries()) sim.set(id, lvl);
+  for (const q of rawQueues.value || []) {
+    const bId = Number(q.buildingId);
+    if (Number.isFinite(bId) && Number.isFinite(q.level)) {
+      sim.set(bId, Math.max(sim.get(bId) || 0, q.level));
+    }
+  }
+  for (const item of buildingQueue.value.items || []) {
+    const bId = Number(item.buildingId);
+    if (Number.isFinite(bId) && Number.isFinite(item.nextLevel)) {
+      sim.set(bId, Math.max(sim.get(bId) || 0, item.nextLevel));
+    }
+  }
+  return sim;
+});
 
-  // Fallback candidates
-  return rawBuildings.value.map((b: any) => {
-    const curLevel = Number(b.level) || 0;
-    const nextLevel = curLevel + 1;
-    return {
-      id: Number(b.id),
-      name: getBuildingName(b.id),
-      currentLevel: curLevel,
-      nextLevel,
-      durationMs: 300000,
-      isBuilt: true,
-    };
-  });
+const SYSTEM_LANDMARK_BUILDING_IDS = new Set([44, 160, 161, 166, 167, 168, 169, 176, 177]);
+
+// Section 2: Candidate upgrades
+const upgradeCandidates = computed(() => {
+  const bHelper = (globalThis as any).hwaHelperBuildingData;
+  const simulatedLevels = simulatedBuildingLevels.value;
+  const hallLevel = simulatedLevels.get(20) ?? Infinity;
+
+  return allBuildingsList.value
+    .map((b: any) => {
+      const curLvl = simulatedLevels.get(b.id) ?? (b.isBuilt ? b.level : 0);
+      const nextLvl = (curLvl > 0 || b.isBuilt) ? (curLvl + 1) : 1;
+      const durationMs = bHelper?.calculateEffectiveDurationMs
+        ? bHelper.calculateEffectiveDurationMs(b.id, nextLvl)
+        : 1000;
+      return {
+        ...b,
+        name: getBuildingName(b.id),
+        currentLevel: curLvl,
+        level: curLvl,
+        nextLevel: nextLvl,
+        durationMs: durationMs || 1000,
+      };
+    })
+    .filter((b: any) => {
+      if (SYSTEM_LANDMARK_BUILDING_IDS.has(Number(b.id))) return false;
+      if (!b.isBuilt && (b.currentLevel ?? b.level ?? 0) <= 0) return false;
+      if (b.isUpgrading) return false;
+      if (b.id !== 20 && b.level >= hallLevel) return false;
+      if (bHelper?.getBuildingLevelData && bHelper.data?.[b.id] && !bHelper.getBuildingLevelData(b.id, b.nextLevel)) {
+        return false;
+      }
+      if (bHelper?.getMissingRequirements) {
+        const missingReqs = bHelper.getMissingRequirements(b.id, b.nextLevel, simulatedLevels);
+        if (missingReqs && missingReqs.length > 0) return false;
+      }
+      return true;
+    })
+    .sort((a: any, b: any) => (b.level - a.level) || (a.id - b.id));
 });
 
 const filteredNextBuildings = computed(() => {
@@ -314,62 +420,13 @@ async function startBuildingUpgrade(candidate: any) {
     });
     calls.push({ name: 'getSummary', feature: 'building', args: {} });
     await dispatchRpc(calls);
+    try {
+      chrome.runtime?.sendMessage?.({ kind: 'building-queue-action', action: 'sync' });
+    } catch {}
   } finally {
     isStarting.value[key] = false;
   }
 }
-
-// Section 3: All City Buildings Directory
-const allBuildingsList = computed(() => {
-  const buildingMap = new Map<number, any>();
-  const raw = rawBuildings.value;
-  for (const b of raw) {
-    const bId = Number(b.buildingId ?? b.id);
-    if (Number.isFinite(bId)) {
-      buildingMap.set(bId, {
-        id: bId,
-        level: b.level ?? 1,
-        initialBuildDate: b.initialBuildDate,
-        isBuilt: true,
-        isUpgrading: false,
-        nextLevel: (b.level ?? 1) + 1,
-      });
-    }
-  }
-
-  for (const q of activeQueues.value) {
-    const bId = Number(q.buildingId);
-    if (buildingMap.has(bId)) {
-      const item = buildingMap.get(bId)!;
-      item.isUpgrading = true;
-      item.nextLevel = q.level ?? (item.level + 1);
-    } else {
-      buildingMap.set(bId, {
-        id: bId,
-        level: q.level ? q.level - 1 : 1,
-        isBuilt: true,
-        isUpgrading: true,
-        nextLevel: q.level ?? 2,
-      });
-    }
-  }
-
-  const allDict = (globalThis as any).hwaHelperNameData?.names?.building || {};
-  for (const key of Object.keys(allDict)) {
-    const bId = Number(key);
-    if (!buildingMap.has(bId)) {
-      buildingMap.set(bId, {
-        id: bId,
-        level: 0,
-        isBuilt: false,
-        isUpgrading: false,
-        nextLevel: 1,
-      });
-    }
-  }
-
-  return Array.from(buildingMap.values());
-});
 
 const builtBuildingsCount = computed(() => {
   return allBuildingsList.value.filter((b) => b.isBuilt).length;

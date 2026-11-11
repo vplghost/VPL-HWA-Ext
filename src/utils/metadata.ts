@@ -56,6 +56,10 @@ export function getHeroSoulProgress(heroId: string | number, hero: any, inventor
   return (globalThis as any).hwaHelperPopupData?.heroSoulProgress?.(String(heroId), hero, inventory);
 }
 
+export function getTitanSoulProgress(titanId: string | number, titan: any, inventory: any) {
+  return (globalThis as any).hwaHelperPopupData?.titanSoulProgress?.(String(titanId), titan, inventory);
+}
+
 const worldMaterialNames: Record<number, string> = {
   1: 'Elarite Shards',
   2: 'Iron',

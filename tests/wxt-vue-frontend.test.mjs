@@ -411,3 +411,92 @@ test('ItemsTab and TitansTab support unified view switchers, count badges, and e
   assert.match(resources, /btn-toolbar-export-resources/, 'ResourcesTab must have #btn-toolbar-export-resources');
   assert.match(resources, /btn-toolbar-refresh-resources/, 'ResourcesTab must have #btn-toolbar-refresh-resources');
 });
+
+test('BuildingModal and ResearchModal compute next candidates with simulated levels and dispatch queue actions', async () => {
+  const bContent = await readFile(join(root, 'src/components/dialogs/BuildingModal.vue'), 'utf8');
+  assert.match(bContent, /simulatedBuildingLevels/, 'BuildingModal must compute simulatedBuildingLevels');
+  assert.match(bContent, /SYSTEM_LANDMARK_BUILDING_IDS/, 'BuildingModal must exclude system landmarks');
+  assert.match(bContent, /building-queue-action/, 'BuildingModal must dispatch building-queue-action');
+  assert.match(bContent, /b\.buildingId \?\? b\.id/, 'BuildingModal must normalize buildingId and id');
+  assert.match(bContent, /getMissingRequirements/, 'BuildingModal must check missing requirements');
+
+  const rContent = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
+  assert.match(rContent, /researchCenterLevel/, 'ResearchModal must compute researchCenterLevel');
+  assert.match(rContent, /simulatedResearchLevels/, 'ResearchModal must compute simulatedResearchLevels');
+  assert.match(rContent, /research-queue-action/, 'ResearchModal must dispatch research-queue-action');
+  assert.match(rContent, /r\.researchId \?\? r\.id/, 'ResearchModal must normalize researchId and id');
+  assert.match(rContent, /isAvailable/, 'ResearchModal must check isAvailable against simulated levels');
+});
+
+test('ItemsTab removes redundant list view mode and TitansTab features hover cards, favorites, and element borders', async () => {
+  const items = await readFile(join(root, 'src/components/tabs/ItemsTab.vue'), 'utf8');
+  assert.doesNotMatch(items, /viewMode === 'list'/, 'ItemsTab must remove redundant list view mode');
+  assert.match(items, /viewMode = ref<'grid' \| 'table'>/, 'ItemsTab viewMode must be grid or table');
+
+  const titans = await readFile(join(root, 'src/components/tabs/TitansTab.vue'), 'utf8');
+  assert.match(titans, /TitanHoverCard/, 'TitansTab must import and render TitanHoverCard');
+  assert.match(titans, /favoriteTitans/, 'TitansTab must track favoriteTitans');
+  assert.match(titans, /toggleFavorite/, 'TitansTab must implement toggleFavorite');
+  assert.match(titans, /filterFavsOnly/, 'TitansTab must provide favorites filter');
+  assert.match(titans, /filterEvolveOnly/, 'TitansTab must provide evolve ready filter');
+  assert.match(titans, /ELEMENT_STYLES/, 'TitansTab must style cards and badges by element');
+  assert.match(titans, /smallGlow/, 'TitansTab must apply star glow border classes');
+
+  const hoverCard = await readFile(join(root, 'src/components/common/TitanHoverCard.vue'), 'utf8');
+  assert.match(hoverCard, /hero-hover-card/, 'TitanHoverCard must use .hero-hover-card styling');
+  assert.match(hoverCard, /soulProgress/, 'TitanHoverCard must compute soulProgress');
+  assert.match(hoverCard, /skillsList/, 'TitanHoverCard must list titan skills');
+  assert.match(hoverCard, /skinsList/, 'TitanHoverCard must list titan skins');
+  assert.match(hoverCard, /artifactsList/, 'TitanHoverCard must list titan artifacts');
+});
+
+test('TeamsTab supports hero and titan avatars, star glow, hover cards, and mixed power', async () => {
+  const teamsTab = await readFile(join(root, 'src/components/tabs/TeamsTab.vue'), 'utf8');
+
+  // Verify component imports
+  assert.match(teamsTab, /import HeroHoverCard from/, 'TeamsTab must import HeroHoverCard');
+  assert.match(teamsTab, /import TitanHoverCard from/, 'TeamsTab must import TitanHoverCard');
+  assert.match(teamsTab, /getTitanMetadata/, 'TeamsTab must import getTitanMetadata');
+
+  // Verify titan differentiation logic
+  assert.match(teamsTab, /isTitanId/, 'TeamsTab must define isTitanId helper');
+  assert.match(teamsTab, /4000/, 'TeamsTab must check threshold 4000 for titans');
+  assert.match(teamsTab, /getMemberSnapshot/, 'TeamsTab must resolve snapshot from heroes or titans');
+  assert.match(teamsTab, /getMemberPower/, 'TeamsTab must compute power for both heroes and titans');
+
+  // Verify avatar and star glow rendering with hover cards
+  assert.match(teamsTab, /getMemberAvatarUrl/, 'TeamsTab must resolve avatar file for members');
+  assert.match(teamsTab, /getMemberStarGlow/, 'TeamsTab must apply star glow aura');
+  assert.match(teamsTab, /<TitanHoverCard[\s\S]*?v-if="isTitanId/, 'TeamsTab must render TitanHoverCard for titans');
+  assert.match(teamsTab, /<HeroHoverCard[\s\S]*?v-else/, 'TeamsTab must render HeroHoverCard for heroes');
+});
+
+test('RaidModal and MonsterModal support team selection, lineup previews, troop capacity and allocation', async () => {
+  const raidModal = await readFile(join(root, 'src/components/dialogs/RaidModal.vue'), 'utf8');
+  const monsterModal = await readFile(join(root, 'src/components/dialogs/MonsterModal.vue'), 'utf8');
+  const squadComposable = await readFile(join(root, 'src/composables/useSquadTeams.ts'), 'utf8');
+
+  // Verify useSquadTeams composable
+  assert.match(squadComposable, /export function useSquadTeams/, 'useSquadTeams composable must be exported');
+  assert.match(squadComposable, /teamOptions/, 'useSquadTeams must handle teamOptions');
+  assert.match(squadComposable, /squadCapacity/, 'useSquadTeams must calculate squad troop capacity');
+  assert.match(squadComposable, /allocatedTroops/, 'useSquadTeams must allocate troops across unit types');
+
+  // Verify RaidModal team selection & troops
+  assert.match(raidModal, /useSquadTeams/, 'RaidModal must use useSquadTeams');
+  assert.match(raidModal, /id="raid-team-select"/, 'RaidModal must feature #raid-team-select');
+  assert.match(raidModal, /HeroHoverCard/, 'RaidModal must import and render HeroHoverCard');
+  assert.match(raidModal, /getHeroGlow/, 'RaidModal must render hero star glow');
+  assert.match(raidModal, /troopTypeSummaries/, 'RaidModal must render troop type summary cards');
+  assert.match(raidModal, /heroIds,/, 'RaidModal must pass heroIds in raid-queue-start options');
+  assert.match(raidModal, /teamId,/, 'RaidModal must pass teamId in raid-queue-start options');
+
+  // Verify MonsterModal team selection & troops
+  assert.match(monsterModal, /useSquadTeams/, 'MonsterModal must use useSquadTeams');
+  assert.match(monsterModal, /id="monster-team-select"/, 'MonsterModal must feature #monster-team-select');
+  assert.match(monsterModal, /HeroHoverCard/, 'MonsterModal must import and render HeroHoverCard');
+  assert.match(monsterModal, /getHeroGlow/, 'MonsterModal must render hero star glow');
+  assert.match(monsterModal, /troopTypeSummaries/, 'MonsterModal must render troop type summary cards');
+  assert.match(monsterModal, /heroIds,/, 'MonsterModal must pass heroIds in monster-queue-start options');
+  assert.match(monsterModal, /teamId,/, 'MonsterModal must pass teamId in monster-queue-start options');
+});

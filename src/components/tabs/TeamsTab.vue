@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
-import { getHeroMetadata } from '@/src/utils/metadata';
+import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
+import TitanHoverCard from '@/src/components/common/TitanHoverCard.vue';
+import { getHeroMetadata, getTitanMetadata, starGlowClass } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 
 interface CustomTeam {
@@ -15,6 +17,7 @@ const { cache, dispatchRpc } = useRpcCache();
 
 const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const heroesData = computed(() => cache.value.heroGetAll?.data || {});
+const titansData = computed(() => cache.value.titanGetAll?.data || {});
 
 const customTeams = ref<CustomTeam[]>([]);
 const isEditing = ref(false);
@@ -48,6 +51,7 @@ async function refreshTeams() {
     await dispatchRpc([
       { name: 'teamGetAll' },
       { name: 'heroGetAll' },
+      { name: 'titanGetAll' },
     ]);
   } finally {
     isRefreshing.value = false;
@@ -237,15 +241,61 @@ async function deleteTeam(id: string) {
   }
 }
 
-function getHeroName(id: number): string {
-  const meta = getHeroMetadata(String(id));
-  return meta?.name || `Hero #${id}`;
+function isTitanId(id: number | string): boolean {
+  const num = Number(id);
+  if (num >= 4000) return true;
+  if (titansData.value[String(id)]) return true;
+  if (getTitanMetadata(id)) return true;
+  return false;
 }
 
-function getTeamPower(heroIds: number[]): number {
-  return heroIds.reduce((sum, id) => {
-    const h = heroesData.value[String(id)];
-    return sum + (Number(h?.power) || 0);
+function getMemberSnapshot(id: number | string): any {
+  const key = String(id);
+  if (isTitanId(id)) {
+    return titansData.value[key] || null;
+  }
+  return heroesData.value[key] || null;
+}
+
+function getMemberName(id: number | string): string {
+  const key = String(id);
+  if (isTitanId(id)) {
+    return getTitanMetadata(id)?.name || `Titan #${id}`;
+  }
+  return getHeroMetadata(id)?.name || (globalThis as any).hwaHelperNameMap?.hero?.(id) || `Hero #${id}`;
+}
+
+function getMemberAvatarUrl(id: number | string): string {
+  const key = String(id);
+  if (isTitanId(id)) {
+    const meta = getTitanMetadata(id);
+    const file = meta?.avatarFile || (meta?.hasAvatar ? `assets/titans/${id}.png` : null);
+    if (!file) return '';
+    if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) return chrome.runtime.getURL(file);
+    return file;
+  } else {
+    const meta = getHeroMetadata(id);
+    const file = meta?.avatarFile || (meta?.hasAvatar ? `assets/heroes/${id}.webp` : null);
+    if (!file) return '';
+    if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) return chrome.runtime.getURL(file);
+    return file;
+  }
+}
+
+function getMemberStarGlow(id: number | string): string {
+  const snap = getMemberSnapshot(id);
+  const stars = Number(snap?.star) || 1;
+  return starGlowClass(stars);
+}
+
+function getMemberPower(id: number | string): number {
+  const snap = getMemberSnapshot(id);
+  return Number(snap?.power) || 0;
+}
+
+function getTeamPower(memberIds: number[]): number {
+  return memberIds.reduce((sum, id) => {
+    return sum + getMemberPower(id);
   }, 0);
 }
 </script>
@@ -347,7 +397,7 @@ function getTeamPower(heroIds: number[]): number {
           <div
             v-for="idx in 5"
             :key="idx"
-            class="h-14 rounded-lg border border-dashed flex flex-col items-center justify-center p-1 text-center transition-colors"
+            class="h-16 rounded-lg border border-dashed flex flex-col items-center justify-center p-1 text-center transition-colors relative"
             :class="
               selectedHeroIds[idx - 1]
                 ? 'border-blue-400 bg-blue-100/60 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100 font-medium'
@@ -355,9 +405,38 @@ function getTeamPower(heroIds: number[]): number {
             "
           >
             <template v-if="selectedHeroIds[idx - 1]">
-              <span class="truncate w-full text-[11px] font-bold">
-                {{ getHeroName(selectedHeroIds[idx - 1]) }}
-              </span>
+              <div class="hero-hover-trigger flex items-center justify-center gap-1.5 w-full min-w-0 px-1">
+                <span
+                  class="relative size-6 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
+                  :class="getMemberStarGlow(selectedHeroIds[idx - 1])"
+                >
+                  <img
+                    v-if="getMemberAvatarUrl(selectedHeroIds[idx - 1])"
+                    :src="getMemberAvatarUrl(selectedHeroIds[idx - 1])"
+                    :alt="getMemberName(selectedHeroIds[idx - 1])"
+                    class="size-full object-cover"
+                    loading="lazy"
+                  />
+                  <span v-else class="text-[9px] font-bold">
+                    {{ isTitanId(selectedHeroIds[idx - 1]) ? '⚡' : '👤' }}
+                  </span>
+                </span>
+                <span class="truncate text-[11px] font-bold">
+                  {{ getMemberName(selectedHeroIds[idx - 1]) }}
+                </span>
+                <TitanHoverCard
+                  v-if="isTitanId(selectedHeroIds[idx - 1])"
+                  :titan-id="selectedHeroIds[idx - 1]"
+                  :titan="getMemberSnapshot(selectedHeroIds[idx - 1])"
+                  :inventory="cache.inventoryGet?.data"
+                />
+                <HeroHoverCard
+                  v-else
+                  :hero-id="selectedHeroIds[idx - 1]"
+                  :hero="getMemberSnapshot(selectedHeroIds[idx - 1])"
+                  :inventory="cache.inventoryGet?.data"
+                />
+              </div>
               <button
                 type="button"
                 class="cursor-pointer text-[10px] text-red-500 hover:text-red-700 mt-0.5"
@@ -392,7 +471,7 @@ function getTeamPower(heroIds: number[]): number {
             v-for="h in filteredHeroes"
             :key="h.id"
             type="button"
-            class="cursor-pointer text-left flex items-center justify-between p-1.5 rounded-md text-xs transition-colors"
+            class="hero-hover-trigger cursor-pointer text-left flex items-center justify-between p-1.5 rounded-md text-xs transition-colors"
             :class="
               selectedHeroIds.includes(h.id)
                 ? 'bg-blue-600 text-white font-semibold'
@@ -402,8 +481,28 @@ function getTeamPower(heroIds: number[]): number {
             "
             @click="toggleHero(h.id)"
           >
-            <span class="truncate min-w-0 pr-1">{{ h.name }}</span>
+            <div class="flex items-center gap-1.5 min-w-0 pr-1">
+              <span
+                class="relative size-5 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
+                :class="getMemberStarGlow(h.id)"
+              >
+                <img
+                  v-if="getMemberAvatarUrl(h.id)"
+                  :src="getMemberAvatarUrl(h.id)"
+                  :alt="h.name"
+                  class="size-full object-cover"
+                  loading="lazy"
+                />
+                <span v-else class="text-[9px]">👤</span>
+              </span>
+              <span class="truncate">{{ h.name }}</span>
+            </div>
             <span class="text-[10px] font-mono shrink-0 opacity-80">{{ formatNumber(h.power) }}</span>
+            <HeroHoverCard
+              :hero-id="h.id"
+              :hero="getMemberSnapshot(h.id)"
+              :inventory="cache.inventoryGet?.data"
+            />
           </button>
         </div>
       </div>
@@ -481,13 +580,42 @@ function getTeamPower(heroIds: number[]): number {
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+          <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
             <span
               v-for="hid in st.heroIds"
               :key="hid"
-              class="rounded bg-slate-50 dark:bg-slate-800/80 px-1.5 py-0.5 text-[11px] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+              class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
             >
-              {{ getHeroName(hid) }}
+              <span
+                class="relative size-5 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
+                :class="getMemberStarGlow(hid)"
+              >
+                <img
+                  v-if="getMemberAvatarUrl(hid)"
+                  :src="getMemberAvatarUrl(hid)"
+                  :alt="getMemberName(hid)"
+                  class="size-full object-cover"
+                  loading="lazy"
+                />
+                <span v-else class="text-[9px] font-bold">
+                  {{ isTitanId(hid) ? '⚡' : '👤' }}
+                </span>
+              </span>
+
+              <span class="font-medium truncate max-w-[120px]">{{ getMemberName(hid) }}</span>
+
+              <TitanHoverCard
+                v-if="isTitanId(hid)"
+                :titan-id="hid"
+                :titan="getMemberSnapshot(hid)"
+                :inventory="cache.inventoryGet?.data"
+              />
+              <HeroHoverCard
+                v-else
+                :hero-id="hid"
+                :hero="getMemberSnapshot(hid)"
+                :inventory="cache.inventoryGet?.data"
+              />
             </span>
           </div>
         </div>
@@ -527,13 +655,42 @@ function getTeamPower(heroIds: number[]): number {
               </span>
             </div>
 
-            <div class="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1.5">
+            <div class="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-2">
               <span
                 v-for="hid in team.heroIds"
                 :key="hid"
-                class="rounded bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 text-[11px] border border-slate-200 dark:border-slate-700"
+                class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
               >
-                {{ getHeroName(hid) }}
+                <span
+                  class="relative size-5 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
+                  :class="getMemberStarGlow(hid)"
+                >
+                  <img
+                    v-if="getMemberAvatarUrl(hid)"
+                    :src="getMemberAvatarUrl(hid)"
+                    :alt="getMemberName(hid)"
+                    class="size-full object-cover"
+                    loading="lazy"
+                  />
+                  <span v-else class="text-[9px] font-bold">
+                    {{ isTitanId(hid) ? '⚡' : '👤' }}
+                  </span>
+                </span>
+
+                <span class="font-medium truncate max-w-[120px]">{{ getMemberName(hid) }}</span>
+
+                <TitanHoverCard
+                  v-if="isTitanId(hid)"
+                  :titan-id="hid"
+                  :titan="getMemberSnapshot(hid)"
+                  :inventory="cache.inventoryGet?.data"
+                />
+                <HeroHoverCard
+                  v-else
+                  :hero-id="hid"
+                  :hero="getMemberSnapshot(hid)"
+                  :inventory="cache.inventoryGet?.data"
+                />
               </span>
             </div>
           </div>

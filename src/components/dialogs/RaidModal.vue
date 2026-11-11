@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
-import { useTroopTraining } from '@/src/composables/useTroopTraining';
+import { useSquadTeams } from '@/src/composables/useSquadTeams';
+import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber } from '@/src/utils/formatters';
 
 const props = defineProps<{
@@ -12,8 +13,26 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { cache, dispatchRpc } = useRpcCache();
-const { troopStats, isRefreshing, refreshTroops } = useTroopTraining();
+const { cache } = useRpcCache();
+
+const {
+  selectedTeamId,
+  selectedTeam,
+  teams,
+  squadCapacity,
+  totalAllocatedTroops,
+  troopTypeSummaries,
+  isRefreshingTroops,
+  mapContext,
+  mapCenter,
+  loadSquadData,
+  refreshTroops,
+  handleTeamChange,
+  getHeroSnapshot,
+  getHeroName,
+  getHeroAvatarUrl,
+  getHeroGlow,
+} = useSquadTeams('raidPreferences', 'rallyTeam');
 
 const bossLevel = ref(1);
 const waitSeconds = ref(300);
@@ -24,6 +43,8 @@ const isRunning = ref(false);
 const queueStatusText = ref('Idle');
 
 onMounted(async () => {
+  await loadSquadData();
+
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
       const stored = await chrome.storage.local.get(['raidPreferences', 'raidQueue']);
@@ -31,6 +52,8 @@ onMounted(async () => {
         if (stored.raidPreferences.bossLevel) bossLevel.value = stored.raidPreferences.bossLevel;
         if (stored.raidPreferences.waitSeconds) waitSeconds.value = stored.raidPreferences.waitSeconds;
         if (stored.raidPreferences.minMembers) minMembers.value = stored.raidPreferences.minMembers;
+        if (stored.raidPreferences.autoCancel !== undefined) autoCancel.value = stored.raidPreferences.autoCancel;
+        if (stored.raidPreferences.rallyTeam) selectedTeamId.value = stored.raidPreferences.rallyTeam;
       }
       if (stored.raidQueue) {
         isRunning.value = stored.raidQueue.running || false;
@@ -63,6 +86,7 @@ watch(
   (open) => {
     if (open) {
       document.addEventListener('keydown', handleKeydown);
+      loadSquadData();
     } else {
       document.removeEventListener('keydown', handleKeydown);
     }
@@ -80,6 +104,8 @@ async function savePreferences() {
         bossLevel: bossLevel.value,
         waitSeconds: waitSeconds.value,
         minMembers: minMembers.value,
+        autoCancel: autoCancel.value,
+        rallyTeam: selectedTeamId.value,
       },
     });
   }
@@ -89,15 +115,27 @@ async function startRaidQueue() {
   isRunning.value = true;
   queueStatusText.value = 'Searching...';
   await savePreferences();
+
+  const heroIds = selectedTeam.value?.heroIds || [];
+  const teamId = selectedTeam.value?.id || '';
+  const maxTroops = selectedTeam.value?.maxTroops;
+  const mapId = mapContext.value?.mapId;
+  const center = mapCenter.value;
+
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     chrome.runtime.sendMessage({
       kind: 'raid-queue-start',
       options: {
+        mapId,
+        center,
         level: bossLevel.value,
         waitSeconds: waitSeconds.value,
         minMembers: minMembers.value,
         count: raidCount.value,
         autoCancel: autoCancel.value,
+        heroIds,
+        teamId,
+        maxTroops,
       },
     });
   }
@@ -110,10 +148,6 @@ async function stopRaidQueue() {
     chrome.runtime.sendMessage({ kind: 'raid-queue-stop' });
   }
 }
-
-const totalReadyTroops = computed(() => {
-  return troopStats.value.reduce((sum, t) => sum + (t.readyCount || 0), 0);
-});
 </script>
 
 <template>
@@ -167,35 +201,106 @@ const totalReadyTroops = computed(() => {
 
       <!-- Dialog Body -->
       <div id="raid-dialog-body" class="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh_-_60px)]">
-        <!-- Section 1: Troop Allocation Overview -->
-        <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-2.5">
-          <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-            <span class="font-semibold">
-              Available Forces: <strong class="text-slate-800 dark:text-slate-200">{{ formatNumber(totalReadyTroops) }}</strong> ready troops
+        <!-- Section 1: Team & Troop Deployment -->
+        <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span>👥</span> Battle Squad & Troop Deployment
+            </h3>
+            <span v-if="selectedTeam" class="text-2xs font-mono text-slate-400">
+              ID: {{ selectedTeam.id }}
             </span>
-            <button
-              type="button"
-              :disabled="isRefreshing"
-              class="cursor-pointer text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 text-xs"
-              title="Refresh available troops"
-              @click="refreshTroops"
-            >
-              <span :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
-              <span>Refresh troops</span>
-            </button>
           </div>
 
-          <div class="grid grid-cols-3 gap-2 text-xs">
-            <div
-              v-for="t in troopStats"
-              :key="t.type"
-              class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800"
+          <!-- Team Selector -->
+          <div>
+            <label for="raid-team-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+              Select Lineup
+            </label>
+            <select
+              id="raid-team-select"
+              v-model="selectedTeamId"
+              class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+              @change="handleTeamChange(selectedTeamId)"
             >
-              <div class="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                <span>{{ t.icon }}</span> <span>{{ t.label }}</span>
-              </div>
-              <div class="text-[10px] text-slate-400 mt-0.5">
-                Ready: <strong class="text-emerald-600 dark:text-emerald-400">{{ formatNumber(t.readyCount) }}</strong>
+              <option v-for="t in teams" :key="t.id" :value="t.id">
+                {{ t.label }} ({{ t.heroIds.length }}/5)
+              </option>
+            </select>
+          </div>
+
+          <!-- Selected Team Lineup Preview -->
+          <div v-if="selectedTeam && selectedTeam.heroIds.length > 0" class="space-y-1.5">
+            <div class="text-xs font-medium text-slate-600 dark:text-slate-400">
+              Active March Heroes ({{ selectedTeam.heroIds.length }}/5):
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span
+                v-for="hid in selectedTeam.heroIds"
+                :key="hid"
+                class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 shadow-2xs"
+              >
+                <!-- Avatar with Star Glow Aura -->
+                <span
+                  class="relative size-5 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
+                  :class="getHeroGlow(hid)"
+                >
+                  <img
+                    v-if="getHeroAvatarUrl(hid)"
+                    :src="getHeroAvatarUrl(hid)"
+                    :alt="getHeroName(hid)"
+                    class="size-full object-cover"
+                    loading="lazy"
+                  />
+                  <span v-else class="text-[9px]">👤</span>
+                </span>
+
+                <span class="font-medium truncate max-w-[110px]">{{ getHeroName(hid) }}</span>
+
+                <!-- Hover Card -->
+                <HeroHoverCard
+                  :hero-id="hid"
+                  :hero="getHeroSnapshot(hid)"
+                  :inventory="cache.inventoryGet?.data"
+                />
+              </span>
+            </div>
+          </div>
+          <div v-else class="text-xs text-amber-600 dark:text-amber-400 font-medium">
+            ⚠️ No complete 5-hero squad selected. Please select or configure a lineup.
+          </div>
+
+          <!-- Troop Allocation Summary -->
+          <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+              <span class="font-semibold">
+                Troops: <strong class="text-slate-800 dark:text-slate-200">{{ formatNumber(totalAllocatedTroops) }}</strong> / {{ formatNumber(squadCapacity) }}
+              </span>
+              <button
+                type="button"
+                :disabled="isRefreshingTroops"
+                class="cursor-pointer text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 text-xs"
+                title="Refresh available troops"
+                @click="refreshTroops"
+              >
+                <span :class="{ 'inline-block animate-spin': isRefreshingTroops }">↻</span>
+                <span>Refresh troops</span>
+              </button>
+            </div>
+
+            <!-- 3 Troop Type Cards -->
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <div
+                v-for="b in troopTypeSummaries"
+                :key="b.type"
+                class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800"
+              >
+                <div class="font-semibold text-slate-800 dark:text-slate-200">
+                  {{ b.label }}: {{ formatNumber(b.total) }}
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 truncate" :title="b.tiersText">
+                  {{ b.tiersText }}
+                </div>
               </div>
             </div>
           </div>
@@ -279,6 +384,7 @@ const totalReadyTroops = computed(() => {
               v-model="autoCancel"
               type="checkbox"
               class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+              @change="savePreferences"
             />
             <span class="text-xs text-slate-700 dark:text-slate-300 font-medium">
               Auto-cancel rally in last 10 seconds if squad members &lt; {{ minMembers }}

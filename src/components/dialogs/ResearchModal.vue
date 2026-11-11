@@ -95,6 +95,9 @@ async function saveResearchQueue() {
         items: researchQueue.value.items,
       },
     });
+    try {
+      chrome.runtime?.sendMessage?.({ kind: 'research-queue-action', action: 'sync' });
+    } catch {}
   }
 }
 
@@ -193,12 +196,22 @@ function clearQueue() {
 // Researches from cache
 const rawResearches = computed(() => {
   const data = cache.value?.researchStatus?.data?.researches || cache.value?.clan_getSummary?.data?.researches || [];
-  if (Array.isArray(data)) return data;
-  return Object.entries(data).map(([id, r]: [string, any]) => ({
-    id: Number(id),
-    level: Number(r.level) || 0,
-    isCompleted: true,
-  }));
+  if (Array.isArray(data)) {
+    return data
+      .map((r: any) => ({
+        id: Number(r.researchId ?? r.id),
+        level: Number(r.level) || 0,
+        isCompleted: true,
+      }))
+      .filter((r: any) => Number.isFinite(r.id));
+  }
+  return Object.entries(data)
+    .map(([id, r]: [string, any]) => ({
+      id: Number(id),
+      level: Number(r?.level) || 0,
+      isCompleted: true,
+    }))
+    .filter((r: any) => Number.isFinite(r.id));
 });
 
 // All researches directory data
@@ -206,7 +219,7 @@ const allResearchesList = computed(() => {
   const researchMap = new Map<number, any>();
   const raw = rawResearches.value;
   for (const r of raw) {
-    const rId = Number(r.researchId ?? r.id);
+    const rId = Number(r.id);
     if (Number.isFinite(rId)) {
       researchMap.set(rId, {
         id: rId,
@@ -274,36 +287,82 @@ const availableResearchesCount = computed(() => {
   return allResearchesList.value.filter((r) => !r.isCompleted && !r.isResearching).length;
 });
 
-// Candidate upgrades
-const upgradeCandidates = computed(() => {
-  const rHelper = (globalThis as any).hwaHelperResearchData;
-  const rQueueHelper = (globalThis as any).hwaHelperResearchQueue;
+// Research Center building level (ID 43 / 165)
+const researchCenterLevel = computed(() => {
+  const rawBuildings = cache.value?.buildingStatus?.data?.buildings || cache.value?.clan_getSummary?.data?.buildings || [];
+  let center: any = null;
+  if (Array.isArray(rawBuildings)) {
+    center = rawBuildings.find((b: any) => (b.buildingId ?? b.id) === 43 || (b.buildingId ?? b.id) === 165);
+  } else if (rawBuildings && typeof rawBuildings === 'object') {
+    center = rawBuildings['43'] || rawBuildings['165'] || rawBuildings[43] || rawBuildings[165];
+  }
+  return Number.isFinite(center?.level) ? Number(center.level) : Infinity;
+});
 
-  const researchMap = new Map();
+// Calculate simulated levels including active queue and queued automation items
+const simulatedResearchLevels = computed(() => {
+  const rQueueHelper = (globalThis as any).hwaHelperResearchQueue;
+  const researchMap = new Map<number, number>();
   for (const r of allResearchesList.value) {
     researchMap.set(Number(r.id), Number(r.level) || 0);
   }
-
-  if (rQueueHelper?.getSimulatedLevels && rQueueHelper?.getEligibleCandidates && rHelper) {
-    const simulated = rQueueHelper.getSimulatedLevels(researchMap, rawQueues.value, researchQueue.value.items);
-    return rQueueHelper.getEligibleCandidates(allResearchesList.value, simulated, rHelper);
+  if (rQueueHelper?.getSimulatedLevels) {
+    return rQueueHelper.getSimulatedLevels(researchMap, rawQueues.value, researchQueue.value.items);
   }
+  const sim = new Map<number, number>();
+  for (const [id, r] of researchMap.entries()) sim.set(id, r);
+  for (const q of rawQueues.value || []) {
+    if (Number.isFinite(q.researchId) && Number.isFinite(q.level)) {
+      sim.set(Number(q.researchId), Math.max(sim.get(Number(q.researchId)) || 0, q.level));
+    }
+  }
+  for (const item of researchQueue.value.items || []) {
+    if (Number.isFinite(item.researchId) && Number.isFinite(item.nextLevel)) {
+      sim.set(Number(item.researchId), Math.max(sim.get(Number(item.researchId)) || 0, item.nextLevel));
+    }
+  }
+  return sim;
+});
 
-  // Fallback candidates
+// Section 2: Candidate upgrades
+const upgradeCandidates = computed(() => {
+  const researchDataHelper = (globalThis as any).hwaHelperResearchData;
+  const simulatedLevels = simulatedResearchLevels.value;
+  const centerLevel = researchCenterLevel.value;
+
   return allResearchesList.value
-    .filter((r) => !r.isResearching && (r.isCompleted || r.level > 0))
     .map((r: any) => {
-      const curLevel = Number(r.level) || 0;
-      const nextLevel = curLevel + 1;
+      const curLvl = simulatedLevels.get(r.id) ?? (r.isCompleted ? r.level : 0);
+      const nextLvl = (curLvl > 0 || r.isCompleted) ? (curLvl + 1) : 1;
+      const durationMs = researchDataHelper?.calculateEffectiveDurationMs
+        ? researchDataHelper.calculateEffectiveDurationMs(r.id, nextLvl)
+        : 60000;
+      const maxLvl = researchDataHelper?.getMaxLevel ? researchDataHelper.getMaxLevel(r.id) : 0;
       return {
-        id: Number(r.id),
+        ...r,
         name: getResearchName(r.id),
-        currentLevel: curLevel,
-        nextLevel,
-        durationMs: 300000,
-        isCompleted: r.isCompleted,
+        currentLevel: curLvl,
+        level: curLvl,
+        nextLevel: nextLvl,
+        maxLevel: maxLvl,
+        durationMs: durationMs || 60000,
       };
-    });
+    })
+    .filter((r: any) => {
+      if (r.isResearching) return false;
+      if (researchDataHelper?.getMaxLevel) {
+        const maxLevel = researchDataHelper.getMaxLevel(r.id);
+        if (maxLevel > 0) {
+          if (r.nextLevel > maxLevel) return false;
+          if (researchDataHelper.isAvailable && !researchDataHelper.isAvailable(r.id, r.nextLevel, simulatedLevels, centerLevel)) {
+            return false;
+          }
+          return true;
+        }
+      }
+      return (r.currentLevel > 0 || r.isCompleted) && r.nextLevel <= centerLevel;
+    })
+    .sort((a: any, b: any) => (b.currentLevel - a.currentLevel) || (a.id - b.id));
 });
 
 const filteredNextResearch = computed(() => {
@@ -403,6 +462,9 @@ async function startResearchUpgrade(candidate: any) {
     });
     calls.push({ name: 'getSummary', feature: 'personalResearch', args: {} });
     await dispatchRpc(calls);
+    try {
+      chrome.runtime?.sendMessage?.({ kind: 'research-queue-action', action: 'sync' });
+    } catch {}
   } finally {
     isStarting.value[key] = false;
   }

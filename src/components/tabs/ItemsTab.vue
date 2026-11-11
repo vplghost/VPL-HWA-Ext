@@ -8,7 +8,7 @@ const { cache, dispatchRpc } = useRpcCache();
 
 const search = ref('');
 const selectedCategory = ref('All');
-const viewMode = ref<'grid' | 'table' | 'list'>('grid');
+const viewMode = ref<'grid' | 'table'>('grid');
 const isRefreshing = ref(false);
 
 const categories = [
@@ -283,15 +283,6 @@ function exportItemsJson() {
           >
             📋 Table
           </button>
-          <button
-            type="button"
-            class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
-            :class="viewMode === 'list' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
-            title="List View (Compact)"
-            @click="viewMode = 'list'"
-          >
-            ☰ List
-          </button>
         </div>
 
         <!-- Export JSON button -->
@@ -375,7 +366,7 @@ function exportItemsJson() {
 
         <!-- 2. Table Mode -->
         <div
-          v-else-if="viewMode === 'table'"
+          v-else
           class="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto"
         >
           <table class="w-full text-left text-xs border-collapse">
@@ -417,34 +408,6 @@ function exportItemsJson() {
               </tr>
             </tbody>
           </table>
-        </div>
-
-        <!-- 3. List Mode -->
-        <div v-else class="divide-y divide-slate-100 dark:divide-slate-800/80">
-          <div
-            v-for="item in sec.items"
-            :key="`${item.category}-${item.id}`"
-            class="py-2 flex items-center justify-between gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 px-1 rounded transition-colors"
-          >
-            <div class="flex items-center gap-2 min-w-0">
-              <div class="size-6 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                <img
-                  v-if="getItemImgSrc(item)"
-                  :src="getItemImgSrc(item)"
-                  :alt="item.name"
-                  class="size-full object-contain"
-                  loading="lazy"
-                />
-                <span v-else class="text-xs">{{ getCategoryIcon(item.category) }}</span>
-              </div>
-              <span class="font-medium text-slate-800 dark:text-slate-200 truncate">{{ item.name }}</span>
-              <span class="text-[10px] font-mono text-slate-400 shrink-0">#{{ item.id }}</span>
-            </div>
-
-            <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs shrink-0">
-              {{ formatNumber(item.amount) }}
-            </span>
-          </div>
         </div>
       </section>
     </div>
