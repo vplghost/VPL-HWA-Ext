@@ -648,3 +648,120 @@ test('Experimental data helpers, mine configurations, and RPC payloads are robus
     'Background controller.start must fall back to userGetInfo.data.id'
   );
 });
+
+test('Header march tooltips provide comprehensive details on time, stage, heroes, and troops for gather, raid, and monster', async () => {
+  const {
+    formatMarchDuration,
+    formatMarchTooltip,
+    formatRaidQueueTooltip,
+    formatMonsterQueueTooltip,
+    formatAutoGatherTooltip,
+  } = await import('../src/utils/marchTooltip.ts');
+
+  const now = 1000000000;
+
+  // 1. Duration formatting
+  assert.equal(formatMarchDuration(0), 'Due now');
+  assert.equal(formatMarchDuration(-500), 'Due now');
+  assert.equal(formatMarchDuration(45000), '0m 45s');
+  assert.equal(formatMarchDuration(90000), '1m 30s');
+  assert.equal(formatMarchDuration(3700000), '1h 1m');
+
+  // 2. Gathering march tooltip
+  const gatherMarch = {
+    mineId: 'mine-1',
+    kind: 'wood',
+    mineConfigId: 58, // Wood Level 10
+    stage: 'gathering',
+    endsAt: now + 120000,
+    team: {
+      heroIds: [16, 67],
+      units: [
+        { id: 7, count: 5000 },
+        { id: 17, count: 5000 },
+      ],
+    },
+  };
+  const gatherTooltip = formatMarchTooltip(gatherMarch, now, {});
+  assert.match(gatherTooltip, /Gathering · Wood Mine \(Lv\.10\)/);
+  assert.match(gatherTooltip, /Status: Gathering resources · 2m 00s/);
+  assert.match(gatherTooltip, /Heroes \(2\/5\):/);
+  assert.match(gatherTooltip, /Troops: 10,000 troops/);
+  assert.match(gatherTooltip, /\(Click to view Gathering dialog\)/);
+
+  // 3. Raid march tooltip
+  const raidMarch = {
+    kind: 'raid',
+    rally: {
+      mobConfigId: 80, // Level 21 Boss (80 - 59 = 21)
+      leaderName: 'HeroKing',
+      target: 'Boss Level 21',
+      arrivalAt: now + 65000,
+      team: {
+        heroIds: [16, 67, 14, 33, 38],
+        units: [{ id: 7, count: 125000 }],
+      },
+    },
+    stage: 'moveToTargetInRally',
+    endsAt: now + 65000,
+  };
+  const raidTooltip = formatMarchTooltip(raidMarch, now, {});
+  assert.match(raidTooltip, /Rally Raid · Level 21 Boss/);
+  assert.match(raidTooltip, /Leader: HeroKing/);
+  assert.match(raidTooltip, /Status: Traveling to boss · 1m 05s to arrival/);
+  assert.match(raidTooltip, /Heroes \(5\/5\):/);
+  assert.match(raidTooltip, /Troops: 125,000 troops/);
+  assert.match(raidTooltip, /\(Click to view Raid dialog\)/);
+
+  // 4. Monster march tooltip
+  const monsterMarch = {
+    kind: 'attack',
+    mobConfigId: 37, // Level 15 Monster (37 - 22 = 15)
+    stage: 'moveToTargetInSolo',
+    targetArrivalAt: now + 30000,
+    endsAt: now + 30000,
+    team: {
+      heroIds: [16, 67, 14],
+      units: [{ id: 7, count: 80000 }],
+    },
+  };
+  const monsterTooltip = formatMarchTooltip(monsterMarch, now, {});
+  assert.match(monsterTooltip, /Monster Attack · Level 15 Monster/);
+  assert.match(monsterTooltip, /Status: Marching to monster · 0m 30s to arrival/);
+  assert.match(monsterTooltip, /Heroes \(3\/5\):/);
+  assert.match(monsterTooltip, /Troops: 80,000 troops/);
+  assert.match(monsterTooltip, /\(Click to view Monster dialog\)/);
+
+  // 5. Standing queue tooltips
+  const raidQTooltip = formatRaidQueueTooltip({
+    phase: 'searching',
+    options: { level: 25, count: 5, heroIds: [16, 67] },
+    bossQueue: { remain_raid_count: 4 },
+  });
+  assert.match(raidQTooltip, /Raid Queue Active \(Level 25 Boss\)/);
+  assert.match(raidQTooltip, /Status: searching · Rounds left: 4/);
+  assert.match(raidQTooltip, /Lineup \(2\/5\):/);
+
+  const monsterQTooltip = formatMonsterQueueTooltip({
+    phase: 'attacking',
+    options: { level: 12, count: 3, heroIds: [16] },
+  });
+  assert.match(monsterQTooltip, /Monster Queue Active \(Level 12 Monster\)/);
+  assert.match(monsterQTooltip, /Status: attacking · Target level: 12/);
+
+  const autoGatherTooltip = formatAutoGatherTooltip({
+    enabled: true,
+    mineType: 'iron',
+    mineLevel: 10,
+    maxMarches: 4,
+  });
+  assert.match(autoGatherTooltip, /Auto-Gathering Active/);
+  assert.match(autoGatherTooltip, /Target: IRON \(Lv\.10\) · Max Marches: 4/);
+
+  // 6. Header template bindings
+  const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
+  assert.match(header, /formatMarchTooltip\(item\.march,\s*now,\s*cache\)/, 'Header must bind rich formatMarchTooltip');
+  assert.match(header, /formatRaidQueueTooltip/, 'Header must bind formatRaidQueueTooltip on standing raid queue');
+  assert.match(header, /formatMonsterQueueTooltip/, 'Header must bind formatMonsterQueueTooltip on standing monster queue');
+  assert.match(header, /formatAutoGatherTooltip/, 'Header must bind formatAutoGatherTooltip on standing auto gather');
+});

@@ -15,6 +15,12 @@ import {
   getMarchBadgeInfo,
   isMarchExpired,
 } from '@/src/utils/resourceData';
+import {
+  formatMarchTooltip,
+  formatRaidQueueTooltip,
+  formatMonsterQueueTooltip,
+  formatAutoGatherTooltip,
+} from '@/src/utils/marchTooltip';
 
 const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
 const { theme, applyTheme } = useTheme();
@@ -28,6 +34,9 @@ let timer: number | null = null;
 // Storage state
 const cachedGameVersion = ref<string>('');
 const isTabOpenButtonVisible = ref(true);
+const raidQueue = ref<any>(null);
+const monsterQueue = ref<any>(null);
+const autoGatherSettings = ref<any>(null);
 
 onMounted(async () => {
   timer = window.setInterval(() => {
@@ -48,16 +57,35 @@ onMounted(async () => {
     });
   }
 
-  // Load cachedGameVersion
+  // Load storage data
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['cachedGameVersion']);
+      const stored = await chrome.storage.local.get([
+        'cachedGameVersion',
+        'raidQueue',
+        'monsterQueue',
+        'autoGatherSettings',
+      ]);
       if (stored.cachedGameVersion) cachedGameVersion.value = stored.cachedGameVersion;
+      if (stored.raidQueue) raidQueue.value = stored.raidQueue;
+      if (stored.monsterQueue) monsterQueue.value = stored.monsterQueue;
+      if (stored.autoGatherSettings) autoGatherSettings.value = stored.autoGatherSettings;
     } catch (_) {}
 
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes.cachedGameVersion) {
-        cachedGameVersion.value = changes.cachedGameVersion.newValue || '';
+      if (area === 'local') {
+        if (changes.cachedGameVersion) {
+          cachedGameVersion.value = changes.cachedGameVersion.newValue || '';
+        }
+        if (changes.raidQueue) {
+          raidQueue.value = changes.raidQueue.newValue || null;
+        }
+        if (changes.monsterQueue) {
+          monsterQueue.value = changes.monsterQueue.newValue || null;
+        }
+        if (changes.autoGatherSettings) {
+          autoGatherSettings.value = changes.autoGatherSettings.newValue || null;
+        }
       }
     });
   }
@@ -105,6 +133,32 @@ function handleMarchClick(march: any) {
   else if (info.category === 'gather') openModal('gathering');
   else if (info.category === 'monster') openModal('monster');
 }
+
+const isRaidQueueRunning = computed(() => {
+  const q = raidQueue.value;
+  return Boolean(q && q.running && !['stopped', 'complete'].includes(q.phase));
+});
+
+const isMonsterQueueRunning = computed(() => {
+  const q = monsterQueue.value;
+  return Boolean(q && q.running && !['stopped', 'complete'].includes(q.phase));
+});
+
+const isAutoGatherEnabled = computed(() => {
+  return Boolean(autoGatherSettings.value?.enabled);
+});
+
+const hasActiveRaidMarch = computed(() => {
+  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value).category === 'raid');
+});
+
+const hasActiveGatherMarch = computed(() => {
+  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value).category === 'gather');
+});
+
+const hasActiveMonsterMarch = computed(() => {
+  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value).category === 'monster');
+});
 
 // Building remaining time
 const buildingRemaining = computed(() => {
@@ -316,8 +370,9 @@ function toggleTheme() {
 
       <!-- Right: Status Badges -->
       <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5" aria-label="Current status">
-        <!-- Active Marches -->
-        <div id="marches" class="flex items-center gap-1" aria-label="Active marches">
+        <!-- Active Marches & Standing Queues -->
+        <div id="marches" class="flex items-center gap-1" aria-label="Active marches and queues">
+          <!-- Active March Badges with Full Tooltip -->
           <button
             v-for="item in activeMarches"
             :key="item.index"
@@ -327,10 +382,47 @@ function toggleTheme() {
               getMarchBadgeInfo(item.march, now).classes,
               getMarchBadgeInfo(item.march, now).isPulse ? 'animate-pulse' : '',
             ]"
-            :title="`March: ${getMarchBadgeInfo(item.march, now).category}`"
+            :title="formatMarchTooltip(item.march, now, cache)"
+            :aria-label="formatMarchTooltip(item.march, now, cache)"
             @click="handleMarchClick(item.march)"
           >
             {{ getMarchBadgeInfo(item.march, now).icon }}
+          </button>
+
+          <!-- Standing Raid Queue (Active between march waves) -->
+          <button
+            v-if="isRaidQueueRunning && !hasActiveRaidMarch"
+            type="button"
+            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-indigo-100 text-indigo-900 ring-indigo-400 dark:bg-indigo-950/70 dark:text-indigo-200 dark:ring-indigo-700 animate-pulse transition-transform hover:scale-110"
+            :title="formatRaidQueueTooltip(raidQueue)"
+            :aria-label="formatRaidQueueTooltip(raidQueue)"
+            @click="openModal('raid')"
+          >
+            🏹
+          </button>
+
+          <!-- Standing Monster Queue (Active between solo attacks) -->
+          <button
+            v-if="isMonsterQueueRunning && !hasActiveMonsterMarch"
+            type="button"
+            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-amber-100 text-amber-900 ring-amber-400 dark:bg-amber-950/70 dark:text-amber-200 dark:ring-amber-700 animate-pulse transition-transform hover:scale-110"
+            :title="formatMonsterQueueTooltip(monsterQueue)"
+            :aria-label="formatMonsterQueueTooltip(monsterQueue)"
+            @click="openModal('monster')"
+          >
+            👾
+          </button>
+
+          <!-- Standing Auto-Gather (Active when no active gather march) -->
+          <button
+            v-if="isAutoGatherEnabled && !hasActiveGatherMarch"
+            type="button"
+            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-emerald-100 text-emerald-900 ring-emerald-400 dark:bg-emerald-950/70 dark:text-emerald-200 dark:ring-emerald-700 transition-transform hover:scale-110"
+            :title="formatAutoGatherTooltip(autoGatherSettings)"
+            :aria-label="formatAutoGatherTooltip(autoGatherSettings)"
+            @click="openModal('gathering')"
+          >
+            ⛏️
           </button>
         </div>
 
