@@ -8,6 +8,7 @@ import '~/extension/building-queue.js';
 import '~/extension/research-data.js';
 import '~/extension/research-queue.js';
 import '~/extension/campaign-missions.js';
+import '~/extension/quest-data.js';
 
 export interface HeroMeta {
   name: string;

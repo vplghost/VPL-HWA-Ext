@@ -261,3 +261,30 @@ test('CampaignRaidModal has Recipe Tree hierarchy and candidate mission chips ma
   assert.match(camp, /candidateMissions/, 'Must compute candidate missions');
   assert.match(camp, /Crafting Recipe Tree/, 'Must have Crafting Recipe Tree');
 });
+
+test('EventsTab and GoalsTab have 1:1 parity with HTML events and goals rendering', async () => {
+  const events = await readFile(join(root, 'src/components/tabs/EventsTab.vue'), 'utf8');
+  assert.match(events, /clanVersus/, 'EventsTab must handle Guild Versus');
+  assert.match(events, /titanDungeon/, 'EventsTab must handle Titan Dungeon');
+  assert.match(events, /clanWarChamp/, 'EventsTab must handle Guild War Championship');
+  assert.match(events, /clanClash/, 'EventsTab must handle Guild Clash');
+  assert.match(events, /brawl/, 'EventsTab must handle Hero Brawl');
+  assert.match(events, /specialQuest/, 'EventsTab must handle Special Quest Events');
+  assert.match(events, /fortress/, 'EventsTab must handle Fortress Event');
+  assert.match(events, /clanBoss/, 'EventsTab must handle Hydra Boss');
+
+  const goals = await readFile(join(root, 'src/components/tabs/GoalsTab.vue'), 'utf8');
+  assert.match(goals, /extractEventGoals/, 'GoalsTab must extract event goals');
+  assert.match(goals, /totalGoals/, 'GoalsTab must display totalGoals KPI');
+  assert.match(goals, /synergiesCount/, 'GoalsTab must display synergiesCount KPI');
+  assert.match(goals, /readyCount/, 'GoalsTab must display readyCount KPI');
+  assert.match(goals, /Activities & Quests/, 'GoalsTab must render Activities group');
+  assert.match(goals, /Resources to Spend/, 'GoalsTab must render Resources group');
+
+  const app = await readFile(join(root, 'entrypoints/popup/App.vue'), 'utf8');
+  assert.match(app, /EventsTab/, 'App.vue must wire EventsTab');
+  assert.match(app, /GoalsTab/, 'App.vue must wire GoalsTab');
+
+  const tabNav = await readFile(join(root, 'src/components/common/TabNav.vue'), 'utf8');
+  assert.match(tabNav, /id="events-tab-badge"/, 'TabNav must have #events-tab-badge');
+});

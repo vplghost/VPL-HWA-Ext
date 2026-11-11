@@ -164,6 +164,7 @@ function selectTab(id: string) {
       <!-- Events Live Badge -->
       <span
         v-if="t.id === 'events' && hasActiveEvents"
+        id="events-tab-badge"
         class="ml-0.5 rounded-full bg-emerald-600 px-1.5 py-0.2 text-[9px] font-bold text-white uppercase"
       >
         Live

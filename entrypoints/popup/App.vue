@@ -9,6 +9,8 @@ import TitansTab from '@/src/components/tabs/TitansTab.vue';
 import ItemsTab from '@/src/components/tabs/ItemsTab.vue';
 import ResourcesTab from '@/src/components/tabs/ResourcesTab.vue';
 import TeamsTab from '@/src/components/tabs/TeamsTab.vue';
+import EventsTab from '@/src/components/tabs/EventsTab.vue';
+import GoalsTab from '@/src/components/tabs/GoalsTab.vue';
 import QuestsTab from '@/src/components/tabs/QuestsTab.vue';
 import SettingsTab from '@/src/components/tabs/SettingsTab.vue';
 import LogTab from '@/src/components/tabs/LogTab.vue';
@@ -51,8 +53,8 @@ const { modalState, modalContext } = useModals();
             activeTab === 'items' ? ItemsTab :
             activeTab === 'resources' ? ResourcesTab :
             activeTab === 'teams' ? TeamsTab :
-            activeTab === 'events' ? QuestsTab :
-            activeTab === 'goals' ? QuestsTab :
+            activeTab === 'events' ? EventsTab :
+            activeTab === 'goals' ? GoalsTab :
             activeTab === 'settings' ? SettingsTab :
             LogTab
           "
