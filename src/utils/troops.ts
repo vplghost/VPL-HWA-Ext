@@ -53,8 +53,11 @@ export function calculateTroopMax(
   }
 
   const researches = normalizeArray(
+    cache?.researchStatus?.data?.completedResearches ||
     cache?.researchStatus?.data?.researches ||
+    cache?.clan_getSummary?.data?.completedResearches ||
     cache?.clan_getSummary?.data?.researches ||
+    cache?.['researchStatus']?.data?.completedResearches ||
     cache?.['researchStatus']?.data?.researches
   );
 

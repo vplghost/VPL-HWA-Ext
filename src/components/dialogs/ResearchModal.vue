@@ -220,10 +220,17 @@ function clearQueue() {
 
 // Researches from cache
 const rawResearches = computed(() => {
-  const rawData = cache.value?.researchStatus?.data?.researches || cache.value?.clan_getSummary?.data?.researches;
-  const data = normalizeArray(rawData);
-  if (Array.isArray(data)) {
-    return data
+  const rawData =
+    cache.value?.researchStatus?.data?.completedResearches ||
+    cache.value?.researchStatus?.data?.researches ||
+    cache.value?.clan_getSummary?.data?.completedResearches ||
+    cache.value?.clan_getSummary?.data?.researches ||
+    cache.value?.personalResearch_getSummary?.data?.completedResearches ||
+    cache.value?.personalResearch_getSummary?.data?.researches;
+
+  if (!rawData) return [];
+  if (Array.isArray(rawData)) {
+    return rawData
       .map((r: any) => ({
         id: Number(r.researchId ?? r.id),
         level: Number(r.level) || 0,
@@ -231,34 +238,43 @@ const rawResearches = computed(() => {
       }))
       .filter((r: any) => Number.isFinite(r.id));
   }
-  return Object.entries(data)
-    .map(([id, r]: [string, any]) => ({
-      id: Number(id),
-      level: Number(r?.level) || 0,
-      isCompleted: true,
-    }))
-    .filter((r: any) => Number.isFinite(r.id));
+  if (typeof rawData === 'object') {
+    return Object.entries(rawData)
+      .map(([key, val]: [string, any]) => ({
+        id: Number(val?.researchId ?? val?.id ?? key),
+        level: typeof val === 'number' ? val : (Number(val?.level) || 0),
+        isCompleted: true,
+      }))
+      .filter((r: any) => Number.isFinite(r.id));
+  }
+  return [];
 });
 
 // All researches directory data
 const allResearchesList = computed(() => {
   const researchMap = new Map<number, any>();
+  const rHelper = (globalThis as any).hwaHelperResearchData;
   const raw = rawResearches.value;
   for (const r of raw) {
     const rId = Number(r.id);
     if (Number.isFinite(rId)) {
+      const maxLvl = rHelper?.getMaxLevel ? rHelper.getMaxLevel(rId) : 0;
+      const lvl = r.level ?? 1;
       researchMap.set(rId, {
         id: rId,
-        level: r.level ?? 1,
+        level: lvl,
         isCompleted: true,
+        isMaxLevel: maxLvl > 0 && lvl >= maxLvl,
         isResearching: false,
-        nextLevel: (r.level ?? 1) + 1,
+        nextLevel: lvl + 1,
+        maxLevel: maxLvl,
       });
     }
   }
 
   for (const q of activeQueues.value) {
     const rId = Number(q.researchId);
+    const maxLvl = rHelper?.getMaxLevel ? rHelper.getMaxLevel(rId) : 0;
     if (researchMap.has(rId)) {
       const item = researchMap.get(rId)!;
       item.isResearching = true;
@@ -268,8 +284,10 @@ const allResearchesList = computed(() => {
         id: rId,
         level: q.level ? q.level - 1 : 0,
         isCompleted: false,
+        isMaxLevel: false,
         isResearching: true,
         nextLevel: q.level ?? 1,
+        maxLevel: maxLvl,
       });
     }
   }
@@ -278,26 +296,32 @@ const allResearchesList = computed(() => {
   for (const key of Object.keys(allDict)) {
     const rId = Number(key);
     if (!researchMap.has(rId)) {
+      const maxLvl = rHelper?.getMaxLevel ? rHelper.getMaxLevel(rId) : 0;
       researchMap.set(rId, {
         id: rId,
         level: 0,
         isCompleted: false,
+        isMaxLevel: false,
         isResearching: false,
         nextLevel: 1,
+        maxLevel: maxLvl,
       });
     }
   }
 
-  const rDataDict = (globalThis as any).hwaHelperResearchData?.data || {};
+  const rDataDict = rHelper?.data || {};
   for (const key of Object.keys(rDataDict)) {
     const rId = Number(key);
     if (!researchMap.has(rId)) {
+      const maxLvl = rHelper?.getMaxLevel ? rHelper.getMaxLevel(rId) : 0;
       researchMap.set(rId, {
         id: rId,
         level: 0,
         isCompleted: false,
+        isMaxLevel: false,
         isResearching: false,
         nextLevel: 1,
+        maxLevel: maxLvl,
       });
     }
   }
@@ -395,10 +419,14 @@ const upgradeCandidates = computed(() => {
       };
     })
     .filter((r: any) => {
+      // Completed tech that reached max level must never appear in Next candidates
+      if (r.maxLevel > 0 && (r.currentLevel >= r.maxLevel || r.nextLevel > r.maxLevel)) {
+        return false;
+      }
       if (researchDataHelper?.getMaxLevel) {
         const maxLevel = researchDataHelper.getMaxLevel(r.id);
         if (maxLevel > 0) {
-          if (r.nextLevel > maxLevel) return false;
+          if (r.nextLevel > maxLevel || r.currentLevel >= maxLevel) return false;
           if (researchDataHelper.isAvailable && !researchDataHelper.isAvailable(r.id, r.nextLevel, simulatedLevels, centerLevel)) {
             return false;
           }
@@ -1098,7 +1126,7 @@ async function refreshResearch() {
                   class="font-bold text-xs"
                   :class="r.isCompleted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'"
                 >
-                  {{ r.isCompleted ? `Lv. ${r.level}` : '—' }}
+                  {{ r.isCompleted ? `Lv. ${r.level}${r.maxLevel ? ` / ${r.maxLevel}` : ''}` : '—' }}
                 </div>
                 <div>
                   <span
@@ -1109,9 +1137,10 @@ async function refreshResearch() {
                   </span>
                   <span
                     v-else-if="r.isCompleted"
-                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold"
+                    :class="r.isMaxLevel ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'"
                   >
-                    Completed
+                    {{ r.isMaxLevel ? 'Max Level' : 'Completed' }}
                   </span>
                   <span
                     v-else

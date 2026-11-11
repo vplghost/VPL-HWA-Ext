@@ -1138,4 +1138,15 @@ test('RaidModal and MonsterModal update title status with dynamic timer countdow
   assert.match(monsterModal, /:data-experimental-until="currentMonsterAttack\.endsAt/, 'MonsterModal timer must bind data-experimental-until');
 });
 
+test('ResearchModal accurately loads completedResearches and excludes max-level techs from Next candidates', async () => {
+  const researchModal = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
+  assert.match(researchModal, /cache\.value\?\.researchStatus\?\.data\?\.completedResearches/, 'Must query completedResearches from researchStatus');
+  assert.match(researchModal, /isMaxLevel/, 'Must compute isMaxLevel for completed techs');
+  assert.match(researchModal, /r\.maxLevel > 0 && \(r\.currentLevel >= r\.maxLevel \|\| r\.nextLevel > r\.maxLevel\)/, 'Must filter out maxed-out techs from Next candidates');
+
+  const troopsUtil = await readFile(join(root, 'src/utils/troops.ts'), 'utf8');
+  assert.match(troopsUtil, /cache\?\.researchStatus\?\.data\?\.completedResearches/, 'troops.ts must query completedResearches');
+});
+
+
 
