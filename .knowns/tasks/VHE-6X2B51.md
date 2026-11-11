@@ -1,11 +1,12 @@
 ---
 id: VHE-6X2B51
 title: 'Sync Campaign Farm 1:1 with HTML: gear crafting recipe tree'
-status: todo
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-11T07:06:29.920Z'
-updatedAt: '2026-11-11T07:06:29.920Z'
+updatedAt: '2026-11-11T07:27:57.772Z'
+completedAt: '2026-11-11T07:27:57.772Z'
 timeSpent: 0
 parent: VHE-H9EGP9
 ---

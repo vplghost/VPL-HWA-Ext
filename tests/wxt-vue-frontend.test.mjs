@@ -249,3 +249,15 @@ test('RaidModal and MonsterModal have 1:1 ID parity and queue controls matching 
   assert.match(mob, /id="monster-mob-level"/, 'Must have #monster-mob-level');
   assert.match(mob, /id="monster-queue-count"/, 'Must have #monster-queue-count');
 });
+
+test('CampaignRaidModal has Recipe Tree hierarchy and candidate mission chips matching HTML', async () => {
+  const camp = await readFile(join(root, 'src/components/dialogs/CampaignRaidModal.vue'), 'utf8');
+  assert.match(camp, /id="campaign-dialog"/, 'Must have #campaign-dialog');
+  assert.match(camp, /id="campaign-dialog-title"/, 'Must have #campaign-dialog-title');
+  assert.match(camp, /id="campaign-dialog-status"/, 'Must have #campaign-dialog-status');
+  assert.match(camp, /id="campaign-dialog-body"/, 'Must have #campaign-dialog-body');
+  assert.match(camp, /id="campaign-mission-input"/, 'Must have #campaign-mission-input');
+  assert.match(camp, /buildGearRecipeTree/, 'Must use buildGearRecipeTree');
+  assert.match(camp, /candidateMissions/, 'Must compute candidate missions');
+  assert.match(camp, /Crafting Recipe Tree/, 'Must have Crafting Recipe Tree');
+});
