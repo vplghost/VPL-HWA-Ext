@@ -208,3 +208,21 @@ test('HeroDetailModal has 1:1 parity with legacy HTML hero-dialog', async () => 
   assert.match(content, /justice-star/, 'Must support 6-star justice star');
   assert.match(content, /craft-fragment/, 'Must support fragment quick-crafting');
 });
+
+test('BuildingModal and ResearchModal have 1:1 ID parity and queue controls matching HTML', async () => {
+  const bContent = await readFile(join(root, 'src/components/dialogs/BuildingModal.vue'), 'utf8');
+  assert.match(bContent, /id="building-dialog"/, 'Must have #building-dialog');
+  assert.match(bContent, /id="building-dialog-title"/, 'Must have #building-dialog-title');
+  assert.match(bContent, /id="building-dialog-status"/, 'Must have #building-dialog-status');
+  assert.match(bContent, /id="building-dialog-body"/, 'Must have #building-dialog-body');
+  assert.match(bContent, /completeConstruction/, 'Must have completeConstruction RPC');
+  assert.match(bContent, /Auto-Build Queue/, 'Must have Auto-Build Queue');
+
+  const rContent = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
+  assert.match(rContent, /id="research-dialog"/, 'Must have #research-dialog');
+  assert.match(rContent, /id="research-dialog-title"/, 'Must have #research-dialog-title');
+  assert.match(rContent, /id="research-dialog-status"/, 'Must have #research-dialog-status');
+  assert.match(rContent, /id="research-dialog-body"/, 'Must have #research-dialog-body');
+  assert.match(rContent, /completeResearch/, 'Must have completeResearch RPC');
+  assert.match(rContent, /Auto-Research Queue/, 'Must have Auto-Research Queue');
+});

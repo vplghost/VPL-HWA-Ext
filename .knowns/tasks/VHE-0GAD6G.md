@@ -1,11 +1,12 @@
 ---
 id: VHE-0GAD6G
 title: 'Sync Building and Research Modals 1:1 with HTML: queues and upgrade candidates'
-status: todo
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-11T07:06:23.619Z'
-updatedAt: '2026-11-11T07:06:23.619Z'
+updatedAt: '2026-11-11T07:22:28.252Z'
+completedAt: '2026-11-11T07:22:28.252Z'
 timeSpent: 0
 parent: VHE-H9EGP9
 ---

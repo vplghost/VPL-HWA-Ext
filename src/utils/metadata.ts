@@ -3,6 +3,10 @@ import '~/extension/titan-metadata.js';
 import '~/extension/data-names.js';
 import '~/extension/name-map.js';
 import '~/extension/popup-data.js';
+import '~/extension/building-data.js';
+import '~/extension/building-queue.js';
+import '~/extension/research-data.js';
+import '~/extension/research-queue.js';
 
 export interface HeroMeta {
   name: string;
@@ -65,6 +69,16 @@ export function getHeroName(heroId: number | string): string {
 
 export function getGearCraftData(gearId: number | string) {
   return (globalThis as any).hwaHelperGearCraftData?.[String(gearId)];
+}
+
+export function getBuildingName(id: number | string): string {
+  const nameMap = (globalThis as any).hwaHelperNameMap;
+  return nameMap?.building?.(id) || (id ? `Building #${id}` : 'Building');
+}
+
+export function getResearchName(id: number | string): string {
+  const nameMap = (globalThis as any).hwaHelperNameMap;
+  return nameMap?.research?.(id) || (id ? `Research #${id}` : 'Research');
 }
 
 export function starGlowClass(starCount: number, isLarge = false) {

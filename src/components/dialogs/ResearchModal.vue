@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import ModalDialog from '@/src/components/common/ModalDialog.vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { getResearchName } from '@/src/utils/metadata';
+import { formatDuration } from '@/src/utils/formatters';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -13,66 +14,569 @@ const emit = defineEmits<{
 
 const { cache, dispatchRpc } = useRpcCache();
 
-const researches = computed(() => {
-  const data = cache.value.researchStatus?.data || cache.value.clan_getSummary?.data?.researches || {};
-  if (Array.isArray(data)) {
-    return data;
+const now = ref(Date.now());
+let timer: number | null = null;
+
+// Storage-backed auto-queue
+interface ResearchQueueItem {
+  researchId: number;
+  currentLevel: number;
+  nextLevel: number;
+  durationMs: number;
+  estStart?: number;
+  estFinish?: number;
+}
+
+interface ResearchQueueState {
+  enabled: boolean;
+  items: ResearchQueueItem[];
+}
+
+const researchQueue = ref<ResearchQueueState>({
+  enabled: true,
+  items: [],
+});
+
+onMounted(async () => {
+  timer = window.setInterval(() => {
+    now.value = Date.now();
+  }, 1000);
+
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    try {
+      const stored = await chrome.storage.local.get(['researchQueue']);
+      if (stored.researchQueue) {
+        researchQueue.value = {
+          enabled: stored.researchQueue.enabled !== false,
+          items: Array.isArray(stored.researchQueue.items) ? stored.researchQueue.items : [],
+        };
+      }
+    } catch (_) {}
   }
+});
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+  document.removeEventListener('keydown', handleKeydown);
+});
+
+function close() {
+  emit('update:modelValue', false);
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.modelValue) {
+    close();
+  }
+}
+
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) {
+      document.addEventListener('keydown', handleKeydown);
+    } else {
+      document.removeEventListener('keydown', handleKeydown);
+    }
+  }
+);
+
+async function saveResearchQueue() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    await chrome.storage.local.set({
+      researchQueue: {
+        enabled: researchQueue.value.enabled,
+        items: researchQueue.value.items,
+      },
+    });
+  }
+}
+
+// Queues from cache
+const rawQueues = computed(() => cache.value?.researchStatus?.data?.queues || []);
+
+const activeQueues = computed(() => {
+  return rawQueues.value.filter(
+    (q: any) =>
+      Number.isFinite(q.startDate) &&
+      Number.isFinite(q.durationMs) &&
+      q.startDate + q.durationMs > now.value
+  );
+});
+
+const finishedQueues = computed(() => {
+  return rawQueues.value.filter(
+    (q: any) =>
+      Number.isFinite(q.startDate) &&
+      Number.isFinite(q.durationMs) &&
+      q.startDate + q.durationMs <= now.value
+  );
+});
+
+const isFinishing = ref<Record<string, boolean>>({});
+
+async function finishResearch(f: any) {
+  const key = `${f.researchId}-${f.level}`;
+  isFinishing.value[key] = true;
+  try {
+    await dispatchRpc([
+      {
+        name: 'completeResearch',
+        feature: 'research',
+        args: {
+          researchId: f.researchId,
+          nextLevel: f.level,
+          completeDate: Date.now(),
+        },
+      },
+      { name: 'getSummary', feature: 'research', args: {} },
+    ]);
+  } finally {
+    isFinishing.value[key] = false;
+  }
+}
+
+// Timeline
+const queueTimeline = computed(() => {
+  const rQueueHelper = (globalThis as any).hwaHelperResearchQueue;
+  if (rQueueHelper?.calculateQueueTimeline) {
+    return rQueueHelper.calculateQueueTimeline(rawQueues.value, researchQueue.value.items, now.value);
+  }
+  let currentEst = now.value;
+  if (activeQueues.value.length > 0) {
+    currentEst = Math.max(...activeQueues.value.map((q: any) => q.startDate + q.durationMs));
+  }
+  let totalMs = 0;
+  const items = researchQueue.value.items.map((item) => {
+    const dur = item.durationMs || 60000;
+    const estStart = currentEst;
+    const estFinish = currentEst + dur;
+    currentEst = estFinish;
+    totalMs += dur;
+    return {
+      ...item,
+      estStart,
+      estFinish,
+    };
+  });
+  return {
+    items,
+    totalDurationMs: totalMs,
+    allDoneAt: currentEst,
+  };
+});
+
+function moveQueueItem(idx: number, direction: 'up' | 'down') {
+  const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (newIdx < 0 || newIdx >= researchQueue.value.items.length) return;
+  const item = researchQueue.value.items.splice(idx, 1)[0];
+  researchQueue.value.items.splice(newIdx, 0, item);
+  saveResearchQueue();
+}
+
+function removeQueueItem(idx: number) {
+  researchQueue.value.items.splice(idx, 1);
+  saveResearchQueue();
+}
+
+function clearQueue() {
+  researchQueue.value.items = [];
+  saveResearchQueue();
+}
+
+// Candidate upgrades
+const rawResearches = computed(() => {
+  const data = cache.value?.researchStatus?.data?.researches || cache.value?.clan_getSummary?.data?.researches || [];
+  if (Array.isArray(data)) return data;
   return Object.entries(data).map(([id, r]: [string, any]) => ({
-    id,
-    name: r.name || `Technology #${id}`,
-    level: r.level || 1,
-    maxLevel: r.maxLevel || 10,
+    id: Number(id),
+    level: Number(r.level) || 0,
+    isResearched: true,
   }));
 });
 
+const upgradeCandidates = computed(() => {
+  const rHelper = (globalThis as any).hwaHelperResearchData;
+  const rQueueHelper = (globalThis as any).hwaHelperResearchQueue;
+
+  const researchMap = new Map();
+  for (const r of rawResearches.value) {
+    researchMap.set(Number(r.id), Number(r.level) || 0);
+  }
+
+  if (rQueueHelper?.getSimulatedLevels && rQueueHelper?.getEligibleCandidates && rHelper) {
+    const simulated = rQueueHelper.getSimulatedLevels(researchMap, rawQueues.value, researchQueue.value.items);
+    return rQueueHelper.getEligibleCandidates(rawResearches.value, simulated, rHelper);
+  }
+
+  // Fallback candidates
+  return rawResearches.value.map((r: any) => {
+    const curLevel = Number(r.level) || 0;
+    const nextLevel = curLevel + 1;
+    return {
+      id: Number(r.id),
+      name: getResearchName(r.id),
+      currentLevel: curLevel,
+      nextLevel,
+      durationMs: 300000,
+    };
+  });
+});
+
+function addToQueue(candidate: any) {
+  researchQueue.value.items.push({
+    researchId: Number(candidate.id),
+    currentLevel: Number(candidate.currentLevel ?? candidate.level ?? 0),
+    nextLevel: Number(candidate.nextLevel ?? 1),
+    durationMs: Number(candidate.durationMs) || 60000,
+  });
+  saveResearchQueue();
+}
+
 async function refreshResearch() {
-  await dispatchRpc([{ name: 'clan_getSummary' }]);
+  await dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'research' }]);
 }
 </script>
 
 <template>
-  <ModalDialog
-    :model-value="modelValue"
-    title="Academy Research Tree"
-    icon="🔬"
-    max-width="max-w-xl"
-    @update:model-value="emit('update:modelValue', $event)"
+  <div
+    v-if="modelValue"
+    id="research-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="research-dialog-title"
+    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+    @click.self="close"
   >
-    <div class="space-y-3">
-      <div class="flex items-center justify-between text-xs text-slate-400">
-        <span>Observed research technologies</span>
+    <div
+      class="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl dark:bg-slate-900 dark:border-slate-800 overflow-hidden"
+    >
+      <!-- Dialog Header -->
+      <div
+        class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 shrink-0"
+      >
+        <div class="flex items-center gap-2 min-w-0 flex-1">
+          <span class="text-xl shrink-0" aria-hidden="true">🔬</span>
+          <h2 id="research-dialog-title" class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">
+            Academy Research Tree
+          </h2>
+
+          <!-- Status Badge -->
+          <div id="research-dialog-status" class="flex items-center gap-2 truncate">
+            <span
+              v-if="activeQueues.length > 0"
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+            >
+              <span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+              Active: <span class="truncate max-w-[140px]">{{ getResearchName(activeQueues[0].researchId) }}</span>
+              {{ activeQueues[0].level ? ` Lv. ${activeQueues[0].level}` : '' }} ·
+              {{ formatDuration(Math.max(0, Math.ceil(((activeQueues[0].startDate + activeQueues[0].durationMs) - now) / 1000))) }}
+            </span>
+            <span
+              v-else-if="finishedQueues.length > 0"
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+            >
+              <span class="size-1.5 rounded-full bg-emerald-500"></span>
+              Ready to finish: {{ getResearchName(finishedQueues[0].researchId) }}
+            </span>
+            <span
+              v-else
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+            >
+              <span class="size-1.5 rounded-full bg-emerald-500"></span>
+              Idle
+            </span>
+          </div>
+        </div>
+
         <button
           type="button"
-          class="cursor-pointer text-indigo-600 dark:text-indigo-400 hover:underline"
-          @click="refreshResearch"
+          autofocus
+          aria-label="Close research dialog"
+          class="cursor-pointer rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 text-base"
+          @click="close"
         >
-          ↻ Refresh
+          ✕
         </button>
       </div>
 
-      <div v-if="researches.length === 0" class="p-6 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-lg">
-        No academy research snapshot observed yet.
-      </div>
+      <!-- Dialog Body -->
+      <div id="research-dialog-body" class="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh_-_60px)]">
+        <!-- Section 1: Active Research Queue -->
+        <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center justify-between gap-2">
+            <span class="flex items-center gap-2">
+              <span>🔬</span> Active Research Queue
+            </span>
+            <button
+              type="button"
+              class="cursor-pointer text-2xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 lowercase font-normal"
+              @click="refreshResearch"
+            >
+              ↻ refresh
+            </button>
+          </h3>
 
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div
-          v-for="r in researches"
-          :key="r.id"
-          class="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between text-xs"
-        >
-          <div class="flex items-center gap-2">
-            <span class="text-base">🧪</span>
-            <div>
-              <div class="font-semibold text-slate-800 dark:text-slate-200">{{ r.name }}</div>
-              <div class="text-[10px] text-slate-400">ID: {{ r.id }}</div>
+          <div v-if="activeQueues.length > 0 || finishedQueues.length > 0" class="space-y-3">
+            <!-- Finished Queues -->
+            <div
+              v-for="f in finishedQueues"
+              :key="`fin-${f.researchId}-${f.level}`"
+              class="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/30 flex items-center justify-between gap-2 flex-wrap"
+            >
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-xl">🎉</span>
+                <div>
+                  <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                    {{ getResearchName(f.researchId) }} · Complete
+                  </div>
+                  <div class="text-xs text-emerald-700 dark:text-emerald-400">
+                    Queue #{{ f.queueNumber ?? 0 }} · Target Lv. {{ f.level ?? '?' }} finished
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                :disabled="isFinishing[`${f.researchId}-${f.level}`]"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                @click="finishResearch(f)"
+              >
+                <span>✅</span>
+                <span>{{ isFinishing[`${f.researchId}-${f.level}`] ? 'Finishing...' : 'Finish' }}</span>
+              </button>
+            </div>
+
+            <!-- In Progress Queues -->
+            <div
+              v-for="q in activeQueues"
+              :key="`act-${q.researchId}-${q.startDate}`"
+              class="rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/20"
+            >
+              <div class="flex items-center justify-between gap-2 flex-wrap">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-lg">🔬</span>
+                  <div>
+                    <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                      {{ getResearchName(q.researchId) }}
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      Queue #{{ q.queueNumber ?? 0 }} · Research ID: {{ q.researchId }}
+                    </div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                    Target Lv. {{ q.level ?? '?' }}
+                  </span>
+                  <div class="text-xs font-mono font-bold text-amber-800 dark:text-amber-300 mt-1">
+                    {{ formatDuration(Math.max(0, Math.ceil(((q.startDate + q.durationMs) - now) / 1000))) }} remaining
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <div class="flex justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
+                  <span>
+                    Progress: {{ Math.min(100, Math.max(0, ((now - q.startDate) / q.durationMs) * 100)).toFixed(1) }}%
+                  </span>
+                  <span>
+                    Est. finish: {{ new Date(q.startDate + q.durationMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}
+                  </span>
+                </div>
+                <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                  <div
+                    class="bg-amber-500 h-full rounded-full transition-all"
+                    :style="{ width: `${Math.min(100, Math.max(0, ((now - q.startDate) / q.durationMs) * 100))}%` }"
+                  ></div>
+                </div>
+              </div>
             </div>
           </div>
-          <span class="px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-mono font-bold">
-            Lv.{{ r.level }}
-          </span>
-        </div>
+
+          <!-- Empty idle box -->
+          <div
+            v-else
+            class="flex items-center gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400"
+          >
+            <span class="text-xl">✅</span>
+            <div>
+              <div class="font-semibold text-slate-700 dark:text-slate-300">Academy is currently idle</div>
+              <div>No technology research in progress. Ready for new technology research.</div>
+            </div>
+          </div>
+
+          <!-- Subsection: Auto-Research Queue -->
+          <div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <span>⚡</span> Auto-Research Queue
+                </span>
+                <span class="text-2xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {{ researchQueue.items.length }} queued
+                </span>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label class="inline-flex items-center gap-1.5 text-2xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+                  <input
+                    v-model="researchQueue.enabled"
+                    type="checkbox"
+                    class="rounded border-slate-300 text-amber-500 focus:ring-amber-400 h-3.5 w-3.5"
+                    @change="saveResearchQueue"
+                  />
+                  <span>Auto-advance</span>
+                </label>
+
+                <button
+                  v-if="researchQueue.items.length > 0"
+                  type="button"
+                  class="text-2xs text-rose-500 hover:text-rose-600 dark:text-rose-400 font-medium px-1.5 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                  @click="clearQueue"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <!-- Queue list -->
+            <div v-if="queueTimeline.items.length > 0" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
+              <div
+                v-for="(item, idx) in queueTimeline.items"
+                :key="`rqueue-${idx}-${item.researchId}`"
+                class="flex items-center justify-between gap-2 p-2 rounded-lg border border-slate-200/80 bg-slate-50/70 text-xs dark:border-slate-700/60 dark:bg-slate-800/60"
+              >
+                <div class="min-w-0 flex items-center gap-2 flex-1">
+                  <span class="inline-flex items-center justify-center size-5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 text-2xs font-bold shrink-0">
+                    #{{ idx + 1 }}
+                  </span>
+                  <div class="min-w-0">
+                    <div class="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
+                      <span>{{ getResearchName(item.researchId) }}</span>
+                      <span class="text-2xs font-normal text-slate-400">(ID: {{ item.researchId }})</span>
+                    </div>
+                    <div class="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
+                      <span class="font-bold text-amber-600 dark:text-amber-400">
+                        Lv. {{ item.currentLevel ?? '?' }} ➔ {{ item.nextLevel }}
+                      </span>
+                      <span>·</span>
+                      <span>⏱ {{ formatDuration(Math.ceil((item.durationMs || 1000) / 1000)) }}</span>
+                      <span v-if="item.estFinish">
+                        · Est: {{ new Date(item.estStart!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }} ➔ {{ new Date(item.estFinish).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    title="Move up"
+                    :disabled="idx === 0"
+                    class="size-6 rounded flex items-center justify-center text-2xs transition-colors"
+                    :class="
+                      idx === 0
+                        ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                        : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer'
+                    "
+                    @click="moveQueueItem(idx, 'up')"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    title="Move down"
+                    :disabled="idx === queueTimeline.items.length - 1"
+                    class="size-6 rounded flex items-center justify-center text-2xs transition-colors"
+                    :class="
+                      idx === queueTimeline.items.length - 1
+                        ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                        : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer'
+                    "
+                    @click="moveQueueItem(idx, 'down')"
+                  >
+                    ▼
+                  </button>
+                  <button
+                    type="button"
+                    title="Remove from queue"
+                    class="size-6 rounded flex items-center justify-center text-2xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                    @click="removeQueueItem(idx)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <!-- Queue footer -->
+              <div class="mt-2 text-2xs text-slate-400 dark:text-slate-500 flex justify-between items-center">
+                <span>
+                  Total time:
+                  <strong class="font-semibold text-slate-600 dark:text-slate-300">
+                    {{ formatDuration(Math.ceil(queueTimeline.totalDurationMs / 1000)) }}
+                  </strong>
+                </span>
+                <span>
+                  Completion:
+                  <strong class="font-semibold text-slate-600 dark:text-slate-300">
+                    {{ queueTimeline.allDoneAt ? new Date(queueTimeline.allDoneAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—' }}
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            <p v-else class="text-2xs text-slate-400 italic py-1">
+              Queue is empty. Click "+ Queue" on candidates below to automate next upgrades.
+            </p>
+          </div>
+        </section>
+
+        <!-- Section 2: Research Upgrade Candidates -->
+        <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span>🧪</span> Available Technology Researches
+            </span>
+            <span class="text-2xs font-normal text-slate-400">
+              {{ upgradeCandidates.length }} available
+            </span>
+          </h3>
+
+          <div v-if="upgradeCandidates.length === 0" class="text-center py-4 text-xs text-slate-400">
+            No research upgrade candidates available.
+          </div>
+
+          <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-0.5">
+            <div
+              v-for="c in upgradeCandidates"
+              :key="c.id"
+              class="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between text-xs gap-2"
+            >
+              <div class="min-w-0 flex items-center gap-2">
+                <span class="text-base shrink-0">🔬</span>
+                <div class="min-w-0">
+                  <div class="font-semibold text-slate-800 dark:text-slate-200 truncate" :title="c.name">
+                    {{ c.name }}
+                  </div>
+                  <div class="text-[10px] text-slate-400 flex items-center gap-1.5">
+                    <span>Lv. {{ c.currentLevel ?? 0 }} ➔ {{ c.nextLevel }}</span>
+                    <span v-if="c.durationMs">· {{ formatDuration(Math.ceil(c.durationMs / 1000)) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                class="shrink-0 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-2xs cursor-pointer transition-colors"
+                @click="addToQueue(c)"
+              >
+                + Queue
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
-  </ModalDialog>
+  </div>
 </template>
