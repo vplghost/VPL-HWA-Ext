@@ -22,6 +22,7 @@ import {
   formatAutoGatherTooltip,
 } from '@/src/utils/marchTooltip';
 import { normalizeArray } from '@/src/utils/troops';
+import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 
 const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
 const { theme, applyTheme } = useTheme();
@@ -372,148 +373,172 @@ function toggleTheme() {
         <!-- Active Marches & Standing Queues -->
         <div id="marches" class="flex items-center gap-1" aria-label="Active marches and queues">
           <!-- Active March Badges with Full Tooltip -->
-          <button
+          <BaseTooltip
             v-for="item in activeMarches"
             :key="item.index"
-            type="button"
-            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 transition-transform hover:scale-110"
-            :class="[
-              getMarchBadgeInfo(item.march, now).classes,
-              getMarchBadgeInfo(item.march, now).isPulse ? 'animate-pulse' : '',
-            ]"
-            :title="formatMarchTooltip(item.march, now, cache)"
-            :aria-label="formatMarchTooltip(item.march, now, cache)"
-            @click="handleMarchClick(item.march)"
+            :content="formatMarchTooltip(item.march, now, cache)"
           >
-            {{ getMarchBadgeInfo(item.march, now).icon }}
-          </button>
+            <button
+              type="button"
+              class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 transition-transform hover:scale-110"
+              :class="[
+                getMarchBadgeInfo(item.march, now).classes,
+                getMarchBadgeInfo(item.march, now).isPulse ? 'animate-pulse' : '',
+              ]"
+              :aria-label="formatMarchTooltip(item.march, now, cache)"
+              @click="handleMarchClick(item.march)"
+            >
+              {{ getMarchBadgeInfo(item.march, now).icon }}
+            </button>
+          </BaseTooltip>
 
           <!-- Standing Raid Queue (Active between march waves) -->
-          <button
+          <BaseTooltip
             v-if="isRaidQueueRunning && !hasActiveRaidMarch"
-            type="button"
-            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-indigo-100 text-indigo-900 ring-indigo-400 dark:bg-indigo-950/70 dark:text-indigo-200 dark:ring-indigo-700 animate-pulse transition-transform hover:scale-110"
-            :title="formatRaidQueueTooltip(raidQueue)"
-            :aria-label="formatRaidQueueTooltip(raidQueue)"
-            @click="openModal('raid')"
+            :content="formatRaidQueueTooltip(raidQueue)"
           >
-            🏹
-          </button>
+            <button
+              type="button"
+              class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-indigo-100 text-indigo-900 ring-indigo-400 dark:bg-indigo-950/70 dark:text-indigo-200 dark:ring-indigo-700 animate-pulse transition-transform hover:scale-110"
+              :aria-label="formatRaidQueueTooltip(raidQueue)"
+              @click="openModal('raid')"
+            >
+              🏹
+            </button>
+          </BaseTooltip>
 
           <!-- Standing Monster Queue (Active between solo attacks) -->
-          <button
+          <BaseTooltip
             v-if="isMonsterQueueRunning && !hasActiveMonsterMarch"
-            type="button"
-            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-amber-100 text-amber-900 ring-amber-400 dark:bg-amber-950/70 dark:text-amber-200 dark:ring-amber-700 animate-pulse transition-transform hover:scale-110"
-            :title="formatMonsterQueueTooltip(monsterQueue)"
-            :aria-label="formatMonsterQueueTooltip(monsterQueue)"
-            @click="openModal('monster')"
+            :content="formatMonsterQueueTooltip(monsterQueue)"
           >
-            👾
-          </button>
+            <button
+              type="button"
+              class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-amber-100 text-amber-900 ring-amber-400 dark:bg-amber-950/70 dark:text-amber-200 dark:ring-amber-700 animate-pulse transition-transform hover:scale-110"
+              :aria-label="formatMonsterQueueTooltip(monsterQueue)"
+              @click="openModal('monster')"
+            >
+              👾
+            </button>
+          </BaseTooltip>
 
           <!-- Standing Auto-Gather (Active when no active gather march) -->
-          <button
+          <BaseTooltip
             v-if="isAutoGatherEnabled && !hasActiveGatherMarch"
-            type="button"
-            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-emerald-100 text-emerald-900 ring-emerald-400 dark:bg-emerald-950/70 dark:text-emerald-200 dark:ring-emerald-700 transition-transform hover:scale-110"
-            :title="formatAutoGatherTooltip(autoGatherSettings)"
-            :aria-label="formatAutoGatherTooltip(autoGatherSettings)"
-            @click="openModal('gathering')"
+            :content="formatAutoGatherTooltip(autoGatherSettings)"
           >
-            ⛏️
-          </button>
+            <button
+              type="button"
+              class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-emerald-100 text-emerald-900 ring-emerald-400 dark:bg-emerald-950/70 dark:text-emerald-200 dark:ring-emerald-700 transition-transform hover:scale-110"
+              :aria-label="formatAutoGatherTooltip(autoGatherSettings)"
+              @click="openModal('gathering')"
+            >
+              ⛏️
+            </button>
+          </BaseTooltip>
         </div>
 
         <!-- Building Badge -->
-        <span
-          id="building-badge"
-          tabindex="0"
-          title="Building time remaining (Click to view City Buildings)"
-          class="cursor-pointer inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          @click="openModal('building')"
-        >
-          <span>🏗</span>
-          <span id="building-time" class="font-mono text-[11px]">{{ buildingRemaining }}</span>
-        </span>
+        <BaseTooltip content="Building time remaining (Click to view City Buildings)">
+          <span
+            id="building-badge"
+            tabindex="0"
+            aria-label="Building time remaining (Click to view City Buildings)"
+            class="cursor-pointer inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            @click="openModal('building')"
+          >
+            <span>🏗</span>
+            <span id="building-time" class="font-mono text-[11px]">{{ buildingRemaining }}</span>
+          </span>
+        </BaseTooltip>
 
         <!-- Research Badge -->
-        <span
-          id="research-badge"
-          tabindex="0"
-          title="Research time remaining (Click to view Personal Research)"
-          class="cursor-pointer inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          @click="openModal('research')"
-        >
-          <span>🔬</span>
-          <span id="research-time" class="font-mono text-[11px]">{{ researchRemaining }}</span>
-        </span>
+        <BaseTooltip content="Research time remaining (Click to view Personal Research)">
+          <span
+            id="research-badge"
+            tabindex="0"
+            aria-label="Research time remaining (Click to view Personal Research)"
+            class="cursor-pointer inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            @click="openModal('research')"
+          >
+            <span>🔬</span>
+            <span id="research-time" class="font-mono text-[11px]">{{ researchRemaining }}</span>
+          </span>
+        </BaseTooltip>
 
         <!-- Legend Draft Alert -->
-        <button
+        <BaseTooltip
           v-if="isDraftActive"
-          id="draft-alert"
-          type="button"
-          aria-label="Open Legend Draft"
-          :title="draftTooltip"
-          class="relative cursor-pointer inline-flex items-center justify-center size-6 rounded-full bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 ring-1 ring-red-300 dark:ring-red-700/60 transition-colors"
-          @click="openModal('draft')"
+          :content="draftTooltip"
         >
-          <span class="text-xs">⚔</span>
-          <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 animate-ping"></span>
-          <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-600"></span>
-        </button>
+          <button
+            id="draft-alert"
+            type="button"
+            :aria-label="draftTooltip"
+            class="relative cursor-pointer inline-flex items-center justify-center size-6 rounded-full bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 ring-1 ring-red-300 dark:ring-red-700/60 transition-colors"
+            @click="openModal('draft')"
+          >
+            <span class="text-xs">⚔</span>
+            <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 animate-ping"></span>
+            <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-600"></span>
+          </button>
+        </BaseTooltip>
 
         <!-- Mail / Reports Badge -->
-        <span
+        <BaseTooltip
           v-if="mailStatus.hasUnclaimed"
-          id="mail-badge"
-          tabindex="0"
-          :title="`New mail / battle report with reward${mailStatus.count > 1 ? `s (${mailStatus.count})` : ''} · Click to refresh mail`"
-          aria-label="Mail and Reports"
-          class="relative cursor-pointer inline-flex items-center justify-center size-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-          @click="refreshMail"
+          :content="`New mail / battle report with reward${mailStatus.count > 1 ? `s (${mailStatus.count})` : ''} · Click to refresh mail`"
         >
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect width="20" height="16" x="2" y="4" rx="2" />
-            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-          </svg>
-          <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 animate-ping"></span>
-          <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-600"></span>
-        </span>
+          <span
+            id="mail-badge"
+            tabindex="0"
+            :aria-label="`New mail / battle report with reward${mailStatus.count > 1 ? `s (${mailStatus.count})` : ''} · Click to refresh mail`"
+            class="relative cursor-pointer inline-flex items-center justify-center size-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            @click="refreshMail"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect width="20" height="16" x="2" y="4" rx="2" />
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            </svg>
+            <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 animate-ping"></span>
+            <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-600"></span>
+          </span>
+        </BaseTooltip>
 
         <!-- Energy Badge -->
-        <span
-          id="energy-badge"
-          tabindex="0"
-          aria-label="Energy"
-          title="Energy balance"
-          class="relative inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 font-semibold text-amber-800 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-700/60 text-xs"
-        >
-          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-            <path d="m13 2-9 12h7l-1 8 10-13h-7V2Z" fill="currentColor" />
-          </svg>
-          <span id="energy-value">{{ energyValue }}</span>
-          <span class="text-amber-500 font-normal">/</span>
-          <span id="energy-max">{{ energyCap }}</span>
-          <span v-if="isEnergyCapped" class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500 animate-ping"></span>
-        </span>
+        <BaseTooltip content="Energy balance">
+          <span
+            id="energy-badge"
+            tabindex="0"
+            aria-label="Energy"
+            class="relative inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 font-semibold text-amber-800 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-700/60 text-xs"
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+              <path d="m13 2-9 12h7l-1 8 10-13h-7V2Z" fill="currentColor" />
+            </svg>
+            <span id="energy-value">{{ energyValue }}</span>
+            <span class="text-amber-500 font-normal">/</span>
+            <span id="energy-max">{{ energyCap }}</span>
+            <span v-if="isEnergyCapped" class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500 animate-ping"></span>
+          </span>
+        </BaseTooltip>
 
         <!-- World Energy Badge -->
-        <span
-          id="world-energy-badge"
-          tabindex="0"
-          aria-label="World Energy"
-          title="World Energy balance"
-          class="relative inline-flex items-center gap-1 rounded-full bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 font-semibold text-sky-800 dark:text-sky-300 ring-1 ring-sky-200 dark:ring-sky-700/60 text-xs"
-        >
-          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
-            <path d="M3 12h18M12 3c3 3 4 6 4 9s-1 6-4 9c-3-3-4-6-4-9s1-6 4-9Z" fill="none" stroke="currentColor" stroke-width="1.5" />
-          </svg>
-          <span id="world-energy-value">{{ worldEnergyValue }}</span>
-          <span v-if="isWorldEnergyCapped" class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-sky-500 animate-ping"></span>
-        </span>
+        <BaseTooltip content="World Energy balance">
+          <span
+            id="world-energy-badge"
+            tabindex="0"
+            aria-label="World Energy"
+            class="relative inline-flex items-center gap-1 rounded-full bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 font-semibold text-sky-800 dark:text-sky-300 ring-1 ring-sky-200 dark:ring-sky-700/60 text-xs"
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+              <path d="M3 12h18M12 3c3 3 4 6 4 9s-1 6-4 9c-3-3-4-6-4-9s1-6 4-9Z" fill="none" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+            <span id="world-energy-value">{{ worldEnergyValue }}</span>
+            <span v-if="isWorldEnergyCapped" class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-sky-500 animate-ping"></span>
+          </span>
+        </BaseTooltip>
 
         <!-- Theme Toggle -->
         <button

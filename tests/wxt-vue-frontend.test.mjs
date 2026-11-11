@@ -886,3 +886,18 @@ test('Prevent TypeError Symbol(Symbol.iterator) regressions on startup with obje
   assert.match(questDetailModal, /normalizeArray\(ev\.groups\)/, 'QuestDetailModal must normalize ev.groups');
   assert.match(questDetailModal, /\[\.\.\.normalizeArray\(list\)\]/, 'QuestDetailModal must normalize list before spread');
 });
+
+test('Header tooltips use BaseTooltip to avoid browser native title flicker during countdown updates', async () => {
+  const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
+  assert.match(header, /import BaseTooltip from '@\/src\/components\/common\/BaseTooltip\.vue'/, 'Header must import BaseTooltip');
+  assert.match(header, /<BaseTooltip[\s\S]*?formatMarchTooltip\(item\.march,\s*now,\s*cache\)/, 'Header must wrap marches in BaseTooltip');
+  assert.match(header, /<BaseTooltip[\s\S]*?formatRaidQueueTooltip\(raidQueue\)/, 'Header must wrap raid queue in BaseTooltip');
+  assert.match(header, /<BaseTooltip[\s\S]*?formatMonsterQueueTooltip\(monsterQueue\)/, 'Header must wrap monster queue in BaseTooltip');
+  assert.match(header, /<BaseTooltip[\s\S]*?formatAutoGatherTooltip\(autoGatherSettings\)/, 'Header must wrap auto gather in BaseTooltip');
+  assert.match(header, /<BaseTooltip[\s\S]*?draftTooltip/, 'Header must wrap draft alert in BaseTooltip');
+
+  const baseTooltip = await readFile(join(root, 'src/components/common/BaseTooltip.vue'), 'utf8');
+  assert.match(baseTooltip, /<Teleport to="body">/, 'BaseTooltip must teleport tooltip to body');
+  assert.match(baseTooltip, /role="tooltip"/, 'BaseTooltip must provide role="tooltip"');
+  assert.match(baseTooltip, /coords\.left/, 'BaseTooltip must dynamically calculate position');
+});
