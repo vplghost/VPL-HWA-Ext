@@ -6,6 +6,7 @@ import {
   getHeroEquipmentRank,
   getHeroSoulProgress,
   starGlowClass,
+  downloadJson,
   type HeroMeta,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
@@ -196,6 +197,29 @@ function openHeroDetail(hero: any) {
 async function refreshHeroes() {
   await dispatchRpc([{ name: 'heroGetAll' }]);
 }
+
+function exportHeroesJson() {
+  const popupData = (globalThis as any).hwaHelperPopupData;
+  const exported = popupData?.exportTableData?.('heroes', cache.value, search.value);
+  if (Array.isArray(exported) && exported.length > 0) {
+    downloadJson('hwa-heroes.json', exported);
+  } else {
+    downloadJson(
+      'hwa-heroes.json',
+      filteredHeroes.value.map((h) => ({
+        id: h.id,
+        name: h.name,
+        level: h.level,
+        star: h.star,
+        power: h.power,
+        class: h.class,
+        faction: h.faction,
+        color: h.color,
+        soulStones: h.soulProg,
+      }))
+    );
+  }
+}
 </script>
 
 <template>
@@ -264,7 +288,12 @@ async function refreshHeroes() {
       </div>
 
       <!-- Right Controls: View Switcher & Refresh -->
-      <div class="flex items-center gap-2 text-xs">
+      <div class="flex items-center gap-2 text-xs shrink-0">
+        <!-- Count badge -->
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          {{ formatNumber(filteredHeroes.length) }} heroes
+        </span>
+
         <!-- View mode switcher -->
         <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800">
           <button
@@ -286,6 +315,17 @@ async function refreshHeroes() {
             🔲 Grid
           </button>
         </div>
+
+        <!-- Export JSON button -->
+        <button
+          id="btn-toolbar-export-heroes"
+          type="button"
+          class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
+          title="Export heroes data as JSON"
+          @click="exportHeroesJson"
+        >
+          📥 Export
+        </button>
 
         <button
           id="btn-toolbar-refresh-heroes"

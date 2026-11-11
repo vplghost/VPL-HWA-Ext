@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useResourceSelection } from '@/src/composables/useResourceSelection';
+import { downloadJson } from '@/src/utils/metadata';
 import {
   formatResourceAmount,
   getAmountAt,
@@ -10,12 +11,13 @@ import {
   isSelectableForHeader,
 } from '@/src/utils/resourceData';
 
-const { cache } = useRpcCache();
+const { cache, dispatchRpc } = useRpcCache();
 const { resourceSelection, togglePin, isPinned } = useResourceSelection();
 
 const now = ref(Date.now());
 const search = ref('');
 const filterPinnedOnly = ref(false);
+const isRefreshing = ref(false);
 
 const allResources = computed(() => {
   const list: any[] = [];
@@ -52,6 +54,33 @@ const filteredResources = computed(() => {
     return true;
   });
 });
+
+async function refreshResources() {
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([{ name: 'inventoryGet' }]);
+  } finally {
+    isRefreshing.value = false;
+  }
+}
+
+function exportResourcesJson() {
+  const popupData = (globalThis as any).hwaHelperPopupData;
+  const exported = popupData?.exportTableData?.('resources', cache.value, search.value);
+  if (Array.isArray(exported) && exported.length > 0) {
+    downloadJson('hwa-resources.json', exported);
+  } else {
+    downloadJson(
+      'hwa-resources.json',
+      filteredResources.value.map((r) => ({
+        key: r.key,
+        name: r.label,
+        amount: r.amount,
+        cap: r.cap,
+      }))
+    );
+  }
+}
 </script>
 
 <template>
@@ -81,7 +110,34 @@ const filteredResources = computed(() => {
             {{ resourceSelection.length }}
           </span>
         </button>
-        <span class="text-xs text-slate-400">Select resources for the top header</span>
+
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          {{ formatResourceAmount(filteredResources.length) }} resources
+        </span>
+
+        <!-- Export JSON button -->
+        <button
+          id="btn-toolbar-export-resources"
+          type="button"
+          class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
+          title="Export resources data as JSON"
+          @click="exportResourcesJson"
+        >
+          📥 Export
+        </button>
+
+        <!-- Refresh button -->
+        <button
+          id="btn-toolbar-refresh-resources"
+          type="button"
+          :disabled="isRefreshing"
+          class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors disabled:opacity-50"
+          title="Refresh resources via RPC"
+          @click="refreshResources"
+        >
+          <span :class="{ 'inline-block animate-spin': isRefreshing }">🔄</span>
+          <span>Refresh</span>
+        </button>
       </div>
     </div>
 

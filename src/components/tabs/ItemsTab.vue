@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { getItemName, downloadJson } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 
 const { cache, dispatchRpc } = useRpcCache();
 
 const search = ref('');
 const selectedCategory = ref('All');
-const viewMode = ref<'grid' | 'list'>('grid');
+const viewMode = ref<'grid' | 'table' | 'list'>('grid');
+const isRefreshing = ref(false);
 
 const categories = [
   'All',
@@ -18,12 +20,14 @@ const categories = [
   'scroll',
   'consumable',
   'coin',
+  'fragmentHero',
+  'fragmentTitan',
 ];
 
 interface InventoryEntry {
   id: string | number;
   category: string;
-  name?: string;
+  name: string;
   amount: number;
 }
 
@@ -44,7 +48,7 @@ const items = computed<InventoryEntry[]>(() => {
             id,
             category: cat,
             amount: count,
-            name: `${cat} #${id}`,
+            name: getItemName(cat, id),
           });
         }
       }
@@ -58,7 +62,7 @@ const filteredItems = computed(() => {
   return items.value
     .filter((item) => {
       if (search.value) {
-        const q = search.value.toLowerCase();
+        const q = search.value.toLowerCase().trim();
         if (!String(item.id).includes(q) && !(item.name || '').toLowerCase().includes(q)) {
           return false;
         }
@@ -69,6 +73,90 @@ const filteredItems = computed(() => {
       return true;
     })
     .sort((a, b) => b.amount - a.amount);
+});
+
+// Category sections grouping
+interface CategorySection {
+  category: string;
+  label: string;
+  icon: string;
+  items: InventoryEntry[];
+}
+
+const categoryLabels: Record<string, { label: string; icon: string }> = {
+  gear: { label: 'Equipment & Gear', icon: '🛡️' },
+  fragmentGear: { label: 'Gear Fragments', icon: '🧩' },
+  artifact: { label: 'Artifacts', icon: '🔮' },
+  fragmentArtifact: { label: 'Artifact Fragments', icon: '✨' },
+  scroll: { label: 'Recipe Scrolls', icon: '📜' },
+  consumable: { label: 'Consumables & Potions', icon: '🧪' },
+  coin: { label: 'Coins & Tokens', icon: '🪙' },
+  fragmentHero: { label: 'Hero Soul Stones', icon: '💎' },
+  fragmentTitan: { label: 'Titan Soul Stones', icon: '🗿' },
+};
+
+const categorizedSections = computed<CategorySection[]>(() => {
+  if (selectedCategory.value !== 'All') {
+    const meta = categoryLabels[selectedCategory.value] || { label: selectedCategory.value, icon: '📦' };
+    return [
+      {
+        category: selectedCategory.value,
+        label: meta.label,
+        icon: meta.icon,
+        items: filteredItems.value,
+      },
+    ];
+  }
+
+  // Group by category order
+  const order = [
+    'gear',
+    'fragmentGear',
+    'artifact',
+    'fragmentArtifact',
+    'scroll',
+    'consumable',
+    'coin',
+    'fragmentHero',
+    'fragmentTitan',
+  ];
+
+  const map = new Map<string, InventoryEntry[]>();
+  for (const item of filteredItems.value) {
+    if (!map.has(item.category)) {
+      map.set(item.category, []);
+    }
+    map.get(item.category)!.push(item);
+  }
+
+  const sections: CategorySection[] = [];
+  for (const cat of order) {
+    const list = map.get(cat);
+    if (list && list.length > 0) {
+      const meta = categoryLabels[cat] || { label: cat, icon: '📦' };
+      sections.push({
+        category: cat,
+        label: meta.label,
+        icon: meta.icon,
+        items: list,
+      });
+      map.delete(cat);
+    }
+  }
+
+  // Any remaining categories
+  for (const [cat, list] of map.entries()) {
+    if (list.length > 0) {
+      sections.push({
+        category: cat,
+        label: cat.charAt(0).toUpperCase() + cat.slice(1),
+        icon: '📦',
+        items: list,
+      });
+    }
+  }
+
+  return sections;
 });
 
 function getItemImgSrc(item: InventoryEntry): string {
@@ -98,39 +186,52 @@ function getItemImgSrc(item: InventoryEntry): string {
 }
 
 function getCategoryIcon(cat: string): string {
-  switch (cat) {
-    case 'gear':
-    case 'fragmentGear':
-      return '🛡️';
-    case 'artifact':
-    case 'fragmentArtifact':
-      return '🔮';
-    case 'scroll':
-      return '📜';
-    case 'consumable':
-      return '🧪';
-    case 'coin':
-      return '🪙';
-    default:
-      return '📦';
-  }
+  return categoryLabels[cat]?.icon || '📦';
 }
 
 async function refreshInventory() {
-  await dispatchRpc([{ name: 'inventoryGet' }]);
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([{ name: 'inventoryGet' }]);
+  } finally {
+    isRefreshing.value = false;
+  }
+}
+
+function exportItemsJson() {
+  const popupData = (globalThis as any).hwaHelperPopupData;
+  const exported = popupData?.exportTableData?.(
+    'items',
+    cache.value,
+    search.value,
+    selectedCategory.value === 'All' ? '' : selectedCategory.value
+  );
+
+  if (Array.isArray(exported) && exported.length > 0) {
+    downloadJson('hwa-inventory.json', exported);
+  } else {
+    // Fallback to formatted filteredItems
+    const fallback = filteredItems.value.map((i) => ({
+      group: i.category,
+      id: Number(i.id) || i.id,
+      name: i.name,
+      amount: i.amount,
+    }));
+    downloadJson('hwa-inventory.json', fallback);
+  }
 }
 </script>
 
 <template>
   <div class="space-y-3">
     <!-- Toolbar -->
-    <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
-      <div class="flex flex-wrap items-center gap-2 flex-1">
+    <div class="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+      <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
         <!-- Search -->
         <input
           v-model="search"
           type="search"
-          placeholder="Search items by ID..."
+          placeholder="Search items by name or ID..."
           class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden w-48"
         />
 
@@ -140,101 +241,193 @@ async function refreshInventory() {
           class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
         >
           <option v-for="c in categories" :key="c" :value="c">
-            {{ c }}
+            {{ c === 'All' ? 'All Categories' : (categoryLabels[c]?.label || c) }}
           </option>
         </select>
 
-        <!-- View Mode -->
-        <div class="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5 text-xs">
+        <!-- Arena Coin Badge -->
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 shrink-0"
+          title="Arena Coin (coin #1) - Distinct from Gold"
+        >
+          <span>🏆</span>
+          <span>Arena:</span>
+          <span class="font-bold tabular-nums">{{ formatNumber(arenaCoinAmount) }}</span>
+        </span>
+      </div>
+
+      <!-- Right Controls: View Switcher, Count, Export & Refresh -->
+      <div class="flex items-center gap-2 text-xs shrink-0">
+        <!-- Count badge -->
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          {{ formatNumber(filteredItems.length) }} items
+        </span>
+
+        <!-- View mode switcher -->
+        <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800">
           <button
             type="button"
-            class="px-2 py-1 rounded transition-colors"
-            :class="viewMode === 'grid' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs' : 'text-slate-400'"
+            class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
+            :class="viewMode === 'grid' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
+            title="Grid View (Icons)"
             @click="viewMode = 'grid'"
           >
-            ▦ Grid
+            🔲 Grid
           </button>
           <button
             type="button"
-            class="px-2 py-1 rounded transition-colors"
-            :class="viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs' : 'text-slate-400'"
+            class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
+            :class="viewMode === 'table' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
+            title="Table View (Snapshot)"
+            @click="viewMode = 'table'"
+          >
+            📋 Table
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
+            :class="viewMode === 'list' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
+            title="List View (Compact)"
             @click="viewMode = 'list'"
           >
             ☰ List
           </button>
         </div>
 
-        <!-- Arena Coin Badge -->
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
-          title="Arena Coin (coin #1) - Distinct from Gold"
-        >
-          <span>🏆</span>
-          <span>Arena Coins:</span>
-          <span class="font-bold tabular-nums">{{ formatNumber(arenaCoinAmount) }}</span>
-        </span>
-      </div>
-
-      <div class="flex items-center gap-2 text-xs text-slate-400">
-        <span>{{ filteredItems.length }} items</span>
+        <!-- Export JSON button -->
         <button
+          id="btn-toolbar-export-items"
           type="button"
-          class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
-          title="Refresh inventory"
+          class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
+          title="Export inventory data as JSON"
+          @click="exportItemsJson"
+        >
+          📥 Export
+        </button>
+
+        <!-- Refresh button -->
+        <button
+          id="btn-toolbar-refresh-items"
+          type="button"
+          :disabled="isRefreshing"
+          class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors disabled:opacity-50"
+          title="Refresh inventory via RPC"
           @click="refreshInventory"
         >
-          ↻ Refresh
+          <span :class="{ 'inline-block animate-spin': isRefreshing }">🔄</span>
+          <span>Refresh</span>
         </button>
       </div>
     </div>
 
-    <!-- Items Grid View -->
-    <div
-      v-if="viewMode === 'grid'"
-      class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2"
-    >
-      <div
-        v-for="item in filteredItems"
-        :key="`${item.category}-${item.id}`"
-        class="relative aspect-square rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center p-1 border border-slate-200 dark:border-slate-700/60 hover:border-indigo-400 dark:hover:border-indigo-600 transition-all select-none group"
-        :title="`${item.category} #${item.id}\nQuantity: ${formatNumber(item.amount)}`"
-      >
-        <img
-          v-if="getItemImgSrc(item)"
-          :src="getItemImgSrc(item)"
-          :alt="item.name"
-          class="size-full object-contain rounded-lg"
-          loading="lazy"
-        />
-        <span v-else class="text-xl">
-          {{ getCategoryIcon(item.category) }}
-        </span>
-
-        <!-- Quantity Pill -->
-        <span class="absolute bottom-1 right-1 bg-slate-900/85 text-white text-[10px] font-mono px-1 rounded-sm tabular-nums">
-          {{ formatNumber(item.amount) }}
-        </span>
-      </div>
+    <!-- Empty State -->
+    <div v-if="filteredItems.length === 0" class="p-8 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+      No items found matching your search and filter criteria.
     </div>
 
-    <!-- Items List View -->
-    <div
-      v-else
-      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-2xs"
-    >
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 dark:bg-slate-800 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-200 dark:border-slate-700">
-          <tr>
-            <th class="p-2.5">Item</th>
-            <th class="p-2.5">Category</th>
-            <th class="p-2.5">ID</th>
-            <th class="p-2.5 text-right">Quantity</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-          <tr v-for="item in filteredItems" :key="`${item.category}-${item.id}`" class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-            <td class="p-2.5 flex items-center gap-2">
-              <div class="size-7 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+    <!-- Categorized Sections Container -->
+    <div v-else class="space-y-4">
+      <section
+        v-for="sec in categorizedSections"
+        :key="sec.category"
+        class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-2xs space-y-3"
+      >
+        <!-- Section Header -->
+        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+          <h3 class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+            <span>{{ sec.icon }}</span>
+            <span>{{ sec.label }}</span>
+            <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+              {{ sec.items.length }}
+            </span>
+          </h3>
+          <span class="text-[11px] font-mono text-slate-400">{{ sec.category }}</span>
+        </div>
+
+        <!-- 1. Grid Mode -->
+        <div
+          v-if="viewMode === 'grid'"
+          class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2"
+        >
+          <div
+            v-for="item in sec.items"
+            :key="`${item.category}-${item.id}`"
+            class="relative aspect-square rounded-xl bg-slate-50 dark:bg-slate-800/80 flex items-center justify-center p-1.5 border border-slate-200 dark:border-slate-700/60 hover:border-blue-400 dark:hover:border-blue-500 transition-all select-none group"
+            :title="`${item.name}\nCategory: ${item.category}\nID: ${item.id}\nQuantity: ${formatNumber(item.amount)}`"
+          >
+            <img
+              v-if="getItemImgSrc(item)"
+              :src="getItemImgSrc(item)"
+              :alt="item.name"
+              class="size-full object-contain rounded-lg"
+              loading="lazy"
+            />
+            <span v-else class="text-xl">
+              {{ getCategoryIcon(item.category) }}
+            </span>
+
+            <!-- Quantity Pill -->
+            <span class="absolute bottom-1 right-1 bg-slate-900/85 text-white text-[10px] font-mono px-1 rounded-sm tabular-nums shadow-xs">
+              {{ formatNumber(item.amount) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 2. Table Mode -->
+        <div
+          v-else-if="viewMode === 'table'"
+          class="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto"
+        >
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 font-semibold text-slate-700 dark:text-slate-200">
+                <th class="p-2 w-12 text-center">Icon</th>
+                <th class="p-2">Item Name</th>
+                <th class="p-2 w-20">ID</th>
+                <th class="p-2 w-28 text-right">Quantity</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+              <tr
+                v-for="item in sec.items"
+                :key="`${item.category}-${item.id}`"
+                class="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors"
+              >
+                <td class="p-2 text-center">
+                  <div class="size-7 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto">
+                    <img
+                      v-if="getItemImgSrc(item)"
+                      :src="getItemImgSrc(item)"
+                      :alt="item.name"
+                      class="size-full object-contain"
+                      loading="lazy"
+                    />
+                    <span v-else class="text-xs">{{ getCategoryIcon(item.category) }}</span>
+                  </div>
+                </td>
+                <td class="p-2 font-medium text-slate-800 dark:text-slate-200">
+                  {{ item.name }}
+                </td>
+                <td class="p-2 font-mono text-slate-400 text-[11px]">
+                  #{{ item.id }}
+                </td>
+                <td class="p-2 text-right font-bold text-slate-700 dark:text-slate-200 tabular-nums">
+                  {{ formatNumber(item.amount) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 3. List Mode -->
+        <div v-else class="divide-y divide-slate-100 dark:divide-slate-800/80">
+          <div
+            v-for="item in sec.items"
+            :key="`${item.category}-${item.id}`"
+            class="py-2 flex items-center justify-between gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 px-1 rounded transition-colors"
+          >
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="size-6 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
                 <img
                   v-if="getItemImgSrc(item)"
                   :src="getItemImgSrc(item)"
@@ -242,19 +435,18 @@ async function refreshInventory() {
                   class="size-full object-contain"
                   loading="lazy"
                 />
-                <span v-else>{{ getCategoryIcon(item.category) }}</span>
+                <span v-else class="text-xs">{{ getCategoryIcon(item.category) }}</span>
               </div>
-              <span class="font-medium text-slate-800 dark:text-slate-200">{{ item.name }}</span>
-            </td>
-            <td class="p-2.5 text-slate-400">{{ item.category }}</td>
-            <td class="p-2.5 font-mono text-slate-500">{{ item.id }}</td>
-            <td class="p-2.5 text-right font-bold text-slate-700 dark:text-slate-200 tabular-nums">
+              <span class="font-medium text-slate-800 dark:text-slate-200 truncate">{{ item.name }}</span>
+              <span class="text-[10px] font-mono text-slate-400 shrink-0">#{{ item.id }}</span>
+            </div>
+
+            <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs shrink-0">
               {{ formatNumber(item.amount) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </span>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
-

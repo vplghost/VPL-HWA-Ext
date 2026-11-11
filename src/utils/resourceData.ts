@@ -106,18 +106,69 @@ export function resourceAppearance(entry: ResourceEntry | undefined): { icon: st
   return { icon: '◉', classes: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-slate-700' };
 }
 
+export const worldMaterialNames: Record<number, string> = {
+  1: 'Elarite Shards',
+  2: 'Iron',
+  3: 'Stone',
+  4: 'Wood',
+  5: 'Food',
+  12: 'Honor Marks',
+};
+
+export const typeNames: Record<string, string> = {
+  speedUpUnitTraining: 'Training Speedup',
+  speedUpUniversal: 'Universal Speedup',
+  speedUpUnitHealing: 'Healing Speedup',
+  speedUpConstruction: 'Construction Speedup',
+  speedUpResearch: 'Research Speedup',
+  teleporter: 'Teleporter',
+  lootboxChanced: 'Chance Lootbox',
+  patron: 'Relic Shard',
+};
+
 export function resourceLabel(entry: ResourceEntry | undefined): string {
-  const id = String(entry?.key || '').replace(/^resource:/, '');
-  const [type, itemId] = id.split(':');
+  if (entry?.data?.label && !entry.data.label.includes('#')) {
+    return entry.data.label;
+  }
+  const rawKey = String(entry?.key || '').replace(/^resource:/, '');
   const fallback: Record<string, string> = {
     gold: 'Gold',
     starMoney: 'Emeralds',
     energy: 'Energy',
     'world-energy': 'World Energy',
   };
-  if (fallback[id]) return fallback[id];
-  if (itemId) return `${type} #${itemId}`;
-  return entry?.data?.label || id || 'Resource';
+  if (fallback[rawKey]) return fallback[rawKey];
+
+  const [type, itemIdStr] = rawKey.split(':');
+  const itemId = Number(itemIdStr);
+
+  if (type === 'material' && Number.isInteger(itemId) && worldMaterialNames[itemId]) {
+    return worldMaterialNames[itemId];
+  }
+
+  // Lookup in nameMap
+  const nameMap = (globalThis as any).hwaHelperNameMap;
+  if (nameMap && typeof nameMap.item === 'function') {
+    const found = nameMap.item(type, itemIdStr || itemId);
+    if (found) return found;
+  }
+
+  // Lookup in nameData dictionary
+  const nameData = (globalThis as any).hwaHelperNameData?.names;
+  if (nameData?.[type]?.[itemIdStr]) {
+    return nameData[type][itemIdStr];
+  }
+
+  if (entry?.data?.label) {
+    return entry.data.label;
+  }
+
+  if (typeNames[type]) {
+    return itemIdStr ? `${typeNames[type]} #${itemIdStr}` : typeNames[type];
+  }
+
+  if (itemIdStr) return `${type} #${itemIdStr}`;
+  return entry?.data?.name || rawKey || 'Resource';
 }
 
 export function isSelectableForHeader(entry: ResourceEntry | undefined): boolean {

@@ -14,7 +14,6 @@ const emit = defineEmits<{
 
 const { cache, dispatchRpc } = useRpcCache();
 
-const isRunning = ref(false);
 const isRefreshing = ref(false);
 
 const dungeonData = computed(() => {
@@ -127,34 +126,15 @@ watch(
   }
 );
 
-onMounted(async () => {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
-    try {
-      const stored = await chrome.storage.local.get(['dungeonRun']);
-      if (stored.dungeonRun && !['stopped', 'complete'].includes(stored.dungeonRun.phase)) {
-        isRunning.value = true;
-      }
-    } catch (_) {}
+onMounted(() => {
+  if (props.modelValue) {
+    document.addEventListener('keydown', handleKeydown);
   }
 });
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
 });
-
-async function toggleDungeonAuto() {
-  if (isRunning.value) {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({ kind: 'dungeon-run-stop' });
-    }
-    isRunning.value = false;
-  } else {
-    isRunning.value = true;
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({ kind: 'dungeon-run-start' });
-    }
-  }
-}
 
 async function refreshDungeon() {
   isRefreshing.value = true;
@@ -224,25 +204,17 @@ function handleImgError(e: Event) {
           </div>
 
           <div class="flex items-center gap-2">
+            <!-- Hidden Auto Button matching legacy HTML contract -->
             <button
               id="dungeon-auto-btn"
+              hidden
               type="button"
-              class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all active:scale-95"
-              :class="
-                isRunning
-                  ? 'border-rose-500 bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
-                  : 'border-blue-500 bg-blue-600 hover:bg-blue-700 text-white'
-              "
-              :title="isRunning ? 'Stop auto attack runner' : 'Auto attack dungeon floor by floor'"
-              @click="toggleDungeonAuto"
+              class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-blue-500 bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs"
             >
-              <svg class="size-3.5 text-white shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <polygon v-if="!isRunning" points="5 3 19 12 5 21 5 3" />
-                <rect v-else x="6" y="6" width="12" height="12" />
-              </svg>
-              <span class="dungeon-auto-label">{{ isRunning ? 'Stop Auto' : 'Auto Attack' }}</span>
+              <span class="dungeon-auto-label">Auto Attack</span>
             </button>
 
+            <!-- Refresh Button -->
             <button
               id="dungeon-refresh-btn"
               type="button"
@@ -268,6 +240,7 @@ function handleImgError(e: Event) {
               <span class="dungeon-refresh-label">{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
             </button>
 
+            <!-- Close Button -->
             <button
               id="dungeon-modal-close"
               type="button"
@@ -336,7 +309,7 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
-          <!-- Last Battle Result Banner -->
+          <!-- Last Battle Result -->
           <div
             v-else-if="lastBattleResult"
             class="rounded-xl border p-3 flex items-center justify-between text-xs shadow-2xs"
@@ -358,26 +331,23 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
-          <!-- Section 1: Overview Stats -->
+          <!-- SECTION 1: OVERVIEW STATS -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Current Floor</div>
               <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">Floor {{ floorNumber }}</div>
               <div class="text-[10px] text-slate-400 dark:text-slate-500">In progress</div>
             </div>
-
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Personal Titanite</div>
               <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(todayTitanite) }}</div>
               <div class="text-[10px] text-slate-400 dark:text-slate-500">Earned today</div>
             </div>
-
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Checkpoint</div>
               <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">Floor {{ dungeonData.respawnFloor || 0 }}</div>
               <div class="text-[10px] text-slate-400 dark:text-slate-500">Respawn point</div>
             </div>
-
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Guild Activity</div>
               <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(dungeonData.dungeonActivity ?? 0) }} pts</div>
@@ -385,7 +355,7 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
-          <!-- Section 2: Element Affinities -->
+          <!-- SECTION 2: ELEMENT AFFINITIES -->
           <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/60">
             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
               Element Affinities
@@ -406,101 +376,62 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
-          <!-- Section 3: Daily Combat Log & Titan Casualty Tracking -->
-          <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
-            <div class="flex items-center justify-between flex-wrap gap-2">
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-bold text-slate-900 dark:text-slate-100">⚔️ Daily Combat Log</span>
-                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                  Total: {{ totalBattles }}
+          <!-- SECTION 3: DAILY COMBAT LOG & TITAN CASUALTY TRACKING -->
+          <div id="dungeon-combat-log-section" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <span>⚔️</span>
+                <span>Daily Combat Log</span>
+              </h3>
+              <div class="flex items-center gap-2 text-xs">
+                <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                  Flawless: <strong id="dungeon-flawless-count" class="tabular-nums">{{ flawlessBattles }}</strong>
                 </span>
-              </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-800/60">
-                  ✨ {{ flawlessBattles }} Flawless Wins (0 casualties)
-                </span>
-                <span
-                  v-if="casualtiesList.length > 0"
-                  class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 dark:border dark:border-rose-800/60"
-                >
-                  ⚠️ {{ casualtiesList.length }} with Casualties
+                <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                  Total: <strong id="dungeon-total-battles" class="tabular-nums">{{ totalBattles }}</strong>
                 </span>
               </div>
             </div>
 
-            <!-- Casualty battles detail -->
-            <div v-if="casualtiesList.length > 0" class="space-y-2.5 pt-1">
-              <div class="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
-                <span>⚠️ Highlighted Battles with Titan Casualties ({{ casualtiesList.length }})</span>
+            <!-- Casualty list -->
+            <div v-if="casualtiesList.length > 0" id="dungeon-casualty-list" class="space-y-2">
+              <div class="text-[11px] font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
+                Battles With Casualties ({{ casualtiesList.length }})
               </div>
-
               <div
-                v-for="(b, idx) in casualtiesList"
-                :key="idx"
-                class="rounded-xl border-2 border-rose-300 bg-rose-50/70 p-3.5 space-y-2.5 shadow-xs dark:border-rose-800/80 dark:bg-rose-950/40"
+                v-for="(c, cIdx) in casualtiesList"
+                :key="cIdx"
+                class="rounded-lg border border-rose-200 bg-rose-50/50 p-2.5 dark:border-rose-900/60 dark:bg-rose-950/20 text-xs space-y-1.5"
               >
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <div class="flex items-center gap-2">
-                    <span class="rounded-md bg-rose-800 px-2 py-0.5 text-xs font-bold text-white shadow-2xs">
-                      {{ b.floorNumber ? `Floor ${b.floorNumber}` : 'Dungeon Battle' }}
-                    </span>
-                    <span
-                      class="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                      :class="
-                        b.win
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                          : 'bg-rose-600 text-white'
-                      "
-                    >
-                      {{ b.win ? 'Victory (with Casualties)' : 'Defeat' }}
-                    </span>
-                  </div>
-                  <span v-if="b.timestamp" class="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
-                    {{ new Date(b.timestamp).toLocaleTimeString() }}
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-rose-900 dark:text-rose-200">
+                    Floor {{ c.floor }} · Door {{ c.door }}
+                  </span>
+                  <span class="text-[10px] text-slate-500 font-mono">
+                    {{ c.time || 'Today' }}
                   </span>
                 </div>
-
-                <!-- Fallen titans -->
-                <div class="rounded-lg border border-rose-200 bg-white/90 p-2.5 space-y-1.5 dark:border-rose-900/60 dark:bg-slate-900/80">
-                  <div class="text-[11px] font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1">
-                    <span>💀 Fallen Titans ({{ (b.casualties || []).length }}):</span>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span
-                      v-for="(cas, cIdx) in (b.casualties || [])"
-                      :key="cIdx"
-                      class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-100/70 px-2 py-1 text-xs font-semibold text-rose-900 shadow-2xs dark:border-rose-800 dark:bg-rose-950/80 dark:text-rose-200"
-                    >
-                      <img
-                        :src="`assets/titans/${cas?.id ?? cas}.png`"
-                        class="size-5 rounded-full object-cover shrink-0 border border-rose-300 dark:border-rose-700"
-                        alt=""
-                        @error="handleImgError"
-                      />
-                      <span>{{ getTitanName(cas?.id ?? cas) }}</span>
-                    </span>
-                  </div>
+                <div v-if="c.fallen && c.fallen.length" class="text-rose-700 dark:text-rose-300">
+                  Fallen Titans: <strong>{{ c.fallen.join(', ') }}</strong>
                 </div>
               </div>
+            </div>
+
+            <div v-else class="text-center p-3 text-slate-400 bg-slate-50/50 dark:bg-slate-800/40 rounded-lg text-xs">
+              No titan casualties recorded today. All victories flawless!
             </div>
           </div>
 
-          <!-- Section 4: Current Floor Doors -->
-          <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
+          <!-- SECTION 4: CURRENT FLOOR DOORS -->
+          <div v-if="doors.length > 0" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
             <div class="flex items-center justify-between">
               <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
                 🚪 Floor {{ floorNumber }} Doors
               </h3>
-              <span class="text-xs text-slate-500 dark:text-slate-400">
-                {{ doors.length }} battle choices
-              </span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">{{ doors.length }} battle choices</span>
             </div>
 
-            <div v-if="doors.length === 0" class="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500">
-              Floor doors will update when a new dungeon floor is unlocked in game.
-            </div>
-
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div id="dungeon-doors-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div
                 v-for="(door, idx) in doors"
                 :key="idx"
@@ -512,90 +443,56 @@ function handleImgError(e: Event) {
                 "
               >
                 <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-1.5">
-                    <span class="rounded-md bg-slate-800 dark:bg-blue-900/60 dark:border dark:border-blue-700/50 px-2 py-0.5 text-[11px] font-bold text-white">
-                      Door {{ idx + 1 }}
-                    </span>
-                    <span
-                      v-if="activeBattle && activeBattle.teamNum === idx"
-                      class="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-bold animate-pulse"
-                    >
-                      ⚔️ In Combat
-                    </span>
-                  </div>
-                  <span class="text-xs font-bold text-slate-700 dark:text-slate-200">
-                    ⚔️ Power: {{ door.power ? formatNumber(door.power) : '—' }}
+                  <span class="font-bold text-xs text-slate-800 dark:text-slate-100">
+                    Door {{ idx + 1 }}
+                  </span>
+                  <span v-if="door.power" class="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300">
+                    Power: {{ formatNumber(door.power) }}
                   </span>
                 </div>
 
-                <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-                  <div>
-                    Attacker:
-                    <strong class="text-slate-900 dark:text-slate-100">
-                      {{ door.attackerType ? door.attackerType.charAt(0).toUpperCase() + door.attackerType.slice(1) : 'Any' }} Titans
-                    </strong>
-                  </div>
-                  <div>
-                    Defender:
-                    <strong class="text-slate-900 dark:text-slate-100">
-                      {{ door.defenderType ? door.defenderType.charAt(0).toUpperCase() + door.defenderType.slice(1) : 'Unknown' }}
-                    </strong>
-                  </div>
-                </div>
-
-                <!-- Squad units -->
-                <div
-                  v-if="Array.isArray(door.team) && door.team.length > 0"
-                  class="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200 dark:border-slate-700/60"
-                >
+                <div v-if="door.enemies && door.enemies.length" class="flex flex-wrap items-center gap-1">
                   <span
-                    v-for="unit in door.team"
-                    :key="unit.id"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 shadow-2xs dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+                    v-for="(en, eIdx) in door.enemies"
+                    :key="eIdx"
+                    class="rounded bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[10px] border border-slate-200 dark:border-slate-700"
                   >
-                    <img
-                      :src="`assets/titans/${unit.id}.png`"
-                      class="size-4 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700"
-                      alt=""
-                      @error="handleImgError"
-                    />
-                    <span>{{ getTitanName(unit.id) }}</span>
-                    <span class="text-slate-400 dark:text-slate-500 font-normal">
-                      (Lv.{{ unit.level || '?' }}{{ unit.star ? ' ★' + unit.star : '' }})
-                    </span>
+                    {{ getTitanName(en.id || en) }}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Section 5: Titan Health & Energy Status -->
-          <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
+          <div
+            v-else
+            class="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500"
+          >
+            Floor doors will update when a new dungeon floor is unlocked in game.
+          </div>
+
+          <!-- SECTION 5: TITAN HEALTH & ENERGY STATUS -->
+          <div v-if="titanEntries.length > 0" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
             <div class="flex items-center justify-between">
-              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                🛡️ Titan Health & Energy
+              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <span>🛡️</span>
+                <span>Titan Health & Energy</span>
               </h3>
-              <span class="text-xs text-slate-500 dark:text-slate-400">
-                {{ titanEntries.length }} deployed titans
-              </span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">{{ titanEntries.length }} deployed titans</span>
             </div>
 
-            <div v-if="titanEntries.length === 0" class="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500">
-              Deployed titan health and energy will update during dungeon battles.
-            </div>
-
-            <div v-else class="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 gap-2">
+            <div id="dungeon-titan-roster" class="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 gap-2">
               <div
                 v-for="t in titanEntries"
                 :key="t.id"
-                class="rounded-xl border p-2.5"
+                class="rounded-xl border p-2.5 space-y-1.5"
                 :class="
                   t.isDead
                     ? 'border-rose-200 bg-rose-50/40 opacity-70 dark:border-rose-900/60 dark:bg-rose-950/30'
                     : 'border-slate-200 bg-slate-50/50 dark:border-slate-700/70 dark:bg-slate-800/70'
                 "
               >
-                <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center justify-between">
                   <div class="flex items-center gap-1.5 min-w-0">
                     <img
                       :src="`assets/titans/${t.id}.png`"
@@ -607,14 +504,12 @@ function handleImgError(e: Event) {
                       <div class="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
                         {{ t.name }}
                       </div>
-                      <span
-                        v-if="t.element"
-                        class="rounded bg-slate-200 dark:bg-slate-700 px-1 py-0.2 text-[9px] font-semibold text-slate-600 dark:text-slate-300"
-                      >
+                      <span v-if="t.element" class="rounded bg-slate-200 dark:bg-slate-700 px-1 py-0.2 text-[9px] font-semibold text-slate-600 dark:text-slate-300">
                         {{ t.element }}
                       </span>
                     </div>
                   </div>
+
                   <span
                     class="rounded-full px-1.5 py-0.5 text-[9px] font-bold"
                     :class="
@@ -652,10 +547,7 @@ function handleImgError(e: Event) {
                       </span>
                     </div>
                     <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        class="bg-amber-400 h-1.5 rounded-full"
-                        :style="{ width: `${t.energyPct}%` }"
-                      ></div>
+                      <div class="bg-amber-400 h-1.5 rounded-full" :style="{ width: `${t.energyPct}%` }"></div>
                     </div>
                   </div>
                 </div>

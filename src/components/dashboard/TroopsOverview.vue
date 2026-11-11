@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useTroopTraining, getTroopType } from '@/src/composables/useTroopTraining';
+import { useTroopTraining, getTroopType, normalizeArray } from '@/src/composables/useTroopTraining';
 import { formatDuration, formatNumber } from '@/src/utils/formatters';
 
 const {
@@ -10,6 +10,8 @@ const {
   isHealingActive,
   isHealingReady,
   isRefreshing,
+  isSyncLoading,
+  isHealLoading,
   now,
   trainings,
   setMaxTarget,
@@ -44,7 +46,7 @@ function getCardState(t: any) {
   const canTrain = remaining > 0;
   const unitsToTrain = Math.min(26, Math.max(0, remaining));
 
-  const queuesForType = (trainings.value?.trainingQueues || []).filter((q: any) => {
+  const queuesForType = normalizeArray(trainings.value?.trainingQueues).filter((q: any) => {
     const info = getTroopType(q?.unitId);
     return info && info.type === t.type;
   });
@@ -120,10 +122,12 @@ const troopCards = computed(() => {
           v-if="isHealingReady"
           id="dashboard-troops-heal-sync-btn"
           type="button"
-          class="cursor-pointer inline-flex items-center gap-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors"
+          :disabled="isSyncLoading"
+          class="cursor-pointer inline-flex items-center gap-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-60"
           @click="syncHealed"
         >
-          <span>✓</span> <span>Sync Healed</span>
+          <span :class="{ 'animate-spin': isSyncLoading }">{{ isSyncLoading ? '↻' : '✓' }}</span>
+          <span>{{ isSyncLoading ? 'Syncing...' : 'Sync Healed' }}</span>
         </button>
 
         <!-- Heal All Button -->
@@ -131,10 +135,12 @@ const troopCards = computed(() => {
           v-else-if="totalInjured > 0 && !isHealingActive"
           id="dashboard-troops-heal-all-btn"
           type="button"
-          class="cursor-pointer inline-flex items-center gap-1 rounded bg-rose-600 hover:bg-rose-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors"
+          :disabled="isHealLoading"
+          class="cursor-pointer inline-flex items-center gap-1 rounded bg-rose-600 hover:bg-rose-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-60"
           @click="healAll"
         >
-          <span>🏥</span> <span>Heal All ({{ formatNumber(totalInjured) }})</span>
+          <span :class="{ 'animate-spin': isHealLoading }">{{ isHealLoading ? '↻' : '🏥' }}</span>
+          <span>{{ isHealLoading ? 'Healing...' : `Heal All (${formatNumber(totalInjured)})` }}</span>
         </button>
 
         <!-- Refresh Button -->

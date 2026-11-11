@@ -56,10 +56,59 @@ export function getHeroSoulProgress(heroId: string | number, hero: any, inventor
   return (globalThis as any).hwaHelperPopupData?.heroSoulProgress?.(String(heroId), hero, inventory);
 }
 
+const worldMaterialNames: Record<number, string> = {
+  1: 'Elarite Shards',
+  2: 'Iron',
+  3: 'Stone',
+  4: 'Wood',
+  5: 'Food',
+  12: 'Honor Marks',
+};
+
 export function getItemName(category: string, id: number | string): string {
+  const strId = String(id);
+  const numId = Number(id);
+
+  if (category === 'material' && Number.isInteger(numId) && worldMaterialNames[numId]) {
+    return worldMaterialNames[numId];
+  }
+  if (category === 'fragmentHero') {
+    const hName = getHeroName(strId);
+    return `${hName} Soul Stone`;
+  }
+  if (category === 'fragmentTitan') {
+    const tMeta = getTitanMetadata(strId);
+    return `${tMeta?.name || `Titan #${strId}`} Titan Soul Stone`;
+  }
+  if (category === 'fragmentGear') {
+    const gName = (globalThis as any).hwaHelperNameData?.names?.gear?.[strId] || `Gear #${strId}`;
+    return `${gName} Fragment`;
+  }
+  if (category === 'fragmentArtifact') {
+    const aName = (globalThis as any).hwaHelperNameData?.names?.artifact?.[strId] || `Artifact #${strId}`;
+    return `${aName} Fragment`;
+  }
+  if (category === 'fragmentScroll') {
+    const sName = (globalThis as any).hwaHelperNameData?.names?.scroll?.[strId] || `Scroll #${strId}`;
+    return `${sName} Fragment`;
+  }
+
   const nameMap = (globalThis as any).hwaHelperNameMap;
   const nameData = (globalThis as any).hwaHelperNameData?.names;
-  return nameData?.[category]?.[id] || nameMap?.item?.(category, id) || `${category} #${id}`;
+  return nameData?.[category]?.[strId] || nameMap?.item?.(category, strId) || `${category} #${strId}`;
+}
+
+export function downloadJson(filename: string, data: any) {
+  if (!data || (Array.isArray(data) && !data.length)) return;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function getHeroName(heroId: number | string): string {

@@ -1,14 +1,16 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from './useRpcCache';
-import { getTroopType, TROOP_DEFS } from '@/src/utils/troops';
+import { getTroopType, TROOP_DEFS, normalizeArray } from '@/src/utils/troops';
 import type { TroopTrainSettings, TroopUnitState } from '@/src/types';
 
-export { getTroopType, TROOP_DEFS };
+export { getTroopType, TROOP_DEFS, normalizeArray };
 
 export function useTroopTraining() {
   const { cache, updateCacheLocally, dispatchRpc } = useRpcCache();
   const trainSettings = ref<TroopTrainSettings>({ maxTargets: {}, trainLevels: {} });
   const isRefreshing = ref(false);
+  const isSyncLoading = ref(false);
+  const isHealLoading = ref(false);
   const now = ref(Date.now());
   let timerInterval: any = null;
 
@@ -64,7 +66,8 @@ export function useTroopTraining() {
   const trainings = computed(() => cache.value['getTrainings:unit']?.data || cache.value.getTrainings?.data);
 
   const totalInjured = computed(() => {
-    return (healing.value?.injuredUnits || []).reduce((sum: number, u: any) => sum + (Number(u?.count) || 0), 0);
+    const list = normalizeArray(healing.value?.injuredUnits);
+    return list.reduce((sum: number, u: any) => sum + (Number(u?.count) || 0), 0);
   });
 
   const isHealingActive = computed(() => {
@@ -101,7 +104,8 @@ export function useTroopTraining() {
     }));
 
     // 1. Available troops
-    for (const item of unitSummary.value?.available || []) {
+    const availableList = normalizeArray(unitSummary.value?.available);
+    for (const item of availableList) {
       const info = getTroopType(item?.unitId);
       const count = Number(item?.count) || 0;
       if (info && count > 0) {
@@ -112,8 +116,10 @@ export function useTroopTraining() {
     }
 
     // 2. Troops in squads
-    for (const sq of unitSummary.value?.squads || []) {
-      for (const u of sq?.units || []) {
+    const squadList = normalizeArray(unitSummary.value?.squads);
+    for (const sq of squadList) {
+      const squadUnits = normalizeArray(sq?.units);
+      for (const u of squadUnits) {
         const info = getTroopType(u?.id);
         const count = Number(u?.state?.survived) || 0;
         if (info && count > 0) {
@@ -125,7 +131,8 @@ export function useTroopTraining() {
     }
 
     // 3. Hospital / Injured units
-    for (const item of healing.value?.injuredUnits || []) {
+    const injuredList = normalizeArray(healing.value?.injuredUnits);
+    for (const item of injuredList) {
       const info = getTroopType(item?.unitId);
       const count = Number(item?.count) || 0;
       if (info && count > 0) {
@@ -134,8 +141,8 @@ export function useTroopTraining() {
     }
 
     // 4. Healing active & timer
-    const healingUnits = healing.value?.healing?.units;
-    if (Array.isArray(healingUnits) && Number.isFinite(healing.value.healing.startDate) && Number.isFinite(healing.value.healing.duration)) {
+    const healingUnits = normalizeArray(healing.value?.healing?.units);
+    if (healingUnits.length > 0 && Number.isFinite(healing.value?.healing?.startDate) && Number.isFinite(healing.value?.healing?.duration)) {
       const endsAt = healing.value.healing.startDate + healing.value.healing.duration;
       for (const item of healingUnits) {
         const info = getTroopType(item?.unitId);
@@ -151,7 +158,8 @@ export function useTroopTraining() {
     }
 
     // 5. Training queues & timer
-    for (const q of trainings.value?.trainingQueues || []) {
+    const queueList = normalizeArray(trainings.value?.trainingQueues);
+    for (const q of queueList) {
       const info = getTroopType(q?.unitId);
       const count = Number(q?.unitCount) || 0;
       if (info && count > 0) {
@@ -197,17 +205,19 @@ export function useTroopTraining() {
     await updateCacheLocally((draft) => {
       const trainKey = draft['getTrainings:unit'] ? 'getTrainings:unit' : (draft.getTrainings ? 'getTrainings' : 'getTrainings:unit');
       if (draft[trainKey]?.data?.trainingQueues) {
-        draft[trainKey].data.trainingQueues = draft[trainKey].data.trainingQueues.filter((q: any) => q !== completedQueue);
+        const queues = normalizeArray(draft[trainKey].data.trainingQueues);
+        draft[trainKey].data.trainingQueues = queues.filter((q: any) => q !== completedQueue);
       }
       const sumKey = draft['getUnitSummary:unit'] ? 'getUnitSummary:unit' : (draft.getUnitSummary ? 'getUnitSummary' : 'getUnitSummary:unit');
       if (draft[sumKey]?.data?.available) {
-        const avail = draft[sumKey].data.available;
+        const avail = normalizeArray(draft[sumKey].data.available);
         const match = avail.find((item: any) => Number(item.unitId) === qUnitId);
         if (match) {
           match.count = (Number(match.count) || 0) + qCount;
         } else {
           avail.push({ unitId: qUnitId, count: qCount });
         }
+        draft[sumKey].data.available = avail;
       }
     });
 
@@ -234,7 +244,7 @@ export function useTroopTraining() {
     await updateCacheLocally((draft) => {
       const trainKey = draft['getTrainings:unit'] ? 'getTrainings:unit' : (draft.getTrainings ? 'getTrainings' : 'getTrainings:unit');
       if (draft[trainKey]?.data) {
-        const queues = [...(draft[trainKey].data.trainingQueues || [])];
+        const queues = [...normalizeArray(draft[trainKey].data.trainingQueues)];
         queues.push({ unitId: targetUnitId, unitCount: count, startDate, duration });
         draft[trainKey].data.trainingQueues = queues;
       }
@@ -251,46 +261,60 @@ export function useTroopTraining() {
   }
 
   async function healAll() {
-    const unitsToHeal = (healing.value?.injuredUnits || [])
+    if (isHealLoading.value) return;
+    const injuredList = normalizeArray(healing.value?.injuredUnits);
+    const unitsToHeal = injuredList
       .filter((u: any) => Number(u?.count) > 0)
       .map((u: any) => ({ unitId: Number(u.unitId), count: Number(u.count) }));
     if (unitsToHeal.length === 0) return;
 
-    const countSum = unitsToHeal.reduce((s: number, u: any) => s + u.count, 0);
-    const duration = Math.max(60000, countSum * 8000);
-    const startDate = Date.now();
+    isHealLoading.value = true;
+    try {
+      const countSum = unitsToHeal.reduce((s: number, u: any) => s + u.count, 0);
+      const duration = Math.max(60000, countSum * 8000);
+      const startDate = Date.now();
 
-    await updateCacheLocally((draft) => {
-      const healKey = draft['getHealing:unit'] ? 'getHealing:unit' : (draft.getHealing ? 'getHealing' : 'getHealing:unit');
-      if (draft[healKey]?.data) {
-        draft[healKey].data = {
-          ...draft[healKey].data,
-          healing: { startDate, duration, units: unitsToHeal },
-        };
-      }
-    });
+      await updateCacheLocally((draft) => {
+        const healKey = draft['getHealing:unit'] ? 'getHealing:unit' : (draft.getHealing ? 'getHealing' : 'getHealing:unit');
+        if (draft[healKey]?.data) {
+          draft[healKey].data = {
+            ...draft[healKey].data,
+            healing: { startDate, duration, units: unitsToHeal },
+          };
+        }
+      });
 
-    await dispatchRpc([
-      {
-        name: 'startHealing',
-        args: { startDate, duration, units: unitsToHeal },
-        feature: 'unit',
-      },
-    ]);
+      await dispatchRpc([
+        {
+          name: 'startHealing',
+          args: { startDate, duration, units: unitsToHeal },
+          feature: 'unit',
+        },
+        { name: 'getHealing', feature: 'unit' },
+      ]);
+    } finally {
+      isHealLoading.value = false;
+    }
   }
 
   async function syncHealed() {
-    await updateCacheLocally((draft) => {
-      const healKey = draft['getHealing:unit'] ? 'getHealing:unit' : (draft.getHealing ? 'getHealing' : 'getHealing:unit');
-      if (draft[healKey]?.data) {
-        draft[healKey].data = { ...draft[healKey].data, healing: null };
-      }
-    });
+    if (isSyncLoading.value) return;
+    isSyncLoading.value = true;
+    try {
+      await updateCacheLocally((draft) => {
+        const healKey = draft['getHealing:unit'] ? 'getHealing:unit' : (draft.getHealing ? 'getHealing' : 'getHealing:unit');
+        if (draft[healKey]?.data) {
+          draft[healKey].data = { ...draft[healKey].data, healing: null };
+        }
+      });
 
-    await dispatchRpc([
-      { name: 'getUnitSummary', feature: 'unit' },
-      { name: 'getHealing', feature: 'unit' },
-    ]);
+      await dispatchRpc([
+        { name: 'getUnitSummary', feature: 'unit' },
+        { name: 'getHealing', feature: 'unit' },
+      ]);
+    } finally {
+      isSyncLoading.value = false;
+    }
   }
 
   return {
@@ -300,6 +324,8 @@ export function useTroopTraining() {
     isHealingActive,
     isHealingReady,
     isRefreshing,
+    isSyncLoading,
+    isHealLoading,
     now,
     trainings,
     setMaxTarget,

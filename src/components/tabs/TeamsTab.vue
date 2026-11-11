@@ -11,7 +11,7 @@ interface CustomTeam {
   maxTroops?: number;
 }
 
-const { cache } = useRpcCache();
+const { cache, dispatchRpc } = useRpcCache();
 
 const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const heroesData = computed(() => cache.value.heroGetAll?.data || {});
@@ -19,6 +19,7 @@ const heroesData = computed(() => cache.value.heroGetAll?.data || {});
 const customTeams = ref<CustomTeam[]>([]);
 const isEditing = ref(false);
 const editingTeamId = ref<string | null>(null);
+const isRefreshing = ref(false);
 
 const formName = ref('');
 const formMaxTroops = ref<string>('');
@@ -41,8 +42,82 @@ async function loadTeams() {
   }
 }
 
+async function refreshTeams() {
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([
+      { name: 'teamGetAll' },
+      { name: 'heroGetAll' },
+    ]);
+  } finally {
+    isRefreshing.value = false;
+  }
+}
+
 onMounted(() => {
   loadTeams();
+  if (!cache.value.teamGetAll?.data) {
+    refreshTeams();
+  }
+});
+
+// Server-saved teams from teamGetAll RPC
+const serverTeams = computed(() => {
+  const data = cache.value.teamGetAll?.data || {};
+  const result: Array<{
+    mode: string;
+    label: string;
+    teamNumber: number | string;
+    heroIds: number[];
+    power: number;
+  }> = [];
+
+  const modeLabels: Record<string, string> = {
+    arena: 'Arena Defense',
+    bossFight: 'Guild Raid / Boss',
+    magicTower: 'Tower',
+    dungeon: 'Dungeon',
+    globalMapCamp: 'Camp March',
+    globalMapTeamKey: 'Global Map',
+    globalMapRallyAutoJoinTeamKey: 'Auto-Rally Join',
+  };
+
+  for (const [mode, rawMembers] of Object.entries(data)) {
+    if (!rawMembers) continue;
+    const groups: any[] = Array.isArray(rawMembers)
+      ? (rawMembers.some(Array.isArray) ? rawMembers : [rawMembers])
+      : (typeof rawMembers === 'object' ? Object.values(rawMembers) : []);
+
+    groups.forEach((group: any, idx: number) => {
+      let ids: number[] = [];
+      if (Array.isArray(group)) {
+        ids = group.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      } else if (typeof group === 'object' && group !== null) {
+        ids = Object.values(group).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      }
+
+      if (ids.length > 0) {
+        let label = modeLabels[mode];
+        if (!label) {
+          if (mode.startsWith('clanBossHead_')) {
+            label = `Hydra Head #${mode.replace('clanBossHead_', '')}`;
+          } else {
+            label = mode.charAt(0).toUpperCase() + mode.slice(1);
+          }
+        }
+
+        result.push({
+          mode,
+          label,
+          teamNumber: groups.length > 1 ? idx + 1 : 1,
+          heroIds: ids,
+          power: getTeamPower(ids),
+        });
+      }
+    });
+  }
+
+  return result;
 });
 
 // Available heroes sorted by power descending
@@ -84,6 +159,16 @@ function openEditTeam(team: CustomTeam) {
   formName.value = team.name;
   formMaxTroops.value = team.maxTroops !== undefined ? String(team.maxTroops) : '';
   selectedHeroIds.value = [...team.heroIds];
+  heroSearch.value = '';
+  formError.value = '';
+  isEditing.value = true;
+}
+
+function cloneServerTeamToCustom(st: { label: string; heroIds: number[] }) {
+  editingTeamId.value = null;
+  formName.value = `${st.label} Lineup`;
+  formMaxTroops.value = '';
+  selectedHeroIds.value = st.heroIds.slice(0, 5);
   heroSearch.value = '';
   formError.value = '';
   isEditing.value = true;
@@ -168,30 +253,46 @@ function getTeamPower(heroIds: number[]): number {
 <template>
   <div class="space-y-4">
     <!-- Header Card -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex items-center justify-between">
+    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <span>⚔️</span>
-          <span>Custom Raid & Farm Teams</span>
+          <span>Teams Management</span>
         </h2>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Preset hero lineups for Guild Raids, Solo Monster attacks, and Gathering marches.
+          Server-saved battle lineups and custom presets for Raids, Monsters, and Gathering.
         </p>
       </div>
 
-      <button
-        v-if="!isEditing"
-        type="button"
-        class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors"
-        @click="openAddTeam"
-      >
-        <span>+ Add Team</span>
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          id="btn-toolbar-refresh-teams"
+          type="button"
+          :disabled="isRefreshing"
+          class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 transition-colors disabled:opacity-50"
+          title="Refresh server teams and heroes via RPC"
+          @click="refreshTeams"
+        >
+          <span :class="{ 'animate-spin': isRefreshing }">🔄</span>
+          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
+        </button>
+
+        <button
+          v-if="!isEditing"
+          id="btn-add-custom-team"
+          type="button"
+          class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors"
+          @click="openAddTeam"
+        >
+          <span>+ Add Custom Team</span>
+        </button>
+      </div>
     </div>
 
     <!-- Team Editor Form -->
     <div
       v-if="isEditing"
+      id="team-editor-form"
       class="rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 p-4 space-y-3.5 shadow-sm"
     >
       <div class="flex items-center justify-between border-b border-blue-100 dark:border-blue-900/40 pb-2.5">
@@ -331,54 +432,128 @@ function getTeamPower(heroIds: number[]): number {
       </div>
     </div>
 
-    <!-- Custom Teams List -->
-    <div v-if="customTeams.length === 0 && !isEditing" class="p-8 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-      No custom teams configured. Click "+ Add Team" to configure custom 5-hero lineups.
-    </div>
+    <!-- SECTION 1: SERVER-SAVED LINEUPS -->
+    <div id="server-teams-section" class="space-y-2.5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+          <span>🏰</span>
+          <span>Server-Saved Lineups</span>
+          <span class="text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">
+            {{ serverTeams.length }}
+          </span>
+        </h3>
+        <span class="text-xs text-slate-400">Synchronized from game RPC (teamGetAll)</span>
+      </div>
 
-    <div v-else class="space-y-2.5">
-      <div
-        v-for="team in customTeams"
-        :key="team.id"
-        class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-      >
-        <div class="min-w-0 flex-1 space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-sm text-slate-900 dark:text-slate-100">{{ team.name }}</span>
-            <span class="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-600 dark:text-slate-300">
-              Power: {{ formatNumber(getTeamPower(team.heroIds)) }}
-            </span>
-            <span class="rounded bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
-              Troops: {{ team.maxTroops != null ? formatNumber(team.maxTroops) : 'Automatic' }}
-            </span>
+      <div v-if="serverTeams.length === 0" class="p-6 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+        No server-saved teams loaded yet. Click "Refresh" or launch the game to synchronize lineups.
+      </div>
+
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+        <div
+          v-for="(st, idx) in serverTeams"
+          :key="`${st.mode}_${st.teamNumber}_${idx}`"
+          class="server-team-card rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xs space-y-2"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 px-2 py-0.5 text-xs font-bold truncate">
+                {{ st.label }}
+              </span>
+              <span v-if="st.teamNumber && st.teamNumber !== 1" class="text-xs text-slate-400 font-medium">
+                #{{ st.teamNumber }}
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-700 dark:text-slate-300">
+                Power: {{ formatNumber(st.power) }}
+              </span>
+
+              <button
+                type="button"
+                class="btn-clone-server-team cursor-pointer text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline px-1.5 py-0.5 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                title="Copy heroes into a new custom team"
+                @click="cloneServerTeamToCustom(st)"
+              >
+                + Clone
+              </button>
+            </div>
           </div>
 
-          <div class="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1.5">
+          <div class="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
             <span
-              v-for="hid in team.heroIds"
+              v-for="hid in st.heroIds"
               :key="hid"
-              class="rounded bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 text-[11px] border border-slate-200 dark:border-slate-700"
+              class="rounded bg-slate-50 dark:bg-slate-800/80 px-1.5 py-0.5 text-[11px] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
             >
               {{ getHeroName(hid) }}
             </span>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
-          <button
-            type="button"
-            class="cursor-pointer text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-            @click="openEditTeam(team)"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            class="cursor-pointer text-xs font-semibold text-red-600 dark:text-red-400 hover:underline px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-            @click="deleteTeam(team.id)"
-          >
-            Delete
-          </button>
+    <!-- SECTION 2: CUSTOM TEAMS -->
+    <div id="custom-teams-section" class="space-y-2.5 pt-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+          <span>⚙️</span>
+          <span>Custom Preset Lineups</span>
+          <span class="text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">
+            {{ customTeams.length }}
+          </span>
+        </h3>
+      </div>
+
+      <div v-if="customTeams.length === 0 && !isEditing" class="p-8 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+        No custom teams configured. Click "+ Add Custom Team" or "+ Clone" from a server squad above.
+      </div>
+
+      <div v-else class="space-y-2.5">
+        <div
+          v-for="team in customTeams"
+          :key="team.id"
+          class="custom-team-card rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        >
+          <div class="min-w-0 flex-1 space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-sm text-slate-900 dark:text-slate-100">{{ team.name }}</span>
+              <span class="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-600 dark:text-slate-300">
+                Power: {{ formatNumber(getTeamPower(team.heroIds)) }}
+              </span>
+              <span class="rounded bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                Troops: {{ team.maxTroops != null ? formatNumber(team.maxTroops) : 'Automatic' }}
+              </span>
+            </div>
+
+            <div class="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1.5">
+              <span
+                v-for="hid in team.heroIds"
+                :key="hid"
+                class="rounded bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 text-[11px] border border-slate-200 dark:border-slate-700"
+              >
+                {{ getHeroName(hid) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <button
+              type="button"
+              class="cursor-pointer text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+              @click="openEditTeam(team)"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer text-xs font-semibold text-red-600 dark:text-red-400 hover:underline px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+              @click="deleteTeam(team.id)"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
     </div>

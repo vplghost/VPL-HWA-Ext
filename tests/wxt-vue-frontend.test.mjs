@@ -125,6 +125,9 @@ test('DraftModal, GuildVersusModal, and GuildChatPanel have 1:1 ID parity with H
   assert.match(gvs, /id="gvs-league-badge"/, 'Must have #gvs-league-badge');
   assert.match(gvs, /id="gvs-modal-close"/, 'Must have #gvs-modal-close');
   assert.match(gvs, /id="gvs-modal-body"/, 'Must have #gvs-modal-body');
+  assert.match(gvs, /Stacked Deck/, 'Must have Stacked Deck mode');
+  assert.match(gvs, /Grid View/, 'Must have Grid View mode');
+  assert.match(gvs, /formatRewardItem/, 'Must have reward itemization formatter');
 
   const chat = await readFile(join(root, 'src/components/common/GuildChatPanel.vue'), 'utf8');
   assert.match(chat, /id="guild-chat-panel"/, 'Must have #guild-chat-panel');
@@ -135,6 +138,17 @@ test('DraftModal, GuildVersusModal, and GuildChatPanel have 1:1 ID parity with H
   assert.match(chat, /id="guild-chat-form"/, 'Must have #guild-chat-form');
   assert.match(chat, /id="guild-chat-input"/, 'Must have #guild-chat-input');
   assert.match(chat, /id="guild-chat-send"/, 'Must have #guild-chat-send');
+});
+
+test('TowerModal provides 1:1 HTML parity for buff priorities, team selectors, and run execution', async () => {
+  const tower = await readFile(join(root, 'src/components/dialogs/TowerModal.vue'), 'utf8');
+  assert.match(tower, /id="tower-modal-badge"/, 'Must have #tower-modal-badge');
+  assert.match(tower, /towerAutomationSettings/, 'Must bind towerAutomationSettings');
+  assert.match(tower, /tower-run-start/, 'Must dispatch tower-run-start');
+  assert.match(tower, /tower-run-stop/, 'Must dispatch tower-run-stop');
+  assert.match(tower, /buffPriority/, 'Must include buffPriority');
+  assert.match(tower, /data-tower-accordion/, 'Must include data-tower-accordion');
+  assert.match(tower, /Auto-fill Top 5 Power/, 'Must have auto-fill button');
 });
 
 test('QuestDetailModal and CampaignRaidModal have 1:1 ID parity with HTML dialogs', async () => {
@@ -168,6 +182,11 @@ test('DungeonModal has 1:1 ID parity and controls matching HTML dungeon-modal', 
   assert.match(content, /dungeon-auto-label/, 'Must have .dungeon-auto-label');
   assert.match(content, /dungeon-refresh-label/, 'Must have .dungeon-refresh-label');
   assert.match(content, /dungeon-clear-active-battle-btn/, 'Must have reset battle button');
+  assert.match(content, /dungeon-combat-log-section/, 'Must have #dungeon-combat-log-section');
+  assert.match(content, /dungeon-flawless-count/, 'Must have #dungeon-flawless-count');
+  assert.match(content, /dungeon-total-battles/, 'Must have #dungeon-total-battles');
+  assert.match(content, /dungeon-doors-grid/, 'Must have #dungeon-doors-grid');
+  assert.match(content, /dungeon-titan-roster/, 'Must have #dungeon-titan-roster');
 });
 
 test('App.vue and index.html support full width and height on browser without fixed max-h constraint', async () => {
@@ -220,7 +239,15 @@ test('BuildingModal and ResearchModal have 1:1 ID parity and queue controls matc
   assert.match(bContent, /id="building-dialog-title"/, 'Must have #building-dialog-title');
   assert.match(bContent, /id="building-dialog-status"/, 'Must have #building-dialog-status');
   assert.match(bContent, /id="building-dialog-body"/, 'Must have #building-dialog-body');
+  assert.match(bContent, /id="next-building-count-badge"/, 'Must have #next-building-count-badge');
+  assert.match(bContent, /id="next-building-search-input"/, 'Must have #next-building-search-input');
+  assert.match(bContent, /id="next-building-sort-select"/, 'Must have #next-building-sort-select');
+  assert.match(bContent, /id="next-building-grid"/, 'Must have #next-building-grid');
+  assert.match(bContent, /id="building-count-subtitle"/, 'Must have #building-count-subtitle');
+  assert.match(bContent, /id="building-search-input"/, 'Must have #building-search-input');
+  assert.match(bContent, /id="building-grid-list"/, 'Must have #building-grid-list');
   assert.match(bContent, /completeConstruction/, 'Must have completeConstruction RPC');
+  assert.match(bContent, /startConstruction/, 'Must have startConstruction RPC');
   assert.match(bContent, /Auto-Build Queue/, 'Must have Auto-Build Queue');
 
   const rContent = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
@@ -228,7 +255,16 @@ test('BuildingModal and ResearchModal have 1:1 ID parity and queue controls matc
   assert.match(rContent, /id="research-dialog-title"/, 'Must have #research-dialog-title');
   assert.match(rContent, /id="research-dialog-status"/, 'Must have #research-dialog-status');
   assert.match(rContent, /id="research-dialog-body"/, 'Must have #research-dialog-body');
+  assert.match(rContent, /id="next-research-count-badge"/, 'Must have #next-research-count-badge');
+  assert.match(rContent, /id="next-research-search-input"/, 'Must have #next-research-search-input');
+  assert.match(rContent, /id="next-research-sort-select"/, 'Must have #next-research-sort-select');
+  assert.match(rContent, /id="next-research-grid"/, 'Must have #next-research-grid');
+  assert.match(rContent, /id="research-count-subtitle"/, 'Must have #research-count-subtitle');
+  assert.match(rContent, /id="research-search-input"/, 'Must have #research-search-input');
+  assert.match(rContent, /id="research-filter-tabs"/, 'Must have #research-filter-tabs');
+  assert.match(rContent, /id="research-grid-list"/, 'Must have #research-grid-list');
   assert.match(rContent, /completeResearch/, 'Must have completeResearch RPC');
+  assert.match(rContent, /startResearch/, 'Must have startResearch RPC');
   assert.match(rContent, /Auto-Research Queue/, 'Must have Auto-Research Queue');
 });
 
@@ -319,4 +355,59 @@ test('HeroesTab and HeroHoverCard provide full HTML parity: table view, favorite
   const nav = await readFile(join(root, 'src/components/common/TabNav.vue'), 'utf8');
   assert.match(nav, /id="heroes-tab-badge"/, 'TabNav must have id="heroes-tab-badge"');
   assert.match(nav, /countEvolvableHeroes/, 'TabNav must calculate countEvolvableHeroes');
+});
+
+test('useTroopTraining exports normalizeArray and guards against non-array payloads', async () => {
+  const { normalizeArray } = await import('../src/utils/troops.ts');
+  assert.deepEqual(normalizeArray(null), []);
+  assert.deepEqual(normalizeArray(undefined), []);
+  assert.deepEqual(normalizeArray([1, 2, 3]), [1, 2, 3]);
+  assert.deepEqual(normalizeArray({ a: 1, b: 2 }), [1, 2]);
+
+  const overview = await readFile(join(root, 'src/components/dashboard/TroopsOverview.vue'), 'utf8');
+  assert.match(overview, /normalizeArray/, 'TroopsOverview must use normalizeArray');
+  assert.match(overview, /isSyncLoading/, 'TroopsOverview must handle isSyncLoading');
+  assert.match(overview, /isHealLoading/, 'TroopsOverview must handle isHealLoading');
+});
+
+test('resourceData resolves human-readable worldMaterialNames instead of raw material codes', async () => {
+  const { resourceLabel, worldMaterialNames } = await import('../src/utils/resourceData.ts');
+  assert.equal(worldMaterialNames[1], 'Elarite Shards');
+  assert.equal(worldMaterialNames[2], 'Iron');
+  assert.equal(worldMaterialNames[3], 'Stone');
+  assert.equal(worldMaterialNames[4], 'Wood');
+  assert.equal(worldMaterialNames[5], 'Food');
+  assert.equal(worldMaterialNames[12], 'Honor Marks');
+
+  assert.equal(resourceLabel({ key: 'resource:material:1' }), 'Elarite Shards');
+  assert.equal(resourceLabel({ key: 'resource:material:2' }), 'Iron');
+  assert.equal(resourceLabel({ key: 'resource:material:5' }), 'Food');
+  assert.equal(resourceLabel({ key: 'resource:gold' }), 'Gold');
+  assert.equal(resourceLabel({ key: 'resource:starMoney' }), 'Emeralds');
+});
+
+test('TeamsTab loads server-saved teams from teamGetAll cache with clone action and refresh', async () => {
+  const teams = await readFile(join(root, 'src/components/tabs/TeamsTab.vue'), 'utf8');
+  assert.match(teams, /server-teams-section/, 'TeamsTab must have #server-teams-section');
+  assert.match(teams, /serverTeams/, 'TeamsTab must compute serverTeams');
+  assert.match(teams, /btn-clone-server-team/, 'TeamsTab must have .btn-clone-server-team');
+  assert.match(teams, /btn-toolbar-refresh-teams/, 'TeamsTab must have #btn-toolbar-refresh-teams');
+  assert.match(teams, /cloneServerTeamToCustom/, 'TeamsTab must implement cloneServerTeamToCustom');
+});
+
+test('ItemsTab and TitansTab support unified view switchers, count badges, and export functionality', async () => {
+  const items = await readFile(join(root, 'src/components/tabs/ItemsTab.vue'), 'utf8');
+  assert.match(items, /categorizedSections/, 'ItemsTab must compute categorizedSections');
+  assert.match(items, /btn-toolbar-export-items/, 'ItemsTab must have #btn-toolbar-export-items');
+  assert.match(items, /btn-toolbar-refresh-items/, 'ItemsTab must have #btn-toolbar-refresh-items');
+  assert.match(items, /getItemName/, 'ItemsTab must resolve in-game names via getItemName');
+
+  const titans = await readFile(join(root, 'src/components/tabs/TitansTab.vue'), 'utf8');
+  assert.match(titans, /viewMode/, 'TitansTab must support viewMode');
+  assert.match(titans, /btn-toolbar-export-titans/, 'TitansTab must have #btn-toolbar-export-titans');
+  assert.match(titans, /btn-toolbar-refresh-titans/, 'TitansTab must have #btn-toolbar-refresh-titans');
+
+  const resources = await readFile(join(root, 'src/components/tabs/ResourcesTab.vue'), 'utf8');
+  assert.match(resources, /btn-toolbar-export-resources/, 'ResourcesTab must have #btn-toolbar-export-resources');
+  assert.match(resources, /btn-toolbar-refresh-resources/, 'ResourcesTab must have #btn-toolbar-refresh-resources');
 });

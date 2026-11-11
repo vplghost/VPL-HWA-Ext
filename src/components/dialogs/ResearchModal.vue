@@ -17,6 +17,12 @@ const { cache, dispatchRpc } = useRpcCache();
 const now = ref(Date.now());
 let timer: number | null = null;
 
+// Search and sort filters
+const nextResearchFilterQuery = ref('');
+const nextResearchSortOrder = ref<'level-desc' | 'level-asc' | 'time-asc' | 'time-desc' | 'name-asc'>('level-desc');
+const researchSearchQuery = ref('');
+const researchFilterTab = ref<'all' | 'completed' | 'in_progress' | 'available'>('all');
+
 // Storage-backed auto-queue
 interface ResearchQueueItem {
   researchId: number;
@@ -122,14 +128,14 @@ async function finishResearch(f: any) {
     await dispatchRpc([
       {
         name: 'completeResearch',
-        feature: 'research',
+        feature: 'personalResearch',
         args: {
           researchId: f.researchId,
-          nextLevel: f.level,
-          completeDate: Date.now(),
+          level: f.level,
+          queueNumber: f.queueNumber || 0,
         },
       },
-      { name: 'getSummary', feature: 'research', args: {} },
+      { name: 'getSummary', feature: 'personalResearch', args: {} },
     ]);
   } finally {
     isFinishing.value[key] = false;
@@ -184,43 +190,152 @@ function clearQueue() {
   saveResearchQueue();
 }
 
-// Candidate upgrades
+// Researches from cache
 const rawResearches = computed(() => {
   const data = cache.value?.researchStatus?.data?.researches || cache.value?.clan_getSummary?.data?.researches || [];
   if (Array.isArray(data)) return data;
   return Object.entries(data).map(([id, r]: [string, any]) => ({
     id: Number(id),
     level: Number(r.level) || 0,
-    isResearched: true,
+    isCompleted: true,
   }));
 });
 
+// All researches directory data
+const allResearchesList = computed(() => {
+  const researchMap = new Map<number, any>();
+  const raw = rawResearches.value;
+  for (const r of raw) {
+    const rId = Number(r.researchId ?? r.id);
+    if (Number.isFinite(rId)) {
+      researchMap.set(rId, {
+        id: rId,
+        level: r.level ?? 1,
+        isCompleted: true,
+        isResearching: false,
+        nextLevel: (r.level ?? 1) + 1,
+      });
+    }
+  }
+
+  for (const q of activeQueues.value) {
+    const rId = Number(q.researchId);
+    if (researchMap.has(rId)) {
+      const item = researchMap.get(rId)!;
+      item.isResearching = true;
+      item.nextLevel = q.level ?? (item.level + 1);
+    } else {
+      researchMap.set(rId, {
+        id: rId,
+        level: q.level ? q.level - 1 : 0,
+        isCompleted: false,
+        isResearching: true,
+        nextLevel: q.level ?? 1,
+      });
+    }
+  }
+
+  const allDict = (globalThis as any).hwaHelperNameData?.names?.research || {};
+  for (const key of Object.keys(allDict)) {
+    const rId = Number(key);
+    if (!researchMap.has(rId)) {
+      researchMap.set(rId, {
+        id: rId,
+        level: 0,
+        isCompleted: false,
+        isResearching: false,
+        nextLevel: 1,
+      });
+    }
+  }
+
+  const rDataDict = (globalThis as any).hwaHelperResearchData?.data || {};
+  for (const key of Object.keys(rDataDict)) {
+    const rId = Number(key);
+    if (!researchMap.has(rId)) {
+      researchMap.set(rId, {
+        id: rId,
+        level: 0,
+        isCompleted: false,
+        isResearching: false,
+        nextLevel: 1,
+      });
+    }
+  }
+
+  return Array.from(researchMap.values());
+});
+
+const completedResearchesCount = computed(() => {
+  return allResearchesList.value.filter((r) => r.isCompleted).length;
+});
+
+const availableResearchesCount = computed(() => {
+  return allResearchesList.value.filter((r) => !r.isCompleted && !r.isResearching).length;
+});
+
+// Candidate upgrades
 const upgradeCandidates = computed(() => {
   const rHelper = (globalThis as any).hwaHelperResearchData;
   const rQueueHelper = (globalThis as any).hwaHelperResearchQueue;
 
   const researchMap = new Map();
-  for (const r of rawResearches.value) {
+  for (const r of allResearchesList.value) {
     researchMap.set(Number(r.id), Number(r.level) || 0);
   }
 
   if (rQueueHelper?.getSimulatedLevels && rQueueHelper?.getEligibleCandidates && rHelper) {
     const simulated = rQueueHelper.getSimulatedLevels(researchMap, rawQueues.value, researchQueue.value.items);
-    return rQueueHelper.getEligibleCandidates(rawResearches.value, simulated, rHelper);
+    return rQueueHelper.getEligibleCandidates(allResearchesList.value, simulated, rHelper);
   }
 
   // Fallback candidates
-  return rawResearches.value.map((r: any) => {
-    const curLevel = Number(r.level) || 0;
-    const nextLevel = curLevel + 1;
-    return {
-      id: Number(r.id),
-      name: getResearchName(r.id),
-      currentLevel: curLevel,
-      nextLevel,
-      durationMs: 300000,
-    };
-  });
+  return allResearchesList.value
+    .filter((r) => !r.isResearching && (r.isCompleted || r.level > 0))
+    .map((r: any) => {
+      const curLevel = Number(r.level) || 0;
+      const nextLevel = curLevel + 1;
+      return {
+        id: Number(r.id),
+        name: getResearchName(r.id),
+        currentLevel: curLevel,
+        nextLevel,
+        durationMs: 300000,
+        isCompleted: r.isCompleted,
+      };
+    });
+});
+
+const filteredNextResearch = computed(() => {
+  const query = nextResearchFilterQuery.value.toLowerCase().trim();
+  return upgradeCandidates.value
+    .filter((r: any) => {
+      if (!query) return true;
+      const name = (r.name || getResearchName(r.id)).toLowerCase();
+      const idStr = String(r.id);
+      return name.includes(query) || idStr.includes(query);
+    })
+    .sort((a: any, b: any) => {
+      const aDur = a.durationMs || 0;
+      const bDur = b.durationMs || 0;
+      const aLvl = a.currentLevel ?? a.level ?? 0;
+      const bLvl = b.currentLevel ?? b.level ?? 0;
+      if (nextResearchSortOrder.value === 'time-asc') {
+        return (aDur - bDur) || (bLvl - aLvl) || (a.id - b.id);
+      }
+      if (nextResearchSortOrder.value === 'time-desc') {
+        return (bDur - aDur) || (bLvl - aLvl) || (a.id - b.id);
+      }
+      if (nextResearchSortOrder.value === 'level-asc') {
+        return (aLvl - bLvl) || (a.id - b.id);
+      }
+      if (nextResearchSortOrder.value === 'name-asc') {
+        const nameA = a.name || getResearchName(a.id);
+        const nameB = b.name || getResearchName(b.id);
+        return nameA.localeCompare(nameB) || (a.id - b.id);
+      }
+      return (bLvl - aLvl) || (a.id - b.id);
+    });
 });
 
 function addToQueue(candidate: any) {
@@ -233,8 +348,91 @@ function addToQueue(candidate: any) {
   saveResearchQueue();
 }
 
+const isStarting = ref<Record<string, boolean>>({});
+
+function hasEnoughResearchResources(candidate: any) {
+  const rHelper = (globalThis as any).hwaHelperResearchData;
+  if (!rHelper?.getMissingCosts) return true;
+  const resourcesMap = new Map([
+    [1, cache.value?.['resource:material:1']?.data?.amount ?? 0],
+    [2, cache.value?.['resource:material:2']?.data?.amount ?? 0],
+    [3, cache.value?.['resource:material:3']?.data?.amount ?? 0],
+    [4, cache.value?.['resource:material:4']?.data?.amount ?? 0],
+    [5, cache.value?.['resource:material:5']?.data?.amount ?? 0],
+    [12, cache.value?.['resource:material:12']?.data?.amount ?? 0],
+  ]);
+  const missing = rHelper.getMissingCosts(candidate.id, candidate.nextLevel, resourcesMap);
+  return !missing || missing.length === 0;
+}
+
+function requiresSpecialResource(researchId: number, nextLevel: number): boolean {
+  const rHelper = (globalThis as any).hwaHelperResearchData;
+  if (rHelper?.requiresSpecialResource) {
+    return rHelper.requiresSpecialResource(researchId, nextLevel);
+  }
+  return false;
+}
+
+async function startResearchUpgrade(candidate: any) {
+  const key = `${candidate.id}-${candidate.nextLevel}`;
+  isStarting.value[key] = true;
+  try {
+    const calls: any[] = [];
+    for (const f of finishedQueues.value) {
+      calls.push({
+        name: 'completeResearch',
+        feature: 'personalResearch',
+        args: {
+          researchId: f.researchId,
+          level: f.level,
+          queueNumber: f.queueNumber || 0,
+        },
+      });
+    }
+    calls.push({
+      name: 'startResearch',
+      feature: 'personalResearch',
+      args: {
+        researchId: candidate.id,
+        nextLevel: candidate.nextLevel,
+        level: candidate.nextLevel,
+        startDate: Date.now(),
+        durationMs: candidate.durationMs || 60000,
+        queueNumber: 0,
+      },
+    });
+    calls.push({ name: 'getSummary', feature: 'personalResearch', args: {} });
+    await dispatchRpc(calls);
+  } finally {
+    isStarting.value[key] = false;
+  }
+}
+
+// Section 3: Directory filter
+const filteredResearchDirectory = computed(() => {
+  const query = researchSearchQuery.value.toLowerCase().trim();
+  return allResearchesList.value
+    .filter((r: any) => {
+      if (researchFilterTab.value === 'completed' && !r.isCompleted) return false;
+      if (researchFilterTab.value === 'in_progress' && !r.isResearching) return false;
+      if (researchFilterTab.value === 'available' && (r.isCompleted || r.isResearching)) return false;
+      if (!query) {
+        if (researchFilterTab.value === 'all') return r.isCompleted || r.isResearching;
+        return true;
+      }
+      const name = getResearchName(r.id).toLowerCase();
+      const idStr = String(r.id);
+      return name.includes(query) || idStr.includes(query);
+    })
+    .sort((a: any, b: any) => {
+      if (a.isResearching !== b.isResearching) return a.isResearching ? -1 : 1;
+      if (a.isCompleted !== b.isCompleted) return a.isCompleted ? -1 : 1;
+      return (b.level - a.level) || (a.id - b.id);
+    });
+});
+
 async function refreshResearch() {
-  await dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'research' }]);
+  await dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'personalResearch' }]);
 }
 </script>
 
@@ -386,7 +584,7 @@ async function refreshResearch() {
                 </div>
                 <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
                   <div
-                    class="bg-amber-500 h-full rounded-full transition-all"
+                    class="bg-purple-500 h-full rounded-full transition-all"
                     :style="{ width: `${Math.min(100, Math.max(0, ((now - q.startDate) / q.durationMs) * 100))}%` }"
                   ></div>
                 </div>
@@ -534,45 +732,233 @@ async function refreshResearch() {
 
         <!-- Section 2: Research Upgrade Candidates -->
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center justify-between">
-            <span class="flex items-center gap-1.5">
-              <span>🧪</span> Available Technology Researches
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span>⚡</span> Next Research Candidates
+            </h3>
+            <span id="next-research-count-badge" class="text-2xs font-normal text-slate-400">
+              {{ nextResearchFilterQuery ? `${filteredNextResearch.length} / ${upgradeCandidates.length} available` : `${upgradeCandidates.length} available` }}
             </span>
-            <span class="text-2xs font-normal text-slate-400">
-              {{ upgradeCandidates.length }} available
-            </span>
-          </h3>
-
-          <div v-if="upgradeCandidates.length === 0" class="text-center py-4 text-xs text-slate-400">
-            No research upgrade candidates available.
           </div>
 
-          <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-0.5">
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ activeQueues.length > 0 ? 'Academy queue is currently occupied. Once complete, the following technologies can be researched or upgraded next:' : 'Academy queue is available. The following technologies can be researched or upgraded next:' }}
+          </p>
+
+          <!-- Search & Sort Controls -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex-1 min-w-[140px]">
+              <input
+                id="next-research-search-input"
+                v-model="nextResearchFilterQuery"
+                type="search"
+                placeholder="Filter research or ID..."
+                class="h-7 w-full rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-900 placeholder-slate-400 focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
+              />
+            </div>
+            <div class="shrink-0 flex items-center gap-1.5">
+              <span class="text-2xs text-slate-400">Sort:</span>
+              <select
+                id="next-research-sort-select"
+                v-model="nextResearchSortOrder"
+                class="h-7 rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-700 focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              >
+                <option value="level-desc">Level: High → Low</option>
+                <option value="level-asc">Level: Low → High</option>
+                <option value="time-asc">Research Time: Shortest → Longest</option>
+                <option value="time-desc">Research Time: Longest → Shortest</option>
+                <option value="name-asc">Name: A → Z</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="filteredNextResearch.length === 0" class="text-center py-4 text-xs text-slate-400 italic">
+            {{ nextResearchFilterQuery ? 'No matching research found.' : 'No research candidates found.' }}
+          </div>
+
+          <div v-else id="next-research-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
             <div
-              v-for="c in upgradeCandidates"
-              :key="c.id"
-              class="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between text-xs gap-2"
+              v-for="r in filteredNextResearch"
+              :key="`rcandidate-${r.id}`"
+              class="rounded-xl border border-slate-200/90 bg-white p-3 space-y-2 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between"
             >
-              <div class="min-w-0 flex items-center gap-2">
-                <span class="text-base shrink-0">🔬</span>
-                <div class="min-w-0">
-                  <div class="font-semibold text-slate-800 dark:text-slate-200 truncate" :title="c.name">
-                    {{ c.name }}
-                  </div>
-                  <div class="text-[10px] text-slate-400 flex items-center gap-1.5">
-                    <span>Lv. {{ c.currentLevel ?? 0 }} ➔ {{ c.nextLevel }}</span>
-                    <span v-if="c.durationMs">· {{ formatDuration(Math.ceil(c.durationMs / 1000)) }}</span>
-                  </div>
+              <div class="flex items-center justify-between gap-2 min-w-0">
+                <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-mono font-bold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0">
+                    #{{ r.id }}
+                  </span>
+                  <span class="font-bold text-slate-900 dark:text-slate-100 truncate text-xs sm:text-sm" :title="r.name || getResearchName(r.id)">
+                    {{ r.name || getResearchName(r.id) }}
+                  </span>
+                  <span
+                    v-if="requiresSpecialResource(r.id, r.nextLevel)"
+                    class="special-resource-icon inline-flex items-center text-xs shrink-0 cursor-help select-none"
+                    title="Requires Honor Marks / Special Material"
+                    aria-label="Requires Honor Marks"
+                  >
+                    🎖️
+                  </span>
+                </div>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 shrink-0">
+                  {{ (r.currentLevel ?? r.level ?? 0) > 0 ? `Lv. ${r.currentLevel ?? r.level} ➔ ${r.nextLevel}${r.maxLevel ? ` / ${r.maxLevel}` : ''}` : `Research Lv. 1${r.maxLevel ? ` / ${r.maxLevel}` : ''}` }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/50">
+                <div class="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400 min-w-0">
+                  <span class="inline-flex items-center gap-1 font-mono text-slate-600 dark:text-slate-300" title="Research Duration">
+                    <span>⏱</span><span>{{ formatDuration(Math.ceil((r.durationMs || 300000) / 1000)) }}</span>
+                  </span>
+                  <span class="text-slate-300 dark:text-slate-600">·</span>
+                  <span class="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500" title="Estimated Finish Time">
+                    <span>🏁</span><span>{{ new Date((queueTimeline.allDoneAt || now) + (r.durationMs || 300000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
+                  </span>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600"
+                    :title="`Add ${r.name || getResearchName(r.id)} Lv. ${r.nextLevel} to auto-research queue`"
+                    @click="addToQueue(r)"
+                  >
+                    <span>➕</span><span>Queue</span>
+                  </button>
+
+                  <button
+                    v-if="activeQueues.length === 0 && hasEnoughResearchResources(r)"
+                    type="button"
+                    :disabled="isStarting[`${r.id}-${r.nextLevel}`]"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                    :title="`Research ${r.name || getResearchName(r.id)} to Lv. ${r.nextLevel}`"
+                    @click="startResearchUpgrade(r)"
+                  >
+                    <span>🔬</span>
+                    <span>{{ isStarting[`${r.id}-${r.nextLevel}`] ? 'Starting...' : 'Research' }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3: Personal Research Directory -->
+        <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <span>📚</span> Personal Research Directory
+              </h3>
+              <p id="research-count-subtitle" class="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">
+                {{ researchSearchQuery ? `${filteredResearchDirectory.length} matching "${researchSearchQuery}" (${completedResearchesCount} completed)` : `${completedResearchesCount} completed technologies` }}
+              </p>
+            </div>
+
+            <div class="w-full sm:w-64">
+              <input
+                id="research-search-input"
+                v-model="researchSearchQuery"
+                type="search"
+                placeholder="Search technologies or ID..."
+                class="h-8 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-purple-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
+              />
+            </div>
+          </div>
+
+          <!-- Filter Tabs -->
+          <div id="research-filter-tabs" class="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
+              :class="researchFilterTab === 'all' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
+              @click="researchFilterTab = 'all'"
+            >
+              All ({{ allResearchesList.length }})
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
+              :class="researchFilterTab === 'completed' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
+              @click="researchFilterTab = 'completed'"
+            >
+              Completed ({{ completedResearchesCount }})
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
+              :class="researchFilterTab === 'in_progress' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
+              @click="researchFilterTab = 'in_progress'"
+            >
+              In Progress ({{ activeQueues.length }})
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer rounded-lg px-2.5 py-1 text-2xs font-semibold transition-colors"
+              :class="researchFilterTab === 'available' ? 'bg-purple-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'"
+              @click="researchFilterTab = 'available'"
+            >
+              Available ({{ availableResearchesCount }})
+            </button>
+          </div>
+
+          <div v-if="filteredResearchDirectory.length === 0" class="col-span-full py-8 text-center text-xs text-slate-400">
+            No research matches your filters.
+          </div>
+
+          <div v-else id="research-grid-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            <div
+              v-for="r in filteredResearchDirectory"
+              :key="`rdir-${r.id}`"
+              class="flex items-center justify-between gap-2 rounded-lg border p-2.5 text-xs transition-colors"
+              :class="
+                r.isResearching
+                  ? 'border-purple-300 bg-purple-50/70 dark:border-purple-800 dark:bg-purple-950/30'
+                  : r.isCompleted
+                    ? 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+                    : 'border-dashed border-slate-200 bg-slate-50/40 text-slate-400 dark:border-slate-800 dark:bg-slate-900/40'
+              "
+            >
+              <div class="min-w-0">
+                <div
+                  class="font-semibold truncate"
+                  :class="r.isCompleted ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'"
+                  :title="getResearchName(r.id)"
+                >
+                  {{ getResearchName(r.id) }}
+                </div>
+                <div class="text-2xs text-slate-400 dark:text-slate-500">
+                  ID: {{ r.id }}
                 </div>
               </div>
 
-              <button
-                type="button"
-                class="shrink-0 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-2xs cursor-pointer transition-colors"
-                @click="addToQueue(c)"
-              >
-                + Queue
-              </button>
+              <div class="text-right shrink-0 space-y-1">
+                <div
+                  class="font-bold text-xs"
+                  :class="r.isCompleted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'"
+                >
+                  {{ r.isCompleted ? `Lv. ${r.level}` : '—' }}
+                </div>
+                <div>
+                  <span
+                    v-if="r.isResearching"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                  >
+                    <span class="size-1 rounded-full bg-amber-500 animate-pulse"></span>Researching
+                  </span>
+                  <span
+                    v-else-if="r.isCompleted"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  >
+                    Completed
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  >
+                    Available
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </section>

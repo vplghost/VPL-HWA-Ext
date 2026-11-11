@@ -17,6 +17,11 @@ const { cache, dispatchRpc } = useRpcCache();
 const now = ref(Date.now());
 let timer: number | null = null;
 
+// Search and sort filters
+const nextBuildingFilterQuery = ref('');
+const nextBuildingSortOrder = ref<'level-desc' | 'level-asc' | 'time-asc' | 'time-desc' | 'name-asc'>('level-desc');
+const buildingSearchQuery = ref('');
+
 // Storage-backed auto-queue
 interface BuildingQueueItem {
   buildingId: number;
@@ -219,8 +224,41 @@ const upgradeCandidates = computed(() => {
       currentLevel: curLevel,
       nextLevel,
       durationMs: 300000,
+      isBuilt: true,
     };
   });
+});
+
+const filteredNextBuildings = computed(() => {
+  const query = nextBuildingFilterQuery.value.toLowerCase().trim();
+  return upgradeCandidates.value
+    .filter((b: any) => {
+      if (!query) return true;
+      const name = (b.name || getBuildingName(b.id)).toLowerCase();
+      const idStr = String(b.id);
+      return name.includes(query) || idStr.includes(query);
+    })
+    .sort((a: any, b: any) => {
+      const aDur = a.durationMs || 0;
+      const bDur = b.durationMs || 0;
+      const aLvl = a.currentLevel ?? a.level ?? 0;
+      const bLvl = b.currentLevel ?? b.level ?? 0;
+      if (nextBuildingSortOrder.value === 'time-asc') {
+        return (aDur - bDur) || (bLvl - aLvl) || (a.id - b.id);
+      }
+      if (nextBuildingSortOrder.value === 'time-desc') {
+        return (bDur - aDur) || (bLvl - aLvl) || (a.id - b.id);
+      }
+      if (nextBuildingSortOrder.value === 'level-asc') {
+        return (aLvl - bLvl) || (a.id - b.id);
+      }
+      if (nextBuildingSortOrder.value === 'name-asc') {
+        const nameA = a.name || getBuildingName(a.id);
+        const nameB = b.name || getBuildingName(b.id);
+        return nameA.localeCompare(nameB) || (a.id - b.id);
+      }
+      return (bLvl - aLvl) || (a.id - b.id);
+    });
 });
 
 function addToQueue(candidate: any) {
@@ -232,6 +270,126 @@ function addToQueue(candidate: any) {
   });
   saveBuildingQueue();
 }
+
+const isStarting = ref<Record<string, boolean>>({});
+
+function hasEnoughBuildingResources(candidate: any) {
+  const bHelper = (globalThis as any).hwaHelperBuildingData;
+  if (!bHelper?.getMissingCosts) return true;
+  const resourcesMap = new Map([
+    [2, cache.value?.['resource:material:2']?.data?.amount ?? 0],
+    [3, cache.value?.['resource:material:3']?.data?.amount ?? 0],
+    [4, cache.value?.['resource:material:4']?.data?.amount ?? 0],
+    [5, cache.value?.['resource:material:5']?.data?.amount ?? 0],
+  ]);
+  const missing = bHelper.getMissingCosts(candidate.id, candidate.nextLevel, resourcesMap);
+  return !missing || missing.length === 0;
+}
+
+async function startBuildingUpgrade(candidate: any) {
+  const key = `${candidate.id}-${candidate.nextLevel}`;
+  isStarting.value[key] = true;
+  try {
+    const calls: any[] = [];
+    for (const f of finishedQueues.value) {
+      calls.push({
+        name: 'completeConstruction',
+        feature: 'building',
+        args: {
+          buildingId: f.buildingId,
+          nextLevel: f.level,
+          completeDate: Date.now(),
+        },
+      });
+    }
+    calls.push({
+      name: 'startConstruction',
+      feature: 'building',
+      args: {
+        buildingId: candidate.id,
+        nextLevel: candidate.nextLevel,
+        startDate: Date.now(),
+        durationMs: candidate.durationMs || 60000,
+      },
+    });
+    calls.push({ name: 'getSummary', feature: 'building', args: {} });
+    await dispatchRpc(calls);
+  } finally {
+    isStarting.value[key] = false;
+  }
+}
+
+// Section 3: All City Buildings Directory
+const allBuildingsList = computed(() => {
+  const buildingMap = new Map<number, any>();
+  const raw = rawBuildings.value;
+  for (const b of raw) {
+    const bId = Number(b.buildingId ?? b.id);
+    if (Number.isFinite(bId)) {
+      buildingMap.set(bId, {
+        id: bId,
+        level: b.level ?? 1,
+        initialBuildDate: b.initialBuildDate,
+        isBuilt: true,
+        isUpgrading: false,
+        nextLevel: (b.level ?? 1) + 1,
+      });
+    }
+  }
+
+  for (const q of activeQueues.value) {
+    const bId = Number(q.buildingId);
+    if (buildingMap.has(bId)) {
+      const item = buildingMap.get(bId)!;
+      item.isUpgrading = true;
+      item.nextLevel = q.level ?? (item.level + 1);
+    } else {
+      buildingMap.set(bId, {
+        id: bId,
+        level: q.level ? q.level - 1 : 1,
+        isBuilt: true,
+        isUpgrading: true,
+        nextLevel: q.level ?? 2,
+      });
+    }
+  }
+
+  const allDict = (globalThis as any).hwaHelperNameData?.names?.building || {};
+  for (const key of Object.keys(allDict)) {
+    const bId = Number(key);
+    if (!buildingMap.has(bId)) {
+      buildingMap.set(bId, {
+        id: bId,
+        level: 0,
+        isBuilt: false,
+        isUpgrading: false,
+        nextLevel: 1,
+      });
+    }
+  }
+
+  return Array.from(buildingMap.values());
+});
+
+const builtBuildingsCount = computed(() => {
+  return allBuildingsList.value.filter((b) => b.isBuilt).length;
+});
+
+const filteredBuildingDirectory = computed(() => {
+  const query = buildingSearchQuery.value.toLowerCase().trim();
+  return allBuildingsList.value
+    .filter((b: any) => {
+      if (!query) return b.isBuilt;
+      const name = getBuildingName(b.id).toLowerCase();
+      const idStr = String(b.id);
+      return name.includes(query) || idStr.includes(query);
+    })
+    .sort((a: any, b: any) => {
+      if (a.isUpgrading !== b.isUpgrading) return a.isUpgrading ? -1 : 1;
+      if (a.isBuilt !== b.isBuilt) return a.isBuilt ? -1 : 1;
+      return (b.level - a.level) || (a.id - b.id);
+    });
+});
 
 async function refreshBuildings() {
   await dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'building' }]);
@@ -534,45 +692,189 @@ async function refreshBuildings() {
 
         <!-- Section 2: Building Upgrade Candidates -->
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center justify-between">
-            <span class="flex items-center gap-1.5">
-              <span>🏛️</span> Available Building Upgrades
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span>⚡</span> Next Building Candidates
+            </h3>
+            <span id="next-building-count-badge" class="text-2xs font-normal text-slate-400">
+              {{ nextBuildingFilterQuery ? `${filteredNextBuildings.length} / ${upgradeCandidates.length} ready` : `${upgradeCandidates.length} ready` }}
             </span>
-            <span class="text-2xs font-normal text-slate-400">
-              {{ upgradeCandidates.length }} available
-            </span>
-          </h3>
-
-          <div v-if="upgradeCandidates.length === 0" class="text-center py-4 text-xs text-slate-400">
-            No building upgrade candidates available.
           </div>
 
-          <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-0.5">
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ activeQueues.length > 0 ? 'Builder queue is currently occupied. Once complete, the following buildings can be upgraded next:' : 'Builder queue is available. The following buildings can be upgraded next:' }}
+          </p>
+
+          <!-- Search & Sort Controls -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex-1 min-w-[140px]">
+              <input
+                id="next-building-search-input"
+                v-model="nextBuildingFilterQuery"
+                type="search"
+                placeholder="Filter candidates or ID..."
+                class="h-7 w-full rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
+              />
+            </div>
+            <div class="shrink-0 flex items-center gap-1.5">
+              <span class="text-2xs text-slate-400">Sort:</span>
+              <select
+                id="next-building-sort-select"
+                v-model="nextBuildingSortOrder"
+                class="h-7 rounded-md border border-slate-300 bg-white px-2 text-2xs text-slate-700 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              >
+                <option value="level-desc">Level: High → Low</option>
+                <option value="level-asc">Level: Low → High</option>
+                <option value="time-asc">Build Time: Shortest → Longest</option>
+                <option value="time-desc">Build Time: Longest → Shortest</option>
+                <option value="name-asc">Name: A → Z</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="filteredNextBuildings.length === 0" class="text-center py-4 text-xs text-slate-400 italic">
+            {{ nextBuildingFilterQuery ? 'No matching buildings found.' : 'No upgradable buildings found.' }}
+          </div>
+
+          <div v-else id="next-building-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
             <div
-              v-for="c in upgradeCandidates"
-              :key="c.id"
-              class="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between text-xs gap-2"
+              v-for="b in filteredNextBuildings"
+              :key="`candidate-${b.id}`"
+              class="flex flex-col gap-2 rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5 text-xs hover:border-amber-300 hover:bg-amber-50/40 transition-colors dark:border-slate-700/80 dark:bg-slate-800/60 dark:hover:border-amber-800/60"
             >
-              <div class="min-w-0 flex items-center gap-2">
-                <span class="text-base shrink-0">🏛️</span>
-                <div class="min-w-0">
-                  <div class="font-semibold text-slate-800 dark:text-slate-200 truncate" :title="c.name">
-                    {{ c.name }}
-                  </div>
-                  <div class="text-[10px] text-slate-400 flex items-center gap-1.5">
-                    <span>Lv. {{ c.currentLevel ?? 0 }} ➔ {{ c.nextLevel }}</span>
-                    <span v-if="c.durationMs">· {{ formatDuration(Math.ceil(c.durationMs / 1000)) }}</span>
-                  </div>
+              <div class="flex items-center justify-between gap-2 min-w-0">
+                <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-mono font-bold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 shrink-0">
+                    #{{ b.id }}
+                  </span>
+                  <span class="font-bold text-slate-900 dark:text-slate-100 truncate text-xs" :title="b.name || getBuildingName(b.id)">
+                    {{ b.name || getBuildingName(b.id) }}
+                  </span>
+                </div>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">
+                  {{ (b.currentLevel ?? b.level ?? 0) > 0 ? `Lv. ${b.currentLevel ?? b.level} ➔ ${b.nextLevel}` : 'Build Lv. 1' }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/50">
+                <div class="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400 min-w-0">
+                  <span class="inline-flex items-center gap-1 font-mono text-slate-600 dark:text-slate-300" title="Build Duration">
+                    <span>⏱</span><span>{{ formatDuration(Math.ceil((b.durationMs || 300000) / 1000)) }}</span>
+                  </span>
+                  <span class="text-slate-300 dark:text-slate-600">·</span>
+                  <span class="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500" title="Estimated Finish Time">
+                    <span>🏁</span><span>{{ new Date((queueTimeline.allDoneAt || now) + (b.durationMs || 300000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
+                  </span>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600"
+                    :title="`Add ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel} to auto-build queue`"
+                    @click="addToQueue(b)"
+                  >
+                    <span>➕</span><span>Queue</span>
+                  </button>
+
+                  <button
+                    v-if="activeQueues.length === 0 && hasEnoughBuildingResources(b)"
+                    type="button"
+                    :disabled="isStarting[`${b.id}-${b.nextLevel}`]"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                    :title="`Build ${b.name || getBuildingName(b.id)} to Lv. ${b.nextLevel}`"
+                    @click="startBuildingUpgrade(b)"
+                  >
+                    <span>🔨</span>
+                    <span>{{ isStarting[`${b.id}-${b.nextLevel}`] ? 'Building...' : ((b.currentLevel ?? b.level ?? 0) > 0 ? 'Upgrade' : 'Build') }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3: All City Buildings Directory -->
+        <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <span>🏛️</span> All City Buildings
+              </h3>
+              <p id="building-count-subtitle" class="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">
+                {{ buildingSearchQuery ? `${filteredBuildingDirectory.length} matching "${buildingSearchQuery}" (${builtBuildingsCount} built)` : `${builtBuildingsCount} built buildings` }}
+              </p>
+            </div>
+
+            <div class="w-full sm:w-64">
+              <input
+                id="building-search-input"
+                v-model="buildingSearchQuery"
+                type="search"
+                placeholder="Search buildings or ID..."
+                class="h-8 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
+              />
+            </div>
+          </div>
+
+          <div v-if="filteredBuildingDirectory.length === 0" class="col-span-full py-8 text-center text-xs text-slate-400">
+            No buildings match your search.
+          </div>
+
+          <div v-else id="building-grid-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+            <div
+              v-for="b in filteredBuildingDirectory"
+              :key="`dir-${b.id}`"
+              class="flex items-center justify-between gap-2 rounded-lg border p-2.5 text-xs transition-colors"
+              :class="
+                b.isUpgrading
+                  ? 'border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/30'
+                  : b.isBuilt
+                    ? 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+                    : 'border-dashed border-slate-200 bg-slate-50/40 text-slate-400 dark:border-slate-800 dark:bg-slate-900/40'
+              "
+            >
+              <div class="min-w-0">
+                <div
+                  class="font-semibold truncate"
+                  :class="b.isBuilt ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'"
+                  :title="getBuildingName(b.id)"
+                >
+                  {{ getBuildingName(b.id) }}
+                </div>
+                <div class="text-2xs text-slate-400 dark:text-slate-500">
+                  ID: {{ b.id }}{{ b.initialBuildDate ? ` · Built ${new Date(b.initialBuildDate * 1000).toLocaleDateString()}` : '' }}
                 </div>
               </div>
 
-              <button
-                type="button"
-                class="shrink-0 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-2xs cursor-pointer transition-colors"
-                @click="addToQueue(c)"
-              >
-                + Queue
-              </button>
+              <div class="text-right shrink-0 space-y-1">
+                <div
+                  class="font-bold text-xs"
+                  :class="b.isBuilt ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'"
+                >
+                  {{ b.isBuilt ? `Lv. ${b.level}` : '—' }}
+                </div>
+                <div>
+                  <span
+                    v-if="b.isUpgrading"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                  >
+                    <span class="size-1 rounded-full bg-amber-500 animate-pulse"></span>Upgrading
+                  </span>
+                  <span
+                    v-else-if="b.isBuilt"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  >
+                    Built
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  >
+                    Unbuilt
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
