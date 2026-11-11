@@ -1,49 +1,150 @@
-# Cài đặt HWA Helper
+# Hướng Dẫn Sử Dụng HWA Helper (Phiên Bản WXT + Vue 3)
 
-## Yêu cầu
+## 1. Yêu Cầu Hệ Thống
 
-- Chrome có hỗ trợ extension Manifest V3.
-- Node.js 20.11 trở lên để chạy lệnh build.
+- **Trình duyệt**: Google Chrome hoặc trình duyệt nhân Chromium hỗ trợ Manifest V3.
+- **Node.js**: Phiên bản 20.11 trở lên.
+- **Nền tảng công nghệ**: WXT Framework (Next-Gen Web Extension Framework), Vue 3 (Composition API, `<script setup lang="ts">`), Tailwind CSS v4.
 
-## Build và nạp vào Chrome
+---
 
-1. Tại thư mục gốc của dự án, chạy `npm ci` rồi `npm run build`. Tailwind CSS được biên dịch vào `dist/popup.css` trên máy phát triển; extension không tải CSS từ CDN.
-2. Mở `chrome://extensions`, bật **Developer mode**.
-3. Chọn **Load unpacked** và trỏ tới thư mục `dist` vừa được tạo.
-4. Mở hoặc tải lại `https://www.hero-wars-alliance.com/`. Phần tử `#header` sẽ được ẩn.
+## 2. Cài Đặt và Build Extension
 
-Sau khi sửa mã, chạy lại `npm run build`, nhấn **Reload** tại thẻ extension trong `chrome://extensions`, rồi tải lại trang game. `npm run check` chạy kiểm thử và build.
+### Bước 1: Cài đặt dependencies
+Mở terminal tại thư mục gốc của dự án và chạy lệnh:
+```bash
+npm ci
+```
 
-Kiểm tra số phiên bản trong popup sau khi reload; bản **0.8.0** dùng tiếng Anh cho toàn bộ giao diện và tên asset game hiển thị. Nút cạnh tên **HWA Helper** mở giao diện trong một tab trình duyệt; trang này cuộn được khi bảng dài. Tailwind CSS được đóng gói trong extension.
+### Bước 2: Build extension
+- **Build bản phát hành (Production)**:
+  ```bash
+  npm run wxt:build
+  ```
+  Lệnh này sẽ biên dịch mã nguồn Vue, TypeScript và Tailwind CSS thành extension đóng gói hoàn chỉnh tại thư mục `.output/chrome-mv3`. Quá trình build chỉ mất khoảng 500ms – 1s.
 
-## Xem log API
+- **Chạy chế độ phát triển (Development với HMR)**:
+  ```bash
+  npm run wxt:dev
+  ```
+  Hỗ trợ Hot Module Replacement (HMR) – mọi thay đổi mã nguồn trong `src/` hoặc `entrypoints/` sẽ tự động cập nhật ngay lập tức vào trình duyệt mà không cần nạp lại extension thủ công.
 
-Nhấn biểu tượng HWA Helper trên thanh công cụ, vào tab **Log** và nhấn **Record** để bắt đầu ghi. Nhấn **Stop** để dừng; bản ghi vẫn xem và xuất được. Nhấn **Record** lần nữa bắt đầu phiên ghi mới và xóa log phiên trước. **Xuất JSON** tải toàn bộ bản ghi hiện có; nút **Xóa log** nằm trong tab Cấu hình và cũng dừng ghi. Log thô nằm trong `chrome.storage.session`, chỉ tồn tại tạm thời trong bộ nhớ trình duyệt, mất khi trình duyệt khởi động lại hoặc extension được reload/cập nhật. Không có giới hạn số bản ghi do extension đặt ra; nếu chạm hạn mức bộ nhớ phiên của Chrome, Record tự dừng và hiện thông báo để xuất log hiện có.
+- **Kiểm thử tự động toàn diện**:
+  ```bash
+  npm run check
+  ```
+  Chạy toàn bộ 467+ unit test và kiểm tra build để đảm bảo 100% tính năng hoạt động chính xác.
 
-Extension không ghi request tới các endpoint analytics, AppsFlyer và Google Ads/Analytics đã xác định từ log mẫu. Khi Record bật, tab Log cũng ghi các gói MQTT `PUBLISH` gửi/nhận trên WebSocket `wss://emqx-hwmb-wss.nextersglobal.com/mqtt`, gồm topic, QoS và payload. Với payload JSON theo cấu trúc game đã quan sát, Log hiển thị thêm `method` và `result.type` để lọc sự kiện. Payload văn bản được giữ ở dạng UTF-8; payload nhị phân được ghi Base64. Gói `CONNECT` chứa thông tin đăng nhập không được lưu. Tên file xuất dùng giờ địa phương theo mẫu `hwa-api-YYYYMMDDHHmm.json`; nếu xuất nhiều lần trong cùng một phút, file sau có hậu tố `-2`, `-3`, v.v.
+### Bước 3: Nạp vào Google Chrome
+1. Mở Chrome và truy cập đường dẫn: `chrome://extensions/`.
+2. Bật công tắc **Developer mode** ở góc trên bên phải.
+3. Nhấp vào nút **Load unpacked** (Tải tiện ích đã giải nén).
+4. Trỏ đến thư mục `.output/chrome-mv3` vừa được tạo (hoặc thư mục `dist` nếu build bằng script legacy).
+5. Mở hoặc tải lại trang web game: `https://www.hero-wars-alliance.com/`.
 
-## Các tab dữ liệu và cache
+---
 
-Popup có các tab **Heroes**, **Items**, **Resources**, **Titans**, **Teams**, **Other**, **Log** và tab bánh răng **Settings** ở cuối. Nhấn tiêu đề cột để sắp xếp tăng/giảm; tab Log có lựa chọn sắp xếp theo thời gian hoặc thời lượng. Tab Items có dropdown nhóm bên cạnh ô tìm kiếm. Tab Resources liệt kê mọi số dư quan sát được nhưng chỉ có checkbox cho resource tăng theo thời gian. Các resource chọn hiện dưới Energy bằng icon và màu riêng; rê chuột để xem tên và nguồn cập nhật. Energy và World Energy đã cố định trên header nên không có checkbox riêng. Tab Heroes hiển thị soul stone đang có / số cần để nâng sao; hero 6 sao hiện `Max`. Cột Star của Heroes và Titans dùng các icon sao màu trắng, xanh lá, xanh, tím, cam kèm shadow. Tab Teams hiển thị cả ID lẫn tên, tách từng đội lồng nhau thành dòng riêng.
+## 3. Tổng Quan Giao Diện & Tính Năng
 
-Tab **Settings** chứa công tắc **Monitor API** và hai nút **Clear cache**, **Clear log**. **Record / Stop** và **Export JSON** nằm ở tab Log. Cache nằm trong `chrome.storage.local` dưới khóa riêng `rpcCache`, nên xóa log không xóa cache và ngược lại. Cache chỉ giữ các response RPC đã chọn, tối đa khoảng 2 MB; dữ liệu đăng nhập, chat, mail và analytics không được đưa vào cache.
+Giao diện popup extension tuân thủ quy chuẩn **100% tiếng Anh** (System Decision `20261110-2012-standardize-extension-popup-ui-language-to-english`) để đồng nhất với định danh game quốc tế.
 
-Góc phải của header hiển thị Energy và World Energy bằng biểu tượng. Energy lấy từ `userGetInfo.refillable[id=1]` hoặc `refillableGetAll.refillables[refillableId=1]` khi có; World Energy lấy từ `refillableGetAll.refillables[refillableId=2]`. Energy tự hồi 1 điểm mỗi 6 phút, tối đa `60 + team level` (riêng level 1: 60); header hiện số hiện tại / mức tối đa và đồng hồ `+1 in MM:SS`. World Energy tự hồi 1 điểm mỗi 5 phút, tối đa 200. Số vượt mức hồi tự nhiên do phần thưởng/mua vẫn được giữ; snapshot API mới luôn thay thế ước tính cũ. Skill Points hồi 1 điểm mỗi 5 phút, tối đa 20 theo cấu hình hiện quan sát được. Đồng hồ trên popup cập nhật mỗi giây. Bên phải tên extension hiện tên account từ `userGetInfo.name`; trước hai số Energy là thời gian building và research còn lại dạng `giờ:phút` lấy từ `getSummary.queues`. Khi chưa quan sát được dữ liệu hoặc không có hàng đợi đang chạy, hiện `—`.
+### 3.1. Header Bar
+- **Tên & Phiên bản**: Hiển thị tên extension `HWA Helper` kèm số phiên bản mới nhất và tên tài khoản người chơi đang đăng nhập.
+- **RPC Queue Badge**: Hiển thị số lượng lệnh RPC đang được xếp hàng chuẩn bị đồng bộ với game (`RPC: X`).
+- **Nút Chuyển Theme (☀️ / 🌙)**: Chuyển đổi nhanh giữa chế độ **Dark Mode** và **Light Mode**.
 
-Resources lấy số dư Gold, Emeralds và refillables từ `userGetInfo`; World Energy và refillables của bản đồ từ `refillableGetAll`; nguyên liệu, speedup, teleporter, lootbox từ `getInventory:inventory`; và các nhóm coin/scroll/consumable khi `inventoryGet` có dữ liệu. Checkbox chỉ xuất hiện ở refillable có quy tắc hồi xác minh và nguyên liệu có nhà sản xuất tự động (Elarite Shards, Iron, Stone, Wood, Food). Số dư kho nguyên liệu chỉ cập nhật khi game trả API mới sau thu hoạch, không cộng giả sản lượng chưa thu. ID chưa có tên xác minh hiện dưới dạng loại và ID. Lựa chọn checkbox được lưu trong `chrome.storage.local` dưới khóa `resourceSelection`; lựa chọn cũ không đủ điều kiện sẽ không hiện trên header. Cache chỉ giữ số lượng, mốc hồi cần thiết, tên account và thời gian hàng đợi; không lưu các định danh tài khoản từ `userGetInfo` vào phần snapshot này.
+### 3.2. Tab Dashboard (Bảng Điều Khiển Tổng Hợp)
+Tab chính tổng hợp mọi thông tin cốt lõi nhất của tài khoản:
+1. **Tài nguyên chiến lược & Đếm ngược hồi phục**:
+   - **Gold** (Vàng) & **Emeralds** (Kim cương).
+   - **Energy** (Năng lượng chiến dịch): Hiển thị số điểm hiện tại / giới hạn tối đa, kèm đồng hồ đếm ngược `+1 in MM:SS` theo thời gian thực.
+   - **World Energy** (Năng lượng viễn chinh bản đồ): Hiển thị số điểm hiện tại / 200, kèm đồng hồ đếm ngược `+1 in MM:SS`.
+   - **Tài nguyên thành phố**: Hiển thị số lượng Lương thực (Food), Gỗ (Wood), Đá (Stone), và Sắt (Iron).
+2. **Quản lý Quân đội & Bệnh viện (Troops · Forces & Hospital)**:
+   - **3 Binh chủng**: Marksmen (Cung thủ 🏹), Spearmen (Giáo binh 🔱), Infantry (Bộ binh 🛡️) với đầy đủ 9 cấp độ (Lv.1 – Lv.9).
+   - **Thanh tiến trình trực quan phân đoạn (Segmented Bar)**:
+     - Màu xanh lục: Quân số sẵn sàng chiến đấu (Ready).
+     - Màu đỏ hồng: Thương binh đang nằm viện (In Hospital).
+     - Màu tím chàm: Quân số đang trong hàng đợi huấn luyện (In Training).
+   - **Ngưỡng quân tối đa (`Max:`)**: Nhập ngưỡng quân tối đa mong muốn cho từng loại; hệ thống tự động lưu vào cấu hình.
+   - **Chọn cấp độ huấn luyện (`Lv.1`–`Lv.9`)**: Dropdown chọn tier quân muốn luyện; tự động lưu lựa chọn.
+   - **Huấn luyện thông minh (Clamped Training)**:
+     - Công thức tự động: `unitsToTrain = Math.min(26, Math.max(0, maxTarget - currentTotal))`.
+     - Chỉ cho phép huấn luyện vừa đủ tới ngưỡng Max, ngăn lãng phí tài nguyên. Nút tự động khóa và hiển thị `Maxed` khi đã đủ quân.
+   - **Thu hoạch quân (`Ready / Collect`)**: Tự động nhận diện khi hàng đợi luyện quân xong và cho phép bấm nhận ngay vào quân số sẵn sàng.
+   - **Cứu chữa toàn bộ (`Heal All`) & Đồng bộ viện binh (`Sync Healed`)**: Bấm một chạm để đưa toàn bộ thương binh vào viện điều trị hoặc đồng bộ quân đã lành lặn ra tiền tuyến.
+3. **Trạng thái Hàng đợi (Queues Status)**:
+   - Thời gian hoàn thành công trình đang nâng cấp (Building Queue).
+   - Thời gian nghiên cứu công nghệ tại Học viện (Research Queue).
+   - Danh sách các đạo quân đang hành quân ngoài thành kèm thời gian đến mục tiêu.
+4. **Tiến độ Hoạt động Hàng ngày (Daily Activities & Progress)**:
+   - Theo dõi trạng thái Tháp (Tower: Cleared hay tầng hiện tại).
+   - Số lượt đánh Đấu trường còn lại (Arena & Grand Arena).
+   - Tiến độ Hầm ngục Guild (Dungeon) và số lượt đánh trùm Hydra.
 
-Các tab Heroes, Items và Titans hiển thị thêm cột **Tên**, có thể lọc theo tên hoặc ID. Bảng tên tiếng Anh được đóng gói sẵn trong extension, không làm phát sinh request khi mở popup. ID chưa có tên xác thực vẫn được giữ lại với dấu `—` ở cột Tên. Xem [nguồn asset CDN và cách cập nhật bảng tên](CDN-ASSETS.md).
+---
 
-Cache tự cập nhật khi extension quan sát được RPC do game phát sinh trong quá trình sử dụng bình thường, ngay cả khi chưa nhấn Record. Khi mở popup mà cache còn rỗng, extension thử nạp lại một lần từ log tạm trong phiên hiện tại. Cả hai thao tác chỉ xử lý dữ liệu đã quan sát được; extension không gọi API game theo lịch, không gửi request để làm mới dữ liệu và không tải lại trang. Nếu chưa có snapshot, mở màn hình tương ứng trong game để game phát sinh RPC.
+### 3.3. Các Tab Chức Năng Chuyên Sâu
 
-Công tắc **Theo dõi API** được lưu qua các lần mở trình duyệt. Khi tắt, extension không thu nhận request/response và không cập nhật cache hoặc log mới; bản ghi trong phiên vẫn xem được. Nhấn **Record** sẽ bật Theo dõi API nếu trước đó đã tắt. Khi mở trang, hook chờ cài đặt từ extension trước khi bắt đầu theo dõi. Thay đổi công tắc áp dụng cho request tiếp theo; request đang xử lý khi tắt có thể bị bỏ qua. Lần nạp cache từ log phiên khi cache rỗng không phụ thuộc trạng thái Theo dõi API.
+#### 🦸 Heroes (Tướng)
+- Lưới danh sách tướng hiển thị hình ảnh đại diện (avatar), tên, cấp độ, số sao (★), rank phẩm trang bị và chiến lực (Power).
+- Tìm kiếm nhanh theo tên hoặc ID tướng.
+- Lọc theo Class: *Tank, Warrior, Marksman, Mage, Support, Control, Healer*.
+- Sắp xếp theo: *Power, Level, Stars, Name*.
 
-Các bảng tài liệu có thể được tạo lại từ một file log đã xuất bằng `npm run docs:data -- <đường-dẫn-log.json>`. Chúng chứa trạng thái của tài khoản tại thời điểm ghi, không phải danh mục chính thức; kiểm tra trước khi commit.
+#### 🗿 Titans (Người khổng lồ)
+- Danh sách 29 Titan trong game kèm icon hệ nguyên tố: Nước (💧 Water), Lửa (🔥 Fire), Đất (🌍 Earth), Ánh sáng (☀️ Light), Bóng tối (🌑 Darkness).
+- Hiển thị vai trò (Role), cấp độ, số sao, chiến lực và ảnh đại diện.
+- Lọc theo nguyên tố và sắp xếp linh hoạt.
 
-Tên hiển thị lấy từ [locale CDN đã xác minh](CDN-NAMES.md) và được đóng gói trong extension. Ba mục còn ký tự Cyrillic trong asset `en.json.gz` đã được chuẩn hóa sang tiếng Anh trong script sinh bảng tên. ID chưa có tên hiện `—`; khi có log `indexGet` mới, chạy `npm run names:update -- <đường-dẫn-log.json>` rồi build lại. Extension không tải locale trong lúc sử dụng.
+#### 🎒 Items (Túi đồ & Trang bị)
+- Hỗ trợ 2 chế độ hiển thị: Dạng lưới (▦ Grid) trực quan hoặc dạng bảng danh sách (☰ List).
+- **Huy hiệu Arena Coins**: Tách biệt rõ ràng Arena Coin (`coin[1]`) với số dư vàng Gold, không bị ghi đè dữ liệu.
+- Phân loại nhanh các danh mục: *Gear, Fragment Gear, Artifact, Fragment Artifact, Scroll, Consumable, Coin*.
 
-Mỗi bản ghi có thời điểm, phương thức, endpoint, kiểu gọi (`fetch` hoặc `xhr`), mã HTTP nếu có, thời lượng (ms) và kết quả. Với `POST`, popup và file JSON còn chứa `requestBody` và `responseBody` khi dữ liệu có thể đọc dưới dạng văn bản; nhấn **Request / Response data** trong popup để xem. Mỗi body giữ tối đa 524.288 ký tự; trường `requestBodyTruncated` hoặc `responseBodyTruncated` cho biết dữ liệu đã bị cắt. Body nhị phân, stream không đọc được và response không thể truy cập có giá trị `null`. Bản ghi đã bị cắt không thể khôi phục từ extension.
+#### ⛏️ Gathering (Tự Động Hóa Khai Thác Mỏ)
+- **Auto-Gather Automation**:
+  - Công tắc Bật / Tắt tự động hóa hoàn toàn.
+  - Tùy chọn loại mỏ: Xoay vòng tài nguyên (🔄 Rotate All) hoặc mỏ chỉ định (Vàng, Lương thực, Gỗ, Đá, Sắt).
+  - Cấp độ mỏ mục tiêu: Lv.1 đến Lv.8.
+  - Giới hạn số đạo quân tối đa được phép ra ngoài (1 đến 5 squads).
+- Danh sách các đạo quân đang khai thác kèm thời gian còn lại.
+- Nút tìm kiếm mỏ thủ công (Search Mines).
 
-Query string, fragment, header và cookie không được ghi trực tiếp, nhưng POST body có thể chứa thông tin nhạy cảm. Endpoint cũng có thể chứa định danh trong đường dẫn; kiểm tra file JSON trước khi chia sẻ. Dữ liệu này chỉ phục vụ khảo sát sơ bộ; mã trạng thái hoặc thời lượng có thể không chính xác tuyệt đối trong mọi trường hợp.
+#### 🏰 Dungeon (Tự Động Đánh Hầm Ngục)
+- Theo dõi tầng hầm ngục và điểm năng động (Activity points).
+- Thuật toán tự động chọn cửa tối ưu nhất dựa trên thuộc tính Titan còn sống.
+- Cơ chế an toàn tự động dừng lại khi có Titan hy sinh hoặc máu giảm xuống mức nguy hiểm.
 
-Extension chỉ hoạt động trên `https://www.hero-wars-alliance.com/*` ở khung trang chính. WebSocket MQTT được quan sát qua kết nối do JavaScript của trang chính tạo; extension không tự mở thêm kết nối hay đăng ký topic. Payload MQTT được giới hạn 128 KiB cho mỗi gói và có cờ `payloadTruncated` khi bị cắt. Kết nối tạo trong Worker hoặc trước khi hook được nạp, request từ iframe, `sendBeacon` và resource của trình duyệt không nằm trong log. Hook chạy trong JavaScript của trang game nên trang có thể thay thế hook hoặc gửi bản ghi giả; không dùng log này làm nguồn dữ liệu bảo mật.
+#### 🗼 Tower (Tự Động Leo Tháp)
+- Tự động leo các tầng tháp từ 1 đến 25.
+- Tự động mua các loại Buff tăng chỉ số tối ưu (Giáp, Kháng phép, Sát thương) bằng đồng Skull Coin tích lũy được.
+- Tự động mở đúng 1 rương miễn phí ở mỗi tầng thưởng; cam kết tuyệt đối **không bao giờ tiêu tốn Emeralds**.
+
+#### 📜 Quests (Nhiệm Vụ Hàng Ngày & Sự Kiện)
+- Danh sách nhiệm vụ ngày và nhiệm vụ sự kiện đặc biệt kèm thanh tiến độ.
+- Khu vực nổi bật các nhiệm vụ đã hoàn thành kèm nút nhận từng mục hoặc nhận nhanh toàn bộ (`Claim All`).
+
+#### ⚙️ Settings (Cấu Hình & Thiết Lập Hệ Thống)
+- **Theme Mode**: Tùy chọn Dark Mode (mặc định), Light Mode, hoặc System Preference.
+- **RPC Dispatch Mode**:
+  - `Piggyback (Safe Stealth)`: Gửi kèm RPC cùng lúc với tương tác tự nhiên của người dùng trên web, an toàn tối đa.
+  - `Direct (Fast RPC)`: Phát lệnh RPC trực tiếp tới tab game để làm mới tức thì.
+- **MQTT Live Telemetry**: Thu nhận các thông báo push thời gian thực (tin nhắn bang hội, thông báo kết quả công thành, quân trở về).
+- **Session Recorder**: Ghi lại nhật ký gói tin RPC thô để phục vụ phân tích dữ liệu hoặc chẩn đoán lỗi.
+
+#### 📝 Log (Nhật Ký Gọi API)
+- Danh sách các cuộc gọi API RPC theo thứ tự thời gian.
+- Hiển thị tên method, trạng thái (thành công/thất bại), thời gian thực thi (ms).
+- Ô tìm kiếm lọc theo tên method và nút **Export JSON** để tải file nhật ký về máy.
+
+---
+
+## 4. Cơ Chế Lưu Trữ & An Toàn Dữ Liệu
+
+1. **Storage Tách Biệt**:
+   - Toàn bộ snapshot dữ liệu game (`rpcCache`), cấu hình ngưỡng quân (`troopTrainSettings`), cấu hình mỏ (`autoGatherSettings`) được lưu trong `chrome.storage.local`.
+   - Nhật ký API log thô trong phiên được lưu trong `chrome.storage.session`, tự động giải phóng khi tắt trình duyệt, không gây đầy bộ nhớ máy tính.
+2. **Nguyên Tắc Bất Biến & Không Giả Lập Dữ Liệu**:
+   - Extension hoạt động hoàn toàn dựa trên dữ liệu game phản hồi thực tế từ máy chủ.
+   - Không tự động gửi request spam làm nghẽn mạng hay gây nguy cơ cho tài khoản.

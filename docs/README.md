@@ -1,30 +1,41 @@
-# Tóm tắt dự án
+# Tóm Tắt Dự Án HWA Helper
 
-## Thông tin chung
-- Tên dự án: Chrome extension cho web game Hero Wars: Alliance
-- Tên extension: HWA Helper
-- Website ảnh hưởng: https://www.hero-wars-alliance.com/
+## 1. Thông Tin Chung
+- **Tên dự án**: Chrome Extension Hỗ Trợ Web Game Hero Wars: Alliance
+- **Tên extension**: HWA Helper
+- **Website mục tiêu**: `https://www.hero-wars-alliance.com/`
+- **Công nghệ nền tảng**: WXT Framework (Manifest V3), Vue 3 Composition API (`<script setup lang="ts">`), Tailwind CSS v4, TypeScript.
 
-## Mục tiêu cơ sở
-Xây dựng web extension để hỗ trợ một số tính năng trên web game, tối ưu trình duyệt, bao gồm nhưng không giới hạn:
-- Tối ưu CSS, thay đổi một số tính năng trên giao diện.
-- Tự động hóa một số tính năng.
-- Bật tính năng cảnh báo bằng hình ảnh / popup / windows notification.
-- Hỗ trợ các tiện ích cho cá nhân như: bảng tính nhanh, cache thông tin số liệu inventory, heroes, heroes line up
+---
 
-## Một số lưu ý
-- Các tài liệu cho người dùng đầu cuối được lưu trong thư mục "docs" dưới định dạng .md.
+## 2. Mục Tiêu & Tính Năng Cốt Lõi
 
-## Bắt đầu sử dụng
+1. **Hiện Đại Hóa Giao Diện (WXT + Vue 3)**:
+   - Kiến trúc module hóa dạng Single File Component (SFC) với reactive state management (`useRpcCache`, `useTroopTraining`, `useTheme`).
+   - Giao diện người dùng tuân thủ 100% tiếng Anh quốc tế, hỗ trợ Dark / Light / System theme mượt mà.
+2. **Dashboard & Quản Lý Binh Chủng Toàn Diện**:
+   - Thống kê sinh động tài nguyên (Gold, Emeralds, Energy, World Energy, City Resources) với đồng hồ đếm ngược hồi phục theo thời gian thực.
+   - Thẻ quân đội phân đoạn 3 màu trực quan (Ready, Hospital, Training).
+   - Thiết lập ngưỡng Max quân đội tự động lưu trữ và dropdown chọn cấp độ tier huấn luyện (`Lv.1`–`Lv.9`).
+   - Cơ chế bảo vệ và giới hạn huấn luyện thông minh: chỉ cho phép luyện vừa đủ đến ngưỡng Max (`unitsToTrain = min(26, maxTarget - currentTotal)`).
+   - Nút thu hoạch quân (`Ready / Collect`), cứu chữa toàn viện (`Heal All`), đồng bộ viện binh (`Sync Healed`).
+3. **Tự Động Hóa & Tối Ưu Chiến Thuật**:
+   - **Auto-Gather**: Tự động phát hiện và gửi đạo quân đi đào mỏ tài nguyên (xoay vòng hoặc chọn lọc mỏ theo cấp độ).
+   - **Tower Auto-Climb**: Tự động leo tháp 25 tầng, ưu tiên mua buff chỉ số và mở rương miễn phí không tốn Emeralds.
+   - **Dungeon Automation**: Đánh hầm ngục tự động theo thứ tự ưu tiên nguyên tố và dừng an toàn khi Titan hy sinh.
+   - **Quests One-Click Claim**: Nhận nhanh toàn bộ nhiệm vụ hàng ngày và sự kiện chỉ với một nút bấm.
+4. **Giám Sát & Phân Tích Gói Tin (Network & Telemetry)**:
+   - Hai chế độ phát lệnh: `Piggyback` (ẩn mình an toàn đi kèm hành động của người chơi) và `Direct` (phát lệnh trực tiếp nhanh chóng).
+   - Lắng nghe và giải mã gói tin thời gian thực qua WebSocket MQTT.
+   - Quay log phiên và xuất báo cáo JSON chi tiết.
 
-Xem [hướng dẫn cài đặt và sử dụng](HUONG-DAN.md) để build, nạp extension vào Chrome và xem log API.
+---
 
-Xem [phân tích log API mẫu](PHAN-TICH-API-LOG.md) để biết các nhóm dữ liệu game đã quan sát được và giới hạn của bản ghi.
+## 3. Tài Liệu Hướng Dẫn & Tham Khảo
 
-Xem [báo cáo RPC làm thay đổi số liệu](RPC-NUMERIC-CHANGE-REPORT.md) để tra các sự kiện được extension nhận diện có thể làm thay đổi items, resources, heroes, titans và các số liệu liên quan.
-
-Các bảng snapshot từ log: [heroes](HEROES.md), [items](ITEMS.md), [titans, đội hình và nhóm khác](DATA-CATALOG.md).
-
-Nguồn và cách xác minh tên hiển thị: [locale CDN](CDN-NAMES.md).
-
-Xem [nguồn asset CDN và phương pháp ánh xạ tên](CDN-ASSETS.md) để biết cách hiển thị tên heroes/items và cập nhật bảng tên khi game đổi phiên bản.
+- **[Hướng dẫn cài đặt và sử dụng chi tiết](HUONG-DAN.md)**: Hướng dẫn cài đặt Node.js, lệnh build WXT (`npm run wxt:build`), dev server HMR (`npm run wxt:dev`), nạp vào Chrome và chi tiết từng tab tính năng.
+- **[Phân tích log API mẫu](PHAN-TICH-API-LOG.md)**: Các nhóm dữ liệu RPC game đã quan sát được và cấu trúc payload.
+- **[Báo cáo RPC làm thay đổi số liệu](RPC-NUMERIC-CHANGE-REPORT.md)**: Danh mục các sự kiện RPC làm thay đổi kho đồ, tài nguyên, tướng, titan.
+- **[Chi tiết cơ chế tự động đánh hầm ngục](dungeon-automation.md)**: Thuật toán chọn cửa và cơ chế bảo vệ máu Titan.
+- **Các bảng snapshot**: [Danh sách Heroes](HEROES.md), [Danh sách Items](ITEMS.md), [Danh mục Titans & đội hình](DATA-CATALOG.md).
+- **[Nguồn CDN Asset & Bảng Tên](CDN-ASSETS.md)**: Cách trích xuất và cập nhật tên hiển thị, ảnh đại diện từ CDN game.
