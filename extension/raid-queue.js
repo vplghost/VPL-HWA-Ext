@@ -46,6 +46,24 @@
     else state.wonBossIds = [...new Set([...(state.wonBossIds || []), mobId])];
     state.current = null;
   }
+  function hasActiveRaidPending(cache, now = Date.now()) {
+    const marches = cache?.marchStatus?.data?.marches || [];
+    return marches.some((march) => {
+      if (!march.rally) return false;
+      if (Number.isFinite(march.endsAt) && now >= march.endsAt) return false;
+      if (Number.isFinite(march.rally.returnAt) && now >= march.rally.returnAt) return false;
+      if (march.stage === 'returnToOutpost' || march.result) return false;
+      const phase = data?.rallyPhase ? data.rallyPhase(march, now) : null;
+      if (phase && (phase.phase === 'Returning' || phase.phase === 'Battle complete')) return false;
+      return true;
+    });
+  }
+  function areHeroesDeployed(summary, heroIds) {
+    if (!summary?.squads || !Array.isArray(heroIds)) return false;
+    return summary.squads.some((squad) =>
+      squad.heroes?.some((hero) => heroIds.includes(hero.id ?? hero.heroId))
+    );
+  }
   function start(options, tabId, accountId, now, cache, settings) {
     if (!accountId || !Number.isInteger(tabId) || !options?.mapId ||
         !Number.isFinite(options.center?.x) || !Number.isFinite(options.center?.y) ||
@@ -67,25 +85,40 @@
     const search = cache.experimentalRallySearch?.data;
     const heroes = cache.heroGetAll?.data;
     const summary = cache['getUnitSummary:unit']?.data;
+    const isGuildRaidActive = hasActiveRaidPending(cache, now);
+    const areDeployed = summary ? areHeroesDeployed(summary, options.heroIds) : false;
     if (search?.mapId !== options.mapId ||
         !search.mobConfigIds?.includes(data.bossConfigId(options.level)) ||
         !search.mobs?.some((mob) => mob.mobId === options.firstMobId) ||
         cache.experimentalDefeatedBosses?.data?.some((boss) =>
           boss.mapId === options.mapId && boss.mobId === options.firstMobId) ||
-        !heroes || !summary ||
-        options.heroIds.some((id) => !heroes[id]) ||
-        summary.squads?.some((squad) => squad.heroes?.some((hero) =>
-          options.heroIds.includes(hero.id ?? hero.heroId)))) return null;
-    const cap = data.capacityModel(options.heroIds, heroes, cache.troopCapacityEvidence?.data,
-      settings, accountId).total;
-    const squad = data.buildSquad(options.heroIds, data.allocateTroops(summary, data.teamTroopCapacity(cap, options.maxTroops)));
+        !heroes ||
+        options.heroIds.some((id) => !heroes[id])) return null;
     const won = cache.experimentalDefeatedBosses?.data || [];
     const bosses = search.mobs.filter((mob) => mob.mobId &&
       !won.some((item) => item.mapId === options.mapId && item.mobId === mob.mobId));
     const ordered = [bosses.find((mob) => mob.mobId === options.firstMobId),
-      ...bosses.filter((mob) => mob.mobId !== options.firstMobId)];
+      ...bosses.filter((mob) => mob.mobId !== options.firstMobId)].filter(Boolean);
+    const uniqueQueue = [...new Map(ordered.map((mob) => [mob.mobId, { mobId: mob.mobId }])).values()];
+    if (isGuildRaidActive || areDeployed || !summary) {
+      const waitState = { ...state,
+        phase: 'waiting_rally',
+        sentAt: now,
+        wakeAt: now + 5000,
+        bossQueue: { ...state.bossQueue, queue: uniqueQueue }
+      };
+      return {
+        state: waitState,
+        calls: [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }],
+        expiresAt: now + 15000
+      };
+    }
+    const cap = data.capacityModel(options.heroIds, heroes, cache.troopCapacityEvidence?.data,
+      settings, accountId).total;
+    const squad = data.buildSquad(options.heroIds, data.allocateTroops(summary, data.teamTroopCapacity(cap, options.maxTroops)));
+    if (!squad) return null;
     return nextBoss({ ...state, squad, bossQueue: { ...state.bossQueue,
-      queue: [...new Map(ordered.map((mob) => [mob.mobId, { mobId: mob.mobId }])).values()] } }, cache, now);
+      queue: uniqueQueue } }, cache, now);
   }
   function responses(record) {
     if (record?.method !== 'POST' || record.status !== 200 || record.requestBodyTruncated ||
@@ -130,6 +163,22 @@
         }
         return { state: stop(state, `${call.name} failed: ${String(detail).slice(0, 160)}. No automatic retry.`) };
       }
+    }
+    if (state.phase === 'waiting_rally') {
+      const isGuildRaidActive = hasActiveRaidPending(cache, now);
+      const areDeployed = areHeroesDeployed(cache?.['getUnitSummary:unit']?.data, state.options?.heroIds);
+      if (!isGuildRaidActive && !areDeployed) {
+        return issue(state, 'refreshing', rosterCalls(), now);
+      }
+      if (now > (state.sentAt || now) + 3600000) {
+        return { state: stop(state, 'Active guild raid wait timed out after 1 hour.') };
+      }
+      state.wakeAt = now + 5000;
+      return {
+        state,
+        calls: [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }],
+        expiresAt: now + 15000
+      };
     }
     if (state.phase === 'refreshing') {
       state.roster = { ...state.roster };

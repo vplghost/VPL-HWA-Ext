@@ -83,8 +83,51 @@ watch(
   { immediate: true }
 );
 
+const now = ref(Date.now());
+let timer: number | null = null;
+
+const activeRallies = computed(() => {
+  const marches = normalizeArray(cache.value?.marchStatus?.data?.marches);
+  return marches.filter(
+    (m: any) => m.rally && !(Number.isFinite(m.endsAt) && now.value >= m.endsAt)
+  );
+});
+
+const currentRaidPhase = computed(() => {
+  if (activeRallies.value.length === 0) return null;
+  const march = activeRallies.value[0];
+  const expData = (globalThis as any).hwaHelperExperimentalData;
+  return expData?.rallyPhase ? expData.rallyPhase(march, now.value) : null;
+});
+
+const currentRaidStageIcon = computed(() => {
+  if (currentRaidPhase.value) {
+    const p = currentRaidPhase.value.phase;
+    if (p === 'Waiting') return '⏳';
+    if (p === 'Traveling to boss') return '🏹';
+    if (p === 'Battle / awaiting result') return '💥';
+    if (p === 'Returning' || p === 'Battle complete') return '↩️';
+  }
+  if (isRunning.value) return '⏱️';
+  return '⚔️';
+});
+
+const queueStatusLabel = computed(() => {
+  if (queueStatusText.value === 'waiting_rally') return 'Waiting for active raid to attack';
+  if (queueStatusText.value === 'refreshing') return 'Refreshing roster';
+  if (queueStatusText.value === 'searching') return 'Searching boss';
+  if (queueStatusText.value === 'creating') return 'Creating rally';
+  if (queueStatusText.value === 'active') return 'Active';
+  if (queueStatusText.value === 'cancelling') return 'Cancelling';
+  return queueStatusText.value;
+});
+
 onMounted(async () => {
   await loadSquadData();
+
+  timer = window.setInterval(() => {
+    now.value = Date.now();
+  }, 1000);
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
@@ -101,7 +144,7 @@ onMounted(async () => {
         await chrome.storage.local.set({ popupRpcEnabled: true });
       }
       if (stored.raidQueue) {
-        isRunning.value = stored.raidQueue.running || false;
+        isRunning.value = !['stopped', 'complete'].includes(stored.raidQueue.phase);
         queueStatusText.value = stored.raidQueue.phase || 'Idle';
       }
     } catch (_) {}
@@ -109,7 +152,7 @@ onMounted(async () => {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.raidQueue) {
         const q = changes.raidQueue.newValue;
-        isRunning.value = q?.running || false;
+        isRunning.value = q ? !['stopped', 'complete'].includes(q.phase) : false;
         queueStatusText.value = q?.phase || 'Idle';
       }
     });
@@ -139,6 +182,7 @@ watch(
 );
 
 onUnmounted(() => {
+  if (timer) clearInterval(timer);
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -283,10 +327,12 @@ async function startRaidQueue(count = raidCount.value) {
     }).catch((err) => ({ error: String(err) }));
 
     if (res?.ok) {
-      queueStatusText.value = res.queued ? 'Queued' : 'Active';
-      statusMessage.value = res.queued
-        ? 'Rally queued for next game interaction.'
-        : `Raid started against boss! Active rounds: ${count}.`;
+      queueStatusText.value = res.phase || (res.queued ? 'Queued' : 'Active');
+      statusMessage.value = res.phase === 'waiting_rally'
+        ? 'Active guild raid in progress. Queue created — will start automatically once current raid attacks.'
+        : (res.queued
+          ? 'Rally queued for next game interaction.'
+          : `Raid started against boss! Active rounds: ${count}.`);
     } else {
       isRunning.value = false;
       queueStatusText.value = 'Idle';
@@ -324,21 +370,31 @@ async function stopRaidQueue() {
         class="sticky top-0 z-10 flex items-center justify-between border-b border-indigo-200 bg-indigo-50/80 px-4 py-3 backdrop-blur dark:border-indigo-900/60 dark:bg-indigo-950/50 shrink-0"
       >
         <div class="flex items-center gap-2 min-w-0 flex-1">
-          <span id="raid-dialog-icon" class="text-xl shrink-0" aria-hidden="true">⚔️</span>
+          <span id="raid-dialog-icon" class="text-xl shrink-0" aria-hidden="true">{{ currentRaidStageIcon }}</span>
           <h2 id="raid-dialog-title" class="font-semibold text-slate-900 dark:text-slate-100 shrink-0">
             Rally raid
           </h2>
           <div id="raid-dialog-status" class="flex items-center gap-2 truncate">
             <span
-              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+              v-if="currentRaidPhase"
+              class="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-0.5 text-2xs font-semibold text-indigo-900 border border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-200 dark:border-indigo-800/60 shrink-0"
+            >
+              <span>{{ currentRaidStageIcon }}</span>
+              <span class="size-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+              <span>{{ activeRallies[0]?.rally?.target || 'Rally' }}: {{ currentRaidPhase.phase }}</span>
+            </span>
+            <span
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0"
               :class="
                 isRunning
-                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                  ? (queueStatusText === 'waiting_rally'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60'
+                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-300 dark:border-blue-700/60')
+                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60'
               "
             >
-              <span class="size-1.5 rounded-full" :class="isRunning ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'"></span>
-              {{ queueStatusText }}
+              <span class="size-1.5 rounded-full" :class="isRunning ? 'bg-indigo-500 animate-pulse' : 'bg-emerald-500'"></span>
+              <span>{{ isRunning ? `Queue: ${queueStatusLabel}` : queueStatusText }}</span>
             </span>
           </div>
         </div>

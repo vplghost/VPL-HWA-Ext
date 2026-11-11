@@ -1008,3 +1008,101 @@ test('BuildingModal and ResearchModal support queuing upgrades with projected pr
   assert.ok(specialFound, 'At least one tech must require special resource');
   assert.ok(regularFound, 'At least one tech must require only standard resources');
 });
+
+test('Raid queue allows creation during active guild raid and Dashboard displays queue badges for raid and monster', async () => {
+  // 1. Check DashboardTab badges
+  const dashboard = await readFile(join(root, 'src/components/dashboard/DashboardTab.vue'), 'utf8');
+  assert.match(dashboard, /id="open-raid-dialog-badge"/, 'DashboardTab must render open-raid-dialog-badge');
+  assert.match(dashboard, /id="open-monster-dialog-badge"/, 'DashboardTab must render open-monster-dialog-badge');
+  assert.match(dashboard, /data-queue-count="raidQueueCount"/, 'open-raid-dialog-badge must bind data-queue-count');
+  assert.match(dashboard, /data-queue-count="monsterQueueCount"/, 'open-monster-dialog-badge must bind data-queue-count');
+  assert.match(dashboard, /raidQueueCount/, 'DashboardTab must compute raidQueueCount');
+  assert.match(dashboard, /monsterQueueCount/, 'DashboardTab must compute monsterQueueCount');
+
+  // 2. Check RaidModal status and active raid phase support
+  const raidModal = await readFile(join(root, 'src/components/dialogs/RaidModal.vue'), 'utf8');
+  assert.match(raidModal, /waiting_rally/, 'RaidModal must handle waiting_rally phase');
+  assert.match(raidModal, /currentRaidPhase/, 'RaidModal must compute currentRaidPhase');
+  assert.match(raidModal, /currentRaidStageIcon/, 'RaidModal must compute currentRaidStageIcon');
+  assert.match(raidModal, /queueStatusLabel/, 'RaidModal must compute queueStatusLabel');
+
+  // 3. Test extension/raid-queue.js active raid handling
+  await import('../extension/experimental-data.js');
+  await import('../extension/raid-queue.js');
+  const controller = globalThis.hwaHelperRaidQueue;
+  assert.equal(typeof controller.start, 'function');
+  assert.equal(typeof controller.advance, 'function');
+
+  const heroes = { 1: { id: 1 }, 2: { id: 2 }, 3: { id: 3 }, 4: { id: 4 }, 5: { id: 5 } };
+  const baseCache = {
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': {
+      data: {
+        squads: [],
+        available: [{ unitId: 7, count: 5000 }, { unitId: 17, count: 5000 }, { unitId: 27, count: 5000 }]
+      }
+    },
+    experimentalRallySearch: {
+      data: { mapId: 'map1', mobConfigIds: [60], mobs: [{ mobId: 'boss_1' }] }
+    },
+    marchStatus: {
+      data: {
+        marches: [
+          {
+            id: 'march_active_1',
+            rally: { id: 'rally_active_1', waitUntil: Date.now() + 180000, outboundMs: 30000 },
+            endsAt: Date.now() + 210000
+          }
+        ]
+      }
+    }
+  };
+
+  const options = {
+    mapId: 'map1',
+    center: { x: 10, y: 20 },
+    level: 1,
+    heroIds: [1, 2, 3, 4, 5],
+    waitSeconds: 60,
+    minMembers: 4,
+    autoCancel: true,
+    count: 3,
+    firstMobId: 'boss_1'
+  };
+
+  const now = Date.now();
+  // With active raid in progress, start() must succeed and enter waiting_rally!
+  const transition = controller.start(options, 1, 100, now, baseCache, { defaultHero: 600, base: 950 });
+  assert.ok(transition, 'start() must return a transition even with active raid');
+  assert.equal(transition.state.phase, 'waiting_rally', 'Phase must be waiting_rally while active raid is pending');
+  assert.equal(transition.state.bossQueue.remain_raid_count, 3, 'remain_raid_count must match options.count');
+  assert.equal(transition.calls[0].name, 'getMarches', 'Must poll getMarches while waiting');
+
+  // Advance while raid still in progress: stays in waiting_rally
+  const advance1 = controller.advance(transition.state, null, baseCache, now + 1000, { defaultHero: 600, base: 950 });
+  assert.equal(advance1.state.phase, 'waiting_rally', 'Must remain in waiting_rally while active raid has not attacked');
+
+  // Simulate active raid has attacked ("tiến công thành công" -> returning to outpost)
+  const returningCache = {
+    ...baseCache,
+    marchStatus: {
+      data: {
+        marches: [
+          {
+            id: 'march_active_1',
+            stage: 'returnToOutpost',
+            result: 'win',
+            rally: { id: 'rally_active_1', returnAt: now + 30000 },
+            endsAt: now + 30000
+          }
+        ]
+      }
+    }
+  };
+
+  // Advance now that active raid has attacked: transitions to refreshing to start the queue!
+  const advance2 = controller.advance(transition.state, null, returningCache, now + 2000, { defaultHero: 600, base: 950 });
+  assert.equal(advance2.state.phase, 'refreshing', 'Must transition to refreshing once previous raid has attacked');
+  assert.equal(advance2.calls[0].name, 'heroGetAll', 'Must request fresh heroGetAll');
+  assert.equal(advance2.calls[1].name, 'getUnitSummary', 'Must request fresh getUnitSummary');
+});

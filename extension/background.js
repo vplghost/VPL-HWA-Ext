@@ -630,7 +630,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         Date.now(), stored.rpcCache || {}, globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
       if (!transition) return { ok: false, error: 'Refresh troops and search for this boss before starting. Check the selected lineup and target.' };
       const state = await saveRaidTransition(transition, stored);
-      return { ok: state.phase !== 'stopped', queued: stored.socketRefreshMode !== 'direct', error: state.reason };
+      return { ok: state.phase !== 'stopped', queued: stored.socketRefreshMode !== 'direct', phase: state.phase, error: state.reason };
     });
     pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
     pending = pending.catch(() => {});
