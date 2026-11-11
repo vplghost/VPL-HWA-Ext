@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useModals } from '@/src/composables/useModals';
 
 const { cache } = useRpcCache();
+const { openModal } = useModals();
 
 interface ActivityRow {
   id: string;
@@ -10,6 +12,7 @@ interface ActivityRow {
   icon: string;
   state: 'pending' | 'done' | 'info' | 'unknown';
   detail: string;
+  isInteractive?: boolean;
 }
 
 const activities = computed<ActivityRow[]>(() => {
@@ -24,6 +27,7 @@ const activities = computed<ActivityRow[]>(() => {
     icon: '🗼',
     state: !tower ? 'unknown' : tower.isCleared ? 'done' : 'pending',
     detail: !tower ? unknown : tower.isCleared ? 'Cleared today' : tower.floorNumber ? `Floor ${tower.floorNumber} / 25` : 'Ready to enter',
+    isInteractive: true,
   });
 
   // Arena
@@ -55,6 +59,7 @@ const activities = computed<ActivityRow[]>(() => {
     icon: '🏰',
     state: dungeon ? 'pending' : 'unknown',
     detail: !dungeon ? unknown : `${Number(dungeon.dungeonActivity) || 0} activity points · Floor ${dungeon.floorNumber ?? '—'}`,
+    isInteractive: true,
   });
 
   // Hydra
@@ -68,8 +73,26 @@ const activities = computed<ActivityRow[]>(() => {
     detail: !hydra ? unknown : `${hydra.tries ?? 0} regular · ${hydra.superTries ?? 0} super tries left`,
   });
 
+  // Daily Quests
+  const quests = cache.value.quest_getAll?.data;
+  const pendingQuests = quests ? Object.values(quests).filter((q: any) => q.state === 2).length : 0;
+  rows.push({
+    id: 'quests',
+    title: 'Daily Quests',
+    icon: '📜',
+    state: pendingQuests > 0 ? 'pending' : 'info',
+    detail: `${pendingQuests} quest rewards ready to claim`,
+    isInteractive: true,
+  });
+
   return rows;
 });
+
+function handleActivityClick(act: ActivityRow) {
+  if (act.id === 'tower') openModal('tower');
+  else if (act.id === 'dungeon') openModal('dungeon');
+  else if (act.id === 'quests') openModal('questDetail');
+}
 </script>
 
 <template>
@@ -85,12 +108,22 @@ const activities = computed<ActivityRow[]>(() => {
       <div
         v-for="act in activities"
         :key="act.id"
-        class="p-2 rounded-lg border border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between text-xs"
+        class="p-2 rounded-lg border border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between text-xs transition-all"
+        :class="
+          act.isInteractive
+            ? 'cursor-pointer hover:border-violet-400 hover:bg-violet-50/40 dark:hover:border-violet-500/60 dark:hover:bg-slate-800 shadow-2xs hover:shadow-xs'
+            : ''
+        "
+        :title="act.isInteractive ? `Click to open ${act.title}` : undefined"
+        @click="act.isInteractive && handleActivityClick(act)"
       >
         <div class="flex items-center gap-2 min-w-0">
           <span class="text-base">{{ act.icon }}</span>
           <div class="min-w-0">
-            <div class="font-semibold text-slate-800 dark:text-slate-200 truncate">{{ act.title }}</div>
+            <div class="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1">
+              <span>{{ act.title }}</span>
+              <span v-if="act.isInteractive" class="text-[10px] text-violet-500 font-normal">↗</span>
+            </div>
             <div class="text-[10px] text-slate-400 truncate">{{ act.detail }}</div>
           </div>
         </div>
@@ -98,10 +131,10 @@ const activities = computed<ActivityRow[]>(() => {
         <span
           class="shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
           :class="{
-            'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300': act.state === 'pending',
-            'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300': act.state === 'done',
-            'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400': act.state === 'info',
-            'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500': act.state === 'unknown',
+            'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300': act.state === 'done',
+            'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 animate-pulse': act.state === 'pending',
+            'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400': act.state === 'info',
+            'bg-slate-50 dark:bg-slate-900 text-slate-400': act.state === 'unknown',
           }"
         >
           {{ act.state }}
@@ -110,4 +143,3 @@ const activities = computed<ActivityRow[]>(() => {
     </div>
   </div>
 </template>
-

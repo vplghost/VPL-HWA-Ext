@@ -1,19 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed } from 'vue';
 import ResourceSummary from './ResourceSummary.vue';
 import TroopsOverview from './TroopsOverview.vue';
 import QueuesOverview from './QueuesOverview.vue';
 import ActivityGoals from './ActivityGoals.vue';
-import RaidModal from '@/src/components/dialogs/RaidModal.vue';
-import MonsterModal from '@/src/components/dialogs/MonsterModal.vue';
-import CampaignRaidModal from '@/src/components/dialogs/CampaignRaidModal.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useModals } from '@/src/composables/useModals';
 
-const { dispatchRpc } = useRpcCache();
-
-const showRaidModal = ref(false);
-const showMonsterModal = ref(false);
-const showCampaignModal = ref(false);
+const { dispatchRpc, cache } = useRpcCache();
+const { openModal } = useModals();
 
 async function refreshAllDashboard() {
   await dispatchRpc([
@@ -34,35 +29,52 @@ async function refreshAllDashboard() {
         <span class="text-lg">⚡</span>
         <div>
           <h3 class="font-bold text-xs text-slate-800 dark:text-slate-100">Quick Actions</h3>
-          <p class="text-[10px] text-slate-400">Launch rallies, hunt monsters, or farm campaign gear</p>
+          <p class="text-[10px] text-slate-400">Launch rallies, start gathering, hunt monsters, or farm gear</p>
         </div>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
+        <!-- Guild Raid -->
         <button
+          id="open-raid-dialog"
           type="button"
           class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
-          @click="showRaidModal = true"
+          @click="openModal('raid')"
         >
           <span>⚔️</span> <span>Guild Raid</span>
         </button>
 
+        <!-- Gathering -->
         <button
+          id="open-gather-dialog"
+          type="button"
+          class="cursor-pointer px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+          @click="openModal('gathering')"
+        >
+          <span>⛏️</span> <span>Gathering</span>
+        </button>
+
+        <!-- Solo Monster -->
+        <button
+          id="open-monster-dialog"
           type="button"
           class="cursor-pointer px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
-          @click="showMonsterModal = true"
+          @click="openModal('monster')"
         >
           <span>👹</span> <span>Solo Monster</span>
         </button>
 
+        <!-- Campaign Raid -->
         <button
+          id="open-campaign-dialog"
           type="button"
           class="cursor-pointer px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
-          @click="showCampaignModal = true"
+          @click="openModal('campaign')"
         >
           <span>🗺️</span> <span>Campaign Raid</span>
         </button>
 
+        <!-- Refresh All -->
         <button
           type="button"
           class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 ml-1"
@@ -85,10 +97,5 @@ async function refreshAllDashboard() {
 
     <!-- Daily Activities & Progress -->
     <ActivityGoals />
-
-    <!-- Dialogs -->
-    <RaidModal v-model="showRaidModal" />
-    <MonsterModal v-model="showMonsterModal" />
-    <CampaignRaidModal v-model="showCampaignModal" />
   </div>
 </template>

@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import Header from '@/src/components/common/Header.vue';
 import TabNav from '@/src/components/common/TabNav.vue';
+import FabDial from '@/src/components/common/FabDial.vue';
 import DashboardTab from '@/src/components/dashboard/DashboardTab.vue';
 import HeroesTab from '@/src/components/tabs/HeroesTab.vue';
 import TitansTab from '@/src/components/tabs/TitansTab.vue';
@@ -25,7 +26,7 @@ const { modalState, modalContext } = useModals();
 </script>
 
 <template>
-  <div class="w-[780px] min-h-[600px] max-h-[640px] overflow-y-auto bg-slate-50 dark:bg-slate-950 p-3 text-slate-800 dark:text-slate-100 flex flex-col gap-3 font-sans transition-colors antialiased">
+  <div class="relative w-[780px] min-h-[600px] max-h-[640px] overflow-y-auto bg-slate-50 dark:bg-slate-950 p-3 text-slate-800 dark:text-slate-100 flex flex-col gap-3 font-sans transition-colors antialiased">
     <!-- Top Header -->
     <Header />
 
@@ -33,7 +34,7 @@ const { modalState, modalContext } = useModals();
     <TabNav v-model="activeTab" />
 
     <!-- Tab Content -->
-    <main class="flex-1 min-h-0">
+    <main class="flex-1 min-h-0 pb-12">
       <KeepAlive>
         <component
           :is="
@@ -51,6 +52,9 @@ const { modalState, modalContext } = useModals();
         />
       </KeepAlive>
     </main>
+
+    <!-- Floating Action Button (FAB) Dial -->
+    <FabDial />
 
     <!-- Global Modals -->
     <BuildingModal v-model="modalState.building" />
