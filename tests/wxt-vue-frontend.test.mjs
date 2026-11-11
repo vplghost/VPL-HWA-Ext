@@ -535,3 +535,21 @@ test('SettingsTab supports popupRpcEnabled toggle, socketRefreshMode direct, and
   assert.match(settings, /socketRefreshMode/, 'SettingsTab must synchronize socketRefreshMode in chrome.storage');
   assert.match(settings, /id="socket-refresh-mode"/, 'SettingsTab must feature #socket-refresh-mode');
 });
+
+test('Header.vue accurately evaluates legend draft and mail indicator states and dispatches mail refresh', async () => {
+  const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
+
+  // Legend Draft checks
+  assert.match(header, /stageId >= 1 && stageId <= 6/, 'Header must check stages 1 through 6 for active Legend Draft');
+  assert.match(header, /draftStageDescription/, 'Header must describe draft stages');
+  assert.match(header, /draftTooltip/, 'Header must provide dynamic tooltip for draft alert');
+  assert.doesNotMatch(header, /stageId !== 'finished'/, 'Header must not use naive stageId !== finished condition');
+
+  // Mail checks
+  assert.match(header, /unclaimedLetters/, 'Header must compute actual unclaimed letters');
+  assert.match(header, /unclaimedReports/, 'Header must compute actual unclaimed reports');
+  assert.match(header, /refreshMail/, 'Header must implement refreshMail');
+  assert.match(header, /@click="refreshMail"/, 'Header must bind @click="refreshMail" on #mail-badge');
+  assert.match(header, /name:\s*'getPage',\s*feature:\s*'report'/, 'refreshMail must request getPage:report');
+  assert.match(header, /name:\s*'mailGetAll'/, 'refreshMail must request mailGetAll');
+});

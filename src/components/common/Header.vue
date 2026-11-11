@@ -16,7 +16,7 @@ import {
   isMarchExpired,
 } from '@/src/utils/resourceData';
 
-const { cache, rpcQueueCount } = useRpcCache();
+const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
 const { theme, applyTheme } = useTheme();
 const { openModal } = useModals();
 const { resourceSelection } = useResourceSelection();
@@ -119,22 +119,98 @@ const researchRemaining = computed(() => {
 });
 
 // Legend Draft Alert
+function draftStageDescription(stageId?: number | null): string {
+  if (stageId === 1) return 'Matching...';
+  if (stageId === 2 || stageId === 3) return 'Defense Draft';
+  if (stageId === 4) return 'Attack Draft';
+  if (stageId === 5) return 'Ready for Battle';
+  if (stageId === 6) return 'Battle in Progress';
+  if (stageId === 7) return 'Match Completed';
+  return 'Not in match';
+}
+
+function formatDraftCountdown(finishTs?: number | null): string {
+  if (!finishTs || typeof finishTs !== 'number' || !Number.isFinite(finishTs)) return '';
+  const nowSec = Math.floor(now.value / 1000);
+  const remaining = Math.max(0, finishTs - nowSec);
+  const m = Math.floor(remaining / 60);
+  const s = remaining % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 const isDraftActive = computed(() => {
-  const stageId = cache.value.legendDraftStatus?.data?.stageId;
-  return stageId !== undefined && stageId !== null && stageId !== 'finished';
+  const draft = cache.value.legendDraftStatus?.data;
+  if (!draft || draft.active === false) return false;
+  const stageId = draft.stageId;
+  // Stages 1 through 6 are active Legend Draft phases (parity with isDraftActive).
+  return typeof stageId === 'number' && Number.isInteger(stageId) && stageId >= 1 && stageId <= 6;
+});
+
+const draftTooltip = computed(() => {
+  const draft = cache.value.legendDraftStatus?.data;
+  const stageDesc = draftStageDescription(draft?.stageId);
+  const countdown = formatDraftCountdown(draft?.stageFinishTs);
+  return `Legend Draft · ${stageDesc}${countdown ? ` · ${countdown}` : ''}`;
 });
 
 // Mail / Battle Reports Status
 const mailStatus = computed(() => {
   const mail = cache.value.mailStatus?.data;
-  const hasUnclaimed = Boolean(
+
+  // 1. Check letters with unclaimed rewards
+  const letters = Array.isArray(mail?.letters)
+    ? mail.letters
+    : (Array.isArray(cache.value.mailGetAll?.data?.letters)
+      ? cache.value.mailGetAll.data.letters
+      : (Array.isArray(cache.value.mailGetAll?.letters) ? cache.value.mailGetAll.letters : []));
+
+  const unclaimedLetters = letters.filter((l: any) =>
+    l && !l.deleted && (l.reward || l.q_reward || l.items) &&
+    !l.claimed && !l.rewardReceived && !l.rewardClaimed
+  );
+
+  // 2. Check battle reports with unclaimed rewards
+  const reports = Array.isArray(mail?.reports) ? mail.reports : [];
+  const unclaimedReports = reports.filter((r: any) => r && r.claimedReward === false);
+
+  let letterCount = unclaimedLetters.length;
+  if (letters.length === 0 && typeof mail?.unclaimedLettersCount === 'number') {
+    letterCount = mail.unclaimedLettersCount;
+  }
+
+  let reportCount = 0;
+  if (reports.length > 0) {
+    reportCount = unclaimedReports.length;
+  } else if (typeof mail?.unclaimedReportsCount === 'number') {
+    reportCount = mail.unclaimedReportsCount;
+  } else if (mail?.hasUnclaimed) {
+    reportCount = Number(mail.totalUnclaimed) || 1;
+  }
+
+  const totalCount = letterCount + reportCount;
+  const hasUnclaimed = totalCount > 0 && Boolean(
     mail?.hasUnclaimed ||
     (mail?.totalUnclaimed && mail.totalUnclaimed > 0) ||
-    (mail?.unclaimedReportsCount && mail.unclaimedReportsCount > 0)
+    (mail?.unclaimedReportsCount && mail.unclaimedReportsCount > 0) ||
+    (mail?.unclaimedLettersCount && mail.unclaimedLettersCount > 0) ||
+    unclaimedLetters.length > 0 ||
+    unclaimedReports.length > 0
   );
-  const count = mail?.totalUnclaimed || mail?.unclaimedReportsCount || 0;
-  return { hasUnclaimed, count };
+
+  return {
+    hasUnclaimed,
+    count: totalCount || (mail?.totalUnclaimed ?? mail?.unclaimedReportsCount ?? 0),
+  };
 });
+
+async function refreshMail() {
+  if (dispatchRpc) {
+    await dispatchRpc([
+      { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
+      { name: 'mailGetAll' },
+    ]);
+  }
+}
 
 // Energy
 const energyEntry = computed(() => cache.value['resource:energy']);
@@ -288,7 +364,7 @@ function toggleTheme() {
           id="draft-alert"
           type="button"
           aria-label="Open Legend Draft"
-          title="Legend Draft is active!"
+          :title="draftTooltip"
           class="relative cursor-pointer inline-flex items-center justify-center size-6 rounded-full bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 ring-1 ring-red-300 dark:ring-red-700/60 transition-colors"
           @click="openModal('draft')"
         >
@@ -302,9 +378,10 @@ function toggleTheme() {
           v-if="mailStatus.hasUnclaimed"
           id="mail-badge"
           tabindex="0"
-          :title="`New mail / battle report with rewards (${mailStatus.count})`"
+          :title="`New mail / battle report with reward${mailStatus.count > 1 ? `s (${mailStatus.count})` : ''} · Click to refresh mail`"
           aria-label="Mail and Reports"
           class="relative cursor-pointer inline-flex items-center justify-center size-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+          @click="refreshMail"
         >
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect width="20" height="16" x="2" y="4" rx="2" />
