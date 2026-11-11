@@ -168,3 +168,15 @@ test('DungeonModal has 1:1 ID parity and controls matching HTML dungeon-modal', 
   assert.match(content, /dungeon-refresh-label/, 'Must have .dungeon-refresh-label');
   assert.match(content, /dungeon-clear-active-battle-btn/, 'Must have reset battle button');
 });
+
+test('App.vue and index.html support full width and height on browser without fixed max-h constraint', async () => {
+  const appContent = await readFile(join(root, 'entrypoints/popup/App.vue'), 'utf8');
+  assert.match(appContent, /w-full/, 'App root must use w-full');
+  assert.match(appContent, /min-h-screen/, 'App root must use min-h-screen');
+  assert.ok(!appContent.includes('w-[780px]'), 'App root must not be locked to fixed w-[780px]');
+  assert.ok(!appContent.includes('max-h-[640px]'), 'App root must not be locked to fixed max-h-[640px]');
+
+  const indexContent = await readFile(join(root, 'entrypoints/popup/index.html'), 'utf8');
+  assert.match(indexContent, /w-full/, 'index.html must have w-full');
+  assert.match(indexContent, /h-full/, 'index.html must have h-full');
+});

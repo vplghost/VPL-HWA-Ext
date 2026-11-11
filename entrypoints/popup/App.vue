@@ -33,7 +33,7 @@ const { modalState, modalContext } = useModals();
 </script>
 
 <template>
-  <div class="relative w-[780px] min-h-[600px] max-h-[640px] overflow-y-auto bg-slate-50 dark:bg-slate-950 p-3 text-slate-800 dark:text-slate-100 flex flex-col gap-3 font-sans transition-colors antialiased">
+  <div class="relative w-full min-h-screen flex-1 bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 text-slate-800 dark:text-slate-100 flex flex-col gap-3 font-sans transition-colors antialiased">
     <!-- Top Header -->
     <Header />
 
