@@ -118,6 +118,12 @@
     return missing;
   }
 
+  function requiresSpecialResource(researchId, level = 1) {
+    const meta = getResearchLevelData(researchId, level) || data[researchId]?.['1'];
+    if (!meta || !meta.c) return false;
+    return Object.keys(meta.c).some((m) => Number(m) === 12 || Number(m) > 5);
+  }
+
   globalThis.hwaHelperResearchData = {
     data,
     getMaxLevel,
@@ -125,6 +131,7 @@
     getMissingRequirements,
     isAvailable,
     calculateEffectiveDurationMs,
-    getMissingCosts
+    getMissingCosts,
+    requiresSpecialResource
   };
 })();

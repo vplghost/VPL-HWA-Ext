@@ -44,6 +44,21 @@ const researchQueue = ref<ResearchQueueState>({
   items: [],
 });
 
+const buildingQueueItems = ref<any[]>([]);
+
+const onStorageChanged = (changes: any, area: string) => {
+  if (area !== 'local') return;
+  if (changes.buildingQueue?.newValue?.items) {
+    buildingQueueItems.value = normalizeArray(changes.buildingQueue.newValue.items);
+  }
+  if (changes.researchQueue?.newValue) {
+    researchQueue.value = {
+      enabled: changes.researchQueue.newValue.enabled !== false,
+      items: normalizeArray(changes.researchQueue.newValue.items),
+    };
+  }
+};
+
 onMounted(async () => {
   timer = window.setInterval(() => {
     now.value = Date.now();
@@ -51,13 +66,17 @@ onMounted(async () => {
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['researchQueue']);
+      const stored = await chrome.storage.local.get(['researchQueue', 'buildingQueue']);
       if (stored.researchQueue) {
         researchQueue.value = {
           enabled: stored.researchQueue.enabled !== false,
-          items: Array.isArray(stored.researchQueue.items) ? stored.researchQueue.items : [],
+          items: normalizeArray(stored.researchQueue.items),
         };
       }
+      if (stored.buildingQueue?.items) {
+        buildingQueueItems.value = normalizeArray(stored.buildingQueue.items);
+      }
+      chrome.storage?.onChanged?.addListener(onStorageChanged);
     } catch (_) {}
   }
 });
@@ -65,6 +84,11 @@ onMounted(async () => {
 onUnmounted(() => {
   if (timer) clearInterval(timer);
   document.removeEventListener('keydown', handleKeydown);
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    try {
+      chrome.storage.onChanged.removeListener(onStorageChanged);
+    } catch (_) {}
+  }
 });
 
 function close() {
@@ -292,11 +316,33 @@ const availableResearchesCount = computed(() => {
 // Research Center building level (ID 43 / 165)
 const researchCenterLevel = computed(() => {
   const rawBuildings = normalizeArray(cache.value?.buildingStatus?.data?.buildings || cache.value?.clan_getSummary?.data?.buildings);
-  let center: any = null;
-  if (Array.isArray(rawBuildings)) {
-    center = rawBuildings.find((b: any) => (b.buildingId ?? b.id) === 43 || (b.buildingId ?? b.id) === 165);
+  let baseLevel = 0;
+  let found = false;
+  if (Array.isArray(rawBuildings) && rawBuildings.length > 0) {
+    const center = rawBuildings.find((b: any) => (b.buildingId ?? b.id) === 43 || (b.buildingId ?? b.id) === 165);
+    if (center && Number.isFinite(center.level)) {
+      baseLevel = Number(center.level);
+      found = true;
+    }
   }
-  return Number.isFinite(center?.level) ? Number(center.level) : Infinity;
+  if (!found && !rawBuildings.length) {
+    return Infinity;
+  }
+  let projected = baseLevel;
+  const buildingQueues = normalizeArray(cache.value?.buildingStatus?.data?.queues);
+  for (const q of buildingQueues) {
+    const bId = Number(q.buildingId ?? q.id);
+    if ((bId === 43 || bId === 165) && Number.isFinite(q.level)) {
+      projected = Math.max(projected, Number(q.level));
+    }
+  }
+  for (const item of buildingQueueItems.value) {
+    const bId = Number(item.buildingId);
+    if ((bId === 43 || bId === 165) && Number.isFinite(item.nextLevel)) {
+      projected = Math.max(projected, Number(item.nextLevel));
+    }
+  }
+  return projected;
 });
 
 // Calculate simulated levels including active queue and queued automation items
@@ -349,7 +395,6 @@ const upgradeCandidates = computed(() => {
       };
     })
     .filter((r: any) => {
-      if (r.isResearching) return false;
       if (researchDataHelper?.getMaxLevel) {
         const maxLevel = researchDataHelper.getMaxLevel(r.id);
         if (maxLevel > 0) {
@@ -432,12 +477,15 @@ function hasEnoughResearchResources(candidate: any) {
   return !missing || missing.length === 0;
 }
 
-function requiresSpecialResource(researchId: number, nextLevel: number): boolean {
+function requiresSpecialResource(researchId: number | string, level: number = 1): boolean {
   const rHelper = (globalThis as any).hwaHelperResearchData;
-  if (rHelper?.requiresSpecialResource) {
-    return rHelper.requiresSpecialResource(researchId, nextLevel);
+  if (typeof rHelper?.requiresSpecialResource === 'function') {
+    return rHelper.requiresSpecialResource(Number(researchId), Number(level));
   }
-  return false;
+  if (!rHelper) return false;
+  const meta = rHelper.getResearchLevelData?.(Number(researchId), Number(level)) || rHelper.data?.[Number(researchId)]?.['1'];
+  if (!meta || !meta.c) return false;
+  return Object.keys(meta.c).some((m: string) => Number(m) === 12 || Number(m) > 5);
 }
 
 async function startResearchUpgrade(candidate: any) {
@@ -595,8 +643,16 @@ async function refreshResearch() {
               <div class="flex items-center gap-2 min-w-0">
                 <span class="text-xl">🎉</span>
                 <div>
-                  <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                    {{ getResearchName(f.researchId) }} · Complete
+                  <div class="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                    <span>{{ getResearchName(f.researchId) }} · Complete</span>
+                    <span
+                      v-if="requiresSpecialResource(f.researchId, f.level)"
+                      class="special-resource-icon inline-flex items-center text-xs shrink-0 cursor-help select-none"
+                      title="Requires Honor Marks / Special Material"
+                      aria-label="Requires Honor Marks"
+                    >
+                      🎖️
+                    </span>
                   </div>
                   <div class="text-xs text-emerald-700 dark:text-emerald-400">
                     Queue #{{ f.queueNumber ?? 0 }} · Target Lv. {{ f.level ?? '?' }} finished
@@ -625,8 +681,16 @@ async function refreshResearch() {
                 <div class="flex items-center gap-2 min-w-0">
                   <span class="text-lg">🔬</span>
                   <div>
-                    <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                      {{ getResearchName(q.researchId) }}
+                    <div class="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                      <span>{{ getResearchName(q.researchId) }}</span>
+                      <span
+                        v-if="requiresSpecialResource(q.researchId, q.level)"
+                        class="special-resource-icon inline-flex items-center text-xs shrink-0 cursor-help select-none"
+                        title="Requires Honor Marks / Special Material"
+                        aria-label="Requires Honor Marks"
+                      >
+                        🎖️
+                      </span>
                     </div>
                     <div class="text-xs text-slate-500 dark:text-slate-400">
                       Queue #{{ q.queueNumber ?? 0 }} · Research ID: {{ q.researchId }}
@@ -722,6 +786,14 @@ async function refreshResearch() {
                   <div class="min-w-0">
                     <div class="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
                       <span>{{ getResearchName(item.researchId) }}</span>
+                      <span
+                        v-if="requiresSpecialResource(item.researchId, item.nextLevel)"
+                        class="special-resource-icon inline-flex items-center text-xs shrink-0 cursor-help select-none"
+                        title="Requires Honor Marks / Special Material"
+                        aria-label="Requires Honor Marks"
+                      >
+                        🎖️
+                      </span>
                       <span class="text-2xs font-normal text-slate-400">(ID: {{ item.researchId }})</span>
                     </div>
                     <div class="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
@@ -907,7 +979,7 @@ async function refreshResearch() {
                   </button>
 
                   <button
-                    v-if="activeQueues.length === 0 && hasEnoughResearchResources(r)"
+                    v-if="activeQueues.length === 0 && !r.isResearching && hasEnoughResearchResources(r)"
                     type="button"
                     :disabled="isStarting[`${r.id}-${r.nextLevel}`]"
                     class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50 shrink-0"
@@ -1002,11 +1074,19 @@ async function refreshResearch() {
             >
               <div class="min-w-0">
                 <div
-                  class="font-semibold truncate"
+                  class="font-semibold truncate flex items-center gap-1.5"
                   :class="r.isCompleted ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'"
                   :title="getResearchName(r.id)"
                 >
-                  {{ getResearchName(r.id) }}
+                  <span class="truncate">{{ getResearchName(r.id) }}</span>
+                  <span
+                    v-if="requiresSpecialResource(r.id, r.isCompleted ? r.level : (r.nextLevel || 1))"
+                    class="special-resource-icon inline-flex items-center text-xs shrink-0 cursor-help select-none"
+                    title="Requires Honor Marks / Special Material"
+                    aria-label="Requires Honor Marks"
+                  >
+                    🎖️
+                  </span>
                 </div>
                 <div class="text-2xs text-slate-400 dark:text-slate-500">
                   ID: {{ r.id }}

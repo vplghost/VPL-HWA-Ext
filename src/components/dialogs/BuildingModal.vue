@@ -323,8 +323,7 @@ const upgradeCandidates = computed(() => {
     .filter((b: any) => {
       if (SYSTEM_LANDMARK_BUILDING_IDS.has(Number(b.id))) return false;
       if (!b.isBuilt && (b.currentLevel ?? b.level ?? 0) <= 0) return false;
-      if (b.isUpgrading) return false;
-      if (b.id !== 20 && b.level >= hallLevel) return false;
+      if (b.id !== 20 && b.nextLevel > hallLevel) return false;
       if (bHelper?.getBuildingLevelData && bHelper.data?.[b.id] && !bHelper.getBuildingLevelData(b.id, b.nextLevel)) {
         return false;
       }
@@ -856,7 +855,7 @@ async function refreshBuildings() {
                   </button>
 
                   <button
-                    v-if="activeQueues.length === 0 && hasEnoughBuildingResources(b)"
+                    v-if="activeQueues.length === 0 && !b.isUpgrading && hasEnoughBuildingResources(b)"
                     type="button"
                     :disabled="isStarting[`${b.id}-${b.nextLevel}`]"
                     class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50 shrink-0"

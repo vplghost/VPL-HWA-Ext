@@ -966,3 +966,45 @@ test('Header tooltips use BaseTooltip to avoid browser native title flicker duri
   assert.match(baseTooltip, /role="tooltip"/, 'BaseTooltip must provide role="tooltip"');
   assert.match(baseTooltip, /coords\.left/, 'BaseTooltip must dynamically calculate position');
 });
+
+test('BuildingModal and ResearchModal support queuing upgrades with projected prerequisites and special resource badge', async () => {
+  const bContent = await readFile(join(root, 'src/components/dialogs/BuildingModal.vue'), 'utf8');
+  // Must NOT filter out isUpgrading buildings from upgrade candidates
+  assert.doesNotMatch(bContent, /if\s*\(b\.isUpgrading\)\s*return\s*false;/, 'BuildingModal must not exclude isUpgrading from candidates');
+  assert.match(bContent, /if\s*\(b\.id\s*!==\s*20\s*&&\s*b\.nextLevel\s*>\s*hallLevel\)\s*return\s*false;/, 'BuildingModal must check nextLevel > hallLevel');
+  assert.match(bContent, /v-if="activeQueues\.length === 0 && !b\.isUpgrading && hasEnoughBuildingResources\(b\)"/, 'Building direct upgrade button must check !b.isUpgrading');
+
+  const rContent = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
+  // Must NOT filter out isResearching tech from upgrade candidates
+  assert.doesNotMatch(rContent, /if\s*\(r\.isResearching\)\s*return\s*false;/, 'ResearchModal must not exclude isResearching from candidates');
+  assert.match(rContent, /v-if="activeQueues\.length === 0 && !r\.isResearching && hasEnoughResearchResources\(r\)"/, 'Research direct upgrade button must check !r.isResearching');
+  assert.match(rContent, /buildingQueueItems/, 'ResearchModal must track buildingQueueItems for projected Research Center level');
+  assert.match(rContent, /special-resource-icon/, 'ResearchModal must render special-resource-icon');
+  assert.match(rContent, /🎖️/, 'ResearchModal must render medal badge for special resource requirements');
+
+  // Verify requiresSpecialResource helper in extension/research-data.js
+  await import('../extension/research-data.js');
+  const rHelper = globalThis.hwaHelperResearchData;
+  assert.equal(typeof rHelper?.requiresSpecialResource, 'function', 'hwaHelperResearchData must export requiresSpecialResource');
+
+  // Find a research requiring honor marks or special material
+  let specialFound = false;
+  let regularFound = false;
+  for (const [idStr, levels] of Object.entries(rHelper.data || {})) {
+    const rId = Number(idStr);
+    for (const [lvlStr, meta] of Object.entries(levels || {})) {
+      const lvl = Number(lvlStr);
+      if (meta?.c && Object.keys(meta.c).some((m) => Number(m) === 12 || Number(m) > 5)) {
+        assert.equal(rHelper.requiresSpecialResource(rId, lvl), true, `Research ${rId} Lv.${lvl} must require special resource`);
+        specialFound = true;
+      } else if (meta?.c && Object.keys(meta.c).length > 0) {
+        assert.equal(rHelper.requiresSpecialResource(rId, lvl), false, `Research ${rId} Lv.${lvl} must not require special resource`);
+        regularFound = true;
+      }
+      if (specialFound && regularFound) break;
+    }
+    if (specialFound && regularFound) break;
+  }
+  assert.ok(specialFound, 'At least one tech must require special resource');
+  assert.ok(regularFound, 'At least one tech must require only standard resources');
+});
