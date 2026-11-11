@@ -797,3 +797,54 @@ test('Hover cards teleport to body with viewport-aware positioning and next cand
   assert.match(researchModal, /:\s*`Lv\.\s*1\$\{r\.maxLevel/, 'ResearchModal candidate label must omit the word Research');
   assert.doesNotMatch(researchModal, /:\s*`Research Lv\.\s*1/, 'ResearchModal candidate label must not contain "Research Lv."');
 });
+
+test('Resilient object-array handling and healing RPC dispatch permissions prevent TypeError regressions', async () => {
+  // 1. Intercept methods for healing and training
+  const intercept = await readFile(join(root, 'extension/intercept.js'), 'utf8');
+  assert.match(intercept, /'startHealing'/, 'intercept.js must register startHealing in helperActionMethods');
+  assert.match(intercept, /'completeTraining'/, 'intercept.js must register completeTraining in helperActionMethods');
+  assert.match(intercept, /'startTraining'/, 'intercept.js must register startTraining in helperActionMethods');
+  assert.match(intercept, /'getHealing'/, 'intercept.js must register getHealing in piggybackMethods');
+  assert.match(intercept, /'getTrainings'/, 'intercept.js must register getTrainings in piggybackMethods');
+
+  // 2. Experimental data helpers resilient against object/dictionary payloads
+  const { availableHeroIds, allocateTroops, buildSquad, teamOptions } = await import('../src/utils/experimentalData.ts');
+
+  // Object-shaped squads and marches (e.g. PHP sparse array or dictionary)
+  const objectSummary = {
+    squads: {
+      '0': { id: 'sq-1', heroes: { '0': { id: 16 } } },
+      '1': { id: 'sq-2', heroes: { '0': { id: 67 } } },
+    },
+    available: {
+      '0': { unitId: 7, count: 500 },
+      '1': { unitId: 17, count: 500 },
+    },
+  };
+  const objectMarches = {
+    '1': { team: { heroIds: { '0': 14 } } },
+  };
+
+  // Must not throw "TypeError: ((intermediate value) || []).flatMap is not a function" or "object is not iterable"
+  const avail = availableHeroIds({ 16: { power: 100 }, 67: { power: 200 }, 14: { power: 300 }, 33: { power: 400 } }, objectSummary, objectMarches);
+  assert.deepEqual(avail, [33], 'Available hero IDs must exclude busy heroes even with object payloads');
+
+  const allocated = allocateTroops(objectSummary, 200);
+  assert.ok(allocated.length > 0, 'allocateTroops must succeed with object-shaped available inventory');
+
+  const squad = buildSquad({ '0': 16, '1': 67, '2': 14, '3': 33, '4': 38 }, { '0': { unitId: 7, count: 50 } });
+  assert.ok(squad && squad.heroes.length === 5, 'buildSquad must succeed with object-shaped hero and unit inputs');
+
+  const customTeamsObj = { '0': { id: 't1', name: 'Team Alpha', heroIds: { '0': 16, '1': 67, '2': 14, '3': 33, '4': 38 } } };
+  const opts = teamOptions({}, { 16: { power: 10 }, 67: { power: 20 }, 14: { power: 30 }, 33: { power: 40 }, 38: { power: 50 } }, customTeamsObj);
+  assert.ok(opts.some((o) => o.id === 'custom:t1'), 'teamOptions must process object-shaped custom teams');
+
+  // 3. Raid modal mobConfigIds safe check
+  const raidModal = await readFile(join(root, 'src/components/dialogs/RaidModal.vue'), 'utf8');
+  assert.match(raidModal, /if \(Array\.isArray\(mobCfgs\)\)/, 'RaidModal must guard mobConfigIds array check');
+  assert.doesNotMatch(raidModal, /searchData\.value\?\.mobConfigIds\?\.includes/, 'RaidModal must not use unguarded mobConfigIds.includes');
+
+  // 4. Header activeMarches normalizeArray usage
+  const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
+  assert.match(header, /normalizeArray\(cache\.value\.marchStatus\?\.data\?\.marches\)/, 'Header must use normalizeArray for marchStatus.data.marches');
+});

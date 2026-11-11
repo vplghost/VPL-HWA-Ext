@@ -4,6 +4,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 import {
   soloMonsterConfigIds,
   soloMonsterLevel,
@@ -52,8 +53,8 @@ const searchData = computed(() => cache.value.experimentalSoloSearch?.data);
 
 const matchingMonsterConfigs = computed(() => {
   const cfgs = soloMonsterConfigIds(mobLevel.value) || [mobLevel.value];
-  const mobCfgs = searchData.value?.mobConfigIds;
-  return Array.isArray(mobCfgs) && cfgs.length === mobCfgs.length && cfgs.every((c: any, i: number) => c === mobCfgs[i]);
+  const mobCfgs = normalizeArray(searchData.value?.mobConfigIds);
+  return cfgs.length === mobCfgs.length && cfgs.every((c: any, i: number) => c === mobCfgs[i]);
 });
 
 const foundMonsters = computed(() => {
@@ -211,7 +212,7 @@ async function startMonsterQueue(count = mobCount.value) {
   await ensureRpcEnabled();
   await savePreferences();
 
-  const heroIds = selectedTeam.value?.heroIds || [];
+  const heroIds = normalizeArray(selectedTeam.value?.heroIds);
   const teamId = selectedTeam.value?.id || '';
   const maxTroops = selectedTeam.value?.maxTroops;
   const mapId = mapContext.value?.mapId;

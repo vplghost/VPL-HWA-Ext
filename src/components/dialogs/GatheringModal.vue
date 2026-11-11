@@ -5,6 +5,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber, formatDuration } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 import {
   getMineConfigId,
   buildSquad,
@@ -134,7 +135,7 @@ const nextTargetType = computed(() => {
 
 // Active gathering marches
 const gatheringMarches = computed(() => {
-  const marches = cache.value.marchStatus?.data?.marches || [];
+  const marches = normalizeArray(cache.value.marchStatus?.data?.marches);
   return marches
     .filter((m: any) => {
       const isMine =

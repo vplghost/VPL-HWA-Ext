@@ -1,4 +1,5 @@
 import { formatNumber } from './formatters.ts';
+import { normalizeArray } from './troops.ts';
 import {
   bossLevel,
   soloMonsterLevel,
@@ -51,37 +52,44 @@ export function extractMarchSquadDetails(march: any, cache: any = {}): MarchSqua
   let heroIds: number[] = [];
   let unitCounts: Array<{ id: number; count: number }> = [];
 
-  if (Array.isArray(march?.team?.heroIds) && march.team.heroIds.length > 0) {
-    heroIds = march.team.heroIds;
-    if (Array.isArray(march.team.units)) {
-      unitCounts = march.team.units.map((u: any) => ({
-        id: u.id ?? u.unitId,
-        count: u.count ?? u.state?.survived ?? 0,
+  const teamHeroIds = normalizeArray(march?.team?.heroIds);
+  const rallyHeroIds = normalizeArray(march?.rally?.team?.heroIds);
+
+  if (teamHeroIds.length > 0) {
+    heroIds = teamHeroIds;
+    const units = normalizeArray(march?.team?.units);
+    if (units.length > 0) {
+      unitCounts = units.map((u: any) => ({
+        id: u?.id ?? u?.unitId,
+        count: u?.count ?? u?.state?.survived ?? 0,
       }));
     }
-  } else if (Array.isArray(march?.rally?.team?.heroIds) && march.rally.team.heroIds.length > 0) {
-    heroIds = march.rally.team.heroIds;
-    if (Array.isArray(march.rally.team.units)) {
-      unitCounts = march.rally.team.units.map((u: any) => ({
-        id: u.id ?? u.unitId,
-        count: u.count ?? u.state?.survived ?? 0,
+  } else if (rallyHeroIds.length > 0) {
+    heroIds = rallyHeroIds;
+    const units = normalizeArray(march?.rally?.team?.units);
+    if (units.length > 0) {
+      unitCounts = units.map((u: any) => ({
+        id: u?.id ?? u?.unitId,
+        count: u?.count ?? u?.state?.survived ?? 0,
       }));
     }
   } else if (march?.squadId && cache) {
-    const squads =
+    const rawSquads =
       cache['getUnitSummary:unit']?.data?.squads ||
       cache.inventoryGet?.data?.unit?.squads ||
-      cache['user_getUnitSummary']?.data?.squads ||
-      [];
-    const matchedSquad = squads.find((s: any) => s.id === march.squadId);
+      cache['user_getUnitSummary']?.data?.squads;
+    const squads = normalizeArray(rawSquads);
+    const matchedSquad = squads.find((s: any) => s?.id === march.squadId);
     if (matchedSquad) {
-      if (Array.isArray(matchedSquad.heroes)) {
-        heroIds = matchedSquad.heroes.map((h: any) => Number(h.id ?? h.heroId)).filter(Boolean);
+      const heroes = normalizeArray(matchedSquad.heroes);
+      if (heroes.length > 0) {
+        heroIds = heroes.map((h: any) => Number(h?.id ?? h?.heroId)).filter(Boolean);
       }
-      if (Array.isArray(matchedSquad.units)) {
-        unitCounts = matchedSquad.units.map((u: any) => ({
-          id: u.id ?? u.unitId,
-          count: u.state?.survived ?? u.count ?? 0,
+      const units = normalizeArray(matchedSquad.units);
+      if (units.length > 0) {
+        unitCounts = units.map((u: any) => ({
+          id: u?.id ?? u?.unitId,
+          count: u?.state?.survived ?? u?.count ?? 0,
         }));
       }
     }
@@ -259,7 +267,7 @@ export function formatRaidQueueTooltip(queue: any): string {
   const lvl = queue.options?.level || 1;
   const count = queue.bossQueue?.remain_raid_count ?? queue.options?.count ?? 0;
   const phase = queue.phase || 'Active';
-  const heroNames = (queue.options?.heroIds || []).map(resolveHeroName);
+  const heroNames = normalizeArray(queue.options?.heroIds).map(resolveHeroName);
   const lines = [
     `⚔️ Raid Queue Active (Level ${lvl} Boss)`,
     `Status: ${phase} · Rounds left: ${count}`,
@@ -278,7 +286,7 @@ export function formatMonsterQueueTooltip(queue: any): string {
   if (!queue) return 'Monster Queue';
   const lvl = queue.options?.level || 1;
   const phase = queue.phase || 'Active';
-  const heroNames = (queue.options?.heroIds || []).map(resolveHeroName);
+  const heroNames = normalizeArray(queue.options?.heroIds).map(resolveHeroName);
   const lines = [
     `👾 Monster Queue Active (Level ${lvl} Monster)`,
     `Status: ${phase} · Target level: ${lvl}`,

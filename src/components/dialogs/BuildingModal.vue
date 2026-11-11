@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getBuildingName } from '@/src/utils/metadata';
 import { formatDuration } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -101,7 +102,7 @@ async function saveBuildingQueue() {
 }
 
 // Queues from cache
-const rawQueues = computed(() => cache.value?.buildingStatus?.data?.queues || []);
+const rawQueues = computed(() => normalizeArray(cache.value?.buildingStatus?.data?.queues));
 
 const activeQueues = computed(() => {
   return rawQueues.value.filter(
@@ -194,7 +195,8 @@ function clearQueue() {
 
 // Raw buildings from cache
 const rawBuildings = computed(() => {
-  const data = cache.value?.buildingStatus?.data?.buildings || cache.value?.clan_getSummary?.data?.buildings || [];
+  const rawData = cache.value?.buildingStatus?.data?.buildings || cache.value?.clan_getSummary?.data?.buildings;
+  const data = normalizeArray(rawData);
   if (Array.isArray(data)) {
     return data
       .map((b: any) => ({

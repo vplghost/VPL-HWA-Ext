@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getResearchName } from '@/src/utils/metadata';
 import { formatDuration } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -102,7 +103,7 @@ async function saveResearchQueue() {
 }
 
 // Queues from cache
-const rawQueues = computed(() => cache.value?.researchStatus?.data?.queues || []);
+const rawQueues = computed(() => normalizeArray(cache.value?.researchStatus?.data?.queues));
 
 const activeQueues = computed(() => {
   return rawQueues.value.filter(
@@ -195,7 +196,8 @@ function clearQueue() {
 
 // Researches from cache
 const rawResearches = computed(() => {
-  const data = cache.value?.researchStatus?.data?.researches || cache.value?.clan_getSummary?.data?.researches || [];
+  const rawData = cache.value?.researchStatus?.data?.researches || cache.value?.clan_getSummary?.data?.researches;
+  const data = normalizeArray(rawData);
   if (Array.isArray(data)) {
     return data
       .map((r: any) => ({
@@ -289,12 +291,10 @@ const availableResearchesCount = computed(() => {
 
 // Research Center building level (ID 43 / 165)
 const researchCenterLevel = computed(() => {
-  const rawBuildings = cache.value?.buildingStatus?.data?.buildings || cache.value?.clan_getSummary?.data?.buildings || [];
+  const rawBuildings = normalizeArray(cache.value?.buildingStatus?.data?.buildings || cache.value?.clan_getSummary?.data?.buildings);
   let center: any = null;
   if (Array.isArray(rawBuildings)) {
     center = rawBuildings.find((b: any) => (b.buildingId ?? b.id) === 43 || (b.buildingId ?? b.id) === 165);
-  } else if (rawBuildings && typeof rawBuildings === 'object') {
-    center = rawBuildings['43'] || rawBuildings['165'] || rawBuildings[43] || rawBuildings[165];
   }
   return Number.isFinite(center?.level) ? Number(center.level) : Infinity;
 });

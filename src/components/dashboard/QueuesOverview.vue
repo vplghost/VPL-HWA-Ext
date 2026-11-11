@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { formatDuration } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 import BuildingModal from '@/src/components/dialogs/BuildingModal.vue';
 import ResearchModal from '@/src/components/dialogs/ResearchModal.vue';
 
@@ -26,9 +27,9 @@ onUnmounted(() => {
 const buildingQueue = computed(() => {
   const status = cache.value.buildingStatus?.data || cache.value.building_getQueue?.data;
   if (!status) return null;
-  const queue = Array.isArray(status) ? status : (status.queue || []);
+  const queue = normalizeArray(Array.isArray(status) ? status : (status.queue || status.queues));
   const active = queue.find((q: any) => {
-    const end = q.finishTime || (q.startDate && q.duration ? q.startDate + q.duration : null);
+    const end = q?.finishTime || (q?.startDate && q?.duration ? q.startDate + q.duration : null);
     return end && end > now.value;
   });
   if (!active) return null;
@@ -46,9 +47,9 @@ const buildingQueue = computed(() => {
 const researchQueue = computed(() => {
   const status = cache.value.researchStatus?.data || cache.value.research_getQueue?.data;
   if (!status) return null;
-  const queue = Array.isArray(status) ? status : (status.queue || []);
+  const queue = normalizeArray(Array.isArray(status) ? status : (status.queue || status.queues));
   const active = queue.find((q: any) => {
-    const end = q.finishTime || (q.startDate && q.duration ? q.startDate + q.duration : null);
+    const end = q?.finishTime || (q?.startDate && q?.duration ? q.startDate + q.duration : null);
     return end && end > now.value;
   });
   if (!active) return null;
@@ -64,7 +65,7 @@ const researchQueue = computed(() => {
 
 // Active Marches
 const marches = computed(() => {
-  const list = cache.value.marchStatus?.data?.marches || [];
+  const list = normalizeArray(cache.value.marchStatus?.data?.marches);
   return list
     .filter((m: any) => {
       const end = m.endTime || (m.startTime && m.duration ? m.startTime + m.duration : null);

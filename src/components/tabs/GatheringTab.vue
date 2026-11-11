@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import type { AutoGatherSettings } from '@/src/types';
 import { formatDuration } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 
 const { cache, dispatchRpc } = useRpcCache();
 
@@ -54,7 +55,7 @@ function toggleEnabled() {
 }
 
 const activeMarches = computed(() => {
-  const list = cache.value.marchStatus?.data?.marches || [];
+  const list = normalizeArray(cache.value.marchStatus?.data?.marches);
   return list
     .filter((m: any) => {
       const end = m.endTime || (m.startTime && m.duration ? m.startTime + m.duration : null);

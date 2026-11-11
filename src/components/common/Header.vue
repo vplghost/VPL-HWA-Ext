@@ -21,6 +21,7 @@ import {
   formatMonsterQueueTooltip,
   formatAutoGatherTooltip,
 } from '@/src/utils/marchTooltip';
+import { normalizeArray } from '@/src/utils/troops';
 
 const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
 const { theme, applyTheme } = useTheme();
@@ -121,7 +122,7 @@ function openInTab() {
 
 // Active Marches
 const activeMarches = computed(() => {
-  const marches = cache.value.marchStatus?.data?.marches || [];
+  const marches = normalizeArray(cache.value.marchStatus?.data?.marches);
   return marches
     .map((m: any, idx: number) => ({ march: m, index: idx }))
     .filter(({ march }: { march: any }) => !isMarchExpired(march, now.value));

@@ -4,6 +4,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 import {
   bossConfigId,
   bossLevel as getBossLevel,
@@ -56,7 +57,11 @@ const searchData = computed(() => cache.value.experimentalRallySearch?.data);
 
 const matchingBossConfig = computed(() => {
   const configId = bossConfigId(bossLevel.value);
-  return Boolean(configId && searchData.value?.mobConfigIds?.includes(configId));
+  const mobCfgs = searchData.value?.mobConfigIds;
+  if (!configId || !mobCfgs) return false;
+  if (Array.isArray(mobCfgs)) return mobCfgs.includes(configId);
+  if (typeof mobCfgs === 'object') return Object.values(mobCfgs).includes(configId) || String(configId) in mobCfgs;
+  return false;
 });
 
 const foundBosses = computed(() => {
@@ -220,7 +225,7 @@ async function startRaidQueue(count = raidCount.value) {
   await ensureRpcEnabled();
   await savePreferences();
 
-  const heroIds = selectedTeam.value?.heroIds || [];
+  const heroIds = normalizeArray(selectedTeam.value?.heroIds);
   const teamId = selectedTeam.value?.id || '';
   const maxTroops = selectedTeam.value?.maxTroops;
   const mapId = mapContext.value?.mapId;

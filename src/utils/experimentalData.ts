@@ -10,6 +10,13 @@
 
 export const rallyWaitOptions = [60, 300, 900, 1800] as const;
 
+function asArray<T = any>(val: any): T[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'object') return Object.values(val) as T[];
+  return [];
+}
+
 export const capacityExamples: Record<number, [number, number, number]> = {
   16: [80, 3, 799],
   67: [70, 4, 740],
@@ -99,7 +106,7 @@ export function capacityModel(
       .filter(([, value]) => value != null)
   );
 
-  const rows = (observations || []).filter(
+  const rows = asArray(observations).filter(
     (row) =>
       accountId != null &&
       String(row.accountId) === String(accountId) &&
@@ -170,7 +177,7 @@ export function capacityModel(
     }
   }
 
-  const counts = (ids || []).map(
+  const counts = asArray(ids).map(
     (id) =>
       (known as Record<string, any>)[id] ??
       inferred[id] ??
@@ -209,7 +216,7 @@ export function unitInfo(id: number): UnitInfo | null {
 export function allocateTroops(summary: any, capacity: number): Array<{ unitId: number; count: number }> {
   if (!Number.isSafeInteger(capacity) || capacity <= 0) return [];
   const stocks = new Map<number, number>();
-  for (const item of summary?.available || []) {
+  for (const item of asArray(summary?.available)) {
     const id = Number(item.unitId);
     if (unitInfo(id) && Number.isSafeInteger(item.count) && item.count > 0) {
       stocks.set(id, Math.max(stocks.get(id) || 0, item.count));
@@ -302,15 +309,15 @@ export function getMineTypeLevel(configId: number): { type: string; level: numbe
 export function availableHeroIds(
   heroes: Record<string | number, any> = {},
   summary: any,
-  marches: any[] = []
+  marches: any = []
 ): number[] {
   const busy = new Set<number>(
-    (summary?.squads || []).flatMap((squad: any) =>
-      (squad.heroes || []).map((h: any) => Number(h.id ?? h.heroId ?? h))
+    asArray(summary?.squads).flatMap((squad: any) =>
+      asArray(squad?.heroes).map((h: any) => Number(h?.id ?? h?.heroId ?? h))
     )
   );
-  for (const march of marches) {
-    for (const id of march.team?.heroIds || []) busy.add(Number(id));
+  for (const march of asArray(marches)) {
+    for (const id of asArray(march?.team?.heroIds)) busy.add(Number(id));
   }
   return Object.keys(heroes || {})
     .map(Number)
@@ -319,7 +326,7 @@ export function availableHeroIds(
 
 export function normalizeCustomTeam(team: any, heroes: Record<string | number, any>) {
   const name = typeof team?.name === 'string' ? team.name.trim().slice(0, 80) : '';
-  const heroIds = [...new Set(team?.heroIds || [])];
+  const heroIds = [...new Set(asArray(team?.heroIds))];
   const maxTroops = team?.maxTroops;
   if (maxTroops != null && (!Number.isSafeInteger(maxTroops) || maxTroops <= 0)) return null;
   return name && heroIds.length === 5 && heroIds.every((id: any) => Number.isInteger(id) && heroes?.[id])
@@ -351,7 +358,7 @@ export function teamOptions(
   customTeams: any[] = [],
   availableIds?: number[]
 ) {
-  const options = (customTeams || [])
+  const options = asArray(customTeams)
     .map((team) => normalizeCustomTeam(team, heroes))
     .filter(Boolean)
     .map((team: any) => ({
@@ -391,9 +398,9 @@ export function teamTroopCapacity(automatic: number, maxTroops?: number): number
 }
 
 export function buildSquad(heroIds: number[], units: Array<{ unitId: number; count: number }>) {
-  const ids = [...new Set(heroIds)].filter(Number.isInteger).slice(0, 5);
-  const troops = (units || []).filter(
-    (unit) => Number.isInteger(unit.unitId) && unit.unitId > 0 && Number.isInteger(unit.count) && unit.count > 0
+  const ids = [...new Set(asArray(heroIds))].filter(Number.isInteger).slice(0, 5);
+  const troops = asArray(units).filter(
+    (unit) => Number.isInteger(unit?.unitId) && unit.unitId > 0 && Number.isInteger(unit?.count) && unit.count > 0
   );
   if (ids.length !== 5 || !troops.length) return null;
   return { heroes: ids.map((heroId) => ({ heroId })), units: troops };

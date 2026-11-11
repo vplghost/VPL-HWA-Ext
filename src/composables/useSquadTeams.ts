@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata, starGlowClass } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 import {
   availableHeroIds as getAvailableHeroIds,
   teamOptions as getTeamOptions,
@@ -38,7 +39,7 @@ export function useSquadTeams(
   const accountId = computed(() => cache.value.accountStatus?.data?.id);
   const heroesData = computed(() => cache.value.heroGetAll?.data || {});
   const unitSummaryData = computed(() => cache.value['getUnitSummary:unit']?.data || cache.value.inventoryGet?.data?.unit || {});
-  const marchData = computed(() => cache.value.marchStatus?.data?.marches || []);
+  const marchData = computed(() => normalizeArray(cache.value.marchStatus?.data?.marches));
 
   const mapContext = computed(() => {
     return {
@@ -60,10 +61,10 @@ export function useSquadTeams(
         const stored = await chrome.storage.local.get(['customTeams', preferenceStorageKey]);
         const accounts = stored.customTeams || {};
         if (accountId.value) {
-          customTeams.value = accounts[String(accountId.value)] || [];
+          customTeams.value = normalizeArray(accounts[String(accountId.value)]);
         } else {
           const firstKey = Object.keys(accounts)[0];
-          customTeams.value = firstKey ? accounts[firstKey] : [];
+          customTeams.value = firstKey ? normalizeArray(accounts[firstKey]) : [];
         }
 
         const prefs = stored[preferenceStorageKey];
@@ -95,8 +96,8 @@ export function useSquadTeams(
     const list: SquadTeamOption[] = [];
 
     // Custom teams
-    customTeams.value.forEach((team) => {
-      const validHeroIds = (team.heroIds || []).filter((id) => heroesData.value[String(id)]);
+    normalizeArray(customTeams.value).forEach((team) => {
+      const validHeroIds = normalizeArray(team?.heroIds).filter((id) => heroesData.value[String(id)]);
       if (validHeroIds.length > 0) {
         list.push({
           id: `custom:${team.id}`,

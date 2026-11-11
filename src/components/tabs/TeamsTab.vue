@@ -5,6 +5,7 @@ import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import TitanHoverCard from '@/src/components/common/TitanHoverCard.vue';
 import { getHeroMetadata, getTitanMetadata, starGlowClass } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 
 interface CustomTeam {
   id: string;
@@ -36,10 +37,10 @@ async function loadTeams() {
       const stored = await chrome.storage.local.get('customTeams');
       const accounts = stored.customTeams || {};
       if (accountId.value) {
-        customTeams.value = accounts[String(accountId.value)] || [];
+        customTeams.value = normalizeArray(accounts[String(accountId.value)]);
       } else {
         const firstKey = Object.keys(accounts)[0];
-        customTeams.value = firstKey ? accounts[firstKey] : [];
+        customTeams.value = firstKey ? normalizeArray(accounts[firstKey]) : [];
       }
     } catch (_) {}
   }
