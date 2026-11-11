@@ -84,6 +84,13 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     'src/components/tabs/QuestsTab.vue',
     'src/components/tabs/SettingsTab.vue',
     'src/components/tabs/LogTab.vue',
+    'src/components/common/ModalDialog.vue',
+    'src/components/dialogs/RaidModal.vue',
+    'src/components/dialogs/MonsterModal.vue',
+    'src/components/dialogs/BuildingModal.vue',
+    'src/components/dialogs/ResearchModal.vue',
+    'src/components/dialogs/CampaignRaidModal.vue',
+    'src/components/dialogs/HeroDetailModal.vue',
   ];
 
   for (const comp of components) {

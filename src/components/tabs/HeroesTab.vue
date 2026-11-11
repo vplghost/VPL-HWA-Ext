@@ -3,12 +3,16 @@ import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata, type HeroMeta } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import HeroDetailModal from '@/src/components/dialogs/HeroDetailModal.vue';
 
 const { cache, dispatchRpc } = useRpcCache();
 
 const search = ref('');
 const selectedClass = ref('All');
 const sortBy = ref<'power' | 'level' | 'star' | 'name'>('power');
+
+const selectedHero = ref<any>(null);
+const showHeroModal = ref(false);
 
 const heroEntries = computed(() => {
   const data = cache.value.heroGetAll?.data || {};
@@ -65,6 +69,11 @@ function getAvatarUrl(file: string | undefined): string {
     return chrome.runtime.getURL(file);
   }
   return file;
+}
+
+function openHeroDetail(hero: any) {
+  selectedHero.value = hero;
+  showHeroModal.value = true;
 }
 
 async function refreshHeroes() {
@@ -130,6 +139,8 @@ async function refreshHeroes() {
         v-for="h in filteredHeroes"
         :key="h.id"
         class="group relative rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-2.5 space-y-1.5 shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-600 transition-all cursor-pointer"
+        title="Click to view equipment slots and hero skills"
+        @click="openHeroDetail(h)"
       >
         <div class="flex items-center gap-2">
           <!-- Avatar -->
@@ -170,6 +181,8 @@ async function refreshHeroes() {
         </div>
       </div>
     </div>
+
+    <!-- Hero Detail Modal -->
+    <HeroDetailModal v-model="showHeroModal" :hero="selectedHero" />
   </div>
 </template>
-

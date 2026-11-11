@@ -2,10 +2,15 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { formatDuration } from '@/src/utils/formatters';
+import BuildingModal from '@/src/components/dialogs/BuildingModal.vue';
+import ResearchModal from '@/src/components/dialogs/ResearchModal.vue';
 
 const { cache, dispatchRpc } = useRpcCache();
 const now = ref(Date.now());
 let timer: any = null;
+
+const showBuildingModal = ref(false);
+const showResearchModal = ref(false);
 
 onMounted(() => {
   timer = setInterval(() => {
@@ -91,8 +96,12 @@ const marches = computed(() => {
       </div>
 
       <div class="space-y-1.5 text-xs">
-        <!-- Building Queue -->
-        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between">
+        <!-- Building Queue Row (Clickable) -->
+        <div
+          class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
+          title="Click to view city buildings and upgrade queues"
+          @click="showBuildingModal = true"
+        >
           <div class="flex items-center gap-2">
             <span class="text-base">🏗️</span>
             <div>
@@ -100,7 +109,7 @@ const marches = computed(() => {
                 {{ buildingQueue ? `${buildingQueue.name} (Lv.${buildingQueue.level || '?'})` : 'Building Queue' }}
               </div>
               <div class="text-[10px] text-slate-400">
-                {{ buildingQueue ? 'In progress' : 'Idle · Ready to upgrade' }}
+                {{ buildingQueue ? 'In progress · Click to manage' : 'Idle · Click to view buildings' }}
               </div>
             </div>
           </div>
@@ -112,8 +121,12 @@ const marches = computed(() => {
           </span>
         </div>
 
-        <!-- Research Queue -->
-        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between">
+        <!-- Research Queue Row (Clickable) -->
+        <div
+          class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
+          title="Click to view academy research tree and upgrades"
+          @click="showResearchModal = true"
+        >
           <div class="flex items-center gap-2">
             <span class="text-base">🔬</span>
             <div>
@@ -121,7 +134,7 @@ const marches = computed(() => {
                 {{ researchQueue ? `${researchQueue.name} (Lv.${researchQueue.level || '?'})` : 'Research Queue' }}
               </div>
               <div class="text-[10px] text-slate-400">
-                {{ researchQueue ? 'In progress' : 'Idle · Ready to research' }}
+                {{ researchQueue ? 'In progress · Click to manage' : 'Idle · Click to view research' }}
               </div>
             </div>
           </div>
@@ -167,6 +180,9 @@ const marches = computed(() => {
         </div>
       </div>
     </div>
+
+    <!-- Building & Research Modals -->
+    <BuildingModal v-model="showBuildingModal" />
+    <ResearchModal v-model="showResearchModal" />
   </div>
 </template>
-
