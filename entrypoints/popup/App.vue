@@ -6,9 +6,8 @@ import DashboardTab from '@/src/components/dashboard/DashboardTab.vue';
 import HeroesTab from '@/src/components/tabs/HeroesTab.vue';
 import TitansTab from '@/src/components/tabs/TitansTab.vue';
 import ItemsTab from '@/src/components/tabs/ItemsTab.vue';
-import GatheringTab from '@/src/components/tabs/GatheringTab.vue';
-import DungeonTab from '@/src/components/tabs/DungeonTab.vue';
-import TowerTab from '@/src/components/tabs/TowerTab.vue';
+import ResourcesTab from '@/src/components/tabs/ResourcesTab.vue';
+import TeamsTab from '@/src/components/tabs/TeamsTab.vue';
 import QuestsTab from '@/src/components/tabs/QuestsTab.vue';
 import SettingsTab from '@/src/components/tabs/SettingsTab.vue';
 import LogTab from '@/src/components/tabs/LogTab.vue';
@@ -42,10 +41,10 @@ const { modalState, modalContext } = useModals();
             activeTab === 'heroes' ? HeroesTab :
             activeTab === 'titans' ? TitansTab :
             activeTab === 'items' ? ItemsTab :
-            activeTab === 'gathering' ? GatheringTab :
-            activeTab === 'dungeon' ? DungeonTab :
-            activeTab === 'tower' ? TowerTab :
-            activeTab === 'quests' ? QuestsTab :
+            activeTab === 'resources' ? ResourcesTab :
+            activeTab === 'teams' ? TeamsTab :
+            activeTab === 'events' ? QuestsTab :
+            activeTab === 'goals' ? QuestsTab :
             activeTab === 'settings' ? SettingsTab :
             LogTab
           "
