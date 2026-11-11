@@ -227,16 +227,27 @@ test('renderDashboardTroops renders ready, train, and heal action buttons and ha
     globalThis: {}
   });
 
+  // Extract variables and function
+  const declStart = popupCode.indexOf('let currentTroopTrainSettings =');
+  const declEnd = popupCode.indexOf(';', declStart) + 1;
+  vm.runInContext(popupCode.slice(declStart, declEnd), context);
+
   const fnStart = popupCode.indexOf('function renderDashboardTroops(');
   const fnEnd = popupCode.indexOf('\nfunction renderEvents(', fnStart);
   const fnCode = popupCode.slice(fnStart, fnEnd);
   vm.runInContext(fnCode, context);
 
   const container = new MockElement('div');
+  // Sibling element in dashboard that must NEVER be wiped when training or healing
+  const otherDashboardSection = new MockElement('div');
+  otherDashboardSection.id = 'dashboard-hero-section';
+  otherDashboardSection.textContent = 'Hero Roster Section';
+  container.append(otherDashboardSection);
+
   const now = 1794100000000;
 
   // Training queue for Marksmen is finished (startDate + duration <= now)
-  // Spearmen has no active training (idle)
+  // Spearmen has no active training (idle, total = 5000 + 12 = 5012, default max = 10000)
   // Hospital has 36 injured units and no active healing
   const mockCache = {
     'getUnitSummary:unit': {
@@ -270,7 +281,8 @@ test('renderDashboardTroops renders ready, train, and heal action buttons and ha
   context.renderDashboardTroops(mockCache, container, now);
 
   const section = container.querySelector('#dashboard-troops-section');
-  assert.ok(section, 'Section must exist');
+  assert.ok(section, 'Troops section must exist in container');
+  assert.ok(container.querySelector('#dashboard-hero-section'), 'Other dashboard sections must be preserved');
 
   // 1. Heal All button
   const healAllBtn = section.querySelector('#dashboard-troops-heal-all-btn');
@@ -281,6 +293,7 @@ test('renderDashboardTroops renders ready, train, and heal action buttons and ha
   const healMsg = sentMessages.find((m) => m.calls?.some((c) => c.name === 'startHealing'));
   assert.ok(healMsg, 'startHealing RPC must be sent');
   assert.equal(healMsg.calls[0].args.units.length, 3);
+  assert.ok(container.querySelector('#dashboard-hero-section'), 'Hero section must not be wiped after healing');
 
   // 2. Ready / Collect button on Marksmen card (card 0)
   const actionHosts = section.querySelectorAll('.troop-card-action');
@@ -295,9 +308,19 @@ test('renderDashboardTroops renders ready, train, and heal action buttons and ha
   const collectMsg = sentMessages.find((m) => m.calls?.some((c) => c.name === 'completeTraining'));
   assert.ok(collectMsg, 'completeTraining RPC must be sent');
   assert.equal(collectMsg.calls[0].args.unitId, 7);
+  assert.ok(container.querySelector('#dashboard-hero-section'), 'Hero section must not be wiped after collecting');
 
-  // 3. Train button on Spearmen card (card 1)
-  const trainBtn = actionHosts[1].children[0];
+  // 3. Train button and level select on Spearmen card (card 1)
+  const controlsWrap = actionHosts[1].children[0];
+  assert.ok(controlsWrap, 'Controls wrap must exist on idle card');
+
+  const levelSelect = controlsWrap.querySelector('.troop-level-select');
+  assert.ok(levelSelect, 'Level selector must exist on idle card');
+  // Select Lv.5 for Spearmen (type 1 => unitId 10 + 5 = 15)
+  levelSelect.value = '5';
+  levelSelect.listeners.change?.({ target: { value: '5' } });
+
+  const trainBtn = controlsWrap.children[1];
   assert.ok(trainBtn, 'Train button must exist on idle card');
   assert.ok(trainBtn.textContent.includes('Train (26)'));
 
@@ -305,6 +328,93 @@ test('renderDashboardTroops renders ready, train, and heal action buttons and ha
   trainBtn.listeners.click();
   const trainMsg = sentMessages.find((m) => m.calls?.some((c) => c.name === 'startTraining'));
   assert.ok(trainMsg, 'startTraining RPC must be sent');
-  assert.equal(trainMsg.calls[0].args.unitId, 17);
+  assert.equal(trainMsg.calls[0].args.unitId, 15, 'Selected level 5 must result in unitId 15 for spearmen');
   assert.equal(trainMsg.calls[0].args.count, 26);
+  assert.ok(container.querySelector('#dashboard-hero-section'), 'Hero section must not be wiped after training');
+});
+
+test('renderDashboardTroops respects max threshold and clamps unitsToTrain or disables button', async () => {
+  const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+
+  const mockChrome = {
+    runtime: { sendMessage: () => {} },
+    storage: { local: { set: async () => {}, get: async () => ({}) } }
+  };
+
+  const mockDoc = {
+    createElement: (tag) => new MockElement(tag),
+    querySelector: () => null
+  };
+
+  const context = vm.createContext({
+    document: mockDoc,
+    chrome: mockChrome,
+    setTimeout,
+    clearTimeout,
+    Date,
+    Number,
+    Array,
+    String,
+    Math,
+    globalThis: {}
+  });
+
+  const declStart = popupCode.indexOf('let currentTroopTrainSettings =');
+  const declEnd = popupCode.indexOf(';', declStart) + 1;
+  vm.runInContext(popupCode.slice(declStart, declEnd), context);
+
+  const fnStart = popupCode.indexOf('function renderDashboardTroops(');
+  const fnEnd = popupCode.indexOf('\nfunction renderEvents(', fnStart);
+  const fnCode = popupCode.slice(fnStart, fnEnd);
+  vm.runInContext(fnCode, context);
+
+  const container = new MockElement('div');
+  const now = 1794100000000;
+
+  // Spearmen has total: 5000 available + 12 hospital = 5012.
+  // Set configured maxTarget for Spearmen (type 1) to 5022 (remaining = 10 < 26)
+  context.currentTroopTrainSettings = {
+    maxTargets: { 1: 5022 },
+    trainLevels: { 1: 7 }
+  };
+  context.globalThis.currentTroopTrainSettings = context.currentTroopTrainSettings;
+
+  const mockCache = {
+    'getUnitSummary:unit': {
+      data: {
+        available: [{ unitId: 17, count: 5000 }]
+      }
+    },
+    'getTrainings:unit': {
+      data: { trainingQueues: [] }
+    },
+    'getHealing:unit': {
+      data: {
+        injuredUnits: [{ unitId: 17, count: 12 }],
+        healing: null
+      }
+    }
+  };
+
+  context.renderDashboardTroops(mockCache, container, now);
+  let section = container.querySelector('#dashboard-troops-section');
+  let actionHosts = section.querySelectorAll('.troop-card-action');
+  let trainBtn = actionHosts[1].children[0].children[1];
+
+  // Train button must clamp to remaining (10)
+  assert.ok(trainBtn.textContent.includes('Train (10)'), 'Should train exactly remaining 10 units up to max 5022');
+  assert.equal(trainBtn.disabled, false);
+
+  // Now set maxTarget to 5012 (total count 5012 reached max)
+  context.currentTroopTrainSettings.maxTargets[1] = 5012;
+  context.globalThis.currentTroopTrainSettings.maxTargets[1] = 5012;
+  context.renderDashboardTroops(mockCache, container, now);
+
+  section = container.querySelector('#dashboard-troops-section');
+  actionHosts = section.querySelectorAll('.troop-card-action');
+  trainBtn = actionHosts[1].children[0].children[1];
+
+  // Train button must be disabled and display "Maxed"
+  assert.equal(trainBtn.disabled, true);
+  assert.ok(trainBtn.textContent.includes('Maxed'), 'Train button must say Maxed when threshold reached');
 });

@@ -105,6 +105,7 @@ let dungeonAutomationSettings = {
 };
 let dungeonSettingsLoadedFor = null;
 let troopCapacitySettings = { defaultHero: 600, base: 950 };
+let currentTroopTrainSettings = { maxTargets: {}, trainLevels: {} };
 let experimentalMessage = '';
 
 function saveRaidPreferences() {
@@ -4850,7 +4851,6 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
           ]
         });
       }
-      container.innerHTML = '';
       renderDashboardTroops(cache, container, Date.now());
     });
     headerActions.append(syncHealBtn);
@@ -4890,7 +4890,6 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
           ]
         });
       }
-      container.innerHTML = '';
       renderDashboardTroops(cache, container, Date.now());
     });
     headerActions.append(healAllBtn);
@@ -5002,12 +5001,25 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
   grid.className = 'grid grid-cols-1 md:grid-cols-3 gap-2.5';
 
   for (const t of troopStats) {
-    t.maxTroops = t.readyCount + t.hospitalCount + t.trainingCount;
+    const currentTotal = t.readyCount + t.hospitalCount + t.trainingCount;
+    const trainSettings = (typeof globalThis !== 'undefined' && globalThis.currentTroopTrainSettings) ||
+      (typeof currentTroopTrainSettings !== 'undefined' && currentTroopTrainSettings) ||
+      { maxTargets: {}, trainLevels: {} };
+    const configuredMax = trainSettings?.maxTargets?.[t.type];
+    const maxTarget = (typeof configuredMax === 'number' && configuredMax >= 0) ? configuredMax : Math.max(10000, currentTotal);
+    t.maxTroops = maxTarget;
+    const remaining = maxTarget - currentTotal;
+    const canTrain = remaining > 0;
+    const unitsToTrain = Math.min(26, Math.max(0, remaining));
 
     const levelsSorted = [...t.readyByLevel.entries()].sort((a, b) => a[0] - b[0]);
     const levelStr = levelsSorted.length > 0
       ? levelsSorted.map(([lvl, cnt]) => `Lv.${lvl}: ${cnt.toLocaleString()}`).join(' · ')
       : '0';
+
+    const savedLevel = trainSettings?.trainLevels?.[t.type];
+    const highestReadyLevel = levelsSorted.length > 0 ? levelsSorted[levelsSorted.length - 1][0] : 7;
+    const selectedLevel = (typeof savedLevel === 'number' && savedLevel >= 1 && savedLevel <= 9) ? savedLevel : highestReadyLevel;
 
     const healingSec = t.healingEndsAt ? Math.max(0, Math.ceil((t.healingEndsAt - now) / 1000)) : null;
     const healingTimerText = healingSec !== null && healingSec > 0 ? formatDuration(healingSec) : (healingSec !== null && healingSec <= 0 ? 'Ready' : null);
@@ -5021,10 +5033,10 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
       ? `Training: ${t.trainingCount.toLocaleString()} units · Ends in ${formatDuration(trainingSec)} (${new Date(t.trainingEndsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
       : (t.trainingCount > 0 ? `Training: ${t.trainingCount.toLocaleString()} units` : 'No active training');
 
-    const max = t.maxTroops;
-    const readyPct = max > 0 ? (t.readyCount / max) * 100 : 0;
-    const hospitalPct = max > 0 ? (t.hospitalCount / max) * 100 : 0;
-    const trainingPct = max > 0 ? (t.trainingCount / max) * 100 : 0;
+    const maxForBar = Math.max(maxTarget, currentTotal);
+    const readyPct = maxForBar > 0 ? (t.readyCount / maxForBar) * 100 : 0;
+    const hospitalPct = maxForBar > 0 ? (t.hospitalCount / maxForBar) * 100 : 0;
+    const trainingPct = maxForBar > 0 ? (t.trainingCount / maxForBar) * 100 : 0;
 
     const card = document.createElement('div');
     card.className = 'rounded-xl border border-slate-200 bg-white p-3 space-y-2 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs';
@@ -5037,22 +5049,24 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
     const activeQueue = queuesForType.find((q) => Number.isFinite(q.startDate) && Number.isFinite(q.duration) && (q.startDate + q.duration > now));
 
     card.innerHTML = `
-      <div class="flex items-center justify-between text-xs">
-        <div class="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
+      <div class="flex items-center justify-between text-xs gap-1">
+        <div class="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100 shrink-0">
           <span class="text-sm">${t.icon}</span>
           <span>${t.label}</span>
         </div>
-        <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-          Max: <strong class="text-slate-900 dark:text-white tabular-nums">${max.toLocaleString()}</strong>
+        <div class="flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          <span>Max:</span>
+          <strong class="hidden tabular-nums">${maxTarget.toLocaleString()}</strong>
+          <input type="number" min="0" max="10000000" step="100" class="troop-max-input w-20 rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-right font-bold text-slate-800 tabular-nums dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-1 focus:ring-blue-500" value="${maxTarget}" title="Target maximum troops for this type (including hospital)" />
         </div>
       </div>
 
       <!-- Segmented Visual Bar -->
-      <div class="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden flex dark:bg-slate-700/60 ring-1 ring-slate-200/50 dark:ring-slate-800" title="Ready: ${t.readyCount.toLocaleString()} · Hospital: ${t.hospitalCount.toLocaleString()} · Training: ${t.trainingCount.toLocaleString()} · Max: ${max.toLocaleString()}">
+      <div class="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden flex dark:bg-slate-700/60 ring-1 ring-slate-200/50 dark:ring-slate-800" title="Ready: ${t.readyCount.toLocaleString()} · Hospital: ${t.hospitalCount.toLocaleString()} · Training: ${t.trainingCount.toLocaleString()} · Total: ${currentTotal.toLocaleString()} · Max: ${maxTarget.toLocaleString()}">
         ${readyPct > 0 ? `<div style="width: ${readyPct.toFixed(1)}%" class="h-full bg-emerald-500 transition-all duration-300" title="Ready: ${t.readyCount.toLocaleString()} (${readyPct.toFixed(1)}%) · ${levelStr}"></div>` : ''}
         ${hospitalPct > 0 ? `<div style="width: ${hospitalPct.toFixed(1)}%" class="h-full bg-rose-500 transition-all duration-300" title="${healingTooltip}"></div>` : ''}
         ${trainingPct > 0 ? `<div style="width: ${trainingPct.toFixed(1)}%" class="h-full bg-indigo-500 transition-all duration-300" title="${trainingTooltip}"></div>` : ''}
-        ${max === 0 ? `<div class="h-full w-full bg-slate-200 dark:bg-slate-700" title="No troops recorded"></div>` : ''}
+        ${maxForBar === 0 ? `<div class="h-full w-full bg-slate-200 dark:bg-slate-700" title="No troops recorded"></div>` : ''}
       </div>
 
       <!-- Detailed Breakdown & Timers -->
@@ -5086,19 +5100,43 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
       </div>
     `;
 
+    // Max Input Change Listener
+    const maxInput = card.querySelector('.troop-max-input');
+    maxInput?.addEventListener('change', (e) => {
+      const parsed = parseInt(e.target.value, 10);
+      const newMax = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+      currentTroopTrainSettings = {
+        ...currentTroopTrainSettings,
+        maxTargets: { ...(currentTroopTrainSettings?.maxTargets || {}), [t.type]: newMax }
+      };
+      if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+        chrome.storage.local.set({ troopTrainSettings: currentTroopTrainSettings }).catch(() => {});
+      }
+      renderDashboardTroops(cache, container, Date.now());
+    });
+
+    // Card Action Row
     const actionRow = document.createElement('div');
-    actionRow.className = 'pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs';
+    actionRow.className = 'pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs gap-1';
+
     const statusSpan = document.createElement('span');
-    statusSpan.className = 'text-[11px] font-medium text-slate-500 dark:text-slate-400';
-    statusSpan.innerHTML = completedQueue
-      ? '<span class="text-emerald-600 dark:text-emerald-400 font-semibold">Training finished</span>'
-      : (activeQueue ? '<span class="text-indigo-600 dark:text-indigo-400 font-medium">In training</span>' : 'Idle');
+    statusSpan.className = 'text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate';
+    if (completedQueue) {
+      statusSpan.innerHTML = '<span class="text-emerald-600 dark:text-emerald-400 font-semibold">Training finished</span>';
+    } else if (activeQueue) {
+      statusSpan.innerHTML = '<span class="text-indigo-600 dark:text-indigo-400 font-medium">In training</span>';
+    } else if (!canTrain) {
+      statusSpan.innerHTML = `<span class="text-amber-600 dark:text-amber-400 font-medium">Max reached (${currentTotal.toLocaleString()})</span>`;
+    } else {
+      statusSpan.innerHTML = `<span>Idle · Cap: <strong class="text-slate-700 dark:text-slate-200 tabular-nums">${remaining.toLocaleString()}</strong></span>`;
+    }
     actionRow.append(statusSpan);
 
     const actionHost = document.createElement('div');
-    actionHost.className = 'troop-card-action';
+    actionHost.className = 'troop-card-action shrink-0';
     actionRow.append(actionHost);
     card.append(actionRow);
+
     if (completedQueue && actionHost) {
       const collectBtn = document.createElement('button');
       collectBtn.type = 'button';
@@ -5135,22 +5173,55 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
             ]
           });
         }
-        container.innerHTML = '';
         renderDashboardTroops(cache, container, Date.now());
       });
       actionHost.append(collectBtn);
     } else if (!activeQueue && actionHost) {
+      const controlsWrap = document.createElement('div');
+      controlsWrap.className = 'flex items-center gap-1';
+
+      // Level select
+      const levelSelect = document.createElement('select');
+      levelSelect.className = 'troop-level-select rounded border border-slate-200 bg-white px-1 py-0.5 text-[11px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-hidden';
+      levelSelect.title = 'Select troop tier/level to train';
+      for (let lvl = 1; lvl <= 9; lvl++) {
+        const opt = document.createElement('option');
+        opt.value = String(lvl);
+        opt.textContent = `Lv.${lvl}`;
+        if (lvl === selectedLevel) opt.selected = true;
+        levelSelect.append(opt);
+      }
+      levelSelect.addEventListener('change', (e) => {
+        const chosen = parseInt(e.target.value, 10);
+        if (chosen >= 1 && chosen <= 9) {
+          currentTroopTrainSettings = {
+            ...currentTroopTrainSettings,
+            trainLevels: { ...(currentTroopTrainSettings?.trainLevels || {}), [t.type]: chosen }
+          };
+          if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+            chrome.storage.local.set({ troopTrainSettings: currentTroopTrainSettings }).catch(() => {});
+          }
+        }
+      });
+      controlsWrap.append(levelSelect);
+
       const trainBtn = document.createElement('button');
       trainBtn.type = 'button';
-      trainBtn.className = 'cursor-pointer inline-flex items-center gap-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-0.5 text-[11px] font-semibold shadow-2xs transition-colors';
-      trainBtn.innerHTML = '<span>⚔️</span> <span>Train (26)</span>';
+      trainBtn.disabled = !canTrain || unitsToTrain <= 0;
+      trainBtn.className = canTrain && unitsToTrain > 0
+        ? 'cursor-pointer inline-flex items-center gap-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-0.5 text-[11px] font-semibold shadow-2xs transition-colors'
+        : 'cursor-not-allowed inline-flex items-center gap-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-400 px-2 py-0.5 text-[11px] font-semibold opacity-60';
+      trainBtn.title = canTrain && unitsToTrain > 0
+        ? `Train ${unitsToTrain} units (up to max ${maxTarget.toLocaleString()})`
+        : `Cannot train: total units (${currentTotal.toLocaleString()}) reached max threshold (${maxTarget.toLocaleString()})`;
+      trainBtn.innerHTML = `<span>⚔️</span> <span>${canTrain && unitsToTrain > 0 ? `Train (${unitsToTrain})` : 'Maxed'}</span>`;
       trainBtn.addEventListener('click', () => {
+        if (!canTrain || unitsToTrain <= 0) return;
         trainBtn.disabled = true;
-        const defaultTier = 7;
-        const highestTier = levelsSorted.length > 0 ? levelsSorted[levelsSorted.length - 1][0] : defaultTier;
-        const targetUnitId = t.type === 0 ? highestTier : (t.type === 1 ? 10 + highestTier : 20 + highestTier);
-        const count = 26;
-        const duration = 1204892;
+        const currentChosenLvl = parseInt(levelSelect.value, 10) || selectedLevel;
+        const targetUnitId = t.type === 0 ? currentChosenLvl : (t.type === 1 ? 10 + currentChosenLvl : 20 + currentChosenLvl);
+        const count = unitsToTrain;
+        const duration = Math.max(10000, Math.round(count * 46342));
         const startDate = Date.now();
         const trainKey = cache?.['getTrainings:unit'] ? 'getTrainings:unit' : (cache?.getTrainings ? 'getTrainings' : 'getTrainings:unit');
         if (cache?.[trainKey]?.data) {
@@ -5174,10 +5245,10 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
             ]
           });
         }
-        container.innerHTML = '';
         renderDashboardTroops(cache, container, Date.now());
       });
-      actionHost.append(trainBtn);
+      controlsWrap.append(trainBtn);
+      actionHost.append(controlsWrap);
     } else if (actionHost) {
       const inProgressBadge = document.createElement('span');
       inProgressBadge.className = 'text-[10px] text-slate-400 dark:text-slate-500';
@@ -5189,7 +5260,23 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
   }
 
   section.append(grid);
-  container.append(section);
+
+  const existingSection = container.querySelector('#dashboard-troops-section');
+  if (existingSection) {
+    if (typeof existingSection.replaceWith === 'function') {
+      existingSection.replaceWith(section);
+    } else {
+      const idx = container.children?.indexOf(existingSection);
+      if (idx !== undefined && idx >= 0) {
+        section.parent = container;
+        container.children[idx] = section;
+      } else {
+        container.append(section);
+      }
+    }
+  } else {
+    container.append(section);
+  }
 }
 
 function renderEvents(cache) {
@@ -11775,9 +11862,12 @@ globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;
 
 async function render() {
   const [stored, session] = await Promise.all([
-    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'autoGatherSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'towerAutomationSettings', 'towerRun', 'dungeonAutomationSettings', 'dungeonRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion', 'campaignRaidSequential']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
+    chrome.storage.local.get([CACHE_KEY, 'buildingQueue', 'researchQueue', 'resourceSelection', 'guildChatLastReadTime', 'favoriteHeroes', 'favoriteTitans', 'tabConfig', 'autoClaimSettings', 'autoGatherSettings', 'priorityAutoJoin', 'popupRpcEnabled', 'claimRpcStatus', 'socketRefreshMode', 'captureSettings', 'rpcQueueStatus', 'customTeams', 'raidPreferences', 'raidQueue', 'monsterPreferences', 'monsterQueue', 'troopCapacitySettings', 'troopTrainSettings', 'towerAutomationSettings', 'towerRun', 'dungeonAutomationSettings', 'dungeonRun', 'rpcMqttTelemetry', 'rpcMqttTriggerStatus', 'cachedGameVersion', 'campaignRaidSequential']), chrome.storage.session.get(['recordingState', 'cachedGameVersion'])
   ]);
   const cache = stored[CACHE_KEY] || {};
+  if (stored.troopTrainSettings) {
+    currentTroopTrainSettings = stored.troopTrainSettings;
+  }
   if (stored.autoGatherSettings) {
     currentAutoGatherSettings = globalThis.hwaHelperAutoGather?.normalizeAutoGatherSettings?.(stored.autoGatherSettings) || stored.autoGatherSettings;
   }
@@ -12809,7 +12899,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
         updateDashboardGameStatus();
       }
     }
-    if ('buildingQueue' in changes || 'researchQueue' in changes || 'troopCapacitySettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || 'dungeonRun' in changes || 'priorityAutoJoin' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
+    if ('buildingQueue' in changes || 'researchQueue' in changes || 'troopCapacitySettings' in changes || 'troopTrainSettings' in changes || 'raidQueue' in changes || 'monsterQueue' in changes || 'towerRun' in changes || 'dungeonRun' in changes || 'priorityAutoJoin' in changes || CACHE_KEY in changes || 'resourceSelection' in changes || 'tabConfig' in changes ||
         'popupRpcEnabled' in changes || 'claimRpcStatus' in changes ||
         'socketRefreshMode' in changes || 'captureSettings' in changes || 'rpcMqttTelemetry' in changes || 'rpcMqttTriggerStatus' in changes) {
       if ('dungeonRun' in changes) dungeonRunState = changes.dungeonRun.newValue || null;
