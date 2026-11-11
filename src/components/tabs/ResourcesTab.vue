@@ -16,19 +16,36 @@ const search = ref('');
 const showAll = ref(false);
 const resourceSelection = ref<string[]>([]);
 
+function normalizeResourceSelection(val: unknown): string[] {
+  if (Array.isArray(val)) {
+    return val.filter((item): item is string => typeof item === 'string');
+  }
+  if (val && typeof val === 'object') {
+    return Object.keys(val).filter((k) => Boolean((val as Record<string, unknown>)[k]));
+  }
+  return [];
+}
+
 onMounted(async () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
       const stored = await chrome.storage.local.get('resourceSelection');
-      if (stored.resourceSelection) {
-        resourceSelection.value = stored.resourceSelection;
+      if (stored.resourceSelection !== undefined) {
+        resourceSelection.value = normalizeResourceSelection(stored.resourceSelection);
       }
     } catch (_) {}
+
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.resourceSelection) {
+        resourceSelection.value = normalizeResourceSelection(changes.resourceSelection.newValue);
+      }
+    });
   }
 });
 
 async function togglePin(key: string) {
-  const next = new Set(resourceSelection.value);
+  const currentList = Array.isArray(resourceSelection.value) ? resourceSelection.value : [];
+  const next = new Set(currentList);
   if (next.has(key)) next.delete(key);
   else next.add(key);
   resourceSelection.value = [...next];
@@ -54,7 +71,7 @@ const allResources = computed(() => {
         cap: val.data.cap,
         appearance,
         isSelectable,
-        isPinned: resourceSelection.value.includes(key),
+        isPinned: Array.isArray(resourceSelection.value) && resourceSelection.value.includes(key),
       });
     }
   }

@@ -28,6 +28,16 @@ const resourceSelection = ref<string[]>([]);
 const cachedGameVersion = ref<string>('');
 const isTabOpenButtonVisible = ref(true);
 
+function normalizeResourceSelection(val: unknown): string[] {
+  if (Array.isArray(val)) {
+    return val.filter((item): item is string => typeof item === 'string');
+  }
+  if (val && typeof val === 'object') {
+    return Object.keys(val).filter((k) => Boolean((val as Record<string, unknown>)[k]));
+  }
+  return [];
+}
+
 onMounted(async () => {
   timer = window.setInterval(() => {
     now.value = Date.now();
@@ -51,13 +61,17 @@ onMounted(async () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
       const stored = await chrome.storage.local.get(['resourceSelection', 'cachedGameVersion']);
-      if (stored.resourceSelection) resourceSelection.value = stored.resourceSelection;
+      if (stored.resourceSelection !== undefined) {
+        resourceSelection.value = normalizeResourceSelection(stored.resourceSelection);
+      }
       if (stored.cachedGameVersion) cachedGameVersion.value = stored.cachedGameVersion;
     } catch (_) {}
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local') {
-        if (changes.resourceSelection) resourceSelection.value = changes.resourceSelection.newValue || [];
+        if (changes.resourceSelection) {
+          resourceSelection.value = normalizeResourceSelection(changes.resourceSelection.newValue);
+        }
         if (changes.cachedGameVersion) cachedGameVersion.value = changes.cachedGameVersion.newValue || '';
       }
     });
@@ -171,7 +185,7 @@ const headerResourceEntries = computed(() => {
   for (const [k, v] of Object.entries(cache.value)) {
     if (k.startsWith('resource:') && v?.data && Number.isFinite(v.data.amount)) {
       const entry = { key: k, data: v.data };
-      if (isSelectableForHeader(entry) && resourceSelection.value.includes(k)) {
+      if (isSelectableForHeader(entry) && Array.isArray(resourceSelection.value) && resourceSelection.value.includes(k)) {
         const val = getAmountAt(entry, now.value);
         const cap = entry.data?.cap;
         const isCapped = Number.isFinite(val) && Number.isFinite(cap) && (val as number) >= cap!;

@@ -34,13 +34,19 @@ const modalState = reactive<Record<ModalName, boolean>>({
 const modalContext = reactive<{
   selectedHero?: any;
   selectedQuestFilter?: string;
+  selectedCampaignGearId?: number | string | null;
 }>({});
 
 export function useModals() {
-  function openModal(name: ModalName, context?: { selectedHero?: any; selectedQuestFilter?: string }) {
+  function openModal(name: ModalName, context?: {
+    selectedHero?: any;
+    selectedQuestFilter?: string;
+    selectedCampaignGearId?: number | string | null;
+  }) {
     if (context) {
       if (context.selectedHero !== undefined) modalContext.selectedHero = context.selectedHero;
       if (context.selectedQuestFilter !== undefined) modalContext.selectedQuestFilter = context.selectedQuestFilter;
+      if (context.selectedCampaignGearId !== undefined) modalContext.selectedCampaignGearId = context.selectedCampaignGearId;
     }
     modalState[name] = true;
   }

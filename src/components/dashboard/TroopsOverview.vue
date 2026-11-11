@@ -94,6 +94,13 @@ function getCardState(t: any) {
     trainingTimerText,
   };
 }
+
+const troopCards = computed(() => {
+  return troopStats.value.map((t) => ({
+    t,
+    st: getCardState(t),
+  }));
+});
 </script>
 
 <template>
@@ -148,12 +155,11 @@ function getCardState(t: any) {
     <!-- Troop Cards Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
       <div
-        v-for="t in troopStats"
+        v-for="{ t, st } in troopCards"
         :key="t.type"
         class="rounded-xl border border-slate-200 bg-white p-3 space-y-2 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs"
       >
-        <template v-with="st = getCardState(t)">
-          <!-- Card Header -->
+        <!-- Card Header -->
           <div class="flex items-center justify-between gap-1.5">
             <span
               class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset ring-current/10"
@@ -305,7 +311,6 @@ function getCardState(t: any) {
               </span>
             </div>
           </div>
-        </template>
       </div>
     </div>
   </section>

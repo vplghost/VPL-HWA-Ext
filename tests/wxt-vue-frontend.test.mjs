@@ -180,3 +180,31 @@ test('App.vue and index.html support full width and height on browser without fi
   assert.match(indexContent, /w-full/, 'index.html must have w-full');
   assert.match(indexContent, /h-full/, 'index.html must have h-full');
 });
+
+test('TroopsOverview and resourceSelection have robust runtime guards against TypeError', async () => {
+  const troops = await readFile(join(root, 'src/components/dashboard/TroopsOverview.vue'), 'utf8');
+  assert.ok(!troops.includes('v-with='), 'TroopsOverview must not use unsupported v-with');
+  assert.match(troops, /troopCards/, 'TroopsOverview must compute troopCards');
+
+  const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
+  assert.match(header, /normalizeResourceSelection/, 'Header must normalize resourceSelection');
+  assert.match(header, /Array\.isArray\(resourceSelection\.value\)/, 'Header must guard Array.isArray');
+
+  const resTab = await readFile(join(root, 'src/components/tabs/ResourcesTab.vue'), 'utf8');
+  assert.match(resTab, /normalizeResourceSelection/, 'ResourcesTab must normalize resourceSelection');
+  assert.match(resTab, /Array\.isArray\(resourceSelection\.value\)/, 'ResourcesTab must guard Array.isArray');
+});
+
+test('HeroDetailModal has 1:1 parity with legacy HTML hero-dialog', async () => {
+  const content = await readFile(join(root, 'src/components/dialogs/HeroDetailModal.vue'), 'utf8');
+  assert.match(content, /id="hero-dialog"/, 'Must have #hero-dialog');
+  assert.match(content, /id="hero-dialog-title"/, 'Must have #hero-dialog-title');
+  assert.match(content, /id="hero-dialog-status"/, 'Must have #hero-dialog-status');
+  assert.match(content, /id="hero-dialog-switcher"/, 'Must have #hero-dialog-switcher');
+  assert.match(content, /id="hero-dialog-body"/, 'Must have #hero-dialog-body');
+  assert.match(content, /btn-upgrade-skill/, 'Must have btn-upgrade-skill class');
+  assert.match(content, /heroUpgradeSkill/, 'Must call heroUpgradeSkill RPC');
+  assert.match(content, /Farm Equipment/, 'Must have Farm Equipment action');
+  assert.match(content, /justice-star/, 'Must support 6-star justice star');
+  assert.match(content, /craft-fragment/, 'Must support fragment quick-crafting');
+});
