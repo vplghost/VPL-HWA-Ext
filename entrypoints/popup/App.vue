@@ -35,49 +35,51 @@ const { modalState, modalContext } = useModals();
 </script>
 
 <template>
-  <div class="relative w-full min-h-screen flex-1 bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 text-slate-800 dark:text-slate-100 flex flex-col gap-3 font-sans transition-colors antialiased">
-    <!-- Top Header -->
-    <Header />
+  <div class="relative w-full min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans transition-colors antialiased flex flex-col items-center">
+    <div class="w-full max-w-7xl 2xl:max-w-screen-2xl min-h-screen p-2.5 sm:p-4 md:p-5 flex flex-col gap-3 flex-1 min-h-0">
+      <!-- Top Header -->
+      <Header />
 
-    <!-- Navigation Tabs -->
-    <TabNav v-model="activeTab" />
+      <!-- Navigation Tabs -->
+      <TabNav v-model="activeTab" />
 
-    <!-- Tab Content -->
-    <main class="flex-1 min-h-0 pb-12">
-      <KeepAlive>
-        <component
-          :is="
-            activeTab === 'dashboard' ? DashboardTab :
-            activeTab === 'heroes' ? HeroesTab :
-            activeTab === 'titans' ? TitansTab :
-            activeTab === 'items' ? ItemsTab :
-            activeTab === 'resources' ? ResourcesTab :
-            activeTab === 'teams' ? TeamsTab :
-            activeTab === 'events' ? EventsTab :
-            activeTab === 'goals' ? GoalsTab :
-            activeTab === 'settings' ? SettingsTab :
-            LogTab
-          "
-        />
-      </KeepAlive>
-    </main>
+      <!-- Tab Content -->
+      <main class="flex-1 min-h-0 pb-12">
+        <KeepAlive>
+          <component
+            :is="
+              activeTab === 'dashboard' ? DashboardTab :
+              activeTab === 'heroes' ? HeroesTab :
+              activeTab === 'titans' ? TitansTab :
+              activeTab === 'items' ? ItemsTab :
+              activeTab === 'resources' ? ResourcesTab :
+              activeTab === 'teams' ? TeamsTab :
+              activeTab === 'events' ? EventsTab :
+              activeTab === 'goals' ? GoalsTab :
+              activeTab === 'settings' ? SettingsTab :
+              LogTab
+            "
+          />
+        </KeepAlive>
+      </main>
 
-    <!-- Floating Action Button (FAB) Dial -->
-    <FabDial />
+      <!-- Floating Action Button (FAB) Dial -->
+      <FabDial />
 
-    <!-- Global Modals -->
-    <BuildingModal v-model="modalState.building" />
-    <ResearchModal v-model="modalState.research" />
-    <RaidModal v-model="modalState.raid" />
-    <GatheringModal v-model="modalState.gathering" />
-    <MonsterModal v-model="modalState.monster" />
-    <CampaignRaidModal v-model="modalState.campaign" />
-    <HeroDetailModal v-model="modalState.hero" :hero="modalContext.selectedHero" />
-    <TowerModal v-model="modalState.tower" />
-    <DungeonModal v-model="modalState.dungeon" />
-    <QuestDetailModal v-model="modalState.questDetail" :initial-filter="modalContext.selectedQuestFilter" />
-    <DraftModal v-model="modalState.draft" />
-    <GuildVersusModal v-model="modalState.guildVersus" />
-    <GuildChatPanel v-model="modalState.guildChat" />
+      <!-- Global Modals -->
+      <BuildingModal v-model="modalState.building" />
+      <ResearchModal v-model="modalState.research" />
+      <RaidModal v-model="modalState.raid" />
+      <GatheringModal v-model="modalState.gathering" />
+      <MonsterModal v-model="modalState.monster" />
+      <CampaignRaidModal v-model="modalState.campaign" />
+      <HeroDetailModal v-model="modalState.hero" :hero="modalContext.selectedHero" />
+      <TowerModal v-model="modalState.tower" />
+      <DungeonModal v-model="modalState.dungeon" />
+      <QuestDetailModal v-model="modalState.questDetail" :initial-filter="modalContext.selectedQuestFilter" />
+      <DraftModal v-model="modalState.draft" />
+      <GuildVersusModal v-model="modalState.guildVersus" />
+      <GuildChatPanel v-model="modalState.guildChat" />
+    </div>
   </div>
 </template>

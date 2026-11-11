@@ -553,3 +553,29 @@ test('Header.vue accurately evaluates legend draft and mail indicator states and
   assert.match(header, /name:\s*'getPage',\s*feature:\s*'report'/, 'refreshMail must request getPage:report');
   assert.match(header, /name:\s*'mailGetAll'/, 'refreshMail must request mailGetAll');
 });
+
+test('App.vue and tab toolbars use responsive container widths and balanced toolbar layouts', async () => {
+  const app = await readFile(join(root, 'entrypoints/popup/App.vue'), 'utf8');
+  assert.match(app, /max-w-7xl/, 'App.vue must constrain layout with max-w-7xl to prevent overly wide stretching on Full HD');
+  assert.match(app, /items-center/, 'App.vue wrapper must center container');
+
+  const heroes = await readFile(join(root, 'src/components/tabs/HeroesTab.vue'), 'utf8');
+  assert.match(heroes, /flex-col xl:flex-row/, 'HeroesTab must use responsive flex-col xl:flex-row toolbar layout');
+  assert.match(heroes, /btn-toolbar-export-heroes/, 'HeroesTab must keep export button');
+  assert.match(heroes, /btn-toolbar-refresh-heroes/, 'HeroesTab must keep refresh button');
+
+  const titans = await readFile(join(root, 'src/components/tabs/TitansTab.vue'), 'utf8');
+  assert.match(titans, /flex-col xl:flex-row/, 'TitansTab must use responsive flex-col xl:flex-row toolbar layout');
+  assert.match(titans, /btn-toolbar-export-titans/, 'TitansTab must keep export button');
+  assert.match(titans, /btn-toolbar-refresh-titans/, 'TitansTab must keep refresh button');
+
+  const items = await readFile(join(root, 'src/components/tabs/ItemsTab.vue'), 'utf8');
+  assert.match(items, /flex-col xl:flex-row/, 'ItemsTab must use responsive flex-col xl:flex-row toolbar layout');
+  assert.match(items, /btn-toolbar-export-items/, 'ItemsTab must keep export button');
+  assert.match(items, /btn-toolbar-refresh-items/, 'ItemsTab must keep refresh button');
+
+  const resources = await readFile(join(root, 'src/components/tabs/ResourcesTab.vue'), 'utf8');
+  assert.match(resources, /flex-col lg:flex-row/, 'ResourcesTab must use responsive flex-col lg:flex-row toolbar layout');
+  assert.match(resources, /btn-toolbar-export-resources/, 'ResourcesTab must keep export button');
+  assert.match(resources, /btn-toolbar-refresh-resources/, 'ResourcesTab must keep refresh button');
+});

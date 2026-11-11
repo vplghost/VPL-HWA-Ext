@@ -67,11 +67,11 @@ async function refreshGoals() {
 <template>
   <div class="space-y-4">
     <!-- Header Controls -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex items-center justify-between gap-3 shadow-2xs flex-wrap">
+    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
       <div class="flex items-center gap-2.5">
-        <span class="text-2xl">🎯</span>
+        <span class="text-2xl shrink-0">🎯</span>
         <div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">
               Cross-Event Goals & Synergies
             </h3>
@@ -85,17 +85,20 @@ async function refreshGoals() {
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <input
-          v-model="search"
-          type="search"
-          placeholder="Search goals, activities, or resources..."
-          class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden w-64"
-        />
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <div class="relative flex-1 sm:w-64">
+          <input
+            v-model="search"
+            type="search"
+            placeholder="Search goals, activities, or resources..."
+            class="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-blue-500"
+          />
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
+        </div>
         <button
           type="button"
           :disabled="isRefreshing"
-          class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+          class="cursor-pointer shrink-0 text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors disabled:opacity-50 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 sm:border-0"
           @click="refreshGoals"
         >
           <span :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
@@ -239,7 +242,7 @@ async function refreshGoals() {
           </span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           <div
             v-for="act in visibleActivities"
             :key="act.key"
@@ -329,7 +332,7 @@ async function refreshGoals() {
           </span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           <div
             v-for="res in visibleResources"
             :key="res.key"

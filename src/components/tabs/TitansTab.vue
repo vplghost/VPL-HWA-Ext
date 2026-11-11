@@ -300,120 +300,128 @@ function exportTitansJson() {
 
 <template>
   <div class="space-y-3">
-    <!-- Filter Toolbar -->
-    <div class="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+    <!-- Filter & Action Toolbar -->
+    <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+      <!-- Left Controls: Search + Filters -->
       <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
         <!-- Search input -->
-        <input
-          v-model="search"
-          type="search"
-          placeholder="Search titan name or ID..."
-          class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden w-44"
-        />
+        <div class="relative w-full sm:w-48 xl:w-56 shrink-0">
+          <input
+            v-model="search"
+            type="search"
+            placeholder="Search titan name or ID..."
+            class="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-blue-500"
+          />
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
+        </div>
 
-        <!-- Element filter -->
-        <select
-          v-model="selectedElement"
-          class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
-        >
-          <option v-for="el in elements" :key="el" :value="el">
-            {{ el === 'All' ? 'All Elements' : `${getElementIcon(el)} ${el}` }}
-          </option>
-        </select>
-
-        <!-- Favorites Only Toggle -->
-        <button
-          type="button"
-          class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors"
-          :class="filterFavsOnly
-            ? 'bg-amber-500 border-amber-600 text-white shadow-xs'
-            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'"
-          @click="filterFavsOnly = !filterFavsOnly"
-        >
-          <span>★</span>
-          <span>Favorites</span>
-          <span
-            v-if="favoritesCount > 0"
-            class="text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums"
-            :class="filterFavsOnly ? 'bg-amber-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'"
+        <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+          <!-- Element filter -->
+          <select
+            v-model="selectedElement"
+            class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
           >
-            {{ favoritesCount }}
-          </span>
-        </button>
+            <option v-for="el in elements" :key="el" :value="el">
+              {{ el === 'All' ? 'All Elements' : `${getElementIcon(el)} ${el}` }}
+            </option>
+          </select>
 
-        <!-- Can Evolve Only Toggle -->
-        <button
-          type="button"
-          class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors"
-          :class="filterEvolveOnly
-            ? 'bg-emerald-600 border-emerald-700 text-white shadow-xs'
-            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'"
-          @click="filterEvolveOnly = !filterEvolveOnly"
-        >
-          <span>⚡</span>
-          <span>Ready to Evolve</span>
-          <span
-            v-if="evolvableCount > 0"
-            class="text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums"
-            :class="filterEvolveOnly ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'"
+          <!-- Favorites Only Toggle -->
+          <button
+            type="button"
+            class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors shrink-0"
+            :class="filterFavsOnly
+              ? 'bg-amber-500 border-amber-600 text-white shadow-xs'
+              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'"
+            @click="filterFavsOnly = !filterFavsOnly"
           >
-            {{ evolvableCount }}
-          </span>
-        </button>
+            <span>★</span>
+            <span>Favorites</span>
+            <span
+              v-if="favoritesCount > 0"
+              class="text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums"
+              :class="filterFavsOnly ? 'bg-amber-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'"
+            >
+              {{ favoritesCount }}
+            </span>
+          </button>
+
+          <!-- Can Evolve Only Toggle -->
+          <button
+            type="button"
+            class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors shrink-0"
+            :class="filterEvolveOnly
+              ? 'bg-emerald-600 border-emerald-700 text-white shadow-xs'
+              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'"
+            @click="filterEvolveOnly = !filterEvolveOnly"
+          >
+            <span>⚡</span>
+            <span>Ready to Evolve</span>
+            <span
+              v-if="evolvableCount > 0"
+              class="text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums"
+              :class="filterEvolveOnly ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'"
+            >
+              {{ evolvableCount }}
+            </span>
+          </button>
+        </div>
       </div>
 
       <!-- Right Controls: View Switcher, Count, Export & Refresh -->
-      <div class="flex items-center gap-2 text-xs shrink-0">
+      <div class="flex items-center justify-between xl:justify-end gap-2 text-xs shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100 dark:border-slate-800">
         <!-- Count badge -->
-        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 tabular-nums">
           {{ formatNumber(filteredTitans.length) }} titans
         </span>
 
-        <!-- View mode switcher -->
-        <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800">
+        <div class="flex items-center gap-1.5 shrink-0">
+          <!-- View mode switcher -->
+          <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800">
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
+              :class="viewMode === 'grid' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
+              title="Grid View (Cards)"
+              @click="viewMode = 'grid'"
+            >
+              🔲 Grid
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
+              :class="viewMode === 'table' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
+              title="Table View (Snapshot)"
+              @click="viewMode = 'table'"
+            >
+              📋 Table
+            </button>
+          </div>
+
+          <!-- Export JSON button -->
           <button
+            id="btn-toolbar-export-titans"
             type="button"
-            class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
-            :class="viewMode === 'grid' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
-            title="Grid View (Cards)"
-            @click="viewMode = 'grid'"
+            class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
+            title="Export titans data as JSON"
+            @click="exportTitansJson"
           >
-            🔲 Grid
+            📥 Export
           </button>
+
+          <!-- Refresh button -->
           <button
+            id="btn-toolbar-refresh-titans"
             type="button"
-            class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
-            :class="viewMode === 'table' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
-            title="Table View (Snapshot)"
-            @click="viewMode = 'table'"
+            :disabled="isRefreshing"
+            class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors disabled:opacity-50"
+            title="Refresh titans via RPC"
+            @click="refreshTitans"
           >
-            📋 Table
+            <span :class="{ 'inline-block animate-spin': isRefreshing }">🔄</span>
+            <span>Refresh</span>
           </button>
         </div>
-
-        <!-- Export JSON button -->
-        <button
-          id="btn-toolbar-export-titans"
-          type="button"
-          class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
-          title="Export titans data as JSON"
-          @click="exportTitansJson"
-        >
-          📥 Export
-        </button>
-
-        <!-- Refresh button -->
-        <button
-          id="btn-toolbar-refresh-titans"
-          type="button"
-          :disabled="isRefreshing"
-          class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors disabled:opacity-50"
-          title="Refresh titans via RPC"
-          @click="refreshTitans"
-        >
-          <span :class="{ 'inline-block animate-spin': isRefreshing }">🔄</span>
-          <span>Refresh</span>
-        </button>
       </div>
     </div>
 
@@ -425,7 +433,7 @@ function exportTitansJson() {
     <!-- GRID VIEW -->
     <div
       v-else-if="viewMode === 'grid'"
-      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5"
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5"
     >
       <div
         v-for="t in filteredTitans"

@@ -224,118 +224,126 @@ function exportHeroesJson() {
 
 <template>
   <div class="space-y-3">
-    <!-- Filter Toolbar -->
-    <div class="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+    <!-- Filter & Action Toolbar -->
+    <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+      <!-- Left Controls: Search + Filters -->
       <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
         <!-- Search input -->
-        <input
-          v-model="search"
-          type="search"
-          placeholder="Search hero name or ID..."
-          class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden w-44"
-        />
+        <div class="relative w-full sm:w-48 xl:w-56 shrink-0">
+          <input
+            v-model="search"
+            type="search"
+            placeholder="Search hero name or ID..."
+            class="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-blue-500"
+          />
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
+        </div>
 
-        <!-- Class filter -->
-        <select
-          v-model="selectedClass"
-          aria-label="Filter by class"
-          class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
-        >
-          <option v-for="c in classes" :key="c" :value="c">
-            Class: {{ c }}
-          </option>
-        </select>
+        <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+          <!-- Class filter -->
+          <select
+            v-model="selectedClass"
+            aria-label="Filter by class"
+            class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
+          >
+            <option v-for="c in classes" :key="c" :value="c">
+              Class: {{ c }}
+            </option>
+          </select>
 
-        <!-- Faction filter -->
-        <select
-          v-model="selectedFaction"
-          aria-label="Filter by faction"
-          class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
-        >
-          <option v-for="f in factions" :key="f" :value="f">
-            Faction: {{ f.replace('Way of ', '') }}
-          </option>
-        </select>
+          <!-- Faction filter -->
+          <select
+            v-model="selectedFaction"
+            aria-label="Filter by faction"
+            class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
+          >
+            <option v-for="f in factions" :key="f" :value="f">
+              Faction: {{ f.replace('Way of ', '') }}
+            </option>
+          </select>
 
-        <!-- Favorites filter toggle -->
-        <button
-          type="button"
-          :class="filterFavsOnly
-            ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800 font-semibold'
-            : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'"
-          class="cursor-pointer inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition-colors"
-          title="Filter only favorited heroes"
-          @click="filterFavsOnly = !filterFavsOnly"
-        >
-          <span>⭐ Favs</span>
-          <span v-if="favoriteHeroes.size > 0" class="rounded-full bg-amber-500 px-1 text-[10px] text-white">
-            {{ favoriteHeroes.size }}
-          </span>
-        </button>
+          <!-- Favorites filter toggle -->
+          <button
+            type="button"
+            :class="filterFavsOnly
+              ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800 font-semibold'
+              : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'"
+            class="cursor-pointer inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition-colors shrink-0"
+            title="Filter only favorited heroes"
+            @click="filterFavsOnly = !filterFavsOnly"
+          >
+            <span>⭐ Favs</span>
+            <span v-if="favoriteHeroes.size > 0" class="rounded-full bg-amber-500 px-1 text-[10px] text-white">
+              {{ favoriteHeroes.size }}
+            </span>
+          </button>
 
-        <!-- Ready to Evolve filter toggle -->
-        <button
-          type="button"
-          :class="filterEvolveOnly
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800 font-semibold'
-            : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'"
-          class="cursor-pointer inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition-colors"
-          title="Filter heroes ready for evolution"
-          @click="filterEvolveOnly = !filterEvolveOnly"
-        >
-          <span>✨ Ready</span>
-        </button>
+          <!-- Ready to Evolve filter toggle -->
+          <button
+            type="button"
+            :class="filterEvolveOnly
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800 font-semibold'
+              : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'"
+            class="cursor-pointer inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition-colors shrink-0"
+            title="Filter heroes ready for evolution"
+            @click="filterEvolveOnly = !filterEvolveOnly"
+          >
+            <span>✨ Ready</span>
+          </button>
+        </div>
       </div>
 
       <!-- Right Controls: View Switcher & Refresh -->
-      <div class="flex items-center gap-2 text-xs shrink-0">
+      <div class="flex items-center justify-between xl:justify-end gap-2 text-xs shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100 dark:border-slate-800">
         <!-- Count badge -->
-        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 tabular-nums">
           {{ formatNumber(filteredHeroes.length) }} heroes
         </span>
 
-        <!-- View mode switcher -->
-        <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800">
+        <div class="flex items-center gap-1.5 shrink-0">
+          <!-- View mode switcher -->
+          <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800">
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
+              :class="viewMode === 'table' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
+              title="Table View (Snapshot)"
+              @click="viewMode = 'table'"
+            >
+              📋 Table
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
+              :class="viewMode === 'grid' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
+              title="Grid View (Cards)"
+              @click="viewMode = 'grid'"
+            >
+              🔲 Grid
+            </button>
+          </div>
+
+          <!-- Export JSON button -->
           <button
+            id="btn-toolbar-export-heroes"
             type="button"
-            class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
-            :class="viewMode === 'table' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
-            title="Table View (Snapshot)"
-            @click="viewMode = 'table'"
+            class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
+            title="Export heroes data as JSON"
+            @click="exportHeroesJson"
           >
-            📋 Table
+            📥 Export
           </button>
+
           <button
+            id="btn-toolbar-refresh-heroes"
             type="button"
-            class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
-            :class="viewMode === 'grid' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
-            title="Grid View (Cards)"
-            @click="viewMode = 'grid'"
+            class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors"
+            title="Refresh Heroes via RPC"
+            @click="refreshHeroes"
           >
-            🔲 Grid
+            🔄 Refresh
           </button>
         </div>
-
-        <!-- Export JSON button -->
-        <button
-          id="btn-toolbar-export-heroes"
-          type="button"
-          class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
-          title="Export heroes data as JSON"
-          @click="exportHeroesJson"
-        >
-          📥 Export
-        </button>
-
-        <button
-          id="btn-toolbar-refresh-heroes"
-          type="button"
-          class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors"
-          title="Refresh Heroes via RPC"
-          @click="refreshHeroes"
-        >
-          🔄 Refresh
-        </button>
       </div>
     </div>
 
@@ -557,7 +565,7 @@ function exportHeroesJson() {
     </div>
 
     <!-- GRID VIEW (Cards) -->
-    <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+    <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5">
       <div
         v-for="h in filteredHeroes"
         :key="h.id"

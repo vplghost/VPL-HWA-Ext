@@ -548,7 +548,7 @@ function getTeamPower(memberIds: number[]): number {
         No server-saved teams loaded yet. Click "Refresh" or launch the game to synchronize lineups.
       </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
         <div
           v-for="(st, idx) in serverTeams"
           :key="`${st.mode}_${st.teamNumber}_${idx}`"

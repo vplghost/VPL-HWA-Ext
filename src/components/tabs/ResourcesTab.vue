@@ -86,23 +86,24 @@ function exportResourcesJson() {
 <template>
   <div class="space-y-4">
     <!-- Filter Toolbar -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-sm flex flex-wrap items-center justify-between gap-3">
-      <div class="min-w-0 flex-1 max-w-sm">
-        <input
-          v-model="search"
-          type="search"
-          placeholder="Search resource name or ID..."
-          class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
-        />
-      </div>
+    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <div class="relative w-full sm:w-64 shrink-0">
+          <input
+            v-model="search"
+            type="search"
+            placeholder="Search resource name or ID..."
+            class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
+          />
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
+        </div>
 
-      <div class="flex items-center gap-2">
         <button
           type="button"
           :class="filterPinnedOnly
-            ? 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800'
+            ? 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800 font-semibold'
             : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'"
-          class="cursor-pointer inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+          class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors shrink-0"
           @click="filterPinnedOnly = !filterPinnedOnly"
         >
           <span>📌 Pinned only</span>
@@ -110,34 +111,38 @@ function exportResourcesJson() {
             {{ resourceSelection.length }}
           </span>
         </button>
+      </div>
 
-        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+      <div class="flex items-center justify-between lg:justify-end gap-2 text-xs shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800">
+        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 tabular-nums">
           {{ formatResourceAmount(filteredResources.length) }} resources
         </span>
 
-        <!-- Export JSON button -->
-        <button
-          id="btn-toolbar-export-resources"
-          type="button"
-          class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
-          title="Export resources data as JSON"
-          @click="exportResourcesJson"
-        >
-          📥 Export
-        </button>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <!-- Export JSON button -->
+          <button
+            id="btn-toolbar-export-resources"
+            type="button"
+            class="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
+            title="Export resources data as JSON"
+            @click="exportResourcesJson"
+          >
+            📥 Export
+          </button>
 
-        <!-- Refresh button -->
-        <button
-          id="btn-toolbar-refresh-resources"
-          type="button"
-          :disabled="isRefreshing"
-          class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors disabled:opacity-50"
-          title="Refresh resources via RPC"
-          @click="refreshResources"
-        >
-          <span :class="{ 'inline-block animate-spin': isRefreshing }">🔄</span>
-          <span>Refresh</span>
-        </button>
+          <!-- Refresh button -->
+          <button
+            id="btn-toolbar-refresh-resources"
+            type="button"
+            :disabled="isRefreshing"
+            class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors disabled:opacity-50"
+            title="Refresh resources via RPC"
+            @click="refreshResources"
+          >
+            <span :class="{ 'inline-block animate-spin': isRefreshing }">🔄</span>
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -146,7 +151,7 @@ function exportResourcesJson() {
       No resources found matching search query.
     </div>
 
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
       <div
         v-for="r in filteredResources"
         :key="r.key"
