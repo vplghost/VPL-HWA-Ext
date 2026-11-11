@@ -1,11 +1,12 @@
 ---
 id: VHE-WTPBHY
 title: 'Sync Raid and Monster Modals 1:1 with HTML: troop allocation and queues'
-status: todo
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-11T07:06:26.810Z'
-updatedAt: '2026-11-11T07:06:26.810Z'
+updatedAt: '2026-11-11T07:25:22.135Z'
+completedAt: '2026-11-11T07:25:22.135Z'
 timeSpent: 0
 parent: VHE-H9EGP9
 ---

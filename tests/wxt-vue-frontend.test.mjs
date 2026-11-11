@@ -226,3 +226,26 @@ test('BuildingModal and ResearchModal have 1:1 ID parity and queue controls matc
   assert.match(rContent, /completeResearch/, 'Must have completeResearch RPC');
   assert.match(rContent, /Auto-Research Queue/, 'Must have Auto-Research Queue');
 });
+
+test('RaidModal and MonsterModal have 1:1 ID parity and queue controls matching HTML', async () => {
+  const raid = await readFile(join(root, 'src/components/dialogs/RaidModal.vue'), 'utf8');
+  assert.match(raid, /id="raid-dialog"/, 'Must have #raid-dialog');
+  assert.match(raid, /id="raid-dialog-header"/, 'Must have #raid-dialog-header');
+  assert.match(raid, /id="raid-dialog-icon"/, 'Must have #raid-dialog-icon');
+  assert.match(raid, /id="raid-dialog-title"/, 'Must have #raid-dialog-title');
+  assert.match(raid, /id="raid-dialog-status"/, 'Must have #raid-dialog-status');
+  assert.match(raid, /id="raid-dialog-body"/, 'Must have #raid-dialog-body');
+  assert.match(raid, /id="raid-boss-level"/, 'Must have #raid-boss-level');
+  assert.match(raid, /id="raid-min-members"/, 'Must have #raid-min-members');
+  assert.match(raid, /id="raid-queue-count"/, 'Must have #raid-queue-count');
+
+  const mob = await readFile(join(root, 'src/components/dialogs/MonsterModal.vue'), 'utf8');
+  assert.match(mob, /id="monster-dialog"/, 'Must have #monster-dialog');
+  assert.match(mob, /id="monster-dialog-header"/, 'Must have #monster-dialog-header');
+  assert.match(mob, /id="monster-dialog-icon"/, 'Must have #monster-dialog-icon');
+  assert.match(mob, /id="monster-dialog-title"/, 'Must have #monster-dialog-title');
+  assert.match(mob, /id="monster-dialog-status"/, 'Must have #monster-dialog-status');
+  assert.match(mob, /id="monster-dialog-body"/, 'Must have #monster-dialog-body');
+  assert.match(mob, /id="monster-mob-level"/, 'Must have #monster-mob-level');
+  assert.match(mob, /id="monster-queue-count"/, 'Must have #monster-queue-count');
+});
