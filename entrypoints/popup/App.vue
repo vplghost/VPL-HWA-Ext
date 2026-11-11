@@ -13,7 +13,16 @@ import QuestsTab from '@/src/components/tabs/QuestsTab.vue';
 import SettingsTab from '@/src/components/tabs/SettingsTab.vue';
 import LogTab from '@/src/components/tabs/LogTab.vue';
 
+import { useModals } from '@/src/composables/useModals';
+import BuildingModal from '@/src/components/dialogs/BuildingModal.vue';
+import ResearchModal from '@/src/components/dialogs/ResearchModal.vue';
+import RaidModal from '@/src/components/dialogs/RaidModal.vue';
+import MonsterModal from '@/src/components/dialogs/MonsterModal.vue';
+import CampaignRaidModal from '@/src/components/dialogs/CampaignRaidModal.vue';
+import HeroDetailModal from '@/src/components/dialogs/HeroDetailModal.vue';
+
 const activeTab = ref('dashboard');
+const { modalState, modalContext } = useModals();
 </script>
 
 <template>
@@ -43,5 +52,13 @@ const activeTab = ref('dashboard');
         />
       </KeepAlive>
     </main>
+
+    <!-- Global Modals -->
+    <BuildingModal v-model="modalState.building" />
+    <ResearchModal v-model="modalState.research" />
+    <RaidModal v-model="modalState.raid" />
+    <MonsterModal v-model="modalState.monster" />
+    <CampaignRaidModal v-model="modalState.campaign" />
+    <HeroDetailModal v-model="modalState.hero" :hero="modalContext.selectedHero" />
   </div>
 </template>
