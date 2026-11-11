@@ -31,6 +31,19 @@ await mkdir(destination, { recursive: true });
 await cp(source, destination, { recursive: true });
 await execFileAsync(process.execPath, [join(root, 'node_modules/@tailwindcss/cli/dist/index.mjs'),
   '-i', join(source, 'popup.css'), '-o', join(destination, 'popup.css'), '--minify'], { cwd: root });
+
+// Build WXT Vue 3 bundle
+try {
+  await execFileAsync(process.execPath, [join(root, 'node_modules/wxt/bin/wxt.mjs'), 'build'], { cwd: root });
+  const wxtOutput = join(root, '.output', 'chrome-mv3');
+  await cp(join(wxtOutput, 'chunks'), join(destination, 'chunks'), { recursive: true });
+  await cp(join(wxtOutput, 'popup.html'), join(destination, 'popup.html'));
+  await cp(join(wxtOutput, 'assets'), join(destination, 'assets'), { recursive: true });
+  console.log('Synchronized WXT Vue 3 bundle into dist');
+} catch (e) {
+  console.warn('WXT build warning (fallback to legacy popup):', e.message);
+}
+
 const buildVersion = await bumpVersion(process.argv[2] || 'patch');
 await cp(join(source, 'manifest.json'), join(destination, 'manifest.json'));
 console.log('Build version: ' + buildVersion);
