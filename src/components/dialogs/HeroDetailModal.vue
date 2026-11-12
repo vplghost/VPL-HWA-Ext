@@ -183,9 +183,28 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
 
 const upgradingSkills = ref<Record<number, boolean>>({});
 
+// Available skill points and gold
+const skillPoints = computed(() => {
+  const entry = cache.value?.['resource:refillable:2'];
+  if (entry?.data && Number.isFinite(entry.data.amount)) return Math.max(0, entry.data.amount);
+  const fromUser = cache.value?.userGetInfo?.data?.refillable?.find((r: any) => r?.id === 2);
+  if (fromUser && Number.isFinite(fromUser.amount)) return Math.max(0, fromUser.amount);
+  return 0;
+});
+
+const currentGold = computed(() => {
+  const entry = cache.value?.['resource:gold'];
+  if (entry?.data && Number.isFinite(entry.data.amount)) return Math.max(0, entry.data.amount);
+  if (cache.value?.userGetInfo?.data && Number.isFinite(cache.value.userGetInfo.data.gold)) {
+    return Math.max(0, cache.value.userGetInfo.data.gold);
+  }
+  return 0;
+});
+
 async function upgradeSkill(s: SkillSlotConfig) {
   if (!activeHero.value) return;
   const numId = Number(currentHeroId.value);
+  if (skillPoints.value <= 0) return;
   upgradingSkills.value[s.slot] = true;
 
   // Optimistic update
@@ -202,7 +221,6 @@ async function upgradeSkill(s: SkillSlotConfig) {
         name: 'heroUpgradeSkill',
         args: { heroId: numId, skill: s.slot },
       },
-      { name: 'heroGetAll' },
     ]);
   } finally {
     upgradingSkills.value[s.slot] = false;
@@ -594,6 +612,18 @@ const JUSTICE_STAR_SVG_PATH =
                   Upgrade hero skills using skill points and gold
                 </div>
               </div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
+                  :class="
+                    skillPoints > 0
+                      ? 'bg-violet-100 dark:bg-violet-950/60 text-violet-800 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-800/50'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                  "
+                >
+                  <span>⚡</span> {{ skillPoints }}/10
+                </span>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -649,9 +679,13 @@ const JUSTICE_STAR_SVG_PATH =
                     <button
                       v-else
                       type="button"
-                      :disabled="upgradingSkills[s.slot]"
+                      :disabled="upgradingSkills[s.slot] || skillPoints <= 0"
                       class="btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
-                      :title="`Upgrade ${meta?.skills?.[s.slot - 1] || s.label} to Lv. ${(Number(activeHero?.skills?.[skillKeys[s.slot - 1]] ?? activeHero?.skills?.[s.slot] ?? 1)) + 1}`"
+                      :title="
+                        skillPoints <= 0
+                          ? 'No skill points available'
+                          : `Upgrade ${meta?.skills?.[s.slot - 1] || s.label} to Lv. ${(Number(activeHero?.skills?.[skillKeys[s.slot - 1]] ?? activeHero?.skills?.[s.slot] ?? 1)) + 1}`
+                      "
                       :aria-label="`Upgrade ${meta?.skills?.[s.slot - 1] || s.label}`"
                       @click="upgradeSkill(s)"
                     >

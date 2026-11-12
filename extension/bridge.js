@@ -365,12 +365,24 @@ let buildingWakeTimer;
 function scheduleBuildingWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
   clearTimeout(buildingWakeTimer);
-  if (!state || state.enabled === false || !Number.isFinite(state.wakeAt)) return;
+  if (!state || state.enabled === false) return;
+  const hasItems = Array.isArray(state.items) && state.items.length > 0;
+  if (!Number.isFinite(state.wakeAt)) {
+    if (hasItems) {
+      buildingWakeTimer = setTimeout(() => {
+        chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).then((response) => {
+          if (response?.watch) return chrome.storage.local.get('buildingQueue').then((stored) => scheduleBuildingWake(stored.buildingQueue));
+        }).catch(() => {});
+      }, 100);
+    }
+    return;
+  }
+  const delay = Math.max(100, Math.min(2147483647, state.wakeAt - Date.now()));
   buildingWakeTimer = setTimeout(() => {
     chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).then((response) => {
       if (response?.watch) return chrome.storage.local.get('buildingQueue').then((stored) => scheduleBuildingWake(stored.buildingQueue));
     }).catch(() => {});
-  }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+  }, delay);
 }
 try { chrome.storage?.local?.get?.('buildingQueue')?.then?.((stored) => scheduleBuildingWake(stored.buildingQueue))?.catch?.(() => {}); } catch {}
 
@@ -378,12 +390,24 @@ let researchWakeTimer;
 function scheduleResearchWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
   clearTimeout(researchWakeTimer);
-  if (!state || state.enabled === false || !Number.isFinite(state.wakeAt)) return;
+  if (!state || state.enabled === false) return;
+  const hasItems = Array.isArray(state.items) && state.items.length > 0;
+  if (!Number.isFinite(state.wakeAt)) {
+    if (hasItems) {
+      researchWakeTimer = setTimeout(() => {
+        chrome.runtime.sendMessage({ kind: 'research-queue-tick' }).then((response) => {
+          if (response?.watch) return chrome.storage.local.get('researchQueue').then((stored) => scheduleResearchWake(stored.researchQueue));
+        }).catch(() => {});
+      }, 100);
+    }
+    return;
+  }
+  const delay = Math.max(100, Math.min(2147483647, state.wakeAt - Date.now()));
   researchWakeTimer = setTimeout(() => {
     chrome.runtime.sendMessage({ kind: 'research-queue-tick' }).then((response) => {
       if (response?.watch) return chrome.storage.local.get('researchQueue').then((stored) => scheduleResearchWake(stored.researchQueue));
     }).catch(() => {});
-  }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+  }, delay);
 }
 try { chrome.storage?.local?.get?.('researchQueue')?.then?.((stored) => scheduleResearchWake(stored.researchQueue))?.catch?.(() => {}); } catch {}
 

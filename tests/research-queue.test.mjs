@@ -119,6 +119,23 @@ test('research-queue planNextStep handles wait, complete, start, and idle action
   const idlePlan = queueHelper.planNextStep({ enabled: true, items: [] }, cacheIdle, now);
   assert.equal(idlePlan.action, 'idle');
   assert.equal(idlePlan.calls.length, 0);
+
+  // 5. Finished research using nextLevel fallback and personalResearch_getQueue data
+  const cacheFlexible = {
+    personalResearch_getQueue: {
+      data: [{ researchId: 507, nextLevel: 4, finishTime: now - 1000 }]
+    }
+  };
+  const flexPlan = queueHelper.planNextStep({
+    enabled: true,
+    items: [{ researchId: 508, nextLevel: 2, durationMs: 15000 }]
+  }, cacheFlexible, now);
+  assert.equal(flexPlan.action, 'start');
+  assert.equal(flexPlan.calls[0].name, 'completeResearch');
+  assert.equal(flexPlan.calls[0].args.researchId, 507);
+  assert.equal(flexPlan.calls[0].args.level, 4);
+  assert.equal(flexPlan.calls[1].name, 'startResearch');
+  assert.equal(flexPlan.calls[1].args.researchId, 508);
 });
 
 test('research-queue queue mutations addToQueue, removeFromQueue, reorderQueue, and clearQueue', () => {

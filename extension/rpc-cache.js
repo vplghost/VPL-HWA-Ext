@@ -760,16 +760,18 @@
           }
           if (call.name === 'heroUpgradeSkill') {
             const actions = resourceAction(record, call, 'refillable:2', -1);
-            if (Number.isInteger(call.args?.heroId) && Number.isInteger(call.args?.skill)) {
+            const numHeroId = Number(call.args?.heroId);
+            const numSkill = Number(call.args?.skill);
+            if (Number.isFinite(numHeroId) && Number.isFinite(numSkill)) {
               actions.push({
                 key: 'heroSkillAction',
                 method: call.name,
                 feature: null,
                 group: 'internal',
                 data: {
-                  heroId: call.args.heroId,
-                  skillIndex: call.args.skill,
-                  token: `${call.ident}:heroSkill`
+                  heroId: numHeroId,
+                  skillIndex: numSkill,
+                  token: `${call.ident || record.timestamp}:heroSkill`
                 },
                 updatedAt: record.timestamp
               });
@@ -2503,6 +2505,18 @@
             };
           } else if (rawResKey.includes(':')) {
             const [rType, rId] = rawResKey.split(':');
+            if (rType === 'refillable' && Array.isArray(next.userGetInfo?.data?.refillable)) {
+              const numRId = Number(rId);
+              next.userGetInfo = {
+                ...next.userGetInfo,
+                data: {
+                  ...next.userGetInfo.data,
+                  refillable: next.userGetInfo.data.refillable.map((r) =>
+                    r?.id === numRId ? { ...r, amount: data.amount } : r
+                  )
+                }
+              };
+            }
             if (next.inventoryGet?.data?.[rType]) {
               next.inventoryGet = {
                 ...next.inventoryGet,

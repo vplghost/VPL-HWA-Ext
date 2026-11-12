@@ -90,8 +90,11 @@ watch(
 
 async function saveBuildingQueue() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const stored = await chrome.storage.local.get(['buildingQueue']).catch(() => ({}));
+    const prev = stored?.buildingQueue || {};
     await chrome.storage.local.set({
       buildingQueue: {
+        ...prev,
         enabled: buildingQueue.value.enabled,
         items: buildingQueue.value.items,
       },

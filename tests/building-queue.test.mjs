@@ -167,3 +167,47 @@ test('addToQueue, removeFromQueue, reorderQueue, and clearQueue manage state imm
   state = qHelper.clearQueue(state);
   assert.equal(state.items.length, 0);
 });
+
+test('planNextStep handles nextLevel fallback, flexible queues structure, and finishTime', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+  const now = 2000000;
+
+  // Case 1: Finished building with nextLevel instead of level, and under building_getQueue fallback
+  const cache1 = {
+    building_getQueue: {
+      data: [
+        { buildingId: 40, nextLevel: 15, finishTime: now - 5000 }
+      ]
+    }
+  };
+  const queueState1 = {
+    enabled: true,
+    items: [{ buildingId: 42, nextLevel: 16, durationMs: 120000 }]
+  };
+  const step1 = qHelper.planNextStep(queueState1, cache1, now);
+  assert.equal(step1.action, 'start');
+  assert.equal(step1.calls[0].name, 'completeConstruction');
+  assert.equal(step1.calls[0].args.buildingId, 40);
+  assert.equal(step1.calls[0].args.nextLevel, 15);
+  assert.equal(step1.calls[1].name, 'startConstruction');
+  assert.equal(step1.calls[1].args.buildingId, 42);
+  assert.equal(step1.calls[1].args.nextLevel, 16);
+
+  // Case 2: In-progress building with startTime and duration in seconds
+  const epochNow = 1794200000000;
+  const cache2 = {
+    buildingStatus: {
+      data: {
+        queue: {
+          buildingId: 20,
+          nextLevel: 21,
+          startTime: (epochNow / 1000) - 10,
+          duration: 100
+        }
+      }
+    }
+  };
+  const step2 = qHelper.planNextStep(queueState1, cache2, epochNow);
+  assert.equal(step2.action, 'wait');
+  assert.ok(step2.wakeAt > epochNow);
+});

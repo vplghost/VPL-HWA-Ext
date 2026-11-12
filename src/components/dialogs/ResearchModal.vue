@@ -115,8 +115,11 @@ watch(
 
 async function saveResearchQueue() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const stored = await chrome.storage.local.get(['researchQueue']).catch(() => ({}));
+    const prev = stored?.researchQueue || {};
     await chrome.storage.local.set({
       researchQueue: {
+        ...prev,
         enabled: researchQueue.value.enabled,
         items: researchQueue.value.items,
       },

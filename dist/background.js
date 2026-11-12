@@ -256,7 +256,21 @@ async function updateDungeonRun(record, tabId) {
     record, stored.rpcCache, Date.now()), stored);
 }
 
+async function findActiveGameTab() {
+  const queryPatterns = GAME_ORIGINS.map((o) => `${o}/*`);
+  const tabs = await new Promise((resolve) => chrome.tabs?.query?.({ url: queryPatterns }, resolve) || resolve([]));
+  const tab = (tabs || []).find((t) => t.id && isGameUrl(t.url));
+  if (tab) return tab;
+  const allTabs = await new Promise((resolve) => chrome.tabs?.query?.({}, resolve) || resolve([]));
+  return (allTabs || []).find((t) => t.id && isGameUrl(t.url)) || null;
+}
+
 async function advanceBuildingQueue(tabId) {
+  if (!tabId) {
+    const activeTab = await findActiveGameTab();
+    tabId = activeTab?.id;
+  }
+  if (!tabId) return null;
   const stored = await chrome.storage.local.get(['buildingQueue', 'rpcCache', 'popupRpcEnabled',
     'socketRefreshMode', 'captureSettings']);
   const queue = stored.buildingQueue;
@@ -283,16 +297,26 @@ async function advanceBuildingQueue(tabId) {
         queue.items = plan.remainingItems;
         queue.wakeAt = plan.wakeAt;
         queue.lastStarted = plan.startedItem;
+      } else if (plan.action === 'complete-only') {
+        queue.wakeAt = null;
       }
       await chrome.storage.local.set({ buildingQueue: queue });
     } catch (e) {
       console.warn('Failed to dispatch building queue to tab', e);
     }
+  } else if (plan.action === 'idle' && queue.wakeAt) {
+    queue.wakeAt = null;
+    await chrome.storage.local.set({ buildingQueue: queue });
   }
   return queue;
 }
 
 async function advanceResearchQueue(tabId) {
+  if (!tabId) {
+    const activeTab = await findActiveGameTab();
+    tabId = activeTab?.id;
+  }
+  if (!tabId) return null;
   const stored = await chrome.storage.local.get(['researchQueue', 'rpcCache', 'popupRpcEnabled',
     'socketRefreshMode', 'captureSettings']);
   const queue = stored.researchQueue;
@@ -319,11 +343,16 @@ async function advanceResearchQueue(tabId) {
         queue.items = plan.remainingItems;
         queue.wakeAt = plan.wakeAt;
         queue.lastStarted = plan.startedItem;
+      } else if (plan.action === 'complete-only') {
+        queue.wakeAt = null;
       }
       await chrome.storage.local.set({ researchQueue: queue });
     } catch (e) {
       console.warn('Failed to dispatch research queue to tab', e);
     }
+  } else if (plan.action === 'idle' && queue.wakeAt) {
+    queue.wakeAt = null;
+    await chrome.storage.local.set({ researchQueue: queue });
   }
   return queue;
 }
@@ -808,17 +837,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.catch(() => {});
     return true;
   }
-  if (message?.kind === 'building-queue-tick' && isGameUrl(sender.url) && sender.tab?.id) {
-    pending = pending.then(() => advanceBuildingQueue(sender.tab.id));
-    pending.then((queue) => sendResponse({ ok: true, watch: queue?.enabled !== false && Number.isFinite(queue?.wakeAt) }),
+  if (message?.kind === 'building-queue-tick') {
+    pending = pending.then(async () => {
+      let tabId = (isGameUrl(sender.url) && sender.tab?.id) ? sender.tab.id : null;
+      if (!tabId) {
+        const tab = await findActiveGameTab();
+        tabId = tab?.id;
+      }
+      return tabId ? advanceBuildingQueue(tabId) : null;
+    });
+    pending.then((queue) => sendResponse({ ok: true, watch: queue?.enabled !== false && (Number.isFinite(queue?.wakeAt) || (Array.isArray(queue?.items) && queue.items.length > 0)) }),
       () => sendResponse({ ok: false }));
     pending = pending.catch(() => {});
     return true;
   }
   if (message?.kind === 'building-queue-action') {
     pending = pending.then(async () => {
-      const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
-      const tab = (tabs || []).find((t) => t.id && isGameUrl(t.url));
+      const tab = await findActiveGameTab();
       if (tab) {
         return advanceBuildingQueue(tab.id).then(() => ({ ok: true }));
       }
@@ -828,17 +863,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.catch(() => {});
     return true;
   }
-  if (message?.kind === 'research-queue-tick' && isGameUrl(sender.url) && sender.tab?.id) {
-    pending = pending.then(() => advanceResearchQueue(sender.tab.id));
-    pending.then((queue) => sendResponse({ ok: true, watch: queue?.enabled !== false && Number.isFinite(queue?.wakeAt) }),
+  if (message?.kind === 'research-queue-tick') {
+    pending = pending.then(async () => {
+      let tabId = (isGameUrl(sender.url) && sender.tab?.id) ? sender.tab.id : null;
+      if (!tabId) {
+        const tab = await findActiveGameTab();
+        tabId = tab?.id;
+      }
+      return tabId ? advanceResearchQueue(tabId) : null;
+    });
+    pending.then((queue) => sendResponse({ ok: true, watch: queue?.enabled !== false && (Number.isFinite(queue?.wakeAt) || (Array.isArray(queue?.items) && queue.items.length > 0)) }),
       () => sendResponse({ ok: false }));
     pending = pending.catch(() => {});
     return true;
   }
   if (message?.kind === 'research-queue-action') {
     pending = pending.then(async () => {
-      const tabs = await new Promise((resolve) => chrome.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
-      const tab = (tabs || []).find((t) => t.id && isGameUrl(t.url));
+      const tab = await findActiveGameTab();
       if (tab) {
         return advanceResearchQueue(tab.id).then(() => ({ ok: true }));
       }
