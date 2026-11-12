@@ -138,6 +138,39 @@ test('research-queue planNextStep handles wait, complete, start, and idle action
   assert.equal(flexPlan.calls[1].args.researchId, 508);
 });
 
+test('research-queue planNextStep skips already-completed researches and advances to next item', () => {
+  const now = 1000000;
+  const cache = {
+    researchStatus: {
+      data: {
+        queues: [],
+        completedResearches: [
+          { researchId: 501, level: 3 },
+          { researchId: 502, level: 1 }
+        ]
+      }
+    }
+  };
+
+  const queueState = {
+    enabled: true,
+    items: [
+      { researchId: 501, nextLevel: 3, durationMs: 10000 }, // ALREADY COMPLETED (level 3 >= 3)
+      { researchId: 502, nextLevel: 2, durationMs: 20000 }  // PENDING (level 1 < 2)
+    ]
+  };
+
+  const plan = queueHelper.planNextStep(queueState, cache, now);
+  assert.equal(plan.action, 'start');
+  assert.equal(plan.skippedItems.length, 1);
+  assert.equal(plan.skippedItems[0].researchId, 501);
+  assert.equal(plan.skippedItems[0].currentLevel, 3);
+  assert.equal(plan.startedItem.researchId, 502);
+  assert.equal(plan.startedItem.nextLevel, 2);
+  assert.equal(plan.calls[0].args.researchId, 502);
+  assert.equal(plan.calls[0].args.nextLevel, 2);
+});
+
 test('research-queue queue mutations addToQueue, removeFromQueue, reorderQueue, and clearQueue', () => {
   let state = { enabled: true, items: [] };
 

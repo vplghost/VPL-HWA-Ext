@@ -265,97 +265,342 @@ async function findActiveGameTab() {
   return (allTabs || []).find((t) => t.id && isGameUrl(t.url)) || null;
 }
 
+async function appendQueueLog(type, logEntry) {
+  try {
+    const key = type === 'building' ? 'buildingQueueLogs' : 'researchQueueLogs';
+    const stored = await chrome.storage.local.get([key]).catch(() => ({}));
+    const currentLogs = Array.isArray(stored[key]) ? stored[key] : [];
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      time: new Date().toISOString(),
+      timestamp: Date.now(),
+      type,
+      ...logEntry
+    };
+    const updatedLogs = [entry, ...currentLogs].slice(0, 100);
+    await chrome.storage.local.set({ [key]: updatedLogs });
+
+    const logPrefix = `[HWA-QUEUE][${type.toUpperCase()}]`;
+    if (entry.status === 'error' || entry.error) {
+      console.error(logPrefix, entry.message || entry.action, entry);
+    } else if (entry.status === 'warn') {
+      console.warn(logPrefix, entry.message || entry.action, entry);
+    } else {
+      console.log(logPrefix, entry.message || entry.action, entry);
+    }
+    return entry;
+  } catch (err) {
+    console.warn('Failed to append queue log', err);
+  }
+}
+
 async function advanceBuildingQueue(tabId) {
+  const triggerTime = Date.now();
   if (!tabId) {
     const activeTab = await findActiveGameTab();
     tabId = activeTab?.id;
   }
   if (!tabId) return null;
   const stored = await chrome.storage.local.get(['buildingQueue', 'rpcCache', 'popupRpcEnabled',
-    'socketRefreshMode', 'captureSettings']);
+    'socketRefreshMode', 'captureSettings']).catch(() => ({}));
   const queue = stored.buildingQueue;
   if (!queue || queue.enabled === false) return queue;
   const helper = globalThis.hwaHelperBuildingQueue;
   if (!helper) return queue;
 
-  const plan = helper.planNextStep(queue, stored.rpcCache, Date.now());
-  if (plan.action === 'wait') {
-    if (queue.wakeAt !== plan.wakeAt) {
-      queue.wakeAt = plan.wakeAt;
-      await chrome.storage.local.set({ buildingQueue: queue });
-    }
-    return queue;
-  }
+  try {
+    const plan = helper.planNextStep(queue, stored.rpcCache, triggerTime);
 
-  if (plan.calls && plan.calls.length > 0) {
-    const dispatch = rpcMessageForSettings(stored, plan.calls);
-    if (!dispatch) return queue;
-    try {
-      await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'building-queue',
-        expiresAt: Date.now() + 120000 });
-      if (plan.action === 'start') {
-        queue.items = plan.remainingItems;
-        queue.wakeAt = plan.wakeAt;
-        queue.lastStarted = plan.startedItem;
-      } else if (plan.action === 'complete-only') {
-        queue.wakeAt = null;
+    // Skip items that are already completed
+    if (Array.isArray(plan.skippedItems) && plan.skippedItems.length > 0) {
+      for (const skipped of plan.skippedItems) {
+        const bName = globalThis.hwaHelperNameMap?.building?.[skipped.buildingId] || `Building #${skipped.buildingId}`;
+        await appendQueueLog('building', {
+          action: 'skip_completed',
+          status: 'warn',
+          targetId: skipped.buildingId,
+          targetName: bName,
+          level: skipped.currentLevel,
+          nextLevel: skipped.nextLevel,
+          message: `${bName} (Lv.${skipped.currentLevel}) is already at or above target Lv.${skipped.nextLevel}. Removed from queue.`
+        });
       }
+      queue.items = plan.remainingItemsAfterSkip || plan.remainingItems || [];
       await chrome.storage.local.set({ buildingQueue: queue });
-    } catch (e) {
-      console.warn('Failed to dispatch building queue to tab', e);
     }
-  } else if (plan.action === 'idle' && queue.wakeAt) {
-    queue.wakeAt = null;
-    await chrome.storage.local.set({ buildingQueue: queue });
+
+    if (plan.action === 'wait') {
+      if (queue.wakeAt !== plan.wakeAt) {
+        queue.wakeAt = plan.wakeAt;
+        await chrome.storage.local.set({ buildingQueue: queue });
+        await appendQueueLog('building', {
+          action: 'wait',
+          status: 'info',
+          message: `Builder occupied until ${new Date(plan.wakeAt).toLocaleTimeString()}. Waiting...`,
+          wakeAt: plan.wakeAt
+        });
+      }
+      return queue;
+    }
+
+    if (plan.calls && plan.calls.length > 0) {
+      const dispatch = rpcMessageForSettings(stored, plan.calls);
+      if (!dispatch) {
+        await appendQueueLog('building', {
+          action: 'blocked',
+          status: 'warn',
+          message: 'RPC dispatch blocked by settings (popupRpcEnabled is disabled).'
+        });
+        return queue;
+      }
+
+      const startedItem = plan.startedItem;
+      const bName = startedItem
+        ? (globalThis.hwaHelperNameMap?.building?.[startedItem.buildingId] || `Building #${startedItem.buildingId}`)
+        : 'Buildings';
+
+      await appendQueueLog('building', {
+        action: 'trigger',
+        status: 'info',
+        targetId: startedItem?.buildingId,
+        targetName: bName,
+        nextLevel: startedItem?.nextLevel,
+        durationMs: startedItem?.durationMs,
+        message: plan.action === 'start'
+          ? `Starting upgrade of ${bName} to Lv.${startedItem.nextLevel}...`
+          : 'Completing finished building constructions...',
+        rpcCalls: plan.calls
+      });
+
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'building-queue',
+          expiresAt: Date.now() + 120000 });
+        if (response && response.error) {
+          throw new Error(response.error);
+        }
+
+        if (plan.action === 'start') {
+          queue.items = plan.remainingItems;
+          queue.wakeAt = plan.wakeAt;
+          queue.lastStarted = plan.startedItem;
+          await appendQueueLog('building', {
+            action: 'start',
+            status: 'success',
+            targetId: startedItem.buildingId,
+            targetName: bName,
+            nextLevel: startedItem.nextLevel,
+            durationMs: startedItem.durationMs,
+            message: `Successfully dispatched upgrade for ${bName} to Lv.${startedItem.nextLevel}. Next wake at ${new Date(plan.wakeAt).toLocaleTimeString()}.`
+          });
+        } else if (plan.action === 'complete-only') {
+          queue.wakeAt = null;
+          await appendQueueLog('building', {
+            action: 'complete',
+            status: 'success',
+            message: 'Successfully completed finished building constructions.'
+          });
+        }
+        await chrome.storage.local.set({ buildingQueue: queue });
+      } catch (e) {
+        await appendQueueLog('building', {
+          action: 'error',
+          status: 'error',
+          targetId: startedItem?.buildingId,
+          targetName: bName,
+          nextLevel: startedItem?.nextLevel,
+          error: e?.message || String(e),
+          message: `RPC error executing building queue for ${bName}: ${e?.message || String(e)}`
+        });
+        console.warn('Failed to dispatch building queue to tab', e);
+      }
+    } else if (plan.action === 'idle' && queue.wakeAt) {
+      queue.wakeAt = null;
+      await chrome.storage.local.set({ buildingQueue: queue });
+    }
+  } catch (execError) {
+    await appendQueueLog('building', {
+      action: 'error',
+      status: 'error',
+      error: execError?.message || String(execError),
+      message: `Exception in building queue planning: ${execError?.message || String(execError)}`
+    });
+    console.error('Exception in advanceBuildingQueue', execError);
   }
   return queue;
 }
 
 async function advanceResearchQueue(tabId) {
+  const triggerTime = Date.now();
   if (!tabId) {
     const activeTab = await findActiveGameTab();
     tabId = activeTab?.id;
   }
   if (!tabId) return null;
   const stored = await chrome.storage.local.get(['researchQueue', 'rpcCache', 'popupRpcEnabled',
-    'socketRefreshMode', 'captureSettings']);
+    'socketRefreshMode', 'captureSettings']).catch(() => ({}));
   const queue = stored.researchQueue;
   if (!queue || queue.enabled === false) return queue;
   const helper = globalThis.hwaHelperResearchQueue;
   if (!helper) return queue;
 
-  const plan = helper.planNextStep(queue, stored.rpcCache, Date.now());
-  if (plan.action === 'wait') {
-    if (queue.wakeAt !== plan.wakeAt) {
-      queue.wakeAt = plan.wakeAt;
-      await chrome.storage.local.set({ researchQueue: queue });
-    }
-    return queue;
-  }
+  try {
+    const plan = helper.planNextStep(queue, stored.rpcCache, triggerTime);
 
-  if (plan.calls && plan.calls.length > 0) {
-    const dispatch = rpcMessageForSettings(stored, plan.calls);
-    if (!dispatch) return queue;
-    try {
-      await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'research-queue',
-        expiresAt: Date.now() + 120000 });
-      if (plan.action === 'start') {
-        queue.items = plan.remainingItems;
-        queue.wakeAt = plan.wakeAt;
-        queue.lastStarted = plan.startedItem;
-      } else if (plan.action === 'complete-only') {
-        queue.wakeAt = null;
+    // Skip items that are already completed
+    if (Array.isArray(plan.skippedItems) && plan.skippedItems.length > 0) {
+      for (const skipped of plan.skippedItems) {
+        const rName = globalThis.hwaHelperNameMap?.research?.[skipped.researchId] || `Research #${skipped.researchId}`;
+        await appendQueueLog('research', {
+          action: 'skip_completed',
+          status: 'warn',
+          targetId: skipped.researchId,
+          targetName: rName,
+          level: skipped.currentLevel,
+          nextLevel: skipped.nextLevel,
+          message: `${rName} (Lv.${skipped.currentLevel}) is already at or above target Lv.${skipped.nextLevel}. Removed from queue.`
+        });
       }
+      queue.items = plan.remainingItemsAfterSkip || plan.remainingItems || [];
       await chrome.storage.local.set({ researchQueue: queue });
-    } catch (e) {
-      console.warn('Failed to dispatch research queue to tab', e);
     }
-  } else if (plan.action === 'idle' && queue.wakeAt) {
-    queue.wakeAt = null;
-    await chrome.storage.local.set({ researchQueue: queue });
+
+    if (plan.action === 'wait') {
+      if (queue.wakeAt !== plan.wakeAt) {
+        queue.wakeAt = plan.wakeAt;
+        await chrome.storage.local.set({ researchQueue: queue });
+        await appendQueueLog('research', {
+          action: 'wait',
+          status: 'info',
+          message: `Research Center occupied until ${new Date(plan.wakeAt).toLocaleTimeString()}. Waiting...`,
+          wakeAt: plan.wakeAt
+        });
+      }
+      return queue;
+    }
+
+    if (plan.calls && plan.calls.length > 0) {
+      const dispatch = rpcMessageForSettings(stored, plan.calls);
+      if (!dispatch) {
+        await appendQueueLog('research', {
+          action: 'blocked',
+          status: 'warn',
+          message: 'RPC dispatch blocked by settings (popupRpcEnabled is disabled).'
+        });
+        return queue;
+      }
+
+      const startedItem = plan.startedItem;
+      const rName = startedItem
+        ? (globalThis.hwaHelperNameMap?.research?.[startedItem.researchId] || `Research #${startedItem.researchId}`)
+        : 'Researches';
+
+      await appendQueueLog('research', {
+        action: 'trigger',
+        status: 'info',
+        targetId: startedItem?.researchId,
+        targetName: rName,
+        nextLevel: startedItem?.nextLevel,
+        durationMs: startedItem?.durationMs,
+        message: plan.action === 'start'
+          ? `Starting research of ${rName} to Lv.${startedItem.nextLevel}...`
+          : 'Completing finished research...',
+        rpcCalls: plan.calls
+      });
+
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'research-queue',
+          expiresAt: Date.now() + 120000 });
+        if (response && response.error) {
+          throw new Error(response.error);
+        }
+
+        if (plan.action === 'start') {
+          queue.items = plan.remainingItems;
+          queue.wakeAt = plan.wakeAt;
+          queue.lastStarted = plan.startedItem;
+          await appendQueueLog('research', {
+            action: 'start',
+            status: 'success',
+            targetId: startedItem.researchId,
+            targetName: rName,
+            nextLevel: startedItem.nextLevel,
+            durationMs: startedItem.durationMs,
+            message: `Successfully dispatched research for ${rName} to Lv.${startedItem.nextLevel}. Next wake at ${new Date(plan.wakeAt).toLocaleTimeString()}.`
+          });
+        } else if (plan.action === 'complete-only') {
+          queue.wakeAt = null;
+          await appendQueueLog('research', {
+            action: 'complete',
+            status: 'success',
+            message: 'Successfully completed finished research.'
+          });
+        }
+        await chrome.storage.local.set({ researchQueue: queue });
+      } catch (e) {
+        await appendQueueLog('research', {
+          action: 'error',
+          status: 'error',
+          targetId: startedItem?.researchId,
+          targetName: rName,
+          nextLevel: startedItem?.nextLevel,
+          error: e?.message || String(e),
+          message: `RPC error executing research queue for ${rName}: ${e?.message || String(e)}`
+        });
+        console.warn('Failed to dispatch research queue to tab', e);
+      }
+    } else if (plan.action === 'idle' && queue.wakeAt) {
+      queue.wakeAt = null;
+      await chrome.storage.local.set({ researchQueue: queue });
+    }
+  } catch (execError) {
+    await appendQueueLog('research', {
+      action: 'error',
+      status: 'error',
+      error: execError?.message || String(execError),
+      message: `Exception in research queue planning: ${execError?.message || String(execError)}`
+    });
+    console.error('Exception in advanceResearchQueue', execError);
   }
   return queue;
 }
+
+function setupQueueAlarms() {
+  if (typeof chrome === 'undefined' || !chrome.alarms) return;
+  try {
+    chrome.alarms.get('hwa-queue-watch', (alarm) => {
+      if (!alarm) {
+        chrome.alarms.create('hwa-queue-watch', { periodInMinutes: 1 });
+      }
+    });
+  } catch (_) {}
+}
+
+chrome.alarms?.onAlarm?.addListener?.(async (alarm) => {
+  if (alarm.name === 'hwa-queue-watch') {
+    const tab = await findActiveGameTab();
+    if (tab?.id) {
+      await advanceBuildingQueue(tab.id);
+      await advanceResearchQueue(tab.id);
+    }
+  }
+});
+
+chrome.runtime?.onStartup?.addListener?.(async () => {
+  setupQueueAlarms();
+  const tab = await findActiveGameTab();
+  if (tab?.id) {
+    await advanceBuildingQueue(tab.id);
+    await advanceResearchQueue(tab.id);
+  }
+});
+
+chrome.runtime?.onInstalled?.addListener?.(async () => {
+  setupQueueAlarms();
+});
+
+try {
+  setupQueueAlarms();
+} catch (_) {}
 
 chrome.storage.onChanged?.addListener?.((changes, area) => {
   if (area !== 'local' || !['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) return;

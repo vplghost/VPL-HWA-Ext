@@ -45,6 +45,17 @@ const researchQueue = ref<ResearchQueueState>({
 });
 
 const buildingQueueItems = ref<any[]>([]);
+const isLoaded = ref(false);
+const queueLogs = ref<any[]>([]);
+const showLogs = ref(false);
+const hasLogError = computed(() => queueLogs.value.some((l) => l.status === 'error' || l.error));
+
+async function clearLogs() {
+  queueLogs.value = [];
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    await chrome.storage.local.set({ researchQueueLogs: [] }).catch(() => {});
+  }
+}
 
 const onStorageChanged = (changes: any, area: string) => {
   if (area !== 'local') return;
@@ -57,6 +68,9 @@ const onStorageChanged = (changes: any, area: string) => {
       items: normalizeArray(changes.researchQueue.newValue.items),
     };
   }
+  if (changes.researchQueueLogs?.newValue) {
+    queueLogs.value = Array.isArray(changes.researchQueueLogs.newValue) ? changes.researchQueueLogs.newValue : [];
+  }
 };
 
 onMounted(async () => {
@@ -66,7 +80,7 @@ onMounted(async () => {
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['researchQueue', 'buildingQueue']);
+      const stored = await chrome.storage.local.get(['researchQueue', 'buildingQueue', 'researchQueueLogs']);
       if (stored.researchQueue) {
         researchQueue.value = {
           enabled: stored.researchQueue.enabled !== false,
@@ -76,8 +90,15 @@ onMounted(async () => {
       if (stored.buildingQueue?.items) {
         buildingQueueItems.value = normalizeArray(stored.buildingQueue.items);
       }
+      if (Array.isArray(stored.researchQueueLogs)) {
+        queueLogs.value = stored.researchQueueLogs;
+      }
       chrome.storage?.onChanged?.addListener(onStorageChanged);
-    } catch (_) {}
+    } catch (_) {} finally {
+      isLoaded.value = true;
+    }
+  } else {
+    isLoaded.value = true;
   }
   dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'personalResearch' }]).catch(() => {});
 });
@@ -114,6 +135,7 @@ watch(
 );
 
 async function saveResearchQueue() {
+  if (!isLoaded.value) return;
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     const stored = await chrome.storage.local.get(['researchQueue']).catch(() => ({}));
     const prev = stored?.researchQueue || {};
@@ -122,6 +144,7 @@ async function saveResearchQueue() {
         ...prev,
         enabled: researchQueue.value.enabled,
         items: researchQueue.value.items,
+        updatedAt: Date.now(),
       },
     });
     try {
@@ -901,6 +924,89 @@ async function refreshResearch() {
             <p v-else class="text-2xs text-slate-400 italic py-1">
               Queue is empty. Click "+ Queue" on candidates below to automate next upgrades.
             </p>
+
+            <!-- Queue Execution Logs -->
+            <div class="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+              <div class="flex items-center justify-between">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 text-2xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer"
+                  @click="showLogs = !showLogs"
+                >
+                  <span>📋 Execution Logs</span>
+                  <span
+                    v-if="queueLogs.length > 0"
+                    class="px-1.5 py-0.2 rounded-full text-[10px] font-bold"
+                    :class="hasLogError ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'"
+                  >
+                    {{ queueLogs.length }}
+                  </span>
+                  <span class="text-[10px]">{{ showLogs ? '▲' : '▼' }}</span>
+                </button>
+                <button
+                  v-if="queueLogs.length > 0 && showLogs"
+                  type="button"
+                  class="text-[11px] text-slate-400 hover:text-rose-500 cursor-pointer transition-colors"
+                  @click="clearLogs"
+                >
+                  Clear Logs
+                </button>
+              </div>
+
+              <div v-if="showLogs" class="mt-2 space-y-1 max-h-[160px] overflow-y-auto pr-0.5 text-2xs">
+                <div v-if="queueLogs.length === 0" class="text-slate-400 italic py-1">
+                  No execution logs recorded yet.
+                </div>
+                <div
+                  v-for="log in queueLogs"
+                  :key="log.id"
+                  class="p-1.5 rounded border leading-tight"
+                  :class="
+                    log.status === 'error' || log.error
+                      ? 'border-rose-200 bg-rose-50/70 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'
+                      : log.status === 'warn'
+                      ? 'border-amber-200 bg-amber-50/70 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700/60 dark:bg-slate-800/60 dark:text-slate-300'
+                  "
+                >
+                  <div class="flex items-center justify-between gap-1 mb-0.5">
+                    <div class="flex items-center gap-1">
+                      <span
+                        class="px-1 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider"
+                        :class="
+                          log.action === 'error'
+                            ? 'bg-rose-200 text-rose-900 dark:bg-rose-900 dark:text-rose-100'
+                            : log.action === 'skip_completed'
+                            ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100'
+                            : log.action === 'start'
+                            ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100'
+                            : log.action === 'complete'
+                            ? 'bg-blue-200 text-blue-900 dark:bg-blue-900 dark:text-blue-100'
+                            : 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200'
+                        "
+                      >
+                        {{ log.action }}
+                      </span>
+                      <span v-if="log.targetName" class="font-bold truncate max-w-[180px]">
+                        {{ log.targetName }}
+                      </span>
+                      <span v-if="log.nextLevel" class="text-slate-500 dark:text-slate-400">
+                        Lv.{{ log.nextLevel }}
+                      </span>
+                    </div>
+                    <span class="text-[10px] text-slate-400 font-mono shrink-0">
+                      {{ new Date(log.timestamp).toLocaleTimeString() }}
+                    </span>
+                  </div>
+                  <div class="break-words">
+                    {{ log.message }}
+                  </div>
+                  <div v-if="log.error" class="mt-0.5 font-mono text-[10px] text-rose-600 dark:text-rose-400 font-semibold break-all">
+                    Error: {{ log.error }}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

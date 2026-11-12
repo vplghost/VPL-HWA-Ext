@@ -211,3 +211,41 @@ test('planNextStep handles nextLevel fallback, flexible queues structure, and fi
   assert.equal(step2.action, 'wait');
   assert.ok(step2.wakeAt > epochNow);
 });
+
+test('planNextStep skips already-completed buildings and starts next uncompleted item', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+  const now = 1000000;
+
+  // Cache shows building 20 is already at level 15, and building 21 is at level 5
+  const cache = {
+    buildingStatus: {
+      data: {
+        queues: [],
+        buildings: [
+          { buildingId: 20, level: 15 },
+          { buildingId: 21, level: 5 }
+        ]
+      }
+    }
+  };
+
+  const queueState = {
+    enabled: true,
+    items: [
+      { buildingId: 20, nextLevel: 15, durationMs: 60000 }, // ALREADY COMPLETED (level 15 >= 15)
+      { buildingId: 21, nextLevel: 6, durationMs: 120000 }   // PENDING (level 5 < 6)
+    ]
+  };
+
+  const step = qHelper.planNextStep(queueState, cache, now);
+  assert.equal(step.action, 'start');
+  assert.equal(step.skippedItems.length, 1);
+  assert.equal(step.skippedItems[0].buildingId, 20);
+  assert.equal(step.skippedItems[0].currentLevel, 15);
+
+  // Started item should be building 21
+  assert.equal(step.startedItem.buildingId, 21);
+  assert.equal(step.startedItem.nextLevel, 6);
+  assert.equal(step.calls[0].args.buildingId, 21);
+  assert.equal(step.calls[0].args.nextLevel, 6);
+});

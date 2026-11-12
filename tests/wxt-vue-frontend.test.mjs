@@ -249,6 +249,8 @@ test('BuildingModal and ResearchModal have 1:1 ID parity and queue controls matc
   assert.match(bContent, /completeConstruction/, 'Must have completeConstruction RPC');
   assert.match(bContent, /startConstruction/, 'Must have startConstruction RPC');
   assert.match(bContent, /Auto-Build Queue/, 'Must have Auto-Build Queue');
+  assert.match(bContent, /Execution Logs/, 'Must have Execution Logs');
+  assert.match(bContent, /clearLogs/, 'Must have clearLogs in BuildingModal');
 
   const rContent = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
   assert.match(rContent, /id="research-dialog"/, 'Must have #research-dialog');
@@ -266,6 +268,8 @@ test('BuildingModal and ResearchModal have 1:1 ID parity and queue controls matc
   assert.match(rContent, /completeResearch/, 'Must have completeResearch RPC');
   assert.match(rContent, /startResearch/, 'Must have startResearch RPC');
   assert.match(rContent, /Auto-Research Queue/, 'Must have Auto-Research Queue');
+  assert.match(rContent, /Execution Logs/, 'Must have Execution Logs');
+  assert.match(rContent, /clearLogs/, 'Must have clearLogs in ResearchModal');
 });
 
 test('RaidModal and MonsterModal have 1:1 ID parity and queue controls matching HTML', async () => {

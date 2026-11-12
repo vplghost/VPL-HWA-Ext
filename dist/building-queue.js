@@ -133,6 +133,27 @@
     };
   }
 
+  function extractBuildingLevels(cache) {
+    const levels = new Map();
+    const raw = cache?.buildingStatus?.data?.buildings ||
+                cache?.clan_getSummary?.data?.buildings ||
+                cache?.building_getSummary?.data?.buildings ||
+                cache?.buildingSummary?.data?.buildings ||
+                cache?.getSummary?.data?.buildings;
+    if (Array.isArray(raw)) {
+      for (const b of raw) {
+        const id = Number(b.buildingId ?? b.id);
+        if (Number.isFinite(id)) levels.set(id, Number(b.level) || 0);
+      }
+    } else if (raw && typeof raw === 'object') {
+      for (const [key, b] of Object.entries(raw)) {
+        const id = Number(b?.buildingId ?? b?.id ?? key);
+        if (Number.isFinite(id)) levels.set(id, typeof b === 'number' ? b : (Number(b?.level) || 0));
+      }
+    }
+    return levels;
+  }
+
   function planNextStep(queueState, cache, now = Date.now()) {
     const rawQueues = extractQueues(cache);
     const inProgress = rawQueues.filter((q) => getQueueEnd(q, now) > now);
@@ -141,12 +162,35 @@
       return end > 0 && end <= now;
     });
 
+    const buildingLevels = extractBuildingLevels(cache);
+    const skippedItems = [];
+    const safeItems = Array.isArray(queueState?.items) ? [...queueState.items] : [];
+
+    while (safeItems.length > 0) {
+      const top = safeItems[0];
+      const bId = Number(top?.buildingId);
+      const reqNextLevel = Number(top?.nextLevel);
+      const curLvl = buildingLevels.get(bId) ?? 0;
+      if (Number.isFinite(bId) && Number.isFinite(reqNextLevel) && curLvl >= reqNextLevel) {
+        skippedItems.push({
+          ...top,
+          currentLevel: curLvl,
+          reason: `Already completed (level ${curLvl} >= target ${reqNextLevel})`
+        });
+        safeItems.shift();
+      } else {
+        break;
+      }
+    }
+
     if (inProgress.length > 0) {
       const nextWake = Math.min(...inProgress.map((q) => getQueueEnd(q, now))) + 1000;
       return {
         action: 'wait',
         wakeAt: nextWake,
-        calls: []
+        calls: [],
+        skippedItems,
+        remainingItemsAfterSkip: safeItems
       };
     }
 
@@ -167,8 +211,8 @@
       }
     }
 
-    if (queueState?.enabled !== false && Array.isArray(queueState?.items) && queueState.items.length > 0) {
-      const nextItem = queueState.items[0];
+    if (queueState?.enabled !== false && safeItems.length > 0) {
+      const nextItem = safeItems[0];
       const durationMs = Number(nextItem.durationMs) ||
         (globalThis.hwaHelperBuildingData?.calculateEffectiveDurationMs
           ? globalThis.hwaHelperBuildingData.calculateEffectiveDurationMs(nextItem.buildingId, nextItem.nextLevel)
@@ -189,9 +233,11 @@
       return {
         action: 'start',
         startedItem: { ...nextItem, durationMs },
-        remainingItems: queueState.items.slice(1),
+        remainingItems: safeItems.slice(1),
         wakeAt: now + durationMs + 1000,
-        calls
+        calls,
+        skippedItems,
+        remainingItemsAfterSkip: safeItems
       };
     }
 
@@ -200,14 +246,18 @@
       return {
         action: 'complete-only',
         wakeAt: null,
-        calls
+        calls,
+        skippedItems,
+        remainingItemsAfterSkip: safeItems
       };
     }
 
     return {
       action: 'idle',
       wakeAt: null,
-      calls: []
+      calls: [],
+      skippedItems,
+      remainingItemsAfterSkip: safeItems
     };
   }
 

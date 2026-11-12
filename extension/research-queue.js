@@ -95,6 +95,28 @@
     };
   }
 
+  function extractResearchLevels(cache) {
+    const levels = new Map();
+    const raw = cache?.researchStatus?.data?.completedResearches ||
+                cache?.researchStatus?.data?.researches ||
+                cache?.clan_getSummary?.data?.completedResearches ||
+                cache?.clan_getSummary?.data?.researches ||
+                cache?.personalResearch_getSummary?.data?.completedResearches ||
+                cache?.personalResearch_getSummary?.data?.researches;
+    if (Array.isArray(raw)) {
+      for (const r of raw) {
+        const id = Number(r.researchId ?? r.id);
+        if (Number.isFinite(id)) levels.set(id, Number(r.level) || 0);
+      }
+    } else if (raw && typeof raw === 'object') {
+      for (const [key, r] of Object.entries(raw)) {
+        const id = Number(r?.researchId ?? r?.id ?? key);
+        if (Number.isFinite(id)) levels.set(id, typeof r === 'number' ? r : (Number(r?.level) || 0));
+      }
+    }
+    return levels;
+  }
+
   function planNextStep(queueState, cache, now = Date.now()) {
     const rawQueues = extractQueues(cache);
     const inProgress = rawQueues.filter((q) => getQueueEnd(q, now) > now);
@@ -103,12 +125,35 @@
       return end > 0 && end <= now;
     });
 
+    const researchLevels = extractResearchLevels(cache);
+    const skippedItems = [];
+    const safeItems = Array.isArray(queueState?.items) ? [...queueState.items] : [];
+
+    while (safeItems.length > 0) {
+      const top = safeItems[0];
+      const rId = Number(top?.researchId);
+      const reqNextLevel = Number(top?.nextLevel);
+      const curLvl = researchLevels.get(rId) ?? 0;
+      if (Number.isFinite(rId) && Number.isFinite(reqNextLevel) && curLvl >= reqNextLevel) {
+        skippedItems.push({
+          ...top,
+          currentLevel: curLvl,
+          reason: `Already completed (level ${curLvl} >= target ${reqNextLevel})`
+        });
+        safeItems.shift();
+      } else {
+        break;
+      }
+    }
+
     if (inProgress.length > 0) {
       const nextWake = Math.min(...inProgress.map((q) => getQueueEnd(q, now))) + 1000;
       return {
         action: 'wait',
         wakeAt: nextWake,
-        calls: []
+        calls: [],
+        skippedItems,
+        remainingItemsAfterSkip: safeItems
       };
     }
 
@@ -129,8 +174,8 @@
       }
     }
 
-    if (queueState?.enabled !== false && Array.isArray(queueState?.items) && queueState.items.length > 0) {
-      const nextItem = queueState.items[0];
+    if (queueState?.enabled !== false && safeItems.length > 0) {
+      const nextItem = safeItems[0];
       const durationMs = Number(nextItem.durationMs) ||
         (globalThis.hwaHelperResearchData?.calculateEffectiveDurationMs
           ? globalThis.hwaHelperResearchData.calculateEffectiveDurationMs(nextItem.researchId, nextItem.nextLevel)
@@ -152,9 +197,11 @@
       return {
         action: 'start',
         startedItem: { ...nextItem, durationMs },
-        remainingItems: queueState.items.slice(1),
+        remainingItems: safeItems.slice(1),
         wakeAt: now + durationMs + 1000,
-        calls
+        calls,
+        skippedItems,
+        remainingItemsAfterSkip: safeItems
       };
     }
 
@@ -163,14 +210,18 @@
       return {
         action: 'complete-only',
         wakeAt: null,
-        calls
+        calls,
+        skippedItems,
+        remainingItemsAfterSkip: safeItems
       };
     }
 
     return {
       action: 'idle',
       wakeAt: null,
-      calls: []
+      calls: [],
+      skippedItems,
+      remainingItemsAfterSkip: safeItems
     };
   }
 
