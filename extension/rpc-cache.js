@@ -390,19 +390,21 @@
         const result = results.get(call.ident);
         if (result?.error && ['createRally:mob', 'attackMine:mine', 'getRallyById:rally'].includes(key)) return [];
         if (key === 'searchMob:mob' && call.args?.mobType === 'rally' &&
-            Array.isArray(result?.response?.mobs)) {
+            (Array.isArray(result?.response?.mobs) || (result?.response?.mobs && typeof result.response.mobs === 'object'))) {
+          const mobs = normalizeArrayData(result.response.mobs);
           return [{ key: 'experimentalRallySearch', method: call.name,
             feature: call.feature, group: 'internal', data: {
               mapId: call.args.mapId, mobConfigIds: call.args.mobConfigIds,
-              center: call.args.center, mobs: result.response.mobs
+              center: call.args.center, mobs
             }, updatedAt: record.timestamp }];
         }
         if (key === 'searchMob:mob' && call.args?.mobType === 'solo' &&
-            Array.isArray(result?.response?.mobs)) {
+            (Array.isArray(result?.response?.mobs) || (result?.response?.mobs && typeof result.response.mobs === 'object'))) {
+          const mobs = normalizeArrayData(result.response.mobs);
           return [{ key: 'experimentalSoloSearch', method: call.name,
             feature: call.feature, group: 'internal', data: {
               mapId: call.args.mapId, mobConfigIds: call.args.mobConfigIds,
-              center: call.args.center, mobs: result.response.mobs
+              center: call.args.center, mobs
             }, updatedAt: record.timestamp },
           { key: 'experimentalMapContext', method: call.name, feature: call.feature,
             group: 'internal', data: { mapId: call.args.mapId, center: call.args.center },
@@ -1950,7 +1952,7 @@
         Number.isInteger(heroes[id]?.star) && Number.isFinite(heroes[id]?.power)) || cache.heroGetAll?.updatedAt > at) return false;
     const profiles = ids.map((id) => ({ id, signature: JSON.stringify([heroes[id].level, heroes[id].star, heroes[id].power]) }));
     const key = JSON.stringify([accountId, profiles]);
-    const prior = cache.troopCapacityEvidence?.data || [];
+    const prior = normalizeArrayData(cache.troopCapacityEvidence?.data);
     const previous = prior.find((row) => row.key === key);
     if (previous && previous.total >= total) return false;
     cache.troopCapacityEvidence = { key: 'troopCapacityEvidence', group: 'internal', method: source, updatedAt: at,
@@ -1965,9 +1967,10 @@
       const entries = extract(record);
       for (const entry of entries) {
         if (entry.key === 'experimentalRallySearch') {
-          const won = next.experimentalDefeatedBosses?.data || [];
-          entry.data = { ...entry.data, mobs: entry.data.mobs.filter((mob) =>
-            !won.some((item) => item.mapId === entry.data.mapId && item.mobId === mob.mobId)) };
+          const won = normalizeArrayData(next.experimentalDefeatedBosses?.data);
+          const mobs = normalizeArrayData(entry.data?.mobs);
+          entry.data = { ...entry.data, mobs: mobs.filter((mob) =>
+            mob && !won.some((item) => item?.mapId === entry.data?.mapId && item?.mobId === mob?.mobId)) };
         }
         if (entry.key === 'questClaimAction') {
           const previous = next.questClaimStatus?.data || { claims: [] };
@@ -2123,7 +2126,7 @@
           } else if (entry.data.action === 'socketResult') {
             if (index < 0) index = marches.findIndex((march) =>
               march.kind === 'raid' && march.squadId === entry.data.squadId);
-            const alreadyReturned = next.experimentalRallyReturns?.data?.some((item) => item.squadId === entry.data.squadId);
+            const alreadyReturned = normalizeArrayData(next.experimentalRallyReturns?.data).some((item) => item?.squadId === entry.data.squadId);
             if (index < 0 && !alreadyReturned && Number.isFinite(entry.data.returnAt) && !(current?.updatedAt > entry.updatedAt)) {
               marches.push({ squadId: entry.data.squadId, kind: 'raid',
                 ...(entry.data.returnRouteId ? { routeId: entry.data.returnRouteId } : {}),
@@ -2251,10 +2254,10 @@
           }
           if (entry.data.action === 'socketResult') {
             const march = marches.find((item) => item.rally?.id === entry.data.rallyId);
-            const target = next.experimentalRallyTargets?.data?.find((item) => item.rallyId === entry.data.rallyId);
-            const prior = next.experimentalRallyHistory?.data || [];
+            const target = normalizeArrayData(next.experimentalRallyTargets?.data).find((item) => item?.rallyId === entry.data.rallyId);
+            const prior = normalizeArrayData(next.experimentalRallyHistory?.data);
             const latest = { rallyId: entry.data.rallyId, squadId: entry.data.squadId,
-              returnedAt: next.experimentalRallyReturns?.data?.find((item) => item.squadId === entry.data.squadId)?.returnedAt || null,
+              returnedAt: normalizeArrayData(next.experimentalRallyReturns?.data).find((item) => item?.squadId === entry.data.squadId)?.returnedAt || null,
               mobId: march?.rally?.mobId || target?.mobId, mapId: march?.rally?.mapId || target?.mapId,
               result: entry.data.result || null, mobConfigId: entry.data.mobConfigId,
               waitUntil: march?.rally?.waitUntil || null,
@@ -2263,17 +2266,20 @@
               updatedAt: entry.updatedAt };
             next.experimentalRallyHistory = { key: 'experimentalRallyHistory',
               method: entry.method, feature: entry.feature, group: 'internal',
-              data: [latest, ...prior.filter((item) => item.rallyId !== latest.rallyId)].slice(0, 20),
+              data: [latest, ...prior.filter((item) => item?.rallyId !== latest.rallyId)].slice(0, 20),
               updatedAt: entry.updatedAt };
             if (latest.result === 'win' && latest.mobId && latest.mapId) {
-              const previousWins = next.experimentalDefeatedBosses?.data || [];
+              const previousWins = normalizeArrayData(next.experimentalDefeatedBosses?.data);
               next.experimentalDefeatedBosses = { key: 'experimentalDefeatedBosses',
                 method: entry.method, group: 'internal', updatedAt: entry.updatedAt,
                 data: [{ mapId: latest.mapId, mobId: latest.mobId }, ...previousWins.filter((item) =>
-                  item.mapId !== latest.mapId || item.mobId !== latest.mobId)].slice(0, 200) };
+                  item && (item.mapId !== latest.mapId || item.mobId !== latest.mobId))].slice(0, 200) };
               const search = next.experimentalRallySearch;
-              if (search?.data?.mapId === latest.mapId) next.experimentalRallySearch = {
-                ...search, data: { ...search.data, mobs: search.data.mobs.filter((mob) => mob.mobId !== latest.mobId) } };
+              if (search?.data?.mapId === latest.mapId) {
+                const searchMobs = normalizeArrayData(search.data?.mobs);
+                next.experimentalRallySearch = {
+                  ...search, data: { ...search.data, mobs: searchMobs.filter((mob) => mob && mob.mobId !== latest.mobId) } };
+              }
             }
           }
           next.marchStatus = current?.updatedAt > entry.updatedAt ? current : { key: 'marchStatus', method: entry.method,

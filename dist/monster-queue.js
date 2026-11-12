@@ -3,6 +3,11 @@
   const terminal = (state) => !state || ['complete', 'stopped'].includes(state.phase);
   const rosterCalls = () => [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }];
   const cost = 10;
+  function safeList(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') return Object.values(raw);
+    return [];
+  }
   const stop = (state, reason) => ({ ...state, phase: 'stopped', reason, wakeAt: null, expected: [] });
   const issue = (state, phase, calls, now) => ({ state: { ...state, phase, expected: calls,
     sentAt: now, wakeAt: now + 120000 }, calls, expiresAt: now + 120000 });
@@ -67,13 +72,14 @@
         (options.maxTroops != null && (!Number.isSafeInteger(options.maxTroops) || options.maxTroops <= 0))) return null;
     const search = cache?.experimentalSoloSearch?.data;
     const configs = data.soloMonsterConfigIds(options.level);
+    const mobs = safeList(search?.mobs);
     if (search?.mapId !== options.mapId || !sameValue(search.mobConfigIds, configs) ||
-        !search.mobs?.some((mob) => mob.mobId === options.firstMobId)) return null;
+        !mobs.some((mob) => mob?.mobId === options.firstMobId)) return null;
     const state = { id: `monster:${now}:${tabId}`, tabId, accountId, options, started: 0,
       completed: 0, phase: 'refreshing', current: null, targets: [], attackedMobIds: [], recentResults: [] };
-    const first = search.mobs.find((mob) => mob.mobId === options.firstMobId);
-    state.targets = [first, ...search.mobs.filter((mob) => mob.mobId !== first.mobId)]
-      .filter((mob) => typeof mob.mobId === 'string');
+    const first = mobs.find((mob) => mob?.mobId === options.firstMobId);
+    state.targets = [first, ...mobs.filter((mob) => mob?.mobId !== first?.mobId)]
+      .filter((mob) => typeof mob?.mobId === 'string');
     return refresh(state, cache, now, settings);
   }
   function refresh(state, cache, now, settings) {
@@ -123,10 +129,11 @@
       }
     } else if (state.phase === 'searching') {
       const match = responses.find(({ call, result }) => sameCall(call, state.expected[0]) &&
-        Array.isArray(result?.response?.mobs));
+        (Array.isArray(result?.response?.mobs) || (result?.response?.mobs && typeof result.response.mobs === 'object')));
       if (match) {
-        state.targets = [...new Map(match.result.response.mobs.filter((mob) =>
-          typeof mob.mobId === 'string' && !state.attackedMobIds.includes(mob.mobId))
+        const replyMobs = safeList(match.result?.response?.mobs);
+        state.targets = [...new Map(replyMobs.filter((mob) =>
+          typeof mob?.mobId === 'string' && !state.attackedMobIds.includes(mob.mobId))
           .map((mob) => [mob.mobId, mob])).values()];
         if (!state.targets.length) return { state: stop(state, 'No new monster found for this level.') };
         return refresh(state, cache, now, settings);

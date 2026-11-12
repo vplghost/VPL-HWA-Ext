@@ -420,8 +420,17 @@ async function stopMonsterQueue() {
             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <span>👥</span> Battle Squad & Troop Deployment
             </h3>
-            <span v-if="selectedTeam" class="text-2xs font-mono text-slate-400">
-              ID: {{ selectedTeam.id }}
+            <span
+              class="text-2xs font-mono font-medium px-2 py-0.5 rounded border inline-flex items-center gap-1"
+              :class="
+                mapContext?.mapId
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60'
+                  : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60'
+              "
+              :title="mapContext?.mapId ? `Current World Map ID: ${mapContext.mapId}` : 'World Map not captured yet. Open map in game or click Locate on Map.'"
+            >
+              <span>🗺️</span>
+              <span>Map: {{ mapContext?.mapId || 'Not detected' }}</span>
             </span>
           </div>
 
@@ -436,7 +445,12 @@ async function stopMonsterQueue() {
               class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
               @change="handleTeamChange(selectedTeamId)"
             >
-              <option v-for="t in teams" :key="t.id" :value="t.id">
+              <option
+                v-for="t in teams"
+                :key="t.id"
+                :value="t.id"
+                class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+              >
                 {{ t.label }} ({{ t.heroIds.length }}/5)
               </option>
             </select>
@@ -535,10 +549,15 @@ async function stopMonsterQueue() {
                 <select
                   id="monster-mob-level"
                   v-model.number="mobLevel"
-                  class="flex-1 min-w-0 border-0 bg-transparent px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                  class="flex-1 min-w-0 border-0 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                   @change="savePreferences"
                 >
-                  <option v-for="lvl in 30" :key="lvl" :value="lvl">
+                  <option
+                    v-for="lvl in 30"
+                    :key="lvl"
+                    :value="lvl"
+                    class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                  >
                     Monster level {{ lvl }}
                   </option>
                 </select>
@@ -566,13 +585,14 @@ async function stopMonsterQueue() {
                 class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 @change="savePreferences"
               >
-                <option v-if="foundMonsters.length === 0" value="">
+                <option v-if="foundMonsters.length === 0" value="" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">
                   No targets found (Click "Find")
                 </option>
                 <option
                   v-for="(target, idx) in foundMonsters"
                   :key="target.mobId || idx"
                   :value="target.mobId"
+                  class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                 >
                   Monster {{ idx + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
                 </option>

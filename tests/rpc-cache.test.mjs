@@ -2736,3 +2736,105 @@ test('merge safely handles object-shaped mailStatus (letters/reports) and marchS
     assert.ok(Array.isArray(afterMarches.marchStatus.data.marches), 'marches normalized to array');
   });
 });
+
+test('merge safely handles experimentalRallySearch when experimentalDefeatedBosses is object-shaped', () => {
+  const initialCache = {
+    experimentalDefeatedBosses: {
+      key: 'experimentalDefeatedBosses',
+      updatedAt: '2026-11-12T04:00:00.000Z',
+      data: {
+        '0': { mapId: 'map-1', mobId: 'boss-1' }
+      }
+    }
+  };
+
+  const searchRec = record(
+    [{
+      name: 'searchMob',
+      feature: 'mob',
+      ident: 's1',
+      args: { mapId: 'map-1', mobType: 'rally', mobConfigIds: [78], center: { x: 100, y: 200 } }
+    }],
+    [{
+      ident: 's1',
+      result: {
+        response: {
+          mobs: [
+            { mobId: 'boss-1', mobConfigId: 78, coordinates: { x: 105, y: 205 } },
+            { mobId: 'boss-2', mobConfigId: 78, coordinates: { x: 110, y: 210 } }
+          ]
+        }
+      }
+    }],
+    '2026-11-12T04:05:00.000Z'
+  );
+
+  assert.doesNotThrow(() => {
+    const res = cache.merge(initialCache, [searchRec]).cache;
+    assert.ok(res.experimentalRallySearch, 'experimentalRallySearch created');
+    assert.ok(Array.isArray(res.experimentalRallySearch.data.mobs), 'mobs is array');
+    assert.equal(res.experimentalRallySearch.data.mobs.length, 1, 'defeated boss-1 filtered out');
+    assert.equal(res.experimentalRallySearch.data.mobs[0].mobId, 'boss-2', 'only boss-2 remains');
+  });
+});
+
+test('merge safely handles observeSquad and socketResult when evidence/returns are object-shaped', () => {
+  const initialCache = {
+    accountStatus: { data: { id: 'user-1' } },
+    heroGetAll: {
+      data: {
+        1: { level: 50, star: 5, power: 10000 },
+        2: { level: 50, star: 5, power: 10000 },
+        3: { level: 50, star: 5, power: 10000 },
+        4: { level: 50, star: 5, power: 10000 },
+        5: { level: 50, star: 5, power: 10000 }
+      },
+      updatedAt: '2026-11-12T04:00:00.000Z'
+    },
+    troopCapacityEvidence: {
+      key: 'troopCapacityEvidence',
+      data: {
+        '0': { key: 'prior-key', total: 50000 }
+      }
+    },
+    experimentalRallyReturns: {
+      key: 'experimentalRallyReturns',
+      data: {
+        '0': { squadId: 'sq1', returnedAt: 1794450000000 }
+      }
+    }
+  };
+
+  const createRallyRec = record(
+    [{
+      name: 'createRally',
+      feature: 'mob',
+      ident: 'c1',
+      args: {
+        mapId: 'map-1',
+        mobId: 'mob-1',
+        waitSeconds: 60,
+        squad: {
+          heroes: [{ heroId: 1 }, { heroId: 2 }, { heroId: 3 }, { heroId: 4 }, { heroId: 5 }],
+          units: [{ unitId: 1, count: 20000 }]
+        }
+      }
+    }],
+    [{
+      ident: 'c1',
+      result: {
+        response: {
+          squadId: 'sq-new',
+          rally: { rallyId: 'rally-1', plannedStartTime: 1794460000000 }
+        }
+      }
+    }],
+    '2026-11-12T04:10:00.000Z'
+  );
+
+  assert.doesNotThrow(() => {
+    const res = cache.merge(initialCache, [createRallyRec]).cache;
+    assert.ok(res.troopCapacityEvidence, 'troopCapacityEvidence updated');
+    assert.ok(Array.isArray(res.troopCapacityEvidence.data), 'evidence is array');
+  });
+});

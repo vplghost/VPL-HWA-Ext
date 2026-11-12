@@ -6,6 +6,23 @@
   --color-slate-925: #0b1120;
 }
 
+html.dark {
+  color-scheme: dark;
+}
+html:not(.dark) {
+  color-scheme: light;
+}
+
+/* Ensure form controls and dropdown options render with proper background and high-contrast text */
+select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+.dark select option {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
 /* Hero Hover Trigger & Card */
 .hero-hover-trigger {
   position: relative;

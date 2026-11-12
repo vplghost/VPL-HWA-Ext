@@ -466,8 +466,17 @@ async function stopRaidQueue() {
             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <span>👥</span> Battle Squad & Troop Deployment
             </h3>
-            <span v-if="selectedTeam" class="text-2xs font-mono text-slate-400">
-              ID: {{ selectedTeam.id }}
+            <span
+              class="text-2xs font-mono font-medium px-2 py-0.5 rounded border inline-flex items-center gap-1"
+              :class="
+                mapContext?.mapId
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60'
+                  : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60'
+              "
+              :title="mapContext?.mapId ? `Current World Map ID: ${mapContext.mapId}` : 'World Map not captured yet. Open map in game or click Locate on Map.'"
+            >
+              <span>🗺️</span>
+              <span>Map: {{ mapContext?.mapId || 'Not detected' }}</span>
             </span>
           </div>
 
@@ -482,7 +491,12 @@ async function stopRaidQueue() {
               class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
               @change="handleTeamChange(selectedTeamId)"
             >
-              <option v-for="t in teams" :key="t.id" :value="t.id">
+              <option
+                v-for="t in teams"
+                :key="t.id"
+                :value="t.id"
+                class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+              >
                 {{ t.label }} ({{ t.heroIds.length }}/5)
               </option>
             </select>
@@ -581,10 +595,15 @@ async function stopRaidQueue() {
                 <select
                   id="raid-boss-level"
                   v-model.number="bossLevel"
-                  class="flex-1 min-w-0 border-0 bg-transparent px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                  class="flex-1 min-w-0 border-0 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                   @change="savePreferences"
                 >
-                  <option v-for="lvl in 30" :key="lvl" :value="lvl">
+                  <option
+                    v-for="lvl in 30"
+                    :key="lvl"
+                    :value="lvl"
+                    class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                  >
                     Boss level {{ lvl }}
                   </option>
                 </select>
@@ -612,13 +631,14 @@ async function stopRaidQueue() {
                 class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 @change="savePreferences"
               >
-                <option v-if="foundBosses.length === 0" value="">
+                <option v-if="foundBosses.length === 0" value="" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">
                   No targets found (Click "Find")
                 </option>
                 <option
                   v-for="(target, idx) in foundBosses"
                   :key="target.mobId || idx"
                   :value="target.mobId"
+                  class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                 >
                   Boss {{ idx + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
                 </option>
@@ -635,10 +655,10 @@ async function stopRaidQueue() {
                 class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 @change="savePreferences"
               >
-                <option :value="60">1 minute (60s)</option>
-                <option :value="300">5 minutes (300s)</option>
-                <option :value="900">15 minutes (900s)</option>
-                <option :value="1800">30 minutes (1800s)</option>
+                <option :value="60" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">1 minute (60s)</option>
+                <option :value="300" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">5 minutes (300s)</option>
+                <option :value="900" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">15 minutes (900s)</option>
+                <option :value="1800" class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">30 minutes (1800s)</option>
               </select>
             </div>
 

@@ -3,6 +3,11 @@
   const terminal = (state) => !state || ['complete', 'stopped'].includes(state.phase);
   const rosterCalls = () => [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }];
   const rallyEnergyCost = 25;
+  function safeList(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') return Object.values(raw);
+    return [];
+  }
   function stop(state, reason) { return { ...state, bossQueue: null, phase: 'stopped', reason, wakeAt: null }; }
   function issue(state, phase, calls, now, expiresAt = now + 120000) {
     return { state: { ...state, phase, sentAt: now, wakeAt: expiresAt, expected: calls }, calls, expiresAt };
@@ -87,16 +92,17 @@
     const summary = cache['getUnitSummary:unit']?.data;
     const isGuildRaidActive = hasActiveRaidPending(cache, now);
     const areDeployed = summary ? areHeroesDeployed(summary, options.heroIds) : false;
+    const won = safeList(cache.experimentalDefeatedBosses?.data);
+    const mobs = safeList(search?.mobs);
     if (search?.mapId !== options.mapId ||
         !search.mobConfigIds?.includes(data.bossConfigId(options.level)) ||
-        !search.mobs?.some((mob) => mob.mobId === options.firstMobId) ||
-        cache.experimentalDefeatedBosses?.data?.some((boss) =>
-          boss.mapId === options.mapId && boss.mobId === options.firstMobId) ||
+        !mobs.some((mob) => mob?.mobId === options.firstMobId) ||
+        won.some((boss) =>
+          boss?.mapId === options.mapId && boss?.mobId === options.firstMobId) ||
         !heroes ||
         options.heroIds.some((id) => !heroes[id])) return null;
-    const won = cache.experimentalDefeatedBosses?.data || [];
-    const bosses = search.mobs.filter((mob) => mob.mobId &&
-      !won.some((item) => item.mapId === options.mapId && item.mobId === mob.mobId));
+    const bosses = mobs.filter((mob) => mob?.mobId &&
+      !won.some((item) => item?.mapId === options.mapId && item?.mobId === mob?.mobId));
     const ordered = [bosses.find((mob) => mob.mobId === options.firstMobId),
       ...bosses.filter((mob) => mob.mobId !== options.firstMobId)].filter(Boolean);
     const uniqueQueue = [...new Map(ordered.map((mob) => [mob.mobId, { mobId: mob.mobId }])).values()];
@@ -206,12 +212,14 @@
       }
     }
     if (state.phase === 'searching') {
-      const reply = replies.find(({ call, result }) => sameCall(call, state.expected[0]) && Array.isArray(result?.response?.mobs));
+      const reply = replies.find(({ call, result }) => sameCall(call, state.expected[0]) &&
+        (Array.isArray(result?.response?.mobs) || (result?.response?.mobs && typeof result.response.mobs === 'object')));
       if (reply) {
-        const won = cache?.experimentalDefeatedBosses?.data || [];
-        const targets = reply.result.response.mobs.filter((mob) => mob.mobId &&
+        const won = safeList(cache?.experimentalDefeatedBosses?.data);
+        const replyMobs = safeList(reply.result?.response?.mobs);
+        const targets = replyMobs.filter((mob) => mob?.mobId &&
           !state.failedBossIds?.includes(mob.mobId) && !state.wonBossIds?.includes(mob.mobId) &&
-          !won.some((item) => item.mapId === state.options.mapId && item.mobId === mob.mobId));
+          !won.some((item) => item?.mapId === state.options.mapId && item?.mobId === mob.mobId));
         const unique = [...new Map(targets.map((mob) => [mob.mobId, { mobId: mob.mobId }])).values()];
         const selected = !state.started && unique.find((mob) => mob.mobId === state.options.firstMobId);
         state.bossQueue = { ...state.bossQueue,

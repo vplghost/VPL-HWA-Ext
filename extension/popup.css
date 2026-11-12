@@ -6,6 +6,10 @@
 
 @layer base {
   [hidden] { display: none !important; }
+  html.dark { color-scheme: dark; }
+  html:not(.dark) { color-scheme: light; }
+  select option { background-color: #ffffff; color: #0f172a; }
+  .dark select option { background-color: #1e293b; color: #f8fafc; }
 }
 
 @layer components {
