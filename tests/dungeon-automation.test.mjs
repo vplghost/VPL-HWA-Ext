@@ -463,6 +463,42 @@ test('dungeonGetInfo supports nested response.dungeon structure', () => {
   assert.equal(cache.dungeonStatus?.data?.currentFloorDoors?.[0]?.attackerType, 'fire');
 });
 
+test('planDungeon handles object-shaped currentFloorDoors without TypeError', () => {
+  const objectDoors = {
+    '0': {
+      attackerType: 'water',
+      defenderType: 'fire',
+      enemyPower: 50000,
+      teamNum: 0,
+      door: { teamNum: 0, attackerType: 'water' }
+    }
+  };
+
+  const cache = {
+    dungeonStatus: {
+      data: {
+        floorNumber: 500,
+        currentFloorDoors: objectDoors,
+        states: {
+          titans: {}
+        }
+      }
+    },
+    teamGetAll: {
+      data: {
+        dungeon_water: [4000, 4001, 4052, 4004, 4002]
+      }
+    }
+  };
+
+  assert.doesNotThrow(() => {
+    const decision = dungeonAuto.planDungeon(cache);
+    assert.equal(decision.kind, 'battle');
+    assert.equal(decision.teamNum, 0);
+    assert.equal(decision.attackerType, 'water');
+  });
+});
+
 test('popup.html includes #dungeon-refresh-btn with refresh icon and label', async () => {
   const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
   assert.ok(popupHtml.includes('id="dungeon-refresh-btn"'), 'popup.html must contain #dungeon-refresh-btn');

@@ -39,7 +39,13 @@ try {
   await cp(join(wxtOutput, 'chunks'), join(destination, 'chunks'), { recursive: true });
   await cp(join(wxtOutput, 'popup.html'), join(destination, 'popup.html'));
   await cp(join(wxtOutput, 'assets'), join(destination, 'assets'), { recursive: true });
-  console.log('Synchronized WXT Vue 3 bundle into dist');
+
+  // Remove obsolete legacy popup files from distribution bundle (replaced by WXT bundle)
+  for (const obsolete of ['popup.js', 'popup-data.js', 'dashboard-data.js', 'export-name.js']) {
+    await rm(join(destination, obsolete), { force: true });
+  }
+
+  console.log('Synchronized WXT Vue 3 bundle into dist (excluded obsolete legacy popup scripts)');
 } catch (e) {
   console.warn('WXT build warning (fallback to legacy popup):', e.message);
 }

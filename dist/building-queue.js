@@ -13,15 +13,15 @@
         if (Number.isFinite(id)) simulated.set(id, b.level ?? 0);
       }
     }
-    for (const q of rawQueues || []) {
-      const bId = Number(q.buildingId);
-      if (Number.isFinite(bId) && Number.isFinite(q.level)) {
+    for (const q of (Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {}))) {
+      const bId = Number(q?.buildingId);
+      if (Number.isFinite(bId) && Number.isFinite(q?.level)) {
         simulated.set(bId, Math.max(simulated.get(bId) || 0, q.level));
       }
     }
-    for (const item of queueItems || []) {
-      const bId = Number(item.buildingId);
-      if (Number.isFinite(bId) && Number.isFinite(item.nextLevel)) {
+    for (const item of (Array.isArray(queueItems) ? queueItems : Object.values(queueItems || {}))) {
+      const bId = Number(item?.buildingId);
+      if (Number.isFinite(bId) && Number.isFinite(item?.nextLevel)) {
         simulated.set(bId, Math.max(simulated.get(bId) || 0, item.nextLevel));
       }
     }
@@ -33,7 +33,7 @@
   function getEligibleCandidates(allBuildings, simulatedLevels, bHelper) {
     const simulatedHall = simulatedLevels.get(20) || 1;
     const candidates = [];
-    for (const b of allBuildings || []) {
+    for (const b of (Array.isArray(allBuildings) ? allBuildings : Object.values(allBuildings || {}))) {
       const bId = Number(b.id);
       if (SYSTEM_LANDMARK_IDS.has(bId)) continue;
       const currentSimulated = simulatedLevels.get(b.id) ?? (b.isBuilt ? b.level : 0);

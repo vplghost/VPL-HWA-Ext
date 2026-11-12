@@ -113,3 +113,61 @@ test('planAutoGather plans search when no cached mines and gather when full mine
   assert.equal(step2.call.args.mineId, 'mine_wood_999');
   assert.equal(step2.call.args.squad.heroes.length, 5);
 });
+
+test('auto-gather handles object-shaped marches and mine search without TypeError', () => {
+  const plan = globalThis.hwaHelperAutoGather.planAutoGather;
+  const count = globalThis.hwaHelperAutoGather.countActiveMarches;
+  const now = 1000000;
+
+  // Object-shaped marches
+  const objectMarches = {
+    '0': { id: 1, kind: 'gather', stage: 'harvest' },
+    '1': { id: 2, kind: 'attack', stage: 'moveToTargetInSolo' }
+  };
+  assert.equal(count(objectMarches, now), 2, 'Object-shaped marches counted correctly');
+
+  const cache = {
+    heroGetAll: {
+      data: {
+        '1': { id: 1, power: 1000 },
+        '2': { id: 2, power: 2000 },
+        '3': { id: 3, power: 3000 },
+        '4': { id: 4, power: 4000 },
+        '5': { id: 5, power: 5000 }
+      }
+    },
+    'getUnitSummary:unit': {
+      data: {
+        units: { '0': { unitId: 1, count: 5000 } }
+      }
+    },
+    experimentalMapContext: { data: { mapId: 42, center: { x: 100, y: 200 } } },
+    marchStatus: { data: { marches: objectMarches } },
+    experimentalMineSearch: {
+      data: {
+        mapId: 42,
+        mineConfigId: globalThis.hwaHelperExperimentalData.mineConfigId('wood', 5),
+        mines: {
+          '0': { mineId: 'mine_wood_obj', coordinates: { x: 105, y: 205 } }
+        }
+      }
+    }
+  };
+
+  const stored = {
+    popupRpcEnabled: true,
+    autoGatherSettings: {
+      enabled: true,
+      maxMarches: 3,
+      mineLevel: 5,
+      mineType: 'rotate',
+      lastAutoMineType: 'food'
+    }
+  };
+
+  assert.doesNotThrow(() => {
+    const res = plan(cache, stored, now);
+    assert.equal(res.action, 'gather');
+    assert.equal(res.mineId, 'mine_wood_obj');
+  });
+});

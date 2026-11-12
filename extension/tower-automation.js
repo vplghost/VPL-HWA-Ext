@@ -4,6 +4,12 @@
     10, 25, 38, 39, 46, 34, 35, 37, 17, 18, 31, 32, 12, 36, 42, 43, 15, 44
   ];
 
+  function safeList(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') return Object.values(raw);
+    return [];
+  }
+
   function priorityOrder(ids, preferred = []) {
     const available = [...new Set(ids.filter(Number.isInteger))];
     const userPrefs = Array.isArray(preferred) ? preferred.filter(Number.isInteger) : [];
@@ -18,11 +24,12 @@
   }
 
   function chooseBattleRoom(rooms, preferred = [], history = [], floor = null) {
-    const battles = Object.values(rooms).filter((room) => {
+    const hist = safeList(history);
+    const battles = Object.values(rooms || {}).filter((room) => {
       if (!['hero_battle', 'boss_battle'].includes(room?.type)) return false;
       if (room.state !== 'initial') return false;
-      const alreadyWon = history.some((e) =>
-        e.action === 'endBattle' && e.floor === floor && Number(e.room) === Number(room.roomNumber) && e.win);
+      const alreadyWon = hist.some((e) =>
+        e?.action === 'endBattle' && e?.floor === floor && Number(e?.room) === Number(room?.roomNumber) && e?.win);
       return !alreadyWon;
     }).sort((a, b) => Number(a.roomNumber) - Number(b.roomNumber));
 
@@ -56,8 +63,8 @@
     }
     const rooms = session.rooms;
     const roomNumber = Number(session.roomNumber) || 0;
-    const room = rooms[roomNumber];
-    const history = session.history || [];
+    const room = rooms?.[roomNumber];
+    const history = safeList(session.history);
     if (roomNumber === 0) {
       const choice = chooseBattleRoom(rooms, preferred, history, session.floorNumber);
       if (choice) {
@@ -65,8 +72,8 @@
           args: { number: Number(choice.roomNumber) } }, floor: session.floorNumber,
           room: Number(choice.roomNumber) };
       }
-      const wonOnFloor = history.some((e) => e.action === 'endBattle' && e.floor === session.floorNumber && e.win);
-      const isBossFloor = Object.values(rooms).some((r) => r?.type === 'boss_battle');
+      const wonOnFloor = history.some((e) => e?.action === 'endBattle' && e?.floor === session.floorNumber && e?.win);
+      const isBossFloor = Object.values(rooms || {}).some((r) => r?.type === 'boss_battle');
       if (wonOnFloor && (isBossFloor || session.floorNumber >= 20)) {
         return { kind: 'complete' };
       }
@@ -84,21 +91,22 @@
         floor: session.floorNumber, room: roomNumber };
     }
     if (room.type === 'buffs') {
-      const chosen = history.some((event) => event.action === 'activateBuff' &&
-        event.floor === session.floorNumber && event.room === roomNumber);
-      if (chosen || !room.buffs?.length) {
+      const chosen = history.some((event) => event?.action === 'activateBuff' &&
+        event?.floor === session.floorNumber && event?.room === roomNumber);
+      const buffs = safeList(room.buffs);
+      if (chosen || !buffs.length) {
         return { kind: 'rpc', call: { name: 'magicTower_enterNextFloor', args: {} },
           floor: session.floorNumber, room: roomNumber };
       }
-      const buffId = chooseBuff(room.buffs, preferred);
+      const buffId = chooseBuff(buffs, preferred);
       return buffId == null ? { kind: 'rpc', call: { name: 'magicTower_enterNextFloor', args: {} },
         floor: session.floorNumber, room: roomNumber } :
         { kind: 'rpc', call: { name: 'magicTower_activateBuff', args: { id: buffId } },
           floor: session.floorNumber, room: roomNumber };
     }
     if (room.type === 'chests') {
-      const opened = history.some((event) => event.action === 'openChest' &&
-        event.floor === session.floorNumber && event.room === roomNumber);
+      const opened = history.some((event) => event?.action === 'openChest' &&
+        event?.floor === session.floorNumber && event?.room === roomNumber);
       if (opened) return { kind: 'rpc', call: { name: 'magicTower_enterNextFloor', args: {} },
         floor: session.floorNumber, room: roomNumber };
       const free = Object.entries(room.openCosts || {}).filter(([number, cost]) =>

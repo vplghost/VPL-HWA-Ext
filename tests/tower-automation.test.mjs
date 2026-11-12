@@ -113,3 +113,36 @@ test('Tower runner stops on battle loss, failed action, timeout, missing team an
   const completed = planner.plan({ ...cache, towerStatus: { data: { state: 'win', isCleared: true } } });
   assert.equal(completed.kind, 'complete');
 });
+
+test('Tower automation handles object-shaped history, tokens, and buffs without TypeError', () => {
+  const objectHistory = {
+    '0': { action: 'endBattle', floor: 1, room: 1, win: true }
+  };
+  const rooms = {
+    1: { roomNumber: 1, type: 'buffs', buffs: { '0': 6, '1': 3 } }
+  };
+  const session = {
+    floorNumber: 1,
+    roomNumber: 1,
+    rooms,
+    history: objectHistory,
+    tokens: { '0': 'token-1' },
+    completed: false
+  };
+  const cache = {
+    towerSession: {
+      data: session,
+      updatedAt: '2026-11-12T04:00:00.000Z'
+    },
+    towerStatus: {
+      data: { isCleared: false }
+    }
+  };
+
+  assert.doesNotThrow(() => {
+    const decision = planner.plan(cache, [6, 3]);
+    assert.equal(decision.kind, 'rpc');
+    assert.equal(decision.call.name, 'magicTower_activateBuff');
+    assert.equal(decision.call.args.id, 6);
+  });
+});

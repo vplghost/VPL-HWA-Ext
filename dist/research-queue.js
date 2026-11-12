@@ -14,15 +14,15 @@
         if (Number.isFinite(id)) simulated.set(id, r?.level ?? 0);
       }
     }
-    for (const q of rawQueues || []) {
-      const rId = Number(q.researchId);
-      if (Number.isFinite(rId) && Number.isFinite(q.level)) {
+    for (const q of (Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {}))) {
+      const rId = Number(q?.researchId);
+      if (Number.isFinite(rId) && Number.isFinite(q?.level)) {
         simulated.set(rId, Math.max(simulated.get(rId) || 0, q.level));
       }
     }
-    for (const item of queueItems || []) {
-      const rId = Number(item.researchId);
-      if (Number.isFinite(rId) && Number.isFinite(item.nextLevel)) {
+    for (const item of (Array.isArray(queueItems) ? queueItems : Object.values(queueItems || {}))) {
+      const rId = Number(item?.researchId);
+      if (Number.isFinite(rId) && Number.isFinite(item?.nextLevel)) {
         simulated.set(rId, Math.max(simulated.get(rId) || 0, item.nextLevel));
       }
     }
@@ -30,8 +30,10 @@
   }
 
   function calculateQueueTimeline(rawQueues = [], queueItems = [], now = Date.now()) {
-    const inProgress = (rawQueues || []).filter((q) =>
-      Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now
+    const safeQueues = Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {});
+    const safeItems = Array.isArray(queueItems) ? queueItems : Object.values(queueItems || {});
+    const inProgress = safeQueues.filter((q) =>
+      Number.isFinite(q?.startDate) && Number.isFinite(q?.durationMs) && q.startDate + q.durationMs > now
     );
     let currentCursor = inProgress.length > 0
       ? Math.max(...inProgress.map((q) => q.startDate + q.durationMs))
@@ -39,7 +41,7 @@
 
     const timeline = [];
     let totalDurationMs = 0;
-    for (const item of queueItems || []) {
+    for (const item of safeItems) {
       const durationMs = item.durationMs || 1000;
       const estStart = currentCursor;
       const estFinish = estStart + durationMs;

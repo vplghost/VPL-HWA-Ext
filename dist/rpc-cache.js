@@ -2055,8 +2055,8 @@
           continue;
         }
         if (entry.key === 'soloAttackResultAction') {
-          const previous = next.soloAttackResults?.data || [];
-          if (previous.some((report) => report.reportId === entry.data.reportId)) continue;
+          const previous = normalizeArrayData(next.soloAttackResults?.data);
+          if (previous.some((report) => report?.reportId === entry.data.reportId)) continue;
           const report = { ...entry.data };
           next.soloAttackResults = { key: 'soloAttackResults', method: entry.method,
             feature: entry.feature, group: 'other',
@@ -3577,7 +3577,7 @@
             } else if (res.reward?.dungeonActivity != null) {
               dailyCombatLog.todayTitanite = (dailyCombatLog.todayTitanite || 0) + Number(res.reward.dungeonActivity);
             }
-            const casualties = Array.isArray(res.casualties) ? res.casualties : [];
+            const casualties = normalizeArrayData(res.casualties);
             if (casualties.length === 0 && res.win) {
               dailyCombatLog.flawlessCount = (dailyCombatLog.flawlessCount || 0) + 1;
             } else {
@@ -3589,7 +3589,7 @@
                 win: res.win,
                 stars: res.stars,
                 casualties,
-                deployed: res.deployed || []
+                deployed: normalizeArrayData(res.deployed)
               });
               if (dailyCombatLog.casualtyBattles.length > 50) {
                 dailyCombatLog.casualtyBattles = dailyCombatLog.casualtyBattles.slice(0, 50);
@@ -3665,8 +3665,8 @@
           const accountId = next.accountStatus?.data?.id;
           if (accountId != null && entry.data?.accountId != null &&
               String(accountId) !== String(entry.data.accountId)) continue;
-          const existing = next.specialQuestStatus?.data?.events || [];
-          const incoming = entry.data?.events || [];
+          const existing = normalizeArrayData(next.specialQuestStatus?.data?.events);
+          const incoming = normalizeArrayData(entry.data?.events);
           const fullSnapshot = ['specialQuestEvents', 'getSpecialQuestState'].includes(entry.method);
           const evMap = new Map();
           const recordTime = Date.parse(entry.updatedAt) || Date.now();

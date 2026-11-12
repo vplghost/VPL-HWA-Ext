@@ -260,7 +260,8 @@
         };
       }
     }
-    const doors = dungeonData.currentFloorDoors;
+    const rawDoors = dungeonData.currentFloorDoors;
+    const doors = Array.isArray(rawDoors) ? rawDoors : (rawDoors && typeof rawDoors === 'object' ? Object.values(rawDoors) : []);
     if (!Array.isArray(doors) || !doors.length) {
       return { kind: 'need-snapshot', reason: 'Waiting for floor doors to be loaded.' };
     }

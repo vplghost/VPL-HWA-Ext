@@ -1,6 +1,12 @@
 (() => {
   const BASIC_MINE_TYPES = ['food', 'wood', 'stone', 'iron'];
 
+  function safeList(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') return Object.values(raw);
+    return [];
+  }
+
   function normalizeAutoGatherSettings(settings) {
     const raw = settings && typeof settings === 'object' ? settings : {};
     const maxMarches = Number.isInteger(raw.maxMarches) && raw.maxMarches >= 1 && raw.maxMarches <= 10
@@ -38,8 +44,8 @@
   }
 
   function countActiveMarches(marches, now = Date.now()) {
-    if (!Array.isArray(marches)) return 0;
-    return marches.filter((m) => {
+    const list = safeList(marches);
+    return list.filter((m) => {
       if (m.stage === 'returnToOutpost' || m.kind === 'return') {
         if (Number.isFinite(m.endsAt) && now >= m.endsAt) return false;
       }
@@ -68,7 +74,7 @@
     if (prevMarches > 0 && curMarches < prevMarches) {
       return true;
     }
-    const prevReturning = (prevCache?.marchStatus?.data?.marches || []).some(
+    const prevReturning = safeList(prevCache?.marchStatus?.data?.marches).some(
       (m) => (m.stage === 'returnToOutpost' || m.kind === 'return') && (!m.endsAt || now >= m.endsAt)
     );
     if (prevReturning) return true;
@@ -94,7 +100,7 @@
       return { action: 'idle', reason: 'Auto-gather disabled' };
     }
 
-    const marches = cache?.marchStatus?.data?.marches || [];
+    const marches = safeList(cache?.marchStatus?.data?.marches);
     const activeCount = countActiveMarches(marches, now);
     if (activeCount >= settings.maxMarches) {
       return {
@@ -135,8 +141,8 @@
 
     // Check if matching mine search results exist with full mines
     const mineSearch = cache?.experimentalMineSearch?.data;
-    const matchingMines = (mineSearch?.mineConfigId === configId && Array.isArray(mineSearch.mines))
-      ? mineSearch.mines.filter((m) => m?.mineId)
+    const matchingMines = (mineSearch?.mineConfigId === configId)
+      ? safeList(mineSearch?.mines).filter((m) => m?.mineId)
       : [];
 
     if (matchingMines.length > 0) {
@@ -151,7 +157,7 @@
         heroIds, heroes, cache?.troopCapacityEvidence?.data,
         data.normalizeCapacitySettings(stored?.troopCapacitySettings), myId
       ).total;
-      const availSummary = Array.isArray(summary?.available) ? summary : { available: summary?.units || [] };
+      const availSummary = Array.isArray(summary?.available) ? summary : { available: safeList(summary?.units) };
       const troops = data.allocateTroops(availSummary, capacity);
       const squad = data.buildSquad(heroIds, troops);
       if (!squad) return { action: 'wait', reason: 'Could not allocate squad troops' };

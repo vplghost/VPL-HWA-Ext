@@ -2838,3 +2838,65 @@ test('merge safely handles observeSquad and socketResult when evidence/returns a
     assert.ok(Array.isArray(res.troopCapacityEvidence.data), 'evidence is array');
   });
 });
+
+test('merge safely handles soloAttackResults, specialQuest, and dungeon with object-shaped collections', () => {
+  const initialCache = {
+    soloAttackResults: {
+      key: 'soloAttackResults',
+      data: {
+        '0': { reportId: 'rep-old', result: 'win', createdAt: 1000 }
+      }
+    },
+    specialQuestStatus: {
+      key: 'specialQuestStatus',
+      data: {
+        events: {
+          '0': { id: 'ev-1', end: 9999999999999 }
+        }
+      }
+    },
+    dungeonStatus: {
+      key: 'dungeonStatus',
+      data: {
+        dailyCombatLog: {
+          date: new Date().toDateString(),
+          casualtyBattles: {
+            '0': { floorNumber: 1, casualties: { '0': { id: 'titan-1' } } }
+          }
+        }
+      }
+    }
+  };
+
+  const soloAttackRec = record(
+    [{ name: 'attackMob', feature: 'mob', ident: 'sa1', args: { mobId: 'mob-1' } }],
+    [{
+      ident: 'sa1',
+      result: { error: { code: 500, message: 'fail' } }
+    }],
+    '2026-11-12T04:15:00.000Z'
+  );
+
+  const questPushRec = record(
+    [{ name: 'getSpecialQuestState', feature: 'quest', ident: 'sqp1' }],
+    [{
+      ident: 'sqp1',
+      result: {
+        response: {
+          events: [
+            { id: 'ev-2', end: 9999999999999 }
+          ]
+        }
+      }
+    }],
+    '2026-11-12T04:16:00.000Z'
+  );
+
+  assert.doesNotThrow(() => {
+    const res1 = cache.merge(initialCache, [soloAttackRec]).cache;
+    assert.ok(Array.isArray(res1.soloAttackResults.data), 'soloAttackResults is array');
+
+    const res2 = cache.merge(res1, [questPushRec]).cache;
+    assert.ok(Array.isArray(res2.specialQuestStatus.data.events), 'specialQuestStatus.events is array');
+  });
+});
