@@ -1852,6 +1852,37 @@ testWithTraces('event claim trace refreshes Balance Sigils and retains every inv
   assert.equal(merged.inventoryGet.data.patron['57'], 30);
 });
 
+test('merge and pruneCache safely handle object-shaped questClaimStatus claims without TypeError', () => {
+  const initial = {
+    questClaimStatus: {
+      key: 'questClaimStatus',
+      updatedAt: '2026-11-03T14:50:00.000Z',
+      data: {
+        claims: {
+          '0': { id: 14360, token: 'claim-1', needsSync: false, at: '2026-11-03T14:50:00.000Z' }
+        }
+      }
+    }
+  };
+
+  const pruned = cache.pruneCache(initial);
+  assert.equal(Array.isArray(pruned.cache.questClaimStatus.data.claims), true);
+  assert.equal(pruned.cache.questClaimStatus.data.claims.length, 1);
+
+  const entry = {
+    key: 'questClaimAction',
+    method: 'completeQuest',
+    data: { questId: 14361, token: 'claim-2' },
+    updatedAt: '2026-11-03T14:55:00.000Z'
+  };
+
+  assert.doesNotThrow(() => {
+    const res = cache.merge(initial, [entry]);
+    assert.equal(Array.isArray(res.cache.questClaimStatus.data.claims), true);
+    assert.equal(res.cache.questClaimStatus.data.claims.length, 2);
+  });
+});
+
 test('rally details enrich an existing squad without adding a duplicate march', () => {
   const at = '2026-11-03T14:17:51.731Z';
   const squadId = 'same-squad';

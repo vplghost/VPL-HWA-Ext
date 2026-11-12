@@ -1289,7 +1289,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ]);
       if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
-    const latestClaim = cacheResult.cache.questClaimStatus?.data?.claims?.at(-1);
+    const rawClaims = cacheResult.cache.questClaimStatus?.data?.claims;
+    const claims = Array.isArray(rawClaims)
+      ? rawClaims
+      : (rawClaims && typeof rawClaims === 'object')
+      ? Object.values(rawClaims)
+      : [];
+    const latestClaim = claims.length > 0 ? claims[claims.length - 1] : null;
     if (stored.popupRpcEnabled === true && cacheResult.changed && latestClaim?.needsSync &&
         latestClaim.at === record.timestamp && sender.tab?.id) {
       const dispatch = rpcMessageForSettings(stored, [

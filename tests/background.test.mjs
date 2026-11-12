@@ -281,6 +281,24 @@ test('empty event quest claim requests authoritative resource and item snapshots
   assert.equal(forwardedMessages.length, 1);
 });
 
+test('api-record safely handles object-shaped questClaimStatus claims without TypeError', async () => {
+  const { local, send } = setup();
+  local.popupRpcEnabled = true;
+  local.rpcCache = {
+    questClaimStatus: {
+      key: 'questClaimStatus',
+      data: {
+        claims: {
+          '0': { id: 14360, token: 'claim-1', needsSync: false, at: '2026-11-03T14:50:00.000Z' }
+        }
+      }
+    }
+  };
+  const dummy = rpc([{ name: 'userGetInfo', ident: 'u-1' }], [{ ident: 'u-1', result: { response: { id: 1 } } }], '2026-11-03T14:55:01.620Z');
+  const res = await send('api-record', dummy, { ...gameSender, tab: { id: 42 } });
+  assert.equal(res.cached, true);
+});
+
 test('skin upgrade requests fresh hero stats and stone balances once', async () => {
   const { local, send, forwardedMessages } = setup();
   local.popupRpcEnabled = true;

@@ -1997,7 +1997,8 @@
         }
         if (entry.key === 'questClaimAction') {
           const previous = next.questClaimStatus?.data || { claims: [] };
-          if (previous.claims?.some((claim) => claim.token === entry.data.token)) continue;
+          const previousClaims = normalizeArrayData(previous.claims);
+          if (previousClaims.some((claim) => claim?.token === entry.data.token)) continue;
           const quest = Array.isArray(next.questGetAll?.data) ?
             next.questGetAll.data.find((item) => item.id === entry.data.questId) : null;
           const reward = entry.data.reward || quest?.reward || null;
@@ -2010,7 +2011,7 @@
             needsSync: !reward, at: entry.updatedAt };
           next.questClaimStatus = { key: 'questClaimStatus', method: entry.method,
             feature: entry.feature, group: 'internal',
-            data: { claims: [...normalizeArrayData(previous.claims), claim].slice(-50) },
+            data: { claims: [...previousClaims, claim].slice(-50) },
             updatedAt: entry.updatedAt };
           changed = true;
           continue;
@@ -4357,6 +4358,18 @@
         };
         changed = true;
       }
+    }
+
+    // 3. Prune / normalize questClaimStatus (heal object-shaped claims)
+    if (next.questClaimStatus?.data?.claims && !Array.isArray(next.questClaimStatus.data.claims)) {
+      next.questClaimStatus = {
+        ...next.questClaimStatus,
+        data: {
+          ...next.questClaimStatus.data,
+          claims: normalizeArrayData(next.questClaimStatus.data.claims)
+        }
+      };
+      changed = true;
     }
 
     return { cache: next, changed };
