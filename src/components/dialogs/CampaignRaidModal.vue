@@ -106,15 +106,41 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+const socketRefreshMode = ref<'direct' | 'piggyback'>('direct');
+
+async function ensureRpcEnabled() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    try {
+      const stored = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode']);
+      const updates: Record<string, any> = {};
+      if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
+      if (!stored.socketRefreshMode) updates.socketRefreshMode = 'direct';
+      if (Object.keys(updates).length > 0) {
+        await chrome.storage.local.set(updates);
+      }
+      socketRefreshMode.value = (stored.socketRefreshMode as any) || 'direct';
+    } catch (_) {}
+  }
+}
+
+async function switchToDirectMode() {
+  socketRefreshMode.value = 'direct';
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    await chrome.storage.local.set({ socketRefreshMode: 'direct', popupRpcEnabled: true });
+  }
+}
+
 watch(
   () => props.modelValue,
   (open) => {
     if (open) {
       document.addEventListener('keydown', handleKeydown);
+      ensureRpcEnabled();
     } else {
       document.removeEventListener('keydown', handleKeydown);
     }
-  }
+  },
+  { immediate: true }
 );
 
 onUnmounted(() => {
@@ -230,44 +256,52 @@ function mergeDropsToInventory(drops: any) {
 }
 
 async function executeRaidCall(times: number): Promise<{ ok: boolean; drops?: any; error?: string }> {
-  // If extension runtime is available, try background 'campaign-raid'
-  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    const res: any = await new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        { kind: 'campaign-raid', missionId: Number(missionId.value), times: Number(times) },
-        (resp) => {
-          if (chrome.runtime?.lastError) {
-            resolve({ ok: false, error: chrome.runtime.lastError.message });
-          } else {
-            resolve(resp || { ok: true });
-          }
-        }
-      );
-    });
-    if (res?.ok) {
-      const drops = res.drops || cache.value?.lastCampaignRaidResult?.data?.drops;
-      mergeDropsToInventory(drops);
-      return { ok: true, drops };
-    }
-    if (res?.error) {
-      return { ok: false, error: res.error };
-    }
-  }
+  await ensureRpcEnabled();
 
-  // Direct RPC fallback with standard game argument { id, times }
+  // Primary: Direct RPC with game parity calls
   try {
     const resp: any = await dispatchRpc([
       {
         name: 'missionRaid',
         args: { id: Number(missionId.value), times: Number(times) },
-        feature: 'campaign',
       },
+      { name: 'playable_getAvailable' },
+      { name: 'worldStars_getAvailable' },
       { name: 'inventoryGet' },
     ]);
+    if (resp && resp.ok === false) {
+      return { ok: false, error: resp.error || 'Raid RPC rejected' };
+    }
+    if (resp?.queued) {
+      loopStatusMsg.value = 'Notice: RPC queued in piggyback mode. Switch to Direct mode for instant execution.';
+    }
     const drops = resp?.data?.drops || cache.value?.lastCampaignRaidResult?.data?.drops;
     mergeDropsToInventory(drops);
     return { ok: true, drops };
   } catch (err: any) {
+    // Secondary fallback via background message
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      const res: any = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { kind: 'campaign-raid', missionId: Number(missionId.value), times: Number(times) },
+          (resp) => {
+            if (chrome.runtime?.lastError) {
+              resolve({ ok: false, error: chrome.runtime.lastError.message });
+            } else {
+              resolve(resp || { ok: true });
+            }
+          }
+        );
+      });
+      if (res?.ok) {
+        const drops = res.drops || cache.value?.lastCampaignRaidResult?.data?.drops;
+        mergeDropsToInventory(drops);
+        return { ok: true, drops };
+      }
+      if (res?.error) {
+        return { ok: false, error: res.error };
+      }
+    }
     return { ok: false, error: err?.message || 'Raid RPC failed' };
   }
 }
@@ -454,6 +488,24 @@ const hasDropItems = computed(() => {
               <span class="text-sm font-extrabold">{{ currentEnergy }}</span>
               <span v-if="maxEnergy !== '—'" class="text-amber-500">/ {{ maxEnergy }}</span>
             </div>
+          </div>
+
+          <!-- Dispatch Mode Warning Banner (if piggyback mode active) -->
+          <div
+            v-if="socketRefreshMode === 'piggyback'"
+            class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300"
+          >
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span>⚠️</span>
+              <span class="truncate">Piggyback mode is active. Automatic raid loops require Direct mode for synchronous execution.</span>
+            </div>
+            <button
+              type="button"
+              class="cursor-pointer shrink-0 px-2.5 py-1 rounded bg-amber-200 hover:bg-amber-300 dark:bg-amber-800 dark:hover:bg-amber-700 text-amber-900 dark:text-amber-100 font-bold transition-colors"
+              @click="switchToDirectMode"
+            >
+              Switch to Direct
+            </button>
           </div>
 
           <!-- Recipe Tree Hierarchy Section (if farming a gear) -->

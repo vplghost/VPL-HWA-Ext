@@ -260,8 +260,9 @@
     for (const [group, stages] of [['marches', response.marches],
       ['scoutMarches', response.scoutMarches]]) {
       if (!stages || typeof stages !== 'object') continue;
-      for (const [stage, list] of Object.entries(stages)) {
-        if (!Array.isArray(list)) continue;
+      for (const [stage, rawList] of Object.entries(stages)) {
+        const list = normalizeArrayData(rawList);
+        if (!list.length) continue;
         for (const march of list) {
           if (march?.squadId && seenSquads.has(march.squadId)) continue;
           if (march?.squadId) seenSquads.add(march.squadId);
@@ -414,14 +415,53 @@
             }, updatedAt: record.timestamp }];
         }
         if (key === 'getMarches:march' && result?.response?.marches) {
-          return [{ key: 'marchStatus', method: call.name, feature: call.feature,
-            group: 'header', data: { marches: extractMarches(result.response) },
+          const marches = extractMarches(result.response);
+          const actions = [{ key: 'marchStatus', method: call.name, feature: call.feature,
+            group: 'header', data: { marches },
             updatedAt: record.timestamp }];
+          let marchMapId = null;
+          let marchCenter = null;
+          const marchOutposts = {};
+          for (const stages of Object.values(result.response.marches || {})) {
+            if (!Array.isArray(stages)) continue;
+            for (const m of stages) {
+              if (m?.mapId && !marchMapId) marchMapId = m.mapId;
+              if (m?.route?.from?.coordinates && Number.isFinite(m.route.from.coordinates.x)) {
+                if (!marchCenter) marchCenter = m.route.from.coordinates;
+                if (m.route.leader?.userId) marchOutposts[m.route.leader.userId] = m.route.from.coordinates;
+              }
+              if (m?.target?.coordinates && Number.isFinite(m.target.coordinates.x) && !marchCenter) {
+                marchCenter = m.target.coordinates;
+              }
+            }
+          }
+          if (marchMapId && (marchCenter || Object.keys(marchOutposts).length > 0)) {
+            actions.push({
+              key: 'experimentalMapContext', method: call.name, feature: call.feature,
+              group: 'internal',
+              data: {
+                mapId: marchMapId,
+                ...(marchCenter ? { center: marchCenter } : {}),
+                ...(Object.keys(marchOutposts).length ? { outposts: marchOutposts } : {})
+              },
+              updatedAt: record.timestamp
+            });
+          }
+          return actions;
         }
         if (key === 'getRallyById:rally' && result?.response?.rally?.rallyId) {
           const rally = result.response.rally;
           const targetConfigId = rally.target?.objectConfigId ?? rally.mob?.mobConfigId;
-          return [{ key: 'rallyAction', method: call.name, feature: call.feature,
+          const rallyOutposts = {};
+          if (rally.leader?.userId && rally.leaderCoordinates?.x != null && rally.leaderCoordinates?.y != null) {
+            rallyOutposts[rally.leader.userId] = rally.leaderCoordinates;
+          }
+          for (const member of (Array.isArray(rally.members) ? rally.members : [])) {
+            if (member?.userId && member.route?.from?.coordinates?.x != null && member.route?.from?.coordinates?.y != null) {
+              rallyOutposts[member.userId] = member.route.from.coordinates;
+            }
+          }
+          const actions = [{ key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'details', rallyId: rally.rallyId,
               mapId: rally.mapId, mobId: rally.mob?.mobId || rally.target?.objectId,
               mobConfigId: targetConfigId,
@@ -438,6 +478,19 @@
               returnMs: routeEstimate(rally.target?.coordinates,
                 rally.leaderCoordinates, 'returnToOutpost') },
             updatedAt: record.timestamp }];
+          if (rally.mapId) {
+            actions.push({
+              key: 'experimentalMapContext', method: call.name, feature: call.feature,
+              group: 'internal',
+              data: {
+                mapId: rally.mapId,
+                center: rally.leaderCoordinates || rally.target?.coordinates,
+                ...(Object.keys(rallyOutposts).length ? { outposts: rallyOutposts } : {})
+              },
+              updatedAt: record.timestamp
+            });
+          }
+          return actions;
         }
         if (key === 'getRoutesByIds:globalMap' && Array.isArray(result?.response?.routes)) {
           const actions = [];
@@ -994,6 +1047,20 @@
               updatedAt: record.timestamp
             }];
           }
+          if (call.name === 'heroInsertItem' && Number.isInteger(call.args?.heroId) && Number.isInteger(call.args?.slot) && result && !result.error) {
+            return [{
+              key: 'heroEquipAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                heroId: call.args.heroId,
+                slot: call.args.slot,
+                token: `${call.ident || record.timestamp}:heroEquip:${call.args.heroId}:${call.args.slot}`
+              },
+              updatedAt: record.timestamp
+            }];
+          }
           if (['missionRaid', 'missionStart', 'missionEnd'].includes(call.name)) {
             let delta = 0;
             if (call.name === 'missionRaid') {
@@ -1497,12 +1564,16 @@
         }
         if (call.name === 'getSummary' && ['building', 'personalResearch'].includes(call.feature) &&
             result?.response) {
-          const rawQueues = Array.isArray(result.response.queues) ? result.response.queues : [];
-          const queues = rawQueues.filter((queue) =>
-            Number.isFinite(queue.startDate) && Number.isFinite(queue.durationMs) && queue.durationMs >= 0)
+          const rawQueues = Array.isArray(result.response.queues)
+            ? result.response.queues
+            : (result.response.queues && typeof result.response.queues === 'object' ? Object.values(result.response.queues) : []);
+          const queues = rawQueues.filter((queue) => {
+            const dur = queue.durationMs ?? queue.duration;
+            return Number.isFinite(queue.startDate) && Number.isFinite(dur) && dur >= 0;
+          })
             .map((queue, index) => ({
               startDate: queue.startDate,
-              durationMs: queue.durationMs,
+              durationMs: queue.durationMs ?? queue.duration,
               buildingId: queue.buildingId,
               researchId: queue.researchId,
               level: queue.level ?? queue.nextLevel,
@@ -1864,6 +1935,12 @@
     return matches.length === 1 ? matches[0].index : -1;
   }
 
+  function normalizeArrayData(raw) {
+    if (Array.isArray(raw)) return [...raw];
+    if (raw && typeof raw === 'object') return Object.values(raw);
+    return [];
+  }
+
   function observeSquad(cache, team, source, at) {
     const accountId = cache.accountStatus?.data?.id;
     const heroes = cache.heroGetAll?.data || {};
@@ -1907,7 +1984,7 @@
             needsSync: !reward, at: entry.updatedAt };
           next.questClaimStatus = { key: 'questClaimStatus', method: entry.method,
             feature: entry.feature, group: 'internal',
-            data: { claims: [...(previous.claims || []), claim].slice(-50) },
+            data: { claims: [...normalizeArrayData(previous.claims), claim].slice(-50) },
             updatedAt: entry.updatedAt };
           changed = true;
           continue;
@@ -1919,11 +1996,12 @@
           next.soloMobMap = { key: 'soloMobMap', method: entry.method,
             feature: entry.feature, group: 'internal', data: monsters,
             updatedAt: entry.updatedAt };
-          if (next.marchStatus?.data?.marches?.some((march) =>
+          const existingMarches = normalizeArrayData(next.marchStatus?.data?.marches);
+          if (existingMarches.some((march) =>
               march.kind === 'attack' && !Number.isInteger(march.mobConfigId) &&
               Number.isInteger(monsters[march.mobId]?.mobConfigId))) {
             next.marchStatus = { ...next.marchStatus, data: {
-              marches: next.marchStatus.data.marches.map((march) =>
+              marches: existingMarches.map((march) =>
                 march.kind === 'attack' && !Number.isInteger(march.mobConfigId) &&
                 Number.isInteger(monsters[march.mobId]?.mobConfigId) ?
                   { ...march, mobConfigId: monsters[march.mobId].mobConfigId } : march)
@@ -1935,7 +2013,7 @@
         if (entry.key === 'soloAttackAction') {
           const current = next.marchStatus;
           if (current?.updatedAt > entry.updatedAt) continue;
-          const marches = [...(current?.data?.marches || [])];
+          const marches = normalizeArrayData(current?.data?.marches);
           const target = next.soloMobMap?.data?.[entry.data.mobId];
           const march = { squadId: entry.data.squadId, kind: 'attack',
             stage: 'moveToTargetInSolo', routeId: entry.data.routeId,
@@ -1957,7 +2035,7 @@
         }
         if (entry.key === 'soloAttackReturnAction') {
           const current = next.marchStatus;
-          const marches = [...(current?.data?.marches || [])];
+          const marches = normalizeArrayData(current?.data?.marches);
           const matches = marches.map((march, index) => ({ march, index }))
             .filter(({ march }) => march.kind === 'attack' &&
               march.mobId === entry.data.mobId &&
@@ -1982,7 +2060,7 @@
             data: [...previous, report].sort((a, b) => b.createdAt - a.createdAt).slice(0, 50),
             updatedAt: entry.updatedAt };
           const current = next.marchStatus;
-          const marches = [...(current?.data?.marches || [])];
+          const marches = normalizeArrayData(current?.data?.marches);
           const candidates = marches.map((march, index) => ({ march, index }))
             .filter(({ march }) => march.kind === 'attack' && !march.result &&
               Number.isFinite(march.startedAt) && report.createdAt >= march.startedAt &&
@@ -2018,18 +2096,18 @@
             next.experimentalRallyReturns = { key: 'experimentalRallyReturns', group: 'internal',
               method: entry.method, updatedAt: entry.updatedAt,
               data: [{ squadId: entry.data.squadId, returnedAt: Date.parse(entry.updatedAt) },
-                ...(next.experimentalRallyReturns?.data || []).filter((item) => item.squadId !== entry.data.squadId)].slice(0, 200) };
+                ...normalizeArrayData(next.experimentalRallyReturns?.data).filter((item) => item.squadId !== entry.data.squadId)].slice(0, 200) };
             changed = true;
           }
           if (['create', 'details'].includes(entry.data.action) && entry.data.mobId && entry.data.mapId) {
             next.experimentalRallyTargets = { key: 'experimentalRallyTargets', group: 'internal',
               method: entry.method, updatedAt: entry.updatedAt,
               data: [{ rallyId: entry.data.rallyId, mobId: entry.data.mobId, mapId: entry.data.mapId },
-                ...(next.experimentalRallyTargets?.data || []).filter((item) => item.rallyId !== entry.data.rallyId)].slice(0, 200) };
+                ...normalizeArrayData(next.experimentalRallyTargets?.data).filter((item) => item.rallyId !== entry.data.rallyId)].slice(0, 200) };
           }
           const current = next.marchStatus;
           if (current?.updatedAt > entry.updatedAt && entry.data.action !== 'socketResult') continue;
-          const marches = [...(current?.data?.marches || [])];
+          const marches = normalizeArrayData(current?.data?.marches);
           let index = marches.findIndex((march) => march.rally?.id === entry.data.rallyId);
           if (entry.data.action === 'socketAutojoined') {
             if (index < 0) index = marches.findIndex((march) =>
@@ -2218,7 +2296,7 @@
           if (entry.data.action === 'startGather') changed = observeSquad(next, entry.data.team, entry.method, entry.updatedAt) || changed;
           const current = next.marchStatus;
           if (current?.updatedAt > entry.updatedAt) continue;
-          const marches = [...(current?.data?.marches || [])];
+          const marches = normalizeArrayData(current?.data?.marches);
           const squadId = entry.data.squadId;
           const index = marches.findIndex((m) => m.squadId === squadId);
           if (entry.data.action === 'startGather') {
@@ -2842,6 +2920,85 @@
           }
           continue;
         }
+        if (entry.key === 'heroEquipAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.heroId || entry.data.slot === undefined) continue;
+          const heroId = String(entry.data.heroId);
+          const slotIdx = Number(entry.data.slot);
+          const heroSnap = next.heroGetAll?.data?.[heroId];
+
+          let equippedItemId = null;
+          if (heroSnap) {
+            let nextSlots;
+            if (Array.isArray(heroSnap.slots)) {
+              nextSlots = [...heroSnap.slots];
+              while (nextSlots.length <= slotIdx) nextSlots.push(null);
+              nextSlots[slotIdx] = 0;
+            } else if (heroSnap.slots && typeof heroSnap.slots === 'object') {
+              nextSlots = { ...heroSnap.slots, [slotIdx]: 0, [String(slotIdx)]: 0 };
+            } else {
+              nextSlots = { [slotIdx]: 0, [String(slotIdx)]: 0 };
+            }
+            next.heroGetAll = {
+              ...next.heroGetAll,
+              data: {
+                ...next.heroGetAll.data,
+                [heroId]: {
+                  ...heroSnap,
+                  slots: nextSlots
+                }
+              }
+            };
+
+            const heroColor = String(heroSnap.color || 1);
+            const equipList = globalThis.hwaHelperHeroMetadata?.[heroId]?.equipment?.[heroColor];
+            equippedItemId = equipList ? equipList[slotIdx] : null;
+          }
+
+          if (equippedItemId) {
+            const strItemId = String(equippedItemId);
+            if (next.inventoryGet?.data?.gear) {
+              const curGear = Number(next.inventoryGet.data.gear[strItemId] ?? next.inventoryGet.data.gear[equippedItemId] ?? 0);
+              if (curGear > 0) {
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    gear: {
+                      ...next.inventoryGet.data.gear,
+                      [strItemId]: Math.max(0, curGear - 1)
+                    }
+                  }
+                };
+              }
+            }
+            const resKey = `resource:gear:${strItemId}`;
+            if (next[resKey]?.data) {
+              next[resKey] = {
+                ...next[resKey],
+                data: {
+                  ...next[resKey].data,
+                  amount: Math.max(0, (next[resKey].data.amount ?? 0) - 1)
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+          }
+
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) => history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = {
+            key: 'resourceActionHistory',
+            method: entry.method,
+            feature: null,
+            group: 'internal',
+            data: history,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
         if (entry.key === 'gearCraftAction') {
           const seen = next.resourceActionHistory?.data || {};
           if (seen[entry.data.token] || !entry.data.libId) continue;
@@ -3402,7 +3559,7 @@
             dailyCombatLog = {
               ...previous.dailyCombatLog,
               todayTitanite: entry.data.todayTitanite ?? previous.dailyCombatLog.todayTitanite ?? 0,
-              casualtyBattles: [...(previous.dailyCombatLog.casualtyBattles || [])]
+              casualtyBattles: [...normalizeArrayData(previous.dailyCombatLog.casualtyBattles)]
             };
           }
 
@@ -3458,11 +3615,17 @@
 
         if (entry.key === 'guildChat') {
           const existing = next.guildChat?.data || { messages: [], users: {} };
-          const incomingMessages = entry.data.messages || [];
-          const incomingUsers = entry.data.users || {};
-          const mergedUsers = { ...existing.users, ...incomingUsers };
+          const incomingMessages = Array.isArray(entry.data?.messages)
+            ? entry.data.messages
+            : (entry.data?.messages && typeof entry.data.messages === 'object' ? Object.values(entry.data.messages) : []);
+          const incomingUsers = entry.data?.users && typeof entry.data.users === 'object' ? entry.data.users : {};
+          const existingUsers = existing.users && typeof existing.users === 'object' ? existing.users : {};
+          const mergedUsers = { ...existingUsers, ...incomingUsers };
           const msgMap = new Map();
-          for (const m of existing.messages || []) {
+          const existingMessages = Array.isArray(existing.messages)
+            ? existing.messages
+            : (existing.messages && typeof existing.messages === 'object' ? Object.values(existing.messages) : []);
+          for (const m of existingMessages) {
             if (m?.id) msgMap.set(String(m.id), m);
           }
           for (const m of incomingMessages) {
@@ -3532,8 +3695,8 @@
             floorNumber: previous.floorNumber || 1,
             roomNumber: previous.roomNumber || 0,
             rooms: previous.rooms || {},
-            history: [...(previous.history || [])],
-            tokens: [...(previous.tokens || [])],
+            history: [...normalizeArrayData(previous.history)],
+            tokens: [...normalizeArrayData(previous.tokens)],
             completed: Boolean(previous.completed),
             completion: previous.completion || null,
             team: previous.team || []
@@ -3629,6 +3792,8 @@
         if (entry.key === 'mailStatus') {
           if (next.mailStatus && next.mailStatus.updatedAt === entry.updatedAt) continue;
           const existing = next.mailStatus?.data || {};
+          const existingReports = normalizeArrayData(existing.reports);
+          const existingLetters = normalizeArrayData(existing.letters);
           if (entry.data?.action === 'claimAll') {
             const isReportOnly = entry.feature === 'report';
             const unclaimedReportsCount = 0;
@@ -3642,13 +3807,13 @@
                 unclaimedLettersCount,
                 totalUnclaimed,
                 hasUnclaimed: totalUnclaimed > 0,
-                reports: (existing.reports || []).map((r) => ({ ...r, claimedReward: true })),
-                letters: isReportOnly ? existing.letters : (existing.letters || []).map((l) => ({ ...l, claimed: true }))
+                reports: existingReports.map((r) => ({ ...r, claimedReward: true })),
+                letters: isReportOnly ? existingLetters : existingLetters.map((l) => ({ ...l, claimed: true }))
               }
             };
           } else if (entry.data?.action === 'claimMail') {
-            const claimedIds = new Set((entry.data.letterIds || []).map(String));
-            const updatedLetters = (existing.letters || []).map((l) => {
+            const claimedIds = new Set(normalizeArrayData(entry.data.letterIds).map(String));
+            const updatedLetters = existingLetters.map((l) => {
               if (claimedIds.has(String(l.id)) || claimedIds.has(String(l.letterId))) {
                 return { ...l, claimed: true, rewardReceived: true, rewardClaimed: true };
               }
@@ -3674,7 +3839,7 @@
             };
           } else if (entry.data?.action === 'claimReport') {
             const reportId = String(entry.data.reportId);
-            const updatedReports = (existing.reports || []).map((r) => {
+            const updatedReports = existingReports.map((r) => {
               if (String(r.id) === reportId) {
                 return { ...r, claimedReward: true };
               }
@@ -3696,11 +3861,12 @@
               }
             };
           } else {
-            let reports = existing.reports || [];
+            let reports = existingReports;
             let unclaimedReportsCount = existing.unclaimedReportsCount || 0;
-            if (Array.isArray(entry.data?.reports)) {
+            const incomingReports = normalizeArrayData(entry.data?.reports);
+            if (incomingReports.length > 0 || Array.isArray(entry.data?.reports)) {
               const repMap = new Map(reports.map((r) => [String(r.id), r]));
-              for (const rep of entry.data.reports) {
+              for (const rep of incomingReports) {
                 const prev = repMap.get(String(rep.id));
                 repMap.set(String(rep.id), prev ? { ...prev, ...rep } : rep);
               }
@@ -3710,11 +3876,12 @@
               unclaimedReportsCount = entry.data.unclaimedReportsCount;
             }
 
-            let letters = existing.letters || [];
+            let letters = existingLetters;
             let unclaimedLettersCount = existing.unclaimedLettersCount || 0;
-            if (Array.isArray(entry.data?.letters)) {
+            const incomingLetters = normalizeArrayData(entry.data?.letters);
+            if (incomingLetters.length > 0 || Array.isArray(entry.data?.letters)) {
               const letterMap = new Map(letters.map((l) => [String(l.id || l.letterId), l]));
-              for (const l of entry.data.letters) {
+              for (const l of incomingLetters) {
                 const lId = String(l.id || l.letterId);
                 const prev = letterMap.get(lId);
                 letterMap.set(lId, prev ? { ...prev, ...l } : l);
@@ -3790,7 +3957,7 @@
           const { unitId, count, startDate, duration } = entry.data;
           const trainKey = next['getTrainings:unit'] ? 'getTrainings:unit' : 'getTrainings';
           const prevData = next[trainKey]?.data || { trainingQueues: [], upgradeQueues: [] };
-          const queues = [...(prevData.trainingQueues || [])];
+          const queues = [...normalizeArrayData(prevData.trainingQueues)];
           const idx = queues.findIndex((q) => Number(q.unitId) === unitId);
           const queueItem = { unitId, unitCount: count, startDate, duration };
           if (idx >= 0) {
@@ -3931,8 +4098,9 @@
           }
         }
         if (entry.key === 'marchStatus') {
-          const previous = next.marchStatus?.data?.marches || [];
-          entry.data.marches = entry.data.marches.map((march) => {
+          const previous = normalizeArrayData(next.marchStatus?.data?.marches);
+          const incoming = normalizeArrayData(entry.data?.marches);
+          entry.data.marches = incoming.map((march) => {
             const prior = previous.find((item) => item.squadId &&
               item.squadId === march.squadId);
             if (!prior) return march;
@@ -3974,8 +4142,10 @@
         if (entry.key === 'buildingStatus' && entry.data.action &&
             next[entry.key]?.updatedAt === entry.updatedAt) continue;
         if (entry.key === 'buildingStatus' && entry.data.action) {
-          const queues = [...(next.buildingStatus?.data?.queues || [])];
-          let buildings = [...(next.buildingStatus?.data?.buildings || [])];
+          const rawQ = next.buildingStatus?.data?.queues;
+          const queues = Array.isArray(rawQ) ? [...rawQ] : (rawQ && typeof rawQ === 'object' ? Object.values(rawQ) : []);
+          const rawB = next.buildingStatus?.data?.buildings;
+          let buildings = Array.isArray(rawB) ? [...rawB] : (rawB && typeof rawB === 'object' ? Object.values(rawB) : []);
           if (entry.data.action === 'start') {
             const queue = entry.data.queue;
             const index = queues.findIndex((item) =>
@@ -4004,8 +4174,10 @@
         if (entry.key === 'researchStatus' && entry.data.action &&
             next[entry.key]?.updatedAt === entry.updatedAt) continue;
         if (entry.key === 'researchStatus' && entry.data.action) {
-          const queues = [...(next.researchStatus?.data?.queues || [])];
-          let completedResearches = [...(next.researchStatus?.data?.completedResearches || [])];
+          const rawQ = next.researchStatus?.data?.queues;
+          const queues = Array.isArray(rawQ) ? [...rawQ] : (rawQ && typeof rawQ === 'object' ? Object.values(rawQ) : []);
+          const rawR = next.researchStatus?.data?.completedResearches;
+          let completedResearches = Array.isArray(rawR) ? [...rawR] : (rawR && typeof rawR === 'object' ? Object.values(rawR) : []);
           if (entry.data.action === 'start') {
             const queue = entry.data.queue;
             const index = queues.findIndex((item) =>
@@ -4078,11 +4250,15 @@
       const existing = next.guildChat.data;
       const refTimeMs = Date.parse(next.guildChat.updatedAt) || now;
       const cutoffSec = Math.floor(refTimeMs / 1000) - (3 * 86400);
-      const msgs = (existing.messages || []).filter((m) => {
-        const ctime = Number(m.ctime || 0);
+      const rawMsgs = Array.isArray(existing.messages)
+        ? existing.messages
+        : (existing.messages && typeof existing.messages === 'object' ? Object.values(existing.messages) : []);
+      const msgs = rawMsgs.filter((m) => {
+        const ctime = Number(m?.ctime || 0);
         return !ctime || ctime >= cutoffSec;
       });
-      if (msgs.length !== existing.messages?.length) {
+      const originalCount = Array.isArray(existing.messages) ? existing.messages.length : (existing.messages ? Object.keys(existing.messages).length : 0);
+      if (msgs.length !== originalCount || !Array.isArray(existing.messages)) {
         const activeUids = new Set(msgs.map((m) => String(m.userId)));
         const users = Object.fromEntries(
           Object.entries(existing.users || {}).filter(([uid]) => activeUids.has(String(uid)))
@@ -4092,7 +4268,7 @@
           data: {
             ...existing,
             messages: msgs,
-            users: Object.keys(users).length > 0 ? users : existing.users
+            users: Object.keys(users).length > 0 ? users : (existing.users || {})
           }
         };
         changed = true;
@@ -4101,10 +4277,13 @@
 
     // 2. Prune specialQuestStatus (drop events expired > 30 minutes relative to last update)
     if (next.specialQuestStatus?.data?.events) {
-      const events = next.specialQuestStatus.data.events;
+      const rawEvents = Array.isArray(next.specialQuestStatus.data.events)
+        ? next.specialQuestStatus.data.events
+        : (next.specialQuestStatus.data.events && typeof next.specialQuestStatus.data.events === 'object' ? Object.values(next.specialQuestStatus.data.events) : []);
       const refTimeMs = Date.parse(next.specialQuestStatus.updatedAt) || now;
-      const validEvents = events.filter((ev) => !Number.isFinite(ev.end) || ev.end >= refTimeMs - 1800000);
-      if (validEvents.length !== events.length) {
+      const validEvents = rawEvents.filter((ev) => !Number.isFinite(ev?.end) || ev.end >= refTimeMs - 1800000);
+      const originalCount = Array.isArray(next.specialQuestStatus.data.events) ? next.specialQuestStatus.data.events.length : Object.keys(next.specialQuestStatus.data.events).length;
+      if (validEvents.length !== originalCount || !Array.isArray(next.specialQuestStatus.data.events)) {
         next.specialQuestStatus = {
           ...next.specialQuestStatus,
           data: {

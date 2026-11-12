@@ -1,11 +1,12 @@
 ---
 id: VHE-NT1AZC
 title: Manage custom raid and farm teams and select available lowest-power heroes
-status: in-review
+status: done
 priority: medium
 labels: []
 createdAt: '2026-11-07T02:08:16.487Z'
-updatedAt: '2026-11-07T02:10:51.617Z'
+updatedAt: '2026-11-12T03:11:58.683Z'
+completedAt: '2026-11-12T03:11:58.683Z'
 timeSpent: 120
 ---
 # Manage custom raid and farm teams and select available lowest-power heroes
@@ -21,7 +22,7 @@ Add local custom team CRUD separate from synced game teams; prioritize custom te
 - [x] #1 Custom teams can be created, edited and deleted independently of game synced teams.
 - [x] #2 Raid and farm dropdowns show custom teams first.
 - [x] #3 Lowest-power lineup selects only available heroes and refreshes at selection/dispatch.
-- [ ] #4 Regression tests and build pass.
+- [x] #4 Regression tests and build pass.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -34,5 +35,7 @@ Add local custom team CRUD separate from synced game teams; prioritize custom te
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented account-local custom team CRUD in Teams, custom-first raid/farm dropdowns, deployment-aware weakest-five resolution on selection, gathering dispatch and raid roster refresh. Verification: 53 targeted tests pass; all available suites excluding quest-data.test.mjs pass (306 pass, 10 optional trace skips); build 0.9.95 passes. Full npm run check blocked only by pre-existing missing temp/tracking-data/hwa-game-record-202611062259_start.json used by quest-data.test.mjs. AC4 remains unchecked because full suite cannot pass without private fixture. System Decision Impact: candidate @decision/20261107-0910-custom-raid-and-farm-teams-are-local-per-account-and-precede-synced-teams (added) — account-local storage and selector availability behavior.
+
+All 504 tests pass and npm run check verifies clean build.
 <!-- SECTION:NOTES:END -->
 

@@ -23,6 +23,7 @@ import {
 } from '@/src/utils/marchTooltip';
 import { normalizeArray } from '@/src/utils/troops';
 import { getBuildingName, getResearchName } from '@/src/utils/metadata';
+import { formatDuration } from '@/src/utils/formatters';
 import { useGameConnection } from '@/src/composables/useGameConnection';
 import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 
@@ -63,6 +64,16 @@ onMounted(async () => {
   timer = window.setInterval(() => {
     now.value = Date.now();
   }, 1000);
+
+  // Initial trigger to ensure building & research summaries and marches are in cache
+  if (dispatchRpc) {
+    dispatchRpc([
+      { name: 'clan_getSummary' },
+      { name: 'getSummary', feature: 'building' },
+      { name: 'getSummary', feature: 'personalResearch' },
+      { name: 'getMarches' },
+    ]).catch(() => {});
+  }
 
   // Check if opened as standalone tab
   if (typeof window !== 'undefined') {
@@ -182,47 +193,85 @@ const hasActiveMonsterMarch = computed(() => {
 });
 
 // Building remaining time & tooltip
+function getQueueEndMs(q: any): number | null {
+  if (!q) return null;
+  if (Number.isFinite(q.finishTime)) {
+    return q.finishTime < 1e11 ? q.finishTime * 1000 : q.finishTime;
+  }
+  const durMs = Number.isFinite(q.durationMs)
+    ? q.durationMs
+    : Number.isFinite(q.duration)
+    ? (q.duration < 1e7 ? q.duration * 1000 : q.duration)
+    : 0;
+  const startMs = Number.isFinite(q.startDate)
+    ? (q.startDate < 1e11 ? q.startDate * 1000 : q.startDate)
+    : Number.isFinite(q.startTime)
+    ? (q.startTime < 1e11 ? q.startTime * 1000 : q.startTime)
+    : null;
+  if (startMs !== null && durMs > 0) {
+    return startMs + durMs;
+  }
+  return null;
+}
+
 const buildingQueues = computed(() => {
-  const q = cache.value.buildingStatus?.data?.queues;
-  return Array.isArray(q) ? q : [];
+  const status = cache.value.buildingStatus?.data || cache.value.building_getQueue?.data;
+  if (!status) return [];
+  return normalizeArray(Array.isArray(status) ? status : (status.queues || status.queue));
 });
 
 const researchQueues = computed(() => {
-  const q = cache.value.researchStatus?.data?.queues;
-  return Array.isArray(q) ? q : [];
+  const status = cache.value.researchStatus?.data || cache.value.research_getQueue?.data;
+  if (!status) return [];
+  return normalizeArray(Array.isArray(status) ? status : (status.queues || status.queue));
 });
 
 const buildingRemaining = computed(() => {
   const queues = buildingQueues.value;
   if (!queues.length) return '—';
   const ends = queues
-    .map((q: any) => q.startDate + q.durationMs)
-    .filter((end: number) => Number.isFinite(end) && end > now.value);
-  if (!ends.length) return 'Ready';
-  const minutes = Math.ceil((Math.min(...ends) - now.value) / 60000);
-  return hoursMinutes(minutes);
+    .map(getQueueEndMs)
+    .filter((end): end is number => Number.isFinite(end) && (end as number) > now.value);
+  if (!ends.length) {
+    const hasFinished = queues.some((q: any) => {
+      const end = getQueueEndMs(q);
+      return end !== null && end <= now.value;
+    });
+    if (hasFinished) return 'Ready';
+    return '—';
+  }
+  const minEnd = Math.min(...ends);
+  const remainingSec = Math.max(0, Math.ceil((minEnd - now.value) / 1000));
+  return formatDuration(remainingSec);
 });
 
 const buildingTooltipText = computed(() => {
   const queues = buildingQueues.value;
   if (!queues.length) return 'Construction: Idle (Click to view Buildings)';
-  const active = queues.filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now.value);
-  const finished = queues.filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs <= now.value);
+  const active = queues.filter((q: any) => {
+    const end = getQueueEndMs(q);
+    return end !== null && end > now.value;
+  });
+  const finished = queues.filter((q: any) => {
+    const end = getQueueEndMs(q);
+    return end !== null && end <= now.value;
+  });
   const lines: string[] = [];
   if (active.length > 0) {
     lines.push('Construction in progress:');
     for (const q of active) {
       const name = getBuildingName(q.buildingId);
-      const level = q.level ? ` (Lv. ${q.level})` : '';
-      const mins = Math.ceil((q.startDate + q.durationMs - now.value) / 60000);
-      lines.push(`• ${name}${level} · ${hoursMinutes(mins)} remaining`);
+      const level = (q.level ?? q.nextLevel) ? ` (Lv. ${q.level ?? q.nextLevel})` : '';
+      const end = getQueueEndMs(q)!;
+      const remainingSec = Math.max(0, Math.ceil((end - now.value) / 1000));
+      lines.push(`• ${name}${level} · ${formatDuration(remainingSec)} remaining`);
     }
   }
   if (finished.length > 0) {
     lines.push(active.length > 0 ? '\nReady to finish:' : 'Ready to finish:');
     for (const q of finished) {
       const name = getBuildingName(q.buildingId);
-      const level = q.level ? ` (Lv. ${q.level})` : '';
+      const level = (q.level ?? q.nextLevel) ? ` (Lv. ${q.level ?? q.nextLevel})` : '';
       lines.push(`• ${name}${level} · Ready!`);
     }
   }
@@ -235,33 +284,48 @@ const researchRemaining = computed(() => {
   const queues = researchQueues.value;
   if (!queues.length) return '—';
   const ends = queues
-    .map((q: any) => q.startDate + q.durationMs)
-    .filter((end: number) => Number.isFinite(end) && end > now.value);
-  if (!ends.length) return 'Ready';
-  const minutes = Math.ceil((Math.min(...ends) - now.value) / 60000);
-  return hoursMinutes(minutes);
+    .map(getQueueEndMs)
+    .filter((end): end is number => Number.isFinite(end) && (end as number) > now.value);
+  if (!ends.length) {
+    const hasFinished = queues.some((q: any) => {
+      const end = getQueueEndMs(q);
+      return end !== null && end <= now.value;
+    });
+    if (hasFinished) return 'Ready';
+    return '—';
+  }
+  const minEnd = Math.min(...ends);
+  const remainingSec = Math.max(0, Math.ceil((minEnd - now.value) / 1000));
+  return formatDuration(remainingSec);
 });
 
 const researchTooltipText = computed(() => {
   const queues = researchQueues.value;
   if (!queues.length) return 'Research: Idle (Click to view Personal Research)';
-  const active = queues.filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now.value);
-  const finished = queues.filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs <= now.value);
+  const active = queues.filter((q: any) => {
+    const end = getQueueEndMs(q);
+    return end !== null && end > now.value;
+  });
+  const finished = queues.filter((q: any) => {
+    const end = getQueueEndMs(q);
+    return end !== null && end <= now.value;
+  });
   const lines: string[] = [];
   if (active.length > 0) {
     lines.push('Research in progress:');
     for (const q of active) {
       const name = getResearchName(q.researchId);
-      const level = q.level ? ` (Lv. ${q.level})` : '';
-      const mins = Math.ceil((q.startDate + q.durationMs - now.value) / 60000);
-      lines.push(`• ${name}${level} · ${hoursMinutes(mins)} remaining`);
+      const level = (q.level ?? q.nextLevel) ? ` (Lv. ${q.level ?? q.nextLevel})` : '';
+      const end = getQueueEndMs(q)!;
+      const remainingSec = Math.max(0, Math.ceil((end - now.value) / 1000));
+      lines.push(`• ${name}${level} · ${formatDuration(remainingSec)} remaining`);
     }
   }
   if (finished.length > 0) {
     lines.push(active.length > 0 ? '\nReady to finish:' : 'Ready to finish:');
     for (const q of finished) {
       const name = getResearchName(q.researchId);
-      const level = q.level ? ` (Lv. ${q.level})` : '';
+      const level = (q.level ?? q.nextLevel) ? ` (Lv. ${q.level ?? q.nextLevel})` : '';
       lines.push(`• ${name}${level} · Ready!`);
     }
   }

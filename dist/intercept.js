@@ -39,7 +39,8 @@
     'userGetInfo', 'inventoryGet', 'heroGetAll', 'titanGetAll', 'teamGetAll',
     'refillableGetAll', 'missionGetAll', 'artifact_getAll', 'titan_artifactGetCounters',
     'skin_getAll', 'rune_getAll', 'arenaGetAll', 'clanWarGetBriefInfo', 'mailGetAll',
-    'searchMob', 'searchMine', 'getTrainings', 'getHealing', 'clan_getSummary', 'getSummary']);
+    'searchMob', 'searchMine', 'getTrainings', 'getHealing', 'clan_getSummary', 'getSummary',
+    'playable_getAvailable', 'worldStars_getAvailable']);
   const helperActionMethods = new Set(['createRally', 'cancelRally', 'joinRally', 'attackMob', 'attackMine', 'stopMineGathering',
     'randomDraft_saveDefence', 'randomDraft_saveAttack',
     'magicTower_enterRoom', 'magicTower_startBattle', 'magicTower_activateBuff',
@@ -47,7 +48,8 @@
     'startConstruction', 'completeConstruction',
     'startResearch', 'completeResearch',
     'startHealing', 'startTraining', 'completeTraining',
-    'missionRaid', 'mission_raid', 'heroUpgradeSkill']);
+    'missionRaid', 'mission_raid', 'heroUpgradeSkill',
+    'heroInsertItem', 'inventoryCraftFragments', 'inventoryCraftRecipe']);
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok, error = null) => window.postMessage({

@@ -312,6 +312,28 @@ const equipmentSlots = computed<EquipmentSlotStatus[]>(() => {
 });
 
 const isCrafting = ref<Record<number, boolean>>({});
+const isEquipping = ref<Record<number, boolean>>({});
+
+async function handleEquip(slot: EquipmentSlotStatus) {
+  if (!activeHero.value || slot.isEquipped) return;
+  const numId = Number(activeHero.value.id);
+  const slotIdx = slot.slotNum - 1;
+  isEquipping.value[slot.slotNum] = true;
+  try {
+    await dispatchRpc([
+      {
+        name: 'heroInsertItem',
+        args: { heroId: numId, slot: slotIdx },
+      },
+      { name: 'inventoryGet' },
+      { name: 'heroGetAll' },
+    ]);
+  } catch (err) {
+    console.error('Failed to equip item:', err);
+  } finally {
+    isEquipping.value[slot.slotNum] = false;
+  }
+}
 
 async function handleCraft(slot: EquipmentSlotStatus) {
   if (!slot.itemId) return;
@@ -819,6 +841,15 @@ const JUSTICE_STAR_SVG_PATH =
                     @click.stop="handleCraft(slot)"
                   >
                     {{ isCrafting[slot.slotNum] ? '...' : 'Craft' }}
+                  </button>
+                  <button
+                    v-else-if="slot.statusKind === 'inventory'"
+                    type="button"
+                    :disabled="isEquipping[slot.slotNum]"
+                    class="px-2 py-0.5 rounded text-3xs font-bold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer shadow-xs shrink-0 disabled:opacity-50"
+                    @click.stop="handleEquip(slot)"
+                  >
+                    {{ isEquipping[slot.slotNum] ? '...' : 'Equip' }}
                   </button>
                 </div>
               </div>

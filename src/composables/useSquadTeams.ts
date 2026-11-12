@@ -42,7 +42,19 @@ export function useSquadTeams(
   const marchData = computed(() => normalizeArray(cache.value.marchStatus?.data?.marches));
 
   const mapContext = computed(() => {
+    const rallyAction = cache.value.rallyAction?.data;
+    const rallyContext = rallyAction?.mapId
+      ? {
+          mapId: rallyAction.mapId,
+          center: rallyAction.leaderCoordinates || rallyAction.center,
+          outposts: rallyAction.leader?.userId && rallyAction.leaderCoordinates
+            ? { [rallyAction.leader.userId]: rallyAction.leaderCoordinates }
+            : {},
+        }
+      : {};
+
     return {
+      ...rallyContext,
       ...(cache.value.experimentalMineSearch?.data || {}),
       ...(cache.value.experimentalRallySearch?.data || {}),
       ...(cache.value.experimentalMapContext?.data || {}),
@@ -52,7 +64,7 @@ export function useSquadTeams(
   const mapCenter = computed(() => {
     const ctx = mapContext.value;
     const accId = accountId.value;
-    return ctx.center || (accId && ctx.outposts ? ctx.outposts[accId] : null);
+    return (accId && ctx.outposts ? ctx.outposts[accId] : null) || ctx.center || null;
   });
 
   async function loadSquadData() {

@@ -131,10 +131,18 @@ const artifactsList = computed(() => {
 const equipmentSlots = computed(() => {
   const slots = props.hero?.slots;
   const result: Array<{ id: number; isEquipped: boolean }> = [];
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 0; i < 6; i++) {
+    let isEquipped = false;
+    if (slots) {
+      if (Array.isArray(slots)) {
+        isEquipped = i < slots.length && slots[i] !== undefined && slots[i] !== null;
+      } else if (typeof slots === 'object') {
+        isEquipped = Object.hasOwn(slots, String(i)) || Object.hasOwn(slots, i);
+      }
+    }
     result.push({
-      id: i,
-      isEquipped: Boolean(slots && slots[i]),
+      id: i + 1,
+      isEquipped,
     });
   }
   return result;

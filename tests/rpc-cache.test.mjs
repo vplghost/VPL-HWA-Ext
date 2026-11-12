@@ -2382,3 +2382,357 @@ test('Arena coin (coin[1]) is distinct from gold and preserved across resource:g
   assert.equal(afterMerge['resource:gold'].data.amount, 6500000, 'resource:gold updated to 6.5M');
   assert.equal(afterMerge.inventoryGet.data.coin['1'], 1420, 'Arena coin remains 1,420 and not overwritten by gold');
 });
+
+test('heroInsertItem equips gear to hero slot in heroGetAll and deducts item from inventory', () => {
+  // Hero 502 (Morrigan), color 8: slot 0 is gear 60
+  const initialCache = {
+    heroGetAll: {
+      key: 'heroGetAll',
+      data: {
+        '502': {
+          id: 502,
+          level: 80,
+          color: 8,
+          slots: { '1': 0 }
+        }
+      },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    inventoryGet: {
+      key: 'inventoryGet',
+      data: {
+        gear: { '60': 1 }
+      },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    },
+    'resource:gear:60': {
+      key: 'resource:gear:60',
+      data: { amount: 1 },
+      updatedAt: '2026-11-01T10:00:00.000Z'
+    }
+  };
+
+  const equipTrace = record([
+    { name: 'heroInsertItem', ident: 'equip60', args: { heroId: 502, slot: 0 } }
+  ], [
+    { ident: 'equip60', result: { response: null } }
+  ], '2026-11-01T10:05:00.000Z');
+
+  const afterMerge = cache.merge(initialCache, [equipTrace]).cache;
+
+  assert.equal(afterMerge.heroGetAll.data['502'].slots['0'], 0, 'hero slot 0 is equipped');
+  assert.equal(afterMerge.heroGetAll.data['502'].slots['1'], 0, 'existing slot 1 remains equipped');
+  assert.equal(afterMerge.inventoryGet.data.gear['60'], 0, 'gear 60 decremented in inventory');
+  assert.equal(afterMerge['resource:gear:60'].data.amount, 0, 'resource:gear:60 decremented to 0');
+});
+
+test('replay hwa-game-record-202611120933_create_and_equip tracks craft and equip sequentially', async () => {
+  let fileContent;
+  try {
+    fileContent = await readFile(new URL('../temp/tracking-data/hwa-game-record-202611120933_create_and_equip.json', import.meta.url), 'utf8');
+  } catch (_) {
+    return;
+  }
+
+  const raw = JSON.parse(fileContent);
+  const timeline = raw.timeline.filter(t => t.kind === 'api' && t.requestBody);
+
+  const initialCache = {
+    heroGetAll: {
+      key: 'heroGetAll',
+      data: {
+        '502': {
+          id: 502,
+          level: 80,
+          color: 8,
+          slots: {}
+        }
+      },
+      updatedAt: '2026-11-12T02:30:00.000Z'
+    },
+    inventoryGet: {
+      key: 'inventoryGet',
+      data: {
+        gear: { '60': 0 },
+        fragmentGear: { '60': 5 },
+        coin: { '1': 100000 }
+      },
+      updatedAt: '2026-11-12T02:30:00.000Z'
+    },
+    'resource:gold': {
+      key: 'resource:gold',
+      data: { amount: 50000 },
+      updatedAt: '2026-11-12T02:30:00.000Z'
+    },
+    'resource:fragmentGear:60': {
+      key: 'resource:fragmentGear:60',
+      data: { amount: 5 },
+      updatedAt: '2026-11-12T02:30:00.000Z'
+    },
+    'resource:gear:60': {
+      key: 'resource:gear:60',
+      data: { amount: 0 },
+      updatedAt: '2026-11-12T02:30:00.000Z'
+    }
+  };
+
+  const afterMerge = cache.merge(initialCache, timeline).cache;
+
+  // After craft (timeline 14) and equip (timeline 29):
+  // 1. Fragments consumed (5 - 5 = 0)
+  assert.equal(afterMerge.inventoryGet.data.fragmentGear['60'], 0, 'fragments deducted after craft');
+  assert.equal(afterMerge['resource:fragmentGear:60'].data.amount, 0, 'resource:fragmentGear:60 is 0');
+
+  // 2. Gold consumed (50000 - 22500 = 27500)
+  assert.equal(afterMerge['resource:gold'].data.amount, 27500, 'gold deducted for crafting gear 60');
+
+  // 3. Gear was crafted (+1) then equipped (-1) -> net 0
+  assert.equal(afterMerge.inventoryGet.data.gear['60'], 0, 'gear count net 0 after equip');
+  assert.equal(afterMerge['resource:gear:60'].data.amount, 0, 'resource:gear:60 net 0 after equip');
+
+  // 4. Hero 502 slot 0 is equipped
+  assert.equal(afterMerge.heroGetAll.data['502'].slots['0'], 0, 'hero 502 slot 0 is marked equipped');
+});
+
+test('getRallyById and getMarches extract mapId and outposts into experimentalMapContext', () => {
+  const rallyRec = record(
+    [{ name: 'getRallyById', feature: 'rally', ident: 'r1', args: { rallyId: 'rally-uuid-1' } }],
+    [{
+      ident: 'r1',
+      result: {
+        response: {
+          rally: {
+            rallyId: 'rally-uuid-1',
+            mapId: 'map-guild-42',
+            leaderCoordinates: { x: 606, y: 376 },
+            target: { objectConfigId: 78, coordinates: { x: 550, y: 350 } },
+            leader: { userId: 1216438103, user: { id: 1216438103, name: 'VplGhost' } },
+            members: [
+              {
+                userId: 999888,
+                route: { from: { coordinates: { x: 610, y: 380 } } }
+              }
+            ]
+          }
+        }
+      }
+    }]
+  );
+
+  const marchesRec = record(
+    [{ name: 'getMarches', feature: 'march', ident: 'm1' }],
+    [{
+      ident: 'm1',
+      result: {
+        response: {
+          marches: {
+            waitingForRallyStart: [],
+            moveToRallyLeader: [
+              {
+                squadId: 'squad-101',
+                mapId: 'map-march-99',
+                route: {
+                  leader: { userId: 777666 },
+                  from: { coordinates: { x: 500, y: 400 } }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }]
+  );
+
+  const mergedRally = cache.merge({}, [rallyRec]).cache;
+  assert.ok(mergedRally.experimentalMapContext, 'experimentalMapContext extracted from getRallyById');
+  assert.equal(mergedRally.experimentalMapContext.data.mapId, 'map-guild-42');
+  assert.equal(mergedRally.experimentalMapContext.data.center.x, 606);
+  assert.equal(mergedRally.experimentalMapContext.data.center.y, 376);
+  assert.equal(mergedRally.experimentalMapContext.data.outposts['1216438103'].x, 606);
+  assert.equal(mergedRally.experimentalMapContext.data.outposts['1216438103'].y, 376);
+  assert.equal(mergedRally.experimentalMapContext.data.outposts['999888'].x, 610);
+  assert.equal(mergedRally.experimentalMapContext.data.outposts['999888'].y, 380);
+
+  const mergedMarches = cache.merge({}, [marchesRec]).cache;
+  assert.ok(mergedMarches.experimentalMapContext, 'experimentalMapContext extracted from getMarches');
+  assert.equal(mergedMarches.experimentalMapContext.data.mapId, 'map-march-99');
+  assert.equal(mergedMarches.experimentalMapContext.data.center.x, 500);
+  assert.equal(mergedMarches.experimentalMapContext.data.center.y, 400);
+  assert.equal(mergedMarches.experimentalMapContext.data.outposts['777666'].x, 500);
+  assert.equal(mergedMarches.experimentalMapContext.data.outposts['777666'].y, 400);
+});
+
+test('getSummary building and research queues handle object format and duration fallback', () => {
+  const buildingSummary = record(
+    [{ name: 'getSummary', feature: 'building', ident: 'b1' }],
+    [{
+      ident: 'b1',
+      result: {
+        response: {
+          queues: {
+            '0': {
+              buildingId: 10,
+              nextLevel: 5,
+              startDate: 1794200000000,
+              duration: 3600000
+            }
+          },
+          buildings: [{ buildingId: 10, level: 4 }]
+        }
+      }
+    }]
+  );
+
+  const merged = cache.merge({}, [buildingSummary]).cache;
+  assert.ok(merged.buildingStatus, 'buildingStatus generated');
+  assert.equal(merged.buildingStatus.data.queues.length, 1);
+  assert.equal(merged.buildingStatus.data.queues[0].buildingId, 10);
+  assert.equal(merged.buildingStatus.data.queues[0].durationMs, 3600000);
+});
+
+test('pruneCache and merge safely handle object-shaped guildChat messages and specialQuestStatus events without TypeError', () => {
+  const initialCache = {
+    guildChat: {
+      key: 'guildChat',
+      updatedAt: '2026-11-12T04:00:00.000Z',
+      data: {
+        messages: {
+          'msg1': { id: 'msg1', userId: 'user1', ctime: 1794450000 },
+          'msg2': { id: 'msg2', userId: 'user2', ctime: 1794450010 }
+        },
+        users: {
+          'user1': { name: 'Player 1' },
+          'user2': { name: 'Player 2' }
+        }
+      }
+    },
+    specialQuestStatus: {
+      key: 'specialQuestStatus',
+      updatedAt: '2026-11-12T04:00:00.000Z',
+      data: {
+        events: {
+          'ev1': { id: 101, end: 1794460000000 }
+        }
+      }
+    }
+  };
+
+  const dummyRec = record(
+    [{ name: 'userGetInfo', ident: 'u1' }],
+    [{ ident: 'u1', result: { response: { id: 12345 } } }]
+  );
+
+  assert.doesNotThrow(() => {
+    const res = cache.merge(initialCache, [dummyRec]);
+    assert.ok(res.cache.guildChat, 'guildChat retained');
+    assert.ok(Array.isArray(res.cache.guildChat.data.messages), 'messages normalized to array');
+    assert.ok(Array.isArray(res.cache.specialQuestStatus.data.events), 'events normalized to array');
+  });
+});
+
+test('merge safely handles object-shaped mailStatus (letters/reports) and marchStatus/rally data without TypeError', () => {
+  const initialCache = {
+    mailStatus: {
+      key: 'mailStatus',
+      updatedAt: '2026-11-12T04:00:00.000Z',
+      data: {
+        reports: {
+          'rep1': { id: 'rep1', type: 'battle', claimedReward: false }
+        },
+        letters: {
+          'let1': { id: 'let1', reward: { gold: 100 }, claimed: false }
+        },
+        unclaimedReportsCount: 1,
+        unclaimedLettersCount: 1,
+        totalUnclaimed: 2,
+        hasUnclaimed: true
+      }
+    },
+    marchStatus: {
+      key: 'marchStatus',
+      updatedAt: '2026-11-12T04:00:00.000Z',
+      data: {
+        marches: {
+          '0': { squadId: 'sq1', kind: 'raid', rally: { id: 'rally-99' } }
+        }
+      }
+    },
+    experimentalRallyReturns: {
+      key: 'experimentalRallyReturns',
+      updatedAt: '2026-11-12T04:00:00.000Z',
+      data: {
+        '0': { squadId: 'sq1', returnedAt: 1794450000000 }
+      }
+    },
+    experimentalRallyTargets: {
+      key: 'experimentalRallyTargets',
+      updatedAt: '2026-11-12T04:00:00.000Z',
+      data: {
+        '0': { rallyId: 'rally-99', mobId: 'mob-1', mapId: 'map-1' }
+      }
+    }
+  };
+
+  const mailRec = record(
+    [{ name: 'getPage', feature: 'report', ident: 'p1', args: { offset: 0, limit: 10 } }],
+    [{
+      ident: 'p1',
+      result: {
+        response: {
+          reports: [
+            { id: 'rep2', type: 'battle', read: false, claimedReward: false, createdAt: 1794451000000 }
+          ]
+        }
+      }
+    }],
+    '2026-11-12T04:01:00.000Z'
+  );
+
+  const rallyRec = record(
+    [{ name: 'getRallyById', feature: 'rally', ident: 'r1', args: { rallyId: 'rally-99' } }],
+    [{
+      ident: 'r1',
+      result: {
+        response: {
+          rally: {
+            rallyId: 'rally-99',
+            mapId: 'map-1',
+            mob: { mobId: 'mob-1', mobConfigId: 78 },
+            leaderCoordinates: { x: 100, y: 200 }
+          }
+        }
+      }
+    }],
+    '2026-11-12T04:02:00.000Z'
+  );
+
+  const marchesRec = record(
+    [{ name: 'getMarches', feature: 'march', ident: 'm1' }],
+    [{
+      ident: 'm1',
+      result: {
+        response: {
+          marches: {
+            waitingForRallyStart: [],
+            moveToRallyLeader: [{ squadId: 'sq1', mapId: 'map-1' }]
+          }
+        }
+      }
+    }],
+    '2026-11-12T04:03:00.000Z'
+  );
+
+  assert.doesNotThrow(() => {
+    const afterMail = cache.merge(initialCache, [mailRec]).cache;
+    assert.ok(afterMail.mailStatus, 'mailStatus merged without throwing');
+    assert.ok(Array.isArray(afterMail.mailStatus.data.reports), 'reports normalized to array');
+    assert.ok(Array.isArray(afterMail.mailStatus.data.letters), 'letters normalized to array');
+
+    const afterRally = cache.merge(afterMail, [rallyRec]).cache;
+    assert.ok(afterRally.marchStatus, 'marchStatus retained without throwing on getRallyById');
+
+    const afterMarches = cache.merge(afterRally, [marchesRec]).cache;
+    assert.ok(afterMarches.marchStatus, 'marchStatus merged without throwing on getMarches');
+    assert.ok(Array.isArray(afterMarches.marchStatus.data.marches), 'marches normalized to array');
+  });
+});

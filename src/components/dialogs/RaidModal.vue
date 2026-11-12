@@ -228,6 +228,29 @@ async function savePreferences() {
   }
 }
 
+const isLocatingMap = ref(false);
+
+async function refreshMapCoordinates() {
+  isLocatingMap.value = true;
+  statusMessage.value = 'Locating coordinates from game...';
+  try {
+    await dispatchRpc([
+      { name: 'getMarches' },
+      { name: 'clan_getSummary' },
+      { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
+    ]);
+    if (mapContext.value?.mapId && mapCenter.value) {
+      statusMessage.value = '✓ World map coordinates located successfully.';
+    } else {
+      statusMessage.value = '⚠️ Coordinates not found in marches. Please open World Map or Guild Rally once in game.';
+    }
+  } catch (err: any) {
+    statusMessage.value = 'Failed to locate coordinates: ' + (err?.message || 'RPC error');
+  } finally {
+    isLocatingMap.value = false;
+  }
+}
+
 async function findBosses() {
   await ensureRpcEnabled();
   const mapId = mapContext.value?.mapId;
@@ -664,6 +687,25 @@ async function stopRaidQueue() {
             </span>
           </label>
         </section>
+
+        <!-- Map Missing Warning & Locate Action -->
+        <div
+          v-if="!mapContext?.mapId || !mapCenter"
+          class="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300"
+        >
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span>⚠️</span>
+            <span class="truncate">World map not captured yet. Open world map in game or locate coordinates.</span>
+          </div>
+          <button
+            type="button"
+            :disabled="isLocatingMap"
+            class="cursor-pointer shrink-0 px-2.5 py-1 rounded bg-amber-200 hover:bg-amber-300 dark:bg-amber-800 dark:hover:bg-amber-700 text-amber-900 dark:text-amber-100 font-bold transition-colors disabled:opacity-50"
+            @click="refreshMapCoordinates"
+          >
+            {{ isLocatingMap ? 'Locating...' : 'Locate on Map' }}
+          </button>
+        </div>
 
         <!-- Status Message Banner -->
         <div v-if="statusMessage" class="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200">

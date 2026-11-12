@@ -323,10 +323,18 @@ test('CampaignRaidModal has Recipe Tree hierarchy, loop controls, auto-stop, max
   assert.match(camp, /latestRaidResult/, 'Must evaluate latestRaidResult from cache and local results');
   assert.match(camp, /mergeDropsToInventory/, 'Must merge raid drops into inventory locally');
 
+  // Direct mode and RPC enablement
+  assert.match(camp, /ensureRpcEnabled/, 'Must ensure RPC is enabled before raid loop');
+  assert.match(camp, /switchToDirectMode/, 'Must provide 1-click switch to Direct mode');
+  assert.match(camp, /playable_getAvailable/, 'Must dispatch playable_getAvailable');
+  assert.match(camp, /worldStars_getAvailable/, 'Must dispatch worldStars_getAvailable');
+
   // Intercept & RPC cache verification
   const intercept = await readFile(join(root, 'extension/intercept.js'), 'utf8');
   assert.match(intercept, /'missionRaid'/, 'intercept.js helperActionMethods must include missionRaid');
   assert.match(intercept, /'mission_raid'/, 'intercept.js helperActionMethods must include mission_raid');
+  assert.match(intercept, /'playable_getAvailable'/, 'intercept.js piggybackMethods must include playable_getAvailable');
+  assert.match(intercept, /'worldStars_getAvailable'/, 'intercept.js piggybackMethods must include worldStars_getAvailable');
 
   const rpcCache = await readFile(join(root, 'extension/rpc-cache.js'), 'utf8');
   assert.match(rpcCache, /entry\.key === 'lastCampaignRaidResult'[\s\S]*?next\.inventoryGet/, 'rpc-cache must synchronize lastCampaignRaidResult drops into next.inventoryGet');
@@ -546,6 +554,7 @@ test('RaidModal and MonsterModal support team selection, lineup previews, troop 
   assert.match(squadComposable, /teamOptions/, 'useSquadTeams must handle teamOptions');
   assert.match(squadComposable, /squadCapacity/, 'useSquadTeams must calculate squad troop capacity');
   assert.match(squadComposable, /allocatedTroops/, 'useSquadTeams must allocate troops across unit types');
+  assert.match(squadComposable, /rallyAction/, 'useSquadTeams must incorporate rallyAction into mapContext');
 
   // Verify RaidModal team selection & troops
   assert.match(raidModal, /useSquadTeams/, 'RaidModal must use useSquadTeams');
@@ -557,6 +566,7 @@ test('RaidModal and MonsterModal support team selection, lineup previews, troop 
   assert.match(raidModal, /troopTypeSummaries/, 'RaidModal must render troop type summary cards');
   assert.match(raidModal, /heroIds,/, 'RaidModal must pass heroIds in raid-queue-start options');
   assert.match(raidModal, /teamId,/, 'RaidModal must pass teamId in raid-queue-start options');
+  assert.match(raidModal, /refreshMapCoordinates/, 'RaidModal must provide refreshMapCoordinates');
 
   // Verify MonsterModal team selection & troops
   assert.match(monsterModal, /useSquadTeams/, 'MonsterModal must use useSquadTeams');
@@ -568,6 +578,7 @@ test('RaidModal and MonsterModal support team selection, lineup previews, troop 
   assert.match(monsterModal, /troopTypeSummaries/, 'MonsterModal must render troop type summary cards');
   assert.match(monsterModal, /heroIds,/, 'MonsterModal must pass heroIds in monster-queue-start options');
   assert.match(monsterModal, /teamId,/, 'MonsterModal must pass teamId in monster-queue-start options');
+  assert.match(monsterModal, /refreshMapCoordinates/, 'MonsterModal must provide refreshMapCoordinates');
 });
 
 test('GatheringModal supports mine levels up to 10, real searchMine, found targets dispatch, and march recall', async () => {
@@ -1123,6 +1134,10 @@ test('ResourceSummary and HeroDetailModal use accurate RPC keys and payload conv
 
   const interceptContent = await readFile(join(root, 'extension/intercept.js'), 'utf8');
   assert.match(interceptContent, /'heroUpgradeSkill'/, 'intercept.js helperActionMethods must include heroUpgradeSkill');
+  assert.match(interceptContent, /'heroInsertItem'/, 'intercept.js helperActionMethods must include heroInsertItem');
+  assert.match(interceptContent, /'inventoryCraftFragments'/, 'intercept.js helperActionMethods must include inventoryCraftFragments');
+  assert.match(heroDetailModalContent, /name:\s*['"]heroInsertItem['"]/, 'HeroDetailModal must dispatch heroInsertItem');
+  assert.match(heroDetailModalContent, /handleEquip/, 'HeroDetailModal must have handleEquip function');
 });
 
 test('RaidModal and MonsterModal update title status with dynamic timer countdown and data-experimental-until', async () => {

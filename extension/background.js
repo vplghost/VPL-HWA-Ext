@@ -1081,7 +1081,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             calls = [
               { name: 'missionRaid', args: { id: missionId, times } },
               { name: 'playable_getAvailable' },
-              { name: 'worldStars_getAvailable' }
+              { name: 'worldStars_getAvailable' },
+              { name: 'inventoryGet' }
             ];
           } else if (message.kind === 'craft-fragment') {
             const libId = Number(message.libId);
