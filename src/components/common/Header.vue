@@ -59,6 +59,8 @@ const isTabOpenButtonVisible = ref(true);
 const raidQueue = ref<any>(null);
 const monsterQueue = ref<any>(null);
 const autoGatherSettings = ref<any>(null);
+const socketRefreshMode = ref<string>('direct');
+const isRpcQueueVisible = computed(() => socketRefreshMode.value !== 'direct');
 
 onMounted(async () => {
   timer = window.setInterval(() => {
@@ -97,11 +99,18 @@ onMounted(async () => {
         'raidQueue',
         'monsterQueue',
         'autoGatherSettings',
+        'socketRefreshMode',
+        'dispatchMode',
       ]);
       if (stored.cachedGameVersion) cachedGameVersion.value = stored.cachedGameVersion;
       if (stored.raidQueue) raidQueue.value = stored.raidQueue;
       if (stored.monsterQueue) monsterQueue.value = stored.monsterQueue;
       if (stored.autoGatherSettings) autoGatherSettings.value = stored.autoGatherSettings;
+      if (stored.socketRefreshMode) {
+        socketRefreshMode.value = stored.socketRefreshMode;
+      } else if (stored.dispatchMode) {
+        socketRefreshMode.value = stored.dispatchMode;
+      }
     } catch (_) {}
 
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -117,6 +126,11 @@ onMounted(async () => {
         }
         if (changes.autoGatherSettings) {
           autoGatherSettings.value = changes.autoGatherSettings.newValue || null;
+        }
+        if (changes.socketRefreshMode) {
+          socketRefreshMode.value = changes.socketRefreshMode.newValue || 'direct';
+        } else if (changes.dispatchMode) {
+          socketRefreshMode.value = changes.dispatchMode.newValue || 'direct';
         }
       }
     });
@@ -529,39 +543,6 @@ function toggleTheme() {
 
       <!-- Right: Status Badges -->
       <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5" aria-label="Current status">
-        <!-- Game Connection Status & Refresh Button -->
-        <BaseTooltip :content="headerConnectionTooltip">
-          <button
-            id="game-connection-badge"
-            type="button"
-            class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-all cursor-pointer shadow-2xs"
-            :class="
-              isHealthy
-                ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                : !hasGameTab
-                ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 ring-1 ring-amber-400'
-                : 'text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 ring-1 ring-sky-400 animate-pulse'
-            "
-            :aria-label="headerConnectionTooltip"
-            :disabled="isRefreshing"
-            @click="handleConnectionClick"
-          >
-            <span
-              class="size-1.5 rounded-full"
-              :class="
-                isHealthy
-                  ? 'bg-emerald-500'
-                  : !hasGameTab
-                  ? 'bg-amber-500'
-                  : 'bg-sky-500 animate-ping'
-              "
-            />
-            <span class="text-[11px] font-semibold">
-              {{ isRefreshing ? 'Refreshing...' : isHealthy ? 'Live' : !hasGameTab ? 'No Game Tab' : 'Refresh Game' }}
-            </span>
-          </button>
-        </BaseTooltip>
-
         <!-- Active Marches & Standing Queues -->
         <div id="marches" class="flex items-center gap-1" aria-label="Active marches and queues">
           <!-- Active March Badges with Full Tooltip -->
@@ -756,7 +737,42 @@ function toggleTheme() {
         >
           Client: {{ cachedGameVersion }}
         </span>
+
+        <!-- Game Connection Status & Refresh Button -->
+        <BaseTooltip :content="headerConnectionTooltip">
+          <button
+            id="game-connection-badge"
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-all cursor-pointer shadow-2xs"
+            :class="
+              isHealthy
+                ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                : !hasGameTab
+                ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 ring-1 ring-amber-400'
+                : 'text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 ring-1 ring-sky-400 animate-pulse'
+            "
+            :aria-label="headerConnectionTooltip"
+            :disabled="isRefreshing"
+            @click="handleConnectionClick"
+          >
+            <span
+              class="size-1.5 rounded-full"
+              :class="
+                isHealthy
+                  ? 'bg-emerald-500'
+                  : !hasGameTab
+                  ? 'bg-amber-500'
+                  : 'bg-sky-500 animate-ping'
+              "
+            />
+            <span class="text-[11px] font-semibold">
+              {{ isRefreshing ? 'Refreshing...' : isHealthy ? 'Live' : !hasGameTab ? 'No Game Tab' : 'Refresh Game' }}
+            </span>
+          </button>
+        </BaseTooltip>
+
         <span
+          v-if="isRpcQueueVisible"
           id="rpc-queue-badge"
           title="RPC calls waiting for the next game request; excludes calls already sent"
           class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:border dark:border-slate-700/60"

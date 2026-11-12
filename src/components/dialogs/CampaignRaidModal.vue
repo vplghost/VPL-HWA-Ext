@@ -32,7 +32,97 @@ const quickMissions = [135, 10, 20, 50, 80, 100, 120, 150];
 const selectedGearId = ref<number | string | null>(null);
 const selectedRecipeNodeId = ref<string | null>(null);
 
+const disabledMissionsToday = ref<Set<number>>(new Set());
+
+function getTodayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+async function loadDisabledMissions() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const stored = await chrome.storage.local.get('campaign_disabled_missions');
+      const val = stored.campaign_disabled_missions;
+      if (val && val.date === getTodayKey() && Array.isArray(val.missionIds)) {
+        disabledMissionsToday.value = new Set(val.missionIds.map(Number));
+      } else {
+        disabledMissionsToday.value = new Set();
+      }
+    } catch (_) {}
+  }
+}
+
+function disableMissionToday(id: number | string) {
+  const numId = Number(id);
+  if (!numId) return;
+  disabledMissionsToday.value.add(numId);
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    chrome.storage.local.set({
+      campaign_disabled_missions: {
+        date: getTodayKey(),
+        missionIds: Array.from(disabledMissionsToday.value),
+      },
+    }).catch(() => {});
+  }
+}
+
+function isHeroic(id: number | string): boolean {
+  const cMissions = (globalThis as any).hwaHelperCampaignMissions;
+  return Boolean(cMissions?.missions?.[String(id)]?.isHeroic);
+}
+
+function getTriesInfo(id: number | string) {
+  const numId = Number(id);
+  const cMissions = (globalThis as any).hwaHelperCampaignMissions;
+  const isHero = isHeroic(numId);
+  if (!isHero) {
+    const disabled = disabledMissionsToday.value.has(numId);
+    return {
+      isHeroic: false,
+      maxTries: Infinity,
+      triesSpent: 0,
+      triesLeft: Infinity,
+      isExhausted: disabled,
+    };
+  }
+  const tries = cMissions?.getMissionTries?.(numId, cache.value?.missionGetAll?.data) || {
+    isHeroic: true,
+    maxTries: 3,
+    triesSpent: 0,
+    triesLeft: 3,
+  };
+  const disabled = disabledMissionsToday.value.has(numId) || tries.triesLeft <= 0;
+  return {
+    ...tries,
+    isExhausted: disabled,
+  };
+}
+
+function isMissionDisabled(id: number | string): boolean {
+  return getTriesInfo(id).isExhausted;
+}
+
+function getTriesBadge(id: number | string): string {
+  const info = getTriesInfo(id);
+  if (!info.isHeroic) return '';
+  if (info.isExhausted) return '0/3 left';
+  return `${info.triesLeft}/${info.maxTries} left`;
+}
+
+function getMissionTooltip(id: number | string): string {
+  const info = getTriesInfo(id);
+  if (!info.isHeroic) {
+    return info.isExhausted ? `Mission #${id} temporarily disabled for today due to error` : `Mission #${id}`;
+  }
+  if (info.isExhausted) {
+    return `Hero Mission #${id} - Daily attempt limit reached (0/${info.maxTries} left today)`;
+  }
+  return `Hero Mission #${id} - ${info.triesLeft}/${info.maxTries} attempts remaining today`;
+}
+
 onMounted(async () => {
+  await loadDisabledMissions();
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
       const stored = await chrome.storage.local.get('campaignRaidSequential');
@@ -53,6 +143,9 @@ function toggleSequential(val: boolean) {
 watch(
   [() => modalContext.selectedCampaignGearId, () => props.modelValue],
   () => {
+    if (props.modelValue) {
+      loadDisabledMissions();
+    }
     if (modalContext.selectedCampaignGearId != null) {
       selectedGearId.value = modalContext.selectedCampaignGearId;
       const tree = buildGearRecipeTree(selectedGearId.value, cache.value);
@@ -64,7 +157,8 @@ watch(
         const candidates = cMissions?.getMissionsForItem?.(selectedRecipeNodeId.value) || [];
         const highest = cMissions?.getHighestRaidableMission?.(
           candidates.map((m: any) => m.id),
-          cache.value?.missionGetAll?.data
+          cache.value?.missionGetAll?.data,
+          { disabledIds: disabledMissionsToday.value }
         );
         if (highest) {
           missionId.value = highest;
@@ -167,7 +261,8 @@ function selectRecipeNode(node: any) {
   const candidates = cMissions?.getMissionsForItem?.(node.id) || [];
   const highest = cMissions?.getHighestRaidableMission?.(
     candidates.map((m: any) => m.id),
-    cache.value?.missionGetAll?.data
+    cache.value?.missionGetAll?.data,
+    { disabledIds: disabledMissionsToday.value }
   );
   if (highest) {
     missionId.value = highest;
@@ -255,8 +350,38 @@ function mergeDropsToInventory(drops: any) {
   });
 }
 
+async function waitForRaidResult(prevUpdatedAt?: string, timeoutMs = 3500): Promise<{ ok: boolean; drops?: any; error?: string }> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const cur = cache.value?.lastCampaignRaidResult;
+    if (cur && cur.updatedAt !== prevUpdatedAt) {
+      if (cur.data?.failed) {
+        return { ok: false, error: cur.data?.error || 'Raid failed' };
+      }
+      return { ok: true, drops: cur.data?.currentDrops || cur.data?.drops };
+    }
+    await new Promise((r) => setTimeout(r, 60));
+  }
+  const cur = cache.value?.lastCampaignRaidResult;
+  if (cur?.data?.failed) {
+    return { ok: false, error: cur.data?.error || 'Raid failed' };
+  }
+  return { ok: true, drops: cur?.data?.currentDrops || cur?.data?.drops };
+}
+
 async function executeRaidCall(times: number): Promise<{ ok: boolean; drops?: any; error?: string }> {
   await ensureRpcEnabled();
+
+  const tries = getTriesInfo(missionId.value);
+  if (tries.isExhausted) {
+    disableMissionToday(missionId.value);
+    return {
+      ok: false,
+      error: `Mission #${missionId.value} daily limit reached (0/${tries.maxTries} left today).`,
+    };
+  }
+
+  const prevUpdatedAt = cache.value?.lastCampaignRaidResult?.updatedAt;
 
   // Primary: Direct RPC with game parity calls
   try {
@@ -267,41 +392,50 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; drops?: an
       },
       { name: 'playable_getAvailable' },
       { name: 'worldStars_getAvailable' },
-      { name: 'inventoryGet' },
     ]);
     if (resp && resp.ok === false) {
+      disableMissionToday(missionId.value);
       return { ok: false, error: resp.error || 'Raid RPC rejected' };
     }
     if (resp?.queued) {
       loopStatusMsg.value = 'Notice: RPC queued in piggyback mode. Switch to Direct mode for instant execution.';
     }
-    const drops = resp?.data?.drops || cache.value?.lastCampaignRaidResult?.data?.drops;
-    mergeDropsToInventory(drops);
-    return { ok: true, drops };
+
+    const raidRes = await waitForRaidResult(prevUpdatedAt);
+    if (!raidRes.ok) {
+      disableMissionToday(missionId.value);
+      return { ok: false, error: raidRes.error || 'Raid rejected by server' };
+    }
+    return { ok: true, drops: raidRes.drops };
   } catch (err: any) {
     // Secondary fallback via background message
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       const res: any = await new Promise((resolve) => {
         chrome.runtime.sendMessage(
           { kind: 'campaign-raid', missionId: Number(missionId.value), times: Number(times) },
-          (resp) => {
+          (r) => {
             if (chrome.runtime?.lastError) {
               resolve({ ok: false, error: chrome.runtime.lastError.message });
             } else {
-              resolve(resp || { ok: true });
+              resolve(r || { ok: true });
             }
           }
         );
       });
       if (res?.ok) {
-        const drops = res.drops || cache.value?.lastCampaignRaidResult?.data?.drops;
-        mergeDropsToInventory(drops);
-        return { ok: true, drops };
+        const raidRes = await waitForRaidResult(prevUpdatedAt);
+        if (!raidRes.ok) {
+          disableMissionToday(missionId.value);
+          return { ok: false, error: raidRes.error };
+        }
+        return { ok: true, drops: raidRes.drops };
       }
       if (res?.error) {
+        disableMissionToday(missionId.value);
         return { ok: false, error: res.error };
       }
     }
+    disableMissionToday(missionId.value);
     return { ok: false, error: err?.message || 'Raid RPC failed' };
   }
 }
@@ -336,6 +470,13 @@ async function executeSequentialLoop(totalTimes: number) {
         break;
       }
 
+      const tries = getTriesInfo(missionId.value);
+      if (tries.isExhausted) {
+        loopStatusMsg.value = `Daily limit reached for Mission #${missionId.value} (${tries.triesSpent}/${tries.maxTries} attempts used). Loop stopped.`;
+        disableMissionToday(missionId.value);
+        break;
+      }
+
       const curEnergy = Number(currentEnergy.value);
       if (Number.isFinite(curEnergy) && curEnergy < missionCost.value) {
         loopStatusMsg.value = `Out of Energy (${curEnergy}/${missionCost.value}) at raid ${completed}/${totalTimes}`;
@@ -346,7 +487,8 @@ async function executeSequentialLoop(totalTimes: number) {
 
       const res = await executeRaidCall(1);
       if (!res.ok) {
-        loopStatusMsg.value = res.error || `Error at raid ${i}`;
+        loopStatusMsg.value = `❌ Raid stopped at ${i}/${totalTimes}: ${res.error}`;
+        disableMissionToday(missionId.value);
         break;
       }
 
@@ -362,7 +504,6 @@ async function executeSequentialLoop(totalTimes: number) {
       }
 
       // Check auto-stop condition for target item:
-      // If was not initially fulfilled, and is now fulfilled, stop automatically!
       if (targetId && !wasInitiallyFulfilled && selectedGearId.value) {
         const freshTree = buildGearRecipeTree(selectedGearId.value, cache.value);
         const freshNode = findNodeInTree(freshTree, targetId);
@@ -379,23 +520,38 @@ async function executeSequentialLoop(totalTimes: number) {
   } finally {
     isRaidRunning.value = false;
     abortCampaignRaidLoop.value = false;
+    dispatchRpc([{ name: 'inventoryGet' }]).catch(() => {});
   }
 }
 
 async function startRaid(times: number) {
   loopStatusMsg.value = '';
 
-  if (campaignRaidSequential.value && times > 1) {
-    await executeSequentialLoop(times);
+  const tries = getTriesInfo(missionId.value);
+  if (tries.isExhausted) {
+    loopStatusMsg.value = `Mission #${missionId.value} daily limit reached (${tries.triesSpent}/${tries.maxTries} attempts used).`;
+    disableMissionToday(missionId.value);
+    return;
+  }
+
+  const effectiveTimes = tries.isHeroic ? Math.min(times, tries.triesLeft) : times;
+  if (effectiveTimes <= 0) {
+    loopStatusMsg.value = `No attempts remaining today for Mission #${missionId.value}.`;
+    disableMissionToday(missionId.value);
+    return;
+  }
+
+  if (campaignRaidSequential.value && effectiveTimes > 1) {
+    await executeSequentialLoop(effectiveTimes);
   } else {
     isRaidRunning.value = true;
     try {
-      const res = await executeRaidCall(times);
+      const res = await executeRaidCall(effectiveTimes);
       if (res.ok) {
         if (res.drops) {
           localRaidResult.value = {
             missionId: missionId.value,
-            times,
+            times: effectiveTimes,
             drops: res.drops,
           };
         }
@@ -404,19 +560,51 @@ async function startRaid(times: number) {
         if (errLower.includes('vip') || errLower.includes('notenough')) {
           loopStatusMsg.value = 'VIP limit detected, switching to sequential loop...';
           toggleSequential(true);
-          await executeSequentialLoop(times);
+          await executeSequentialLoop(effectiveTimes);
           return;
         }
         loopStatusMsg.value = res.error || 'Raid failed';
+        disableMissionToday(missionId.value);
       }
     } finally {
       isRaidRunning.value = false;
+      dispatchRpc([{ name: 'inventoryGet' }]).catch(() => {});
     }
   }
 }
 
 const latestRaidResult = computed(() => {
   return localRaidResult.value || cache.value?.lastCampaignRaidResult?.data || null;
+});
+
+const targetItemProgress = computed(() => {
+  const targetId = selectedRecipeNodeId.value || selectedGearId.value;
+  if (!targetId || !recipeTree.value) return null;
+  const node = findNodeInTree(recipeTree.value, targetId);
+  if (!node) return null;
+  const isFrag = Boolean(node.fragment);
+  const owned = isFrag ? Number(node.fragment.owned) : Number(node.owned);
+  const required = isFrag ? Number(node.fragment.required) : Number(node.requiredCount || 1);
+  return {
+    id: String(targetId),
+    name: node.name,
+    isFragment: isFrag,
+    owned,
+    required,
+    isFulfilled: owned >= required,
+  };
+});
+
+const sessionFarmedCount = computed(() => {
+  const d = latestRaidResult.value?.drops;
+  const targetId = selectedRecipeNodeId.value || selectedGearId.value;
+  if (!d || !targetId) return 0;
+  const strId = String(targetId);
+  const fg = Number(d.fragmentGear?.[strId] || 0);
+  const fs = Number(d.fragmentScroll?.[strId] || 0);
+  const g = Number(d.gear?.[strId] || 0);
+  const s = Number(d.scroll?.[strId] || 0);
+  return fg + fs + g + s;
 });
 
 const hasDropItems = computed(() => {
@@ -642,15 +830,27 @@ const hasDropItems = computed(() => {
                   v-for="m in candidateMissions"
                   :key="m.id"
                   type="button"
-                  class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-all"
-                  :class="
-                    missionId === m.id
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 hover:border-indigo-400'
-                  "
-                  @click="missionId = m.id"
+                  :disabled="isMissionDisabled(m.id)"
+                  class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-all inline-flex items-center gap-1.5"
+                  :class="[
+                    isMissionDisabled(m.id)
+                      ? 'opacity-50 cursor-not-allowed bg-slate-100 text-slate-400 border-dashed border-slate-300 dark:bg-slate-800/40 dark:border-slate-700 line-through'
+                      : missionId === m.id
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 hover:border-indigo-400'
+                  ]"
+                  :title="getMissionTooltip(m.id)"
+                  @click="!isMissionDisabled(m.id) && (missionId = m.id)"
                 >
-                  Mission #{{ m.id }} (Ch.{{ m.chapter }}-{{ m.index }})
+                  <span v-if="m.isHeroic" title="Hero Mission (Daily Limit)">🦸</span>
+                  <span>Mission #{{ m.id }} (Ch.{{ m.chapter }}-{{ m.index }})</span>
+                  <span
+                    v-if="m.isHeroic"
+                    class="text-3xs px-1 py-0.5 rounded font-bold"
+                    :class="missionId === m.id ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'"
+                  >
+                    {{ getTriesBadge(m.id) }}
+                  </span>
                 </button>
               </div>
             </div>
@@ -661,16 +861,64 @@ const hasDropItems = computed(() => {
                 v-for="qId in quickMissions"
                 :key="qId"
                 type="button"
-                class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-all"
-                :class="
-                  missionId === qId
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 hover:border-indigo-400'
-                "
-                @click="missionId = qId"
+                :disabled="isMissionDisabled(qId)"
+                class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-all inline-flex items-center gap-1.5"
+                :class="[
+                  isMissionDisabled(qId)
+                    ? 'opacity-50 cursor-not-allowed bg-slate-100 text-slate-400 border-dashed border-slate-300 dark:bg-slate-800/40 dark:border-slate-700 line-through'
+                    : missionId === qId
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 hover:border-indigo-400'
+                ]"
+                :title="getMissionTooltip(qId)"
+                @click="!isMissionDisabled(qId) && (missionId = qId)"
               >
-                Mission #{{ qId }}
+                <span v-if="isHeroic(qId)" title="Hero Mission (Daily Limit)">🦸</span>
+                <span>Mission #{{ qId }}</span>
+                <span
+                  v-if="isHeroic(qId)"
+                  class="text-3xs px-1 py-0.5 rounded font-bold"
+                  :class="missionId === qId ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'"
+                >
+                  {{ getTriesBadge(qId) }}
+                </span>
               </button>
+            </div>
+
+            <!-- Warning if Selected Mission is Exhausted or Disabled -->
+            <div
+              v-if="isMissionDisabled(missionId)"
+              class="rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 p-2.5 text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-2"
+            >
+              <span>⛔</span>
+              <span>
+                Mission #{{ missionId }} has reached its daily attempt limit (0/{{ getTriesInfo(missionId).maxTries }} left today) or was disabled due to an error. Please select another mission above.
+              </span>
+            </div>
+
+            <!-- Target Progress & Farmed Count Indicator -->
+            <div
+              v-if="targetItemProgress"
+              class="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-2xs flex-wrap"
+            >
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-slate-600 dark:text-slate-400">Target Item:</span>
+                <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ targetItemProgress.name }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="px-1.5 py-0.5 rounded font-bold"
+                  :class="targetItemProgress.isFulfilled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'"
+                >
+                  Total Owned: {{ targetItemProgress.owned }}/{{ targetItemProgress.required }}
+                </span>
+                <span
+                  v-if="sessionFarmedCount > 0"
+                  class="px-1.5 py-0.5 rounded bg-emerald-500 text-white font-extrabold shadow-2xs"
+                >
+                  +{{ sessionFarmedCount }} Farmed
+                </span>
+              </div>
             </div>
 
             <!-- Sequential Loop Option -->
@@ -714,8 +962,9 @@ const hasDropItems = computed(() => {
                 <button
                   id="campaign-raid-1"
                   type="button"
-                  :disabled="isRaidRunning"
-                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
+                  :disabled="isRaidRunning || isMissionDisabled(missionId)"
+                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  :title="isMissionDisabled(missionId) ? 'Mission daily limit reached' : 'Raid 1x'"
                   @click="startRaid(1)"
                 >
                   ⚔️ Raid 1x
@@ -723,8 +972,9 @@ const hasDropItems = computed(() => {
                 <button
                   id="campaign-raid-10"
                   type="button"
-                  :disabled="isRaidRunning"
-                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
+                  :disabled="isRaidRunning || isMissionDisabled(missionId)"
+                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  :title="isMissionDisabled(missionId) ? 'Mission daily limit reached' : 'Raid 10x'"
                   @click="startRaid(10)"
                 >
                   ⚔️ Raid 10x
@@ -732,9 +982,9 @@ const hasDropItems = computed(() => {
                 <button
                   id="campaign-raid-max"
                   type="button"
-                  :disabled="isRaidRunning || maxPossibleTimes < 1"
-                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
-                  :title="`Raid maximum possible times (${maxPossibleTimes}x) based on energy`"
+                  :disabled="isRaidRunning || maxPossibleTimes < 1 || isMissionDisabled(missionId)"
+                  class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  :title="isMissionDisabled(missionId) ? 'Mission daily limit reached' : `Raid maximum possible times (${maxPossibleTimes}x) based on energy`"
                   @click="startRaid(maxPossibleTimes)"
                 >
                   ⚔️ Max ({{ maxPossibleTimes }}x)
@@ -753,8 +1003,12 @@ const hasDropItems = computed(() => {
               <span class="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
                 <span>🎉</span> Raid Results: Mission #{{ latestRaidResult.missionId }} ({{ latestRaidResult.times }} {{ latestRaidResult.times > 1 ? 'raids' : 'raid' }})
               </span>
-              <span class="text-2xs font-semibold text-emerald-700 dark:text-emerald-300">
-                💰 +{{ formatNumber(latestRaidResult.drops?.gold || 0) }} Gold • 🧪 +{{ latestRaidResult.drops?.experience || 0 }} EXP
+              <span class="text-2xs font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-2 flex-wrap">
+                <span v-if="sessionFarmedCount > 0" class="font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded">
+                  +{{ sessionFarmedCount }} Target {{ targetItemProgress?.isFragment ? 'Fragments' : 'Items' }}
+                </span>
+                <span>💰 +{{ formatNumber(latestRaidResult.drops?.gold || 0) }} Gold</span>
+                <span>🧪 +{{ latestRaidResult.drops?.experience || 0 }} EXP</span>
               </span>
             </div>
 

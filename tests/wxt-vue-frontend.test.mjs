@@ -1195,6 +1195,9 @@ test('Game connection monitoring, warning banner, and browser refresh button ope
   assert.match(header, /id="game-connection-badge"/, 'Header must feature #game-connection-badge');
   assert.match(header, /headerConnectionTooltip/, 'Header must provide dynamic connection tooltip');
   assert.match(header, /handleConnectionClick/, 'Header must support click to reload or check game tab');
+  assert.match(header, /socketRefreshMode/, 'Header must observe socketRefreshMode for RPC queue visibility');
+  assert.match(header, /isRpcQueueVisible/, 'Header must compute isRpcQueueVisible when queue is active');
+  assert.match(header, /v-if="isRpcQueueVisible"[\s\S]*?id="rpc-queue-badge"/, 'Header must conditionally hide #rpc-queue-badge');
 
   const connectionComposable = await readFile(join(root, 'src/composables/useGameConnection.ts'), 'utf8');
   assert.match(connectionComposable, /get-game-tab-status/, 'Must query get-game-tab-status');

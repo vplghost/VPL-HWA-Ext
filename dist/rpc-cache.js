@@ -383,7 +383,7 @@
       const request = JSON.parse(record.requestBody);
       const response = JSON.parse(record.responseBody);
       if (!Array.isArray(request.calls) || !Array.isArray(response.results)) return [];
-      const results = new Map(response.results.map((result) => [result.ident, result.result]));
+      const results = new Map(response.results.map((result) => [result.ident, result.result || result]));
       const actions = request.calls.flatMap((call) => {
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
@@ -679,6 +679,23 @@
               reportId: `rpc:${call.ident}`, createdAt: Date.parse(record.timestamp),
               result: 'request_failed', mobId: call.args?.mobId
             }, updatedAt: record.timestamp }];
+        }
+        if (call.name === 'missionRaid' && (result?.error || result?.response?.error)) {
+          const err = result?.error || result?.response?.error;
+          const errMsg = typeof err === 'string' ? err : (err?.message || err?.name || 'Raid failed');
+          return [{
+            key: 'lastCampaignRaidResult',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: {
+              missionId: call.args?.id,
+              times: Number(call.args?.times) || 1,
+              error: errMsg,
+              failed: true
+            },
+            updatedAt: record.timestamp
+          }];
         }
         if (key === 'attackMine:mine' && result?.response?.squadId && result?.response?.route) {
           const route = result.response.route;
@@ -1151,6 +1168,7 @@
                   missionId: call.args?.id,
                   times,
                   drops,
+                  currentDrops: drops,
                   raw: resp
                 },
                 updatedAt: record.timestamp
@@ -1456,9 +1474,12 @@
             group: 'internal', data: { bonuses: entries }, updatedAt: record.timestamp }];
         }
         if (call.name === 'missionGetAll' && result?.response) {
-          const completed = Object.entries(result.response).filter(([id, mission]) =>
-            /^\d+$/.test(id) && Number.isFinite(mission?.stars) && mission.stars > 0)
-            .map(([id]) => Number(id));
+          const completed = Array.isArray(result.response)
+            ? result.response.filter((mission) => Number.isFinite(mission?.stars) && mission.stars > 0)
+                .map((mission) => Number(mission?.id ?? 0))
+            : Object.entries(result.response).filter(([id, mission]) =>
+                /^\d+$/.test(id) && Number.isFinite(mission?.stars) && mission.stars > 0)
+                .map(([id, mission]) => Number(mission?.id ?? id));
           const progress = { key: 'missionProgressStatus', method: call.name, feature: null,
             group: 'internal', data: { completed }, updatedAt: record.timestamp };
           return group ? [progress, { key, method: call.name, feature: null,
@@ -1964,7 +1985,7 @@
     let next = { ...(cache && typeof cache === 'object' ? cache : {}) };
     let changed = false;
     for (const record of records) {
-      const entries = extract(record);
+      const entries = record && record.key ? [record] : extract(record);
       for (const entry of entries) {
         if (entry.key === 'experimentalRallySearch') {
           const won = normalizeArrayData(next.experimentalDefeatedBosses?.data);
@@ -4002,9 +4023,31 @@
           const prev = next.lastCampaignRaidResult;
           if (prev && prev.updatedAt >= entry.updatedAt) continue;
 
-          // Merge newly dropped items directly into inventoryGet
-          const currentDrops = entry.data?.drops;
-          if (next.inventoryGet?.data && currentDrops) {
+          if (entry.data?.failed) {
+            next.lastCampaignRaidResult = entry;
+            changed = true;
+            continue;
+          }
+
+          if (next.missionGetAll?.data && entry.data?.missionId) {
+            const mId = Number(entry.data.missionId);
+            const times = Number(entry.data.times) || 1;
+            if (Array.isArray(next.missionGetAll.data)) {
+              const item = next.missionGetAll.data.find((m) => Number(m?.id) === mId);
+              if (item) {
+                item.triesSpent = (Number(item.triesSpent) || 0) + times;
+              }
+            } else if (typeof next.missionGetAll.data === 'object') {
+              const item = next.missionGetAll.data[String(mId)] || next.missionGetAll.data[mId];
+              if (item) {
+                item.triesSpent = (Number(item.triesSpent) || 0) + times;
+              }
+            }
+          }
+
+          // Merge newly dropped items directly into inventoryGet ONLY if inventoryGet was not updated in this same response
+          const currentDrops = entry.data?.currentDrops || entry.data?.drops;
+          if (next.inventoryGet?.data && currentDrops && next.inventoryGet.updatedAt !== entry.updatedAt) {
             const inv = { ...next.inventoryGet.data };
             if (currentDrops.fragmentGear) {
               inv.fragmentGear = { ...(inv.fragmentGear || {}) };
@@ -4045,7 +4088,7 @@
 
           const prevTime = prev?.updatedAt ? Date.parse(prev.updatedAt) : 0;
           const currTime = entry.updatedAt ? Date.parse(entry.updatedAt) : 0;
-          if (prev && prev.data?.missionId === entry.data?.missionId && currTime - prevTime < 15000 && currTime > prevTime) {
+          if (prev && !prev.data?.failed && prev.data?.missionId === entry.data?.missionId && currTime - prevTime < 15000 && currTime > prevTime) {
             const combinedDrops = {
               fragmentGear: { ...(prev.data?.drops?.fragmentGear || {}) },
               fragmentScroll: { ...(prev.data?.drops?.fragmentScroll || {}) },
@@ -4083,7 +4126,8 @@
             entry.data = {
               ...entry.data,
               times: (prev.data?.times || 0) + (entry.data?.times || 1),
-              drops: combinedDrops
+              drops: combinedDrops,
+              currentDrops: entry.data?.currentDrops || entry.data?.drops
             };
           }
           next.lastCampaignRaidResult = entry;

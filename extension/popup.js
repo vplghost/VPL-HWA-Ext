@@ -7103,7 +7103,7 @@ function renderRpcQueue(count, mode = currentRpcPolicy?.mode) {
   const label = document.querySelector('#rpc-queue-count');
   if (label && count !== undefined) label.textContent = String(Number.isInteger(count) && count >= 0 ? count : 0);
   if (badge) {
-    badge.hidden = mode !== 'piggyback';
+    badge.hidden = mode === 'direct';
   }
 }
 

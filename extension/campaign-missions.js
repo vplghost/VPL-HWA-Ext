@@ -4092,20 +4092,80 @@
     return ids.map((id) => missions[id]).filter(Boolean);
   }
 
-  function getHighestRaidableMission(candidateMissionIds, missionProgressMap) {
+  function getMissionProgress(missionId, missionProgressMap) {
+    if (!missionProgressMap) return null;
+    const numId = Number(missionId);
+    if (Array.isArray(missionProgressMap)) {
+      return missionProgressMap.find((m) => Number(m?.id) === numId) || null;
+    }
+    if (typeof missionProgressMap === 'object') {
+      return missionProgressMap[String(missionId)] || missionProgressMap[numId] || null;
+    }
+    return null;
+  }
+
+  function getMissionTries(missionId, missionProgressMap) {
+    const numId = Number(missionId);
+    const m = missions[String(numId)];
+    const isHeroic = Boolean(m?.isHeroic);
+    if (!isHeroic) {
+      return { isHeroic: false, maxTries: Infinity, triesSpent: 0, triesLeft: Infinity };
+    }
+    const progress = getMissionProgress(numId, missionProgressMap);
+    const resetToday = Number(progress?.resetToday) || 0;
+    const maxTries = (resetToday + 1) * 3;
+    const triesSpent = Number(progress?.triesSpent) || 0;
+    const triesLeft = Math.max(0, maxTries - triesSpent);
+    return { isHeroic: true, maxTries, triesSpent, triesLeft };
+  }
+
+  function isMissionRaidable(missionId, missionProgressMap, options = {}) {
+    const numId = Number(missionId);
+    const m = missions[String(numId)];
+    if (!m) return false;
+
+    const disabledIds = options.disabledIds;
+    if (disabledIds) {
+      if (typeof disabledIds.has === 'function' && disabledIds.has(numId)) return false;
+      if (Array.isArray(disabledIds) && disabledIds.includes(numId)) return false;
+    }
+
+    const progress = getMissionProgress(numId, missionProgressMap);
+    if (!progress || !Number.isFinite(progress.stars) || progress.stars < 3) {
+      return false;
+    }
+
+    if (m.isHeroic) {
+      const tries = getMissionTries(numId, missionProgressMap);
+      if (tries.triesLeft <= 0) return false;
+    }
+
+    return true;
+  }
+
+  function getHighestRaidableMission(candidateMissionIds, missionProgressMap, options = {}) {
     if (!candidateMissionIds || candidateMissionIds.length === 0) return null;
     const sorted = [...candidateMissionIds].sort((a, b) => Number(b) - Number(a));
     const threeStar = sorted.find((id) => {
-      const entry = missionProgressMap?.[String(id)] || missionProgressMap?.[Number(id)];
-      return Number(entry?.stars) >= 3;
+      const progress = getMissionProgress(id, missionProgressMap);
+      const is3Star = Number(progress?.stars) >= 3;
+      return is3Star && isMissionRaidable(id, missionProgressMap, options);
     });
-    return threeStar != null ? Number(threeStar) : Number(sorted[0]);
+    if (threeStar != null) return Number(threeStar);
+
+    const anyRaidable = sorted.find((id) => isMissionRaidable(id, missionProgressMap, options));
+    if (anyRaidable != null) return Number(anyRaidable);
+
+    return Number(sorted[0]);
   }
 
   globalThis.hwaHelperCampaignMissions = {
     missions,
     itemDrops,
     getMissionsForItem,
-    getHighestRaidableMission
+    getHighestRaidableMission,
+    getMissionProgress,
+    getMissionTries,
+    isMissionRaidable
   };
 })();
