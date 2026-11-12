@@ -298,7 +298,7 @@ test('renderHeroDialog shows MAX badge and no upgrade button when skill is maxed
           skills: {
             '1': 30, // Max for white (30 / 30)
             '2': 30, // Max for green (30 / 30)
-            '3': 10  // Max for blue (30 - 20 = 10 / 10)
+            '3': 30  // Max for blue (raw 30 - 20 = 10 / 10)
           }
         }
       }

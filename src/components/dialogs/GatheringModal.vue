@@ -6,6 +6,7 @@ import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber, formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
+import { isMarchExpired, getMarchBadgeInfo } from '@/src/utils/resourceData';
 import {
   getMineConfigId,
   buildSquad,
@@ -87,6 +88,16 @@ onMounted(async () => {
       }
     } catch (_) {}
   }
+
+  // Refresh marches to ensure active marches list is completely fresh
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      await chrome.runtime.sendMessage({
+        kind: 'experimental-rpc',
+        calls: [{ name: 'getMarches', feature: 'march' }],
+      });
+    }
+  } catch (_) {}
 });
 
 onUnmounted(() => {
@@ -138,21 +149,44 @@ const gatheringMarches = computed(() => {
   const marches = normalizeArray(cache.value.marchStatus?.data?.marches);
   return marches
     .filter((m: any) => {
+      if (isMarchExpired(m, now.value)) return false;
+      const badge = getMarchBadgeInfo(m, now.value);
+      if (badge.category === 'gather') return true;
       const isMine =
         Boolean(m.mineId) ||
         ['food', 'wood', 'stone', 'iron', 'mine'].includes(m.kind) ||
         ['food', 'wood', 'stone', 'iron', 'mine'].includes(m.previousKind);
-      return isMine && (!m.endsAt || m.endsAt > now.value);
+      return isMine;
     })
     .map((m: any) => {
-      const remainingSec = m.endsAt ? Math.max(0, Math.ceil((m.endsAt - now.value) / 1000)) : 0;
+      const isReturning = m.kind === 'return' || m.stage === 'returnToOutpost';
+      const isMoving =
+        m.stage === 'moveToTargetInSolo' ||
+        (Number.isFinite(m.targetArrivalAt) && now.value < m.targetArrivalAt) ||
+        (Number.isFinite(m.endsAt) && now.value < m.endsAt && m.stage !== 'gathering');
+      const targetTime = isReturning
+        ? (m.endsAt || m.returnAt)
+        : isMoving
+        ? (m.targetArrivalAt || m.endsAt)
+        : null;
+      const remainingSec = targetTime && targetTime > now.value
+        ? Math.max(0, Math.ceil((targetTime - now.value) / 1000))
+        : 0;
+
+      let stageText = 'Gathering at mine';
+      if (isReturning) {
+        stageText = 'Returning';
+      } else if (isMoving && remainingSec > 0) {
+        stageText = 'Marching to mine';
+      }
+
       return {
         id: m.id || m.squadId,
         squadId: m.squadId || m.id,
         kind: m.kind,
-        stage: m.stage || (m.kind === 'return' ? 'Returning' : 'Gathering'),
+        stage: stageText,
         remainingSec,
-        timerText: m.endsAt ? formatDuration(remainingSec) : 'In progress',
+        timerText: (isReturning || isMoving) && remainingSec > 0 ? formatDuration(remainingSec) : 'In progress',
       };
     });
 });
@@ -257,6 +291,12 @@ async function dispatchSquadToMine(mine: any) {
         searchStatus.value = res?.queued
           ? 'Gathering march queued for next game RPC.'
           : 'Gathering march dispatched! March will appear in active list.';
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({
+            kind: 'experimental-rpc',
+            calls: [{ name: 'getMarches', feature: 'march' }],
+          }).catch(() => {});
+        }
       }
     }
   } catch (err: any) {

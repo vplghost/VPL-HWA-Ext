@@ -171,3 +171,78 @@ test('auto-gather handles object-shaped marches and mine search without TypeErro
     assert.equal(res.mineId, 'mine_wood_obj');
   });
 });
+
+test('isGameLoadRecord recognizes mobileLogin, userGetInfo, and getMarches', () => {
+  const isGameLoad = globalThis.hwaHelperAutoGather.isGameLoadRecord;
+
+  assert.equal(isGameLoad({ requestBody: JSON.stringify({ calls: [{ name: 'mobileLogin' }] }) }), true);
+  assert.equal(isGameLoad({ requestBody: JSON.stringify({ calls: [{ name: 'userGetInfo' }] }) }), true);
+  assert.equal(isGameLoad({ requestBody: JSON.stringify({ calls: [{ name: 'getMarches', feature: 'march' }] }) }), true);
+  assert.equal(isGameLoad({ requestBody: '{"calls":[{"name":"unknownMethod"}]}' }), false);
+});
+
+test('planAutoGather filters out mines currently being gathered by active squads', () => {
+  const plan = globalThis.hwaHelperAutoGather.planAutoGather;
+  const now = 1000000;
+
+  const heroes = {
+    '1': { id: 1, power: 1000 },
+    '2': { id: 2, power: 2000 },
+    '3': { id: 3, power: 3000 },
+    '4': { id: 4, power: 4000 },
+    '5': { id: 5, power: 5000 },
+    '6': { id: 6, power: 6000 },
+    '7': { id: 7, power: 7000 },
+    '8': { id: 8, power: 8000 },
+    '9': { id: 9, power: 9000 },
+    '10': { id: 10, power: 10000 }
+  };
+  const unitSummary = {
+    available: [{ unitId: 1, count: 50000 }]
+  };
+  const mapContext = {
+    mapId: 42,
+    center: { x: 100, y: 200 }
+  };
+
+  const stored = {
+    popupRpcEnabled: true,
+    autoGatherSettings: {
+      enabled: true,
+      maxMarches: 3,
+      mineLevel: 5,
+      mineType: 'wood',
+      lastAutoMineType: null
+    }
+  };
+
+  const woodLvl5Config = globalThis.hwaHelperExperimentalData.mineConfigId('wood', 5);
+  const cache = {
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': { data: unitSummary },
+    experimentalMapContext: { data: mapContext },
+    // 1 active march gathering mine_wood_1
+    marchStatus: {
+      data: {
+        marches: [
+          { squadId: 'sq1', mineId: 'mine_wood_1', kind: 'wood', stage: 'harvest' }
+        ]
+      }
+    },
+    // Search results contains mine_wood_1 (already occupied) and mine_wood_2 (available)
+    experimentalMineSearch: {
+      data: {
+        mapId: 42,
+        mineConfigId: woodLvl5Config,
+        mines: [
+          { mineId: 'mine_wood_1', coordinates: { x: 105, y: 205 } },
+          { mineId: 'mine_wood_2', coordinates: { x: 110, y: 210 } }
+        ]
+      }
+    }
+  };
+
+  const result = plan(cache, stored, now);
+  assert.equal(result.action, 'gather');
+  assert.equal(result.mineId, 'mine_wood_2', 'Should pick mine_wood_2 instead of mine_wood_1 which is already being gathered');
+});

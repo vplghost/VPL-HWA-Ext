@@ -492,8 +492,12 @@ async function evaluateAutoGather(record, currentCache, stored, tabId) {
     record.responseBody.includes('"mines"') &&
     typeof record?.requestBody === 'string' &&
     record.requestBody.includes('"searchMine"');
+  const isMineAction = typeof record?.requestBody === 'string' &&
+    (record.requestBody.includes('"attackMine"') || record.requestBody.includes('"searchMine"'));
+  const isMarchesUpdate = typeof record?.requestBody === 'string' &&
+    record.requestBody.includes('"getMarches"');
 
-  if (!isLoad && !isReturn && !isMineSearch) return;
+  if (!isLoad && !isReturn && !isMineSearch && !isMineAction && !isMarchesUpdate) return;
 
   const plan = helper.planAutoGather(currentCache, stored, now);
   if (plan.action === 'search') {
@@ -521,6 +525,7 @@ async function evaluateAutoGather(record, currentCache, stored, tabId) {
       await chrome.storage.local.set({ autoGatherSettings: updatedSettings });
       lastAutoGatherPendingType = null;
       lastAutoGatherPendingLevel = null;
+      lastAutoGatherSearchAt = 0;
     }
   }
 }
@@ -1278,7 +1283,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         (record.requestBody.includes('"userGetInfo"') || record.requestBody.includes('"mobileLogin"'))) {
       const dispatch = rpcMessageForSettings(stored, [
         { name: 'getSummary', feature: 'building' },
-        { name: 'getSummary', feature: 'personalResearch' }
+        { name: 'getSummary', feature: 'personalResearch' },
+        { name: 'getMarches', feature: 'march' },
+        { name: 'getUnitSummary', feature: 'unit' }
       ]);
       if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }

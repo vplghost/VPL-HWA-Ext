@@ -56,7 +56,16 @@
   function isGameLoadRecord(record) {
     if (!record) return false;
     const calls = record.requestBody ? parseCalls(record.requestBody) : [];
-    return calls.some((c) => ['userGetInfo', 'getLeaderboardPowerSummary', 'getUnitSummary'].includes(c.name));
+    if (calls.some((c) => ['userGetInfo', 'mobileLogin', 'getLeaderboardPowerSummary', 'getUnitSummary', 'getMarches'].includes(c.name))) {
+      return true;
+    }
+    if (typeof record.requestBody === 'string' &&
+        (record.requestBody.includes('"userGetInfo"') ||
+         record.requestBody.includes('"mobileLogin"') ||
+         record.requestBody.includes('"getMarches"'))) {
+      return true;
+    }
+    return false;
   }
 
   function isMarchReturnRecord(record, prevCache, currentCache, now = Date.now()) {
@@ -64,7 +73,10 @@
     if (record.transport === 'websocket' && record.direction === 'received' && record.encoding === 'utf8') {
       try {
         const payload = JSON.parse(record.payload)?.result;
-        if (payload?.type === 'returnToOutpostFromMob' || payload?.type === 'rallyCompleted') {
+        if (payload?.type === 'returnToOutpostFromMob' ||
+            payload?.type === 'returnToOutpostFromMine' ||
+            payload?.type === 'rallyCompleted' ||
+            payload?.type === 'marchCompleted') {
           return true;
         }
       } catch (_) {}
@@ -141,8 +153,13 @@
 
     // Check if matching mine search results exist with full mines
     const mineSearch = cache?.experimentalMineSearch?.data;
+    const activeMineIds = new Set(
+      marches
+        .map((m) => m?.mineId || m?.target?.objectId || m?.targetId)
+        .filter(Boolean)
+    );
     const matchingMines = (mineSearch?.mineConfigId === configId)
-      ? safeList(mineSearch?.mines).filter((m) => m?.mineId)
+      ? safeList(mineSearch?.mines).filter((m) => m?.mineId && !activeMineIds.has(m.mineId))
       : [];
 
     if (matchingMines.length > 0) {

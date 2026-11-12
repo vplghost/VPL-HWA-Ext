@@ -10499,10 +10499,10 @@ function renderHeroDialog(heroId, cache) {
   const skillKeys = Object.keys(hero.skills || {}).sort((a, b) => Number(a) - Number(b));
 
   const skillSlots = [
-    { slot: 1, label: 'Skill 1', tier: 'White', rankReq: 1, rankName: 'White', bg: 'border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300', maxLvl: heroLevel },
-    { slot: 2, label: 'Skill 2', tier: 'Green', rankReq: 2, rankName: 'Green', bg: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20', badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200', maxLvl: heroLevel },
-    { slot: 3, label: 'Skill 3', tier: 'Blue', rankReq: 4, rankName: 'Blue', bg: 'border-sky-200 bg-sky-50/60 dark:border-sky-900/40 dark:bg-sky-950/20', badge: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200', maxLvl: Math.max(0, heroLevel - 20) },
-    { slot: 4, label: 'Skill 4', tier: 'Violet', rankReq: 7, rankName: 'Violet', bg: 'border-purple-200 bg-purple-50/60 dark:border-purple-900/40 dark:bg-purple-950/20', badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200', maxLvl: Math.max(0, heroLevel - 40) }
+    { slot: 1, label: 'Skill 1', tier: 'White', rankReq: 1, rankName: 'White', bg: 'border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300', delta: 0, maxLvl: heroLevel },
+    { slot: 2, label: 'Skill 2', tier: 'Green', rankReq: 2, rankName: 'Green', bg: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20', badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200', delta: 0, maxLvl: heroLevel },
+    { slot: 3, label: 'Skill 3', tier: 'Blue', rankReq: 4, rankName: 'Blue', bg: 'border-sky-200 bg-sky-50/60 dark:border-sky-900/40 dark:bg-sky-950/20', badge: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200', delta: 20, maxLvl: Math.max(0, heroLevel - 20) },
+    { slot: 4, label: 'Skill 4', tier: 'Violet', rankReq: 7, rankName: 'Violet', bg: 'border-purple-200 bg-purple-50/60 dark:border-purple-900/40 dark:bg-purple-950/20', badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200', delta: 40, maxLvl: Math.max(0, heroLevel - 40) }
   ];
 
   const skillsList = document.createElement('div');
@@ -10511,7 +10511,8 @@ function renderHeroDialog(heroId, cache) {
   for (const s of skillSlots) {
     const isUnlocked = heroColor >= s.rankReq || s.slot <= skillKeys.length;
     const skillKey = skillKeys[s.slot - 1];
-    const curLevel = isUnlocked ? Number(hero.skills?.[skillKey] ?? hero.skills?.[s.slot] ?? 1) : 0;
+    const rawLevel = isUnlocked ? Number(hero.skills?.[skillKey] ?? hero.skills?.[s.slot] ?? 1) : 0;
+    const curLevel = isUnlocked ? Math.max(1, rawLevel - s.delta) : 0;
     const maxLevel = s.maxLvl;
     const isMax = isUnlocked && curLevel >= maxLevel && maxLevel > 0;
     const pct = maxLevel > 0 ? Math.min(100, Math.round((curLevel / maxLevel) * 100)) : 0;

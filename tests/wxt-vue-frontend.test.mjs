@@ -1210,6 +1210,71 @@ test('Game connection monitoring, warning banner, and browser refresh button ope
   assert.match(settingsTab, /Refresh Game Tab/, 'SettingsTab must feature Refresh Game Tab button');
 });
 
+test('HeroDetailModal adjusts skill 3 and 4 display level by delta offsets', async () => {
+  const heroDetail = await readFile(join(root, 'src/components/dialogs/HeroDetailModal.vue'), 'utf8');
+  assert.match(heroDetail, /delta:\s*20/, 'Skill 3 must define delta: 20');
+  assert.match(heroDetail, /delta:\s*40/, 'Skill 4 must define delta: 40');
+  assert.match(heroDetail, /getSkillDisplayLevel/, 'Must use getSkillDisplayLevel to compute level minus delta');
+  assert.match(heroDetail, /isSkillMax/, 'Must use isSkillMax based on adjusted display level');
+  assert.match(heroDetail, /getSkillProgressPercent/, 'Must compute progress percent using adjusted level');
+});
+
+test('EventsTab uses normalizeArray for rounds, chestNumbers, lanes, and boss heads', async () => {
+  const eventsTab = await readFile(join(root, 'src/components/tabs/EventsTab.vue'), 'utf8');
+  assert.match(eventsTab, /import\s*\{\s*normalizeArray\s*\}\s*from\s*['"]@\/src\/utils\/troops['"]/, 'EventsTab must import normalizeArray');
+  assert.match(eventsTab, /normalizeArray\(battle\.rounds\)/, 'EventsTab must normalize battle.rounds');
+  assert.match(eventsTab, /normalizeArray\(vsStatus\.chestNumbers\)/, 'EventsTab must normalize vsStatus.chestNumbers');
+  assert.match(eventsTab, /normalizeArray\(clashStatus\.lanes\)/, 'EventsTab must normalize clashStatus.lanes');
+  assert.match(eventsTab, /normalizeArray\(clanBoss\?\.heads\)/, 'EventsTab must normalize clanBoss.heads');
+  assert.doesNotMatch(eventsTab, /\(battle\.rounds \|\| \[\]\)\.find/, 'EventsTab must not use unsafe (battle.rounds || []).find');
+});
+
+test('GatheringModal and GatheringTab align with Header.vue using isMarchExpired and getMarchBadgeInfo', async () => {
+  const gatherModal = await readFile(join(root, 'src/components/dialogs/GatheringModal.vue'), 'utf8');
+  assert.match(gatherModal, /import\s*\{[^}]*isMarchExpired[^}]*\}\s*from\s*['"]@\/src\/utils\/resourceData['"]/, 'GatheringModal must import isMarchExpired and getMarchBadgeInfo');
+  assert.match(gatherModal, /isMarchExpired\(m,\s*now\.value\)/, 'GatheringModal must filter out expired returning marches');
+  assert.match(gatherModal, /badge\.category === 'gather'/, 'GatheringModal must match gather category with Header');
+  assert.doesNotMatch(gatherModal, /!m\.endsAt \|\| m\.endsAt > now\.value/, 'GatheringModal must not exclude arrived gathering marches with endsAt <= now');
+
+  const gatherTab = await readFile(join(root, 'src/components/tabs/GatheringTab.vue'), 'utf8');
+  assert.match(gatherTab, /isMarchExpired\(m,\s*now\.value\)/, 'GatheringTab must use isMarchExpired');
+});
+
+test('GuildVersusModal synchronizes all 6 sections with legacy HTML', async () => {
+  const gvs = await readFile(join(root, 'src/components/dialogs/GuildVersusModal.vue'), 'utf8');
+
+  // Section 1: Matchup Banner
+  assert.match(gvs, /Theme:\s*\{\{\s*currentTheme\s*\}\}/, 'GuildVersusModal must dynamically display currentTheme');
+  assert.match(gvs, /clanRoundPoints\.toLocaleString\(\)/, 'GuildVersusModal must format clan round points');
+  assert.match(gvs, /enemyRoundPoints\.toLocaleString\(\)/, 'GuildVersusModal must format enemy round points');
+
+  // Section 2: Personal Points
+  assert.match(gvs, /isStaleVersusDay/, 'GuildVersusModal must evaluate isStaleVersusDay');
+  assert.match(gvs, /personalRoundPoints/, 'GuildVersusModal must display personalRoundPoints');
+  assert.match(gvs, /personalBattlePoints/, 'GuildVersusModal must display personalBattlePoints');
+  assert.match(gvs, /personalSeasonPoints/, 'GuildVersusModal must display personalSeasonPoints');
+
+  // Section 3: Milestone Chests
+  assert.match(gvs, /isStackMode/, 'GuildVersusModal must provide Stacked Deck view toggle');
+  assert.match(gvs, /targetChestNum/, 'GuildVersusModal must highlight targetChestNum');
+  assert.match(gvs, /formatRewardItem/, 'GuildVersusModal must itemize chest rewards');
+
+  // Section 4: 6-Round Battle Schedule & Quests
+  assert.match(gvs, /6-Round Battle Schedule & Quests/, 'GuildVersusModal must include 6-round schedule section');
+  assert.match(gvs, /roundQuestsMap/, 'GuildVersusModal must map round quests');
+  assert.match(gvs, /getQuestDisplayName/, 'GuildVersusModal must render quest names with resource stock');
+
+  // Section 5: Guild Requirements
+  assert.match(gvs, /Guild Participation & Requirements/, 'GuildVersusModal must include guild participation section');
+  assert.match(gvs, /Active Members/, 'GuildVersusModal must render active members card');
+  assert.match(gvs, /Weekly Activity/, 'GuildVersusModal must render weekly activity card');
+
+  // Section 6: Daily Challenges
+  assert.match(gvs, /Daily Challenges/, 'GuildVersusModal must include daily challenges section');
+  assert.match(gvs, /totalChallengePts/, 'GuildVersusModal must compute total challenge points');
+  assert.match(gvs, /getChallengeConvertedPts/, 'GuildVersusModal must convert challenge progress to points');
+});
+
 
 
 

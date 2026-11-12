@@ -4,6 +4,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import type { AutoGatherSettings } from '@/src/types';
 import { formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
+import { isMarchExpired, getMarchBadgeInfo } from '@/src/utils/resourceData';
 
 const { cache, dispatchRpc } = useRpcCache();
 
@@ -58,18 +59,43 @@ const activeMarches = computed(() => {
   const list = normalizeArray(cache.value.marchStatus?.data?.marches);
   return list
     .filter((m: any) => {
-      const end = m.endTime || (m.startTime && m.duration ? m.startTime + m.duration : null);
-      return end && end > now.value;
+      if (isMarchExpired(m, now.value)) return false;
+      const badge = getMarchBadgeInfo(m, now.value);
+      if (badge.category === 'gather') return true;
+      const isMine =
+        Boolean(m.mineId) ||
+        ['food', 'wood', 'stone', 'iron', 'mine'].includes(m.kind) ||
+        ['food', 'wood', 'stone', 'iron', 'mine'].includes(m.previousKind);
+      return isMine;
     })
     .map((m: any) => {
-      const end = m.endTime || (m.startTime + m.duration);
-      const remainingSec = Math.max(0, Math.ceil((end - now.value) / 1000));
+      const isReturning = m.kind === 'return' || m.stage === 'returnToOutpost';
+      const isMoving =
+        m.stage === 'moveToTargetInSolo' ||
+        (Number.isFinite(m.targetArrivalAt) && now.value < m.targetArrivalAt) ||
+        (Number.isFinite(m.endsAt) && now.value < m.endsAt && m.stage !== 'gathering');
+      const targetTime = isReturning
+        ? (m.endsAt || m.returnAt)
+        : isMoving
+        ? (m.targetArrivalAt || m.endsAt)
+        : null;
+      const remainingSec = targetTime && targetTime > now.value
+        ? Math.max(0, Math.ceil((targetTime - now.value) / 1000))
+        : 0;
+
+      let stageLabel = 'Gathering at mine';
+      if (isReturning) {
+        stageLabel = 'Returning';
+      } else if (isMoving && remainingSec > 0) {
+        stageLabel = 'Marching to mine';
+      }
+
       return {
-        id: m.id || m.marchId,
-        type: m.type || 'Gathering',
-        target: m.targetName || `Mine #${m.targetId || ''}`,
+        id: m.id || m.marchId || m.squadId,
+        type: stageLabel,
+        target: m.targetName || (m.mineId ? `Mine #${m.mineId}` : 'Resource Mine'),
         remainingSec,
-        timerText: formatDuration(remainingSec),
+        timerText: remainingSec > 0 ? formatDuration(remainingSec) : 'In progress',
       };
     });
 });

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import { formatNumber } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 
 const { cache, dispatchRpc } = useRpcCache();
 const { openModal } = useModals();
@@ -36,7 +37,8 @@ const eventCards = computed<EventCard[]>(() => {
     const league = battle.league || (info.league ? `League #${info.league}` : 'Bronze');
     const leagueLabel = league.charAt(0).toUpperCase() + league.slice(1);
     const roundNumber = info.roundNumber || 1;
-    const currentRound = (battle.rounds || []).find((r: any) => r.status === 'inProgress') || battle.rounds?.[0] || {};
+    const rounds = normalizeArray(battle.rounds);
+    const currentRound = rounds.find((r: any) => r.status === 'inProgress') || rounds[0] || {};
     const theme = currentRound.theme || 'Radar Training';
     const roundPoints = formatNumber(battle.clanRoundPoints ?? currentRound.points ?? 0);
     const enemyRoundPoints = formatNumber(battle.enemyClanRoundPoints ?? currentRound.enemyPoints ?? 0);
@@ -44,7 +46,7 @@ const eventCards = computed<EventCard[]>(() => {
       cache.value?.clanVersusStatus?.updatedAt &&
       new Date(cache.value.clanVersusStatus.updatedAt).toDateString() !== new Date().toDateString();
     const personalScore = isStaleVersusDay ? 0 : (vsStatus.score ?? rewards.userRoundPoints ?? 0);
-    const claimedCount = isStaleVersusDay ? 0 : (vsStatus.chestNumbers || []).length;
+    const claimedCount = isStaleVersusDay ? 0 : normalizeArray(vsStatus.chestNumbers).length;
 
     cards.push({
       id: 'clanVersus',
@@ -124,7 +126,7 @@ const eventCards = computed<EventCard[]>(() => {
   // 4. Guild Clash (clanClashStatus)
   const clashStatus = cache.value?.clanClashStatus?.data?.clashEvent;
   if (clashStatus) {
-    const lanesCount = clashStatus.lanes?.length || 0;
+    const lanesCount = normalizeArray(clashStatus.lanes).length;
     cards.push({
       id: 'clanClash',
       type: 'clash',
@@ -138,8 +140,8 @@ const eventCards = computed<EventCard[]>(() => {
   }
 
   // 5. Hero Brawl (brawlStatus)
-  const brawls = cache.value?.brawlStatus?.data?.brawls;
-  if (Array.isArray(brawls) && brawls.length > 0) {
+  const brawls = normalizeArray(cache.value?.brawlStatus?.data?.brawls);
+  if (brawls.length > 0) {
     const brawl = brawls[0];
     cards.push({
       id: 'brawl',
@@ -226,9 +228,10 @@ const eventCards = computed<EventCard[]>(() => {
 
   // 8. Hydra Boss (clanBoss_getAll)
   const clanBoss = cache.value?.clanBoss_getAll?.data;
-  if (clanBoss && Array.isArray(clanBoss.heads)) {
-    const deadCount = clanBoss.heads.filter((h: any) => h.state?.isDead).length;
-    const totalCount = clanBoss.heads.length;
+  const heads = normalizeArray(clanBoss?.heads);
+  if (clanBoss && heads.length > 0) {
+    const deadCount = heads.filter((h: any) => h.state?.isDead).length;
+    const totalCount = heads.length;
     cards.push({
       id: 'clanBoss',
       type: 'boss',

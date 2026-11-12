@@ -2,6 +2,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { formatNumber } from '@/src/utils/formatters';
+import { normalizeArray } from '@/src/utils/troops';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -18,7 +19,7 @@ const battle = computed(() => vsStatus.value.battle || {});
 const info = computed(() => vsStatus.value.info || {});
 const rewards = computed(() => vsStatus.value.rewards || {});
 
-const clan = computed(() => battle.value.clan || { name: 'Guild', server: '—' });
+const clan = computed(() => battle.value.clan || { name: '4-LEAF CLOVER', server: '—' });
 const enemyClan = computed(() => battle.value.enemyClan || { name: 'Opponent', server: '—' });
 
 const league = computed(() => {
@@ -26,7 +27,7 @@ const league = computed(() => {
   return l.charAt(0).toUpperCase() + l.slice(1);
 });
 
-const battleNumber = computed(() => info.value.battleNumber ?? 1);
+const battleNumber = computed(() => info.value.battleNumber ?? 4);
 const roundNumber = computed(() => info.value.roundNumber ?? 1);
 
 const clanRoundPoints = computed(() => battle.value.clanRoundPoints ?? 0);
@@ -35,8 +36,15 @@ const totalPoints = computed(() => clanRoundPoints.value + enemyRoundPoints.valu
 const clanPct = computed(() => Math.round((clanRoundPoints.value / totalPoints.value) * 100));
 const enemyPct = computed(() => 100 - clanPct.value);
 
-const personalRoundPoints = computed(() => vsStatus.value.score ?? rewards.value.userRoundPoints ?? 0);
-const personalBattlePoints = computed(() => rewards.value.userBattlePoints ?? personalRoundPoints.value);
+const isStaleVersusDay = computed(() => {
+  return (
+    Boolean(cache.value?.clanVersusStatus?.updatedAt) &&
+    new Date(cache.value.clanVersusStatus.updatedAt).toDateString() !== new Date().toDateString()
+  );
+});
+
+const personalRoundPoints = computed(() => (isStaleVersusDay.value ? 0 : (vsStatus.value.score ?? rewards.value.userRoundPoints ?? 0)));
+const personalBattlePoints = computed(() => (isStaleVersusDay.value ? 0 : (rewards.value.userBattlePoints ?? personalRoundPoints.value)));
 const personalSeasonPoints = computed(() => rewards.value.userSeasonPoints ?? 0);
 const clanRank = computed(() => (rewards.value.userClanRank ? `#${rewards.value.userClanRank}` : '—'));
 const seasonRank = computed(() => (rewards.value.seasonClanRank ? `#${rewards.value.seasonClanRank}` : '—'));
@@ -61,8 +69,8 @@ const defaultChestRewards: Record<number, Record<string, number>> = {
   5: { energy: 300, 'coin:40077': 350, 'consumable:40228': 4, 'consumable:40230': 4, 'speedUpResearch:2': 6 },
   6: { 'patron:1': 1, energy: 400, 'consumable:40232': 2, 'consumable:40228': 5, 'consumable:40230': 5, 'material:12': 100, 'speedUpResearch:2': 15 },
   7: { energy: 400, 'coin:40077': 550, 'consumable:40228': 5, 'consumable:40230': 5, 'material:12': 50, 'speedUpResearch:2': 8 },
-  8: { energy: 600, 'coin:40077': 750, 'consumable:40229': 1, 'consumable:40231': 1, 'material:12': 100, 'speedUpResearch:2': 10 },
-  9: { 'patron:1': 2, energy: 800, 'consumable:40232': 5, 'consumable:40229': 2, 'consumable:40231': 2, 'material:12': 200, 'speedUpResearch:2': 25 },
+  8: { energy: 600, 'coin:40077': 750, 'consumable:40228': 7, 'consumable:40230': 7, 'material:12': 100, 'speedUpResearch:2': 15 },
+  9: { 'patron:1': 2, energy: 1000, 'consumable:40232': 5, 'consumable:40228': 5, 'consumable:40230': 5, 'material:12': 200, 'speedUpResearch:2': 25 },
 };
 
 const chestRewardsMap = computed(() => {
@@ -86,6 +94,7 @@ function formatRewardItem(key: string, amount: number) {
 }
 
 const claimedChests = computed<number[]>(() => {
+  if (isStaleVersusDay.value) return [];
   const raw = vsStatus.value.chestNumbers;
   if (Array.isArray(raw)) return raw.map(Number).filter(Number.isFinite);
   if (raw && typeof raw === 'object') {
@@ -113,6 +122,83 @@ watch(
   },
   { immediate: true }
 );
+
+// --- Sections 4, 5, 6 Data ---
+const roundQuestsMap = computed(() => {
+  return (globalThis as any).hwaHelperClanVersusRoundQuests || {};
+});
+
+const currentRound = computed(() => {
+  const rounds = normalizeArray(battle.value.rounds);
+  return rounds.find((r: any) => r.status === 'inProgress') || rounds[0] || {};
+});
+
+const currentTheme = computed(() => {
+  return currentRound.value?.theme || roundQuestsMap.value[roundNumber.value]?.theme || 'Radar Training';
+});
+
+const roundsList = computed(() => {
+  const raw = normalizeArray(battle.value?.rounds);
+  if (raw.length > 0) return raw;
+  return [
+    { index: 1, theme: 'Radar Training & Titan Power', score: 1, points: clanRoundPoints.value, enemyPoints: enemyRoundPoints.value, status: 'inProgress' },
+    { index: 2, theme: 'City Development & Gathering', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
+    { index: 3, theme: 'Research & Wilderness', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
+    { index: 4, theme: 'Hero Advancement & Equipment', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
+    { index: 5, theme: 'Military Training & Outland', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
+    { index: 6, theme: 'Grand Finale & PvP Clash', score: 4, points: 0, enemyPoints: 0, status: 'soon' },
+  ];
+});
+
+function getResourceStock(target: string | number): number | null {
+  const pData = (globalThis as any).hwaHelperPopupData;
+  return pData?.getChallengeResourceStock?.(cache.value, target) ?? null;
+}
+
+function getQuestDisplayName(q: { label: string }): string {
+  const stock = getResourceStock(q.label);
+  const cleanLabel = q.label.replace(/\s*\(\d+[\d,]*\)$/, '');
+  return stock != null ? `${cleanLabel} (${stock.toLocaleString()})` : cleanLabel;
+}
+
+// Section 5: Guild Requirements
+const curUsers = computed(() => info.value?.currentNumActiveUsers ?? 28);
+const minUsers = computed(() => info.value?.numActiveUsers ?? 5);
+const weeklyAct = computed(() => info.value?.weeklyUserActivity ?? 2450);
+const personalSat = computed(() => info.value?.personalRequirementsIsSatisfied ?? true);
+const guildSat = computed(() => info.value?.guildRequirementsIsSatisfied ?? true);
+
+// Section 6: Daily Challenges
+const challengeNames = computed(() => (globalThis as any).hwaHelperClanVersusChallengeNames || {});
+const challengePoints = computed(() => (globalThis as any).hwaHelperClanVersusChallengePoints || {});
+const challengeSteps = computed(() => (globalThis as any).hwaHelperClanVersusChallengeSteps || {});
+
+const challenges = computed(() => normalizeArray(info.value?.challenges));
+
+const totalChallengePts = computed(() => {
+  let total = 0;
+  for (const ch of challenges.value) {
+    const progress = Number(ch.progress || 0);
+    const step = Number(challengeSteps.value[ch.id] || 1);
+    const ptsPerStep = Number(challengePoints.value[ch.id] || 0);
+    total += Math.floor(progress / step) * ptsPerStep;
+  }
+  return total;
+});
+
+function getChallengeDisplayName(ch: any): string {
+  const name = challengeNames.value[ch.id] || `Daily Challenge #${ch.id}`;
+  const stock = getResourceStock(ch.id);
+  const cleanName = name.replace(/\s*\(\d+[\d,]*\)$/, '');
+  return stock != null ? `${cleanName} (${stock.toLocaleString()})` : cleanName;
+}
+
+function getChallengeConvertedPts(ch: any): number {
+  const progress = Number(ch.progress || 0);
+  const step = Number(challengeSteps.value[ch.id] || 1);
+  const ptsPerStep = Number(challengePoints.value[ch.id] || 0);
+  return Math.floor(progress / step) * ptsPerStep;
+}
 
 function close() {
   emit('update:modelValue', false);
@@ -188,14 +274,14 @@ onUnmounted(() => {
           <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/60">
             <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-3">
               <span>Battle #{{ battleNumber }} • Round {{ roundNumber }} of 6</span>
-              <span class="font-semibold text-emerald-700 dark:text-emerald-400">Theme: Guild Contest</span>
+              <span class="font-semibold text-emerald-700 dark:text-emerald-400">Theme: {{ currentTheme }}</span>
             </div>
 
             <div class="grid grid-cols-5 items-center gap-2 mb-3">
               <div class="col-span-2 min-w-0">
                 <div class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">{{ clan.name }}</div>
                 <div class="text-xs text-slate-500 dark:text-slate-400">Server {{ clan.server || '—' }}</div>
-                <div class="text-emerald-700 dark:text-emerald-400 font-black text-base sm:text-lg tabular-nums mt-0.5">{{ formatNumber(clanRoundPoints) }}</div>
+                <div class="text-emerald-700 dark:text-emerald-400 font-black text-base sm:text-lg tabular-nums mt-0.5">{{ clanRoundPoints.toLocaleString() }}</div>
                 <div class="text-[11px] text-slate-500 dark:text-slate-400">Score: <strong class="text-slate-800 dark:text-slate-200">{{ battle.clanBattleScore ?? 0 }}</strong></div>
               </div>
 
@@ -206,7 +292,7 @@ onUnmounted(() => {
               <div class="col-span-2 min-w-0 text-right">
                 <div class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">{{ enemyClan.name }}</div>
                 <div class="text-xs text-slate-500 dark:text-slate-400">Server {{ enemyClan.server || '—' }}</div>
-                <div class="text-rose-700 dark:text-rose-400 font-black text-base sm:text-lg tabular-nums mt-0.5">{{ formatNumber(enemyRoundPoints) }}</div>
+                <div class="text-rose-700 dark:text-rose-400 font-black text-base sm:text-lg tabular-nums mt-0.5">{{ enemyRoundPoints.toLocaleString() }}</div>
                 <div class="text-[11px] text-slate-500 dark:text-slate-400">Score: <strong class="text-slate-800 dark:text-slate-200">{{ battle.enemyClanBattleScore ?? 0 }}</strong></div>
               </div>
             </div>
@@ -225,13 +311,13 @@ onUnmounted(() => {
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Round Points</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(personalRoundPoints) }}</div>
-              <div class="text-[10px] text-slate-400 dark:text-slate-500">Current round</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ personalRoundPoints.toLocaleString() }}</div>
+              <div class="text-[10px] text-slate-400 dark:text-slate-500">{{ isStaleVersusDay ? 'New round starting' : 'Current round' }}</div>
             </div>
 
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Battle Points</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(personalBattlePoints) }}</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ personalBattlePoints.toLocaleString() }}</div>
               <div class="text-[10px] text-slate-400 dark:text-slate-500">This battle</div>
             </div>
 
@@ -282,10 +368,10 @@ onUnmounted(() => {
             <!-- Target progress banner -->
             <div class="rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
               <div class="flex justify-between font-medium text-slate-700 dark:text-slate-300">
-                <span>Target: <strong class="text-amber-800 dark:text-amber-300">Chest {{ targetChestNum }}</strong> ({{ formatNumber(thresholds[targetChestNum] || 0) }} pts)</span>
+                <span>Target: <strong class="text-amber-800 dark:text-amber-300">Chest {{ targetChestNum }}</strong> ({{ (thresholds[targetChestNum] || 0).toLocaleString() }} pts)</span>
                 <span class="font-bold text-slate-900 dark:text-slate-100">
                   {{ Math.min(100, Math.round((personalRoundPoints / (thresholds[targetChestNum] || 1)) * 100)) }}%
-                  ({{ formatNumber(personalRoundPoints) }} / {{ formatNumber(thresholds[targetChestNum] || 0) }})
+                  ({{ personalRoundPoints.toLocaleString() }} / {{ (thresholds[targetChestNum] || 0).toLocaleString() }})
                 </span>
               </div>
               <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
@@ -297,17 +383,24 @@ onUnmounted(() => {
             </div>
 
             <!-- Quick Jump Ribbon -->
-            <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
               <button
                 v-for="c in 9"
                 :key="`ribbon-${c}`"
                 type="button"
-                class="px-2 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer"
+                class="px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer"
                 :class="
-                  activeChestNum === c
-                    ? 'ring-2 ring-amber-400 font-bold bg-amber-50/70 border-amber-300 dark:bg-amber-950/40 dark:border-amber-700'
-                    : 'bg-white border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                  activeChestNum === c && isStackMode
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100' + (c === targetChestNum ? ' ring-2 ring-amber-400' : '')
+                    : claimedChests.includes(c)
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                    : personalRoundPoints >= thresholds[c]
+                    ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
+                    : c === targetChestNum
+                    ? 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-2 ring-amber-400 font-bold hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800/60'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 dark:bg-slate-800/70 dark:text-slate-300 dark:border-slate-700'
                 "
+                :title="`Chest ${c} (${(thresholds[c] || 0).toLocaleString()} pts)${c === targetChestNum ? ' - Target' : ''}`"
                 @click="activeChestNum = c"
               >
                 <span class="font-mono">№ {{ c }}</span>
@@ -318,9 +411,13 @@ onUnmounted(() => {
             </div>
 
             <!-- Stacked Deck View -->
-            <div v-if="isStackMode" class="relative pt-1 pb-2">
+            <div v-if="isStackMode" class="relative pt-1 pb-3 flex flex-col justify-center">
+              <!-- 3D Underlay Layers -->
+              <div class="absolute inset-x-4 top-3 bottom-1 rounded-2xl bg-slate-200/70 border border-slate-300 shadow-2xs -z-20 pointer-events-none dark:bg-slate-800/50 dark:border-slate-700/60"></div>
+              <div class="absolute inset-x-2 top-2 bottom-2 rounded-2xl bg-slate-100/80 border border-slate-300 shadow-xs -z-10 pointer-events-none dark:bg-slate-800/80 dark:border-slate-700/80"></div>
+
               <div
-                class="rounded-2xl border-2 p-4 flex flex-col justify-between text-xs transition-all relative"
+                class="rounded-2xl border-2 p-3.5 sm:p-4 flex flex-col justify-between text-xs transition-all relative z-10 shadow-xl"
                 :class="
                   claimedChests.includes(activeChestNum)
                     ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-100/50 shadow-sm dark:border-emerald-600/60 dark:from-emerald-950/40 dark:via-slate-800/90 dark:to-emerald-950/30'
@@ -361,8 +458,19 @@ onUnmounted(() => {
                 <!-- Milestone Requirement -->
                 <div class="flex items-baseline justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
                   <span class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Milestone Requirement</span>
-                  <span class="tabular-nums font-extrabold text-sm text-slate-900 dark:text-slate-100">
-                    {{ formatNumber(thresholds[activeChestNum] || 0) }} pts
+                  <span
+                    class="tabular-nums font-extrabold text-sm"
+                    :class="
+                      claimedChests.includes(activeChestNum)
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : personalRoundPoints >= thresholds[activeChestNum]
+                        ? 'text-amber-800 dark:text-amber-400'
+                        : activeChestNum === targetChestNum
+                        ? 'text-indigo-900 dark:text-indigo-300'
+                        : 'text-slate-700 dark:text-slate-300'
+                    "
+                  >
+                    {{ (thresholds[activeChestNum] || 0).toLocaleString() }} pts
                   </span>
                 </div>
 
@@ -370,9 +478,12 @@ onUnmounted(() => {
                 <div class="mt-2 space-y-1">
                   <div class="flex justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
                     <span>Progress</span>
-                    <span class="tabular-nums font-bold">
+                    <span
+                      class="tabular-nums font-bold"
+                      :class="claimedChests.includes(activeChestNum) || personalRoundPoints >= thresholds[activeChestNum] ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'"
+                    >
                       {{ Math.min(100, Math.round((personalRoundPoints / (thresholds[activeChestNum] || 1)) * 100)) }}%
-                      ({{ formatNumber(personalRoundPoints) }} / {{ formatNumber(thresholds[activeChestNum] || 0) }})
+                      ({{ personalRoundPoints.toLocaleString() }} / {{ (thresholds[activeChestNum] || 0).toLocaleString() }})
                     </span>
                   </div>
                   <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
@@ -457,7 +568,7 @@ onUnmounted(() => {
                     </span>
                   </div>
                   <div class="text-[10px] text-slate-400 font-mono mb-2">
-                    {{ formatNumber(thresholds[c]) }} pts
+                    {{ (thresholds[c] || 0).toLocaleString() }} pts
                   </div>
 
                   <!-- Reward snippet -->
@@ -470,6 +581,183 @@ onUnmounted(() => {
                       {{ formatRewardItem(String(rKey), Number(amt)) }}
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 4: 6-Round Battle Schedule & Quests -->
+          <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">🗓️ 6-Round Battle Schedule & Quests</h3>
+              <span class="text-xs text-slate-500 dark:text-slate-400">Click round to view point-earning quests</span>
+            </div>
+
+            <div class="space-y-2">
+              <details
+                v-for="r in roundsList"
+                :key="`round-${r.index}`"
+                :open="r.status === 'inProgress'"
+                class="group rounded-lg border text-xs overflow-hidden transition-colors"
+                :class="
+                  r.status === 'inProgress'
+                    ? 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-700/60 dark:bg-emerald-950/30'
+                    : 'border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/50'
+                "
+              >
+                <summary class="flex items-center justify-between p-2.5 cursor-pointer select-none hover:bg-slate-100/60 dark:hover:bg-slate-700/40 list-none">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span
+                      class="size-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0"
+                      :class="r.status === 'inProgress' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'"
+                    >
+                      {{ r.index }}
+                    </span>
+                    <div class="min-w-0">
+                      <div class="font-bold text-slate-900 dark:text-slate-100 truncate">
+                        {{ roundQuestsMap[r.index]?.theme || r.theme || `Round ${r.index}` }}
+                      </div>
+                      <div class="text-[10px] text-slate-500 dark:text-slate-400">
+                        Reward: {{ r.score || roundQuestsMap[r.index]?.battlePoints || 1 }} Battle Point{{ (r.score || roundQuestsMap[r.index]?.battlePoints || 1) > 1 ? 's' : '' }} • {{ (roundQuestsMap[r.index]?.quests || []).length }} Quests
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="text-right shrink-0 ml-2">
+                    <div v-if="r.status === 'inProgress'">
+                      <div class="font-black text-emerald-800 dark:text-emerald-400 tabular-nums">
+                        {{ formatNumber(r.points || 0) }} vs {{ formatNumber(r.enemyPoints || 0) }}
+                      </div>
+                      <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                        <span class="size-1.5 rounded-full bg-emerald-500 animate-ping"></span>In Progress
+                      </span>
+                    </div>
+                    <div v-else-if="r.status === 'finished'">
+                      <div class="font-bold text-slate-700 dark:text-slate-300">
+                        {{ formatNumber(r.points || 0) }} vs {{ formatNumber(r.enemyPoints || 0) }}
+                      </div>
+                      <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Finished</span>
+                    </div>
+                    <span v-else class="rounded bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">
+                      Upcoming
+                    </span>
+                  </div>
+                </summary>
+
+                <!-- Quests List inside round -->
+                <div class="p-3 border-t border-slate-200/80 bg-white/70 space-y-2 dark:border-slate-700/80 dark:bg-slate-800/70">
+                  <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    <span>🎯 Quests to Earn Points:</span>
+                    <span class="text-[10px] text-slate-400 dark:text-slate-500 font-normal">Day {{ r.index }}</span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <div
+                      v-for="q in roundQuestsMap[r.index]?.quests || []"
+                      :key="q.label"
+                      class="flex items-center justify-between rounded bg-white border border-slate-200/80 px-2 py-1 text-[11px] dark:bg-slate-800/90 dark:border-slate-700"
+                    >
+                      <span
+                        class="text-slate-800 dark:text-slate-200 font-medium truncate mr-1.5"
+                        :title="getQuestDisplayName(q)"
+                      >
+                        {{ getQuestDisplayName(q) }}
+                      </span>
+                      <span class="rounded bg-emerald-50 text-emerald-700 px-1.5 py-0.2 font-bold tabular-nums shrink-0 border border-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60">
+                        +{{ q.points.toLocaleString() }} pts
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- Section 5: Guild Participation & Requirements -->
+          <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">👥 Guild Participation & Requirements</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+                <div class="text-slate-500 dark:text-slate-400 text-[11px]">Active Members</div>
+                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">{{ curUsers }} / {{ minUsers }} req</div>
+                <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">✓ Satisfied</span>
+              </div>
+
+              <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+                <div class="text-slate-500 dark:text-slate-400 text-[11px]">Weekly Activity</div>
+                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">{{ weeklyAct.toLocaleString() }}</div>
+                <span class="text-[10px] text-slate-400 dark:text-slate-500">Total guild score</span>
+              </div>
+
+              <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+                <div class="text-slate-500 dark:text-slate-400 text-[11px]">Personal Status</div>
+                <div
+                  class="font-bold text-sm mt-0.5"
+                  :class="personalSat ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'"
+                >
+                  {{ personalSat ? 'Eligible' : 'Pending' }}
+                </div>
+                <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  {{ personalSat ? '✓ Qualified' : 'Action needed' }}
+                </span>
+              </div>
+
+              <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+                <div class="text-slate-500 dark:text-slate-400 text-[11px]">Guild Status</div>
+                <div
+                  class="font-bold text-sm mt-0.5"
+                  :class="guildSat ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'"
+                >
+                  {{ guildSat ? 'Eligible' : 'Pending' }}
+                </div>
+                <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  {{ guildSat ? '✓ Qualified' : 'Action needed' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 6: Daily Challenges -->
+          <div
+            v-if="challenges.length > 0"
+            class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60"
+          >
+            <div class="flex items-center justify-between flex-wrap gap-1">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                🎯 Daily Challenges ({{ challenges.length }})
+              </h3>
+              <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-900 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60">
+                Total: {{ totalChallengePts.toLocaleString() }} pts
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div
+                v-for="ch in challenges"
+                :key="ch.id"
+                class="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs dark:border-slate-700/60 dark:bg-slate-800/70"
+              >
+                <span
+                  class="font-medium text-slate-800 dark:text-slate-200 truncate mr-2"
+                  :title="getChallengeDisplayName(ch)"
+                >
+                  {{ getChallengeDisplayName(ch) }}
+                </span>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
+                    {{ Number(ch.progress || 0).toLocaleString() }}
+                  </span>
+                  <span
+                    class="rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
+                    :class="
+                      getChallengeConvertedPts(ch) > 0
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60'
+                        : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700'
+                    "
+                    :title="challengePoints[ch.id] > 0 ? `${challengePoints[ch.id].toLocaleString()} pts per ${challengeSteps[ch.id] === 1 ? 'completion' : `${challengeSteps[ch.id]} units`}` : ''"
+                  >
+                    {{ getChallengeConvertedPts(ch).toLocaleString() }} pts
+                  </span>
                 </div>
               </div>
             </div>

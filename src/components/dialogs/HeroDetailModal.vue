@@ -135,6 +135,7 @@ interface SkillSlotConfig {
   rankName: string;
   bg: string;
   badge: string;
+  delta: number;
   maxLvl: number;
 }
 
@@ -147,6 +148,7 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
     rankName: 'White',
     bg: 'border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40',
     badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
+    delta: 0,
     maxLvl: heroLevel.value,
   },
   {
@@ -157,6 +159,7 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
     rankName: 'Green',
     bg: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20',
     badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
+    delta: 0,
     maxLvl: heroLevel.value,
   },
   {
@@ -167,6 +170,7 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
     rankName: 'Blue',
     bg: 'border-sky-200 bg-sky-50/60 dark:border-sky-900/40 dark:bg-sky-950/20',
     badge: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200',
+    delta: 20,
     maxLvl: Math.max(0, heroLevel.value - 20),
   },
   {
@@ -177,9 +181,26 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
     rankName: 'Violet',
     bg: 'border-purple-200 bg-purple-50/60 dark:border-purple-900/40 dark:bg-purple-950/20',
     badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200',
+    delta: 40,
     maxLvl: Math.max(0, heroLevel.value - 40),
   },
 ]);
+
+function getSkillDisplayLevel(s: SkillSlotConfig): number {
+  const skillKey = skillKeys.value[s.slot - 1];
+  const rawLvl = Number(activeHero.value?.skills?.[skillKey] ?? activeHero.value?.skills?.[s.slot] ?? 1);
+  return Math.max(1, rawLvl - s.delta);
+}
+
+function isSkillMax(s: SkillSlotConfig): boolean {
+  if (s.maxLvl <= 0) return false;
+  return getSkillDisplayLevel(s) >= s.maxLvl;
+}
+
+function getSkillProgressPercent(s: SkillSlotConfig): number {
+  if (s.maxLvl <= 0) return 0;
+  return Math.min(100, Math.round((getSkillDisplayLevel(s) / s.maxLvl) * 100));
+}
 
 const upgradingSkills = ref<Record<number, boolean>>({});
 
@@ -668,10 +689,7 @@ const JUSTICE_STAR_SVG_PATH =
                       Locked
                     </span>
                     <span
-                      v-else-if="
-                        Number(activeHero?.skills?.[skillKeys[s.slot - 1]] ?? activeHero?.skills?.[s.slot] ?? 1) >= s.maxLvl &&
-                        s.maxLvl > 0
-                      "
+                      v-else-if="isSkillMax(s)"
                       class="px-2 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
                     >
                       MAX
@@ -684,7 +702,7 @@ const JUSTICE_STAR_SVG_PATH =
                       :title="
                         skillPoints <= 0
                           ? 'No skill points available'
-                          : `Upgrade ${meta?.skills?.[s.slot - 1] || s.label} to Lv. ${(Number(activeHero?.skills?.[skillKeys[s.slot - 1]] ?? activeHero?.skills?.[s.slot] ?? 1)) + 1}`
+                          : `Upgrade ${meta?.skills?.[s.slot - 1] || s.label} to Lv. ${getSkillDisplayLevel(s) + 1}`
                       "
                       :aria-label="`Upgrade ${meta?.skills?.[s.slot - 1] || s.label}`"
                       @click="upgradeSkill(s)"
@@ -704,33 +722,19 @@ const JUSTICE_STAR_SVG_PATH =
                       <span>
                         Level:
                         <span class="font-bold text-slate-700 dark:text-slate-200">
-                          {{ Number(activeHero?.skills?.[skillKeys[s.slot - 1]] ?? activeHero?.skills?.[s.slot] ?? 1) }}
+                          {{ getSkillDisplayLevel(s) }}
                         </span>
                         / {{ s.maxLvl }}
                       </span>
                       <span>
-                        {{
-                          s.maxLvl > 0
-                            ? Math.min(100, Math.round(((Number(activeHero?.skills?.[skillKeys[s.slot - 1]] ?? activeHero?.skills?.[s.slot] ?? 1)) / s.maxLvl) * 100))
-                            : 0
-                        }}%
+                        {{ getSkillProgressPercent(s) }}%
                       </span>
                     </div>
                     <div class="w-full bg-slate-200/80 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                       <div
                         class="h-full rounded-full transition-all"
-                        :class="
-                          Number(activeHero?.skills?.[skillKeys[s.slot - 1]] ?? activeHero?.skills?.[s.slot] ?? 1) >= s.maxLvl
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
-                        "
-                        :style="{
-                          width: `${
-                            s.maxLvl > 0
-                              ? Math.min(100, Math.round(((Number(activeHero?.skills?.[skillKeys[s.slot - 1]] ?? activeHero?.skills?.[s.slot] ?? 1)) / s.maxLvl) * 100))
-                              : 0
-                          }%`,
-                        }"
+                        :class="isSkillMax(s) ? 'bg-amber-500' : 'bg-emerald-500'"
+                        :style="{ width: `${getSkillProgressPercent(s)}%` }"
                       ></div>
                     </div>
                   </template>
