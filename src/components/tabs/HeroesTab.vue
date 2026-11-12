@@ -624,12 +624,23 @@ function exportHeroesJson() {
         </div>
 
         <!-- Soul Stones Progress bar -->
-        <div class="space-y-0.5 text-[10px]">
-          <div class="flex items-center justify-between">
-            <span class="text-slate-400 font-mono">Soul: {{ h.soulProg.formatted }}</span>
-            <span v-if="h.soulProg.canEvolve" class="text-emerald-600 dark:text-emerald-400 font-bold uppercase text-[9px]">
-              Ready
+        <div class="space-y-1">
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="text-slate-400 font-medium">Soul:</span>
+            <span
+              class="font-mono font-bold"
+              :class="h.soulProg.canEvolve ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-400'"
+            >
+              {{ formatNumber(h.soulProg.owned) }} / {{ typeof h.soulProg.needed === 'number' ? formatNumber(h.soulProg.needed) : (h.soulProg.needed ?? '—') }}
             </span>
+          </div>
+          <!-- Progress bar -->
+          <div class="h-1 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all"
+              :class="h.soulProg.canEvolve ? 'bg-emerald-500' : 'bg-blue-500'"
+              :style="{ width: `${typeof h.soulProg.needed === 'number' && h.soulProg.needed > 0 ? Math.min(100, (h.soulProg.owned / h.soulProg.needed) * 100) : 100}%` }"
+            ></div>
           </div>
         </div>
 

@@ -377,6 +377,8 @@ test('HeroesTab and HeroHoverCard provide full HTML parity: table view, favorite
   assert.match(heroesTab, /canEvolve/, 'HeroesTab must track canEvolve status');
   assert.match(heroesTab, /getHeroEquipmentRank/, 'HeroesTab must use getHeroEquipmentRank');
   assert.match(heroesTab, /hero-hover-trigger/, 'HeroesTab must use hero-hover-trigger class');
+  assert.match(heroesTab, /bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden/, 'HeroesTab must render soul progress track in grid cards');
+  assert.match(heroesTab, /h\.soulProg\.canEvolve \? 'bg-emerald-500' : 'bg-blue-500'/, 'HeroesTab must render soul progress bar with canEvolve highlight');
 
   const hoverCard = await readFile(join(root, 'src/components/common/HeroHoverCard.vue'), 'utf8');
   assert.match(hoverCard, /hero-hover-card/, 'HeroHoverCard must have hero-hover-card class');
