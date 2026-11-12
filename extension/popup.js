@@ -3975,15 +3975,21 @@ function openGuildVersusModal(vsStatus, cache) {
 
       const item = document.createElement('div');
       item.className = 'flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs dark:border-slate-700/60 dark:bg-slate-800/70';
+      const rateSub = ptsPerStep > 0
+        ? `<span class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">+${ptsPerStep.toLocaleString()} pts / ${step.toLocaleString()} ${step > 1 ? 'units' : 'action'}</span>`
+        : '';
       item.innerHTML = `
-        <span class="font-medium text-slate-800 dark:text-slate-200 truncate mr-2" title="${displayName}">${displayName}</span>
+        <div class="flex flex-col min-w-0 mr-2">
+          <span class="font-medium text-slate-800 dark:text-slate-200 truncate" title="${displayName}">${displayName}</span>
+          ${rateSub}
+        </div>
         <div class="flex items-center gap-1.5 shrink-0">
-          <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">${progress.toLocaleString()}</span>
+          <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700" title="Progress: ${progress.toLocaleString()}">${progress.toLocaleString()}</span>
           <span class="rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
             convertedPts > 0
               ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60'
               : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700'
-          }" title="${ptsPerStep > 0 ? `${ptsPerStep.toLocaleString()} pts per ${step === 1 ? 'completion' : `${step} units`}` : ''}">${convertedPts.toLocaleString()} pts</span>
+          }" title="${ptsPerStep > 0 ? `${ptsPerStep.toLocaleString()} pts per ${step === 1 ? 'completion' : `${step.toLocaleString()} units`}` : ''}">${convertedPts.toLocaleString()} pts</span>
         </div>
       `;
       chGrid.append(item);

@@ -91,6 +91,10 @@
   const challengeNames = {
     7: 'Defeat 1 Map Monster (Lv. 1+)',
     8: 'Clear 1 Bandit Camp',
+    9: 'Gather 3,000 Food on Map',
+    10: 'Gather 3,000 Wood on Map',
+    11: 'Gather 600 Stone on Map',
+    12: 'Gather 150 Iron on Map',
     13: 'Defeat 1 Map Boss / Rally',
     14: 'Increase Research Power by 1',
     15: 'Use 1 Research Speedup',
@@ -111,8 +115,10 @@
     30: 'Fight 1 Arena Battle',
     31: 'Open 1 Tower Chest',
     32: 'Complete 1 Daily Quest',
+    33: 'Spend 15 Sparks of Power',
     34: 'Open 1 Heroic Chest',
     35: 'Obtain 1 VIP Point',
+    36: 'Spend 1 Hero Artifact Fragment',
     37: 'Spend 15 Hero Skin Stones',
     38: 'Open 1 Artifact Chest',
     39: 'Start 1 Expedition',
@@ -124,6 +130,7 @@
     45: 'Equip 1 Green Item',
     46: 'Equip 1 White Item',
     47: 'Collect 1 Hero Soul Stone',
+    48: 'Spend 25 Fairy Dust',
     49: 'Spend 3 Energy',
     50: 'Spend 100 Rune Spheres',
     51: 'Spend 20 Rune Stones',
@@ -135,8 +142,45 @@
     57: 'Spend 1 Chaos Core',
     70: 'Use 1 Building Speedup',
     92: 'Spend 1 Honor Mark',
+    94: 'Lose 1 Tier 9 Troop in PvP',
+    95: 'Lose 1 Tier 8 Troop in PvP',
+    96: 'Lose 1 Tier 7 Troop in PvP',
+    97: 'Lose 1 Tier 6 Troop in PvP',
+    98: 'Lose 1 Tier 5 Troop in PvP',
+    99: 'Lose 1 Tier 4 Troop in PvP',
+    100: 'Lose 1 Tier 3 Troop in PvP',
+    101: 'Lose 1 Tier 2 Troop in PvP',
+    102: 'Lose 1 Tier 1 Troop in PvP',
+    103: 'Defeat 1 Tier 9 Troop in PvP',
+    104: 'Defeat 1 Tier 8 Troop in PvP',
+    105: 'Defeat 1 Tier 7 Troop in PvP',
+    106: 'Defeat 1 Tier 6 Troop in PvP',
+    107: 'Defeat 1 Tier 5 Troop in PvP',
+    108: 'Defeat 1 Tier 4 Troop in PvP',
+    109: 'Defeat 1 Tier 3 Troop in PvP',
+    110: 'Defeat 1 Tier 2 Troop in PvP',
+    111: 'Defeat 1 Tier 1 Troop in PvP',
+    112: 'Use 1 Healing Speedup',
     113: 'Increase Building Power by 1',
-    114: 'Open 1 Outland Chest'
+    114: 'Open 1 Outland Chest',
+    134: 'Defeat 1 Tier 1 Troop in PvP (Rival Guild)',
+    135: 'Defeat 1 Tier 2 Troop in PvP (Rival Guild)',
+    136: 'Defeat 1 Tier 3 Troop in PvP (Rival Guild)',
+    137: 'Defeat 1 Tier 4 Troop in PvP (Rival Guild)',
+    138: 'Defeat 1 Tier 5 Troop in PvP (Rival Guild)',
+    139: 'Defeat 1 Tier 6 Troop in PvP (Rival Guild)',
+    140: 'Defeat 1 Tier 7 Troop in PvP (Rival Guild)',
+    141: 'Defeat 1 Tier 8 Troop in PvP (Rival Guild)',
+    142: 'Defeat 1 Tier 9 Troop in PvP (Rival Guild)',
+    152: 'Defeat 1 Tier 1 Troop in PvP (Non-Battle)',
+    153: 'Defeat 1 Tier 2 Troop in PvP (Non-Battle)',
+    154: 'Defeat 1 Tier 3 Troop in PvP (Non-Battle)',
+    155: 'Defeat 1 Tier 4 Troop in PvP (Non-Battle)',
+    156: 'Defeat 1 Tier 5 Troop in PvP (Non-Battle)',
+    157: 'Defeat 1 Tier 6 Troop in PvP (Non-Battle)',
+    158: 'Defeat 1 Tier 7 Troop in PvP (Non-Battle)',
+    159: 'Defeat 1 Tier 8 Troop in PvP (Non-Battle)',
+    160: 'Defeat 1 Tier 9 Troop in PvP (Non-Battle)'
   };
 
   // Points awarded per completion for each daily challenge ID
@@ -144,28 +188,34 @@
   const challengePoints = {
     7: 2000,     // Defeat 1 Map Monster (Lv. 1+)
     8: 2500,     // Clear 1 Bandit Camp
+    9: 10,       // Gather 3,000 Food on Map
+    10: 10,      // Gather 3,000 Wood on Map
+    11: 10,      // Gather 600 Stone on Map
+    12: 10,      // Gather 150 Iron on Map
     13: 850,     // Defeat 1 Map Boss / Rally
     14: 30,      // Increase Research Power by 1
     15: 200,     // Use 1 Research Speedup
     16: 5000,    // Spend 1 Skill Book
     17: 200,     // Use 1 Training Speedup
     18: 120,     // Train 1 Tier 9 Troop
-    19: 100,     // Train 1 Tier 8 Troop
-    20: 80,      // Train 1 Tier 7 Troop
-    21: 65,      // Train 1 Tier 6 Troop
-    22: 50,      // Train 1 Tier 5 Troop
-    23: 40,      // Train 1 Tier 4 Troop
-    24: 30,      // Train 1 Tier 3 Troop
-    25: 20,      // Train 1 Tier 2 Troop
-    26: 10,      // Train 1 Tier 1 Troop
+    19: 84,      // Train 1 Tier 8 Troop
+    20: 59,      // Train 1 Tier 7 Troop
+    21: 41,      // Train 1 Tier 6 Troop
+    22: 29,      // Train 1 Tier 5 Troop
+    23: 20,      // Train 1 Tier 4 Troop
+    24: 14,      // Train 1 Tier 3 Troop
+    25: 10,      // Train 1 Tier 2 Troop
+    26: 7,       // Train 1 Tier 1 Troop
     27: 100,     // Increase Titan Power by 3
     28: 1500,    // Summon 1 Titan in Circle
     29: 1200,    // Open 1 Elemental Sphere
     30: 6000,    // Fight 1 Arena Battle
     31: 4000,    // Open 1 Tower Chest
     32: 2000,    // Complete 1 Daily Quest
+    33: 30,      // Spend 15 Sparks of Power
     34: 4000,    // Open 1 Heroic Chest
     35: 100,     // Obtain 1 VIP Point
+    36: 1200,    // Spend 1 Hero Artifact Fragment
     37: 700,     // Spend 15 Hero Skin Stones
     38: 750,     // Open 1 Artifact Chest
     39: 5000,    // Start 1 Expedition
@@ -175,8 +225,9 @@
     43: 27000,   // Equip 1 Violet Item
     44: 5000,    // Equip 1 Blue Item
     45: 1000,    // Equip 1 Green Item
-    46: 200,     // Equip 1 White Item
+    46: 400,     // Equip 1 White Item
     47: 500,     // Collect 1 Hero Soul Stone
+    48: 50,      // Spend 25 Fairy Dust
     49: 100,     // Spend 3 Energy
     50: 50000,   // Spend 100 Rune Spheres
     51: 100,     // Spend 20 Rune Stones
@@ -188,14 +239,55 @@
     57: 3000,    // Spend 1 Chaos Core
     70: 200,     // Use 1 Building Speedup
     92: 2000,    // Spend 1 Honor Mark
+    94: 18,      // Lose 1 Tier 9 Troop in PvP
+    95: 16,      // Lose 1 Tier 8 Troop in PvP
+    96: 12,      // Lose 1 Tier 7 Troop in PvP
+    97: 8,       // Lose 1 Tier 6 Troop in PvP
+    98: 6,       // Lose 1 Tier 5 Troop in PvP
+    99: 4,       // Lose 1 Tier 4 Troop in PvP
+    100: 3,      // Lose 1 Tier 3 Troop in PvP
+    101: 2,      // Lose 1 Tier 2 Troop in PvP
+    102: 1,      // Lose 1 Tier 1 Troop in PvP
+    103: 30,     // Defeat 1 Tier 9 Troop in PvP
+    104: 26,     // Defeat 1 Tier 8 Troop in PvP
+    105: 19,     // Defeat 1 Tier 7 Troop in PvP
+    106: 13,     // Defeat 1 Tier 6 Troop in PvP
+    107: 9,      // Defeat 1 Tier 5 Troop in PvP
+    108: 6,      // Defeat 1 Tier 4 Troop in PvP
+    109: 4,      // Defeat 1 Tier 3 Troop in PvP
+    110: 3,      // Defeat 1 Tier 2 Troop in PvP
+    111: 2,      // Defeat 1 Tier 1 Troop in PvP
+    112: 200,    // Use 1 Healing Speedup
     113: 200,    // Increase Building Power by 1
-    114: 2000    // Open 1 Outland Chest
+    114: 2000,   // Open 1 Outland Chest
+    134: 4,      // Defeat 1 Tier 1 Troop in PvP (Rival Guild)
+    135: 6,      // Defeat 1 Tier 2 Troop in PvP (Rival Guild)
+    136: 8,      // Defeat 1 Tier 3 Troop in PvP (Rival Guild)
+    137: 13,     // Defeat 1 Tier 4 Troop in PvP (Rival Guild)
+    138: 20,     // Defeat 1 Tier 5 Troop in PvP (Rival Guild)
+    139: 27,     // Defeat 1 Tier 6 Troop in PvP (Rival Guild)
+    140: 41,     // Defeat 1 Tier 7 Troop in PvP (Rival Guild)
+    141: 55,     // Defeat 1 Tier 8 Troop in PvP (Rival Guild)
+    142: 62,     // Defeat 1 Tier 9 Troop in PvP (Rival Guild)
+    152: 2,      // Defeat 1 Tier 1 Troop in PvP (Non-Battle)
+    153: 3,      // Defeat 1 Tier 2 Troop in PvP (Non-Battle)
+    154: 4,      // Defeat 1 Tier 3 Troop in PvP (Non-Battle)
+    155: 6,      // Defeat 1 Tier 4 Troop in PvP (Non-Battle)
+    156: 9,      // Defeat 1 Tier 5 Troop in PvP (Non-Battle)
+    157: 13,     // Defeat 1 Tier 6 Troop in PvP (Non-Battle)
+    158: 19,     // Defeat 1 Tier 7 Troop in PvP (Non-Battle)
+    159: 26,     // Defeat 1 Tier 8 Troop in PvP (Non-Battle)
+    160: 30      // Defeat 1 Tier 9 Troop in PvP (Non-Battle)
   };
 
   // Unit denominator / step required to earn challengePoints for each daily challenge ID
   const challengeSteps = {
     7: 1,      // Defeat 1 Map Monster (Lv. 1+)
     8: 1,      // Clear 1 Bandit Camp
+    9: 3000,   // Gather 3,000 Food on Map (10 pts per 3,000 Food)
+    10: 3000,  // Gather 3,000 Wood on Map (10 pts per 3,000 Wood)
+    11: 600,   // Gather 600 Stone on Map (10 pts per 600 Stone)
+    12: 150,   // Gather 150 Iron on Map (10 pts per 150 Iron)
     13: 1,     // Defeat 1 Map Boss / Rally
     14: 1,     // Increase Research Power by 1
     15: 1,     // Use 1 Research Speedup
@@ -216,8 +308,10 @@
     30: 1,     // Fight 1 Arena Battle
     31: 1,     // Open 1 Tower Chest
     32: 1,     // Complete 1 Daily Quest
+    33: 15,    // Spend 15 Sparks of Power (30 pts per 15 sparks)
     34: 1,     // Open 1 Heroic Chest
     35: 1,     // Obtain 1 VIP Point
+    36: 1,     // Spend 1 Hero Artifact Fragment
     37: 15,    // Spend 15 Hero Skin Stones (700 pts per 15 stones)
     38: 1,     // Open 1 Artifact Chest
     39: 1,     // Start 1 Expedition
@@ -229,6 +323,7 @@
     45: 1,     // Equip 1 Green Item
     46: 1,     // Equip 1 White Item
     47: 1,     // Collect 1 Hero Soul Stone
+    48: 25,    // Spend 25 Fairy Dust (50 pts per 25 fairy dust)
     49: 3,     // Spend 3 Energy (100 pts per 3 energy)
     50: 100,   // Spend 100 Rune Spheres (50,000 pts per 100 spheres)
     51: 20,    // Spend 20 Rune Stones (100 pts per 20 stones)
@@ -240,8 +335,45 @@
     57: 1,     // Spend 1 Chaos Core
     70: 1,     // Use 1 Building Speedup
     92: 1,     // Spend 1 Honor Mark
+    94: 1,     // Lose 1 Tier 9 Troop in PvP
+    95: 1,     // Lose 1 Tier 8 Troop in PvP
+    96: 1,     // Lose 1 Tier 7 Troop in PvP
+    97: 1,     // Lose 1 Tier 6 Troop in PvP
+    98: 1,     // Lose 1 Tier 5 Troop in PvP
+    99: 1,     // Lose 1 Tier 4 Troop in PvP
+    100: 1,    // Lose 1 Tier 3 Troop in PvP
+    101: 1,    // Lose 1 Tier 2 Troop in PvP
+    102: 1,    // Lose 1 Tier 1 Troop in PvP
+    103: 1,    // Defeat 1 Tier 9 Troop in PvP
+    104: 1,    // Defeat 1 Tier 8 Troop in PvP
+    105: 1,    // Defeat 1 Tier 7 Troop in PvP
+    106: 1,    // Defeat 1 Tier 6 Troop in PvP
+    107: 1,    // Defeat 1 Tier 5 Troop in PvP
+    108: 1,    // Defeat 1 Tier 4 Troop in PvP
+    109: 1,    // Defeat 1 Tier 3 Troop in PvP
+    110: 1,    // Defeat 1 Tier 2 Troop in PvP
+    111: 1,    // Defeat 1 Tier 1 Troop in PvP
+    112: 1,    // Use 1 Healing Speedup
     113: 1,    // Increase Building Power by 1
-    114: 1     // Open 1 Outland Chest
+    114: 1,    // Open 1 Outland Chest
+    134: 1,    // Defeat 1 Tier 1 Troop in PvP (Rival Guild)
+    135: 1,    // Defeat 1 Tier 2 Troop in PvP (Rival Guild)
+    136: 1,    // Defeat 1 Tier 3 Troop in PvP (Rival Guild)
+    137: 1,    // Defeat 1 Tier 4 Troop in PvP (Rival Guild)
+    138: 1,    // Defeat 1 Tier 5 Troop in PvP (Rival Guild)
+    139: 1,    // Defeat 1 Tier 6 Troop in PvP (Rival Guild)
+    140: 1,    // Defeat 1 Tier 7 Troop in PvP (Rival Guild)
+    141: 1,    // Defeat 1 Tier 8 Troop in PvP (Rival Guild)
+    142: 1,    // Defeat 1 Tier 9 Troop in PvP (Rival Guild)
+    152: 1,    // Defeat 1 Tier 1 Troop in PvP (Non-Battle)
+    153: 1,    // Defeat 1 Tier 2 Troop in PvP (Non-Battle)
+    154: 1,    // Defeat 1 Tier 3 Troop in PvP (Non-Battle)
+    155: 1,    // Defeat 1 Tier 4 Troop in PvP (Non-Battle)
+    156: 1,    // Defeat 1 Tier 5 Troop in PvP (Non-Battle)
+    157: 1,    // Defeat 1 Tier 6 Troop in PvP (Non-Battle)
+    158: 1,    // Defeat 1 Tier 7 Troop in PvP (Non-Battle)
+    159: 1,    // Defeat 1 Tier 8 Troop in PvP (Non-Battle)
+    160: 1     // Defeat 1 Tier 9 Troop in PvP (Non-Battle)
   };
 
   // Quests / point earning activities for all 6 battle rounds
@@ -317,8 +449,11 @@
         { label: 'Equip 1 Violet Item', points: 27000 },
         { label: 'Equip 1 Blue Item', points: 5000 },
         { label: 'Equip 1 Green Item', points: 1000 },
-        { label: 'Equip 1 White Item', points: 200 },
-        { label: 'Gather Resources on Map', points: 10 },
+        { label: 'Equip 1 White Item', points: 400 },
+        { label: 'Gather 3,000 Food on Map', points: 10 },
+        { label: 'Gather 3,000 Wood on Map', points: 10 },
+        { label: 'Gather 600 Stone on Map', points: 10 },
+        { label: 'Gather 150 Iron on Map', points: 10 },
         { label: 'Fight 1 Arena Battle', points: 6000 },
         { label: 'Fight 1 Grand Arena Battle', points: 6000 },
         { label: 'Open 1 Tower Chest', points: 4000 },

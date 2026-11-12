@@ -756,6 +756,51 @@ test('openGuildVersusModal populates all 6 sections and displays modal', () => {
   assert.ok(bodyText.includes('Quests to Earn Points'));
 });
 
+test('openGuildVersusModal accurately calculates gathering resource challenges with correct step denominators', () => {
+  modal.hidden = true;
+  modalBody.replaceChildren();
+
+  const vsData = {
+    battle: {
+      league: 'bronze',
+      rounds: [
+        { index: 2, theme: 'City Development & Gathering', status: 'inProgress' }
+      ]
+    },
+    info: {
+      battleNumber: 4,
+      roundNumber: 2,
+      challenges: [
+        { id: 9, progress: 30000 },  // Food: step 3000, 10 pts -> 100 pts
+        { id: 10, progress: 15000 }, // Wood: step 3000, 10 pts -> 50 pts
+        { id: 11, progress: 6000 },  // Stone: step 600, 10 pts -> 100 pts
+        { id: 12, progress: 1500 }   // Iron: step 150, 10 pts -> 100 pts
+      ]
+    },
+    rewards: {},
+    chestNumbers: []
+  };
+
+  context.openGuildVersusModal(vsData);
+  const text = modalBody.textContent;
+
+  // Challenge titles
+  assert.ok(text.includes('Gather 3,000 Food on Map'));
+  assert.ok(text.includes('Gather 3,000 Wood on Map'));
+  assert.ok(text.includes('Gather 600 Stone on Map'));
+  assert.ok(text.includes('Gather 150 Iron on Map'));
+
+  // Rate denominators
+  assert.ok(text.includes('+10 pts / 3,000 units'));
+  assert.ok(text.includes('+10 pts / 600 units'));
+  assert.ok(text.includes('+10 pts / 150 units'));
+
+  // Converted points: 100 + 50 + 100 + 100 = 350 pts
+  assert.ok(text.includes('Total: 350 pts'));
+  assert.ok(text.includes('100 pts'));
+  assert.ok(text.includes('50 pts'));
+});
+
 test('header resource capped styling toggles classes when cap reached or exceeded', () => {
   energyBadge.className = 'inline-flex rounded-full';
   worldEnergyBadge.className = 'inline-flex rounded-full';

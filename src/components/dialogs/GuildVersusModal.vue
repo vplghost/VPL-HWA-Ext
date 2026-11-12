@@ -737,14 +737,25 @@ onUnmounted(() => {
                 :key="ch.id"
                 class="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs dark:border-slate-700/60 dark:bg-slate-800/70"
               >
-                <span
-                  class="font-medium text-slate-800 dark:text-slate-200 truncate mr-2"
-                  :title="getChallengeDisplayName(ch)"
-                >
-                  {{ getChallengeDisplayName(ch) }}
-                </span>
+                <div class="flex flex-col min-w-0 mr-2">
+                  <span
+                    class="font-medium text-slate-800 dark:text-slate-200 truncate"
+                    :title="getChallengeDisplayName(ch)"
+                  >
+                    {{ getChallengeDisplayName(ch) }}
+                  </span>
+                  <span
+                    v-if="challengePoints[ch.id] > 0"
+                    class="text-[10px] text-slate-500 dark:text-slate-400 font-mono"
+                  >
+                    +{{ Number(challengePoints[ch.id] || 0).toLocaleString() }} pts / {{ Number(challengeSteps[ch.id] || 1).toLocaleString() }} {{ (challengeSteps[ch.id] || 1) > 1 ? 'units' : 'action' }}
+                  </span>
+                </div>
                 <div class="flex items-center gap-1.5 shrink-0">
-                  <span class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
+                  <span
+                    class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700"
+                    :title="`Progress: ${Number(ch.progress || 0).toLocaleString()}`"
+                  >
                     {{ Number(ch.progress || 0).toLocaleString() }}
                   </span>
                   <span
@@ -754,7 +765,7 @@ onUnmounted(() => {
                         ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60'
                         : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700'
                     "
-                    :title="challengePoints[ch.id] > 0 ? `${challengePoints[ch.id].toLocaleString()} pts per ${challengeSteps[ch.id] === 1 ? 'completion' : `${challengeSteps[ch.id]} units`}` : ''"
+                    :title="challengePoints[ch.id] > 0 ? `${Number(challengePoints[ch.id]).toLocaleString()} pts per ${Number(challengeSteps[ch.id]) === 1 ? 'completion' : `${Number(challengeSteps[ch.id]).toLocaleString()} units`}` : ''"
                   >
                     {{ getChallengeConvertedPts(ch).toLocaleString() }} pts
                   </span>

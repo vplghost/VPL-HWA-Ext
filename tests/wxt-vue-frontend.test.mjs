@@ -1275,6 +1275,7 @@ test('GuildVersusModal synchronizes all 6 sections with legacy HTML', async () =
   assert.match(gvs, /Daily Challenges/, 'GuildVersusModal must include daily challenges section');
   assert.match(gvs, /totalChallengePts/, 'GuildVersusModal must compute total challenge points');
   assert.match(gvs, /getChallengeConvertedPts/, 'GuildVersusModal must convert challenge progress to points');
+  assert.match(gvs, /pts \/.*units/, 'GuildVersusModal must display rate formula in daily challenges');
 });
 
 
