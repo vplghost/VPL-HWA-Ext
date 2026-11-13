@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.58 — 2026-11-13
+
+### Fixed
+
+- Correct troop stock caps to use only completed Drill Grounds; exclude legacy Camp bonuses. Level 19 + level 14 now yields 14,230 for every troop type.
+- Scale troop progress against the true cap, clip visual segments at 100%, and show actual occupancy and excess troop count instead of renormalizing to current stock.
+- Keep unknown and zero-cap progress explicit; training remains blocked while the cap is unknown or reached.
+
 ## 0.10.57 — 2026-11-13
 
 ### Changed

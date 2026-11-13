@@ -1,4 +1,4 @@
-import { CAMP_LIMIT_BY_LEVEL, DRILL_GROUND_BUILDING_IDS, DRILL_GROUND_LIMIT_BY_LEVEL } from './troopLimitData.ts';
+import { DRILL_GROUND_BUILDING_IDS, DRILL_GROUND_LIMIT_BY_LEVEL } from './troopLimitData.ts';
 
 export function getTroopType(unitId: number | string): { type: 0 | 1 | 2; level: number } | null {
   const id = Number(unitId);
@@ -27,10 +27,32 @@ export const CAMP_BUILDING_IDS: Record<number, number> = {
   2: 40, // Infantry Camp
 };
 
+/** Progress against the true cap, never against an inflated current-stock denominator. */
+export function troopStockProgress(stock: { readyCount: number; hospitalCount: number; trainingCount: number; maxTroops: number | null }) {
+  const amounts = [stock.readyCount, stock.hospitalCount, stock.trainingCount].map(value =>
+    Number.isFinite(value) ? Math.max(0, value) : 0);
+  const currentTotal = amounts.reduce((sum, value) => sum + value, 0);
+  const maxTarget = stock.maxTroops;
+  const limitKnown = typeof maxTarget === 'number' && Number.isSafeInteger(maxTarget) && maxTarget >= 0;
+  const remaining = limitKnown ? Math.max(0, maxTarget - currentTotal) : 0;
+  const overLimit = limitKnown ? Math.max(0, currentTotal - maxTarget) : 0;
+  const occupancyPct = !limitKnown ? null : maxTarget > 0 ? currentTotal / maxTarget * 100 : currentTotal === 0 ? 0 : null;
+  let availablePct = 100;
+  const segments = amounts.map(amount => {
+    const raw = !limitKnown ? 0 : maxTarget > 0 ? amount / maxTarget * 100 : amount > 0 ? 100 : 0;
+    const width = Math.max(0, Math.min(availablePct, raw));
+    availablePct -= width;
+    return width;
+  });
+  return { currentTotal, maxTarget, limitKnown, remaining, overLimit, occupancyPct,
+    filledPct: segments.reduce((sum, value) => sum + value, 0),
+    readyPct: segments[0], hospitalPct: segments[1], trainingPct: segments[2],
+    canTrain: limitKnown && remaining > 0, unitsToTrain: Math.min(26, remaining) };
+}
+
 /** Stock limit, distinct from per-march capacity and per-batch trainingCapacity. */
 export function calculateTroopMax(type: number, cache: any, _currentTotal = 0): number | null {
-  const campId = CAMP_BUILDING_IDS[type];
-  if (!campId) return null;
+  if (!Number.isInteger(type) || type < 0 || type > 2) return null;
   const raw = cache?.buildingStatus?.data?.buildings ?? cache?.['getSummary:building']?.data?.buildings;
   if (raw == null) {
     const unitSummary = cache?.['getUnitSummary:unit']?.data ?? cache?.getUnitSummary?.data;
@@ -44,14 +66,14 @@ export function calculateTroopMax(type: number, cache: any, _currentTotal = 0): 
     const id = Number(building?.buildingId ?? building?.id ?? (!Array.isArray(raw) ? key : NaN));
     const rawLevel = typeof building === 'number' ? building : building?.level;
     const level = rawLevel == null ? NaN : Number(rawLevel);
-    if (![campId, ...DRILL_GROUND_BUILDING_IDS].includes(id)) continue;
+    if (!(DRILL_GROUND_BUILDING_IDS as readonly number[]).includes(id)) continue;
     if (!Number.isInteger(level) || level < 0) return null;
     confirmed.set(id, level);
   }
   let limit = 0;
-  for (const id of [campId, ...DRILL_GROUND_BUILDING_IDS]) {
+  for (const id of DRILL_GROUND_BUILDING_IDS) {
     const level = confirmed.get(id) ?? 0;
-    const value = (id === campId ? CAMP_LIMIT_BY_LEVEL : DRILL_GROUND_LIMIT_BY_LEVEL)[level];
+    const value = DRILL_GROUND_LIMIT_BY_LEVEL[level];
     if (value == null) return null; // Never extrapolate unsupported building levels.
     limit += value;
   }

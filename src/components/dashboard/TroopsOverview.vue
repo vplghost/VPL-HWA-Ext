@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { troopStockProgress } from '@/src/utils/troops';
 import { useTroopTraining, getTroopType, normalizeArray } from '@/src/composables/useTroopTraining';
 import { formatDuration, formatNumber } from '@/src/utils/formatters';
 
@@ -32,12 +33,7 @@ function handleLevelChange(type: number, event: Event) {
 }
 
 function getCardState(t: any) {
-  const currentTotal = t.readyCount + t.hospitalCount + t.trainingCount;
-  const maxTarget = t.maxTroops;
-  const limitKnown = Number.isSafeInteger(maxTarget) && maxTarget >= 0;
-  const remaining = limitKnown ? Math.max(0, maxTarget - currentTotal) : 0;
-  const canTrain = limitKnown && remaining > 0;
-  const unitsToTrain = Math.min(26, Math.max(0, remaining));
+  const progress = troopStockProgress(t);
 
   const queuesForType = normalizeArray(trainings.value?.trainingQueues).filter((q: any) => {
     const info = getTroopType(q?.unitId);
@@ -63,10 +59,6 @@ function getCardState(t: any) {
   const highestReadyLevel = levelsSorted.length > 0 ? levelsSorted[levelsSorted.length - 1][0] : 7;
   const selectedLevel = typeof savedLevel === 'number' && savedLevel >= 1 && savedLevel <= 9 ? savedLevel : highestReadyLevel;
 
-  const maxForBar = Math.max(limitKnown ? maxTarget : 0, currentTotal);
-  const readyPct = maxForBar > 0 ? (t.readyCount / maxForBar) * 100 : 0;
-  const hospitalPct = maxForBar > 0 ? (t.hospitalCount / maxForBar) * 100 : 0;
-  const trainingPct = maxForBar > 0 ? (t.trainingCount / maxForBar) * 100 : 0;
 
   const healingSec = t.healingEndsAt ? Math.max(0, Math.ceil((t.healingEndsAt - now.value) / 1000)) : null;
   const healingTimerText = healingSec !== null && healingSec > 0 ? formatDuration(healingSec) : healingSec !== null ? 'Ready' : null;
@@ -75,19 +67,11 @@ function getCardState(t: any) {
   const trainingTimerText = trainingSec !== null && trainingSec > 0 ? formatDuration(trainingSec) : trainingSec !== null ? 'Ready' : null;
 
   return {
-    currentTotal,
-    maxTarget,
-    limitKnown,
-    remaining,
-    canTrain,
-    unitsToTrain,
+    ...progress,
     completedQueue,
     activeQueue,
     levelStr,
     selectedLevel,
-    readyPct,
-    hospitalPct,
-    trainingPct,
     healingTimerText,
     trainingTimerText,
   };
@@ -174,7 +158,7 @@ const troopCards = computed(() => {
             <div class="flex items-center gap-1.5 text-xs">
               <span
                 class="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
-                title="Troop stock limit from confirmed Drill Grounds and Camp levels"
+                title="Troop limit from completed Drill Grounds levels only"
               >
                 Cap: <strong class="text-slate-700 dark:text-slate-200 font-bold tabular-nums">{{ st.limitKnown ? formatNumber(st.maxTarget) : 'Unknown' }}</strong>
               </span>
@@ -214,19 +198,25 @@ const troopCards = computed(() => {
           </div>
 
           <!-- Segmented Visual Bar -->
-          <div class="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
+          <div class="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex"
+            :role="st.limitKnown ? 'progressbar' : undefined"
+            :aria-label="t.label + ' capacity'"
+            :aria-valuemin="st.limitKnown ? 0 : undefined"
+            :aria-valuemax="st.limitKnown ? 100 : undefined"
+            :aria-valuenow="st.limitKnown ? st.filledPct : undefined"
+            :aria-valuetext="st.limitKnown ? formatNumber(st.currentTotal) + ' / ' + formatNumber(st.maxTarget) + (st.overLimit ? ' · Over cap by ' + formatNumber(st.overLimit) : '') : 'Limit unknown'">
             <div
-              class="h-full bg-emerald-500 transition-all duration-300"
+              class="h-full shrink-0 bg-emerald-500 transition-all duration-300"
               :style="{ width: `${st.readyPct}%` }"
               title="Ready Troops"
             ></div>
             <div
-              class="h-full bg-rose-500 transition-all duration-300"
+              class="h-full shrink-0 bg-rose-500 transition-all duration-300"
               :style="{ width: `${st.hospitalPct}%` }"
               title="Injured Troops"
             ></div>
             <div
-              class="h-full bg-indigo-500 transition-all duration-300"
+              class="h-full shrink-0 bg-indigo-500 transition-all duration-300"
               :style="{ width: `${st.trainingPct}%` }"
               title="In Training"
             ></div>
@@ -238,6 +228,11 @@ const troopCards = computed(() => {
           </div>
 
           <!-- Card Action Row -->
+          <div class="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+            <span v-if="st.limitKnown">{{ formatNumber(st.currentTotal) }} / {{ formatNumber(st.maxTarget) }}<template v-if="st.occupancyPct !== null"> · {{ st.occupancyPct.toFixed(1) }}%</template></span>
+            <span v-else>Capacity progress unavailable</span>
+            <span v-if="st.overLimit > 0" class="font-semibold text-amber-600 dark:text-amber-400">Over cap by {{ formatNumber(st.overLimit) }}</span>
+          </div>
           <div class="pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs gap-1">
             <!-- Status Text -->
             <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">

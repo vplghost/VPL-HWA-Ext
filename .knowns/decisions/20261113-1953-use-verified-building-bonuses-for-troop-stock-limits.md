@@ -1,7 +1,7 @@
 ---
 id: 20261113-1953-use-verified-building-bonuses-for-troop-stock-limits
 title: Use verified building bonuses for troop stock limits
-status: draft
+status: rejected
 supersedes: []
 supersededBy: []
 tags: []
@@ -16,15 +16,14 @@ relatedDocs:
 relatedTasks:
   - VHE-JXMA49
 verification: []
-reviewState: needs_evidence
-reviewBlockers:
-  - 'linked task "VHE-JXMA49" is "in-progress"; all linked tasks must be done before accepting candidate'
+reviewState: ''
+reviewBlockers: []
 reviewMatches: []
 reviewAllowedResolutions: []
 reviewEvaluatedHash: '093debb3cce55d7f150dde8b8f9b5b6339c802c1d613e6571cc59c794af35031'
 reviewEvaluatedAt: '2026-11-13T12:53:30.227Z'
 createdAt: '2026-11-13T12:53:30.227Z'
-updatedAt: '2026-11-13T12:53:30.227Z'
+updatedAt: '2026-11-13T13:16:30.644Z'
 ---
 
 ## Context

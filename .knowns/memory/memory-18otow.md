@@ -5,18 +5,19 @@ key: troop-stock-capacity-is-distinct-from-training-batch-and-march-capacity
 layer: project
 category: failure
 status: active
-lastVerified: '2026-11-13T12:54:10.613Z'
+lastVerified: '2026-11-13T13:16:30.590Z'
 sources:
-  - '@task-VHE-JXMA49'
+  - User confirmation, 2026-11-13, Drill Grounds-only rule and14230 sum
+  - '@task-VHE-WH13EE'
   - '@doc/architecture/troop-stock-limits-from-building-levels'
   - 'src/utils/troops.ts:calculateTroopMax'
-  - scripts/generate-troop-limit-data.mjs
+  - 'src/utils/troops.ts:troopStockProgress'
 tags:
   - troops
   - capacity
   - buildings
 createdAt: '2026-11-13T12:54:10.613Z'
-updatedAt: '2026-11-13T12:54:10.613Z'
+updatedAt: '2026-11-13T13:16:30.590Z'
 ---
 
-The removed calculateTroopMax estimate 5000+level*1500 and researchLevel*500 was unsupported. Verified buildingLevel/bonus configs grant cumulative absolute unitsCapacity by completed levels: all three Drill Grounds IDs182/183/184 contribute to every troop type; matching Camp IDs41/42/40 contribute to Marksmen/Spearmen/Infantry. Camp Expansion research example bonus2792 is trainingCapacity (batch size), not stock capacity. Current stock must not inflate the cap; unknown building levels yield null and block training. See calculateTroopMax, generated troopLimitData.ts and @doc/architecture/troop-stock-limits-from-building-levels.
+Current game stock caps use only completed Drill Grounds IDs182/183/184. Do not add legacy Camp40/41/42 bonus rows even though older immutable configs contain them. User confirmed on2026-11-13 that Drill Grounds19=7400 and14=6830, total14230 for each troop type (14320 was a typo). The earlier inclusion of Camp bonuses was incorrect. TrainingCapacity research is batch size, not stock capacity; hero/march capacity is separate. calculateTroopMax keeps true cap despite overflow, and troopStockProgress uses that cap as denominator with clipped visual segments and explicit overflow/unknown text. See @doc/architecture/troop-stock-limits-from-building-levels.

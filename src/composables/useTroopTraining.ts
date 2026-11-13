@@ -175,7 +175,7 @@ export function useTroopTraining() {
       }
     }
 
-    // Stock capacity comes from confirmed Drill Grounds and Camp building levels.
+    // Latest game stock capacity comes only from completed Drill Grounds levels.
     for (const t of stats) {
       t.maxTroops = calculateTroopMax(t.type, cache.value);
     }

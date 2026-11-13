@@ -432,10 +432,10 @@ test('useTroopTraining exports normalizeArray and guards against non-array paylo
     }
   };
 
-  // Verified cumulative permanent stock bonuses; trainingCapacity research is separate.
-  assert.equal(calculateTroopMax(0, mockCache, 12000), 9500);
-  assert.equal(calculateTroopMax(1, mockCache, 5000), 6150);
-  assert.equal(calculateTroopMax(1, mockCache, 18000), 6150, 'Overflow must not inflate the real limit');
+  // Camps and trainingCapacity research do not contribute to current stock limits.
+  assert.equal(calculateTroopMax(0, mockCache, 12000), 0);
+  assert.equal(calculateTroopMax(1, mockCache, 5000), 0);
+  assert.equal(calculateTroopMax(1, mockCache, 18000), 0, 'Overflow must not inflate the real limit');
   assert.equal(calculateTroopMax(0, {}, 3000), null, 'Unknown buildings do not imply a guessed limit');
 
   const overview = await readFile(join(root, 'src/components/dashboard/TroopsOverview.vue'), 'utf8');
