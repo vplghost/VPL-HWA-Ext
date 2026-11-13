@@ -67,6 +67,56 @@ const formattedCountdown = computed(() => {
 const enemyUser = computed(() => draftStatus.value.enemyUser || null);
 const rating = computed(() => draftStatus.value.rating || null);
 
+const draftViewMode = ref<'defense' | 'attack'>('defense');
+
+watch(
+  stageId,
+  (newStage) => {
+    if (newStage === 4) {
+      draftViewMode.value = 'attack';
+    } else if (newStage === 2 || newStage === 3) {
+      draftViewMode.value = 'defense';
+    }
+  },
+  { immediate: true }
+);
+
+const defenceHeroes = computed<number[]>(() => {
+  const raw = draftStatus.value.defenceHeroes || draftStatus.value.lastResult?.defenceHeroes || [];
+  return Array.isArray(raw) ? raw : [];
+});
+
+const attackHeroes = computed<number[]>(() => {
+  const raw = draftStatus.value.attackHeroes || draftStatus.value.lastResult?.attackHeroes || [];
+  return Array.isArray(raw) ? raw : [];
+});
+
+const enemyDefenceHeroes = computed<number[]>(() => {
+  const raw = draftStatus.value.enemyDefenceHeroes || [];
+  return Array.isArray(raw) ? raw : [];
+});
+
+const enemyAttackHeroes = computed<number[]>(() => {
+  const raw = draftStatus.value.enemyAttackHeroes || [];
+  return Array.isArray(raw) ? raw : [];
+});
+
+const currentLineupHeroes = computed(() => {
+  return draftViewMode.value === 'attack' ? attackHeroes.value : defenceHeroes.value;
+});
+
+function getHeroStar(mode: 'defense' | 'attack' | 'enemyDefence' | 'enemyAttack', heroId: number | string): number | null {
+  const starsKey = mode === 'defense' ? 'defenceStars' : `${mode}Stars`;
+  const starsObj = (draftStatus.value as any)[starsKey];
+  const star = starsObj?.[heroId];
+  return Number.isInteger(star) ? star : null;
+}
+
+const observedChoices = computed(() => {
+  if (!matchId.value) return null;
+  return (globalThis as any).hwaHelperPopupData?.observedDraftChoices?.(matchId.value) || null;
+});
+
 const lastResult = computed(() => draftStatus.value.lastResult || null);
 const isWin = computed(() => {
   if (!lastResult.value) return false;
@@ -79,6 +129,19 @@ const bpExpReward = computed(() => lastResult.value?.reward?.draftBpExp ?? null)
 function getEnemyAvatar(avatarId?: number): string {
   const idStr = String(avatarId || 1).padStart(2, '0');
   return `assets/heroes/hero_00${idStr}.png`;
+}
+
+function getHeroAvatar(heroId: number | string): string | null {
+  const meta = getHeroMetadata(heroId);
+  return meta?.avatarFile || (meta?.hasAvatar ? `assets/heroes/${heroId}.webp` : null);
+}
+
+function getStarGlow(star?: number | null): string {
+  if (!star || star < 3) return '';
+  if (star === 3) return 'ring-1 ring-blue-400 shadow-blue-500/20';
+  if (star === 4) return 'ring-2 ring-violet-400 shadow-violet-500/30';
+  if (star === 5) return 'ring-2 ring-amber-400 shadow-amber-500/40';
+  return 'ring-2 ring-rose-500 shadow-rose-500/50';
 }
 
 function close() {
@@ -273,14 +336,156 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
-          <!-- Stage Info & Lineup -->
+          <!-- Team Mode Switcher -->
+          <div
+            v-if="stageId !== 0"
+            id="draft-mode-switcher"
+            class="flex items-center justify-between flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-800/60"
+          >
+            <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 gap-1 dark:border-slate-700 dark:bg-slate-800">
+              <button
+                id="draft-tab-defense"
+                type="button"
+                class="px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                :class="
+                  draftViewMode === 'defense'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                "
+                @click="draftViewMode = 'defense'"
+              >
+                <span>🛡️ Defense Draft</span>
+                <span
+                  class="px-1.5 py-0.2 rounded-full text-[10px]"
+                  :class="draftViewMode === 'defense' ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'"
+                >
+                  {{ defenceHeroes.length }}/5
+                </span>
+              </button>
+
+              <button
+                id="draft-tab-attack"
+                type="button"
+                class="px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                :class="
+                  draftViewMode === 'attack'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                "
+                @click="draftViewMode = 'attack'"
+              >
+                <span>⚔️ Attack Draft</span>
+                <span
+                  class="px-1.5 py-0.2 rounded-full text-[10px]"
+                  :class="draftViewMode === 'attack' ? 'bg-red-700 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'"
+                >
+                  {{ attackHeroes.length }}/5
+                </span>
+              </button>
+            </div>
+
+            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium px-2">
+              {{ draftViewMode === 'attack' ? 'Viewing Attack Draft lineup & Opponent Defense counter' : 'Viewing Defense Draft lineup & Opponent Attack' }}
+            </span>
+          </div>
+
+          <!-- Opponent Counter Lineup -->
+          <div
+            v-if="draftViewMode === 'attack' && enemyDefenceHeroes.length > 0"
+            id="draft-enemy-counter-card"
+            class="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2 dark:border-amber-900/40 dark:bg-amber-950/20"
+          >
+            <div class="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+              <span>🛡️ Opponent Defense Lineup (5 heroes to counter):</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <div
+                v-for="hId in enemyDefenceHeroes"
+                :key="'enemy-def-' + hId"
+                class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white shadow-2xs dark:border-amber-800/60 dark:bg-slate-800"
+              >
+                <div class="size-7 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0">
+                  <img
+                    v-if="getHeroAvatar(hId)"
+                    :src="getHeroAvatar(hId)!"
+                    :alt="getHeroName(hId)"
+                    class="size-full object-cover"
+                    @error="handleImgError"
+                  />
+                  <div v-else class="size-full flex items-center justify-center text-[10px] font-bold text-slate-500">
+                    {{ getHeroName(hId).charAt(0) }}
+                  </div>
+                </div>
+                <div class="flex flex-col">
+                  <span class="font-bold text-[11px] text-slate-800 dark:text-slate-200">{{ getHeroName(hId) }}</span>
+                  <span v-if="getHeroStar('enemyDefence', hId)" class="text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                    ★{{ getHeroStar('enemyDefence', hId) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Observed enemy pick sequence if present -->
+            <div
+              v-if="observedChoices?.enemyDefence"
+              id="draft-observed-picks"
+              class="flex flex-wrap gap-1.5 pt-1 text-[11px] text-amber-900 dark:text-amber-300"
+            >
+              <span
+                v-for="(choices, stepIdx) in observedChoices.enemyDefence"
+                :key="'obs-def-' + stepIdx"
+                class="rounded border border-amber-200 bg-white px-2 py-0.5 text-[10px] dark:border-amber-800/60 dark:bg-slate-800"
+              >
+                Step {{ stepIdx + 1 }}: {{ getHeroName(choices.find((id: any) => Number.isInteger(id)) || 0) }}
+              </span>
+            </div>
+          </div>
+
+          <div
+            v-else-if="draftViewMode === 'defense' && enemyAttackHeroes.length > 0"
+            id="draft-enemy-counter-card"
+            class="rounded-xl border border-red-200 bg-red-50/50 p-3 space-y-2 dark:border-red-900/40 dark:bg-red-950/20"
+          >
+            <div class="text-xs font-bold text-red-900 dark:text-red-200 flex items-center gap-1.5">
+              <span>⚔️ Opponent Attack Lineup (5 heroes deployed against your defense):</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <div
+                v-for="hId in enemyAttackHeroes"
+                :key="'enemy-atk-' + hId"
+                class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-red-200 bg-white shadow-2xs dark:border-red-800/60 dark:bg-slate-800"
+              >
+                <div class="size-7 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0">
+                  <img
+                    v-if="getHeroAvatar(hId)"
+                    :src="getHeroAvatar(hId)!"
+                    :alt="getHeroName(hId)"
+                    class="size-full object-cover"
+                    @error="handleImgError"
+                  />
+                  <div v-else class="size-full flex items-center justify-center text-[10px] font-bold text-slate-500">
+                    {{ getHeroName(hId).charAt(0) }}
+                  </div>
+                </div>
+                <div class="flex flex-col">
+                  <span class="font-bold text-[11px] text-slate-800 dark:text-slate-200">{{ getHeroName(hId) }}</span>
+                  <span v-if="getHeroStar('enemyAttack', hId)" class="text-[9px] font-bold text-red-600 dark:text-red-400">
+                    ★{{ getHeroStar('enemyAttack', hId) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- User Lineup Display (5 Slots) -->
           <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
             <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700/60">
               <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                <span>🛡️</span> Stage Lineup & Hero Pool
+                <span>{{ draftViewMode === 'attack' ? '⚔️' : '🛡️' }}</span>
+                <span>{{ draftViewMode === 'attack' ? 'Your Attack Lineup' : 'Your Defense Lineup' }}</span>
               </h3>
               <span class="text-[11px] text-slate-500 dark:text-slate-400">
-                Stage ID: {{ stageId }} · {{ stageDescription }}
+                {{ currentLineupHeroes.length === 5 ? '✓ 5/5 Heroes Locked' : (currentLineupHeroes.length > 0 ? `${currentLineupHeroes.length}/5 Heroes Selected` : 'No heroes recorded yet') }}
               </span>
             </div>
 
@@ -288,10 +493,62 @@ function handleImgError(e: Event) {
               No active draft match. Click Register above or enter Legend Draft in game to start drafting.
             </div>
 
-            <div v-else class="space-y-3">
-              <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 space-y-1">
-                <div class="font-semibold text-slate-800 dark:text-slate-200">Draft Status:</div>
-                <div>{{ stageDescription }}. Select your heroes or counter draft picks in the active game window.</div>
+            <div v-else class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              <div
+                v-for="i in 5"
+                :key="'slot-' + i"
+                class="flex flex-col items-center justify-between p-2.5 rounded-xl border transition-all text-center min-h-[120px]"
+                :class="
+                  currentLineupHeroes[i - 1]
+                    ? 'border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/80 shadow-2xs'
+                    : 'border-dashed border-slate-200 bg-slate-50/30 text-slate-400 dark:border-slate-700/60 dark:bg-slate-800/20'
+                "
+              >
+                <div class="w-full flex items-center justify-between">
+                  <span class="text-[10px] px-1.5 py-0.2 rounded font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                    Hero {{ i }}
+                  </span>
+                  <span v-if="currentLineupHeroes[i - 1]" class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                    ✓ Locked
+                  </span>
+                </div>
+
+                <template v-if="currentLineupHeroes[i - 1]">
+                  <div
+                    class="relative size-12 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 my-1 shrink-0"
+                    :class="getStarGlow(getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', currentLineupHeroes[i - 1]))"
+                  >
+                    <img
+                      v-if="getHeroAvatar(currentLineupHeroes[i - 1])"
+                      :src="getHeroAvatar(currentLineupHeroes[i - 1])!"
+                      :alt="getHeroName(currentLineupHeroes[i - 1])"
+                      class="size-full object-cover"
+                      @error="handleImgError"
+                    />
+                    <div v-else class="size-full flex items-center justify-center text-xs font-bold text-slate-500">
+                      {{ getHeroName(currentLineupHeroes[i - 1]).charAt(0) }}
+                    </div>
+                  </div>
+
+                  <div class="space-y-0.5">
+                    <div class="font-bold text-xs text-slate-800 dark:text-slate-200 truncate max-w-[100px]">
+                      {{ getHeroName(currentLineupHeroes[i - 1]) }}
+                    </div>
+                    <div
+                      v-if="getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', currentLineupHeroes[i - 1])"
+                      class="text-[10px] font-bold text-amber-600 dark:text-amber-400"
+                    >
+                      ★{{ getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', currentLineupHeroes[i - 1]) }}
+                    </div>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div class="flex flex-col items-center justify-center my-auto text-slate-400 dark:text-slate-500">
+                    <span class="text-xl font-bold leading-none">+</span>
+                    <span class="text-[10px] mt-1">Empty Slot</span>
+                  </div>
+                </template>
               </div>
             </div>
           </div>

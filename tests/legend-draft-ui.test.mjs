@@ -674,4 +674,16 @@ test('DraftModal tracks match status, live timer, opponent profile, and match re
   assert.match(code, /id="draft-result-box"/, 'Must have #draft-result-box element');
   assert.match(code, /userDifRating/, 'Must track userDifRating delta');
   assert.match(code, /draftBpExp/, 'Must track draftBpExp reward');
+
+  // Defense & Attack Lineup Switcher
+  assert.match(code, /id="draft-tab-defense"/, 'Must have #draft-tab-defense button');
+  assert.match(code, /id="draft-tab-attack"/, 'Must have #draft-tab-attack button');
+
+  // Lineup tracking
+  assert.match(code, /defenceHeroes/, 'Must track defenceHeroes from RPC');
+  assert.match(code, /attackHeroes/, 'Must track attackHeroes from RPC');
+  assert.match(code, /enemyDefenceHeroes/, 'Must track enemyDefenceHeroes counter');
+  assert.match(code, /enemyAttackHeroes/, 'Must track enemyAttackHeroes counter');
+  assert.match(code, /getHeroStar/, 'Must extract hero stars');
+  assert.match(code, /getHeroAvatar/, 'Must extract hero avatars');
 });
