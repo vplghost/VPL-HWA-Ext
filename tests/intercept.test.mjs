@@ -602,6 +602,33 @@ test('legacy direct messages and Draft submissions piggyback by default with act
   assert.deepEqual(JSON.parse(await response.text()).results.map((result) => result.ident), ['native']);
 });
 
+test('camp discovery is a feature-scoped Piggyback read with native results preserved', async () => {
+  for (const mode of ['piggyback', 'mqtt-piggyback']) {
+    const batches = [];
+    const { window } = setup(async (_url, options) => {
+      const request = JSON.parse(options.body); batches.push(request.calls);
+      return new Response(JSON.stringify({ results: request.calls.map(call => ({
+        ident: call.ident, result: { response: {} }
+      })) }), { status: 200 });
+    }, true, { Response, Headers });
+    const origin = 'https://www.hero-wars-alliance.com';
+    window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true,
+      popupRpcEnabled: true, socketRefreshMode: mode }, origin);
+    window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [
+      { name: 'getCampSummary', feature: 'camp', args: {} },
+      { name: 'getCampSummary', feature: 'wrong', args: {} },
+      { name: 'getCampSummary', args: {} }
+    ] }, origin);
+    const response = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+      method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] })
+    });
+    assert.equal(batches[0].length, 2);
+    assert.equal(batches[0][1].name, 'getCampSummary');
+    assert.equal(batches[0][1].feature, 'camp');
+    assert.deepEqual(JSON.parse(await response.text()).results.map(result => result.ident), ['native']);
+  }
+});
+
 test('Brigand camp action piggybacks once and hides helper result from native client', async () => {
   const batches = [];
   const { window } = setup(async (_url, options) => {

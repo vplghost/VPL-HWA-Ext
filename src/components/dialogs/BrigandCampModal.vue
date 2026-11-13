@@ -5,7 +5,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { getHeroMetadata, getItemName } from '@/src/utils/metadata';
 import { getAmountAt } from '@/src/utils/resourceData';
-import { BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls } from '@/src/utils/brigandCamp';
+import { BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls, campSearchCalls, availableCamps } from '@/src/utils/brigandCamp';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
@@ -31,6 +31,56 @@ const savedTeam = computed(() => {
     ? observed.data?.units : snapshot?.data?.globalMapCamp);
 });
 const campId = ref('');
+const campLevel = ref(0);
+const summary = computed(() => cache.value.brigandCampSummary);
+const searchStatus = computed(() => cache.value.brigandCampSearchStatus);
+const searchPending = shallowRef<{ startedAt: number; previous?: string } | null>(null);
+const searchMessage = ref('');
+const searchError = ref('');
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+const camps = computed(() => availableCamps(summary.value?.data, now.value));
+const filteredCamps = computed(() => camps.value.filter(camp => !campLevel.value || camp.campConfigId === campLevel.value));
+const selectedCamp = computed(() => camps.value.find(camp => camp.id === campId.value));
+const expired = computed(() => typeof summary.value?.data?.nextRespawnDt === 'number' && summary.value.data.nextRespawnDt <= now.value);
+const respawnText = computed(() => summary.value?.data?.nextRespawnDt
+  ? new Date(summary.value.data.nextRespawnDt).toLocaleString() : 'Unknown');
+function chooseCamp(id: string) {
+  if (!pending.value && !searchPending.value && camps.value.some(camp => camp.id === id)) campId.value = id;
+}
+watch(camps, rows => {
+  if (!pending.value && campId.value && !rows.some(camp => camp.id === campId.value)) campId.value = '';
+});
+watch(searchStatus, entry => {
+  const request = searchPending.value;
+  if (!request || !entry || entry.updatedAt === request.previous || Date.parse(entry.updatedAt) < request.startedAt) return;
+  clearTimeout(searchTimer);
+  searchPending.value = null;
+  searchError.value = entry.data.success ? '' : entry.data.error || 'Camp search failed.';
+  searchMessage.value = entry.data.success ? 'Camp list updated.' : '';
+});
+onUnmounted(() => clearTimeout(searchTimer));
+async function searchCamps() {
+  if (pending.value || searchPending.value) return;
+  const request = { startedAt: Date.now(), previous: searchStatus.value?.updatedAt };
+  searchPending.value = request;
+  searchError.value = '';
+  searchMessage.value = 'Searching camps…';
+  const response = await dispatchRpc(campSearchCalls());
+  if (searchPending.value !== request) return;
+  if (!response?.ok) {
+    searchPending.value = null;
+    searchMessage.value = '';
+    searchError.value = response?.error || 'Camp search could not be sent.';
+    return;
+  }
+  searchMessage.value = response.queued ? 'Search queued. Waiting for game traffic.' : 'Waiting for camp list…';
+  searchTimer = setTimeout(() => {
+    if (searchPending.value !== request) return;
+    searchPending.value = null;
+    searchMessage.value = '';
+    searchError.value = 'No camp list received yet. You can search again.';
+  }, 30000);
+}
 const heroIds = ref<number[]>([]);
 const message = ref('');
 const error = ref('');
@@ -38,7 +88,9 @@ const refreshing = ref(false);
 const pending = shallowRef<{ campId: string; startedAt: number; previous: string | undefined } | null>(null);
 let timer: ReturnType<typeof setTimeout> | undefined;
 const result = computed(() => cache.value.brigandCampStatus);
-const validation = computed(() => campAttackError(campId.value, heroIds.value, owned.value, energy.value));
+const validation = computed(() => summary.value && !selectedCamp.value
+  ? 'Search and select an available camp.'
+  : campAttackError(campId.value, heroIds.value, owned.value, energy.value));
 const alreadyWon = computed(() => result.value?.data?.success && result.value.data.campId === campId.value.trim());
 
 function selectTeam(ids: number[]) {
@@ -54,6 +106,10 @@ watch(() => props.modelValue, open => {
 watch(savedTeam, ids => { if (props.modelValue && !heroIds.value.length) selectTeam(ids); });
 watch(accountId, () => {
   clearTimeout(timer);
+  clearTimeout(searchTimer);
+  searchPending.value = null;
+  searchMessage.value = '';
+  searchError.value = '';
   pending.value = null;
   heroIds.value = [];
   campId.value = '';
@@ -84,7 +140,7 @@ async function sync() {
   } finally { refreshing.value = false; }
 }
 async function attack() {
-  if (pending.value) return;
+  if (pending.value || searchPending.value) return;
   error.value = validation.value || (alreadyWon.value ? 'This camp has already been defeated.' : '');
   if (error.value) return;
   const request = { campId: campId.value.trim(), startedAt: Date.now(), previous: result.value?.updatedAt };
@@ -112,10 +168,32 @@ async function attack() {
         <div><strong>World Energy: {{ energy ?? 'Unknown' }}</strong><p class="text-xs text-slate-500">{{ BRIGAND_ENERGY_COST }} per camp · Levels 1–3</p></div>
         <button class="rounded-lg px-3 py-2 bg-slate-200 dark:bg-slate-700 disabled:opacity-50" :disabled="refreshing || !!pending" @click="sync">{{ refreshing ? 'Syncing…' : 'Sync Team & Energy' }}</button>
       </div>
-      <label class="block font-semibold">Camp ID
-        <input v-model="campId" :disabled="!!pending" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 font-mono text-xs" />
-      </label>
-      <p class="text-xs text-slate-500">Enter the target camp ID from the game record. Automatic camp search is not available yet. This sends a camp victory request directly; it does not open the in-game battle.</p>
+      <section class="space-y-2" aria-label="Available Brigand camps">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <strong>Available Camps · {{ filteredCamps.length }}</strong>
+            <select v-model.number="campLevel" aria-label="Camp level" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
+              <option :value="0">All levels</option><option v-for="level in 3" :key="level" :value="level">Level {{ level }}</option>
+            </select>
+          </div>
+          <button id="brigand-search" class="rounded-lg bg-orange-600 hover:bg-orange-500 px-3 py-2 text-white font-semibold disabled:opacity-50" :disabled="!!searchPending || !!pending" @click="searchCamps">{{ searchPending ? 'Searching…' : 'Search Camps' }}</button>
+        </div>
+        <p v-if="summary" class="text-xs text-slate-500">Next respawn: {{ respawnText }}</p>
+        <p v-if="searchError" role="alert" class="text-red-600 dark:text-red-400">{{ searchError }}</p>
+        <p v-if="searchMessage" role="status" class="text-xs text-slate-500">{{ searchMessage }}</p>
+        <p v-if="expired" class="text-xs text-amber-600">Camp list expired. Search again for current targets.</p>
+        <p v-else-if="!summary" class="text-xs text-slate-500">Search to load camps from the game.</p>
+        <p v-else-if="!filteredCamps.length" class="text-xs text-slate-500">No available camps for this level.</p>
+        <div class="grid sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto">
+          <button v-for="camp in filteredCamps" :key="camp.id" :aria-pressed="campId === camp.id" :disabled="!!pending || !!searchPending" class="rounded-lg border p-3 text-left disabled:opacity-50" :class="campId === camp.id ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/40' : 'border-slate-200 dark:border-slate-700'" @click="chooseCamp(camp.id)">
+            <strong>Level {{ camp.campConfigId }} · {{ BRIGAND_ENERGY_COST }} World Energy</strong>
+            <span class="block text-xs text-slate-500 break-all">{{ camp.id }}</span>
+            <span class="block mt-1 text-xs">{{ camp.defendersPack?.map(hero => (getHeroMetadata(hero.id)?.name || 'Hero #' + hero.id) + ' · Lv.' + (hero.level ?? '?')).join(', ') || 'Defenders unavailable' }}</span>
+          </button>
+        </div>
+        <p v-if="selectedCamp" class="text-xs text-orange-600">Selected: Level {{ selectedCamp.campConfigId }} · {{ selectedCamp.id }}</p>
+      </section>
+      <p class="text-xs text-slate-500">Attack sends a camp victory request directly; it does not open the in-game battle.</p>
       <div class="flex flex-wrap items-center gap-2">
         <strong>Team · {{ heroIds.length }}/5 heroes</strong>
         <button class="text-xs text-orange-600 disabled:opacity-50" :disabled="!!pending || !savedTeam.length" @click="selectTeam(savedTeam)">Use Brigand Camp team</button>
@@ -143,7 +221,7 @@ async function attack() {
     <template #footer>
       <div class="flex flex-wrap justify-end items-center gap-3">
         <span v-if="!pending && validation" class="text-xs text-slate-500">{{ validation }}</span>
-        <button id="brigand-attack" class="rounded-lg bg-orange-600 hover:bg-orange-500 px-4 py-2 font-semibold text-white disabled:opacity-50" :disabled="!!pending || !!validation || alreadyWon" @click="attack">{{ pending ? 'Waiting…' : 'Attack Camp' }}</button>
+        <button id="brigand-attack" class="rounded-lg bg-orange-600 hover:bg-orange-500 px-4 py-2 font-semibold text-white disabled:opacity-50" :disabled="!!pending || !!searchPending || !!validation || alreadyWon" @click="attack">{{ pending ? 'Waiting…' : 'Attack Camp' }}</button>
       </div>
     </template>
   </ModalDialog>

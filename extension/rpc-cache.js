@@ -659,6 +659,21 @@
           }
           if (actions.length) return actions;
         }
+        if (key === 'getCampSummary:camp' && result) {
+          const error = result.error || result.response?.error;
+          const summary = result.response?.campsSummary;
+          if (!error && !Array.isArray(summary?.camps)) return [];
+          const status = { key: 'brigandCampSearchStatus', method: call.name,
+            feature: call.feature, group: 'other', data: { success: !error,
+              error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null
+            }, updatedAt: record.timestamp };
+          return error ? [status] : [status, { key: 'brigandCampSummary',
+            method: call.name, feature: call.feature, group: 'other', data: {
+              nextRespawnDt: Number.isFinite(summary.nextRespawnDt) ? summary.nextRespawnDt : null,
+              camps: summary.camps.filter(camp => typeof camp?.id === 'string' &&
+                Number.isInteger(camp.campConfigId))
+            }, updatedAt: record.timestamp }];
+        }
         if (key === 'winCampBattle:camp' && call.args?.campId && result) {
           const error = result.error || result.response?.error;
           const success = !error && Array.isArray(result.response?.reward);
@@ -4214,7 +4229,20 @@
           changed = true;
           continue;
         }
-        if (['lastCampaignRaidResult', 'lastCraftResult', 'brigandCampStatus', 'brigandCampTeam'].includes(entry.key) &&
+        if (entry.key === 'brigandCampStatus' && entry.data.success &&
+            next.brigandCampSummary && next.brigandCampSummary.updatedAt <= entry.updatedAt) {
+          next.brigandCampSummary = { ...next.brigandCampSummary, updatedAt: entry.updatedAt,
+            data: { ...next.brigandCampSummary.data,
+              camps: (next.brigandCampSummary.data.camps || []).filter(camp => camp.id !== entry.data.campId)
+            } };
+        }
+        if (entry.key === 'brigandCampSummary') {
+          const victory = next.brigandCampStatus;
+          if (victory?.data?.success && victory.updatedAt >= entry.updatedAt) {
+            entry.data = { ...entry.data, camps: entry.data.camps.filter(camp => camp.id !== victory.data.campId) };
+          }
+        }
+        if (['lastCampaignRaidResult', 'lastCraftResult', 'brigandCampStatus', 'brigandCampTeam', 'brigandCampSearchStatus', 'brigandCampSummary'].includes(entry.key) &&
             next[entry.key] && next[entry.key].updatedAt >= entry.updatedAt) continue;
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
         if (entry.key === 'experimentalMapContext' &&

@@ -45,6 +45,7 @@
   // a method shared by multiple game features into an unrestricted RPC.
   const migratedReadFeatures = new Map([
     ['getInfo', 'clanVersus'],
+    ['getCampSummary', 'camp'],
     ['getDailyQuests', 'quest'],
     ['getSpecialQuestState', 'quest'],
     ['magicTower_briefInfo', ''],

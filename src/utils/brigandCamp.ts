@@ -1,5 +1,20 @@
 export const BRIGAND_ENERGY_COST = 10;
 
+export function campSearchCalls() {
+  return [{ name: 'getCampSummary', feature: 'camp', args: {} }];
+}
+
+export interface DiscoveredCamp {
+  id: string;
+  campConfigId: number;
+  defendersPack?: Array<{ id: number; level?: number; star?: number }>;
+}
+
+export function availableCamps(summary: { camps?: DiscoveredCamp[]; nextRespawnDt?: number | null } | undefined, now = Date.now()): DiscoveredCamp[] {
+  if (!summary || (typeof summary.nextRespawnDt === 'number' && summary.nextRespawnDt <= now)) return [];
+  return Array.isArray(summary.camps) ? summary.camps : [];
+}
+
 export function campHeroIds(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];
   const group = Array.isArray(raw[0]) ? raw[0] : raw;

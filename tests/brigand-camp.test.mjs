@@ -4,7 +4,7 @@ import { readFile, access } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { computed, ref, shallowRef, watch, nextTick } from 'vue';
-import { campAttackError, campAttackCalls, campHeroIds, BRIGAND_ENERGY_COST } from '../src/utils/brigandCamp.ts';
+import { campAttackError, campAttackCalls, campHeroIds, BRIGAND_ENERGY_COST, campSearchCalls, availableCamps } from '../src/utils/brigandCamp.ts';
 import { getAmountAt } from '../src/utils/resourceData.ts';
 
 const context = { TextEncoder };
@@ -95,11 +95,11 @@ test('actual Brigand dialog prevents duplicate sends and waits for server result
     onMounted() {}, onUnmounted() {}, defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     useRpcCache: () => ({ cache: state, dispatchRpc: batch => { calls.push(batch); return new Promise(resolve => callbacks.push(resolve)); } }),
     useAccountTeams: () => ({ customTeams: ref([]) }), getHeroMetadata: () => ({}), getItemName: () => '',
-    BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls, getAmountAt,
+    BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls, campSearchCalls, availableCamps, getAmountAt,
     setTimeout: fn => { timers.push(fn); return timers.length; }, clearTimeout() {}, clearInterval() {}, Date };
   t.after(() => stops.forEach(stop => stop()));
   const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
-  vm.runInNewContext(js + '\nglobalThis.api = { attack, pending, message, error, campId, heroIds, validation };', context);
+  vm.runInNewContext(js + '\nglobalThis.api = { attack, pending, message, error, campId, heroIds, validation, searchCamps, searchPending, searchError, searchMessage, camps, filteredCamps, chooseCamp, campLevel, now };', context);
   const ui = context.api;
   ui.campId.value = campId;
   ui.heroIds.value = heroes;
@@ -134,6 +134,88 @@ test('actual Brigand dialog prevents duplicate sends and waits for server result
   assert.match(ui.message.value, /defeated/);
   await ui.attack();
   assert.equal(calls.length, 3, 'Do not submit the same completed camp again');
+  const search = ui.searchCamps();
+  await ui.searchCamps();
+  assert.equal(calls.length, 4, 'Do not enqueue duplicate searches while awaiting a receipt');
+  assert.equal(calls[3][0].name, 'getCampSummary');
+  assert.equal(calls[3][0].feature, 'camp');
+  callbacks.shift()({ ok: true, queued: true });
+  await search;
+  assert.ok(ui.searchPending.value, 'Transport ack must not produce a fake empty camp list');
+  assert.match(ui.searchMessage.value, /queued/);
+  state.value.brigandCampSearchStatus = { updatedAt: new Date(Date.now() + 2).toISOString(), data: { success: false, error: 'Search rejected' } };
+  await nextTick();
+  assert.equal(ui.searchPending.value, null);
+  assert.equal(ui.searchError.value, 'Search rejected');
+  const retrySearch = ui.searchCamps();
+  const nextCamp = '03d087d3-001c-410b-80ad-85405a038810';
+  const expiry = Date.now() + 60000;
+  state.value.brigandCampSummary = { updatedAt: new Date().toISOString(), data: {
+    nextRespawnDt: expiry, camps: [{ id: nextCamp, campConfigId: 2, defendersPack: [{ id: 1, level: 60 }] }]
+  } };
+  state.value.brigandCampSearchStatus = { updatedAt: new Date(Date.now() + 3).toISOString(), data: { success: true } };
+  await nextTick();
+  callbacks.shift()({ ok: true });
+  await retrySearch;
+  assert.equal(ui.searchPending.value, null);
+  ui.chooseCamp(nextCamp);
+  assert.equal(ui.campId.value, nextCamp);
+  assert.equal(ui.validation.value, '');
+  ui.campLevel.value = 1;
+  assert.equal(ui.filteredCamps.value.length, 0);
+  ui.campLevel.value = 2;
+  assert.equal(ui.filteredCamps.value.length, 1);
+  ui.now.value = expiry;
+  await nextTick();
+  assert.equal(ui.camps.value.length, 0);
+  assert.equal(ui.campId.value, '');
+  assert.match(ui.validation.value, /available camp/);
+});
+
+function searchRecord(camps, timestamp = at, error = null) {
+  const result = error ? { error } : { response: { campsSummary: { camps, nextRespawnDt: Date.parse(at) + 86400000 } } };
+  return { ...record(), timestamp,
+    requestBody: JSON.stringify({ calls: [{ ...campSearchCalls()[0], ident: 'search' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'search', result }] }) };
+}
+
+test('camp discovery keeps server targets, respawn and errors without spending energy', () => {
+  const targets = [{ id: campId, campConfigId: 1, defendersPack: [{ id: 26, level: 51, star: 2 }] }];
+  let state = reducer.merge(baseline(), [searchRecord(targets)]).cache;
+  assert.deepEqual(campSearchCalls(), [{ name: 'getCampSummary', feature: 'camp', args: {} }]);
+  assert.equal(state.brigandCampSearchStatus.data.success, true);
+  assert.equal(JSON.stringify(state.brigandCampSummary.data.camps), JSON.stringify(targets));
+  assert.equal(state['resource:world-energy'].data.amount, 100);
+  assert.equal(availableCamps(state.brigandCampSummary.data, Date.parse(at)).length, 1);
+  assert.equal(availableCamps(state.brigandCampSummary.data, Date.parse(at) + 86400000).length, 0);
+  state = reducer.merge(state, [searchRecord([], '2026-11-13T09:03:00Z', 'searchFailed')]).cache;
+  assert.equal(state.brigandCampSearchStatus.data.success, false);
+  assert.equal(state.brigandCampSearchStatus.data.error, 'searchFailed');
+  assert.equal(state.brigandCampSummary.data.camps.length, 1, 'Failure must not replace targets with an empty success');
+  state = reducer.merge(state, [searchRecord([], '2026-11-13T09:04:00Z')]).cache;
+  assert.equal(state.brigandCampSummary.data.camps.length, 0, 'Confirmed empty list is authoritative');
+});
+
+test('victory removes target from available camps and stale summary cannot restore it', () => {
+  const targets = [{ id: campId, campConfigId: 1 }, { id: 'other-camp', campConfigId: 2 }];
+  let state = reducer.merge(baseline(), [searchRecord(targets, '2026-11-13T09:01:30Z'), record()]).cache;
+  assert.equal(state.brigandCampSummary.data.camps.length, 1);
+  assert.equal(state.brigandCampSummary.data.camps[0].id, 'other-camp');
+  state = reducer.merge(state, [searchRecord(targets, '2026-11-13T09:01:30Z')]).cache;
+  assert.equal(state.brigandCampSummary.data.camps.length, 1);
+  assert.equal(state['resource:world-energy'].data.amount, 90);
+});
+
+test('private camp search trace supplies six selectable targets with defender teams', async t => {
+  const file = new URL('../temp/tracking-data/hwa-game-record-202611131645_brigand_search.json', import.meta.url);
+  try { await access(file); } catch (error) { if (error.code !== 'ENOENT') throw error; t.skip('Optional private search trace unavailable'); return; }
+  const trace = JSON.parse(await readFile(file, 'utf8'));
+  const state = reducer.merge(baseline(), trace.timeline.map(entry => entry.record || entry)).cache;
+  assert.equal(state.brigandCampSummary.data.camps.length, 6);
+  assert.equal(state.brigandCampSummary.data.nextRespawnDt, 1794602724064);
+  assert.deepEqual([...state.brigandCampSummary.data.camps.map(camp => camp.campConfigId)], [1, 2, 2, 1, 1, 1]);
+  assert.ok(state.brigandCampSummary.data.camps.every(camp => camp.defendersPack.length === 5));
+  assert.equal(state['resource:world-energy'].data.amount, 100);
 });
 
 test('private Brigand trace replays the captured victory and 10 energy deduction', async t => {

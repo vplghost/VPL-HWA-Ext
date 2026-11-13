@@ -3,7 +3,7 @@ id: doc-59e19121b0b558e50444c3eca66392b8
 title: Brigand camp RPC contract
 description: Captured camp victory protocol, hero team, verified energy cost and Dashboard dialog limitations.
 createdAt: '2026-11-13T09:14:39.529Z'
-updatedAt: '2026-11-13T09:15:14.984Z'
+updatedAt: '2026-11-13T09:52:33.524Z'
 tags:
   - brigand
   - world-map
@@ -13,48 +13,56 @@ tags:
 
 # Brigand Camp RPC contract
 
-Implemented by @task-VHE-GVVBMR. Evidence: `temp/tracking-data/hwa-game-record-202611131602_brigand.json` (game 1.293.1010, exported 2026-11-13T09:02:18.473Z). Private capture is optional for tests; sanitized fixtures are in `tests/brigand-camp.test.mjs`.
+Implemented by @task-VHE-GVVBMR (settlement) and @task-VHE-DHB6KB (discovery). Evidence: `temp/tracking-data/hwa-game-record-202611131602_brigand.json` and `temp/tracking-data/hwa-game-record-202611131645_brigand_search.json`, game 1.293.1010. Private traces are optional tests; sanitized fixtures are mandatory.
 
-## Observed protocol
+## Discovery
 
-The native client saved a hero-only team at 09:01:50.399Z:
+The search capture at 2026-11-13T09:45:24.278Z observes exactly:
+
+```json
+{"name":"getCampSummary","feature":"camp","args":{}}
+```
+
+The successful response is `response.campsSummary`, containing `nextRespawnDt` (epoch milliseconds) and `camps[]`. Each camp has `id` (UUID), `campConfigId` and `defendersPack[]` with hero IDs, levels, stars and detailed equipment/skills. The trace contains six camps: config IDs [1,2,2,1,1,1], each with five defenders, nextRespawnDt 1794602724064. No map ID, coordinates, search radius or level argument is sent. The UI filters levels locally; config IDs 1–3 map to levels 1–3 in verified globalMapCamp config.
+
+The reducer keeps `brigandCampSummary` only for confirmed array-shaped responses and `brigandCampSearchStatus` for confirmed success/failure. Error receipts retain the previous target list. Confirmed empty arrays replace it with an empty list. Older summaries cannot replace newer data. A successful winCampBattle removes its target from an older/current summary; a stale replay cannot re-add it. `availableCamps` hides targets at or after nextRespawnDt. This timestamp is a validity limit, not a synthetic new spawn event; search again to obtain authoritative replacements.
+
+`getCampSummary` is a read scoped to feature `camp` in the intercept Piggyback allowlist. Search uses `useRpcCache.dispatchRpc` and inherits popupRpcEnabled, Monitor API and Direct/Piggyback/MQTT-assisted Piggyback policy. Search has no energy/resource actions.
+
+## Team and settlement
+
+The native client saves a hero-only team through:
 
 ```json
 {"name":"battle_teamSet","args":{"key":"globalMapCamp","units":[[79,72,16,54,60]]}}
 ```
 
-Successful response is `null`. `teamGetAll.globalMapCamp` is the canonical saved team; a newer successful `battle_teamSet` supplies the latest observed team until the next snapshot.
+A successful null response is valid. `teamGetAll.globalMapCamp` supplies the canonical saved team; newer successful battle_teamSet updates supply the latest observed team until another snapshot.
 
-At 09:02:02.924Z the client sent:
+The captured victory call is:
 
 ```json
-{"name":"winCampBattle","feature":"camp","args":{"campId":"<target UUID>","userHeroesIds":[79,72,16,54,60]}}
+{"name":"winCampBattle","feature":"camp","args":{"campId":"<selected target UUID>","userHeroesIds":[79,72,16,54,60]}}
 ```
 
-The successful response contains `reward`, an array of typed amounts. Captured reward: lootboxChanced #27 ×1, coin #40077 ×135, gold ×15000 and experience ×6. Preserve unknown reward types for display; do not invent resource accounting for unsupported types.
+The successful response contains `reward[]`. Observed rewards: lootboxChanced #27 ×1, coin #40077 ×135, gold ×15000, experience ×6. Preserve unknown reward types for display; account supported types through existing resource actions.
 
-Client telemetry places `winCampBattle` after CampBattleThread / BattleScreen and the victory popup. It is a victory settlement endpoint, not evidence of a separate battle-start or simulation RPC. The extension sends this observed endpoint directly on an explicit Attack Camp click; it does not run Unity battle simulation or show the native animation. Live acceptance of this direct action has not been verified.
+Client telemetry places winCampBattle after CampBattleThread / BattleScreen and the victory popup. It is a victory settlement endpoint. Attack Camp sends this observed call directly; it does not launch Unity battle simulation or the native animation. Direct live acceptance has not been verified. Neither trace proves a separate battle-start RPC or a camp troop march, so the implementation invents neither.
 
-## Verified World Energy cost
+## World Energy
 
-The captured remote-config index resolves globalMapCamp to [immutable configuration f45fde890a6683ceef09053f5b636c0b](https://hwmb-remote-config-cdn.nextersglobal.com/config/globalMapCamp/f45fde890a6683ceef09053f5b636c0b.json). All three camp levels specify `attackCost: [{"amount":10,"id":2,"type":"refillableResource"}]`. World refillable #2 is World Energy; it is distinct from the regular userGetInfo refillable #2 skill-point resource.
+The captured remote config resolves globalMapCamp to [immutable configuration f45fde890a6683ceef09053f5b636c0b](https://hwmb-remote-config-cdn.nextersglobal.com/config/globalMapCamp/f45fde890a6683ceef09053f5b636c0b.json). Downloaded bytes matched that MD5. All three levels specify attackCost [{amount:10,id:2,type:"refillableResource"}]. World refillable #2 is World Energy, distinct from regular userGetInfo refillable #2 skill points. Popup never fetches the CDN at runtime.
 
-`hwaHelperRpcCache.extract` recognizes a successful `winCampBattle:camp` only when `response.reward` is an array and neither the result nor response has an error. It retains `brigandCampStatus`, applies a -10 World Energy resource action with a request-ident deduplication token, and applies supported rewards through existing resource actions. Energy deduction requires an existing World Energy snapshot, honors regeneration and newer authoritative snapshots, updates worldEnergyStatus consistently, and restarts the refill clock when spending from a full pool. Failure and incomplete receipts never spend energy or grant rewards. A passive native victory is processed identically to a dialog request.
+A successful winCampBattle requires reward[] and no result/response error. The reducer retains brigandCampStatus, deducts 10 World Energy once using the request-ident token, and applies supported rewards. Require a known energy snapshot; respect regeneration, newer authoritative data, worldEnergyStatus consistency and the refill clock when spending from full. Failed/incomplete receipts do not spend energy or grant rewards. Native passive victories follow the same path.
 
-After a successful receipt, the background requests `refillableGetAll:refillable` and `inventoryGet` using the existing popup RPC enablement and Direct/Piggyback policy. Disabled RPC still allows passive cache reduction but sends no follow-up request.
+Background requests refillableGetAll:refillable and inventoryGet after a confirmed win under the shared RPC policy. Disabled RPC permits passive reduction but sends no follow-up.
 
-## Dialog behavior and evidence limits
+## Dialog
 
-`BrigandCampModal` is mounted globally and opened by the Dashboard button directly beside Solo Monster. It supports explicit camp UUID entry, 1–5 unique owned heroes, the saved globalMapCamp team or account custom teams, known World Energy, and last server result/rewards. It waits for a matching captured server receipt; transport acknowledgment and timeout do not count as success or permit automatic retry. A newer receipt for another camp is ignored. A last-confirmed defeated camp cannot be immediately resubmitted. Changing accounts clears local form/pending state.
+Dashboard opens BrigandCampModal beside Solo Monster. Search Camps requests the server summary, displays camps, defender names/levels and next respawn, and permits local level filtering and explicit target selection. The normal flow no longer requires entering UUIDs. Expired targets disappear and require a new search. A selected target missing from the current known list cannot be attacked. Attacking never happens automatically after search.
 
-The capture contains no camp search RPC, no camp list or camp objects in getChunks, and no march returned by winCampBattle. Consequently there is no fabricated search API, inferred available target, generated camp UUID, or camp march in the dashboard. The user currently supplies an active camp UUID from game tracking. A capture of finding/selecting camps is required to implement automatic discovery. The already-completed camp UUID from this capture is never prefilled as a new target.
-
-`winCampBattle` is explicitly allowed as an action in the intercept Piggyback queue. Queue deduplication, expiry, non-retry after dispatch failure, helper-result filtering, and global RPC policy remain shared with existing actions.
+Team selection supports saved globalMapCamp and account custom teams, or 1–5 unique owned heroes. Show known regenerated World Energy and last server rewards/result. Search acknowledgment means queued/sent, not an empty result. Search errors are visible; after 30 seconds without a receipt a read may be retried. Attack waits for matching server confirmation and does not automatically retry a settlement. Completed targets are removed and changing accounts clears form/pending state.
 
 ## Verification
 
-`tests/brigand-camp.test.mjs` proves successful/rejected/incomplete receipts, repeated replay, absent/newer energy snapshots, regeneration and full-pool refill timing, saved teams, input constraints, actual dialog setup pending/error/race behavior, and optional private capture replay. Intercept tests prove one-shot Piggyback dispatch and native response filtering; background tests prove follow-up refresh policy. Live game interaction has not been exercised.
-
-Downloaded globalMapCamp JSON was verified with MD5 `f45fde890a6683ceef09053f5b636c0b`, matching its immutable CDN path. Popup code does not fetch this CDN at runtime.
-
-Final verification: full suite 611 tests, 599 passed, 12 optional private-data skips, zero failures; typecheck and production build passed. No live battle has been sent during development.
+`tests/brigand-camp.test.mjs` covers discovery success/error/empty/stale receipts, expiration, no search energy cost, defeated target removal, actual Vue setup pending/result/error races, target selection/filtering, and optional six-camp trace replay. Existing settlement tests cover exact protocol, deduplication, energy regeneration/full-pool behavior, owned teams and failures. Intercept tests verify feature scoping, Piggyback modes and native-result filtering; background tests cover follow-up policy. Live game interaction has not been exercised.
