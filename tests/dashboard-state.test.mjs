@@ -63,6 +63,24 @@ test('tower completion expires daily and a newer reset beats an older completed 
   assert.equal(towerActivityState({ towerStatus: { data: { isCleared: true } } }, now).state, 'unknown');
 });
 
+test('Dashboard recognizes existing accepted boss win history, but not regular wins or reset sessions', () => {
+  const session = { floorNumber: 23, rooms: { 1: { type: 'boss_battle' } },
+    history: { 0: { action: 'endBattle', floor: 23, room: 1, win: true } } };
+  const cache = { towerSession: entry(session) };
+  assert.equal(towerActivityState(cache, now).state, 'done');
+  assert.equal(towerActivityState({ towerSession: entry({ ...session, history: [] }) }, now).state, 'pending');
+  assert.equal(towerActivityState({ towerSession: entry({ ...session,
+    history: [{ action: 'endBattle', floor: 23, room: 1, win: false }] }) }, now).state, 'pending');
+  assert.equal(towerActivityState({ towerSession: entry({ ...session,
+    rooms: { 1: { type: 'hero_battle' } } }) }, now).state, 'pending');
+  assert.equal(towerActivityState({ towerSession: entry({ ...session, floorNumber: 1 }) }, now).state, 'pending');
+  assert.equal(towerActivityState({ towerSession: entry(session, yesterday) }, now).state, 'unknown');
+  assert.equal(towerActivityState({ towerSession: entry({ ...session, history: [
+    { action: 'endBattle', floor: 23, room: 1, win: true, at: new Date(yesterday).toISOString() }
+  ] }) }, now).state, 'pending');
+  assert.equal(towerActivityState({ ...cache, towerStatus: entry({ floorNumber: 1 }, now) }, now).state, 'pending');
+});
+
 test('daily freshness follows observed server reset instead of midnight when available', () => {
   const reset = now - 3600000;
   const cache = { questResetStatus: entry({ nextDayAt: reset + 86400000 }),

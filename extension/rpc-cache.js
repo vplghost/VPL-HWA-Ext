@@ -1367,7 +1367,8 @@
             updatedAt: record.timestamp
           }];
         }
-        if (call.name?.startsWith('magicTower_') && !['magicTower_briefInfo', 'magicTower_getAll'].includes(call.name) && result && !result.error) {
+        if (call.name?.startsWith('magicTower_') && !['magicTower_briefInfo', 'magicTower_getAll'].includes(call.name) && result &&
+            Object.hasOwn(result, 'response') && !result.error && !result.response?.error) {
           const action = call.name.slice('magicTower_'.length);
           if (['enterNextFloor', 'enterRoom', 'startBattle', 'endBattle', 'activateBuff', 'openChest'].includes(action)) {
             const response = result.response || {};
@@ -3795,13 +3796,15 @@
           } else if (action.action === 'endBattle') {
             event.room = session.roomNumber;
             event.win = action.win;
+            event.roomType = room?.type || null;
             event.stars = action.stars;
             event.reward = action.reward;
             event.enemyIds = room?.defenders?.units?.map((unit) => unit.id) || [];
             event.team = session.team;
             session.history.push(event);
             session.roomNumber = action.roomNumber ?? session.roomNumber;
-            if (action.completion || action.briefInfo?.state === 'win') {
+            if (action.completion || ['win', 'completed'].includes(action.briefInfo?.state) ||
+                (action.win && room?.type === 'boss_battle')) {
               session.completed = true;
               session.completion = action.completion;
               next.towerStatus = {

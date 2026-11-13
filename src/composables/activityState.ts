@@ -1,3 +1,5 @@
+import { normalizeArray } from '../utils/troops.ts';
+
 export function observedToday(entry: any, now = Date.now(), nextReset?: number): boolean {
   const time = new Date(entry?.updatedAt).getTime();
   if (!Number.isFinite(time) || time > now) return false;
@@ -18,7 +20,11 @@ export function towerActivityState(cache: Record<string, any>, now = Date.now())
   const current = entries.filter((entry) => new Date(entry.updatedAt).getTime() === newest)
     .map((entry) => entry.data ?? entry);
   const cleared = current.some((data) => data.isCleared === true || data.completed === true ||
-    ['win', 'completed'].includes(data.state) || Number(data.floorNumber) > 25);
+    ['win', 'completed'].includes(data.state) || Number(data.floorNumber) > 25 ||
+    normalizeArray(data.history).some((event: any) => event?.action === 'endBattle' &&
+      event.win === true && Number(event.floor) === Number(data.floorNumber) &&
+      (!event.at || observedToday({ updatedAt: event.at }, now, cache.questResetStatus?.data?.nextDayAt)) &&
+      (event.roomType === 'boss_battle' || data.rooms?.[event.room]?.type === 'boss_battle')));
   const floor = current.find((data) => data.floorNumber != null)?.floorNumber;
   return {
     state: cleared ? 'done' as const : 'pending' as const,

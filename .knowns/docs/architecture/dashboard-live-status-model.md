@@ -3,7 +3,7 @@ id: doc-d229300ad19a499cc8f6e79fc5ea4df4
 title: Dashboard Live Status Model
 description: Vue Dashboard queue/march sources, countdown lifecycle, and evidence-based daily activity completion and reset rules.
 createdAt: '2026-11-13T05:20:28.286Z'
-updatedAt: '2026-11-13T05:20:28.286Z'
+updatedAt: '2026-11-13T09:47:08.700Z'
 tags:
   - dashboard
   - queues
@@ -34,3 +34,9 @@ Implemented by @task-VHE-64GPHS.
 ## Verification
 
 `tests/dashboard-state.test.mjs` exercises time units, active/ready/idle/unknown queues, object-shaped collections, march lifecycle, completion evidence, alternate Dungeon doors/remaining titans, missing observations, daily reset and reactive execution of the actual Dashboard SFC setup code. Existing `vue-ui-parity-runtime.test.mjs` covers brief-only Tower state with dated observations. Live Chrome/game visual acceptance remains separate from these automated setup tests.
+
+## Final boss completion (VHE-01ZJZ6)
+
+An accepted `magicTower_endBattle` with `args.result.win === true` while the current room is `boss_battle` immediately sets canonical towerSession.completed and towerStatus.isCleared, even without optional magicTower_completion / magicTower_briefInfo sidecars. Failed or missing RPC responses, boss losses and regular hero_battle wins do not count. The reducer retains roomType on combat history. Dashboard also recognizes an existing current-floor boss victory in session history (array or object map), checking its observation date when provided, so previously cached runs display Done without replaying a battle. Merely reaching floor 23 is not completion evidence. A newer reset/run and the server daily reset retain precedence.
+
+Regression coverage: tests/tower-session.test.mjs and tests/dashboard-state.test.mjs; full suite 614 tests, 602 passed, 12 optional private-data skips, zero failures. Typecheck/build validated.
