@@ -46,6 +46,7 @@
     clanWarChampInfo_getBriefInfo: 'events',
     'getEventInfo:fortress': 'events',
     clanClash_getCurrentState: 'events',
+    clanClash_claimReward: 'events',
     brawl_getAll: 'events',
     heroEvolve: 'heroes',
     titanEvolve: 'titans',
@@ -1450,6 +1451,19 @@
             updatedAt: record.timestamp
           }];
         }
+        if (call.name === 'clanClash_claimReward') {
+          const response = result?.response;
+          if (!call.ident || result?.error || !response || typeof response !== 'object' ||
+              Array.isArray(response) || response.error) return [];
+          const reward = response.reward && typeof response.reward === 'object' && !Array.isArray(response.reward)
+            ? response.reward : response;
+          return [{ key: 'clanClashClaimAction', method: call.name, feature: null,
+            group: 'internal', data: {
+              token: call.ident, eventId: call.args?.ClashEventId,
+              claimedTypes: Array.isArray(call.args?.ClaimedTypes) ? [...call.args.ClaimedTypes] : [],
+              reward,
+            }, updatedAt: record.timestamp }];
+        }
         if (call.name === 'clanClash_getCurrentState' && result?.response) {
           return [{
             key: 'clanClashStatus',
@@ -2047,6 +2061,22 @@
           const mobs = normalizeArrayData(entry.data?.mobs);
           entry.data = { ...entry.data, mobs: mobs.filter((mob) =>
             mob && !won.some((item) => item?.mapId === entry.data?.mapId && item?.mobId === mob?.mobId)) };
+        }
+        if (entry.key === 'clanClashClaimAction') {
+          const claims = normalizeArrayData(next.clanClashClaimStatus?.data?.claims);
+          if (claims.some(claim => claim?.token === entry.data.token)) continue;
+          const rewardActions = extractRewardActions(record,
+            { name: entry.method, ident: entry.data.token }, entry.data.reward, 'clanClash');
+          // An authoritative balance in the same batch already includes the claimed reward.
+          entries.push(...rewardActions.filter(action => !entries.some(snapshot =>
+            snapshot.key === action.data.resourceKey && snapshot.updatedAt >= entry.updatedAt)));
+          next.clanClashClaimStatus = { key: 'clanClashClaimStatus', method: entry.method,
+            feature: null, group: 'internal', data: { claims: [...claims, {
+              token: entry.data.token, eventId: entry.data.eventId,
+              claimedTypes: entry.data.claimedTypes, needsSync: true, at: entry.updatedAt,
+            }].slice(-100) }, updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
         }
         if (entry.key === 'questClaimAction') {
           const previous = next.questClaimStatus?.data || { claims: [] };

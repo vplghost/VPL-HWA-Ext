@@ -3,7 +3,7 @@ id: doc-5977b0645ae33e48fc00a5b8f7c90347
 title: RPC Cache Pipeline
 description: Passive RPC interception, delta reduction, resource keys, and action deduplication in HWA Helper
 createdAt: '2026-11-02T06:43:06.566Z'
-updatedAt: '2026-11-13T17:21:04.831Z'
+updatedAt: '2026-11-13T23:56:05.910Z'
 tags:
   - architecture,cache,rpc
 ---
@@ -54,3 +54,17 @@ Implemented by @task-VHE-ZZ3KDC. Inventory-derived `resource:<category>:<id>` mi
 Resources search, pinned-only filtering, shown count and JSON export use the same deduplicated list. Its pinned badge counts only resources remaining in that view; existing saved header pin choices remain intact, including hidden inventory items. Export no longer delegates to the unfiltered generic raw resource table. This is a tab-level view rule, not a cache reduction or header-selection policy change.
 
 The grid follows available container width with `repeat(auto-fill,minmax(min(100%,12rem),1fr))`, compact cards and icon-only accessible pin controls. The toolbar wraps instead of requiring viewport-based fixed columns. `tests/resources-view.test.mjs` exercises the actual SFC state/template, inventory updates, category collisions, pin preservation, filtered exports and controls. The production CSS was checked for the compiled grid declaration.
+
+
+## Guild Clash reward receipts (2026-11-14)
+
+Implemented by @task-VHE-FP7HF6. Evidence: `temp/tracking-data/hwa-game-record-202611140649._guild_rewardjson.json` (client 1.293.1010; SHA-256 `ca189eb47f14c6a85e0aaf40eb8c50e945510e8c3a04d01fff5d513494cb912e`). At `2026-11-13T23:49:09.310Z`, the batch contains `topGet(type: clanClash)` and `clanClash_claimReward` with `{ ClashEventId: 1, ClaimedTypes: [1] }`. Match results by `ident`, not array position. The successful claim response is exactly `{}`. Ranking data, loaded coin textures and client popup telemetry do not establish reward quantities; this capture contains no reward-bearing socket event.
+
+`extract` emits `clanClashClaimAction` only for a successful object response; failed, missing and truncated responses are ignored. Reduction records an account-cache-scoped receipt in `clanClashClaimStatus.data.claims`, deduplicated by request ident and bounded to 100 entries. Claim event/type metadata is retained separately from reward balances. Every new receipt requests authoritative `userGetInfo`, `inventoryGet` and `refillableGetAll` snapshots through the existing global RPC policy; Piggyback queues these reads and Direct sends them immediately. Disabled RPC is respected, and the claim itself is never reissued. Background compares prior receipt tokens as well as the record timestamp to avoid repeat follow-ups.
+
+When an explicit reward payload is present, the existing `extractRewardActions` compatibility path can apply supported deltas with normal resource-action deduplication and newer-snapshot guards. This positive-payload shape is compatibility behavior, not observed evidence from this trace. Empty acknowledgements create no invented resource amounts: the subsequent authoritative snapshots populate inventory and resource mirrors. No new MQTT event name or fixed Guild Clash reward table is inferred.
+
+`tests/guild-clash-rewards.test.mjs` covers the sanitized captured acknowledgement, duplicate/replayed/error/truncated envelopes and explicit-payload compatibility. `tests/background.test.mjs` covers Direct/Piggyback/disabled policy, once-only refresh dispatch and refreshed inventory/resource mirrors.
+
+
+Guild Clash explicit-delta compatibility also skips a resource delta when the same RPC batch includes an authoritative snapshot for that resource, regardless of call order. This prevents adding a reward again on top of a balance that already includes it; regression coverage tests both snapshot-before-claim and claim-before-snapshot batches.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.73 — 2026-11-14
+
+### Fixed
+
+- Detect successful Guild Clash reward claims and refresh authoritative inventory, currency and refillable balances under the configured RPC dispatch policy.
+- Deduplicate claim receipts and follow-up reads; ignore rejected, missing or truncated responses. Empty claim acknowledgements never invent reward amounts.
+- Apply supported explicit reward payloads through the existing deduplicated resource-delta pipeline when present.
+
 ## 0.10.72 — 2026-11-14
 
 ### Changed

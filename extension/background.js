@@ -1690,6 +1690,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ]);
       if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
+    const clashClaimList = raw => Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? Object.values(raw) : [];
+    const clashClaims = clashClaimList(cacheResult.cache.clanClashClaimStatus?.data?.claims);
+    const previousClashClaims = clashClaimList(stored.rpcCache?.clanClashClaimStatus?.data?.claims);
+    const newClashClaim = clashClaims.some(claim => claim?.at === record.timestamp &&
+      !previousClashClaims.some(previous => previous?.token === claim.token));
+    if (stored.popupRpcEnabled === true && cacheResult.changed && newClashClaim && sender.tab?.id) {
+      const dispatch = rpcMessageForSettings(stored, [
+        { name: 'userGetInfo' }, { name: 'inventoryGet' },
+        { name: 'refillableGetAll', feature: 'refillable' },
+      ]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+    }
     const rawClaims = cacheResult.cache.questClaimStatus?.data?.claims;
     const claims = Array.isArray(rawClaims)
       ? rawClaims

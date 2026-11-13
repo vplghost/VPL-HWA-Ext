@@ -687,6 +687,33 @@ test('game interactions persist locally only while recording and export beside A
   assert.equal(Object.hasOwn(local, 'interaction:0'), false);
 });
 
+test('Guild Clash claim refreshes authoritative reward balances under shared settings without replaying the claim', async () => {
+  for (const mode of ['direct', 'piggyback', 'disabled', 'failed']) {
+    const env = setup();
+    env.local.popupRpcEnabled = mode !== 'disabled';
+    env.local.socketRefreshMode = mode === 'direct' ? 'direct' : 'piggyback';
+    const claim = rpc([{ name: 'clanClash_claimReward', ident: 'clash', args: { ClashEventId: 1, ClaimedTypes: [1] } }],
+      [{ ident: 'clash', result: mode === 'failed' ? { error: 'alreadyClaimed' } : { response: {} } }],
+      '2026-11-13T23:49:09.310Z');
+    const sender = { ...gameSender, tab: { id: 42 } };
+    await env.send('api-record', claim, sender);
+    const active = mode === 'direct' || mode === 'piggyback';
+    assert.equal(env.forwardedMessages.length, active ? 1 : 0);
+    if (!active) continue;
+    assert.equal(env.forwardedMessages[0].msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+    assert.deepEqual(Array.from(env.forwardedMessages[0].msg.calls, call => call.name), ['userGetInfo', 'inventoryGet', 'refillableGetAll']);
+    await env.send('api-record', claim, sender);
+    assert.equal(env.forwardedMessages.length, 1, 'Duplicate claim receipt must not request another refresh');
+    const snapshot = rpc([{ name: 'inventoryGet', ident: 'inventory' }], [{ ident: 'inventory', result: {
+      response: { coin: { 45: 1234 }, lootboxChanced: { 27: 6 } }
+    } }], '2026-11-13T23:49:12.000Z');
+    await env.send('api-record', snapshot, sender);
+    assert.equal(env.local.rpcCache.inventoryGet.data.coin[45], 1234);
+    assert.equal(env.local.rpcCache['resource:coin:45'].data.amount, 1234);
+    assert.equal(env.local.rpcCache['resource:lootboxChanced:27'].data.amount, 6);
+  }
+});
+
 test('empty event quest claim requests authoritative resource and item snapshots once', async () => {
   const { local, send, forwardedMessages } = setup();
   local.popupRpcEnabled = true;
