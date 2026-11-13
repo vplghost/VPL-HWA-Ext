@@ -1,3 +1,5 @@
+import { isInactiveResource } from './itemResources.ts';
+
 export interface ResourceEntry {
   key?: string;
   data?: {
@@ -181,7 +183,7 @@ export function isListedInventoryItem(entry: ResourceEntry | undefined, inventor
 }
 
 export function isSelectableForHeader(entry: ResourceEntry | undefined): boolean {
-  if (!entry?.key) return false;
+  if (!entry?.key || isInactiveResource(entry)) return false;
   return !['resource:energy', 'resource:world-energy', 'resource:refillable:62', 'resource:world-refillable:62'].includes(entry.key);
 }
 

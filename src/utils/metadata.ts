@@ -1,6 +1,7 @@
 import '~/extension/hero-metadata.js';
 import '~/extension/titan-metadata.js';
 import '~/extension/data-names.js';
+import '~/extension/item-resources.js';
 import '~/extension/name-map.js';
 import '~/extension/popup-data.js';
 import '~/extension/building-data.js';

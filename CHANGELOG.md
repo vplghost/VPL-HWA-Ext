@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.68 — 2026-11-14
+
+### Added
+
+- Add 65 verified server images for observed inventory/resources, including relic shards, skin fragments, frames, lootboxes, materials, speedups and teleporters.
+- Resolve the 16 previously unnamed inventory entries from verified locale/library references and share bundled image lookup with Items and Resources.
+- Record per-item coverage, image checksums and unresolved mappings in a public audit report.
+
+### Changed
+
+- Hide 27 expired event resources and 27 technical reset/cooldown counters from Resources and header selection, preserving active daily quotas and raw game data.
+- Fall back to category symbols when an item/resource image is unavailable or fails to load.
+
 ## 0.10.67 — 2026-11-14
 
 ### Changed

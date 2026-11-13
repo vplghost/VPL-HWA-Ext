@@ -7,6 +7,7 @@ import * as Vue from 'vue';
 import { compile } from '@vue/compiler-dom';
 import { renderToString } from '@vue/server-renderer';
 import * as formatting from '../src/utils/resourceData.ts';
+import * as itemResources from '../src/utils/itemResources.ts';
 
 const source = await readFile(new URL('../src/components/tabs/ResourcesTab.vue', import.meta.url), 'utf8');
 const script = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
@@ -18,14 +19,14 @@ const resource = (amount, label) => ({ data: { amount, label } });
 function setup(data) {
   const cache = Vue.ref(data), pins = Vue.ref(['resource:gold', 'resource:lootboxChanced:27']);
   const downloads = [], calls = [];
-  const boundary = { ...formatting, ref: Vue.ref, computed: Vue.computed,
+  const boundary = { ...formatting, ...itemResources, ref: Vue.ref, computed: Vue.computed,
     useNow: () => Vue.ref(Date.parse('2026-11-14T00:00:00Z')),
     useRpcCache: () => ({ cache, dispatchRpc: async rpc => { calls.push(rpc); } }),
     useResourceSelection: () => ({ isPinned: key => pins.value.includes(key),
       togglePin: key => { pins.value = pins.value.includes(key) ? pins.value.filter(pin => pin !== key) : [...pins.value, key]; } }),
     downloadJson: (filename, value) => downloads.push({ filename, value }),
   };
-  vm.runInNewContext(js + '\nglobalThis.api = { allResources, filteredResources, pinnedResourceCount, search, filterPinnedOnly, isRefreshing, togglePin, refreshResources, exportResourcesJson };', boundary);
+  vm.runInNewContext(js + '\nglobalThis.api = { allResources, filteredResources, pinnedResourceCount, search, filterPinnedOnly, isRefreshing, togglePin, refreshResources, exportResourcesJson, handleResourceImageError };', boundary);
   const html = () => renderToString(Vue.createSSRApp({ setup: () => ({ ...boundary, ...boundary.api }), render }));
   return { cache, pins, api: boundary.api, downloads, calls, html };
 }
@@ -69,6 +70,26 @@ test('search, pinned filtering and JSON export use the same deduplicated resourc
   assert.equal(runtime.downloads[2].value.length, 0);
   runtime.api.search.value = ''; runtime.api.togglePin('resource:material:4');
   assert.equal(runtime.api.pinnedResourceCount.value, 2);
+});
+
+test('expired events and technical counters are absent from Resources and export while zero battle quotas stay', () => {
+  const old = resource(200, 'Old Adventure Energy');
+  const runtime = setup({ 'resource:refillable:511': old,
+    'resource:refillable:512': resource(52, 'Adventure Energy'),
+    'resource:refillable:6': resource(0, 'Arena battles'),
+    'resource:refillable:10': resource(0, 'Shop reset'), 'resource:gold': resource(50, 'Gold') });
+  assert.deepEqual(Array.from(runtime.api.allResources.value, item => item.key),
+    ['resource:refillable:512', 'resource:refillable:6', 'resource:gold']);
+  runtime.api.exportResourcesJson();
+  assert.equal(runtime.downloads[0].value.length, 3);
+  assert.equal(runtime.cache.value['resource:refillable:511'].data.amount, 200);
+});
+
+test('resource images fall back to the category icon after a load failure', async () => {
+  const runtime = setup({ 'resource:lootboxChanced:27': resource(1, 'Tomes Casket') });
+  assert.match(await runtime.html(), /assets\/items\/lootboxChanced\/27.png/);
+  runtime.api.handleResourceImageError('resource:lootboxChanced:27');
+  assert.doesNotMatch(await runtime.html(), /assets\/items\/lootboxChanced\/27.png/);
 });
 
 test('actual Resources template renders compact automatic columns and accessible pin controls', async () => {

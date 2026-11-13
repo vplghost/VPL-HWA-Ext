@@ -8,7 +8,10 @@
 
   function lookup(group, id) {
     const entries = names[group];
-    return entries && Object.hasOwn(entries, id) ? entries[id] : null;
+    if (entries && Object.hasOwn(entries, id)) return entries[id];
+    const extra = globalThis.hwaHelperItemResources?.items;
+    const rows = extra && Object.hasOwn(extra, group) ? extra[group] : null;
+    return rows && Object.hasOwn(rows, id) && typeof rows[id]?.name === 'string' ? rows[id].name : null;
   }
   function hero(id) { return lookup('hero', id); }
   function artifact(id) { return lookup('artifact', id); }

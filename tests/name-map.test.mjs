@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
 const context = {};
-for (const file of ['data-names.js', 'name-map.js']) {
+for (const file of ['data-names.js', 'item-resources.js', 'name-map.js']) {
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 
@@ -24,6 +24,6 @@ test('missing and unresolved locale entries retain the popup fallback', () => {
   const { hero, item } = context.hwaHelperNameMap;
   assert.equal(hero(5041), null);
   assert.equal(hero(999999), null);
-  assert.equal(item('border', 1), null);
+  assert.equal(item('border', 999999), null);
   assert.equal(item('gear', 999999), null);
 });

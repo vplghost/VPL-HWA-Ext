@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useNow } from '@/src/composables/useNow';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useResourceSelection } from '@/src/composables/useResourceSelection';
+import { getResourceIcon, isInactiveResource } from '@/src/utils/itemResources';
 import { downloadJson } from '@/src/utils/metadata';
 import {
   formatResourceAmount,
@@ -20,12 +21,16 @@ const now = useNow();
 const search = ref('');
 const filterPinnedOnly = ref(false);
 const isRefreshing = ref(false);
+const failedIcons = ref<Set<string>>(new Set());
+function handleResourceImageError(key: string) {
+  failedIcons.value = new Set(failedIcons.value).add(key);
+}
 
 const allResources = computed(() => {
   const list: any[] = [];
   for (const [key, val] of Object.entries(cache.value)) {
     if (key.startsWith('resource:') && val?.data && Number.isFinite(val.data.amount) &&
-        !isListedInventoryItem({ key }, cache.value.inventoryGet?.data)) {
+        !isListedInventoryItem({ key }, cache.value.inventoryGet?.data) && !isInactiveResource({ key }, now.value)) {
       const entry = { key, data: val.data };
       const label = resourceLabel(entry);
       const isSelectable = isSelectableForHeader(entry);
@@ -37,6 +42,7 @@ const allResources = computed(() => {
         amount,
         cap: val.data.cap,
         appearance,
+        image: failedIcons.value.has(key) ? null : getResourceIcon(entry),
         isSelectable,
         isPinned: isPinned(key),
       });
@@ -159,7 +165,8 @@ function exportResourcesJson() {
             class="size-7 rounded-md flex items-center justify-center text-sm shrink-0 ring-1"
             :class="r.appearance.classes"
           >
-            {{ r.appearance.icon }}
+            <img v-if="r.image" :src="r.image" alt="" class="size-full rounded-md object-contain" loading="lazy" @error="handleResourceImageError(r.key)" />
+            <span v-else>{{ r.appearance.icon }}</span>
           </span>
 
           <div class="min-w-0 flex-1">

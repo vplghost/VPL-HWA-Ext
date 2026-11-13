@@ -3,7 +3,7 @@ id: doc-3bb1526b9a3b682954b90038c19b8c0a
 title: Versioned CDN Asset Synchronization
 description: Verified manifest/splitlib-based asset inventory, conversion, provenance and 1.293 audit results
 createdAt: '2026-11-06T09:38:35.328Z'
-updatedAt: '2026-11-13T17:14:14.153Z'
+updatedAt: '2026-11-13T17:52:45.378Z'
 tags:
   - assets
   - cdn
@@ -99,3 +99,8 @@ npm run names:update -- temp/tracking-data/hwa-game-record-202611100940_dungeon.
 The optional second argument after the export is a cached compressed locale file. It must pass exactly the same size/MD5 checks as a downloaded file; omit it to download the pinned URL. Repeated generation with the verified cached bytes reproduced `data-names.js` byte-for-byte. This refresh updates name data only; the image inventory/audit above remains tied to its original verified manifest and is not a claim of a new texture sync.
 
 `tests/current-resource-names.test.mjs` exercises namespace extraction, pinned source metadata and the actual shared Items/Resources label resolvers, including cached placeholder labels and unknown IDs. `tests/popup-data.test.mjs` verifies that Marksmen Manual and Tomes Casket are visible normal resources after name resolution.
+
+
+## Observed resource/inventory icon extraction (2026-11-14)
+
+@task-VHE-5SS41S added65checksum-verified server images and supplemental names from the current v0054library for the user's150resource/418inventory export rows. The mutable latest manifest no longer matches the captured indexGet checksum, so the extraction explicitly uses the cached verified1.293.0manifest and leaves36image mappings unresolved. Coverage, per-image hashes and limitations are in `docs/observed-item-assets-1.293.1010-audit.json`; source relationships, regeneration and expired/internal-resource filtering are documented in @doc/architecture/observed-resource-inventory-metadata-and-retirement.
