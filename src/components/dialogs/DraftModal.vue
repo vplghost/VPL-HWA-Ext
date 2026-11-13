@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
@@ -15,6 +15,19 @@ const emit = defineEmits<{
 const { cache, dispatchRpc } = useRpcCache();
 
 const isRegistering = ref(false);
+const now = ref(Date.now());
+let timer: number | null = null;
+
+onMounted(() => {
+  timer = window.setInterval(() => {
+    now.value = Date.now();
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+  document.removeEventListener('keydown', handleKeydown);
+});
 
 const draftStatus = computed(() => cache.value.legendDraftStatus?.data || {});
 const stageId = computed(() => (Number.isInteger(draftStatus.value.stageId) ? draftStatus.value.stageId : 0));
@@ -37,7 +50,36 @@ const stageDescription = computed(() => {
 const matchId = computed(() => draftStatus.value.matchId ?? draftStatus.value.lastResult?.matchId ?? null);
 const draftChips = computed(() => cache.value['resource:consumable:40103']?.data?.amount ?? 0);
 
+const stageFinishTs = computed(() => Number(draftStatus.value.stageFinishTs) || 0);
+
+const countdownSeconds = computed(() => {
+  if (!stageFinishTs.value || stageId.value === 0 || stageId.value === 7) return 0;
+  return Math.max(0, Math.floor(stageFinishTs.value - now.value / 1000));
+});
+
+const formattedCountdown = computed(() => {
+  const secs = countdownSeconds.value;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+});
+
+const enemyUser = computed(() => draftStatus.value.enemyUser || null);
+const rating = computed(() => draftStatus.value.rating || null);
+
 const lastResult = computed(() => draftStatus.value.lastResult || null);
+const isWin = computed(() => {
+  if (!lastResult.value) return false;
+  return lastResult.value.result === 0 || lastResult.value.win === true;
+});
+const ratingDelta = computed(() => lastResult.value?.rating?.userDifRating ?? null);
+const userRating = computed(() => lastResult.value?.rating?.userRating ?? null);
+const bpExpReward = computed(() => lastResult.value?.reward?.draftBpExp ?? null);
+
+function getEnemyAvatar(avatarId?: number): string {
+  const idStr = String(avatarId || 1).padStart(2, '0');
+  return `assets/heroes/hero_00${idStr}.png`;
+}
 
 function close() {
   emit('update:modelValue', false);
@@ -144,6 +186,12 @@ function handleImgError(e: Event) {
               <div class="text-[11px] text-slate-600 dark:text-slate-400">
                 Draft counter heroes, lock team lineups, and battle players in real-time draft matches.
               </div>
+              <div v-if="countdownSeconds > 0" id="draft-countdown-row" class="flex items-center gap-2 pt-1 text-xs text-slate-500 dark:text-slate-400">
+                <span>Time remaining:</span>
+                <span id="draft-countdown" class="font-mono font-bold text-red-600 dark:text-red-400 text-sm">
+                  {{ formattedCountdown }}
+                </span>
+              </div>
             </div>
 
             <div class="flex items-center gap-3">
@@ -164,22 +212,64 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
+          <!-- Opponent Profile Card -->
+          <div
+            v-if="enemyUser"
+            id="draft-opponent-card"
+            class="rounded-xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-800/80 flex items-center justify-between gap-3 flex-wrap shadow-2xs"
+          >
+            <div class="flex items-center gap-3">
+              <div class="relative size-11 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-700 shrink-0">
+                <img
+                  :src="getEnemyAvatar(enemyUser.avatarId)"
+                  :alt="enemyUser.name || 'Opponent'"
+                  class="size-full object-cover"
+                  @error="handleImgError"
+                />
+              </div>
+              <div class="space-y-0.5">
+                <div class="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <span>{{ enemyUser.name || 'Opponent' }}</span>
+                  <span v-if="enemyUser.level" class="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-normal">
+                    Lv.{{ enemyUser.level }}
+                  </span>
+                </div>
+                <div v-if="enemyUser.clanTitle" class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Guild: {{ enemyUser.clanTitle }}
+                </div>
+              </div>
+            </div>
+
+            <div v-if="rating" class="text-right text-xs">
+              <div class="text-[11px] text-slate-500 dark:text-slate-400">Match Ratings</div>
+              <div class="font-mono font-bold text-slate-800 dark:text-slate-200">
+                You {{ rating.userRating ?? '—' }} <span class="text-slate-400 font-normal">vs</span> Opponent {{ rating.enemyRating ?? '—' }}
+              </div>
+            </div>
+          </div>
+
           <!-- Last Result -->
           <div
             v-if="lastResult"
-            class="rounded-xl border p-3 flex items-center justify-between text-xs shadow-2xs"
+            id="draft-result-box"
+            class="rounded-xl border p-3 flex items-center justify-between text-xs shadow-2xs flex-wrap gap-2"
             :class="
-              lastResult.win !== false
+              isWin
                 ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200'
                 : 'border-rose-200 bg-rose-50/70 text-rose-900 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-200'
             "
           >
             <div class="flex items-center gap-2">
-              <span class="font-bold">{{ lastResult.win !== false ? '🏆 Victory' : '❌ Defeat' }}</span>
-              <span class="text-[11px] text-slate-500 dark:text-slate-400">Previous match outcome</span>
+              <span class="font-bold text-sm">{{ isWin ? '🏆 Victory' : '⚔️ Defeat / Finished' }}</span>
+              <span v-if="userRating != null" class="font-mono font-semibold">
+                Rating: {{ userRating }}
+                <span v-if="ratingDelta != null" :class="ratingDelta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">
+                  ({{ ratingDelta >= 0 ? '+' : '' }}{{ ratingDelta }})
+                </span>
+              </span>
             </div>
-            <div v-if="lastResult.score" class="font-mono font-semibold">
-              Score: {{ lastResult.score }}
+            <div v-if="bpExpReward" class="font-bold text-amber-600 dark:text-amber-400">
+              +{{ bpExpReward }} BP EXP
             </div>
           </div>
 

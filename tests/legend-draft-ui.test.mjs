@@ -655,3 +655,23 @@ test('Legend Draft presents 3 candidate cards per step for match 360504765 and a
   assert.match(viewEl.textContent, /Iris/);
   assert.match(viewEl.textContent, /Krista/);
 });
+
+test('DraftModal tracks match status, live timer, opponent profile, and match results from RPC', async () => {
+  const modalPath = new URL('../src/components/dialogs/DraftModal.vue', import.meta.url);
+  const code = await readFile(modalPath, 'utf8');
+
+  // Match Status & Countdown Timer
+  assert.match(code, /stageFinishTs/, 'Must track stageFinishTs from RPC');
+  assert.match(code, /id="draft-countdown"/, 'Must have #draft-countdown element');
+
+  // Opponent Profile Card
+  assert.match(code, /id="draft-opponent-card"/, 'Must have #draft-opponent-card element');
+  assert.match(code, /enemyUser\.name/, 'Must track opponent name');
+  assert.match(code, /enemyUser\.clanTitle/, 'Must track opponent guild/clan title');
+  assert.match(code, /rating\.userRating/, 'Must track user and opponent rating');
+
+  // Match Result
+  assert.match(code, /id="draft-result-box"/, 'Must have #draft-result-box element');
+  assert.match(code, /userDifRating/, 'Must track userDifRating delta');
+  assert.match(code, /draftBpExp/, 'Must track draftBpExp reward');
+});
