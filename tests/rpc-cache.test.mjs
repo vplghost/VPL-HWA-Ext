@@ -17,6 +17,7 @@ runInNewContext(marchRules, context);
 runInNewContext(heroMetadata, context);
 runInNewContext(clanVersusRules, context);
 runInNewContext(resourceDataSource, context);
+runInNewContext(await readFile(new URL('../extension/tower-rules.js', import.meta.url), 'utf8'), context);
 runInNewContext(source, context);
 const cache = context.hwaHelperRpcCache;
 
@@ -1520,7 +1521,7 @@ test('magicTower_briefInfo and magicTower_getAll extract towerStatus with isClea
   assert.ok(towerEntry);
   assert.equal(towerEntry.data.state, 'win');
   assert.equal(towerEntry.data.isCleared, true);
-  assert.equal(towerEntry.data.floorNumber, 26);
+  assert.equal(towerEntry.data.floorNumber, context.hwaHelperTowerRules.finalFloor);
 
   const merged = cache.merge({}, [briefRecord]);
   assert.equal(merged.cache.towerStatus.data.isCleared, true);

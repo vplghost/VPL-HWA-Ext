@@ -5,6 +5,7 @@ import { useDialogTeamSelection } from '@/src/composables/useDialogTeamSelection
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { towerSettingsForAccount } from '@/src/utils/dialogRpc';
 import { getHeroMetadata } from '@/src/utils/metadata';
+import { TOWER_FLOOR_COUNT } from '@/src/utils/towerRules';
 import { formatNumber } from '@/src/utils/formatters';
 
 const props = defineProps<{
@@ -33,7 +34,7 @@ const isComplete = computed(() => Boolean(
   (cache.value as any)?.magicTower_briefInfo?.data?.state === 'win' ||
   (cache.value as any)?.['magicTower_briefInfo']?.state === 'win'
 ));
-const floorNumber = computed(() => session.value?.floorNumber || (isComplete.value ? 25 : status.value?.floorNumber) || 1);
+const floorNumber = computed(() => session.value?.floorNumber || (isComplete.value ? TOWER_FLOOR_COUNT : status.value?.floorNumber) || 1);
 
 const heroEntries = computed(() => {
   return Object.entries(cache.value.heroGetAll?.data || {})
@@ -306,7 +307,7 @@ watch(() => props.modelValue, (open) => {
                     : 'bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300'
                 "
               >
-                {{ isComplete ? 'Completed ✓' : `Floor ${floorNumber} / 25` }}
+                {{ isComplete ? 'Completed ✓' : `Floor ${floorNumber} / ${TOWER_FLOOR_COUNT}` }}
               </span>
             </div>
             <p class="text-xs text-slate-400 mt-0.5">

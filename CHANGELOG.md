@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.59 — 2026-11-13
+
+### Fixed
+
+- Use the verified splitlib Tower layout (23 floors, final boss template 12) for Dashboard and Tower dialog progress.
+- Remove guessed 25/26 floor sentinels and late-floor victory completion; require server completion or a win in the configured final boss room.
+- Add reproducible Tower configuration extraction, source hashes, public fixtures and refresh documentation.
+
 ## 0.10.58 — 2026-11-13
 
 ### Fixed

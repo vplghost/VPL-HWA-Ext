@@ -72,9 +72,10 @@
           args: { number: Number(choice.roomNumber) } }, floor: session.floorNumber,
           room: Number(choice.roomNumber) };
       }
-      const wonOnFloor = history.some((e) => e?.action === 'endBattle' && e?.floor === session.floorNumber && e?.win);
-      const isBossFloor = Object.values(rooms || {}).some((r) => r?.type === 'boss_battle');
-      if (wonOnFloor && (isBossFloor || session.floorNumber >= 20)) {
+      const wonFinalBoss = session.floorNumber === globalThis.hwaHelperTowerRules?.finalFloor &&
+        history.some((event) => event?.action === 'endBattle' && event?.floor === session.floorNumber &&
+          event?.win === true && (event.roomType === 'boss_battle' || rooms[event.room]?.type === 'boss_battle'));
+      if (wonFinalBoss) {
         return { kind: 'complete' };
       }
       return { kind: 'stop', reason: 'No available Tower battle room.' };

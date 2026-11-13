@@ -1,3 +1,4 @@
+import { TOWER_FLOOR_COUNT } from '../utils/towerRules.ts';
 import { normalizeArray } from '../utils/troops.ts';
 
 export function observedToday(entry: any, now = Date.now(), nextReset?: number): boolean {
@@ -20,15 +21,15 @@ export function towerActivityState(cache: Record<string, any>, now = Date.now())
   const current = entries.filter((entry) => new Date(entry.updatedAt).getTime() === newest)
     .map((entry) => entry.data ?? entry);
   const cleared = current.some((data) => data.isCleared === true || data.completed === true ||
-    ['win', 'completed'].includes(data.state) || Number(data.floorNumber) > 25 ||
-    normalizeArray(data.history).some((event: any) => event?.action === 'endBattle' &&
+    ['win', 'completed'].includes(data.state) ||
+    (Number(data.floorNumber) === TOWER_FLOOR_COUNT && normalizeArray(data.history).some((event: any) => event?.action === 'endBattle' &&
       event.win === true && Number(event.floor) === Number(data.floorNumber) &&
       (!event.at || observedToday({ updatedAt: event.at }, now, cache.questResetStatus?.data?.nextDayAt)) &&
-      (event.roomType === 'boss_battle' || data.rooms?.[event.room]?.type === 'boss_battle')));
+      (event.roomType === 'boss_battle' || data.rooms?.[event.room]?.type === 'boss_battle'))));
   const floor = current.find((data) => data.floorNumber != null)?.floorNumber;
   return {
     state: cleared ? 'done' as const : 'pending' as const,
-    detail: cleared ? 'Cleared today' : floor ? `Floor ${floor} / 25` : 'Ready to enter',
+    detail: cleared ? 'Cleared today' : floor ? `Floor ${floor} / ${TOWER_FLOOR_COUNT}` : 'Ready to enter',
   };
 }
 

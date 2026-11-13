@@ -3,7 +3,7 @@ id: doc-5e8425dc5b6bbedc140f08bbabb316ab
 title: Tower RPC Session and Progress Model
 description: Observed Tower route, choices, rewards, assets and cache representation
 createdAt: '2026-11-03T05:51:31.632Z'
-updatedAt: '2026-11-03T05:51:31.632Z'
+updatedAt: '2026-11-13T13:53:55.648Z'
 tags:
   - tower
   - rpc
@@ -47,3 +47,8 @@ The completion summary reports total clears 30, streak 15, battle rewards 171,10
 
 ## UI and cache
 `towerSession` in the passive RPC cache stores the current floor/room graph, selected team, compact action history, and completion payload. `towerStatus` still supplies the existing Goals cleared state. The Tower FAB sub button opens a read-only dialog; current choices come from the latest floor's room graph, and prior choices come from action history. A complete run shows completion and suppresses current choices. Missing initial snapshot means earlier opponent or buff options can remain unknown.
+
+
+## Configured total floors (verified 2026-11-13)
+
+The observed 23-floor route is now backed by versioned splitlib configuration: `magicTower.pb` has contiguous floor IDs 1–23, with floor 23 referencing template 12 (`MAGIC_TOWER_FLOORLAST_TITLE`). Runtime progress reads the shared generated Tower rules; 25/26 and generic high-floor win heuristics are removed. Source hashes, indexed protobuf structure, tests and regeneration procedure: @doc/architecture/tower-floor-count-from-splitlib.

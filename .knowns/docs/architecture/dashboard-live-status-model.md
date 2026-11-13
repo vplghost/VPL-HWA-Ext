@@ -3,7 +3,7 @@ id: doc-d229300ad19a499cc8f6e79fc5ea4df4
 title: Dashboard Live Status Model
 description: Vue Dashboard queue/march sources, countdown lifecycle, and evidence-based daily activity completion and reset rules.
 createdAt: '2026-11-13T05:20:28.286Z'
-updatedAt: '2026-11-13T09:47:08.700Z'
+updatedAt: '2026-11-13T13:53:55.687Z'
 tags:
   - dashboard
   - queues
@@ -40,3 +40,8 @@ Implemented by @task-VHE-64GPHS.
 An accepted `magicTower_endBattle` with `args.result.win === true` while the current room is `boss_battle` immediately sets canonical towerSession.completed and towerStatus.isCleared, even without optional magicTower_completion / magicTower_briefInfo sidecars. Failed or missing RPC responses, boss losses and regular hero_battle wins do not count. The reducer retains roomType on combat history. Dashboard also recognizes an existing current-floor boss victory in session history (array or object map), checking its observation date when provided, so previously cached runs display Done without replaying a battle. Merely reaching floor 23 is not completion evidence. A newer reset/run and the server daily reset retain precedence.
 
 Regression coverage: tests/tower-session.test.mjs and tests/dashboard-state.test.mjs; full suite 614 tests, 602 passed, 12 optional private-data skips, zero failures. Typecheck/build validated.
+
+
+## Tower denominator from splitlib (2026-11-13)
+
+The Tower progress denominator comes from shared generated `hwaHelperTowerRules.floorCount`, currently 23. Floor number alone never proves completion, including an unexpected floor above the configured count. The fallback boss-win history must belong to the configured final floor. Source and refresh instructions: @doc/architecture/tower-floor-count-from-splitlib.

@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
 const context = { TextEncoder };
+runInNewContext(await readFile(new URL('../extension/tower-rules.js', import.meta.url), 'utf8'), context);
 runInNewContext(source, context);
 const cache = context.hwaHelperRpcCache;
 

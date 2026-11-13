@@ -1409,7 +1409,7 @@
         }
         if ((call.name === 'magicTower_briefInfo' || call.name === 'magicTower_getAll') && result?.response) {
           const resp = result.response;
-          const isCleared = resp.state === 'win' || resp.state === 'completed' || (Number(resp.floorData?.floorNumber) > 25);
+          const isCleared = resp.state === 'win' || resp.state === 'completed';
           return [{
             key: 'towerStatus',
             method: call.name,
@@ -1420,7 +1420,7 @@
               isCleared,
               ...(resp.skipState != null ? { skipState: resp.skipState } : {}),
               deadHeroesCount: resp.deadHeroesCount ?? 0,
-              floorNumber: resp.floorData?.floorNumber ?? (isCleared ? 26 : 0),
+              floorNumber: resp.floorData?.floorNumber ?? (isCleared ? (globalThis.hwaHelperTowerRules?.finalFloor ?? 0) : 0),
               floorData: resp.floorData ? {
                 floorNumber: resp.floorData.floorNumber,
                 currentRoomNumber: resp.floorData.currentRoomNumber,
@@ -3819,7 +3819,7 @@
             session.history.push(event);
             session.roomNumber = action.roomNumber ?? session.roomNumber;
             if (action.completion || ['win', 'completed'].includes(action.briefInfo?.state) ||
-                (action.win && room?.type === 'boss_battle')) {
+                (action.win && room?.type === 'boss_battle' && floor === globalThis.hwaHelperTowerRules?.finalFloor)) {
               session.completed = true;
               session.completion = action.completion;
               next.towerStatus = {

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const context = { Date };
-for (const name of ['tower-automation', 'tower-runner']) vm.runInNewContext(
+for (const name of ['tower-rules', 'tower-automation', 'tower-runner']) vm.runInNewContext(
   await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
 const planner = context.hwaHelperTowerAutomation;
 const runner = context.hwaHelperTowerRunner;
