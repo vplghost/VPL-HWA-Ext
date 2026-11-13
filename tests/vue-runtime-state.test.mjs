@@ -156,6 +156,14 @@ test('Rejected troop actions never fabricate queues, collected units, or healing
   await mounted.result.training.syncHealed();
   assert.equal(JSON.stringify(mounted.result.cache.cache.value), before);
   assert.deepEqual(writes, []);
+  assert.ok(sent.some(message => message.calls.some(call => call.name === 'completeHealing')));
+  // Simulate the next authoritative idle-hospital snapshot before testing a rejected start.
+  snapshot['getHealing:unit'].data.healing = null;
+  await mounted.result.cache.reload();
+  const beforeHeal = JSON.stringify(mounted.result.cache.cache.value);
+  await mounted.result.training.healAll();
+  assert.equal(JSON.stringify(mounted.result.cache.cache.value), beforeHeal);
+  assert.deepEqual(writes, []);
   assert.ok(sent.some(message => message.calls.some(call => call.name === 'completeTraining')));
   assert.ok(sent.some(message => message.calls.some(call => call.name === 'startTraining')));
   assert.ok(sent.some(message => message.calls.some(call => call.name === 'startHealing')));

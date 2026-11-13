@@ -21,9 +21,11 @@
     'startTraining:unit': 'teams',
     'completeTraining:unit': 'teams',
     'startHealing:unit': 'teams',
+    'completeHealing:unit': 'teams',
     startTraining: 'teams',
     completeTraining: 'teams',
     startHealing: 'teams',
+    completeHealing: 'teams',
     questGetAll: 'other',
     arenaGetAll: 'other',
     expeditionGet: 'other',
@@ -1896,6 +1898,14 @@
               updatedAt: record.timestamp
             }];
           }
+        }
+        if (key === 'completeHealing:unit' && result?.response && !result.error &&
+            !result.response.error && Number.isFinite(call.args?.completeDate)) {
+          return [{
+            key: 'completeHealingAction', method: call.name, feature: call.feature,
+            group: 'internal', data: { completeDate: call.args.completeDate, token: call.ident },
+            updatedAt: record.timestamp
+          }];
         }
         if ((key === 'startHealing:unit' || call.name === 'startHealing') && result?.response) {
           const units = Array.isArray(call.args?.units) ? call.args.units.map((u) => ({
@@ -4013,6 +4023,31 @@
             updatedAt: entry.updatedAt
           };
           changed = true;
+          continue;
+        }
+
+        if (entry.key === 'completeHealingAction') {
+          for (const healKey of ['getHealing:unit', 'getHealing']) {
+            const previous = next[healKey];
+            const healing = previous?.data?.healing;
+            if (!healing || previous.updatedAt > entry.updatedAt ||
+                !Number.isFinite(healing.startDate) || !Number.isFinite(healing.duration) ||
+                healing.startDate + healing.duration > entry.data.completeDate) continue;
+            const healed = new Map(normalizeArrayData(healing.units)
+              .map((unit) => [Number(unit.unitId), Number(unit.count) || 0]));
+            next[healKey] = {
+              ...previous,
+              data: {
+                ...previous.data, healing: null,
+                injuredUnits: normalizeArrayData(previous.data.injuredUnits).map((unit) => ({
+                  ...unit, count: Math.max(0, (Number(unit.count) || 0) - (healed.get(Number(unit.unitId)) || 0))
+                }))
+              },
+              updatedAt: entry.updatedAt
+            };
+            changed = true;
+          }
+          // Available troop counts are reconciled from getUnitSummary, not inferred.
           continue;
         }
 

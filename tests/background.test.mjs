@@ -299,6 +299,30 @@ test('api-record safely handles object-shaped questClaimStatus claims without Ty
   assert.equal(res.cached, true);
 });
 
+test('confirmed healing completion refreshes authoritative troop state in each shared dispatch mode', async () => {
+  for (const mode of ['direct', 'piggyback', 'mqtt-piggyback']) {
+    const { local, send, forwardedMessages } = setup();
+    const completeDate = 1794552240233;
+    local.popupRpcEnabled = true;
+    local.socketRefreshMode = mode;
+    local.rpcCache = { 'getHealing:unit': { data: {
+      injuredUnits: [{ unitId: 7, count: 2 }],
+      healing: { startDate: completeDate - 20000, duration: 8000, units: [{ unitId: 7, count: 1 }] }
+    } } };
+    const record = rpc([{ name: 'completeHealing', feature: 'unit', args: { completeDate }, ident: 'heal-done' }],
+      [{ ident: 'heal-done', result: { response: {} } }], '2026-11-13T06:44:00.882Z');
+    await send('api-record', record, { ...gameSender, tab: { id: 7 } });
+    assert.equal(local.rpcCache['getHealing:unit'].data.healing, null);
+    assert.equal(forwardedMessages.length, 1);
+    assert.equal(forwardedMessages[0].tabId, 7);
+    assert.equal(forwardedMessages[0].msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+    assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, call => call.name),
+      ['getUnitSummary', 'getTrainings', 'getHealing']);
+    await send('api-record', record, { ...gameSender, tab: { id: 7 } });
+    assert.equal(forwardedMessages.length, 1, 'Duplicate completion must not schedule another refresh');
+  }
+});
+
 test('skin upgrade requests fresh hero stats and stone balances once', async () => {
   const { local, send, forwardedMessages } = setup();
   local.popupRpcEnabled = true;

@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-08T10:10:34.789Z'
+updatedAt: '2026-11-13T06:51:02.153Z'
 tags:
   - api
   - rpc
@@ -231,3 +231,20 @@ All calls inherit @doc/architecture/shared-rpc-settings, including cancellation.
 ### Regression coverage
 
 `tests/experimental-ui.test.mjs` covers lineup persistence writes, troop changes, last searched level and game wait options. `tests/experimental-data.test.mjs` covers allocation/capacity/member counts. `tests/raid-queue.test.mjs` covers identity correlation, return confirmation, loss/timeout, unknown membership and one-shot deadline cancellation. Background tests cover all three shared modes, tab ownership and popup-independent progression; interceptor tests cover expired cancellation, group removal and no mutation retry. Cache tests cover won-boss filtering across fresh searches and delayed results.
+
+
+## Hospital healing completion (2026-11-13)
+
+Evidence: `temp/tracking-data/hwa-game-record-202611131344_sync_healed.json`, game version 1.293.1010; completion response at 06:44:00.882Z and next start response at 06:44:04.439Z. Verified by @task-VHE-CMZHNT.
+
+The game explicitly collects elapsed healing before starting a new run:
+```json
+{"name":"completeHealing","feature":"unit","args":{"completeDate":1794552240233}}
+```
+Successful response: `result.response = {}`. Reading `getUnitSummary:unit` and `getHealing:unit` alone does not perform this mutation.
+
+The next observed `startHealing:unit` has millisecond `startDate`, `duration: 40000`, and `units: [{unitId:27,count:2},{unitId:17,count:2},{unitId:7,count:1}]`. This five-unit run is consistent with the existing 8000 ms/unit estimate; a 60000 ms minimum is contradicted by the capture. This single trace does not prove every future healing modifier or speed-up formula.
+
+`useTroopTraining.syncHealed` sends completion first, then authoritative summary/healing reads, through the shared RPC policy. Queued dispatch waits for the game response; rejection never clears UI cache. `completeHealingAction` clears only an elapsed confirmed run, subtracts those units from hospital injuries, and leaves available troop counts to `getUnitSummary`. Duplicate completion is a no-op once healing is null; older completion cannot clear a newer healing run/snapshot. Background requests authoritative unit/training/healing refresh after an applied completion.
+
+Regression coverage: `tests/healing-sync.test.mjs`, `tests/background.test.mjs`, and the rejected-action test in `tests/vue-runtime-state.test.mjs`. Only sanitized contract fields are embedded in tests; the private capture is not required by the test suite.

@@ -1562,7 +1562,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
         globalThis.hwaHelperRpcCache.extract(record).some((entry) =>
-          ['completeTrainingAction', 'startTrainingAction', 'startHealingAction'].includes(entry.key))) {
+          ['completeTrainingAction', 'startTrainingAction', 'startHealingAction', 'completeHealingAction'].includes(entry.key))) {
       const dispatch = rpcMessageForSettings(stored, [
         { name: 'getUnitSummary', feature: 'unit' },
         { name: 'getTrainings', feature: 'unit' },

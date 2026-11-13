@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from './useRpcCache.ts';
 import { getTroopType, TROOP_DEFS, normalizeArray, calculateTroopMax, CAMP_BUILDING_IDS } from '../utils/troops.ts';
 import type { TroopTrainSettings, TroopUnitState } from '@/src/types';
@@ -11,6 +11,7 @@ export function useTroopTraining() {
   const isRefreshing = ref(false);
   const isSyncLoading = ref(false);
   const isHealLoading = ref(false);
+  const healStatus = ref('');
   const now = ref(Date.now());
   let timerInterval: any = null;
 
@@ -64,6 +65,7 @@ export function useTroopTraining() {
   const unitSummary = computed(() => cache.value['getUnitSummary:unit']?.data || cache.value.getUnitSummary?.data);
   const healing = computed(() => cache.value['getHealing:unit']?.data || cache.value.getHealing?.data);
   const trainings = computed(() => cache.value['getTrainings:unit']?.data || cache.value.getTrainings?.data);
+  watch(() => healing.value?.healing, () => { healStatus.value = ''; });
 
   const totalInjured = computed(() => {
     const list = normalizeArray(healing.value?.injuredUnits);
@@ -232,40 +234,50 @@ export function useTroopTraining() {
   }
 
   async function healAll() {
-    if (isHealLoading.value) return;
-    const injuredList = normalizeArray(healing.value?.injuredUnits);
-    const unitsToHeal = injuredList
-      .filter((u: any) => Number(u?.count) > 0)
+    if (isHealLoading.value || isSyncLoading.value) return;
+    if (isHealingActive.value || isHealingReady.value) {
+      healStatus.value = isHealingReady.value ? 'Sync healed troops before starting another heal.' : 'Healing is already in progress.';
+      return;
+    }
+    const unitsToHeal = normalizeArray(healing.value?.injuredUnits)
+      .filter((u: any) => Number.isInteger(Number(u?.unitId)) && Number(u?.count) > 0)
       .map((u: any) => ({ unitId: Number(u.unitId), count: Number(u.count) }));
     if (unitsToHeal.length === 0) return;
 
     isHealLoading.value = true;
+    healStatus.value = '';
     try {
       const countSum = unitsToHeal.reduce((s: number, u: any) => s + u.count, 0);
-      const duration = Math.max(60000, countSum * 8000);
-      const startDate = Date.now();
-
-      await dispatchRpc([
-        {
-          name: 'startHealing',
-          args: { startDate, duration, units: unitsToHeal },
-          feature: 'unit',
-        },
+      const result = await dispatchRpc([
+        { name: 'startHealing', feature: 'unit',
+          args: { startDate: Date.now(), duration: countSum * 8000, units: unitsToHeal } },
         { name: 'getHealing', feature: 'unit' },
       ]);
+      healStatus.value = !result?.ok ? result?.error || 'Could not start healing.'
+        : result.queued ? 'Queued. Waiting for the game to start healing.'
+        : 'Healing requested. Waiting for game data.';
+    } catch (error) {
+      healStatus.value = error instanceof Error ? error.message : String(error);
     } finally {
       isHealLoading.value = false;
     }
   }
 
   async function syncHealed() {
-    if (isSyncLoading.value) return;
+    if (isSyncLoading.value || isHealLoading.value || !isHealingReady.value) return;
     isSyncLoading.value = true;
+    healStatus.value = '';
     try {
-      await dispatchRpc([
+      const result = await dispatchRpc([
+        { name: 'completeHealing', args: { completeDate: Date.now() }, feature: 'unit' },
         { name: 'getUnitSummary', feature: 'unit' },
         { name: 'getHealing', feature: 'unit' },
       ]);
+      healStatus.value = !result?.ok ? result?.error || 'Could not sync healed troops.'
+        : result.queued ? 'Queued. Waiting for the game to collect healed troops.'
+        : 'Healing completion requested. Waiting for game data.';
+    } catch (error) {
+      healStatus.value = error instanceof Error ? error.message : String(error);
     } finally {
       isSyncLoading.value = false;
     }
@@ -280,6 +292,7 @@ export function useTroopTraining() {
     isRefreshing,
     isSyncLoading,
     isHealLoading,
+    healStatus,
     now,
     trainings,
     setMaxTarget,
