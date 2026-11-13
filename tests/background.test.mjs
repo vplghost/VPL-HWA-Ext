@@ -52,12 +52,20 @@ function setup(quota = Infinity) {
   const tabsList = [];
   const forwardedMessages = [];
   let reloadedTabId = null;
+  const reloadedTabIds = [];
+  const alarms = new Map();
+  let onAlarm;
   let onTabRemoved;
   const chrome = {
+    alarms: {
+      get: (name, cb) => cb(alarms.get(name)),
+      create: (name, options) => alarms.set(name, options),
+      onAlarm: { addListener: callback => { onAlarm = callback; } },
+    },
     tabs: {
       onRemoved: { addListener: (handler) => { onTabRemoved = handler; } },
       query: (filter, cb) => cb(tabsList),
-      reload: (tabId, opts, cb) => { reloadedTabId = tabId; if (cb) cb(); },
+      reload: (tabId, opts, cb) => { reloadedTabId = tabId; reloadedTabIds.push(tabId); if (cb) cb(); },
       sendMessage: async (tabId, msg) => { forwardedMessages.push({ tabId, msg }); }
     },
     runtime: {
@@ -88,8 +96,185 @@ function setup(quota = Infinity) {
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
     new Promise((resolve) => listener({ kind, record }, sender, resolve));
-  return { local, session, send, installed, listener, tabsList, forwardedMessages, removeTab: (id) => onTabRemoved(id), getReloadedTabId: () => reloadedTabId };
+  return { local, session, send, installed, listener, tabsList, forwardedMessages, chrome, alarms, reloadedTabIds,
+    fireAlarm: name => onAlarm({ name }), removeTab: (id) => onTabRemoved(id), getReloadedTabId: () => reloadedTabId };
 }
+
+function stalledCityQueue(type, now) {
+  const env = setup(), key = type + 'Queue', idKey = type === 'building' ? 'buildingId' : 'researchId';
+  env.tabsList.push({ id: 1, url: gameSender.url });
+  env.local.popupRpcEnabled = true; env.local.socketRefreshMode = 'piggyback';
+  env.local[key] = { enabled: true, waitUntil: now,
+    items: [{ [idKey]: 40, currentLevel: 1, nextLevel: 2, durationMs: 30000 }] };
+  env.local.rpcCache = { [type + 'Status']: { method: 'getSummary',
+    updatedAt: new Date(now).toISOString(), data: { queues: [] } } };
+  const sync = () => new Promise(resolve =>
+    env.listener({ kind: type + '-queue-action', action: 'sync' }, popupSender, resolve));
+  return { env, key, sync, idKey };
+}
+
+test('both city queues refresh at 60s after completion while a start is still unacknowledged', async t => {
+  const now = Date.parse('2026-11-13T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    t.mock.timers.setTime(now);
+    const { env, key, sync } = stalledCityQueue(type, now);
+    await sync();
+    assert.ok(env.local[key].pendingRequest);
+    assert.equal(env.alarms.get('hwa-' + type + '-queue-recovery').when, now + 60000);
+    t.mock.timers.tick(59999); await sync();
+    assert.equal(env.reloadedTabIds.length, 0);
+    t.mock.timers.tick(1);
+    await env.fireAlarm('hwa-' + type + '-queue-recovery');
+    assert.deepEqual(env.reloadedTabIds, [1]);
+    assert.equal(env.local[key].items.length, 1);
+    assert.ok(env.local[key].pendingRequest, 'Reload cannot consume or redispatch an uncertain mutation');
+    assert.ok(env.local[key + 'Logs'].some(log => log.action === 'refresh'));
+    t.mock.timers.tick(60000); await sync(); await sync();
+    assert.equal(env.reloadedTabIds.length, 1, 'One attempt per stalled transition');
+    const resumed = setup();
+    Object.assign(resumed.local, env.local); resumed.tabsList.push(...env.tabsList);
+    await resumed.fireAlarm('hwa-' + type + '-queue-recovery');
+    assert.equal(resumed.reloadedTabIds.length, 0, 'Restart retains the attempted marker');
+  }
+});
+
+test('city queue refresh is shared across simultaneous building and research stalls', async t => {
+  const now = Date.parse('2026-11-13T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now: now + 60000 });
+  const { env } = stalledCityQueue('building', now);
+  const research = stalledCityQueue('research', now);
+  env.local.researchQueue = research.env.local.researchQueue;
+  Object.assign(env.local.rpcCache, research.env.local.rpcCache);
+  await Promise.all(['building', 'research'].map(type => env.fireAlarm('hwa-' + type + '-queue-recovery')));
+  assert.deepEqual(env.reloadedTabIds, [1]);
+  assert.equal(env.local.buildingQueue.stalledRefresh.attemptedAt, now + 60000);
+  assert.equal(env.local.researchQueue.stalledRefresh.attemptedAt, now + 60000);
+});
+
+test('city queue refresh requires enabled work, allowed RPC and an existing game tab', async t => {
+  const now = Date.parse('2026-11-13T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now: now + 60000 });
+  for (const type of ['building', 'research']) {
+    for (const mode of ['disabled-queue', 'empty', 'disabled-rpc', 'disabled-monitor', 'no-tab', 'other-tab', 'not-a-transition']) {
+      const { env, key, sync } = stalledCityQueue(type, now);
+      if (mode === 'disabled-queue') env.local[key].enabled = false;
+      if (mode === 'empty') env.local[key].items = [];
+      if (mode === 'disabled-rpc') env.local.popupRpcEnabled = false;
+      if (mode === 'disabled-monitor') env.local.captureSettings = { interceptEnabled: false };
+      if (mode === 'no-tab') env.tabsList.length = 0;
+      if (mode === 'other-tab') env.tabsList[0].url = 'https://example.com/';
+      if (mode === 'not-a-transition') env.local[key].waitUntil = null;
+      await sync();
+      assert.equal(env.reloadedTabIds.length, 0, type + ': ' + mode);
+    }
+  }
+});
+
+test('confirmed city start or active server occupancy cancels stalled recovery', async t => {
+  const now = Date.parse('2026-11-13T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    for (const mode of ['confirmed-start', 'occupied', 'targets-done']) {
+      t.mock.timers.setTime(now);
+      const { env, key, sync, idKey } = stalledCityQueue(type, now);
+      await sync();
+      t.mock.timers.tick(60000);
+      if (mode === 'confirmed-start') {
+        const calls = env.local[key].pendingRequest.calls.map((call, i) => ({ ...call, ident: String(i) }));
+        await env.send('api-record', rpc(calls, calls.map(call => ({ ident: call.ident,
+          result: { response: {} } })), new Date(Date.now()).toISOString()), { ...gameSender, tab: { id: 1 } });
+      } else {
+        env.local[key].pendingRequest = null;
+        env.local.rpcCache[type + 'Status'] = { method: 'getSummary', updatedAt: new Date(Date.now()).toISOString(),
+          data: { queues: mode === 'occupied' ? [{ [idKey]: 41, level: 2, startDate: Date.now(), durationMs: 90000 }] : [],
+            [type === 'building' ? 'buildings' : 'completedResearches']: [{ [idKey]: 40, level: 2 }] } };
+      }
+      await sync();
+      assert.equal(env.reloadedTabIds.length, 0, type + ': ' + mode);
+      assert.equal(env.local[key].stalledRefresh, null);
+    }
+  }
+});
+
+test('city recovery survives an idle snapshot and logs reload failures once', async t => {
+  const now = Date.parse('2026-11-13T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    t.mock.timers.setTime(now);
+    const { env, key, sync, idKey } = stalledCityQueue(type, now);
+    env.local[key].waitUntil = null;
+    env.local.rpcCache[type + 'Status'].data.queues =
+      [{ [idKey]: 41, level: 2, startDate: now - 30000, durationMs: 30000 }];
+    await sync();
+    env.local.rpcCache[type + 'Status'].data.queues = [];
+    env.chrome.tabs.reload = async () => { throw Error('tab disconnected'); };
+    t.mock.timers.tick(60000); await sync(); await sync();
+    assert.equal(env.local[key].stalledRefresh.completedAt, now);
+    assert.equal(env.local[key].stalledRefresh.attemptedAt, now + 60000);
+    assert.equal(env.local[key + 'Logs'].filter(log => log.message.includes('Could not refresh')).length, 1);
+    assert.equal(env.local[key].items.length, 1);
+  }
+});
+
+test('city recovery does not infer an early finish from missing or stale occupancy', async t => {
+  const now = Date.parse('2026-11-13T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    const { env, key, sync } = stalledCityQueue(type, now);
+    env.local[key].waitUntil = now + 3600000;
+    delete env.local.rpcCache[type + 'Status'];
+    await sync();
+    t.mock.timers.tick(60001); await sync();
+    assert.equal(env.reloadedTabIds.length, 0);
+    assert.equal(env.local[key].stalledRefresh, undefined);
+    t.mock.timers.setTime(now);
+  }
+});
+
+test('a later completed upgrade arms a new recovery after progress', async t => {
+  const now = Date.parse('2026-11-13T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    t.mock.timers.setTime(now);
+    const { env, key, sync, idKey } = stalledCityQueue(type, now);
+    env.local[key].stalledRefresh = { completedAt: now - 120000, attemptedAt: now - 60000 };
+    env.local[key].lastConfirmedStartAt = now - 30000;
+    env.local.cityQueueGameRefresh = { tabId: 1, at: now - 60000 };
+    env.local.rpcCache[type + 'Status'].data.queues =
+      [{ [idKey]: 41, level: 2, startDate: now - 30000, durationMs: 60000 }];
+    await sync();
+    assert.equal(env.local[key].stalledRefresh, null);
+    assert.equal(env.alarms.get('hwa-' + type + '-queue-recovery').when, now + 90000);
+    t.mock.timers.tick(90000);
+    await env.fireAlarm('hwa-' + type + '-queue-recovery');
+    assert.deepEqual(env.reloadedTabIds, [1]);
+    assert.equal(env.local[key].stalledRefresh.completedAt, now + 30000);
+  }
+});
+
+test('late start acknowledgement does not hide the finish of a short upgrade', async t => {
+  const now = Date.parse('2026-11-13T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    t.mock.timers.setTime(now);
+    const { env, key, sync, idKey } = stalledCityQueue(type, now);
+    env.local[key].items.push({ [idKey]: 42, currentLevel: 1, nextLevel: 2, durationMs: 30000 });
+    await sync();
+    const request = env.local[key].pendingRequest;
+    t.mock.timers.tick(45000);
+    const calls = request.calls.map((call, i) => ({ ...call, ident: String(i) }));
+    await env.send('api-record', rpc(calls, calls.map(call => ({ ident: call.ident, result: { response: {} } })),
+      new Date(Date.now()).toISOString()), { ...gameSender, tab: { id: 1 } });
+    assert.equal(env.local[key].lastConfirmedStartAt, now);
+    env.local.rpcCache[type + 'Status'] = { method: 'getSummary', updatedAt: new Date(Date.now()).toISOString(),
+      data: { queues: [{ [idKey]: 40, level: 2, startDate: now, durationMs: 30000 }] } };
+    await sync();
+    t.mock.timers.tick(45000); await sync();
+    assert.deepEqual(env.reloadedTabIds, [1]);
+    assert.equal(env.local[key].stalledRefresh.completedAt, now + 30000);
+  }
+});
 
 test('city queue Add persists until server acknowledgement and fresh idle summaries chain immediately', async t => {
   const now = Date.parse('2026-11-13T08:33:46Z');

@@ -388,6 +388,12 @@ function cityMutationResults(record, request) {
   } catch { return null; }
 }
 
+function scheduleCityQueueRecovery(type, when) {
+  if (Number.isFinite(when) && when > Date.now()) {
+    chrome.alarms?.create?.('hwa-' + type + '-queue-recovery', { when });
+  }
+}
+
 async function runCityQueue(type, tabId, record) {
   const now = Date.now();
   if (!tabId) tabId = (await findActiveGameTab())?.id;
@@ -415,6 +421,59 @@ async function runCityQueue(type, tabId, record) {
   const idKey = type === 'building' ? 'buildingId' : 'researchId';
   const rawQueues = status?.data?.queues;
   const observed = Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {});
+
+  // Remember the prior finish even when a new idle summary replaces its queue row.
+  // Dispatch acknowledgement is not progress: only a confirmed start clears this.
+  const remainingTargets = fresh ? helper.planNextStep(queue, stored.rpcCache, now).remainingItemsAfterSkip : queue.items;
+  const ends = observed.map(item => helper.getQueueEnd(item, now)).filter(end => end > 0);
+  if (!remainingTargets.length || ends.some(end => end > now)) {
+    if (queue.stalledRefresh) { queue.stalledRefresh = null; await save(); }
+  } else {
+    const previousEnd = queue.waitUntil > 0 &&
+      (queue.waitUntil <= now || (fresh && observed.length === 0)) ? Math.min(queue.waitUntil, now) : 0;
+    const finishedAt = Math.max(0, ...ends.filter(end => end <= now), previousEnd);
+    if (finishedAt > (queue.lastConfirmedStartAt || 0) && !queue.stalledRefresh) {
+      queue.stalledRefresh = { completedAt: finishedAt };
+      scheduleCityQueueRecovery(type, finishedAt + 60000);
+      await save();
+    }
+  }
+
+  async function recoverStalledQueue() {
+    const watch = queue.stalledRefresh;
+    if (!watch || watch.attemptedAt != null || !queue.items.length ||
+        now - watch.completedAt < 60000 || !rpcMessageForSettings(stored, [])) return false;
+    return inCityQueueLane('game-refresh', async () => {
+      // Recheck that this tab still exists; never open a new game window.
+      const tabs = await new Promise(resolve => chrome.tabs.query({}, resolve));
+      const tab = tabs.find(tab => tab.id === tabId && isGameUrl(tab.url));
+      if (!tab) return false;
+      const latest = await chrome.storage.local.get('cityQueueGameRefresh');
+      const previous = latest.cityQueueGameRefresh;
+      if (previous?.tabId === tab.id && previous.at >= watch.completedAt) {
+        watch.attemptedAt = previous.at;
+        await save();
+        await log('refresh', 'Game tab refresh was already attempted for stalled city queues. Waiting for server state.', 'warn');
+        return true;
+      }
+      if (previous?.tabId === tab.id && now - previous.at < 60000) {
+        scheduleCityQueueRecovery(type, previous.at + 60000);
+        return false;
+      }
+      // Persist before reload so another queue/tick or worker restart cannot loop.
+      watch.attemptedAt = now;
+      await save();
+      await chrome.storage.local.set({ cityQueueGameRefresh: { tabId: tab.id, at: now } });
+      try {
+        await chrome.tabs.reload(tab.id);
+        await log('refresh', 'No next upgrade started within 60 seconds after the previous upgrade ended. Refreshed the open game tab.', 'warn',
+          { tabId: tab.id, completedAt: watch.completedAt });
+      } catch (error) {
+        await log('error', 'Could not refresh the game tab for the stalled queue: ' + (error?.message || String(error)), 'error');
+      }
+      return true;
+    });
+  }
 
   async function verify(reason) {
     if (!tabId) {
@@ -464,12 +523,19 @@ async function runCityQueue(type, tabId, record) {
         : Number(value[idKey]) === Number(item[idKey]) && Number(value.nextLevel) === Number(item.nextLevel));
       if (index >= 0) queue.items.splice(index, 1);
       queue.lastStarted = item;
+      queue.lastConfirmedStartAt = request.issuedAt;
+      queue.stalledRefresh = null;
     }
     if (confirmed || outcomes) {
       queue.pendingRequest = null;
       queue.wakeAt = null;
       await save();
       if (confirmed) {
+        if (!request.startedItem && queue.items.length && !queue.stalledRefresh) {
+          queue.stalledRefresh = { completedAt: now };
+          scheduleCityQueueRecovery(type, now + 60000);
+          await save();
+        }
         await log(request.startedItem ? 'start' : 'complete',
           request.startedItem ? 'Server confirmed queued upgrade started.' : 'Server confirmed finished upgrades completed.',
           'success', { targetId: request.startedItem?.[idKey], nextLevel: request.startedItem?.nextLevel });
@@ -477,14 +543,17 @@ async function runCityQueue(type, tabId, record) {
         queue.retryAt = now + 30000;
         await save();
         await log('error', 'Server rejected queue action: ' + JSON.stringify(outcomes.filter(result => !result.ok).map(result => result.error)), 'error');
+        if (await recoverStalledQueue()) return queue;
         await verify('Checking state after rejected action.');
         return queue;
       }
     } else if (now < request.expiresAt) {
+      await recoverStalledQueue();
       return queue;
     } else {
       // Do not retry a mutation against old occupancy data.
       if (!fresh || summaryTime < request.expiresAt) {
+        if (await recoverStalledQueue()) return queue;
         await verify('Queue action acknowledgement timed out.');
         return queue;
       }
@@ -493,6 +562,7 @@ async function runCityQueue(type, tabId, record) {
       await log('retry', 'No start was observed after dispatch. Retrying from the verified server state.', 'warn');
     }
   }
+  if (await recoverStalledQueue()) return queue;
   const hasWork = (queue.items || []).length > 0 || observed.length > 0 || Boolean(queue.wakeAt);
   if (!hasWork) return queue;
   if (!fresh) {
@@ -512,6 +582,7 @@ async function runCityQueue(type, tabId, record) {
     const observedEnd = plan.wakeAt - 1000;
     const changedWait = queue.waitUntil !== observedEnd;
     queue.waitUntil = observedEnd;
+    scheduleCityQueueRecovery(type, observedEnd + 60000);
     queue.wakeAt = Math.min(plan.wakeAt, now + 60000);
     await save();
     if (changedWait) await log('wait', 'Observed upgrade ends at ' + new Date(observedEnd).toLocaleTimeString() +
@@ -622,6 +693,9 @@ function setupQueueAlarms() {
 }
 
 chrome.alarms?.onAlarm?.addListener?.(async (alarm) => {
+  if (alarm.name === 'hwa-building-queue-recovery' || alarm.name === 'hwa-research-queue-recovery') {
+    await advanceCityQueue(alarm.name === 'hwa-building-queue-recovery' ? 'building' : 'research');
+  }
   if (alarm.name === 'hwa-queue-watch') {
     const tab = await findActiveGameTab();
     if (tab?.id) {

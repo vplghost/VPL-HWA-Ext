@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.60 — 2026-11-13
+
+### Fixed
+
+- Refresh an existing game tab when Building or Research cannot start the next queued upgrade within 60 seconds after the previous upgrade ends.
+- Share recovery across both queues and persist one attempt per stalled handoff to avoid repeated reloads; log refreshes and failures while preserving pending RPC confirmation and queued work.
+- Cancel recovery when progress is confirmed, no pending targets remain, or automation is disabled.
+
 ## 0.10.59 — 2026-11-13
 
 ### Fixed

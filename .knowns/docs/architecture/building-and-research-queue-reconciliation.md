@@ -3,7 +3,7 @@ id: doc-54006de1999a5f5836fbb35dc67d4d62
 title: Building and Research Queue Reconciliation
 description: Background ownership, queue acknowledgement, idle wake-up, correct wait timing, bounded RPC verification and visible failure logging.
 createdAt: '2026-11-13T08:50:14.091Z'
-updatedAt: '2026-11-13T08:51:58.982Z'
+updatedAt: '2026-11-13T15:56:14.276Z'
 tags:
   - building
   - research
@@ -48,3 +48,20 @@ Live Chrome/game validation is separate from automated RPC replay and Vue setup 
 ## Invalid saved state
 
 Non-array saved item collections are recovered to arrays with a warning log. Before dispatch, invalid target IDs or levels from a planner produce an error log and retry cooldown rather than an invalid RPC. Rejected summaries and mutations do not fabricate idle/active state in the reducer.
+
+
+## Stalled handoff game refresh (2026-11-13)
+
+Implemented by @task-VHE-406XCM in `runCityQueue`, `scheduleCityQueueRecovery`, and its local `recoverStalledQueue`.
+
+- When queued targets remain, retain the known previous upgrade end from the server queue row or persisted `waitUntil`. A fresh idle summary can establish an early completion at observation time. Missing/stale occupancy cannot imply early completion of an upgrade whose known end is still in the future.
+- Persist `stalledRefresh.completedAt` across summaries and service-worker restarts. If no next start is confirmed after60seconds, reload the existing game tab once. One-shot `hwa-building-queue-recovery` / `hwa-research-queue-recovery` alarms check the deadline, alongside the existing queue ticks and minute watchdog. Chrome may deliver alarms late; recovery never runs before the deadline.
+- This check also runs while a start mutation is awaiting its normal120second acknowledgement timeout, after rejection, or during stale-summary verification. Reload does not clear `pendingRequest`, consume a target or redispatch an uncertain mutation. Existing authoritative reconciliation continues after game reload.
+- A confirmed start records `lastConfirmedStartAt` and clears the stalled marker. Observed active occupancy also clears it, and a later completed upgrade can arm a new recovery. Already-completed targets, empty/disabled queues, disabled global RPC/monitor settings and absent game tabs do not trigger reload. No tab/window is created.
+- Reload decisions share a serialized lane across both queue types. `cityQueueGameRefresh` stores the tab and attempt time before reload: a shared attempt after both completions satisfies both watchdogs, with a minimum60second gap for distinct transitions. Each queue's persisted `attemptedAt` prevents repeated reloads for the same stall, including after worker restart or reload failure.
+- Execution Logs use `refresh` for the attempt/shared recovery and `error` for reload failure. Queue items remain saved when recovery fails; repeated ticks do not cause a reload loop.
+
+`tests/background.test.mjs` verifies the59,999/60,000ms boundary, pending acknowledgements, no-tab and policy exclusions, start/occupancy progress, completed targets, shared simultaneous stalls, persisted attempts across restart, reload failures, stale future occupancy and subsequent completion episodes. Real game/browser timing remains a separate live validation.
+
+
+A delayed successful start acknowledgement stores the request issue time as `lastConfirmedStartAt`, rather than receipt time: a short upgrade may have finished before its acknowledgement arrived. Its later end must still arm recovery for the following target. A regression test covers this ordering.
