@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.67 — 2026-11-14
+
+### Changed
+
+- Move healing feedback below the Troops cards into a fixed-height status area, preventing messages from shifting the Dashboard heading and troop controls.
+
 ## 0.10.66 — 2026-11-14
 
 ### Changed

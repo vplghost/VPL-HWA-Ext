@@ -87,7 +87,6 @@ const troopCards = computed(() => {
 
 <template>
   <section id="dashboard-troops-section" class="space-y-2">
-    <p v-if="healStatus" role="status" class="text-xs text-slate-500 dark:text-slate-400">{{ healStatus }}</p>
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-1.5">
@@ -306,6 +305,14 @@ const troopCards = computed(() => {
             </div>
           </div>
       </div>
+    </div>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      class="h-8 overflow-y-auto break-words text-xs leading-4 text-slate-500 dark:text-slate-400"
+    >
+      {{ healStatus }}
     </div>
   </section>
 </template>
