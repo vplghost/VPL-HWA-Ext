@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import RecipeTreeNode from './RecipeTreeNode.vue';
+import { findRecipeNode, recipeMissions, recipeFarmCategory } from '@/src/utils/recipeTree';
 import { waitForCampaignRaidResult } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
@@ -151,11 +153,11 @@ watch(
       selectedGearId.value = modalContext.selectedCampaignGearId;
       const tree = buildGearRecipeTree(selectedGearId.value, cache.value);
       const unfulfilled = findFirstUnfulfilledNode(tree);
-      selectedRecipeNodeId.value = unfulfilled ? unfulfilled.id : (tree ? tree.id : null);
+      selectedRecipeNodeId.value = unfulfilled?.key ?? tree?.key ?? null;
 
       if (selectedRecipeNodeId.value) {
         const cMissions = (globalThis as any).hwaHelperCampaignMissions;
-        const candidates = cMissions?.getMissionsForItem?.(selectedRecipeNodeId.value) || [];
+        const candidates = recipeMissions(findRecipeNode(tree, selectedRecipeNodeId.value));
         const highest = cMissions?.getHighestRaidableMission?.(
           candidates.map((m: any) => m.id),
           cache.value?.missionGetAll?.data,
@@ -248,18 +250,22 @@ const recipeTree = computed(() => {
   return buildGearRecipeTree(selectedGearId.value, cache.value);
 });
 
+const selectedRecipeNode = computed(() => selectedRecipeNodeId.value
+  ? findRecipeNode(recipeTree.value, selectedRecipeNodeId.value) : recipeTree.value);
+
 // Candidate missions for selected recipe node
 const candidateMissions = computed(() => {
-  const targetId = selectedRecipeNodeId.value || selectedGearId.value;
-  if (!targetId) return [];
-  const cMissions = (globalThis as any).hwaHelperCampaignMissions;
-  return cMissions?.getMissionsForItem?.(targetId) || [];
+  return recipeMissions(selectedRecipeNode.value);
 });
 
+const canFarmSelectedTarget = computed(() => !selectedGearId.value ||
+  candidateMissions.value.some((mission: any) => Number(mission.id) === Number(missionId.value)));
+
 function selectRecipeNode(node: any) {
-  selectedRecipeNodeId.value = node.id;
+  if (isRaidRunning.value) return;
+  selectedRecipeNodeId.value = node.key;
   const cMissions = (globalThis as any).hwaHelperCampaignMissions;
-  const candidates = cMissions?.getMissionsForItem?.(node.id) || [];
+  const candidates = recipeMissions(node);
   const highest = cMissions?.getHighestRaidableMission?.(
     candidates.map((m: any) => m.id),
     cache.value?.missionGetAll?.data,
@@ -273,9 +279,10 @@ function selectRecipeNode(node: any) {
 const isCrafting = ref(false);
 
 async function craftNode(node: any) {
+  if (isCrafting.value || isRaidRunning.value || !node.canCraft) return;
   isCrafting.value = true;
   try {
-    const kind = node.fragment || node.isScroll ? 'craft-fragment' : 'craft-recipe';
+    const kind = node.fragment ? 'craft-fragment' : 'craft-recipe';
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage(
         { kind, type: node.isScroll ? 'scroll' : 'gear', libId: Number(node.id), amount: 1 },
@@ -290,7 +297,7 @@ async function craftNode(node: any) {
       await dispatchRpc([
         {
           name: kind === 'craft-fragment' ? 'inventoryCraftFragments' : 'inventoryCraftRecipe',
-          args: { libId: Number(node.id), amount: 1 },
+          args: { type: node.category, libId: Number(node.id), amount: 1 },
         },
         { name: 'inventoryGet' },
       ]);
@@ -302,23 +309,16 @@ async function craftNode(node: any) {
 }
 
 function findNodeInTree(node: any, targetId: string | number): any {
-  if (!node) return null;
-  if (String(node.id) === String(targetId)) return node;
-  if (Array.isArray(node.children)) {
-    for (const c of node.children) {
-      const found = findNodeInTree(c, targetId);
-      if (found) return found;
-    }
-  }
-  return null;
+  return findRecipeNode(node, targetId);
 }
 
 function isNodeRequirementMet(node: any): boolean {
   if (!node) return false;
+  if (node.isFulfilled) return true;
   if (node.fragment) {
     return Number(node.fragment.owned) >= Number(node.fragment.required);
   }
-  return Number(node.owned) >= Number(node.requiredCount || 1);
+  return Number(node.owned) >= Number(node.requiredCount ?? 1);
 }
 
 function mergeDropsIntoAccumulator(acc: any, drops: any) {
@@ -511,7 +511,12 @@ async function executeSequentialLoop(totalTimes: number) {
 }
 
 async function startRaid(times: number) {
+  if (isRaidRunning.value || isCrafting.value) return;
   loopStatusMsg.value = '';
+  if (!canFarmSelectedTarget.value) {
+    loopStatusMsg.value = 'Select a component and a mission that drops it before farming.';
+    return;
+  }
 
   const tries = getTriesInfo(missionId.value);
   if (tries.isExhausted) {
@@ -570,9 +575,9 @@ const targetItemProgress = computed(() => {
   if (!node) return null;
   const isFrag = Boolean(node.fragment);
   const owned = isFrag ? Number(node.fragment.owned) : Number(node.owned);
-  const required = isFrag ? Number(node.fragment.required) : Number(node.requiredCount || 1);
+  const required = isFrag ? Number(node.fragment.required) : Number(node.requiredCount ?? 1);
   return {
-    id: String(targetId),
+    id: node.id,
     name: node.name,
     isFragment: isFrag,
     owned,
@@ -585,12 +590,8 @@ const sessionFarmedCount = computed(() => {
   const d = latestRaidResult.value?.drops;
   const targetId = selectedRecipeNodeId.value || selectedGearId.value;
   if (!d || !targetId) return 0;
-  const strId = String(targetId);
-  const fg = Number(d.fragmentGear?.[strId] || 0);
-  const fs = Number(d.fragmentScroll?.[strId] || 0);
-  const g = Number(d.gear?.[strId] || 0);
-  const s = Number(d.scroll?.[strId] || 0);
-  return fg + fs + g + s;
+  const node = selectedRecipeNode.value;
+  return node ? Number(d[recipeFarmCategory(node)]?.[node.id] || 0) : 0;
 });
 
 const hasDropItems = computed(() => {
@@ -691,7 +692,7 @@ const hasDropItems = computed(() => {
               <button
                 v-if="recipeTree.canCraft"
                 type="button"
-                :disabled="isCrafting"
+                :disabled="isCrafting || isRaidRunning"
                 class="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-bold text-2xs cursor-pointer shadow-xs disabled:opacity-50"
                 @click="craftNode(recipeTree)"
               >
@@ -699,93 +700,9 @@ const hasDropItems = computed(() => {
               </button>
             </div>
 
-            <!-- Root & Children Nodes -->
-            <div class="space-y-1.5">
-              <div
-                class="p-2 rounded-lg border text-xs flex items-center justify-between cursor-pointer transition-colors"
-                :class="
-                  selectedRecipeNodeId === recipeTree.id
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 dark:border-indigo-500'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
-                "
-                @click="selectRecipeNode(recipeTree)"
-              >
-                <div class="flex items-center gap-2">
-                  <span>🛡️</span>
-                  <span class="font-bold">{{ recipeTree.name }}</span>
-                  <span class="text-slate-400 text-2xs">Owned: {{ recipeTree.owned }}</span>
-                </div>
-
-                <div class="flex items-center gap-1.5">
-                  <span
-                    v-if="recipeTree.fragment"
-                    class="text-2xs font-semibold px-1.5 py-0.5 rounded"
-                    :class="
-                      recipeTree.fragment.isFulfilled
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                    "
-                  >
-                    Fragments: {{ recipeTree.fragment.owned }}/{{ recipeTree.fragment.required }}
-                  </span>
-                  <span
-                    v-if="recipeTree.isFulfilled"
-                    class="text-2xs font-bold text-emerald-600 dark:text-emerald-400"
-                  >
-                    ✓ Ready
-                  </span>
-                </div>
-              </div>
-
-              <!-- Children Components -->
-              <div v-if="recipeTree.children?.length > 0" class="pl-4 space-y-1 border-l-2 border-indigo-200 dark:border-indigo-800">
-                <div
-                  v-for="c in recipeTree.children"
-                  :key="c.id"
-                  class="p-2 rounded-lg border text-xs flex items-center justify-between cursor-pointer transition-colors"
-                  :class="
-                    selectedRecipeNodeId === c.id
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 dark:border-indigo-500'
-                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
-                  "
-                  @click="selectRecipeNode(c)"
-                >
-                  <div class="flex items-center gap-2">
-                    <span>{{ c.isScroll ? '📜' : '🧩' }}</span>
-                    <span class="font-medium">{{ c.name }}</span>
-                    <span class="text-slate-400 text-2xs">Req: {{ c.requiredCount }} · Owned: {{ c.owned }}</span>
-                  </div>
-
-                  <div class="flex items-center gap-1.5">
-                    <span
-                      v-if="c.fragment"
-                      class="text-2xs font-semibold px-1.5 py-0.5 rounded"
-                      :class="
-                        c.fragment.isFulfilled
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                      "
-                    >
-                      Frags: {{ c.fragment.owned }}/{{ c.fragment.required }}
-                    </span>
-                    <button
-                      v-if="c.canCraft"
-                      type="button"
-                      :disabled="isCrafting"
-                      class="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-white font-bold text-3xs cursor-pointer shadow-xs disabled:opacity-50"
-                      @click.stop="craftNode(c)"
-                    >
-                      Craft
-                    </button>
-                    <span
-                      v-else-if="c.isFulfilled"
-                      class="text-2xs font-bold text-emerald-600 dark:text-emerald-400"
-                    >
-                      ✓
-                    </span>
-                  </div>
-                </div>
-              </div>
+            <div role="tree" aria-label="Equipment recipe">
+              <RecipeTreeNode :node="recipeTree" :selected-key="selectedRecipeNodeId" :is-crafting="isCrafting" :is-running="isRaidRunning"
+                @select="selectRecipeNode" @craft="craftNode" />
             </div>
           </div>
 
@@ -800,6 +717,7 @@ const hasDropItems = computed(() => {
                 <input
                   id="campaign-mission-input"
                   v-model.number="missionId"
+                  :disabled="isRaidRunning"
                   type="number"
                   min="1"
                   max="300"
@@ -816,7 +734,7 @@ const hasDropItems = computed(() => {
                   v-for="m in candidateMissions"
                   :key="m.id"
                   type="button"
-                  :disabled="isMissionDisabled(m.id)"
+                  :disabled="isRaidRunning || isMissionDisabled(m.id)"
                   class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-all inline-flex items-center gap-1.5"
                   :class="[
                     isMissionDisabled(m.id)
@@ -842,12 +760,12 @@ const hasDropItems = computed(() => {
             </div>
 
             <!-- Quick Jump Chips -->
-            <div v-else class="flex flex-wrap gap-1.5">
+            <div v-else-if="!selectedGearId" class="flex flex-wrap gap-1.5">
               <button
                 v-for="qId in quickMissions"
                 :key="qId"
                 type="button"
-                :disabled="isMissionDisabled(qId)"
+                :disabled="isRaidRunning || isMissionDisabled(qId)"
                 class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-all inline-flex items-center gap-1.5"
                 :class="[
                   isMissionDisabled(qId)
@@ -871,7 +789,11 @@ const hasDropItems = computed(() => {
               </button>
             </div>
 
-            <!-- Warning if Selected Mission is Exhausted or Disabled -->
+            <p v-if="selectedGearId && !candidateMissions.length" class="text-xs text-slate-500 dark:text-slate-400">
+            This item has no direct campaign drops. Select a component below it to farm, or craft it when the ingredients are ready.
+          </p>
+
+          <!-- Warning if Selected Mission is Exhausted or Disabled -->
             <div
               v-if="isMissionDisabled(missionId)"
               class="rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 p-2.5 text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-2"
@@ -948,7 +870,7 @@ const hasDropItems = computed(() => {
                 <button
                   id="campaign-raid-1"
                   type="button"
-                  :disabled="isRaidRunning || isMissionDisabled(missionId)"
+                  :disabled="isRaidRunning || isCrafting || !canFarmSelectedTarget || isMissionDisabled(missionId)"
                   class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   :title="isMissionDisabled(missionId) ? 'Mission daily limit reached' : 'Raid 1x'"
                   @click="startRaid(1)"
@@ -958,7 +880,7 @@ const hasDropItems = computed(() => {
                 <button
                   id="campaign-raid-10"
                   type="button"
-                  :disabled="isRaidRunning || isMissionDisabled(missionId)"
+                  :disabled="isRaidRunning || isCrafting || !canFarmSelectedTarget || isMissionDisabled(missionId)"
                   class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   :title="isMissionDisabled(missionId) ? 'Mission daily limit reached' : 'Raid 10x'"
                   @click="startRaid(10)"
@@ -968,7 +890,7 @@ const hasDropItems = computed(() => {
                 <button
                   id="campaign-raid-max"
                   type="button"
-                  :disabled="isRaidRunning || maxPossibleTimes < 1 || isMissionDisabled(missionId)"
+                  :disabled="isRaidRunning || isCrafting || !canFarmSelectedTarget || maxPossibleTimes < 1 || isMissionDisabled(missionId)"
                   class="cursor-pointer flex-1 py-2 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   :title="isMissionDisabled(missionId) ? 'Mission daily limit reached' : `Raid maximum possible times (${maxPossibleTimes}x) based on energy`"
                   @click="startRaid(maxPossibleTimes)"
