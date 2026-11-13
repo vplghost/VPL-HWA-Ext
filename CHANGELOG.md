@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.69 — 2026-11-14
+
+### Changed
+
+- Use synced resource images for pinned header badges when available, with fixed icon sizing and symbolic fallback for missing or failed images.
+
 ## 0.10.68 — 2026-11-14
 
 ### Added

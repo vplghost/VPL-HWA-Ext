@@ -26,6 +26,7 @@ import { getBuildingName, getResearchName } from '@/src/utils/metadata';
 import { formatDuration } from '@/src/utils/formatters';
 import { useGameConnection } from '@/src/composables/useGameConnection';
 import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
+import { getResourceIcon } from '@/src/utils/itemResources';
 
 const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
 const { theme, applyTheme } = useTheme();
@@ -468,6 +469,10 @@ const isWorldEnergyCapped = computed(() => {
 });
 
 // Header Resources Bar
+const failedResourceIcons = ref<Set<string>>(new Set());
+function handleResourceImageError(key: string) {
+  failedResourceIcons.value = new Set(failedResourceIcons.value).add(key);
+}
 const headerResourceEntries = computed(() => {
   const entries: any[] = [];
   for (const [k, v] of Object.entries(cache.value)) {
@@ -482,6 +487,7 @@ const headerResourceEntries = computed(() => {
           label: resourceLabel(entry),
           formattedAmount: formatResourceAmount(val),
           appearance: resourceAppearance(entry),
+          image: failedResourceIcons.value.has(k) ? null : getResourceIcon(entry),
           isCapped,
         });
       }
@@ -795,7 +801,10 @@ function toggleTheme() {
           class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 transition-colors"
           :class="[res.appearance.classes, res.isCapped ? 'relative ring-2 ring-amber-400' : '']"
         >
-          <span aria-hidden="true">{{ res.appearance.icon }}</span>
+          <span class="inline-flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
+            <img v-if="res.image" :src="res.image" alt="" class="size-full object-contain" @error="handleResourceImageError(res.key)" />
+            <span v-else>{{ res.appearance.icon }}</span>
+          </span>
           <span>{{ res.formattedAmount }}</span>
           <span v-if="res.isCapped" class="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-amber-500 animate-ping"></span>
         </span>
