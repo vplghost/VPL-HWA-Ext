@@ -164,7 +164,7 @@ test('disabled auto-cancel never dispatches a cancellation during the final ten 
 
 test('first rally uses selected boss and current troops without repeating search', () => {
   const snapshot = { heroGetAll: { data: heroes }, 'getUnitSummary:unit': { data: inventory },
-    experimentalRallySearch: { data: { mapId: 'map', mobConfigIds: [64], mobs: [{ mobId: 'boss' }] } } };
+    experimentalRallySearch: { updatedAt: new Date(1000).toISOString(), data: { mapId: 'map', mobConfigIds: [64], mobs: [{ mobId: 'boss' }] } } };
   const step = queue.start({ ...options, firstMobId: 'boss', autoCancel: false }, 1, 10, 1000, snapshot);
   assert.equal(step.state.phase, 'creating');
   assert.deepEqual(Array.from(step.calls, (call) => call.name), ['createRally']);
@@ -175,7 +175,7 @@ test('first rally uses selected boss and current troops without repeating search
   assert.equal(created.state.phase, 'active');
   assert.equal(created.state.current.memberChecked, true);
   assert.equal(created.state.wakeAt, 80000);
-  assert.equal(queue.start({ ...options, firstMobId: 'wrong' }, 1, 10, 1000, snapshot), null);
+  assert.equal(queue.start({ ...options, firstMobId: 'wrong' }, 1, 10, 1000, snapshot).state.phase, 'refreshing');
 });
 
 test('unknown or stale membership cancels conservatively; late wake never dispatches cancellation', () => {
@@ -219,7 +219,7 @@ test('queue stops at requested count and cannot reuse a won boss', () => {
 
 function cachedQueue(bosses = ['boss-a', 'boss-b'], count = 3, energy = 100) {
   const cache = { heroGetAll: { data: heroes }, 'getUnitSummary:unit': { data: inventory },
-    experimentalRallySearch: { data: { mapId: 'map', mobConfigIds: [64],
+    experimentalRallySearch: { updatedAt: new Date(1000).toISOString(), data: { mapId: 'map', mobConfigIds: [64],
       mobs: bosses.map((mobId) => ({ mobId })) } },
     'resource:world-energy': { data: { amount: energy } } };
   return { cache, step: queue.start({ ...options, count, firstMobId: bosses[1] || bosses[0],
@@ -275,12 +275,40 @@ test('one search supplies several rallies; next search waits until every queued 
   assert.equal(step.calls[0].args.mobId, 'boss-c', 'won bosses stay excluded even if cache lags');
 });
 
+test('missing or stale cached target refreshes roster, searches and continues without a second click', () => {
+  for (const override of [{}, { updatedAt: new Date(-400000).toISOString() }, { updatedAt: 'invalid' }]) {
+    const { cache } = cachedQueue();
+    cache.experimentalRallySearch = override;
+    let step = queue.start({ ...options, firstMobId: 'old' }, 1, 10, 1000, cache);
+    assert.equal(step.state.phase, 'refreshing');
+    step = queue.advance(step.state, rpc(step.calls, [heroes, inventory], 1100), cache, 1101);
+    assert.equal(step.state.phase, 'searching');
+    step = queue.advance(step.state, rpc(step.calls, [{ mobs: [{ mobId: 'new' }] }], 1200), cache, 1201);
+    assert.equal(step.calls[0].name, 'createRally');
+    assert.equal(step.calls[0].args.mobId, 'new');
+  }
+});
+
+test('target-not-found discards stale candidates, searches and excludes failed boss without consuming count', () => {
+  const { cache, step: initial } = cachedQueue(['boss-a', 'boss-b']);
+  const call = initial.calls[0];
+  const failed = rpc([call], [{ error: { code: 'mobNotFound' } }], 1100);
+  // rpc() wraps supplied values in response, exercising response.error as well.
+  let step = queue.advance(initial.state, failed, cache, 1101);
+  assert.equal(step.state.phase, 'searching');
+  assert.equal(step.state.bossQueue.remain_raid_count, 3);
+  assert.equal(step.state.failedBossIds[0], 'boss-b');
+  step = queue.advance(step.state, rpc(step.calls, [{ mobs: [{ mobId: 'boss-b' }, { mobId: 'fresh' }] }], 1200), cache, 1201);
+  assert.equal(step.calls[0].args.mobId, 'fresh');
+  assert.equal(step.state.bossQueue.remain_raid_count, 3);
+});
+
 test('create errors skip only their boss and preserve remaining win count', () => {
   const { cache, step: first } = cachedQueue(['boss-a', 'boss-b', 'boss-c']);
   const failed = { method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
     timestamp: new Date(1100).toISOString(),
     requestBody: JSON.stringify({ calls: [{ ...first.calls[0], ident: 'create' }] }),
-    responseBody: JSON.stringify({ results: [{ ident: 'create', result: { error: { message: 'Boss is unavailable' } } }] }) };
+    responseBody: JSON.stringify({ results: [{ ident: 'create', result: { error: { message: 'Temporary server failure' } } }] }) };
   let step = queue.advance(first.state, failed, cache, 1200);
   assert.equal(step.state.phase, 'creating');
   assert.equal(step.calls[0].args.mobId, 'boss-a');

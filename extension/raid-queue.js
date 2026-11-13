@@ -31,6 +31,9 @@
   }
   function nextBoss(state, cache, now) {
     if (state.bossQueue.remain_raid_count === 0) return { state: { ...state, phase: 'complete', wakeAt: null } };
+    if (state.bossQueue.queue.length && (!Number.isFinite(state.searchedAt) || now - state.searchedAt > 300000)) {
+      state.bossQueue = { ...state.bossQueue, queue: [] };
+    }
     if (!state.bossQueue.queue.length) return search(state, now);
     const energy = energyAt(cache, now);
     if (Number.isFinite(energy) && energy < rallyEnergyCost) {
@@ -94,13 +97,19 @@
     const areDeployed = summary ? areHeroesDeployed(summary, options.heroIds) : false;
     const won = safeList(cache.experimentalDefeatedBosses?.data);
     const mobs = safeList(search?.mobs);
+    if (!heroes || options.heroIds.some((id) => !heroes[id])) return issue(state, 'refreshing', rosterCalls(), now);
+    const searchedAt = Date.parse(cache.experimentalRallySearch?.updatedAt);
     if (search?.mapId !== options.mapId ||
-        !search.mobConfigIds?.includes(data.bossConfigId(options.level)) ||
-        !mobs.some((mob) => mob?.mobId === options.firstMobId) ||
-        won.some((boss) =>
-          boss?.mapId === options.mapId && boss?.mobId === options.firstMobId) ||
-        !heroes ||
-        options.heroIds.some((id) => !heroes[id])) return null;
+        !safeList(search.mobConfigIds).includes(data.bossConfigId(options.level)) ||
+        !mobs.some(mob => mob?.mobId === options.firstMobId) ||
+        won.some(boss => boss?.mapId === options.mapId && boss?.mobId === options.firstMobId) ||
+        !Number.isFinite(searchedAt) || searchedAt > now || now - searchedAt > 300000) {
+      if (isGuildRaidActive || areDeployed) return { state: { ...state, phase: 'waiting_rally',
+        sentAt: now, wakeAt: now + 5000 }, calls: [{ name: 'getMarches', feature: 'march' },
+        { name: 'getUnitSummary', feature: 'unit' }], expiresAt: now + 15000 };
+      return issue(state, 'refreshing', rosterCalls(), now);
+    }
+    state.searchedAt = searchedAt;
     const bosses = mobs.filter((mob) => mob?.mobId &&
       !won.some((item) => item?.mapId === options.mapId && item?.mobId === mob?.mobId));
     const ordered = [bosses.find((mob) => mob.mobId === options.firstMobId),
@@ -157,14 +166,19 @@
     const fresh = record && Date.parse(record.timestamp) >= state.sentAt;
     const replies = fresh ? responses(record) : [];
     for (const { call, result } of replies) {
-      if (result?.error && state.expected?.some((expected) => sameCall(call, expected))) {
-        const detail = typeof result.error === 'string' ? result.error :
-          result.error.message || result.error.description || result.error.code || 'Game rejected the request';
+      const error = result?.error || result?.response?.error;
+      if (error && state.expected?.some((expected) => sameCall(call, expected))) {
+        const detail = typeof error === 'string' ? error :
+          error.message || error.description || error.code || 'Game rejected the request';
         if (call.name === 'createRally' && state.phase === 'creating') {
-          if (/energy|stamina|refillable|resource/i.test(JSON.stringify(result.error))) {
+          if (/energy|stamina|refillable|resource/i.test(JSON.stringify(error))) {
             return { state: stop(state, `Not enough World Energy: ${String(detail).slice(0, 160)}.`) };
           }
           consumeBoss(state, true);
+          if (/not.?found|not.?exist|expired|unavailable|already.*(?:dead|defeated|killed)|invalid.?mob|mob.*(?:missing|removed)/i.test(JSON.stringify(error))) {
+            state.bossQueue = { ...state.bossQueue, queue: [] };
+            return search(state, now);
+          }
           return nextBoss(state, cache, now);
         }
         return { state: stop(state, `${call.name} failed: ${String(detail).slice(0, 160)}. No automatic retry.`) };
@@ -224,6 +238,7 @@
         const selected = !state.started && unique.find((mob) => mob.mobId === state.options.firstMobId);
         state.bossQueue = { ...state.bossQueue,
           queue: selected ? [selected, ...unique.filter((mob) => mob.mobId !== selected.mobId)] : unique };
+        state.searchedAt = now;
         if (!state.bossQueue.queue.length) return { state: stop(state, 'No boss found for the selected level.') };
         return nextBoss(state, cache, now);
       }

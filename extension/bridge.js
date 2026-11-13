@@ -210,6 +210,7 @@ try {
       }
     }
     if (area !== 'local') return;
+    if ('raidEnergyAuto' in changes) scheduleRaidEnergy(changes.raidEnergyAuto.newValue?.enabled === true);
     if ('raidQueue' in changes) scheduleRaidWake(changes.raidQueue.newValue);
     if ('monsterQueue' in changes) scheduleMonsterWake(changes.monsterQueue.newValue);
     if ('towerRun' in changes) scheduleTowerWake(changes.towerRun.newValue);
@@ -309,6 +310,18 @@ chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
 
 // Content-script timers wake the MV3 worker while the popup is closed. A late wake
 // is checked against the deadline again by the controller and MAIN-world queue.
+let raidEnergyTimer;
+const raidEnergySession = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+function scheduleRaidEnergy(enabled) {
+  if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') return;
+  clearTimeout(raidEnergyTimer);
+  if (!enabled) return;
+  chrome.runtime.sendMessage({ kind: 'raid-energy-tick', sessionId: raidEnergySession }).catch(() => {});
+  raidEnergyTimer = setTimeout(() => scheduleRaidEnergy(true), 30000);
+}
+try {
+  chrome.storage?.local?.get?.('raidEnergyAuto')?.then?.(stored => scheduleRaidEnergy(stored.raidEnergyAuto?.enabled === true)).catch?.(() => {});
+} catch (_) {}
 let raidWakeTimer;
 function scheduleRaidWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.10.54 — 2026-11-13
+
+### Added
+
+- Optional automatic Guild Raid when World Energy naturally rises from below to exactly a configurable threshold.
+- Reuse the Raid dialog's team, boss level, count, troop limit and rally settings; keep monitoring while the popup is closed.
+- Skip startup/reload, item gains, offline catch-up, energy above the threshold and conflicting queues; report skipped triggers in the dialog.
+
+### Fixed
+
+- Automatically search and continue when a selected boss is missing or the cached search is older than five minutes.
+- Search again after target-not-found/expired boss rejections, preserving remaining raid count and excluding failed targets.
+- Keep Raid preferences account-bound and respect global RPC settings when saving or starting raids.
+
 ## 0.10.53 — 2026-11-13
 
 ### Added

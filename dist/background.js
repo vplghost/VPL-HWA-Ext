@@ -7,6 +7,7 @@ importScripts('hero-metadata.js');
 importScripts('rpc-cache.js');
 importScripts('experimental-data.js');
 importScripts('raid-queue.js');
+importScripts('raid-energy-auto.js');
 importScripts('monster-queue.js');
 importScripts('tower-automation.js');
 importScripts('tower-runner.js');
@@ -161,6 +162,51 @@ async function saveRaidTransition(transition, stored) {
     }
   }
   return state;
+}
+
+async function evaluateRaidEnergy(tabId, sessionId, now = Date.now()) {
+  const stored = await chrome.storage.local.get(['raidEnergyAuto', 'rpcCache', 'raidQueue', 'monsterQueue',
+    'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings', 'customTeams']);
+  const config = stored.raidEnergyAuto;
+  if (!config?.enabled) return;
+  const cache = stored.rpcCache || {};
+  const accountId = cache.accountStatus?.data?.id;
+  const session = await chrome.storage.session.get('raidEnergyWatch');
+  const observation = globalThis.hwaHelperRaidEnergyAuto.observe(session.raidEnergyWatch,
+    config, cache['resource:world-energy'], accountId, tabId, sessionId, now);
+  // Consume the crossing before any asynchronous dispatch, including blocked crossings.
+  await chrome.storage.session.set({ raidEnergyWatch: observation.state });
+  if (!observation.trigger) return;
+  let reason = '';
+  const controller = globalThis.hwaHelperRaidQueue;
+  if (!rpcMessageForSettings(stored, [])) reason = 'Auto raid skipped: RPC is disabled by shared settings.';
+  else if (!controller.terminal(stored.raidQueue) || !globalThis.hwaHelperMonsterQueue.terminal(stored.monsterQueue)) {
+    reason = 'Auto raid skipped: a raid or monster queue is already running.';
+  }
+  const data = globalThis.hwaHelperExperimentalData;
+  const heroes = cache.heroGetAll?.data || {};
+  const available = data.availableHeroIds(heroes, cache['getUnitSummary:unit']?.data, cache.marchStatus?.data?.marches);
+  const team = data.teamOptions(cache.teamGetAll?.data, heroes,
+    stored.customTeams?.[String(accountId)] || [], available).find(team => team.id === config.options.teamId);
+  if (!team || team.heroIds.length !== 5) reason ||= 'Auto raid skipped: selected team is unavailable.';
+  if (team?.heroIds.some(id => !available.includes(id))) reason ||= 'Auto raid skipped: selected heroes are deployed.';
+  const activeRally = (Array.isArray(cache.marchStatus?.data?.marches) ? cache.marchStatus.data.marches :
+    Object.values(cache.marchStatus?.data?.marches || {})).some(march => march.rally &&
+      (!Number.isFinite(march.endsAt) || march.endsAt > now) && !march.result && march.stage !== 'returnToOutpost');
+  if (activeRally) reason ||= 'Auto raid skipped: an active rally is already in progress.';
+  let state;
+  if (!reason) {
+    const transition = controller.start({ ...config.options, firstMobId: '',
+      heroIds: team.heroIds, maxTroops: team.maxTroops ?? config.options.maxTroops }, tabId, accountId, now, cache,
+      data.normalizeCapacitySettings(stored.troopCapacitySettings));
+    if (transition) state = await saveRaidTransition(transition, stored);
+    else reason = 'Auto raid skipped: dialog options or troop data are invalid.';
+  }
+  await chrome.storage.local.set({ raidEnergyAutoStatus: {
+    at: new Date(now).toISOString(), message: reason || (state?.phase === 'stopped'
+      ? state.reason : 'Auto raid started at the natural World Energy threshold.'),
+    phase: state?.phase || 'skipped'
+  } });
 }
 
 async function updateRaidQueue(record, tabId) {
@@ -888,6 +934,33 @@ async function handleControl(kind) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.kind === 'raid-energy-config' &&
+      sender.url?.startsWith('chrome-extension://' + chrome.runtime.id + '/')) {
+    pending = pending.then(async () => {
+      const config = message.config;
+      const stored = await chrome.storage.local.get(['rpcCache']);
+      if (!globalThis.hwaHelperRaidEnergyAuto.validConfig(config) ||
+          config.enabled && String(config.accountId) !== String(stored.rpcCache?.accountStatus?.data?.id)) {
+        return { ok: false, error: 'Select a complete team, valid map and raid options before enabling auto raid.' };
+      }
+      const old = await chrome.storage.local.get('raidEnergyAuto');
+      await chrome.storage.local.set({ raidEnergyAuto: config });
+      if (JSON.stringify(old.raidEnergyAuto) !== JSON.stringify(config)) {
+        await chrome.storage.session.remove('raidEnergyWatch');
+      }
+      return { ok: true };
+    });
+    pending.then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'raid-energy-tick' && isGameUrl(sender.url) && sender.tab?.id &&
+      typeof message.sessionId === 'string') {
+    pending = pending.then(() => evaluateRaidEnergy(sender.tab.id, message.sessionId));
+    pending.then(() => sendResponse({ ok: true }), () => sendResponse({ ok: false }));
+    pending = pending.catch(() => {});
+    return true;
+  }
   if (['raid-queue-start', 'raid-queue-stop'].includes(message?.kind) &&
       sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     pending = pending.then(async () => {
@@ -1489,6 +1562,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings',
       'popupRpcEnabled', 'socketRefreshMode', 'priorityAutoJoin', 'troopCapacitySettings', 'raidPreferences', 'customTeams', 'autoGatherSettings']);
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
+    if (record.requestBody && /"name"\s*:\s*"(?:mobileLogin|userLogin)"/.test(record.requestBody)) {
+      await chrome.storage.session.remove('raidEnergyWatch');
+    }
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
     if (cacheResult.changed) {
       await chrome.storage.local.set({ rpcCache: cacheResult.cache });

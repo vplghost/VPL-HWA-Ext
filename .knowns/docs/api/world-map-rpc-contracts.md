@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-13T06:51:02.153Z'
+updatedAt: '2026-11-13T11:16:08.665Z'
 tags:
   - api
   - rpc
@@ -248,3 +248,9 @@ The next observed `startHealing:unit` has millisecond `startDate`, `duration: 40
 `useTroopTraining.syncHealed` sends completion first, then authoritative summary/healing reads, through the shared RPC policy. Queued dispatch waits for the game response; rejection never clears UI cache. `completeHealingAction` clears only an elapsed confirmed run, subtracts those units from hospital injuries, and leaves available troop counts to `getUnitSummary`. Duplicate completion is a no-op once healing is null; older completion cannot clear a newer healing run/snapshot. Background requests authoritative unit/training/healing refresh after an applied completion.
 
 Regression coverage: `tests/healing-sync.test.mjs`, `tests/background.test.mjs`, and the rejected-action test in `tests/vue-runtime-state.test.mjs`. Only sanitized contract fields are embedded in tests; the private capture is not required by the test suite.
+
+## Raid stale target recovery and opt-in energy trigger (VHE-BPQPT6)
+
+See @doc/architecture/raid-target-recovery-and-natural-energy-trigger. Missing/undated/future/older-than-five-minute searches no longer block queue startup; refresh roster and search automatically. Fresh candidate batches still run in order. The prior search-only-when-exhausted rule has explicit stale/invalid batch exceptions: five-minute expiry or a confirmed nonexistent/expired/unavailable target rejection clears the old batch and searches again. Preserve remaining count and failed/won exclusions. This does not change confirmed win+return sequencing or insufficient-energy stops.
+
+Account-bound auto raid settings use the Raid dialog's team, level, wait, count, troop cap and cancellation options. A 30-second document heartbeat detects only a below-to-exact-threshold natural refill transition with continuous observations; startup/reload, above threshold, item gains, offline catch-up, active conflicting queues and disabled RPC do not start/defer raids. Global RPC mode/enabled flags are never changed by Raid preferences. The full behavior and regression evidence are in the linked architecture document.

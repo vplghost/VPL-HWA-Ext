@@ -9,6 +9,7 @@ const cacheSource = await readFile(new URL('../extension/rpc-cache.js', import.m
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const experimentalSource = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
 const raidSource = await readFile(new URL('../extension/raid-queue.js', import.meta.url), 'utf8');
+const raidEnergySource = await readFile(new URL('../extension/raid-energy-auto.js', import.meta.url), 'utf8');
 const monsterSource = await readFile(new URL('../extension/monster-queue.js', import.meta.url), 'utf8');
 const towerAutomationSource = await readFile(new URL('../extension/tower-automation.js', import.meta.url), 'utf8');
 const towerRunnerSource = await readFile(new URL('../extension/tower-runner.js', import.meta.url), 'utf8');
@@ -82,7 +83,7 @@ function setup(quota = Infinity) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${buildingQueueSource}\n${researchQueueSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${raidEnergySource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${buildingQueueSource}\n${researchQueueSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
@@ -240,6 +241,58 @@ test('RPC queue totals aggregate live game tabs and remove closed tabs', async (
   assert.equal(local.rpcQueueStatus.count, 0);
 });
 
+test('energy auto raid consumes exact natural crossing once, respects policy and uses saved options', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1794567600000 });
+  for (const scenario of ['direct', 'piggyback', 'disabled', 'busy', 'startup', 'reload', 'item']) {
+    const env = setup();
+    env.local.popupRpcEnabled = scenario !== 'disabled';
+    env.local.socketRefreshMode = scenario === 'direct' ? 'direct' : 'piggyback';
+    const start = Date.now();
+    env.local.rpcCache = { accountStatus: { data: { id: 10 } },
+      heroGetAll: { data: Object.fromEntries([1, 2, 3, 4, 5].map(id => [id, { power: id, level: 30, star: 2 }])) },
+      'getUnitSummary:unit': { data: { squads: [], available: [7, 17, 27].map(unitId => ({ unitId, count: 5000 })) } },
+      'resource:world-energy': { method: 'refillableGetAll', data: { amount: scenario === 'startup' ? 200 : 199,
+        cap: 200, lastRefillAt: start - 270000, refillEveryMs: 300000, refillAmount: 1 } } };
+    const invoke = (message, sender = popupSender) => new Promise(resolve => env.listener(message, sender, resolve));
+    const options = { mapId: 'map', center: { x: 1, y: 2 }, teamId: 'weakest', heroIds: [1, 2, 3, 4, 5],
+      level: 7, waitSeconds: 300, minMembers: 3, count: 4, autoCancel: false, maxTroops: 100 };
+    assert.equal((await invoke({ kind: 'raid-energy-config', config: {
+      enabled: true, threshold: 200, accountId: 10, options
+    } })).ok, true);
+    const tick = sessionId => invoke({ kind: 'raid-energy-tick', sessionId }, { ...gameSender, tab: { id: 1 } });
+    await tick('document-a');
+    assert.equal(env.forwardedMessages.length, 0, 'Initial sample never starts a raid');
+    if (scenario === 'busy') env.local.raidQueue = { phase: 'active' };
+    if (scenario === 'item') {
+      env.local.rpcCache['resource:world-energy'] = { method: 'inventory_use', data: {
+        ...env.local.rpcCache['resource:world-energy'].data, amount: 200
+      } };
+    }
+    t.mock.timers.tick(30001);
+    await Promise.all([tick(scenario === 'reload' ? 'document-b' : 'document-a'),
+      tick(scenario === 'reload' ? 'document-b' : 'document-a')]);
+    if (['direct', 'piggyback'].includes(scenario)) {
+      assert.equal(env.forwardedMessages.length, 1);
+      assert.equal(env.forwardedMessages[0].msg.kind, scenario === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+      assert.equal(env.local.raidQueue.options.level, 7);
+      assert.equal(env.local.raidQueue.options.count, 4);
+      assert.equal(env.local.raidQueue.options.minMembers, 3);
+      assert.equal(env.local.raidQueue.options.maxTroops, 100);
+      assert.equal(env.local.raidQueue.options.autoCancel, false);
+      assert.equal(env.local.raidQueue.phase, 'refreshing');
+    } else assert.equal(env.forwardedMessages.length, 0, scenario + ' must not dispatch');
+    env.local.popupRpcEnabled = true;
+    env.local.raidQueue = { phase: 'complete' };
+    t.mock.timers.tick(1000);
+    await tick(scenario === 'reload' ? 'document-b' : 'document-a');
+    assert.equal(env.forwardedMessages.length, ['direct', 'piggyback'].includes(scenario) ? 1 : 0,
+      'A consumed or skipped crossing must never be replayed later');
+    await env.send('api-record', rpc([{ name: 'mobileLogin', ident: 'login' }],
+      [{ ident: 'login', result: { response: {} } }], new Date().toISOString()), { ...gameSender, tab: { id: 1 } });
+    assert.equal(env.session.raidEnergyWatch, undefined, 'Login clears the natural energy baseline');
+  }
+});
+
 test('managed raid queue uses shared policy, pins one game tab and waits for return across popup closure', async () => {
   for (const mode of ['piggyback', 'mqtt-piggyback', 'direct']) {
     const env = setup();
@@ -251,7 +304,7 @@ test('managed raid queue uses shared policy, pins one game tab and waits for ret
     local.troopCapacitySettings = { defaultHero: 700, base: 1000 };
     local.rpcCache = { accountStatus: { data: { id: 10 } }, heroGetAll: { data: heroes },
       'getUnitSummary:unit': { data: { squads: [], available: [7, 17, 27].map((unitId) => ({ unitId, count: 5000 })) } },
-      experimentalRallySearch: { data: { mapId: 'map', mobConfigIds: [60], mobs: [{ mobId: 'boss' }] } } };
+      experimentalRallySearch: { updatedAt: new Date().toISOString(), data: { mapId: 'map', mobConfigIds: [60], mobs: [{ mobId: 'boss' }] } } };
     const invoke = (message, sender = popupSender) => new Promise((resolve) => listener(message, sender, resolve));
     const response = await invoke({ kind: 'raid-queue-start', options: {
       mapId: 'map', center: { x: 1, y: 2 }, level: 1, heroIds: [1, 2, 3, 4, 5], capacities,

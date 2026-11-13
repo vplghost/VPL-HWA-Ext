@@ -5,6 +5,33 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/bridge.js', import.meta.url), 'utf8');
 
+test('energy auto heartbeat runs with popup closed, stops on disable and resets document identity on reload', async () => {
+  const run = async () => {
+    const timers = new Map(), sent = []; let timerId = 0; const listeners = [];
+    const window = { addEventListener() {}, postMessage() {} };
+    const chrome = { runtime: { sendMessage: async message => { sent.push(message); return {}; },
+      onMessage: { addListener() {} } }, storage: { local: { get: async () => ({ raidEnergyAuto: { enabled: true } }) },
+      onChanged: { addListener: listener => listeners.push(listener) } } };
+    runInNewContext(source, { window, chrome, Date, location: { origin: 'https://www.hero-wars-alliance.com' },
+      setTimeout: (callback, delay) => { timers.set(++timerId, { callback, delay }); return timerId; },
+      clearTimeout: id => timers.delete(id) });
+    await Promise.resolve(); await Promise.resolve();
+    const tick = () => sent.filter(message => message.kind === 'raid-energy-tick');
+    assert.equal(tick().length, 1);
+    const session = tick()[0].sessionId;
+    const timer = [...timers.values()].find(timer => timer.delay === 30000);
+    assert.ok(timer);
+    timers.clear(); timer.callback();
+    await Promise.resolve();
+    assert.equal(tick().length, 2);
+    assert.equal(tick()[1].sessionId, session);
+    for (const listener of listeners) listener({ raidEnergyAuto: { newValue: { enabled: false } } }, 'local');
+    assert.equal(timers.size, 0);
+    return session;
+  };
+  assert.notEqual(await run(), await run(), 'Reload must create a new baseline session');
+});
+
 test('persisted raid timer wakes worker without popup and forwards RPC deadlines and queue ownership', async () => {
   const timers = new Map(); let timerId = 0; let onChanged; let onMessage;
   const sent = [], posted = [];

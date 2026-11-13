@@ -45,6 +45,10 @@ const waitSeconds = ref(300);
 const minMembers = ref(4);
 const raidCount = ref(2);
 const autoCancel = ref(true);
+const autoEnergyRaid = ref(false);
+const energyThreshold = ref(200);
+const autoEnergyMessage = ref('');
+const autoConfigLoaded = ref(false);
 const isRunning = ref(false);
 const queueStatusText = ref('Idle');
 
@@ -135,6 +139,14 @@ const queueStatusLabel = computed(() => {
 
 onMounted(async () => {
   await loadSquadData();
+  const autoStored: any = await chrome.storage.local.get(['raidEnergyAuto', 'raidEnergyAutoStatus', 'raidPreferences']);
+  raidCount.value = autoStored.raidPreferences?.raidCount || 2;
+  if (String(autoStored.raidEnergyAuto?.accountId) === String(cache.value.accountStatus?.data?.id)) {
+    autoEnergyRaid.value = autoStored.raidEnergyAuto?.enabled === true;
+    energyThreshold.value = autoStored.raidEnergyAuto?.threshold || 200;
+  }
+  autoEnergyMessage.value = autoStored.raidEnergyAutoStatus?.message || '';
+  autoConfigLoaded.value = true;
 
   timer = window.setInterval(() => {
     now.value = Date.now();
@@ -159,6 +171,7 @@ onMounted(async () => {
     } catch (_) {}
 
     chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.raidEnergyAutoStatus) autoEnergyMessage.value = (changes.raidEnergyAutoStatus.newValue as any)?.message || '';
       if (area === 'local' && changes.raidQueue) {
         const q = changes.raidQueue.newValue as { phase?: string } | undefined;
         raidQueueState.value = q;
@@ -198,22 +211,49 @@ onUnmounted(() => {
 });
 
 async function ensureRpcEnabled() {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; raidPreferences?: {bossLevel?: number; waitSeconds?: number; minMembers?: number; autoCancel?: boolean; rallyTeam?: string; targetMobId?: string}; raidQueue?: {phase: string; [key: string]: unknown} }>(['popupRpcEnabled', 'socketRefreshMode']);
-    const updates: Record<string, any> = {};
-    if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
-    if (!stored.socketRefreshMode) updates.socketRefreshMode = 'piggyback';
-    if (Object.keys(updates).length > 0) {
-      await chrome.storage.local.set(updates);
-    }
+  const stored: any = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  if (stored.popupRpcEnabled !== true ||
+      (stored.socketRefreshMode !== 'direct' && stored.captureSettings?.interceptEnabled === false)) {
+    statusMessage.value = 'Enable RPC in Settings, and Monitor API for Piggyback mode.';
+    return false;
   }
+  return true;
 }
 
+function raidOptions(count = raidCount.value) {
+  return { mapId: mapContext.value?.mapId, center: mapCenter.value, firstMobId: selectedMobId.value,
+    level: bossLevel.value, waitSeconds: waitSeconds.value, minMembers: minMembers.value, count,
+    autoCancel: autoCancel.value, heroIds: normalizeArray(selectedTeam.value?.heroIds),
+    teamId: selectedTeam.value?.id || '', maxTroops: selectedTeam.value?.maxTroops };
+}
+async function saveAutoRaid() {
+  const config = { enabled: autoEnergyRaid.value, threshold: energyThreshold.value,
+    accountId: cache.value.accountStatus?.data?.id, options: raidOptions() };
+  const response = await chrome.runtime.sendMessage({ kind: 'raid-energy-config', config }).catch(error => ({ error: String(error) }));
+  if (!response?.ok) {
+    autoEnergyMessage.value = response?.error || 'Auto raid settings could not be saved.';
+    if (autoEnergyRaid.value) {
+      autoEnergyRaid.value = false;
+      await chrome.runtime.sendMessage({ kind: 'raid-energy-config', config: { enabled: false } }).catch(() => {});
+    }
+  } else autoEnergyMessage.value = autoEnergyRaid.value
+    ? 'Watching natural World Energy regeneration with these raid options.'
+    : 'Automatic energy raid is off.';
+}
+watch(selectedTeamId, () => {
+  if (autoConfigLoaded.value && autoEnergyRaid.value) void saveAutoRaid();
+});
+watch(() => cache.value.accountStatus?.data?.id, () => {
+  autoEnergyRaid.value = false;
+  autoEnergyMessage.value = 'Account changed. Enable auto raid again for this account.';
+});
+
 async function savePreferences() {
-  await ensureRpcEnabled();
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await chrome.storage.local.set({
       raidPreferences: {
+        accountId: cache.value.accountStatus?.data?.id,
+        raidCount: raidCount.value,
         bossLevel: bossLevel.value,
         waitSeconds: waitSeconds.value,
         minMembers: minMembers.value,
@@ -224,6 +264,10 @@ async function savePreferences() {
     });
   }
 }
+
+watch([bossLevel, waitSeconds, minMembers, raidCount, autoCancel], () => {
+  if (autoConfigLoaded.value && autoEnergyRaid.value) void saveAutoRaid();
+});
 
 const isLocatingMap = ref(false);
 
@@ -249,7 +293,7 @@ async function refreshMapCoordinates() {
 }
 
 async function findBosses() {
-  await ensureRpcEnabled();
+  if (!await ensureRpcEnabled()) return;
   const mapId = mapContext.value?.mapId;
   const center = mapCenter.value;
 
@@ -300,7 +344,7 @@ async function findBosses() {
 }
 
 async function startRaidQueue(count = raidCount.value) {
-  await ensureRpcEnabled();
+  if (!await ensureRpcEnabled()) return;
   await savePreferences();
 
   const heroIds = normalizeArray(selectedTeam.value?.heroIds);
@@ -325,19 +369,8 @@ async function startRaidQueue(count = raidCount.value) {
     await refreshTroops();
   }
 
-  let firstMobId = selectedMobId.value;
-  const isTargetInFound = foundBosses.value.some((b: any) => b.mobId === firstMobId);
-  if (!isTargetInFound) {
-    if (foundBosses.value.length > 0) {
-      firstMobId = foundBosses.value[0].mobId;
-      selectedMobId.value = firstMobId;
-    } else {
-      statusMessage.value = `⚠️ Searching for Level ${bossLevel.value} Boss targets on world map...`;
-      await findBosses();
-      return;
-    }
-  }
-
+  const firstMobId = selectedMobId.value;
+  // The background controller searches and continues if this target is missing or stale.
   isRunning.value = true;
   queueStatusText.value = 'Starting...';
   statusMessage.value = 'Dispatching rally raid to game...';
@@ -689,6 +722,16 @@ async function stopRaidQueue() {
               max="100"
               class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
             />
+          </div>
+
+          <div class="rounded-lg border border-indigo-200 dark:border-indigo-900 p-3 space-y-2">
+            <label class="flex items-center gap-2 text-xs font-semibold">
+              <input id="raid-auto-energy" v-model="autoEnergyRaid" type="checkbox" @change="saveAutoRaid" />
+              Auto raid when World Energy naturally reaches
+              <input id="raid-energy-threshold" v-model.number="energyThreshold" type="number" min="25" max="200" aria-label="World Energy threshold" class="w-16 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-1" @change="saveAutoRaid" />
+            </label>
+            <p class="text-xs text-slate-500">Uses the team, boss level, raid count and rally settings above. Triggers only from below to exactly the threshold through natural regeneration; skips startup, item gains and energy already above the threshold.</p>
+            <p v-if="autoEnergyMessage" role="status" class="text-xs text-indigo-600 dark:text-indigo-300">{{ autoEnergyMessage }}</p>
           </div>
 
           <!-- Auto Cancel Checkbox -->
