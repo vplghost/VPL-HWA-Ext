@@ -659,6 +659,33 @@
           }
           if (actions.length) return actions;
         }
+        if (key === 'winCampBattle:camp' && call.args?.campId && result) {
+          const error = result.error || result.response?.error;
+          const success = !error && Array.isArray(result.response?.reward);
+          if (!error && !success) return [];
+          const status = { key: 'brigandCampStatus', method: call.name,
+            feature: call.feature, group: 'other', data: {
+              campId: call.args.campId, heroIds: call.args.userHeroesIds || [],
+              requestId: call.ident, success,
+              error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null,
+              rewards: success ? result.response.reward : []
+            }, updatedAt: record.timestamp };
+          if (!success) return [status];
+          // globalMapCamp f45fde890a6683ceef09053f5b636c0b: all three levels cost
+          // 10 refillableResource #2. No troop march is returned by this endpoint.
+          const energy = resourceAction(record, call, 'world-energy', -10,
+            'World Energy', 'brigandCampAttack').map((action) => ({
+              ...action, data: { ...action.data, requireSnapshot: true }
+            }));
+          return [status, ...energy, ...extractRewardActions(record, call,
+            result.response, 'brigandCampReward')];
+        }
+        if (call.name === 'battle_teamSet' && call.args?.key === 'globalMapCamp' &&
+            result && Object.hasOwn(result, 'response') && !result.error && !result.response?.error &&
+            Array.isArray(call.args.units)) {
+          return [{ key: 'brigandCampTeam', method: call.name, feature: null,
+            group: 'teams', data: { units: call.args.units }, updatedAt: record.timestamp }];
+        }
         if (key === 'attackMob:mob' && result?.response?.squadId && result.response.route) {
           const route = result.response.route;
           const durationMs = route.durationMs ?? route.duration;
@@ -1590,7 +1617,7 @@
             data: result.response, updatedAt: record.timestamp }, ...entries];
         }
         if (call.name === 'getSummary' && ['building', 'personalResearch'].includes(call.feature) &&
-            result?.response) {
+            result?.response && !result.error && !result.response.error) {
           const rawQueues = Array.isArray(result.response.queues)
             ? result.response.queues
             : (result.response.queues && typeof result.response.queues === 'object' ? Object.values(result.response.queues) : []);
@@ -1619,7 +1646,7 @@
             updatedAt: record.timestamp }];
         }
         if ((key === 'startConstruction:building' || (call.name === 'startConstruction' && (!call.feature || call.feature === 'building'))) &&
-            result?.response &&
+            result?.response && !result.error && !result.response.error &&
             Number.isFinite(call.args?.startDate) && Number.isFinite(call.args?.durationMs) &&
             call.args.durationMs >= 0) {
           return [{ key: 'buildingStatus', method: call.name, feature: call.feature,
@@ -1630,13 +1657,13 @@
             } }, updatedAt: record.timestamp }];
         }
         if ((key === 'completeConstruction:building' || (call.name === 'completeConstruction' && (!call.feature || call.feature === 'building'))) &&
-            result?.response) {
+            result?.response && !result.error && !result.response.error) {
           return [{ key: 'buildingStatus', method: call.name, feature: call.feature,
             group: 'header', data: { action: 'complete', buildingId: call.args?.buildingId },
             updatedAt: record.timestamp }];
         }
         if ((key === 'startResearch:personalResearch' || (call.name === 'startResearch' && (!call.feature || call.feature === 'personalResearch'))) &&
-            result?.response &&
+            result?.response && !result.error && !result.response.error &&
             Number.isFinite(call.args?.startDate) && Number.isFinite(call.args?.durationMs) &&
             call.args.durationMs >= 0) {
           return [{ key: 'researchStatus', method: call.name, feature: call.feature,
@@ -1647,7 +1674,7 @@
             } }, updatedAt: record.timestamp }];
         }
         if ((key === 'completeResearch:personalResearch' || (call.name === 'completeResearch' && (!call.feature || call.feature === 'personalResearch'))) &&
-            result?.response) {
+            result?.response && !result.error && !result.response.error) {
           return [{ key: 'researchStatus', method: call.name, feature: call.feature,
             group: 'header', data: { action: 'complete', researchId: call.args?.researchId },
             updatedAt: record.timestamp }];
@@ -4184,7 +4211,7 @@
           changed = true;
           continue;
         }
-        if (['lastCampaignRaidResult', 'lastCraftResult'].includes(entry.key) &&
+        if (['lastCampaignRaidResult', 'lastCraftResult', 'brigandCampStatus', 'brigandCampTeam'].includes(entry.key) &&
             next[entry.key] && next[entry.key].updatedAt >= entry.updatedAt) continue;
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
         if (entry.key === 'experimentalMapContext' &&
@@ -4239,6 +4266,7 @@
             return enriched;
           });
         }
+        if (['buildingStatus', 'researchStatus'].includes(entry.key) && next[entry.key]?.updatedAt > entry.updatedAt) continue;
         if (entry.key === 'buildingStatus' && entry.data.action &&
             next[entry.key]?.updatedAt === entry.updatedAt) continue;
         if (entry.key === 'buildingStatus' && entry.data.action) {

@@ -659,6 +659,33 @@
           }
           if (actions.length) return actions;
         }
+        if (key === 'winCampBattle:camp' && call.args?.campId && result) {
+          const error = result.error || result.response?.error;
+          const success = !error && Array.isArray(result.response?.reward);
+          if (!error && !success) return [];
+          const status = { key: 'brigandCampStatus', method: call.name,
+            feature: call.feature, group: 'other', data: {
+              campId: call.args.campId, heroIds: call.args.userHeroesIds || [],
+              requestId: call.ident, success,
+              error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null,
+              rewards: success ? result.response.reward : []
+            }, updatedAt: record.timestamp };
+          if (!success) return [status];
+          // globalMapCamp f45fde890a6683ceef09053f5b636c0b: all three levels cost
+          // 10 refillableResource #2. No troop march is returned by this endpoint.
+          const energy = resourceAction(record, call, 'world-energy', -10,
+            'World Energy', 'brigandCampAttack').map((action) => ({
+              ...action, data: { ...action.data, requireSnapshot: true }
+            }));
+          return [status, ...energy, ...extractRewardActions(record, call,
+            result.response, 'brigandCampReward')];
+        }
+        if (call.name === 'battle_teamSet' && call.args?.key === 'globalMapCamp' &&
+            result && Object.hasOwn(result, 'response') && !result.error && !result.response?.error &&
+            Array.isArray(call.args.units)) {
+          return [{ key: 'brigandCampTeam', method: call.name, feature: null,
+            group: 'teams', data: { units: call.args.units }, updatedAt: record.timestamp }];
+        }
         if (key === 'attackMob:mob' && result?.response?.squadId && result.response.route) {
           const route = result.response.route;
           const durationMs = route.durationMs ?? route.duration;
@@ -4184,7 +4211,7 @@
           changed = true;
           continue;
         }
-        if (['lastCampaignRaidResult', 'lastCraftResult'].includes(entry.key) &&
+        if (['lastCampaignRaidResult', 'lastCraftResult', 'brigandCampStatus', 'brigandCampTeam'].includes(entry.key) &&
             next[entry.key] && next[entry.key].updatedAt >= entry.updatedAt) continue;
         if (next[entry.key] && next[entry.key].updatedAt > entry.updatedAt) continue;
         if (entry.key === 'experimentalMapContext' &&

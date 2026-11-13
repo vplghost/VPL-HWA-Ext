@@ -69,7 +69,7 @@ const serverTeams = computed(() => {
     bossFight: 'Guild Raid / Boss',
     magicTower: 'Tower',
     dungeon: 'Dungeon',
-    globalMapCamp: 'Camp March',
+    globalMapCamp: 'Brigand Camp',
     globalMapTeamKey: 'Global Map',
     globalMapRallyAutoJoinTeamKey: 'Auto-Rally Join',
   };

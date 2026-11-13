@@ -602,6 +602,32 @@ test('legacy direct messages and Draft submissions piggyback by default with act
   assert.deepEqual(JSON.parse(await response.text()).results.map((result) => result.ident), ['native']);
 });
 
+test('Brigand camp action piggybacks once and hides helper result from native client', async () => {
+  const batches = [];
+  const { window } = setup(async (_url, options) => {
+    const request = JSON.parse(options.body); batches.push(request.calls);
+    return new Response(JSON.stringify({ results: request.calls.map(call => ({
+      ident: call.ident, result: { response: call.name === 'winCampBattle' ? { reward: [] } : {} }
+    })) }), { status: 200 });
+  }, true, { Response, Headers });
+  const call = { name: 'winCampBattle', feature: 'camp',
+    args: { campId: 'camp-target', userHeroesIds: [79, 72, 16, 54, 60] } };
+  for (let i = 0; i < 2; i++) window.postMessage({
+    source: 'hwa-helper-control', kind: 'queue-rpc', calls: [call]
+  }, 'https://www.hero-wars-alliance.com');
+  assert.equal(batches.length, 0);
+  const send = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] })
+  });
+  const response = await send();
+  assert.deepEqual(batches[0].map(call => call.name), ['userGetInfo', 'winCampBattle']);
+  assert.deepEqual(batches[0][1].args, call.args);
+  assert.equal(batches[0][1].feature, 'camp');
+  assert.deepEqual(JSON.parse(await response.text()).results.map(result => result.ident), ['native']);
+  await send();
+  assert.deepEqual(batches[1].map(call => call.name), ['userGetInfo']);
+});
+
 test('queued actions expire, cancel on settings change and never retry after network failure', async () => {
   for (const scenario of ['expiry', 'disable', 'direct', 'failure']) {
     let now = 1000; const batches = [];

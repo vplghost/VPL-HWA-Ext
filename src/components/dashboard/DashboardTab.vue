@@ -203,6 +203,15 @@ async function refreshAllDashboard() {
           </span>
         </button>
 
+        <button
+          id="open-brigand-dialog"
+          type="button"
+          class="cursor-pointer px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+          @click="openModal('brigand')"
+        >
+          <span>⛺</span> <span>Brigand Camp</span>
+        </button>
+
         <!-- Campaign Raid -->
         <button
           id="open-campaign-dialog"

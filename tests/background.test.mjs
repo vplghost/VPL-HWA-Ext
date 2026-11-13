@@ -19,6 +19,27 @@ const researchQueueSource = await readFile(new URL('../extension/research-queue.
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
 const popupSender = { url: 'chrome-extension://test-extension/popup.html' };
 
+test('confirmed Brigand victory refreshes authoritative energy only under enabled RPC policy', async () => {
+  for (const mode of ['direct', 'piggyback', 'disabled', 'failed']) {
+    const env = setup();
+    env.local.popupRpcEnabled = mode !== 'disabled';
+    env.local.socketRefreshMode = mode === 'direct' ? 'direct' : 'piggyback';
+    const event = rpc([{ name: 'winCampBattle', feature: 'camp', ident: 'camp', args: {
+      campId: 'camp-target', userHeroesIds: [79, 72, 16, 54, 60]
+    } }], [{ ident: 'camp', result: mode === 'failed' ? { error: 'notEnoughEnergy' } :
+      { response: { reward: [{ type: 'gold', id: 0, amount: 15000 }] } } }]);
+    await env.send('api-record', event, { ...gameSender, tab: { id: 1 } });
+    assert.equal(env.forwardedMessages.length, ['direct', 'piggyback'].includes(mode) ? 1 : 0);
+    if (env.forwardedMessages.length) {
+      const msg = env.forwardedMessages[0].msg;
+      assert.equal(msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+      assert.equal(JSON.stringify(msg.calls), JSON.stringify([
+        { name: 'refillableGetAll', feature: 'refillable' }, { name: 'inventoryGet' }
+      ]));
+    }
+  }
+});
+
 function setup(quota = Infinity) {
   let listener;
   let installed;

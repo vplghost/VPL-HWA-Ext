@@ -1524,6 +1524,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ]);
       if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
+    if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
+        cacheResult.cache.brigandCampStatus?.updatedAt === record.timestamp &&
+        cacheResult.cache.brigandCampStatus.data?.success) {
+      const dispatch = rpcMessageForSettings(stored, [
+        { name: 'refillableGetAll', feature: 'refillable' },
+        { name: 'inventoryGet' }
+      ]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+    }
     const rawClaims = cacheResult.cache.questClaimStatus?.data?.claims;
     const claims = Array.isArray(rawClaims)
       ? rawClaims

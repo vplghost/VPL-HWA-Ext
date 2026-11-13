@@ -21,6 +21,7 @@ import ResearchModal from '@/src/components/dialogs/ResearchModal.vue';
 import RaidModal from '@/src/components/dialogs/RaidModal.vue';
 import GatheringModal from '@/src/components/dialogs/GatheringModal.vue';
 import MonsterModal from '@/src/components/dialogs/MonsterModal.vue';
+import BrigandCampModal from '@/src/components/dialogs/BrigandCampModal.vue';
 import CampaignRaidModal from '@/src/components/dialogs/CampaignRaidModal.vue';
 import HeroDetailModal from '@/src/components/dialogs/HeroDetailModal.vue';
 import TowerModal from '@/src/components/dialogs/TowerModal.vue';
@@ -72,6 +73,7 @@ const { modalState, modalContext } = useModals();
       <RaidModal v-model="modalState.raid" />
       <GatheringModal v-model="modalState.gathering" />
       <MonsterModal v-model="modalState.monster" />
+      <BrigandCampModal v-model="modalState.brigand" />
       <CampaignRaidModal v-model="modalState.campaign" />
       <HeroDetailModal v-model="modalState.hero" :hero="modalContext.selectedHero" />
       <TowerModal v-model="modalState.tower" />

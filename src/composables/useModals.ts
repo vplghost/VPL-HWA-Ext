@@ -6,6 +6,7 @@ export type ModalName =
   | 'raid'
   | 'gathering'
   | 'monster'
+  | 'brigand'
   | 'campaign'
   | 'hero'
   | 'tower'
@@ -21,6 +22,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   raid: false,
   gathering: false,
   monster: false,
+  brigand: false,
   campaign: false,
   hero: false,
   tower: false,

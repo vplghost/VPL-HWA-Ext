@@ -55,9 +55,11 @@
       return (now > 1e11 && q.endTime < 1e11 && q.endTime > 1e8) ? q.endTime * 1000 : q.endTime;
     }
     let start = Number.isFinite(q.startDate) ? q.startDate : (Number.isFinite(q.startTime) ? q.startTime : 0);
-    if (now > 1e11 && start < 1e11 && start > 1e8) start *= 1000;
+    const startInSeconds = now > 1e11 && start < 1e11 && start > 1e8;
+    if (startInSeconds) start *= 1000;
     let dur = Number.isFinite(q.durationMs) ? q.durationMs : (Number.isFinite(q.duration) ? q.duration : 0);
-    if (Number.isFinite(q.duration) && !Number.isFinite(q.durationMs) && dur > 0 && dur < 100000 && (start > 1e8 || now > 1e8)) {
+    // Legacy second-based starts imply second-based duration; millisecond starts do not.
+    if (startInSeconds && Number.isFinite(q.duration) && !Number.isFinite(q.durationMs)) {
       dur *= 1000;
     }
     if (!start && !dur) return 0;
@@ -276,6 +278,7 @@
 
   globalThis.hwaHelperResearchQueue = {
     getSimulatedLevels,
+    getQueueEnd,
     calculateQueueTimeline,
     planNextStep,
     addToQueue,
