@@ -75,12 +75,12 @@ function handleMouseEnter() {
   }, props.delay);
 }
 
-function handleMouseLeave(e?: MouseEvent) {
+function handleMouseLeave(e?: MouseEvent | FocusEvent) {
   if (showTimeout) {
     clearTimeout(showTimeout);
     showTimeout = null;
   }
-  if (e && triggerRef.value) {
+  if (e instanceof MouseEvent && triggerRef.value) {
     const rect = triggerRef.value.getBoundingClientRect();
     if (
       e.clientX >= rect.left &&

@@ -139,7 +139,7 @@ export function resourceLabel(entry: ResourceEntry | undefined): string {
   };
   if (fallback[rawKey]) return fallback[rawKey];
 
-  const [type, itemIdStr] = rawKey.split(':');
+  const [type = '', itemIdStr = ''] = rawKey.split(':');
   const itemId = Number(itemIdStr);
 
   if (type === 'material' && Number.isInteger(itemId) && worldMaterialNames[itemId]) {

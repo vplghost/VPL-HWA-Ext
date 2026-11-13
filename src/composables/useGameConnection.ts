@@ -15,7 +15,8 @@ export interface GameEngineStatus {
 const hasGameTab = ref(true); // optimistic default
 const gameEngineStatus = ref<GameEngineStatus | null>(null);
 const isRefreshing = ref(false);
-let isInitialized = false;
+let consumerCount = 0;
+let detachListeners: (() => void) | null = null;
 let checkInterval: any = null;
 
 export function useGameConnection() {
@@ -144,19 +145,30 @@ export function useGameConnection() {
   }
 
   onMounted(() => {
+    consumerCount++;
     checkStatus();
-    if (!isInitialized) {
-      isInitialized = true;
-      if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
-        chrome.storage.onChanged.addListener(handleStorageChange);
+    if (!detachListeners) {
+      if (typeof chrome !== 'undefined') {
+        const changed = () => { void checkStatus(); };
+        chrome.storage?.onChanged?.addListener(handleStorageChange);
+        chrome.tabs?.onUpdated?.addListener?.(changed);
+        chrome.tabs?.onRemoved?.addListener?.(changed);
+        detachListeners = () => {
+          chrome.storage?.onChanged?.removeListener(handleStorageChange);
+          chrome.tabs?.onUpdated?.removeListener?.(changed);
+          chrome.tabs?.onRemoved?.removeListener?.(changed);
+        };
       }
-      if (typeof chrome !== 'undefined' && chrome.tabs) {
-        chrome.tabs.onUpdated?.addListener?.(() => checkStatus());
-        chrome.tabs.onRemoved?.addListener?.(() => checkStatus());
-      }
+      if (!checkInterval) checkInterval = setInterval(checkStatus, 3000);
     }
-    if (!checkInterval) {
-      checkInterval = setInterval(checkStatus, 3000);
+  });
+  onUnmounted(() => {
+    consumerCount--;
+    if (consumerCount === 0) {
+      detachListeners?.();
+      detachListeners = null;
+      if (checkInterval) clearInterval(checkInterval);
+      checkInterval = null;
     }
   });
 

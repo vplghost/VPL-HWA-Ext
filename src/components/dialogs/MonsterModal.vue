@@ -18,7 +18,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { cache } = useRpcCache();
+const { cache, dispatchRpc } = useRpcCache();
 
 const {
   selectedTeamId,
@@ -113,14 +113,11 @@ onMounted(async () => {
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['monsterPreferences', 'monsterQueue', 'popupRpcEnabled', 'socketRefreshMode']);
+      const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; monsterPreferences?: {mobLevel?: number; teamId?: string; targetMobId?: string}; monsterQueue?: {running?: boolean; phase?: string} }>(['monsterPreferences', 'monsterQueue', 'popupRpcEnabled', 'socketRefreshMode']);
       if (stored.monsterPreferences) {
         if (stored.monsterPreferences.mobLevel) mobLevel.value = stored.monsterPreferences.mobLevel;
         if (stored.monsterPreferences.teamId) selectedTeamId.value = stored.monsterPreferences.teamId;
         if (stored.monsterPreferences.targetMobId) selectedMobId.value = stored.monsterPreferences.targetMobId;
-      }
-      if (stored.popupRpcEnabled !== true) {
-        await chrome.storage.local.set({ popupRpcEnabled: true });
       }
       if (stored.monsterQueue) {
         isRunning.value = stored.monsterQueue.running || false;
@@ -130,7 +127,7 @@ onMounted(async () => {
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.monsterQueue) {
-        const q = changes.monsterQueue.newValue;
+        const q = changes.monsterQueue.newValue as { running?: boolean; phase?: string } | undefined;
         isRunning.value = q?.running || false;
         queueStatusText.value = q?.phase || 'Idle';
       }
@@ -168,7 +165,7 @@ onUnmounted(() => {
 
 async function ensureRpcEnabled() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    const stored = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode']);
+    const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; monsterPreferences?: {mobLevel?: number; teamId?: string; targetMobId?: string}; monsterQueue?: {running?: boolean; phase?: string} }>(['popupRpcEnabled', 'socketRefreshMode']);
     const updates: Record<string, any> = {};
     if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
     if (!stored.socketRefreshMode) updates.socketRefreshMode = 'piggyback';
@@ -198,7 +195,7 @@ async function refreshMapCoordinates() {
   statusMessage.value = 'Locating coordinates from game...';
   try {
     await dispatchRpc([
-      { name: 'getMarches' },
+      { name: 'getMarches', feature: 'march' },
       { name: 'clan_getSummary' },
       { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
     ]);
@@ -594,7 +591,7 @@ async function stopMonsterQueue() {
                   :value="target.mobId"
                   class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                 >
-                  Monster {{ idx + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
+                  Monster {{ Number(idx) + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
                 </option>
               </select>
             </div>

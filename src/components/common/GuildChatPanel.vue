@@ -107,12 +107,6 @@ function handleScroll() {
 async function refreshChat() {
   isRefreshing.value = true;
   try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({
-        kind: 'refresh-rpc',
-        calls: [{ name: 'chatGetAll', args: { chatType: 'clan' } }],
-      });
-    }
     await dispatchRpc([{ name: 'chatGetAll', args: { chatType: 'clan' } }]);
   } finally {
     setTimeout(() => {

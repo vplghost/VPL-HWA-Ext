@@ -1,10 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import '@/src/utils/metadata';
+import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import { useModals } from '@/src/composables/useModals';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 
-const { openModal } = useModals();
+const { openModal, modalState } = useModals();
 const { cache } = useRpcCache();
+usePopupAutomation(cache, true);
+const lastRead = ref(0);
+const chatMessages = computed<any[]>(() => {
+  const raw = cache.value.guildChat?.data?.messages || [];
+  return Array.isArray(raw) ? raw : Object.values(raw);
+});
+const unreadCount = computed(() => {
+  const reference = Math.floor(Date.parse(cache.value.guildChat?.updatedAt || '') / 1000);
+  return (globalThis as any).hwaHelperPopupData?.getUnreadChatCount?.(chatMessages.value, lastRead.value, reference) || 0;
+});
+const unreadLabel = computed(() => unreadCount.value > 99 ? '99+' : String(unreadCount.value));
+function updateLastRead(changes: Record<string, chrome.storage.StorageChange>, area: string) {
+  if (area === 'local' && 'guildChatLastReadTime' in changes) lastRead.value = Number(changes.guildChatLastReadTime.newValue) || 0;
+}
+watch([() => modalState.guildChat, chatMessages], async ([open, messages]) => {
+  if (!open) return;
+  const latest = (messages as any[]).reduce((max, entry) => Math.max(max, Number(entry.ctime) || 0), 0);
+  if (latest > lastRead.value) {
+    lastRead.value = latest;
+    await chrome.storage.local.set({ guildChatLastReadTime: latest });
+  }
+});
 
 const isOpen = ref(false);
 
@@ -31,10 +55,13 @@ function handleKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown);
+  chrome.storage.onChanged.addListener(updateLastRead);
+  chrome.storage.local.get('guildChatLastReadTime').then((stored) => { lastRead.value = Number(stored.guildChatLastReadTime) || 0; });
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
+  chrome.storage.onChanged.removeListener(updateLastRead);
 });
 </script>
 
@@ -76,9 +103,10 @@ onUnmounted(() => {
               type="button"
               title="Guild Chat"
               aria-label="Open Guild Chat"
-              class="cursor-pointer flex size-10 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-transform hover:scale-105"
+              class="cursor-pointer relative flex size-10 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-transform hover:scale-105"
               @click="handleAction('chat')"
             >
+              <span v-if="unreadCount" id="guild-chat-badge" class="absolute -top-1 -right-1 rounded-full bg-rose-600 px-1.5 text-[10px] text-white">{{ unreadLabel }}</span>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
@@ -130,6 +158,7 @@ onUnmounted(() => {
         class="cursor-pointer relative flex size-12 items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg transition-transform hover:scale-105 focus:outline-none"
         @click="toggle"
       >
+        <span v-if="unreadCount" id="fab-unread-badge" class="absolute -top-1 -right-1 rounded-full bg-rose-600 px-1.5 text-[10px] text-white" :title="`${unreadCount} unread guild messages`">{{ unreadLabel }}</span>
         <svg
           viewBox="0 0 24 24"
           width="22"

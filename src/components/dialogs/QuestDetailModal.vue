@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { questRefreshCalls, sendQuestClaim } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { normalizeArray } from '@/src/utils/troops';
 
@@ -17,6 +18,8 @@ const { cache, dispatchRpc } = useRpcCache();
 const currentFilter = ref<'all' | 'daily' | 'event' | 'ready'>('all');
 const searchQuery = ref('');
 const isRefreshing = ref(false);
+const isClaiming = ref(false);
+const claimMessage = ref('');
 
 watch(
   () => props.initialFilter,
@@ -287,21 +290,7 @@ const filteredQuests = computed(() => {
 async function refreshQuests() {
   isRefreshing.value = true;
   try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({
-        kind: 'refresh-rpc',
-        calls: [
-          { name: 'getDailyQuests', feature: 'quest', args: {} },
-          { name: 'getSpecialQuestState' },
-          { name: 'questGetAll' },
-          { name: 'questGetEvents' },
-        ],
-      });
-    }
-    await dispatchRpc([
-      { name: 'quest_getAll', feature: 'quest' },
-      { name: 'questGetAll' },
-    ]);
+    await dispatchRpc(questRefreshCalls());
   } finally {
     setTimeout(() => {
       isRefreshing.value = false;
@@ -324,10 +313,14 @@ function exportCatalog() {
 }
 
 async function claimQuest(qId: string | number) {
-  await dispatchRpc([
-    { name: 'quest_claim', args: { questId: qId }, feature: 'quest' },
-    { name: 'quest_getAll', feature: 'quest' },
-  ]);
+  if (isClaiming.value) return;
+  isClaiming.value = true;
+  try {
+    const result = await sendQuestClaim(qId);
+    claimMessage.value = result.ok
+      ? result.queued ? 'Reward claim queued for the next game RPC.' : 'Reward claim sent. Waiting for game sync.'
+      : result.error || 'Reward claim failed.';
+  } finally { isClaiming.value = false; }
 }
 </script>
 
@@ -377,6 +370,7 @@ async function claimQuest(qId: string | number) {
 
         <!-- Dialog Body -->
         <div id="quest-detail-dialog-body" class="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh_-_60px)] text-xs">
+          <p v-if="claimMessage" role="status" class="text-xs text-slate-600 dark:text-slate-300">{{ claimMessage }}</p>
           <!-- Toolbar -->
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200 dark:border-slate-800">
             <!-- Filter Tabs -->
@@ -556,6 +550,7 @@ async function claimQuest(qId: string | number) {
                     v-if="item.state === 'ready'"
                     type="button"
                     class="cursor-pointer px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] shadow-2xs transition-colors shrink-0"
+                    :disabled="isClaiming"
                     @click="claimQuest(item.id)"
                   >
                     Claim

@@ -83,9 +83,6 @@ onMounted(async () => {
       if (stored.autoGatherSettings) {
         autoSettings.value = { ...autoSettings.value, ...stored.autoGatherSettings };
       }
-      if (stored.popupRpcEnabled !== true) {
-        await chrome.storage.local.set({ popupRpcEnabled: true });
-      }
     } catch (_) {}
   }
 
@@ -141,7 +138,7 @@ const nextTargetType = computed(() => {
   const last = autoSettings.value.lastAutoMineType;
   if (!last || !types.includes(last)) return 'food';
   const idx = types.indexOf(last);
-  return types[(idx + 1) % types.length];
+  return types[(Number(idx) + 1) % types.length];
 });
 
 // Active gathering marches
@@ -498,7 +495,7 @@ async function recallMarch(march: any) {
           <template v-if="autoSettings.enabled">
             <span>Dispatches automatically on game load or when marches return to base if active marches &lt; {{ autoSettings.maxMarches }}. </span>
             <span v-if="autoSettings.mineType === 'rotate'">
-              Cycling: Next target is <strong>{{ nextTargetType.toUpperCase() }} (Lv.{{ autoSettings.mineLevel }})</strong>.
+              Cycling: Next target is <strong>{{ (nextTargetType || 'gold').toUpperCase() }} (Lv.{{ autoSettings.mineLevel }})</strong>.
             </span>
             <span v-else>
               Target: <strong>{{ autoSettings.mineType.toUpperCase() }} (Lv.{{ autoSettings.mineLevel }})</strong>.
@@ -565,7 +562,7 @@ async function recallMarch(march: any) {
             >
               <div>
                 <div class="font-bold text-slate-800 dark:text-slate-200">
-                  Mine #{{ idx + 1 }} · ({{ mine.coordinates?.x ?? '?' }}, {{ mine.coordinates?.y ?? '?' }})
+                  Mine #{{ Number(idx) + 1 }} · ({{ mine.coordinates?.x ?? '?' }}, {{ mine.coordinates?.y ?? '?' }})
                 </div>
                 <div class="text-[11px] text-slate-400">
                   Resource: {{ formatNumber(mine.resourceCount || mine.resAmount || 0) }}

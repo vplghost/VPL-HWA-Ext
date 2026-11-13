@@ -1,16 +1,33 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { engineDiagnostics } from '@/src/composables/engineDiagnostics';
 import { useTheme } from '@/src/composables/useTheme';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useGameConnection } from '@/src/composables/useGameConnection';
+import '@/src/utils/metadata';
+import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import type { ThemeMode } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
-const { recordingState } = useRpcCache();
-const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab } = useGameConnection();
+const { recordingState, cache } = useRpcCache();
+const { autoClaimSettings, priorityAutoJoin, teams: autoJoinTeams, pending: pendingClaims, selectedCount, busy: claimBusy, message: claimMessage, saveAutoClaim, savePriorityJoin, claimRewards } = usePopupAutomation(cache);
+const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab, gameEngineStatus, checkStatus } = useGameConnection();
+const engine = computed(() => engineDiagnostics(gameEngineStatus.value));
+const enginePingMessage = ref('');
+const enginePingPending = ref(false);
+async function pingEngine() {
+  enginePingPending.value = true;
+  try {
+    const response = await chrome.runtime.sendMessage({ kind: 'engine-ping' });
+    if (!response?.ok) throw new Error(response?.error || 'No active Hero Wars tab found.');
+    enginePingMessage.value = 'Ping sent. Waiting for engine status.';
+    await checkStatus();
+  } catch (cause) { enginePingMessage.value = String(cause); }
+  finally { enginePingPending.value = false; }
+}
 
 const dispatchMode = ref<'piggyback' | 'direct' | 'mqtt-piggyback'>('direct');
-const popupRpcEnabled = ref(true);
+const popupRpcEnabled = ref(false);
 const interceptEnabled = ref(true);
 const mqttCaptureEnabled = ref(true);
 
@@ -39,7 +56,7 @@ const tabSettings = ref<TabSettingItem[]>(
 onMounted(async () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
-      const stored = await chrome.storage.local.get([
+      const stored: Record<string, any> = await chrome.storage.local.get([
         'dispatchMode',
         'socketRefreshMode',
         'popupRpcEnabled',
@@ -52,7 +69,7 @@ onMounted(async () => {
       } else if (stored.dispatchMode) {
         dispatchMode.value = stored.dispatchMode;
       }
-      popupRpcEnabled.value = stored.popupRpcEnabled !== false;
+      popupRpcEnabled.value = stored.popupRpcEnabled === true;
       if (stored.captureSettings?.interceptEnabled !== undefined) {
         interceptEnabled.value = stored.captureSettings.interceptEnabled !== false;
       }
@@ -97,14 +114,16 @@ function moveTab(index: number, direction: 'up' | 'down') {
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
   if (targetIndex < 0 || targetIndex >= tabSettings.value.length) return;
   const item = tabSettings.value.splice(index, 1)[0];
-  tabSettings.value.splice(targetIndex, 0, item);
+  if (item) tabSettings.value.splice(targetIndex, 0, item);
   saveTabs();
 }
 
 function toggleTabVisible(index: number) {
-  tabSettings.value[index].visible = !tabSettings.value[index].visible;
+  const item = tabSettings.value[index];
+  if (!item) return;
+  item.visible = !item.visible;
   if (!tabSettings.value.some((t) => t.visible)) {
-    tabSettings.value[index].visible = true;
+    item.visible = true;
   }
   saveTabs();
 }
@@ -362,6 +381,45 @@ async function toggleRecording() {
       </div>
     </div>
 
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <h3 class="text-sm font-bold">Reward Claims · {{ pendingClaims.totalCount }} ready</h3>
+      <div class="flex flex-wrap gap-4">
+        <label v-for="option in (['mail', 'reports', 'quests', 'onOpen'] as const)" :key="option" class="flex items-center gap-2">
+          <input v-model="autoClaimSettings[option]" type="checkbox" :id="'autoclaim-opt-' + option" @change="saveAutoClaim" />
+          {{ option === 'onOpen' ? 'Claim when popup opens' : option }}
+        </label>
+      </div>
+      <button id="btn-claim-all" type="button" :disabled="claimBusy || !popupRpcEnabled || selectedCount === 0" @click="claimRewards"
+        class="rounded-lg px-3 py-2 bg-emerald-600 text-white disabled:opacity-50">Claim Selected Rewards ({{ selectedCount }})</button>
+      <p role="status" class="text-slate-500">{{ claimMessage }}</p>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <h3 class="text-sm font-bold">Priority Rally Auto Join</h3>
+      <p class="text-slate-500">Joins priority rallies using the shared RPC dispatch settings. Requires popup RPC calls.</p>
+      <label class="flex items-center gap-2"><input id="setting-priority-autojoin-enabled" v-model="priorityAutoJoin.enabled" type="checkbox" @change="savePriorityJoin" />Enabled</label>
+      <label class="flex items-center gap-2">Minimum monster level
+        <input id="setting-priority-autojoin-min-level" v-model.number="priorityAutoJoin.minLevel" type="number" min="1" max="30" @change="savePriorityJoin" class="rounded border p-1 dark:bg-slate-800" />
+      </label>
+      <label class="flex items-center gap-2">Team
+        <select id="setting-priority-autojoin-team" v-model="priorityAutoJoin.teamId" @change="savePriorityJoin" class="rounded border p-1 dark:bg-slate-800">
+          <option v-for="team in autoJoinTeams" :key="team.id" :value="team.id">{{ team.label }}</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <h3 class="text-sm font-bold">Game Engine Diagnostics</h3>
+      <p id="engine-status-badge">{{ engine.badge }}</p>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <dt>Unity instance</dt><dd id="engine-unity-instance">{{ engine.instance }}</dd>
+        <dt>SendMessage</dt><dd id="engine-send-message">{{ engine.sendMessage }}</dd>
+        <dt>RPC authentication headers</dt><dd id="engine-rpc-headers">{{ engine.rpcHeaders }}</dd>
+        <dt>Game tab extension version</dt><dd>{{ gameEngineStatus?.extensionVersion || 'Unknown' }}</dd>
+      </dl>
+      <button id="btn-ping-engine" type="button" :disabled="enginePingPending" @click="pingEngine" class="rounded-lg px-3 py-1.5 bg-indigo-600 text-white disabled:opacity-50">Ping Engine</button>
+      <p id="engine-ping-result" role="status" class="text-slate-500">{{ enginePingMessage }}</p>
+    </section>
     <!-- Session Profiling & Recording -->
     <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs">
       <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">

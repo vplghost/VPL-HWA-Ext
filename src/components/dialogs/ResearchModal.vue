@@ -80,7 +80,7 @@ onMounted(async () => {
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['researchQueue', 'buildingQueue', 'researchQueueLogs']);
+      const stored = await chrome.storage.local.get(['researchQueue', 'buildingQueue', 'researchQueueLogs']) as { researchQueue?: Partial<ResearchQueueState>; buildingQueue?: { items?: unknown[] }; researchQueueLogs?: unknown };
       if (stored.researchQueue) {
         researchQueue.value = {
           enabled: stored.researchQueue.enabled !== false,
@@ -137,7 +137,7 @@ watch(
 async function saveResearchQueue() {
   if (!isLoaded.value) return;
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    const stored = await chrome.storage.local.get(['researchQueue']).catch(() => ({}));
+    const stored = await chrome.storage.local.get(['researchQueue']).catch(() => ({})) as { researchQueue?: Partial<ResearchQueueState> };
     const prev = stored?.researchQueue || {};
     await chrome.storage.local.set({
       researchQueue: {
@@ -230,7 +230,9 @@ const queueTimeline = computed(() => {
 function moveQueueItem(idx: number, direction: 'up' | 'down') {
   const newIdx = direction === 'up' ? idx - 1 : idx + 1;
   if (newIdx < 0 || newIdx >= researchQueue.value.items.length) return;
+  if (idx < 0 || idx >= researchQueue.value.items.length) return;
   const item = researchQueue.value.items.splice(idx, 1)[0];
+  if (!item) return;
   researchQueue.value.items.splice(newIdx, 0, item);
   saveResearchQueue();
 }
@@ -836,7 +838,7 @@ async function refreshResearch() {
               >
                 <div class="min-w-0 flex items-center gap-2 flex-1">
                   <span class="inline-flex items-center justify-center size-5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 text-2xs font-bold shrink-0">
-                    #{{ idx + 1 }}
+                    #{{ Number(idx) + 1 }}
                   </span>
                   <div class="min-w-0">
                     <div class="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
@@ -875,7 +877,7 @@ async function refreshResearch() {
                         ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
                         : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer'
                     "
-                    @click="moveQueueItem(idx, 'up')"
+                    @click="moveQueueItem(Number(idx), 'up')"
                   >
                     ▲
                   </button>
@@ -889,7 +891,7 @@ async function refreshResearch() {
                         ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
                         : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer'
                     "
-                    @click="moveQueueItem(idx, 'down')"
+                    @click="moveQueueItem(Number(idx), 'down')"
                   >
                     ▼
                   </button>
@@ -897,7 +899,7 @@ async function refreshResearch() {
                     type="button"
                     title="Remove from queue"
                     class="size-6 rounded flex items-center justify-center text-2xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
-                    @click="removeQueueItem(idx)"
+                    @click="removeQueueItem(Number(idx))"
                   >
                     ✕
                   </button>

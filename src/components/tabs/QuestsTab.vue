@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { sendQuestClaim } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 
-const { cache, dispatchRpc } = useRpcCache();
+const { cache } = useRpcCache();
+const isClaiming = ref(false);
+const claimMessage = ref('');
 
 interface QuestItem {
   id: string | number;
@@ -50,26 +53,26 @@ const readyQuests = computed(() => quests.value.filter((q) => q.state === 2));
 const inProgressQuests = computed(() => quests.value.filter((q) => q.state === 1 && !q.isUnavailable));
 const unfulfillableQuests = computed(() => quests.value.filter((q) => q.isUnavailable));
 
-async function claimQuest(questId: string | number) {
-  await dispatchRpc([
-    { name: 'quest_claim', args: { questId }, feature: 'quest' },
-    { name: 'quest_getAll', feature: 'quest' },
-  ]);
+async function claimQuest(questId: string | number | Array<string | number>) {
+  if (isClaiming.value) return;
+  isClaiming.value = true;
+  try {
+    const result = await sendQuestClaim(questId);
+    claimMessage.value = result.ok
+      ? result.queued ? 'Reward claim queued for the next game RPC.' : 'Reward claim sent. Waiting for game sync.'
+      : result.error || 'Reward claim failed.';
+  } finally { isClaiming.value = false; }
 }
 
 async function claimAll() {
-  const calls = readyQuests.value.map((q) => ({
-    name: 'quest_claim',
-    args: { questId: q.id },
-    feature: 'quest',
-  }));
-  calls.push({ name: 'quest_getAll', feature: 'quest' });
-  await dispatchRpc(calls);
+  const ids = readyQuests.value.map(q => q.id);
+  if (ids.length) await claimQuest(ids);
 }
 </script>
 
 <template>
   <div class="space-y-4">
+    <p v-if="claimMessage" role="status" class="text-xs text-slate-600 dark:text-slate-300">{{ claimMessage }}</p>
     <!-- Header Summary -->
     <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex items-center justify-between shadow-2xs">
       <div class="flex items-center gap-2.5">
@@ -88,6 +91,7 @@ async function claimAll() {
         v-if="readyQuests.length > 0"
         type="button"
         class="cursor-pointer px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-2xs transition-all"
+        :disabled="isClaiming"
         @click="claimAll"
       >
         Claim All ({{ readyQuests.length }})
@@ -112,7 +116,8 @@ async function claimAll() {
           <button
             type="button"
             class="cursor-pointer px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
-            @click="claimQuest(q.id)"
+            :disabled="isClaiming"
+        @click="claimQuest(q.id)"
           >
             Claim
           </button>

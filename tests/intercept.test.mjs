@@ -130,6 +130,53 @@ test('monster attack joins one native RPC and MQTT-assisted mode nudges after qu
   }
 });
 
+test('migrated refresh reads use bounded feature pairs in both piggyback modes', async () => {
+  const reads = [
+    { name: 'getInfo', feature: 'clanVersus' },
+    { name: 'getDailyQuests', feature: 'quest' },
+    { name: 'getSpecialQuestState', feature: 'quest' },
+    { name: 'magicTower_briefInfo' },
+    { name: 'magicTower_getAll' },
+    { name: 'dungeonGetInfo' },
+    { name: 'chatGetAll', args: { chatType: 'clan' } },
+  ];
+  for (const mode of ['piggyback', 'mqtt-piggyback']) {
+    const batches = [];
+    const { window, messages, queueCounts } = setup(async (_url, options) => {
+      const request = JSON.parse(options.body);
+      batches.push(request.calls);
+      return new Response(JSON.stringify({ results: request.calls.map(call => ({
+        ident: call.ident, result: { response: { name: call.name } },
+      })) }), { headers: { 'content-type': 'application/json' } });
+    }, true, { Response, Headers });
+    const origin = 'https://www.hero-wars-alliance.com';
+    window.postMessage({ source: 'hwa-helper-config', kind: 'control',
+      interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: mode }, origin);
+    window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [
+      ...reads,
+      { name: 'getInfo', feature: 'otherFeature' },
+      { name: 'getInfo' },
+      { name: 'getDailyQuests', feature: 'otherFeature' },
+      { name: 'getSpecialQuestState' },
+      { name: 'magicTower_getAll', feature: 'otherFeature' },
+      { name: 'dungeonGetInfo', feature: 'otherFeature' },
+      { name: 'chatGetAll', feature: 'otherFeature' },
+      { name: 'arbitraryMutation', feature: 'quest' },
+    ] }, origin);
+    assert.equal(queueCounts.at(-1), reads.length, mode);
+    const response = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+      method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] }),
+    });
+    assert.deepEqual(batches[0].map(({ name, feature }) => ({ name, ...(feature ? { feature } : {}) })),
+      [{ name: 'userGetInfo' }, ...reads.map(({ name, feature }) => ({ name, ...(feature ? { feature } : {}) }))]);
+    assert.deepEqual(JSON.parse(await response.text()).results.map(item => item.ident), ['native'],
+      'appended refresh results must never reach the native game consumer');
+    await waitForMessage(messages);
+    assert.equal(JSON.parse(messages[0].data.record.responseBody).results.length, reads.length + 1,
+      'extension recording still sees the complete response');
+  }
+});
+
 test('POST fetch preserves response and stores request/response text', async () => {
   const response = new Response('{"hero":1}', { status: 200, headers: { 'content-type': 'application/json' } });
   const { window, messages } = setup(async () => response);

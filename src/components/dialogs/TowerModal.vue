@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { towerSettingsForAccount } from '@/src/utils/dialogRpc';
 import { getHeroMetadata } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 
@@ -100,22 +101,13 @@ async function loadTowerSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
       const stored = await chrome.storage.local.get(['towerAutomationSettings', 'towerRun']);
-      if (stored.towerAutomationSettings) {
-        if (Array.isArray(stored.towerAutomationSettings.heroes) && stored.towerAutomationSettings.heroes.length === 5) {
-          selectedHeroIds.value = [...stored.towerAutomationSettings.heroes];
-        }
-        if (Array.isArray(stored.towerAutomationSettings.buffPriority) && stored.towerAutomationSettings.buffPriority.length > 0) {
-          initBuffOrder(stored.towerAutomationSettings.buffPriority);
-        } else {
-          initBuffOrder();
-        }
-      } else {
-        initBuffOrder();
-      }
-
+      const accountId = cache.value.accountStatus?.data?.id ?? cache.value.userGetInfo?.data?.id;
+      const settings = towerSettingsForAccount(stored.towerAutomationSettings, accountId);
+      selectedHeroIds.value = settings.heroes?.length === 5 ? [...settings.heroes] : [];
+      initBuffOrder(settings.buffPriority);
       if (stored.towerRun) {
-        towerRunState.value = stored.towerRun;
-        isRunning.value = !['stopped', 'complete'].includes(stored.towerRun.phase);
+        towerRunState.value = stored.towerRun as { phase?: string };
+        isRunning.value = !['stopped', 'complete'].includes(towerRunState.value.phase || 'stopped');
       }
     } catch (_) {
       initBuffOrder();
@@ -210,7 +202,7 @@ async function toggleTowerRun() {
 }
 
 async function refreshTower() {
-  await dispatchRpc([{ name: 'towerGetInfo' }]);
+  await dispatchRpc([{ name: 'magicTower_briefInfo' }, { name: 'magicTower_getAll' }]);
 }
 
 // Accordion floor tracking

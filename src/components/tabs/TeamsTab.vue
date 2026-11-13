@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
+import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import TitanHoverCard from '@/src/components/common/TitanHoverCard.vue';
@@ -20,7 +21,7 @@ const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const heroesData = computed(() => cache.value.heroGetAll?.data || {});
 const titansData = computed(() => cache.value.titanGetAll?.data || {});
 
-const customTeams = ref<CustomTeam[]>([]);
+const { customTeams, saveTeams, storageError } = useAccountTeams(accountId);
 const isEditing = ref(false);
 const editingTeamId = ref<string | null>(null);
 const isRefreshing = ref(false);
@@ -31,20 +32,7 @@ const selectedHeroIds = ref<number[]>([]);
 const heroSearch = ref('');
 const formError = ref('');
 
-async function loadTeams() {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    try {
-      const stored = await chrome.storage.local.get('customTeams');
-      const accounts = stored.customTeams || {};
-      if (accountId.value) {
-        customTeams.value = normalizeArray(accounts[String(accountId.value)]);
-      } else {
-        const firstKey = Object.keys(accounts)[0];
-        customTeams.value = firstKey ? normalizeArray(accounts[firstKey]) : [];
-      }
-    } catch (_) {}
-  }
-}
+watch(accountId, () => { isEditing.value = false; editingTeamId.value = null; selectedHeroIds.value = []; });
 
 async function refreshTeams() {
   isRefreshing.value = true;
@@ -60,7 +48,6 @@ async function refreshTeams() {
 }
 
 onMounted(() => {
-  loadTeams();
   if (!cache.value.teamGetAll?.data) {
     refreshTeams();
   }
@@ -204,42 +191,29 @@ async function saveTeam() {
     return;
   }
 
+  const maxTroops = formMaxTroops.value === '' ? undefined : Number(formMaxTroops.value);
+  if (maxTroops !== undefined && (!Number.isSafeInteger(maxTroops) || maxTroops <= 0)) {
+    formError.value = 'Troop limit must be a positive whole number.';
+    return;
+  }
   const team: CustomTeam = {
     id: editingTeamId.value || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `team_${Date.now()}`),
     name: formName.value.trim(),
     heroIds: [...selectedHeroIds.value],
-    maxTroops: formMaxTroops.value !== '' ? Math.max(1, parseInt(formMaxTroops.value, 10)) : undefined,
+    maxTroops,
   };
 
   const next = [...customTeams.value.filter((t) => t.id !== team.id), team];
-  customTeams.value = next;
-
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    try {
-      const stored = await chrome.storage.local.get('customTeams');
-      const accounts = stored.customTeams || {};
-      const key = String(accountId.value || 'default');
-      accounts[key] = next;
-      await chrome.storage.local.set({ customTeams: accounts });
-    } catch (_) {}
-  }
+  try { await saveTeams(next); }
+  catch (cause) { formError.value = String(cause); return; }
 
   isEditing.value = false;
   editingTeamId.value = null;
 }
 
 async function deleteTeam(id: string) {
-  const next = customTeams.value.filter((t) => t.id !== id);
-  customTeams.value = next;
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    try {
-      const stored = await chrome.storage.local.get('customTeams');
-      const accounts = stored.customTeams || {};
-      const key = String(accountId.value || 'default');
-      accounts[key] = next;
-      await chrome.storage.local.set({ customTeams: accounts });
-    } catch (_) {}
-  }
+  try { await saveTeams(customTeams.value.filter((team) => team.id !== id)); }
+  catch (cause) { formError.value = String(cause); }
 }
 
 function isTitanId(id: number | string): boolean {
@@ -303,6 +277,7 @@ function getTeamPower(memberIds: number[]): number {
 
 <template>
   <div class="space-y-4">
+    <p v-if="storageError" role="alert" class="text-xs text-rose-600">{{ storageError }}</p>
     <!-- Header Card -->
     <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
       <div>
@@ -400,48 +375,48 @@ function getTeamPower(memberIds: number[]): number {
             :key="idx"
             class="h-16 rounded-lg border border-dashed flex flex-col items-center justify-center p-1 text-center transition-colors relative"
             :class="
-              selectedHeroIds[idx - 1]
+              selectedHeroIds[idx - 1]!
                 ? 'border-blue-400 bg-blue-100/60 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100 font-medium'
                 : 'border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-400 text-xs'
             "
           >
-            <template v-if="selectedHeroIds[idx - 1]">
+            <template v-if="selectedHeroIds[idx - 1]!">
               <div class="hero-hover-trigger flex items-center justify-center gap-1.5 w-full min-w-0 px-1">
                 <span
                   class="relative size-6 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
-                  :class="getMemberStarGlow(selectedHeroIds[idx - 1])"
+                  :class="getMemberStarGlow(selectedHeroIds[idx - 1]!)"
                 >
                   <img
-                    v-if="getMemberAvatarUrl(selectedHeroIds[idx - 1])"
-                    :src="getMemberAvatarUrl(selectedHeroIds[idx - 1])"
-                    :alt="getMemberName(selectedHeroIds[idx - 1])"
+                    v-if="getMemberAvatarUrl(selectedHeroIds[idx - 1]!)"
+                    :src="getMemberAvatarUrl(selectedHeroIds[idx - 1]!)"
+                    :alt="getMemberName(selectedHeroIds[idx - 1]!)"
                     class="size-full object-cover"
                     loading="lazy"
                   />
                   <span v-else class="text-[9px] font-bold">
-                    {{ isTitanId(selectedHeroIds[idx - 1]) ? '⚡' : '👤' }}
+                    {{ isTitanId(selectedHeroIds[idx - 1]!) ? '⚡' : '👤' }}
                   </span>
                 </span>
                 <span class="truncate text-[11px] font-bold">
-                  {{ getMemberName(selectedHeroIds[idx - 1]) }}
+                  {{ getMemberName(selectedHeroIds[idx - 1]!) }}
                 </span>
                 <TitanHoverCard
-                  v-if="isTitanId(selectedHeroIds[idx - 1])"
-                  :titan-id="selectedHeroIds[idx - 1]"
-                  :titan="getMemberSnapshot(selectedHeroIds[idx - 1])"
+                  v-if="isTitanId(selectedHeroIds[idx - 1]!)"
+                  :titan-id="selectedHeroIds[idx - 1]!"
+                  :titan="getMemberSnapshot(selectedHeroIds[idx - 1]!)"
                   :inventory="cache.inventoryGet?.data"
                 />
                 <HeroHoverCard
                   v-else
-                  :hero-id="selectedHeroIds[idx - 1]"
-                  :hero="getMemberSnapshot(selectedHeroIds[idx - 1])"
+                  :hero-id="selectedHeroIds[idx - 1]!"
+                  :hero="getMemberSnapshot(selectedHeroIds[idx - 1]!)"
                   :inventory="cache.inventoryGet?.data"
                 />
               </div>
               <button
                 type="button"
                 class="cursor-pointer text-[10px] text-red-500 hover:text-red-700 mt-0.5"
-                @click="toggleHero(selectedHeroIds[idx - 1])"
+                @click="toggleHero(selectedHeroIds[idx - 1]!)"
               >
                 Remove
               </button>

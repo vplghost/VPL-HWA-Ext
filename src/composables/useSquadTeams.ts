@@ -1,4 +1,5 @@
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { selectSquadStorage } from '../utils/squadStorage';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata, starGlowClass } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
@@ -34,6 +35,8 @@ export function useSquadTeams(
 
   const customTeams = ref<Array<{ id: string; name: string; heroIds: number[]; maxTroops?: number }>>([]);
   const selectedTeamId = ref<string>('');
+  const capacitySettings = ref<any>();
+  let loadRevision = 0;
   const isRefreshingTroops = ref<boolean>(false);
 
   const accountId = computed(() => cache.value.accountStatus?.data?.id);
@@ -68,24 +71,37 @@ export function useSquadTeams(
   });
 
   async function loadSquadData() {
+    const revision = ++loadRevision;
+    const currentAccount = accountId.value;
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       try {
-        const stored = await chrome.storage.local.get(['customTeams', preferenceStorageKey]);
-        const accounts = stored.customTeams || {};
-        if (accountId.value) {
-          customTeams.value = normalizeArray(accounts[String(accountId.value)]);
-        } else {
-          const firstKey = Object.keys(accounts)[0];
-          customTeams.value = firstKey ? normalizeArray(accounts[firstKey]) : [];
-        }
-
-        const prefs = stored[preferenceStorageKey];
-        if (prefs && prefs[teamFieldKey]) {
-          selectedTeamId.value = String(prefs[teamFieldKey]);
-        }
+        const stored = await chrome.storage.local.get(['customTeams', preferenceStorageKey, 'troopCapacitySettings']);
+        if (revision !== loadRevision || currentAccount !== accountId.value) return;
+        const selection = selectSquadStorage(stored, currentAccount, preferenceStorageKey, teamFieldKey);
+        customTeams.value = selection.teams;
+        selectedTeamId.value = selection.selected;
+        capacitySettings.value = stored.troopCapacitySettings;
       } catch (_) {}
     }
   }
+
+  watch(accountId, () => {
+    customTeams.value = [];
+    selectedTeamId.value = '';
+    void loadSquadData();
+  });
+  function onSquadStorageChanged(changes: Record<string, chrome.storage.StorageChange>, area: string) {
+    if (area === 'local' && ['customTeams', preferenceStorageKey, 'troopCapacitySettings'].some((key) => key in changes)) {
+      void loadSquadData();
+    }
+  }
+  onMounted(() => {
+    if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.addListener(onSquadStorageChanged);
+  });
+  onUnmounted(() => {
+    ++loadRevision;
+    if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.removeListener(onSquadStorageChanged);
+  });
 
   // Available hero IDs not committed in active non-returned marches
   const availableHeroIds = computed<number[]>(() => {
@@ -182,7 +198,7 @@ export function useSquadTeams(
       team.heroIds,
       heroesData.value,
       cache.value.troopCapacityEvidence?.data,
-      undefined,
+      capacitySettings.value,
       accountId.value
     );
     return getTeamTroopCapacity(model?.total ?? 0, team.maxTroops);
@@ -255,8 +271,13 @@ export function useSquadTeams(
     selectedTeamId.value = newTeamId;
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       try {
+        const currentAccount = accountId.value;
+        if (currentAccount == null) return;
         const stored = await chrome.storage.local.get(preferenceStorageKey);
-        const prefs = stored[preferenceStorageKey] || {};
+        if (currentAccount !== accountId.value) return;
+        const saved = stored[preferenceStorageKey] as Record<string, any> | undefined;
+        const prefs = String(saved?.accountId) === String(currentAccount) ? { ...saved } : {};
+        prefs.accountId = currentAccount;
         prefs[teamFieldKey] = newTeamId;
         await chrome.storage.local.set({ [preferenceStorageKey]: prefs });
       } catch (_) {}

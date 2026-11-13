@@ -485,7 +485,7 @@ function handleImgError(e: Event) {
                 :key="'obs-def-' + stepIdx"
                 class="rounded border border-amber-200 bg-white px-2 py-0.5 text-[10px] dark:border-amber-800/60 dark:bg-slate-800"
               >
-                Step {{ stepIdx + 1 }}: {{ getHeroName(choices.find((id: any) => Number.isInteger(id)) || 0) }}
+                Step {{ Number(stepIdx) + 1 }}: {{ getHeroName(choices.find((id: any) => Number.isInteger(id)) || 0) }}
               </span>
             </div>
           </div>
@@ -548,7 +548,7 @@ function handleImgError(e: Event) {
                 :key="'slot-' + i"
                 class="flex flex-col items-center justify-between p-2.5 rounded-xl border transition-all text-center min-h-[120px]"
                 :class="
-                  currentLineupHeroes[i - 1]
+                  (currentLineupHeroes[i - 1] ?? 0)
                     ? 'border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/80 shadow-2xs'
                     : 'border-dashed border-slate-200 bg-slate-50/30 text-slate-400 dark:border-slate-700/60 dark:bg-slate-800/20'
                 "
@@ -557,37 +557,37 @@ function handleImgError(e: Event) {
                   <span class="text-[10px] px-1.5 py-0.2 rounded font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                     Hero {{ i }}
                   </span>
-                  <span v-if="currentLineupHeroes[i - 1]" class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                  <span v-if="(currentLineupHeroes[i - 1] ?? 0)" class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
                     ✓ Locked
                   </span>
                 </div>
 
-                <template v-if="currentLineupHeroes[i - 1]">
+                <template v-if="(currentLineupHeroes[i - 1] ?? 0)">
                   <div
                     class="relative size-12 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 my-1 shrink-0"
-                    :class="getStarGlow(getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', currentLineupHeroes[i - 1]))"
+                    :class="getStarGlow(getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', (currentLineupHeroes[i - 1] ?? 0)))"
                   >
                     <img
-                      v-if="getHeroAvatar(currentLineupHeroes[i - 1])"
-                      :src="getHeroAvatar(currentLineupHeroes[i - 1])!"
-                      :alt="getHeroName(currentLineupHeroes[i - 1])"
+                      v-if="getHeroAvatar((currentLineupHeroes[i - 1] ?? 0))"
+                      :src="getHeroAvatar((currentLineupHeroes[i - 1] ?? 0))!"
+                      :alt="getHeroName((currentLineupHeroes[i - 1] ?? 0))"
                       class="size-full object-cover"
                       @error="handleImgError"
                     />
                     <div v-else class="size-full flex items-center justify-center text-xs font-bold text-slate-500">
-                      {{ getHeroName(currentLineupHeroes[i - 1]).charAt(0) }}
+                      {{ getHeroName((currentLineupHeroes[i - 1] ?? 0)).charAt(0) }}
                     </div>
                   </div>
 
                   <div class="space-y-0.5">
                     <div class="font-bold text-xs text-slate-800 dark:text-slate-200 truncate max-w-[100px]">
-                      {{ getHeroName(currentLineupHeroes[i - 1]) }}
+                      {{ getHeroName((currentLineupHeroes[i - 1] ?? 0)) }}
                     </div>
                     <div
-                      v-if="getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', currentLineupHeroes[i - 1])"
+                      v-if="getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', (currentLineupHeroes[i - 1] ?? 0))"
                       class="text-[10px] font-bold text-amber-600 dark:text-amber-400"
                     >
-                      ★{{ getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', currentLineupHeroes[i - 1]) }}
+                      ★{{ getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', (currentLineupHeroes[i - 1] ?? 0)) }}
                     </div>
                   </div>
                 </template>

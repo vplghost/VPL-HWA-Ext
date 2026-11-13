@@ -259,9 +259,9 @@ async function refreshEvents() {
   isRefreshing.value = true;
   try {
     await dispatchRpc([
-      { name: 'clanVersus_getInfo' },
+      { name: 'getInfo', feature: 'clanVersus', args: {} },
       { name: 'dungeonGetInfo' },
-      { name: 'quest_getAll' },
+      { name: 'questGetAll' },
     ]);
   } finally {
     isRefreshing.value = false;

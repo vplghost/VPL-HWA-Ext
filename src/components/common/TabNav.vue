@@ -30,7 +30,7 @@ const emit = defineEmits<{
 const { cache } = useRpcCache();
 const tabConfig = ref<TabConfigItem[]>(DEFAULT_TABS.map((t) => ({ id: t.id, visible: true })));
 
-function normalizeConfig(stored: any[]): TabConfigItem[] {
+function normalizeConfig(stored: unknown): TabConfigItem[] {
   if (!Array.isArray(stored) || stored.length === 0) {
     return DEFAULT_TABS.map((t) => ({ id: t.id, visible: true }));
   }
@@ -52,7 +52,7 @@ function normalizeConfig(stored: any[]): TabConfigItem[] {
   }
 
   if (!result.some((t) => t.visible)) {
-    result[0].visible = true;
+    if (result[0]) result[0].visible = true;
   }
   return result;
 }

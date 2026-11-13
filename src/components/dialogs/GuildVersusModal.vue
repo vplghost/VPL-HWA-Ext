@@ -368,16 +368,16 @@ onUnmounted(() => {
             <!-- Target progress banner -->
             <div class="rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
               <div class="flex justify-between font-medium text-slate-700 dark:text-slate-300">
-                <span>Target: <strong class="text-amber-800 dark:text-amber-300">Chest {{ targetChestNum }}</strong> ({{ (thresholds[targetChestNum] || 0).toLocaleString() }} pts)</span>
+                <span>Target: <strong class="text-amber-800 dark:text-amber-300">Chest {{ targetChestNum }}</strong> ({{ ((thresholds[targetChestNum] ?? Infinity) || 0).toLocaleString() }} pts)</span>
                 <span class="font-bold text-slate-900 dark:text-slate-100">
-                  {{ Math.min(100, Math.round((personalRoundPoints / (thresholds[targetChestNum] || 1)) * 100)) }}%
-                  ({{ personalRoundPoints.toLocaleString() }} / {{ (thresholds[targetChestNum] || 0).toLocaleString() }})
+                  {{ Math.min(100, Math.round((personalRoundPoints / ((thresholds[targetChestNum] ?? Infinity) || 1)) * 100)) }}%
+                  ({{ personalRoundPoints.toLocaleString() }} / {{ ((thresholds[targetChestNum] ?? Infinity) || 0).toLocaleString() }})
                 </span>
               </div>
               <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
                 <div
                   class="bg-amber-500 h-2 rounded-full transition-all duration-300"
-                  :style="{ width: `${Math.min(100, Math.round((personalRoundPoints / (thresholds[targetChestNum] || 1)) * 100))}%` }"
+                  :style="{ width: `${Math.min(100, Math.round((personalRoundPoints / ((thresholds[targetChestNum] ?? Infinity) || 1)) * 100))}%` }"
                 ></div>
               </div>
             </div>
@@ -394,18 +394,18 @@ onUnmounted(() => {
                     ? 'bg-slate-900 text-white border-slate-900 shadow-xs dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100' + (c === targetChestNum ? ' ring-2 ring-amber-400' : '')
                     : claimedChests.includes(c)
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
-                    : personalRoundPoints >= thresholds[c]
+                    : personalRoundPoints >= (thresholds[c] ?? Infinity)
                     ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
                     : c === targetChestNum
                     ? 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-2 ring-amber-400 font-bold hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800/60'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 dark:bg-slate-800/70 dark:text-slate-300 dark:border-slate-700'
                 "
-                :title="`Chest ${c} (${(thresholds[c] || 0).toLocaleString()} pts)${c === targetChestNum ? ' - Target' : ''}`"
+                :title="`Chest ${c} (${((thresholds[c] ?? Infinity) || 0).toLocaleString()} pts)${c === targetChestNum ? ' - Target' : ''}`"
                 @click="activeChestNum = c"
               >
                 <span class="font-mono">№ {{ c }}</span>
                 <span class="text-[10px]">
-                  {{ claimedChests.includes(c) ? '✓' : personalRoundPoints >= thresholds[c] ? '★' : c === targetChestNum ? '🎯' : '🔒' }}
+                  {{ claimedChests.includes(c) ? '✓' : personalRoundPoints >= (thresholds[c] ?? Infinity) ? '★' : c === targetChestNum ? '🎯' : '🔒' }}
                 </span>
               </button>
             </div>
@@ -421,7 +421,7 @@ onUnmounted(() => {
                 :class="
                   claimedChests.includes(activeChestNum)
                     ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-100/50 shadow-sm dark:border-emerald-600/60 dark:from-emerald-950/40 dark:via-slate-800/90 dark:to-emerald-950/30'
-                    : personalRoundPoints >= thresholds[activeChestNum]
+                    : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity)
                     ? 'border-amber-400 bg-gradient-to-br from-amber-50/80 via-white to-amber-100/60 shadow-md dark:border-amber-500/70 dark:from-amber-950/40 dark:via-slate-800/90 dark:to-amber-950/30'
                     : activeChestNum === targetChestNum
                     ? 'border-indigo-400 bg-gradient-to-br from-indigo-50/60 via-white to-amber-50/40 shadow-md ring-2 ring-indigo-200 dark:border-indigo-500/70 dark:ring-indigo-900/50 dark:from-indigo-950/40 dark:via-slate-800/90 dark:to-slate-800'
@@ -444,14 +444,14 @@ onUnmounted(() => {
                     :class="
                       claimedChests.includes(activeChestNum)
                         ? 'bg-emerald-600 text-white'
-                        : personalRoundPoints >= thresholds[activeChestNum]
+                        : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity)
                         ? 'bg-amber-500 text-white animate-pulse'
                         : activeChestNum === targetChestNum
                         ? 'bg-indigo-600 text-white'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                     "
                   >
-                    {{ claimedChests.includes(activeChestNum) ? '✓ Claimed' : personalRoundPoints >= thresholds[activeChestNum] ? '★ Ready to Claim' : activeChestNum === targetChestNum ? '🎯 Target Chest' : '🔒 Locked' }}
+                    {{ claimedChests.includes(activeChestNum) ? '✓ Claimed' : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity) ? '★ Ready to Claim' : activeChestNum === targetChestNum ? '🎯 Target Chest' : '🔒 Locked' }}
                   </span>
                 </div>
 
@@ -463,14 +463,14 @@ onUnmounted(() => {
                     :class="
                       claimedChests.includes(activeChestNum)
                         ? 'text-emerald-700 dark:text-emerald-400'
-                        : personalRoundPoints >= thresholds[activeChestNum]
+                        : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity)
                         ? 'text-amber-800 dark:text-amber-400'
                         : activeChestNum === targetChestNum
                         ? 'text-indigo-900 dark:text-indigo-300'
                         : 'text-slate-700 dark:text-slate-300'
                     "
                   >
-                    {{ (thresholds[activeChestNum] || 0).toLocaleString() }} pts
+                    {{ ((thresholds[activeChestNum] ?? Infinity) || 0).toLocaleString() }} pts
                   </span>
                 </div>
 
@@ -480,17 +480,17 @@ onUnmounted(() => {
                     <span>Progress</span>
                     <span
                       class="tabular-nums font-bold"
-                      :class="claimedChests.includes(activeChestNum) || personalRoundPoints >= thresholds[activeChestNum] ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'"
+                      :class="claimedChests.includes(activeChestNum) || personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity) ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'"
                     >
-                      {{ Math.min(100, Math.round((personalRoundPoints / (thresholds[activeChestNum] || 1)) * 100)) }}%
-                      ({{ personalRoundPoints.toLocaleString() }} / {{ (thresholds[activeChestNum] || 0).toLocaleString() }})
+                      {{ Math.min(100, Math.round((personalRoundPoints / ((thresholds[activeChestNum] ?? Infinity) || 1)) * 100)) }}%
+                      ({{ personalRoundPoints.toLocaleString() }} / {{ ((thresholds[activeChestNum] ?? Infinity) || 0).toLocaleString() }})
                     </span>
                   </div>
                   <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
                     <div
                       class="h-1.5 rounded-full transition-all duration-300"
-                      :class="claimedChests.includes(activeChestNum) ? 'bg-emerald-500' : personalRoundPoints >= thresholds[activeChestNum] ? 'bg-amber-500' : 'bg-indigo-500'"
-                      :style="{ width: `${Math.min(100, Math.round((personalRoundPoints / (thresholds[activeChestNum] || 1)) * 100))}%` }"
+                      :class="claimedChests.includes(activeChestNum) ? 'bg-emerald-500' : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity) ? 'bg-amber-500' : 'bg-indigo-500'"
+                      :style="{ width: `${Math.min(100, Math.round((personalRoundPoints / ((thresholds[activeChestNum] ?? Infinity) || 1)) * 100))}%` }"
                     ></div>
                   </div>
                 </div>
@@ -546,7 +546,7 @@ onUnmounted(() => {
                 :class="
                   claimedChests.includes(c)
                     ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
-                    : personalRoundPoints >= thresholds[c]
+                    : personalRoundPoints >= (thresholds[c] ?? Infinity)
                     ? 'border-amber-300 bg-amber-50/60 dark:border-amber-700/50 dark:bg-amber-950/30'
                     : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800/60'
                 "
@@ -559,16 +559,16 @@ onUnmounted(() => {
                       :class="
                         claimedChests.includes(c)
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
-                          : personalRoundPoints >= thresholds[c]
+                          : personalRoundPoints >= (thresholds[c] ?? Infinity)
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
                           : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
                       "
                     >
-                      {{ claimedChests.includes(c) ? 'Claimed' : personalRoundPoints >= thresholds[c] ? 'Ready' : 'Locked' }}
+                      {{ claimedChests.includes(c) ? 'Claimed' : personalRoundPoints >= (thresholds[c] ?? Infinity) ? 'Ready' : 'Locked' }}
                     </span>
                   </div>
                   <div class="text-[10px] text-slate-400 font-mono mb-2">
-                    {{ (thresholds[c] || 0).toLocaleString() }} pts
+                    {{ ((thresholds[c] ?? Infinity) || 0).toLocaleString() }} pts
                   </div>
 
                   <!-- Reward snippet -->

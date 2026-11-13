@@ -65,7 +65,9 @@ export function estimateHeroTroopCapacity(power?: number | null): number | null 
   return Math.max(1, troop - 2);
 }
 
-export function heroCapacity(id: number | string, hero: any, saved?: any, fallback = 600): number {
+export function heroCapacity(id: number | string, hero: any, saved: any, fallback: null): number | null;
+export function heroCapacity(id: number | string, hero: any, saved?: any, fallback?: number): number;
+export function heroCapacity(id: number | string, hero: any, saved?: any, fallback: number | null = 600): number | null {
   if (Number.isSafeInteger(hero?.troopCapacity) && hero.troopCapacity > 0) return hero.troopCapacity;
   if (saved?.signature === capacitySignature(hero) && Number.isSafeInteger(saved.count) && saved.count > 0) {
     return saved.count;
@@ -143,15 +145,20 @@ export function capacityModel(
 
   let pivot = 0;
   for (let column = 0; column < unknown.length && pivot < matrix.length; column++) {
-    const found = matrix.findIndex((row, idx) => idx >= pivot && Math.abs(row[column]) > 1e-7);
-    if (found < 0) continue;
-    [matrix[pivot], matrix[found]] = [matrix[found], matrix[pivot]];
-    const factor = matrix[pivot][column];
-    matrix[pivot] = matrix[pivot].map((val) => val / factor);
+    const found = matrix.findIndex((row, idx) => idx >= pivot && Math.abs(row[column] ?? 0) > 1e-7);
+    const pivotRow = matrix[pivot];
+    const foundRow = matrix[found];
+    if (found < 0 || !pivotRow || !foundRow) continue;
+    matrix[found] = pivotRow;
+    const factor = foundRow[column];
+    if (factor == null || factor === 0) continue;
+    const normalized = foundRow.map((val) => val / factor);
+    matrix[pivot] = normalized;
     for (let idx = 0; idx < matrix.length; idx++) {
-      if (idx !== pivot) {
-        const scale = matrix[idx][column];
-        matrix[idx] = matrix[idx].map((val, col) => val - scale * matrix[pivot][col]);
+      const row = matrix[idx];
+      if (idx !== pivot && row) {
+        const scale = row[column] ?? 0;
+        matrix[idx] = row.map((val, col) => val - scale * (normalized[col] ?? 0));
       }
     }
     pivot++;
@@ -172,7 +179,9 @@ export function capacityModel(
         (row.at(-1) as number) >= settings.defaultHero &&
         (row.at(-1) as number) <= 1000000
       ) {
-        inferred[unknown[columns[0]]] = Math.floor((row.at(-1) as number) + 1e-7);
+        const column = columns[0];
+        const heroId = column == null ? undefined : unknown[column];
+        if (heroId != null) inferred[heroId] = Math.floor((row.at(-1) as number) + 1e-7);
       }
     }
   }
@@ -209,7 +218,7 @@ export function unitInfo(id: number): UnitInfo | null {
   const type = Math.floor(id / 10);
   const labels = ['Marksmen', 'Spearmen', 'Infantry'];
   return Number.isInteger(id) && level >= 1 && level <= 9 && type >= 0 && type <= 2
-    ? { type, level, label: labels[type] }
+    ? { type, level, label: labels[type] ?? 'Unknown' }
     : null;
 }
 
@@ -234,19 +243,19 @@ export function allocateTroops(summary: any, capacity: number): Array<{ unitId: 
   while (left > 0) {
     const open = quotas
       .map((count, type) => ({ count, type }))
-      .filter(({ count, type }) => count < totals[type]);
+      .filter(({ count, type }) => count < (totals[type] ?? 0));
     if (!open.length) break;
     const step = Math.max(1, Math.floor(left / open.length));
     for (const { type } of open) {
-      const amount = Math.min(step, totals[type] - quotas[type], left);
-      quotas[type] += amount;
+      const amount = Math.min(step, (totals[type] ?? 0) - (quotas[type] ?? 0), left);
+      quotas[type] = (quotas[type] ?? 0) + amount;
       left -= amount;
     }
   }
 
   const units: Array<{ unitId: number; count: number }> = [];
   for (let type = 0; type < 3; type++) {
-    let remaining = quotas[type];
+    let remaining = quotas[type] ?? 0;
     for (let tier = 9; tier >= 1 && remaining > 0; tier--) {
       const unitId = type * 10 + tier;
       const count = Math.min(remaining, stocks.get(unitId) || 0);
@@ -358,7 +367,7 @@ export function teamOptions(
   customTeams: any[] = [],
   availableIds?: number[]
 ) {
-  const options = asArray(customTeams)
+  const options: Array<{ id: string; label: string; heroIds: number[]; maxTroops?: number }> = asArray(customTeams)
     .map((team) => normalizeCustomTeam(team, heroes))
     .filter(Boolean)
     .map((team: any) => ({

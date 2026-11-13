@@ -19,7 +19,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { cache } = useRpcCache();
+const { cache, dispatchRpc } = useRpcCache();
 
 const {
   selectedTeamId,
@@ -142,7 +142,7 @@ onMounted(async () => {
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get(['raidPreferences', 'raidQueue', 'popupRpcEnabled', 'socketRefreshMode']);
+      const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; raidPreferences?: {bossLevel?: number; waitSeconds?: number; minMembers?: number; autoCancel?: boolean; rallyTeam?: string; targetMobId?: string}; raidQueue?: {phase: string; [key: string]: unknown} }>(['raidPreferences', 'raidQueue', 'popupRpcEnabled', 'socketRefreshMode']);
       if (stored.raidPreferences) {
         if (stored.raidPreferences.bossLevel) bossLevel.value = stored.raidPreferences.bossLevel;
         if (stored.raidPreferences.waitSeconds) waitSeconds.value = stored.raidPreferences.waitSeconds;
@@ -150,9 +150,6 @@ onMounted(async () => {
         if (stored.raidPreferences.autoCancel !== undefined) autoCancel.value = stored.raidPreferences.autoCancel;
         if (stored.raidPreferences.rallyTeam) selectedTeamId.value = stored.raidPreferences.rallyTeam;
         if (stored.raidPreferences.targetMobId) selectedMobId.value = stored.raidPreferences.targetMobId;
-      }
-      if (stored.popupRpcEnabled !== true) {
-        await chrome.storage.local.set({ popupRpcEnabled: true });
       }
       if (stored.raidQueue) {
         raidQueueState.value = stored.raidQueue;
@@ -163,9 +160,9 @@ onMounted(async () => {
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.raidQueue) {
-        const q = changes.raidQueue.newValue;
+        const q = changes.raidQueue.newValue as { phase?: string } | undefined;
         raidQueueState.value = q;
-        isRunning.value = q ? !['stopped', 'complete'].includes(q.phase) : false;
+        isRunning.value = q ? !['stopped', 'complete'].includes(q.phase || 'stopped') : false;
         queueStatusText.value = q?.phase || 'Idle';
       }
     });
@@ -202,7 +199,7 @@ onUnmounted(() => {
 
 async function ensureRpcEnabled() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    const stored = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode']);
+    const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; raidPreferences?: {bossLevel?: number; waitSeconds?: number; minMembers?: number; autoCancel?: boolean; rallyTeam?: string; targetMobId?: string}; raidQueue?: {phase: string; [key: string]: unknown} }>(['popupRpcEnabled', 'socketRefreshMode']);
     const updates: Record<string, any> = {};
     if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
     if (!stored.socketRefreshMode) updates.socketRefreshMode = 'piggyback';
@@ -235,7 +232,7 @@ async function refreshMapCoordinates() {
   statusMessage.value = 'Locating coordinates from game...';
   try {
     await dispatchRpc([
-      { name: 'getMarches' },
+      { name: 'getMarches', feature: 'march' },
       { name: 'clan_getSummary' },
       { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
     ]);
@@ -640,7 +637,7 @@ async function stopRaidQueue() {
                   :value="target.mobId"
                   class="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                 >
-                  Boss {{ idx + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
+                  Boss {{ Number(idx) + 1 }} · ({{ target.coordinates?.x ?? '?' }}, {{ target.coordinates?.y ?? '?' }})
                 </option>
               </select>
             </div>

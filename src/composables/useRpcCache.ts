@@ -1,30 +1,33 @@
-import { ref, onMounted, readonly } from 'vue';
+import { ref, onMounted, readonly, toRaw } from 'vue';
 import type { RpcCache } from '@/src/types';
 
 const cache = ref<RpcCache>({});
 const recordingState = ref<any>({ active: false });
-const rpcQueueCount = ref<number>(0);
+const rpcQueueCount = ref(0);
 const isInitialized = ref(false);
 let listenerAttached = false;
+let initialLoad: Promise<void> | null = null;
+const revisions = new Map<string, number>();
+
+function countQueued(raw: unknown = {}) {
+  const counts = raw && typeof raw === 'object' ? raw : {};
+  return Object.values(counts).reduce<number>((sum, count) => sum + (Number(count) || 0), 0);
+}
 
 function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) {
+  for (const key of Object.keys(changes)) {
+    const id = areaName + ':' + key;
+    revisions.set(id, (revisions.get(id) || 0) + 1);
+  }
   if (areaName === 'local') {
-    if (changes.rpcCache?.newValue) {
-      cache.value = changes.rpcCache.newValue;
-    }
-    if (changes.recordingState?.newValue) {
-      recordingState.value = changes.recordingState.newValue;
-    } else if ('gameRecordingActive' in changes) {
-      recordingState.value = { ...recordingState.value, active: changes.gameRecordingActive.newValue === true };
+    if ('rpcCache' in changes) cache.value = changes.rpcCache?.newValue || {};
+    if ('recordingState' in changes) recordingState.value = changes.recordingState?.newValue || { active: false };
+    else if ('gameRecordingActive' in changes) {
+      recordingState.value = { ...recordingState.value, active: changes.gameRecordingActive?.newValue === true };
     }
   } else if (areaName === 'session') {
-    if (changes.recordingState?.newValue) {
-      recordingState.value = changes.recordingState.newValue;
-    }
-    if (changes.rpcQueueCounts?.newValue) {
-      const counts = changes.rpcQueueCounts.newValue || {};
-      rpcQueueCount.value = Object.values(counts).reduce((sum: number, c: any) => sum + (Number(c) || 0), 0);
-    }
+    if ('recordingState' in changes) recordingState.value = changes.recordingState?.newValue || { active: false };
+    if ('rpcQueueCounts' in changes) rpcQueueCount.value = countQueued(changes.rpcQueueCounts?.newValue);
   }
 }
 
@@ -36,63 +39,70 @@ function ensureStorageListener() {
   }
 }
 
-export function useRpcCache() {
-  async function loadInitial() {
-    if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+function loadInitial(): Promise<void> {
+  if (initialLoad) return initialLoad;
+  if (typeof chrome === 'undefined' || !chrome.storage?.local) return Promise.resolve();
+  ensureStorageListener();
+  const started = new Map(revisions);
+  const unchanged = (area: string, key: string) =>
+    (revisions.get(area + ':' + key) || 0) === (started.get(area + ':' + key) || 0);
+  initialLoad = (async () => {
     try {
       const stored = await chrome.storage.local.get(['rpcCache', 'recordingState', 'gameRecordingActive']);
-      if (stored.rpcCache) {
-        cache.value = stored.rpcCache;
+      if (unchanged('local', 'rpcCache')) cache.value = stored.rpcCache || {};
+      if (unchanged('local', 'recordingState') && unchanged('local', 'gameRecordingActive') &&
+          unchanged('session', 'recordingState')) {
+        recordingState.value = stored.recordingState || { active: stored.gameRecordingActive === true };
       }
-      if (stored.recordingState) {
-        recordingState.value = stored.recordingState;
-      } else if (stored.gameRecordingActive !== undefined) {
-        recordingState.value = { active: stored.gameRecordingActive === true };
-      }
-    } catch (e) {
-      console.warn('Failed to load storage in useRpcCache:', e);
+    } catch (error) {
+      console.warn('Failed to load storage in useRpcCache:', error);
     }
-
     try {
       if (chrome.storage?.session?.get) {
         const sessionData = await chrome.storage.session.get(['rpcQueueCounts', 'recordingState']);
-        if (sessionData.recordingState) {
+        if (sessionData.recordingState && unchanged('session', 'recordingState') &&
+            unchanged('local', 'recordingState') && unchanged('local', 'gameRecordingActive')) {
           recordingState.value = sessionData.recordingState;
         }
-        const counts = sessionData.rpcQueueCounts || {};
-        rpcQueueCount.value = Object.values(counts).reduce((sum: number, c: any) => sum + (Number(c) || 0), 0);
+        if (unchanged('session', 'rpcQueueCounts')) rpcQueueCount.value = countQueued(sessionData.rpcQueueCounts);
       }
-    } catch (_) {}
-
-    isInitialized.value = true;
-  }
-
-  onMounted(() => {
-    if (!isInitialized.value) {
-      loadInitial();
+    } catch (error) {
+      console.warn('Failed to load session storage in useRpcCache:', error);
     }
+    isInitialized.value = true;
+  })().finally(() => { initialLoad = null; });
+  return initialLoad;
+}
+
+export function useRpcCache() {
+  onMounted(() => {
     ensureStorageListener();
+    if (!isInitialized.value) void loadInitial();
   });
 
   async function updateCacheLocally(updater: (draft: RpcCache) => void) {
-    const next = { ...cache.value };
+    // The background reducer owns persisted RPC state. Optimistic UI changes
+    // must never replace its entire cache with a potentially stale snapshot.
+    const next = structuredClone(toRaw(cache.value));
     updater(next);
     cache.value = next;
-    if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
-      try {
-        await chrome.storage.local.set({ rpcCache: next });
-      } catch (e) {
-        console.warn('Failed to update local rpcCache:', e);
-      }
-    }
   }
 
   async function dispatchRpc(calls: Array<{ name: string; args?: any; feature?: string }>) {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      return new Promise<any>((resolve) => {
-        chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (res) => resolve(res));
-      });
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+      return { ok: false, error: 'Extension runtime is unavailable.' };
     }
+    return new Promise<any>((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+          const error = chrome.runtime.lastError;
+          resolve(error ? { ok: false, error: error.message || 'RPC transport failed.' } :
+            response || { ok: false, error: 'No response from extension background.' });
+        });
+      } catch (error) {
+        resolve({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    });
   }
 
   return {
@@ -105,4 +115,3 @@ export function useRpcCache() {
     reload: loadInitial,
   };
 }
-

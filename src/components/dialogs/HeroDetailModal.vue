@@ -188,7 +188,7 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
 
 function getSkillDisplayLevel(s: SkillSlotConfig): number {
   const skillKey = skillKeys.value[s.slot - 1];
-  const rawLvl = Number(activeHero.value?.skills?.[skillKey] ?? activeHero.value?.skills?.[s.slot] ?? 1);
+  const rawLvl = Number((skillKey == null ? undefined : activeHero.value?.skills?.[skillKey]) ?? activeHero.value?.skills?.[s.slot] ?? 1);
   return Math.max(1, rawLvl - s.delta);
 }
 
@@ -228,20 +228,15 @@ async function upgradeSkill(s: SkillSlotConfig) {
   if (skillPoints.value <= 0) return;
   upgradingSkills.value[s.slot] = true;
 
-  // Optimistic update
-  const skillKey = skillKeys.value[s.slot - 1];
-  if (activeHero.value.skills && skillKey) {
-    activeHero.value.skills[skillKey] = (Number(activeHero.value.skills[skillKey]) || 0) + 1;
-  } else if (activeHero.value.skills) {
-    activeHero.value.skills[s.slot] = (Number(activeHero.value.skills[s.slot]) || 0) + 1;
-  }
-
+  // Display only server-observed skill levels, including queued/rejected RPCs.
   try {
     await dispatchRpc([
       {
         name: 'heroUpgradeSkill',
         args: { heroId: numId, skill: s.slot },
       },
+      { name: 'heroGetAll' },
+      { name: 'inventoryGet' },
     ]);
   } finally {
     upgradingSkills.value[s.slot] = false;

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { towerActivityState, readyQuestCount } from '@/src/composables/activityState';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 
@@ -20,22 +21,12 @@ const activities = computed<ActivityRow[]>(() => {
   const unknown = 'Waiting for game data';
 
   // Tower
-  const tower = cache.value.towerStatus?.data;
-  const session = cache.value.towerSession?.data;
-  const isTowerCleared = Boolean(
-    tower?.isCleared ||
-    tower?.state === 'win' ||
-    tower?.state === 'completed' ||
-    session?.completed ||
-    (cache.value as any)?.magicTower_briefInfo?.data?.state === 'win' ||
-    (cache.value as any)?.['magicTower_briefInfo']?.state === 'win'
-  );
+  const towerState = towerActivityState(cache.value);
   rows.push({
     id: 'tower',
     title: 'Tower',
     icon: '🗼',
-    state: !tower && !session ? 'unknown' : isTowerCleared ? 'done' : 'pending',
-    detail: !tower && !session ? unknown : isTowerCleared ? 'Cleared today' : tower?.floorNumber ? `Floor ${tower.floorNumber} / 25` : 'Ready to enter',
+    ...towerState,
     isInteractive: true,
   });
 
@@ -83,8 +74,7 @@ const activities = computed<ActivityRow[]>(() => {
   });
 
   // Daily Quests
-  const quests = cache.value.quest_getAll?.data;
-  const pendingQuests = quests ? Object.values(quests).filter((q: any) => q.state === 2).length : 0;
+  const pendingQuests = readyQuestCount(cache.value);
   rows.push({
     id: 'quests',
     title: 'Daily Quests',

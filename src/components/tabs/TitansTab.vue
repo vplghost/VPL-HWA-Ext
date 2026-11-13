@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
+import { useStoredFavorites } from '@/src/composables/useStoredFavorites';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import {
   getTitanMetadata,
@@ -26,27 +27,7 @@ const sortColumn = ref<SortColumn>('power');
 const sortDirection = ref<'asc' | 'desc'>('desc');
 
 // Favorite titans stored as string IDs
-const favoriteTitans = ref<Set<string>>(new Set());
-
-onMounted(async () => {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    try {
-      const stored = await chrome.storage.local.get(['favoriteTitans']);
-      if (Array.isArray(stored.favoriteTitans)) {
-        favoriteTitans.value = new Set(stored.favoriteTitans.map(String));
-      }
-    } catch (_) {}
-
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes.favoriteTitans) {
-        const val = changes.favoriteTitans.newValue;
-        if (Array.isArray(val)) {
-          favoriteTitans.value = new Set(val.map(String));
-        }
-      }
-    });
-  }
-});
+const favoriteTitans = useStoredFavorites('favoriteTitans');
 
 async function toggleFavorite(titanId: number | string) {
   const idStr = String(titanId);

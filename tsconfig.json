@@ -7,8 +7,9 @@
     "strict": true,
     "jsx": "preserve",
     "skipLibCheck": true,
+    "types": ["chrome", "node"],
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": ["./*"],
       "~/*": ["./*"]
     }
   }

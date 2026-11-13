@@ -12,7 +12,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { cache, dispatchRpc } = useRpcCache();
+const { cache, dispatchRpc, updateCacheLocally } = useRpcCache();
 
 const isRefreshing = ref(false);
 
@@ -139,9 +139,6 @@ onUnmounted(() => {
 async function refreshDungeon() {
   isRefreshing.value = true;
   try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls: [{ name: 'dungeonGetInfo', args: {} }] });
-    }
     await dispatchRpc([{ name: 'dungeonGetInfo' }]);
   } finally {
     setTimeout(() => {
@@ -151,15 +148,10 @@ async function refreshDungeon() {
 }
 
 async function resetActiveBattle() {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
-    try {
-      const stored = await chrome.storage.local.get(['rpcCache']);
-      if (stored.rpcCache?.dungeonStatus?.data) {
-        stored.rpcCache.dungeonStatus.data.activeBattle = null;
-        await chrome.storage.local.set({ rpcCache: stored.rpcCache });
-      }
-    } catch (_) {}
-  }
+  // Clear the stale popup view only; the background owns persistent RPC state.
+  await updateCacheLocally((draft) => {
+    if (draft.dungeonStatus?.data) draft.dungeonStatus.data.activeBattle = null;
+  });
   await refreshDungeon();
 }
 

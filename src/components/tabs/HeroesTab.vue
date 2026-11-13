@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
+import { useStoredFavorites } from '@/src/composables/useStoredFavorites';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import {
   getHeroMetadata,
@@ -31,27 +32,7 @@ const selectedHero = ref<any>(null);
 const showHeroModal = ref(false);
 
 // Favorite heroes stored as string IDs
-const favoriteHeroes = ref<Set<string>>(new Set());
-
-onMounted(async () => {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    try {
-      const stored = await chrome.storage.local.get(['favoriteHeroes']);
-      if (Array.isArray(stored.favoriteHeroes)) {
-        favoriteHeroes.value = new Set(stored.favoriteHeroes.map(String));
-      }
-    } catch (_) {}
-
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes.favoriteHeroes) {
-        const val = changes.favoriteHeroes.newValue;
-        if (Array.isArray(val)) {
-          favoriteHeroes.value = new Set(val.map(String));
-        }
-      }
-    });
-  }
-});
+const favoriteHeroes = useStoredFavorites('favoriteHeroes');
 
 async function toggleFavorite(heroId: number | string) {
   const idStr = String(heroId);

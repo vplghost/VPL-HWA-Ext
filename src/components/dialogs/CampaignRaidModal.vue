@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { waitForCampaignRaidResult } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import {
@@ -43,7 +44,7 @@ async function loadDisabledMissions() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
       const stored = await chrome.storage.local.get('campaign_disabled_missions');
-      const val = stored.campaign_disabled_missions;
+      const val = stored.campaign_disabled_missions as { date?: string; missionIds?: unknown[] } | undefined;
       if (val && val.date === getTodayKey() && Array.isArray(val.missionIds)) {
         disabledMissionsToday.value = new Set(val.missionIds.map(Number));
       } else {
@@ -350,26 +351,11 @@ function mergeDropsToInventory(drops: any) {
   });
 }
 
-async function waitForRaidResult(prevUpdatedAt?: string, timeoutMs = 3500): Promise<{ ok: boolean; drops?: any; error?: string }> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const cur = cache.value?.lastCampaignRaidResult;
-    if (cur && cur.updatedAt !== prevUpdatedAt) {
-      if (cur.data?.failed) {
-        return { ok: false, error: cur.data?.error || 'Raid failed' };
-      }
-      return { ok: true, drops: cur.data?.currentDrops || cur.data?.drops };
-    }
-    await new Promise((r) => setTimeout(r, 60));
-  }
-  const cur = cache.value?.lastCampaignRaidResult;
-  if (cur?.data?.failed) {
-    return { ok: false, error: cur.data?.error || 'Raid failed' };
-  }
-  return { ok: true, drops: cur?.data?.currentDrops || cur?.data?.drops };
+async function waitForRaidResult(prevUpdatedAt?: string, timeoutMs = 3500) {
+  return waitForCampaignRaidResult(() => cache.value?.lastCampaignRaidResult, prevUpdatedAt, timeoutMs);
 }
 
-async function executeRaidCall(times: number): Promise<{ ok: boolean; drops?: any; error?: string }> {
+async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: boolean; drops?: any; error?: string }> {
   await ensureRpcEnabled();
 
   const tries = getTriesInfo(missionId.value);
@@ -403,8 +389,8 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; drops?: an
 
     const raidRes = await waitForRaidResult(prevUpdatedAt);
     if (!raidRes.ok) {
-      disableMissionToday(missionId.value);
-      return { ok: false, error: raidRes.error || 'Raid rejected by server' };
+      if (!raidRes.pending) disableMissionToday(missionId.value);
+      return { ok: false, pending: raidRes.pending, error: raidRes.error || 'Raid rejected by server' };
     }
     return { ok: true, drops: raidRes.drops };
   } catch (err: any) {
@@ -488,7 +474,7 @@ async function executeSequentialLoop(totalTimes: number) {
       const res = await executeRaidCall(1);
       if (!res.ok) {
         loopStatusMsg.value = `❌ Raid stopped at ${i}/${totalTimes}: ${res.error}`;
-        disableMissionToday(missionId.value);
+        if (!res.pending) disableMissionToday(missionId.value);
         break;
       }
 
@@ -564,7 +550,7 @@ async function startRaid(times: number) {
           return;
         }
         loopStatusMsg.value = res.error || 'Raid failed';
-        disableMissionToday(missionId.value);
+        if (!res.pending) disableMissionToday(missionId.value);
       }
     } finally {
       isRaidRunning.value = false;

@@ -73,7 +73,7 @@ onMounted(async () => {
       { name: 'clan_getSummary' },
       { name: 'getSummary', feature: 'building' },
       { name: 'getSummary', feature: 'personalResearch' },
-      { name: 'getMarches' },
+      { name: 'getMarches', feature: 'march' },
     ]).catch(() => {});
   }
 
@@ -102,21 +102,21 @@ onMounted(async () => {
         'socketRefreshMode',
         'dispatchMode',
       ]);
-      if (stored.cachedGameVersion) cachedGameVersion.value = stored.cachedGameVersion;
+      if (stored.cachedGameVersion) cachedGameVersion.value = String(stored.cachedGameVersion);
       if (stored.raidQueue) raidQueue.value = stored.raidQueue;
       if (stored.monsterQueue) monsterQueue.value = stored.monsterQueue;
       if (stored.autoGatherSettings) autoGatherSettings.value = stored.autoGatherSettings;
       if (stored.socketRefreshMode) {
-        socketRefreshMode.value = stored.socketRefreshMode;
+        socketRefreshMode.value = String(stored.socketRefreshMode);
       } else if (stored.dispatchMode) {
-        socketRefreshMode.value = stored.dispatchMode;
+        socketRefreshMode.value = String(stored.dispatchMode);
       }
     } catch (_) {}
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local') {
         if (changes.cachedGameVersion) {
-          cachedGameVersion.value = changes.cachedGameVersion.newValue || '';
+          cachedGameVersion.value = String(changes.cachedGameVersion.newValue || '');
         }
         if (changes.raidQueue) {
           raidQueue.value = changes.raidQueue.newValue || null;
@@ -128,9 +128,9 @@ onMounted(async () => {
           autoGatherSettings.value = changes.autoGatherSettings.newValue || null;
         }
         if (changes.socketRefreshMode) {
-          socketRefreshMode.value = changes.socketRefreshMode.newValue || 'direct';
+          socketRefreshMode.value = String(changes.socketRefreshMode.newValue || 'direct');
         } else if (changes.dispatchMode) {
-          socketRefreshMode.value = changes.dispatchMode.newValue || 'direct';
+          socketRefreshMode.value = String(changes.dispatchMode.newValue || 'direct');
         }
       }
     });

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useNow } from '@/src/composables/useNow';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useResourceSelection } from '@/src/composables/useResourceSelection';
 import { downloadJson } from '@/src/utils/metadata';
@@ -14,7 +15,7 @@ import {
 const { cache, dispatchRpc } = useRpcCache();
 const { resourceSelection, togglePin, isPinned } = useResourceSelection();
 
-const now = ref(Date.now());
+const now = useNow();
 const search = ref('');
 const filterPinnedOnly = ref(false);
 const isRefreshing = ref(false);

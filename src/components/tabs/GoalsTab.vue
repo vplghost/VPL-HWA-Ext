@@ -54,8 +54,8 @@ async function refreshGoals() {
   isRefreshing.value = true;
   try {
     await dispatchRpc([
-      { name: 'clanVersus_getInfo' },
-      { name: 'quest_getAll' },
+      { name: 'getInfo', feature: 'clanVersus', args: {} },
+      { name: 'questGetAll' },
       { name: 'inventoryGet' },
     ]);
   } finally {

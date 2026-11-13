@@ -41,6 +41,23 @@
     'skin_getAll', 'rune_getAll', 'arenaGetAll', 'clanWarGetBriefInfo', 'mailGetAll',
     'searchMob', 'searchMine', 'getTrainings', 'getHealing', 'clan_getSummary', 'getSummary',
     'playable_getAvailable', 'worldStars_getAvailable']);
+  // Migrated refreshes are bounded by both method and feature. Do not turn
+  // a method shared by multiple game features into an unrestricted RPC.
+  const migratedReadFeatures = new Map([
+    ['getInfo', 'clanVersus'],
+    ['getDailyQuests', 'quest'],
+    ['getSpecialQuestState', 'quest'],
+    ['magicTower_briefInfo', ''],
+    ['magicTower_getAll', ''],
+    ['dungeonGetInfo', ''],
+    ['chatGetAll', ''],
+  ]);
+  function isPiggybackRead(call) {
+    if (migratedReadFeatures.has(call?.name)) {
+      return (call.feature ?? '') === migratedReadFeatures.get(call.name);
+    }
+    return piggybackMethods.has(call?.name);
+  }
   const helperActionMethods = new Set(['createRally', 'cancelRally', 'joinRally', 'attackMob', 'attackMine', 'stopMineGathering',
     'randomDraft_saveDefence', 'randomDraft_saveAttack',
     'magicTower_enterRoom', 'magicTower_startBattle', 'magicTower_activateBuff',
@@ -239,12 +256,12 @@
       if (Number.isFinite(event.data.expiresAt) && Date.now() >= event.data.expiresAt) return;
       for (const call of event.data.calls) {
         if (!(isClaim ? claimQueueMethods.has(call?.name) :
-            piggybackMethods.has(call?.name) || helperActionMethods.has(call?.name))) continue;
+            isPiggybackRead(call) || helperActionMethods.has(call?.name))) continue;
         const safe = { name: call.name, args: call.args || {},
           ...(call.feature ? { feature: call.feature } : {}) };
         const key = JSON.stringify(safe);
         if (event.data.calls.some((item) => helperActionMethods.has(item?.name) || claimActionMethods.has(item?.name)) &&
-            piggybackMethods.has(call.name)) queuedRpcCalls.delete(key);
+            isPiggybackRead(call)) queuedRpcCalls.delete(key);
         if (!queuedRpcCalls.has(key)) {
           if (queuedRpcCalls.size >= 64) {
             const oldest = [...queuedRpcCalls.keys()].find((item) =>
@@ -1079,7 +1096,7 @@
       const hasActions = [...queuedRpcCalls.values()].some((call) =>
         helperActionMethods.has(call.name) || claimActionMethods.has(call.name));
       for (const [key, call] of queuedRpcCalls) {
-        if (!existing.has(key) || (hasActions && piggybackMethods.has(call.name))) {
+        if (!existing.has(key) || (hasActions && isPiggybackRead(call))) {
           const ident = Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16) +
             Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16);
           appended.push({ ...call, ident });
@@ -1169,7 +1186,7 @@
   function restorePiggyback(appended) {
     if (!captureEnabled || !popupRpcEnabled || rpcDispatchMode === 'direct') return;
     for (const { ident, ...call } of appended || []) {
-      if (!piggybackMethods.has(call.name)) continue;
+      if (!isPiggybackRead(call)) continue;
       const key = JSON.stringify(call);
       if (!queuedRpcCalls.has(key)) queuedRpcCalls.set(key, call);
     }
