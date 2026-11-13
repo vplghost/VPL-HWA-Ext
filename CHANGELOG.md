@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.63 — 2026-11-13
+
+### Fixed
+
+- Preserve day components in server Building duration strings, correcting 102 upgrade estimates including Hall of Heroes 20 → 21 (about 2d 14h instead of 2h 56m).
+- Repair matching legacy estimates in saved building queues and future RPC/timeline calculations while retaining authoritative running durations and in-flight payloads.
+- Display multi-day durations and dated finish estimates in Building and Research dialogs; verify all current Research duration values remain correct.
+
 ## 0.10.62 — 2026-11-13
 
 ### Fixed

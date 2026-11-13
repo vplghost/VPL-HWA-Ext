@@ -104,6 +104,10 @@
     return start + dur;
   }
 
+  function normalizeQueuedItem(item) {
+    return globalThis.hwaHelperBuildingData?.normalizeQueuedDuration?.(item) || item;
+  }
+
   function calculateQueueTimeline(rawQueues = [], queueItems = [], now = Date.now()) {
     const safeQueues = Array.isArray(rawQueues) ? rawQueues : (rawQueues && typeof rawQueues === 'object' ? Object.values(rawQueues) : []);
     const safeItems = Array.isArray(queueItems) ? queueItems : (queueItems && typeof queueItems === 'object' ? Object.values(queueItems) : []);
@@ -114,7 +118,8 @@
 
     const timeline = [];
     let totalDurationMs = 0;
-    for (const item of safeItems) {
+    for (const rawItem of safeItems) {
+      const item = normalizeQueuedItem(rawItem);
       const durationMs = Number(item.durationMs) || 1000;
       const estStart = currentCursor;
       const estFinish = estStart + durationMs;
@@ -166,7 +171,7 @@
 
     const buildingLevels = extractBuildingLevels(cache);
     const skippedItems = [];
-    const safeItems = Array.isArray(queueState?.items) ? [...queueState.items] : [];
+    const safeItems = Array.isArray(queueState?.items) ? queueState.items.map(normalizeQueuedItem) : [];
 
     while (safeItems.length > 0) {
       const top = safeItems[0];
@@ -317,6 +322,7 @@
     getQueueEnd,
     getEligibleCandidates,
     calculateQueueTimeline,
+    normalizeQueuedItem,
     planNextStep,
     addToQueue,
     removeFromQueue,

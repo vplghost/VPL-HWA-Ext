@@ -1,22 +1,24 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-function parseDuration(dStr) {
-  if (!dStr) return 0;
-  const parts = dStr.split(':').map(Number);
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return Number(dStr) || 0;
-}
+import { createHash } from 'node:crypto';
+import { parseRemoteDurationSeconds } from './lib/remote-duration.mjs';
 
 const root = resolve(import.meta.dirname, '..');
-const blData = JSON.parse(await readFile(resolve(root, 'temp/buildingLevel.json'), 'utf8'));
+const bytes = await readFile(resolve(root, 'temp/buildingLevel.json'));
+const index = JSON.parse(await readFile(resolve(root, 'temp/remote-config-captured.json'), 'utf8')).index.configs;
+const sourceUrl = index.buildingLevel.url;
+if (!sourceUrl.endsWith('/' + createHash('md5').update(bytes).digest('hex') + '.json')) {
+  throw Error('buildingLevel source MD5 does not match the captured indexGet');
+}
+const blData = JSON.parse(bytes);
 
 // Compact representation:
 // buildingLevels[buildingId] = {
 //   [level]: { d: durationSec, r: [[reqId, reqLvl], ...], c: { [matId]: amount } }
 // }
 const buildingLevels = {};
+const legacyDurations = {};
 
 for (const item of Object.values(blData)) {
   const bId = item.buildingId;
@@ -40,7 +42,15 @@ for (const item of Object.values(blData)) {
     }
   }
 
-  const durationSec = parseDuration(item.duration);
+  const durationSec = parseRemoteDurationSeconds(item.duration);
+  // Persist only exact historical bad values for safe migration of queued estimates.
+  if (typeof item.duration === 'string' && item.duration.includes('.')) {
+    const [hours, minutes, seconds] = item.duration.split(':').map(Number);
+    const legacy = hours * 3600 + minutes * 60 + seconds;
+    if (legacy !== durationSec) {
+      (legacyDurations[bId] ||= {})[lvl] = legacy;
+    }
+  }
 
   if (!buildingLevels[bId]) buildingLevels[bId] = {};
   buildingLevels[bId][lvl] = {
@@ -50,10 +60,11 @@ for (const item of Object.values(blData)) {
   };
 }
 
-const header = '// Generated from WebGL buildingLevel remote config.\n';
+const header = '// Generated from WebGL buildingLevel remote config.\n// ' + sourceUrl + '\n';
 const helperMethods = `
 (() => {
   const data = ${JSON.stringify(buildingLevels)};
+  const legacyDurations = ${JSON.stringify(legacyDurations)};
 
   function getBuildingLevelData(buildingId, level) {
     return data[buildingId]?.[level] || null;
@@ -96,12 +107,19 @@ const helperMethods = `
     return Math.round(meta.d * 1000 * mult);
   }
 
+  function normalizeQueuedDuration(item) {
+    const legacy = legacyDurations[item?.buildingId]?.[item?.nextLevel];
+    if (legacy == null || Number(item.durationMs) !== Math.round(legacy * 1000 * 0.58)) return item;
+    return { ...item, durationMs: calculateEffectiveDurationMs(item.buildingId, item.nextLevel) };
+  }
+
   globalThis.hwaHelperBuildingData = {
     data,
     getBuildingLevelData,
     getMissingRequirements,
     getMissingCosts,
-    calculateEffectiveDurationMs
+    calculateEffectiveDurationMs,
+    normalizeQueuedDuration
   };
 })();
 `;

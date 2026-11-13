@@ -6,6 +6,28 @@ import ts from 'typescript';
 import { ref, computed } from 'vue';
 import { useCityQueueActions } from '../src/composables/useCityQueueActions.ts';
 
+test('Building dialog candidates and saved queue timeline preserve Hall multi-day duration', async () => {
+  const source = await readFile(new URL('../src/components/dialogs/BuildingModal.vue', import.meta.url), 'utf8');
+  const setup = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
+  const context = { ref, computed, useCityQueueActions,
+    useRpcCache: () => ({ cache: ref({ buildingStatus: { data: { queues: [],
+      buildings: [{ buildingId: 20, level: 20 }, { buildingId: 40, level: 20 }, { buildingId: 182, level: 20 }] } } }),
+      dispatchRpc: async () => ({ ok: false }) }),
+    defineProps: () => ({ modelValue: false }), defineEmits: () => () => {}, onMounted() {}, onUnmounted() {}, watch() {},
+    getBuildingName: id => String(id), normalizeArray: value => Array.isArray(value) ? value : Object.values(value || {}) };
+  for (const name of ['building-data', 'building-queue']) {
+    vm.runInNewContext(await readFile(new URL('../extension/' + name + '.js', import.meta.url), 'utf8'), context);
+  }
+  const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
+  vm.runInNewContext(js + '\nglobalThis.api = { upgradeCandidates, queueTimeline, buildingQueue };', context);
+  const hall = context.api.upgradeCandidates.value.find(item => item.id === 20);
+  assert.equal(hall.nextLevel, 21);
+  assert.equal(hall.durationMs, 223381200);
+  context.api.buildingQueue.value.items = [{ buildingId: 20, nextLevel: 21, durationMs: 10614000 }];
+  assert.equal(context.api.queueTimeline.value.items[0].durationMs, 223381200);
+});
+
 test('both queue helpers preserve millisecond duration and distinguish legacy seconds by start units', async () => {
   const now = Date.parse('2026-11-13T08:33:46Z');
   for (const type of ['building', 'research']) {

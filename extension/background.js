@@ -418,6 +418,12 @@ async function runCityQueue(type, tabId, record) {
     await save();
     await log('repair', 'Recovered a non-array saved queue. Check its targets before continuing.', 'warn');
   }
+  const repairedItems = queue.items.map(item => helper.normalizeQueuedItem?.(item) || item);
+  if (repairedItems.some((item, index) => item !== queue.items[index])) {
+    queue.items = repairedItems;
+    await save();
+    await log('repair', 'Corrected saved building duration estimates that lost their day component.', 'warn');
+  }
   const idKey = type === 'building' ? 'buildingId' : 'researchId';
   const rawQueues = status?.data?.queues;
   const observed = Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {});

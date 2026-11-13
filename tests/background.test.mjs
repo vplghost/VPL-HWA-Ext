@@ -15,6 +15,7 @@ const towerAutomationSource = await readFile(new URL('../extension/tower-automat
 const towerRunnerSource = await readFile(new URL('../extension/tower-runner.js', import.meta.url), 'utf8');
 const dungeonAutomationSource = await readFile(new URL('../extension/dungeon-automation.js', import.meta.url), 'utf8');
 const dungeonRunnerSource = await readFile(new URL('../extension/dungeon-runner.js', import.meta.url), 'utf8');
+const buildingDataSource = await readFile(new URL('../extension/building-data.js', import.meta.url), 'utf8');
 const buildingQueueSource = await readFile(new URL('../extension/building-queue.js', import.meta.url), 'utf8');
 const researchQueueSource = await readFile(new URL('../extension/research-queue.js', import.meta.url), 'utf8');
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
@@ -41,7 +42,7 @@ test('confirmed Brigand victory refreshes authoritative energy only under enable
   }
 });
 
-function setup(quota = Infinity) {
+function setup(quota = Infinity, withBuildingData = false) {
   let listener;
   let installed;
   const local = {};
@@ -91,7 +92,7 @@ function setup(quota = Infinity) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${raidEnergySource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${buildingQueueSource}\n${researchQueueSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${raidEnergySource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${withBuildingData ? buildingDataSource : ''}\n${buildingQueueSource}\n${researchQueueSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
@@ -273,6 +274,28 @@ test('late start acknowledgement does not hide the finish of a short upgrade', a
     t.mock.timers.tick(45000); await sync();
     assert.deepEqual(env.reloadedTabIds, [1]);
     assert.equal(env.local[key].stalledRefresh.completedAt, now + 30000);
+  }
+});
+
+test('background repairs legacy day estimates without modifying pending payloads or server timers', async t => {
+  const now = Date.parse('2026-11-13T08:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const pending of [false, true]) {
+    const env = setup(Infinity, true);
+    env.tabsList.push({ id: 1, url: gameSender.url });
+    env.local.popupRpcEnabled = true; env.local.socketRefreshMode = 'direct';
+    const item = { buildingId: 20, currentLevel: 20, nextLevel: 21, durationMs: 10614000, queueItemId: 'hall' };
+    const calls = [{ name: 'startConstruction', feature: 'building', args: { buildingId: 20, nextLevel: 21, durationMs: 10614000, startDate: now } }];
+    env.local.buildingQueue = { enabled: true, items: [item], ...(pending ? {
+      pendingRequest: { tabId: 1, issuedAt: now, expiresAt: now + 120000, calls, startedItem: { ...item } },
+    } : {}) };
+    env.local.rpcCache = { buildingStatus: { method: 'getSummary', updatedAt: new Date(now).toISOString(), data: { queues: [] } } };
+    await new Promise(resolve => env.listener({ kind: 'building-queue-action', action: 'sync' }, popupSender, resolve));
+    assert.equal(env.local.buildingQueue.items[0].durationMs, 223381200);
+    assert.equal(env.local.buildingQueue.items[0].queueItemId, 'hall');
+    assert.equal(env.local.buildingQueue.pendingRequest.calls[0].args.durationMs, pending ? 10614000 : 223381200);
+    assert.equal(env.forwardedMessages.length, pending ? 0 : 1);
+    assert.equal(env.local.buildingQueueLogs.filter(log => log.action === 'repair').length, 1);
   }
 });
 

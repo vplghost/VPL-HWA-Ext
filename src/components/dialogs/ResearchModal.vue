@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useCityQueueActions } from '@/src/composables/useCityQueueActions';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getResearchName } from '@/src/utils/metadata';
-import { formatDuration } from '@/src/utils/formatters';
+import { formatDuration, formatFinishTime } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 
 const props = defineProps<{
@@ -746,7 +746,7 @@ async function refreshResearch() {
                     Progress: {{ Math.min(100, Math.max(0, ((now - q.startDate) / q.durationMs) * 100)).toFixed(1) }}%
                   </span>
                   <span>
-                    Est. finish: {{ new Date(q.startDate + q.durationMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}
+                    Est. finish: {{ formatFinishTime(q.startDate + q.durationMs, now) }}
                   </span>
                 </div>
                 <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
@@ -837,7 +837,7 @@ async function refreshResearch() {
                       <span>·</span>
                       <span>⏱ {{ formatDuration(Math.ceil((item.durationMs || 1000) / 1000)) }}</span>
                       <span v-if="item.estFinish">
-                        · Est: {{ new Date(item.estStart!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }} ➔ {{ new Date(item.estFinish).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+                        · Est: {{ formatFinishTime(item.estStart!, now) }} ➔ {{ formatFinishTime(item.estFinish, now) }}
                       </span>
                     </div>
                   </div>
@@ -894,7 +894,7 @@ async function refreshResearch() {
                 <span>
                   Completion:
                   <strong class="font-semibold text-slate-600 dark:text-slate-300">
-                    {{ queueTimeline.allDoneAt ? new Date(queueTimeline.allDoneAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—' }}
+                    {{ queueTimeline.allDoneAt ? formatFinishTime(queueTimeline.allDoneAt, now) : '—' }}
                   </strong>
                 </span>
               </div>
@@ -1070,7 +1070,7 @@ async function refreshResearch() {
                   </span>
                   <span class="text-slate-300 dark:text-slate-600">·</span>
                   <span class="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500" title="Estimated Finish Time">
-                    <span>🏁</span><span>{{ new Date((queueTimeline.allDoneAt || now) + (r.durationMs || 300000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
+                    <span>🏁</span><span>{{ formatFinishTime((queueTimeline.allDoneAt || now) + (r.durationMs || 300000), now) }}</span>
                   </span>
                 </div>
 
