@@ -4,6 +4,13 @@ title: Extension SemVer Bump on Commit Waves
 layer: project
 category: convention
 status: proposed
+confidence: high
+lastVerified: '2026-11-02T06:44:15.787Z'
+ttlDays: 90
+sources:
+  - package.json
+  - extension/manifest.json
+  - scripts/bump-version.js
 tags:
   - versioning,release
 createdAt: '2026-11-02T06:44:15.787Z'

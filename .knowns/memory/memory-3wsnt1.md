@@ -7,6 +7,7 @@ category: failure
 status: active
 confidence: high
 lastVerified: '2026-11-03T06:11:33.143Z'
+ttlDays: 90
 sources:
   - resourceLabel
   - '@task-VHE-EZ49PN'

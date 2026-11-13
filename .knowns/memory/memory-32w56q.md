@@ -4,6 +4,13 @@ title: Popup-originated RPC dispatch defaults off
 layer: project
 category: preference
 status: proposed
+confidence: high
+lastVerified: '2026-11-03T16:37:11.663Z'
+ttlDays: 90
+sources:
+  - extension/intercept.js
+  - extension/background.js
+  - @doc/architecture/shared-rpc-settings
 tags:
   - popup
   - rpc

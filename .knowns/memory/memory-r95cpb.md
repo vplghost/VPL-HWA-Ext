@@ -4,6 +4,12 @@ title: dist/ is committed to Git for direct load without rebuild
 layer: project
 category: convention
 status: proposed
+confidence: high
+lastVerified: '2026-11-03T14:35:02.285Z'
+ttlDays: 90
+sources:
+  - dist/
+  - @doc/workflows/extension-versioning-and-release
 tags:
   - dist
   - git

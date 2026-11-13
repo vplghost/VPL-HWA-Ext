@@ -4,6 +4,14 @@ title: Helper RPC actions require registration in helperActionMethods
 layer: project
 category: pattern
 status: active
+confidence: high
+lastVerified: '2026-11-08T10:10:49.392Z'
+ttlDays: 90
+sources:
+  - extension/intercept.js
+  - @task-VHE-X2SJ1X
+  - @doc/architecture/shared-rpc-settings
+  - @doc/architecture/mqtt-assisted-piggyback
 tags:
   - rpc
   - piggyback

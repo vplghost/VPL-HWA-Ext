@@ -4,6 +4,13 @@ title: Quest feeds require separate eligibility filters
 layer: project
 category: pattern
 status: proposed
+confidence: high
+lastVerified: '2026-11-07T00:20:43.074Z'
+ttlDays: 90
+sources:
+  - extension/rpc-cache.js
+  - extension/popup-data.js
+  - @doc/architecture/goals-tracking
 tags:
   - quests
   - dashboard

@@ -5,7 +5,9 @@ key: persisted-rpc-matching-must-ignore-object-key-order
 layer: project
 category: failure
 status: active
+confidence: high
 lastVerified: '2026-11-07T02:23:26.270Z'
+ttlDays: 90
 sources:
   - 'extension/raid-queue.js:sameCall'
   - tests/raid-queue.test.mjs

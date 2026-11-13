@@ -5,7 +5,9 @@ key: rally-and-gathering-command-payloads-from-captured-game-rpcs
 layer: project
 category: pattern
 status: active
+confidence: high
 lastVerified: '2026-11-06T03:50:20.732Z'
+ttlDays: 90
 sources:
   - buildRallyCall
   - buildGatherCall

@@ -6,6 +6,7 @@ category: preference
 status: active
 confidence: high
 lastVerified: '2026-11-06T10:27:54.670Z'
+ttlDays: 90
 sources:
   - '@task-VHE-WABVR0'
   - 'extension/popup.js:renderDraft'

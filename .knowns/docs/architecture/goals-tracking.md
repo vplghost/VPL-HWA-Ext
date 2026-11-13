@@ -3,7 +3,7 @@ id: doc-6b29aa2dba5227a05c9446f14ca7373a
 title: Goals Tracking
 description: 'Goals tab model: event source extraction, Guild Versus step denominators, Tower cleared state, quest integration, and event resource stock tracking'
 createdAt: '2026-11-03T14:32:27.635Z'
-updatedAt: '2026-11-03T14:32:27.635Z'
+updatedAt: '2026-11-13T02:31:38.072Z'
 tags:
   - goals
   - events
@@ -30,6 +30,7 @@ A Synergies sub-filter surfaces goals whose required resource or activity appear
 
 ### Guild Versus (clanVersusStatus)
 - Reads clanVersusStatus.data from cache.
+- Object-shaped collection normalization: Server responses may deliver clanVersusStatus.data.battle.rounds and info.challenges as numeric-string keyed Object dictionaries ({ 1: {...}, 2: {...} }) instead of standard Arrays. extractEventGoals in popup-data.js and renderers in popup.js must normalize collections using Array.isArray(col) ? col : (col && typeof col === 'object' ? Object.values(col) : []) before invoking .find(), .map(), or .filter(), preventing TypeError: r.find is not a function.
 - Round goals: total challenge points needed this round vs. points earned; denominator comes from hwaHelperClanVersusChestThresholds keyed by round number.
 - Daily goals: individual challenge step progress vs. daily target; denominators from hwaHelperClanVersusChallengeSteps. Deduplication: round and daily goals for the same challenge ID are merged — only one card is emitted per challenge to prevent double-counting.
 - Challenge names from hwaHelperClanVersusChallengeNames; point values from hwaHelperClanVersusChallengePoints.
@@ -61,6 +62,7 @@ renderGoals(cache) in popup.js:
 
 ## Key Invariants
 - Guild Versus round and daily goals for the same challenge ID must be deduplicated — emit one unified card only.
+- Always normalize ounds and challenges to arrays with Array.isArray(col) ? col : Object.values(col || {}) to prevent runtime TypeErrors when the server returns dictionary payloads.
 - Tower cleared state must be checked from towerStatus, not inferred from towerSession alone.
 - Goals tab shows 'No active event goals' when extractEventGoals returns an empty all array.
 - Container padding must prevent border overlap with adjacent tab content.

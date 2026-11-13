@@ -3,7 +3,7 @@ id: doc-45cb642564ea6f7fbd7553c41c582fe2
 title: Legend Draft System
 description: Legend Draft state machine, 3-choice per step protocol, Unity WebGL hooking architecture, and empirical verification data
 createdAt: '2026-11-02T06:43:38.355Z'
-updatedAt: '2026-11-09T13:10:14.955Z'
+updatedAt: '2026-11-13T02:31:58.401Z'
 tags:
   - draft
   - legend-draft
@@ -113,3 +113,17 @@ Because the game engine runs on Unity WebGL with IL2CPP compiled to WebAssembly 
 - **Phase 1 (Safe HUD & 3-Choice Step Picker):** Deliver clean 3-choice-per-step UI; disallow free selection of invalid heroes when candidates are known; log raw `draft` strings alongside captured draft actions.
 - **Phase 2 (Unity Memory Hook Prototype):** Intercept Unity Emscripten string/data conversions in `extension/intercept.js` to extract candidate IDs from `HEAPU8`.
 - **Phase 3 (Decoder Analysis & Finalization):** Compare logged empirical data against decoded heap values to formalize the mathematical decoding algorithm into pure JS.
+
+## Vue 3 Dialog Implementation and RPC Tracking Scope
+In the WXT + Vue 3 architecture, src/components/dialogs/DraftModal.vue provides retained dialog parity for the Legend Draft system.
+- **Scope**: Implements strict 1:1 read/record parity for all observed RPC information without auto-pick, automated drafting, or client-side recommendation algorithms.
+- **Tracked Information**:
+  - Live stage status, stage description, and live countdown timer (stageFinishTs).
+  - Opponent profile card: Name, level, guild/clan (enemyUser.clanTitle), avatar, and rating comparison (draftStatus.rating).
+  - Match outcome card: Victory/Defeat, user rating delta (userDifRating), and BP EXP rewards (draftBpExp).
+  - Team mode switcher: Interactive toggle between Defense Draft and Attack Draft.
+  - Lineups: Displays player's 5-slot defense lineup (defenceHeroes) and attack lineup (ttackHeroes) with confirmed star ratings (★x), hero avatars, and role/faction badges.
+  - Opponent counter lineup: Displays opponent's revealed defense lineup (enemyDefenceHeroes) during Attack Draft and opponent's attack lineup (enemyAttackHeroes) during Defense Draft.
+  - Candidate pool: Displays candidate hero pool (legendDraft.candidates) when populated by game RPC or Unity memory hooks.
+  - Error and status reporting: Surfaces server rejection errors (lastError, lastErrorCode, lastErrorAction).
+- Provenance: src/components/dialogs/DraftModal.vue, 	ests/legend-draft-ui.test.mjs.

@@ -4,6 +4,11 @@ title: Hero and Titan Evolution Dual Reduction
 layer: project
 category: pattern
 status: proposed
+confidence: high
+lastVerified: '2026-11-02T06:44:20.415Z'
+ttlDays: 90
+sources:
+  - extension/rpc-cache.js
 tags:
   - evolution,cache,fragments
 createdAt: '2026-11-02T06:44:20.415Z'

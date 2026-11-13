@@ -4,6 +4,11 @@ title: Piggyback missed fetch requests whose body lived in a Request object
 layer: project
 category: failure
 status: proposed
+confidence: high
+lastVerified: '2026-11-05T16:41:07.154Z'
+ttlDays: 90
+sources:
+  - extension/intercept.js
 tags:
   - rpc
   - piggyback

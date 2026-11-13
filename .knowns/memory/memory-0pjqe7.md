@@ -4,6 +4,12 @@ title: Bridge Extension Context Invalidation Handling
 layer: project
 category: failure
 status: proposed
+confidence: high
+lastVerified: '2026-11-02T06:44:30.693Z'
+ttlDays: 90
+sources:
+  - extension/bridge.js
+  - extension/content.js
 tags:
   - bridge,extension-context
 createdAt: '2026-11-02T06:44:30.693Z'

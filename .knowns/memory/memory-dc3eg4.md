@@ -4,6 +4,12 @@ title: skin_upgrade has no upgrade cost or updated balances
 layer: project
 category: failure
 status: proposed
+confidence: high
+lastVerified: '2026-11-03T16:22:20.565Z'
+ttlDays: 90
+sources:
+  - extension/rpc-cache.js
+  - extension/background.js
 tags:
   - hero
   - skin

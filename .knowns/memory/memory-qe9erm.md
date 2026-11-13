@@ -4,6 +4,12 @@ title: Draft push is a refresh trigger, rally push includes exact return ETA
 layer: project
 category: pattern
 status: proposed
+confidence: high
+lastVerified: '2026-11-05T15:18:25.062Z'
+ttlDays: 90
+sources:
+  - extension/rpc-cache.js
+  - @doc/architecture/rpc-cache-pipeline
 tags:
   - mqtt
   - draft

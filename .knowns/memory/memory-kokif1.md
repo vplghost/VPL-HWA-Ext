@@ -7,6 +7,7 @@ category: pattern
 status: active
 confidence: high
 lastVerified: '2026-11-03T05:55:30.171Z'
+ttlDays: 90
 sources:
   - '@doc/architecture/tower-rpc-session-and-progress-model'
   - extension/rpc-cache.js

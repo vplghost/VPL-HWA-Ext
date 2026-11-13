@@ -5,7 +5,9 @@ key: all-helper-rpc-features-inherit-the-global-dispatch-settings
 layer: project
 category: preference
 status: active
+confidence: high
 lastVerified: '2026-11-06T04:23:01.370Z'
+ttlDays: 90
 sources:
   - User request on 2026-11-06 in this conversation
   - '@task-VHE-62VVG5'

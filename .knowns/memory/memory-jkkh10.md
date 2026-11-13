@@ -4,6 +4,12 @@ title: Event quest claims may have empty reward responses
 layer: project
 category: failure
 status: proposed
+confidence: high
+lastVerified: '2026-11-03T16:13:51.126Z'
+ttlDays: 90
+sources:
+  - extension/rpc-cache.js
+  - extension/background.js
 tags:
   - event
   - rpc

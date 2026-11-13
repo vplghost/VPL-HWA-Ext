@@ -4,6 +4,12 @@ title: Energy RPC fields
 layer: project
 category: pattern
 status: proposed
+confidence: high
+lastVerified: '2026-11-01T11:53:54.443Z'
+ttlDays: 90
+sources:
+  - extension/rpc-cache.js
+  - @task-VHE-F99XNX
 tags: []
 createdAt: '2026-11-01T11:53:54.443Z'
 updatedAt: '2026-11-01T11:53:54.443Z'

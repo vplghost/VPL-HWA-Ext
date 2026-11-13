@@ -4,6 +4,12 @@ title: Rally first dispatch must use selected boss snapshot
 layer: project
 category: failure
 status: proposed
+confidence: high
+lastVerified: '2026-11-06T14:08:55.553Z'
+ttlDays: 90
+sources:
+  - extension/raid-queue.js
+  - @task-VHE-992BGT
 tags:
   - rally
   - rpc

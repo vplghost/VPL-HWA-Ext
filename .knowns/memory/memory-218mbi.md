@@ -7,6 +7,7 @@ category: pattern
 status: active
 confidence: high
 lastVerified: '2026-11-05T05:13:32.468Z'
+ttlDays: 90
 sources:
   - extension/rpc-cache.js
   - extension/popup-data.js

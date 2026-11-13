@@ -5,7 +5,7 @@ status: done
 priority: high
 labels: []
 createdAt: '2026-11-11T07:06:23.619Z'
-updatedAt: '2026-11-11T07:22:28.252Z'
+updatedAt: '2026-11-13T02:37:12.097Z'
 completedAt: '2026-11-11T07:22:28.252Z'
 timeSpent: 0
 parent: VHE-H9EGP9
@@ -19,8 +19,8 @@ parent: VHE-H9EGP9
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Active and finished queues with finish button
-- [ ] #2 Auto queue reordering and timeline
-- [ ] #3 Upgrade candidates with cost and queue buttons
+- [x] #1 Active and finished queues with finish button
+- [x] #2 Auto queue reordering and timeline
+- [x] #3 Upgrade candidates with cost and queue buttons
 <!-- AC:END -->
 

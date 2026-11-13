@@ -5,7 +5,7 @@ status: done
 priority: high
 labels: []
 createdAt: '2026-11-11T07:06:26.810Z'
-updatedAt: '2026-11-11T07:25:22.135Z'
+updatedAt: '2026-11-13T02:36:59.705Z'
 completedAt: '2026-11-11T07:25:22.135Z'
 timeSpent: 0
 parent: VHE-H9EGP9
@@ -19,8 +19,8 @@ parent: VHE-H9EGP9
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Raid troop capacity and boss level 1-30
-- [ ] #2 Rally wait and cancellation settings
-- [ ] #3 Sequential raid and monster queue runners
+- [x] #1 Raid troop capacity and boss level 1-30
+- [x] #2 Rally wait and cancellation settings
+- [x] #3 Sequential raid and monster queue runners
 <!-- AC:END -->
 

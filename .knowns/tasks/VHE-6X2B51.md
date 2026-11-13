@@ -5,7 +5,7 @@ status: done
 priority: high
 labels: []
 createdAt: '2026-11-11T07:06:29.920Z'
-updatedAt: '2026-11-11T07:27:57.772Z'
+updatedAt: '2026-11-13T02:36:59.958Z'
 completedAt: '2026-11-11T07:27:57.772Z'
 timeSpent: 0
 parent: VHE-H9EGP9
@@ -19,8 +19,8 @@ parent: VHE-H9EGP9
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Interactive recipe tree hierarchy
-- [ ] #2 Missing fragment calculation and quick craft
-- [ ] #3 Candidate mission chips
+- [x] #1 Interactive recipe tree hierarchy
+- [x] #2 Missing fragment calculation and quick craft
+- [x] #3 Candidate mission chips
 <!-- AC:END -->
 

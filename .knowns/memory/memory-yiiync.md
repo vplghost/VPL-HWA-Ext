@@ -4,6 +4,11 @@ title: Khong dua du lieu temp len Git
 layer: project
 category: preference
 status: proposed
+confidence: high
+lastVerified: '2026-11-01T08:52:39.581Z'
+ttlDays: 90
+sources:
+  - .gitignore
 tags:
   - git
   - temp

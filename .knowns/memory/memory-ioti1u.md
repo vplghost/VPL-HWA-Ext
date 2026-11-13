@@ -4,6 +4,12 @@ title: World action RPCs can have empty successful responses
 layer: project
 category: pattern
 status: proposed
+confidence: high
+lastVerified: '2026-11-01T12:48:22.184Z'
+ttlDays: 90
+sources:
+  - extension/rpc-cache.js
+  - @task-VHE-BTR30J
 tags:
   - rpc
   - cache

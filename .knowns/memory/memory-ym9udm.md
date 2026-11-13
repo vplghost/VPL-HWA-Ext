@@ -4,6 +4,12 @@ title: WSS metadata refresh can piggyback on game fetch RPC
 layer: project
 category: pattern
 status: proposed
+confidence: high
+lastVerified: '2026-11-05T16:16:49.393Z'
+ttlDays: 90
+sources:
+  - extension/intercept.js
+  - @doc/architecture/rpc-cache-pipeline
 tags:
   - mqtt
   - rpc

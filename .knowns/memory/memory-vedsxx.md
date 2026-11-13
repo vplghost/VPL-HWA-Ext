@@ -4,6 +4,13 @@ title: 'MQTT nudge must target the game''s active map chunks'
 layer: project
 category: failure
 status: active
+confidence: high
+lastVerified: '2026-11-08T10:11:05.945Z'
+ttlDays: 90
+sources:
+  - extension/mqtt-capture.js
+  - @task-VHE-BZXW0H
+  - @doc/architecture/mqtt-assisted-piggyback
 tags:
   - mqtt
   - rpc

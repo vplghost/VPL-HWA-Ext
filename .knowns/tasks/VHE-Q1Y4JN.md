@@ -5,7 +5,7 @@ status: done
 priority: high
 labels: []
 createdAt: '2026-11-11T07:05:55.828Z'
-updatedAt: '2026-11-11T07:17:30.333Z'
+updatedAt: '2026-11-13T02:36:59.883Z'
 completedAt: '2026-11-11T07:17:30.333Z'
 timeSpent: 0
 parent: VHE-H9EGP9
@@ -19,8 +19,8 @@ parent: VHE-H9EGP9
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Hero switcher dropdown in title bar
-- [ ] #2 Hero skills with upgrade buttons and progress
-- [ ] #3 6 equipment slots with crafting status and campaign farm link
+- [x] #1 Hero switcher dropdown in title bar
+- [x] #2 Hero skills with upgrade buttons and progress
+- [x] #3 6 equipment slots with crafting status and campaign farm link
 <!-- AC:END -->
 

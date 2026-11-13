@@ -4,6 +4,12 @@ title: Reward claim dispatch follows the Piggyback or Direct setting
 layer: project
 category: pattern
 status: proposed
+confidence: high
+lastVerified: '2026-11-05T16:29:55.486Z'
+ttlDays: 90
+sources:
+  - extension/background.js
+  - @doc/architecture/rpc-cache-pipeline
 tags:
   - rewards
   - rpc

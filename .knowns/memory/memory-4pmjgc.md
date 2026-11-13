@@ -7,6 +7,7 @@ category: pattern
 status: active
 confidence: high
 lastVerified: '2026-11-06T09:42:48.275Z'
+ttlDays: 90
 sources:
   - 'scripts/sync-cdn-assets.mjs:manifestCandidates'
   - tests/cdn-assets.test.mjs

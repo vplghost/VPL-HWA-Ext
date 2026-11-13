@@ -7,6 +7,7 @@ category: pattern
 status: active
 confidence: high
 lastVerified: '2026-11-06T10:08:32.355Z'
+ttlDays: 90
 sources:
   - 'extension/experimental-data.js:capacityModel'
   - 'extension/rpc-cache.js:observeSquad'

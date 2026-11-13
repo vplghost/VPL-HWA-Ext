@@ -4,6 +4,12 @@ title: Old API records survive extension reload
 layer: project
 category: failure
 status: proposed
+confidence: high
+lastVerified: '2026-11-01T09:16:33.497Z'
+ttlDays: 90
+sources:
+  - extension/background.js
+  - @task-VHE-X1SQQH
 tags:
   - extension
   - profiling

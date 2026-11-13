@@ -5,7 +5,9 @@ key: wheel-feature-is-shelved-until-explicitly-resumed
 layer: project
 category: preference
 status: active
+confidence: high
 lastVerified: '2026-11-06T04:32:15.061Z'
+ttlDays: 90
 sources:
   - User instruction on 2026-11-06
   - '@task-VHE-8D82V9'

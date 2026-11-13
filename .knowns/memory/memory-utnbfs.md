@@ -4,6 +4,12 @@ title: Skill Points use a soft cap of 10 in WebGL 1.292.0
 layer: project
 category: pattern
 status: proposed
+confidence: high
+lastVerified: '2026-11-01T13:51:37.877Z'
+ttlDays: 90
+sources:
+  - extension/popup-data.js
+  - @task-VHE-FZRFSN
 tags: []
 createdAt: '2026-11-01T13:51:37.877Z'
 updatedAt: '2026-11-01T13:51:37.877Z'
