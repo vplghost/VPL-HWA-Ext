@@ -63,6 +63,33 @@ test('automation normalization preserves opt-out defaults and clamps rally level
   assert.equal(normalizePriorityJoin().enabled, false);
 });
 
+test('popup automation renders and saves object-form stored teams through the real runtime helper', async t => {
+  const { readFile } = await import('node:fs/promises');
+  const vm = await import('node:vm');
+  const runtime = {};
+  vm.runInNewContext(await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8'), runtime);
+  const writes = [];
+  const heroIds = { 0: 5, 1: 3, 2: 1, 3: 2, 4: 4 };
+  const saved = { id: 'stored', name: 'Stored', heroIds };
+  globalThis.hwaHelperExperimentalData = runtime.hwaHelperExperimentalData;
+  globalThis.chrome = { storage: {
+    local: { get: async () => ({ customTeams: { '7': [saved] }, popupRpcEnabled: true }),
+      set: async value => writes.push(value) },
+    onChanged: { addListener() {}, removeListener() {} },
+  } };
+  let unmountPopup = () => {};
+  t.after(() => { unmountPopup(); delete globalThis.chrome; delete globalThis.hwaHelperExperimentalData; });
+  const cache = ref({ accountStatus: { data: { id: 7 } },
+    heroGetAll: { data: Object.fromEntries([1, 2, 3, 4, 5].map(id => [id, { power: id }])) } });
+  const { value, unmount } = mountComposable(() => usePopupAutomation(cache));
+  unmountPopup = unmount;
+  await flush();
+  assert.deepEqual(Array.from(value.teams.value.find(team => team.id === 'custom:stored').heroIds), [5, 3, 1, 2, 4]);
+  value.priorityAutoJoin.value = { enabled: true, minLevel: 10, teamId: 'custom:stored' };
+  await value.savePriorityJoin();
+  assert.deepEqual(writes.at(-1).priorityAutoJoin.heroIds, [5, 3, 1, 2, 4]);
+});
+
 test('popup automation honors RPC gate, claims on open once and saves selected team without stale heroes', async (t) => {
   const listeners = new Set(); const writes = []; const sent = [];
   globalThis.chrome = { storage: { local: { get: async () => ({ autoClaimSettings: { onOpen: true }, popupRpcEnabled: false }),

@@ -8,6 +8,38 @@ const context = { globalThis: {} };
 vm.runInNewContext(source, context);
 const data = context.globalThis.hwaHelperExperimentalData;
 
+test('object-form custom heroes render in both team option builders without mutation', () => {
+  const heroes = Object.fromEntries([1, 2, 3, 4, 5].map(id => [id, { power: id }]));
+  const ids = { 0: 5, 1: 3, 2: 1, 3: 2, 4: 4 };
+  const team = { id: 'saved', name: ' Saved team ', heroIds: ids, maxTroops: 14000 };
+  const before = JSON.stringify(team);
+  for (const options of [data.autoJoinTeamOptions, data.teamOptions]) {
+    for (const collection of [[team], { saved: team }]) {
+      const option = options({}, heroes, collection).find(option => option.id === 'custom:saved');
+      assert.deepEqual(Array.from(option.heroIds), [5, 3, 1, 2, 4]);
+      assert.equal(option.maxTroops, 14000);
+      assert.equal(option.label, 'Custom · Saved team');
+    }
+  }
+  assert.equal(JSON.stringify(team), before);
+});
+
+test('invalid custom hero collections are rejected while option defaults remain usable', () => {
+  const heroes = Object.fromEntries([1, 2, 3, 4, 5].map(id => [id, { power: id }]));
+  const bad = [null, undefined, true, 12345, '12345', {}, { 0: 1, 1: 1, 2: 2, 3: 3, 4: 4 },
+    { 0: 1, 1: 2, 2: 3, 3: 4, 4: 99 }, { 0: '1', 1: 2, 2: 3, 3: 4, 4: 5 },
+    { 0: { id: 1 }, 1: 2, 2: 3, 3: 4, 4: 5 }];
+  for (const heroIds of bad) {
+    assert.equal(data.normalizeCustomTeam({ id: 'bad', name: 'Bad', heroIds }, heroes), null);
+    const options = data.autoJoinTeamOptions({}, heroes, [{ id: 'bad', name: 'Bad', heroIds }]);
+    assert.deepEqual(Array.from(options, option => option.id), ['highest', 'weakest']);
+  }
+  for (const collection of [null, undefined, true, 123, 'invalid']) {
+    assert.deepEqual(Array.from(data.autoJoinTeamOptions({}, heroes, collection), option => option.id),
+      ['highest', 'weakest']);
+  }
+});
+
 test('gather default chooses five owned heroes with least power', () => {
   const heroes = { 7: { power: 20 }, 8: { power: 5 }, 9: { power: 5 },
     10: { power: 10 }, 11: { power: 30 }, 12: { power: 15 } };

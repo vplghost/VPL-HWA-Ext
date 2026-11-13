@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.61 — 2026-11-13
+
+### Fixed
+
+- Prevent the popup auto-join team selector from crashing when stored custom team hero IDs are an object instead of an array.
+- Normalize custom team collections in both shared option builders, preserving hero order and existing validation; skip malformed teams safely.
+
 ## 0.10.60 — 2026-11-13
 
 ### Fixed

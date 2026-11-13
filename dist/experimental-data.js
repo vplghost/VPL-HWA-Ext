@@ -159,9 +159,14 @@
     return Object.keys(heroes || {}).map(Number).filter((id) => !busy.has(id));
   }
 
+  function asArray(value) {
+    if (Array.isArray(value)) return value;
+    return value && typeof value === 'object' ? Object.values(value) : [];
+  }
+
   function normalizeCustomTeam(team, heroes) {
     const name = typeof team?.name === 'string' ? team.name.trim().slice(0, 80) : '';
-    const heroIds = [...new Set(team?.heroIds || [])];
+    const heroIds = [...new Set(asArray(team?.heroIds))];
     const maxTroops = team?.maxTroops;
     if (maxTroops != null && (!Number.isSafeInteger(maxTroops) || maxTroops <= 0)) return null;
     return name && heroIds.length === 5 && heroIds.every((id) => Number.isInteger(id) && heroes?.[id]) ?
@@ -186,7 +191,7 @@
     const list = [
       { id: 'highest', label: '⭐ Top 5 highest power heroes (Default)', heroIds: highestPowerHeroes(heroes, availableIds) }
     ];
-    list.push(...customTeams.map((team) => normalizeCustomTeam(team, heroes)).filter(Boolean)
+    list.push(...asArray(customTeams).map((team) => normalizeCustomTeam(team, heroes)).filter(Boolean)
       .map((team) => ({ id: `custom:${team.id}`, label: `Custom · ${team.name}`, heroIds: team.heroIds, maxTroops: team.maxTroops })));
     for (const [mode, members] of Object.entries(teams || {})) {
       if (!Array.isArray(members)) continue;
@@ -203,7 +208,7 @@
   }
 
   function teamOptions(teams, heroes, customTeams = [], availableIds) {
-    const options = customTeams.map((team) => normalizeCustomTeam(team, heroes)).filter(Boolean)
+    const options = asArray(customTeams).map((team) => normalizeCustomTeam(team, heroes)).filter(Boolean)
       .map((team) => ({ id: `custom:${team.id}`, label: `Custom · ${team.name}`, heroIds: team.heroIds, maxTroops: team.maxTroops }));
     options.push({ id: 'weakest', label: '5 lowest power heroes', heroIds: lowestPowerHeroes(heroes, availableIds) });
     for (const [mode, members] of Object.entries(teams || {})) {
