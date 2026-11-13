@@ -3818,7 +3818,10 @@ function openGuildVersusModal(vsStatus, cache) {
   `;
 
   const roundQuestsMap = globalThis.hwaHelperClanVersusRoundQuests || {};
-  const roundsList = battle.rounds || [
+  const rawRounds = Array.isArray(battle.rounds)
+    ? battle.rounds
+    : (battle.rounds && typeof battle.rounds === 'object' ? Object.values(battle.rounds) : null);
+  const roundsList = (rawRounds && rawRounds.length > 0) ? rawRounds : [
     { index: 1, theme: 'Radar Training & Titan Power', score: 1, points: clanRoundPoints, enemyPoints: enemyRoundPoints, status: 'inProgress' },
     { index: 2, theme: 'City Development & Gathering', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
     { index: 3, theme: 'Research & Wilderness', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
@@ -5302,7 +5305,10 @@ function renderEvents(cache) {
     const league = battle.league || (info.league ? `League #${info.league}` : 'Bronze');
     const leagueLabel = league.charAt(0).toUpperCase() + league.slice(1);
     const roundNumber = info.roundNumber || 1;
-    const currentRound = (battle.rounds || []).find((r) => r.status === 'inProgress') || battle.rounds?.[0] || {};
+    const battleRounds = Array.isArray(battle.rounds)
+      ? battle.rounds
+      : (battle.rounds && typeof battle.rounds === 'object' ? Object.values(battle.rounds) : []);
+    const currentRound = battleRounds.find((r) => r && r.status === 'inProgress') || battleRounds[0] || {};
     const theme = currentRound.theme || 'Radar Training';
     const roundPoints = resourceData.formatAmount(battle.clanRoundPoints ?? currentRound.points ?? 0);
     const enemyRoundPoints = resourceData.formatAmount(battle.enemyClanRoundPoints ?? currentRound.enemyPoints ?? 0);

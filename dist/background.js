@@ -596,6 +596,13 @@ chrome.runtime?.onStartup?.addListener?.(async () => {
 
 chrome.runtime?.onInstalled?.addListener?.(async () => {
   setupQueueAlarms();
+  chrome.storage.local.remove('apiRecords').catch(() => {});
+  try {
+    const stored = await chrome.storage.local.get(['socketRefreshMode']);
+    if (!stored?.socketRefreshMode) {
+      await chrome.storage.local.set({ socketRefreshMode: 'piggyback' });
+    }
+  } catch (_) {}
 });
 
 try {
@@ -880,10 +887,6 @@ async function handleControl(kind) {
   }
   return state;
 }
-
-chrome.runtime.onInstalled?.addListener(() => {
-  chrome.storage.local.remove('apiRecords').catch(() => {});
-});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (['raid-queue-start', 'raid-queue-stop'].includes(message?.kind) &&

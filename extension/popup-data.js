@@ -1065,14 +1065,17 @@
     if (vsStatus) {
       const battle = vsStatus.battle || {};
       const info = vsStatus.info || {};
-      const rounds = battle.rounds || [];
-      const liveRound = rounds.find((r) => r.status === 'inProgress') || rounds[0] || { index: 1 };
+      const rounds = Array.isArray(battle.rounds)
+        ? battle.rounds
+        : (battle.rounds && typeof battle.rounds === 'object' ? Object.values(battle.rounds) : []);
+      const liveRound = rounds.find((r) => r && r.status === 'inProgress') || rounds[0] || { index: 1 };
       const roundConfig = roundQuestsMap[liveRound.index] || roundQuestsMap[1] || {};
       const roundName = `Guild Versus Round ${liveRound.index}`;
 
-      const activeChallenges = Array.isArray(info.challenges) && info.challenges.length > 0
+      const rawChallenges = Array.isArray(info.challenges)
         ? info.challenges
-        : null;
+        : (info.challenges && typeof info.challenges === 'object' ? Object.values(info.challenges) : []);
+      const activeChallenges = rawChallenges.length > 0 ? rawChallenges : null;
 
       if (activeChallenges) {
         for (const ch of activeChallenges) {

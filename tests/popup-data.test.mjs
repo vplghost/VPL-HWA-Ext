@@ -1068,3 +1068,34 @@ test('getHeroArtifactTier and getHeroArtifactTierStyle apply 5-color scale break
   assert.ok(styleT5.badge.includes('bg-amber-950/60'));
   assert.equal(styleT5.starColor, 'text-orange-400');
 });
+
+test('extractEventGoals safely handles object-shaped clanVersusStatus.battle.rounds and challenges without TypeError', () => {
+  const cacheWithObjectRounds = {
+    clanVersusStatus: {
+      data: {
+        score: 1200,
+        chestNumbers: [1, 2],
+        battle: {
+          clanRoundPoints: 5000,
+          enemyClanRoundPoints: 4000,
+          rounds: {
+            '1': { index: 1, theme: 'Radar Training & Titan Power', status: 'finished', points: 2000 },
+            '2': { index: 2, theme: 'City Development & Gathering', status: 'inProgress', points: 3000 }
+          }
+        },
+        info: {
+          challenges: {
+            '1': { id: 1, progress: 100 },
+            '2': { id: 2, progress: 200 }
+          }
+        }
+      }
+    }
+  };
+
+  assert.doesNotThrow(() => {
+    const goals = extractEventGoals(cacheWithObjectRounds);
+    assert.ok(goals && Array.isArray(goals.all));
+    assert.ok(goals.all.some((g) => g.events?.some((e) => e.name === 'Guild Versus Round 2')));
+  });
+});
