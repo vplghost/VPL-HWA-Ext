@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useCityQueueActions } from '@/src/composables/useCityQueueActions';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getResearchName } from '@/src/utils/metadata';
 import { formatDuration } from '@/src/utils/formatters';
@@ -45,6 +46,9 @@ const researchQueue = ref<ResearchQueueState>({
 });
 
 const buildingQueueItems = ref<any[]>([]);
+const { commandQueue, queueError, queueBusy, applyQueueSnapshot } = useCityQueueActions('research', queue => {
+  researchQueue.value = { enabled: queue.enabled !== false, items: Array.isArray(queue.items) ? queue.items : [] };
+});
 const isLoaded = ref(false);
 const queueLogs = ref<any[]>([]);
 const showLogs = ref(false);
@@ -63,10 +67,7 @@ const onStorageChanged = (changes: any, area: string) => {
     buildingQueueItems.value = normalizeArray(changes.buildingQueue.newValue.items);
   }
   if (changes.researchQueue?.newValue) {
-    researchQueue.value = {
-      enabled: changes.researchQueue.newValue.enabled !== false,
-      items: normalizeArray(changes.researchQueue.newValue.items),
-    };
+    applyQueueSnapshot(changes.researchQueue.newValue);
   }
   if (changes.researchQueueLogs?.newValue) {
     queueLogs.value = Array.isArray(changes.researchQueueLogs.newValue) ? changes.researchQueueLogs.newValue : [];
@@ -82,10 +83,7 @@ onMounted(async () => {
     try {
       const stored = await chrome.storage.local.get(['researchQueue', 'buildingQueue', 'researchQueueLogs']) as { researchQueue?: Partial<ResearchQueueState>; buildingQueue?: { items?: unknown[] }; researchQueueLogs?: unknown };
       if (stored.researchQueue) {
-        researchQueue.value = {
-          enabled: stored.researchQueue.enabled !== false,
-          items: normalizeArray(stored.researchQueue.items),
-        };
+        applyQueueSnapshot(stored.researchQueue);
       }
       if (stored.buildingQueue?.items) {
         buildingQueueItems.value = normalizeArray(stored.buildingQueue.items);
@@ -135,22 +133,7 @@ watch(
 );
 
 async function saveResearchQueue() {
-  if (!isLoaded.value) return;
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    const stored = await chrome.storage.local.get(['researchQueue']).catch(() => ({})) as { researchQueue?: Partial<ResearchQueueState> };
-    const prev = stored?.researchQueue || {};
-    await chrome.storage.local.set({
-      researchQueue: {
-        ...prev,
-        enabled: researchQueue.value.enabled,
-        items: researchQueue.value.items,
-        updatedAt: Date.now(),
-      },
-    });
-    try {
-      chrome.runtime?.sendMessage?.({ kind: 'research-queue-action', action: 'sync' });
-    } catch {}
-  }
+  await commandQueue('enabled', { enabled: researchQueue.value.enabled });
 }
 
 // Queues from cache
@@ -228,23 +211,17 @@ const queueTimeline = computed(() => {
 });
 
 function moveQueueItem(idx: number, direction: 'up' | 'down') {
-  const newIdx = direction === 'up' ? idx - 1 : idx + 1;
-  if (newIdx < 0 || newIdx >= researchQueue.value.items.length) return;
-  if (idx < 0 || idx >= researchQueue.value.items.length) return;
-  const item = researchQueue.value.items.splice(idx, 1)[0];
-  if (!item) return;
-  researchQueue.value.items.splice(newIdx, 0, item);
-  saveResearchQueue();
+  const item = researchQueue.value.items[idx];
+  if (item) void commandQueue('move', { item: { ...item }, direction });
 }
 
 function removeQueueItem(idx: number) {
-  researchQueue.value.items.splice(idx, 1);
-  saveResearchQueue();
+  const item = researchQueue.value.items[idx];
+  if (item) void commandQueue('remove', { item: { ...item } });
 }
 
 function clearQueue() {
-  researchQueue.value.items = [];
-  saveResearchQueue();
+  void commandQueue('clear');
 }
 
 // Researches from cache
@@ -507,14 +484,13 @@ function locateResearch(r: any) {
   el?.focus();
 }
 
-function addToQueue(candidate: any) {
-  researchQueue.value.items.push({
+async function addToQueue(candidate: any) {
+  await commandQueue('add', { item: {
     researchId: Number(candidate.id),
     currentLevel: Number(candidate.currentLevel ?? candidate.level ?? 0),
     nextLevel: Number(candidate.nextLevel ?? 1),
     durationMs: Number(candidate.durationMs) || 60000,
-  });
-  saveResearchQueue();
+  } });
 }
 
 const isStarting = ref<Record<string, boolean>>({});
@@ -829,6 +805,7 @@ async function refreshResearch() {
               </div>
             </div>
 
+            <p v-if="queueError" role="alert" class="text-xs text-rose-600 dark:text-rose-400">{{ queueError }}</p>
             <!-- Queue list -->
             <div v-if="queueTimeline.items.length > 0" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
               <div
@@ -1113,6 +1090,7 @@ async function refreshResearch() {
                     class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600 shrink-0"
                     :title="`Add ${r.name || getResearchName(r.id)} Lv. ${r.nextLevel} to auto-research queue`"
                     :aria-label="`Queue ${r.name || getResearchName(r.id)} Lv. ${r.nextLevel}`"
+                    :disabled="queueBusy"
                     @click="addToQueue(r)"
                   >
                     <span>➕</span>

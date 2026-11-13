@@ -14,6 +14,8 @@ const towerAutomationSource = await readFile(new URL('../extension/tower-automat
 const towerRunnerSource = await readFile(new URL('../extension/tower-runner.js', import.meta.url), 'utf8');
 const dungeonAutomationSource = await readFile(new URL('../extension/dungeon-automation.js', import.meta.url), 'utf8');
 const dungeonRunnerSource = await readFile(new URL('../extension/dungeon-runner.js', import.meta.url), 'utf8');
+const buildingQueueSource = await readFile(new URL('../extension/building-queue.js', import.meta.url), 'utf8');
+const researchQueueSource = await readFile(new URL('../extension/research-queue.js', import.meta.url), 'utf8');
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
 const popupSender = { url: 'chrome-extension://test-extension/popup.html' };
 
@@ -59,13 +61,150 @@ function setup(quota = Infinity) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${buildingQueueSource}\n${researchQueueSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
     new Promise((resolve) => listener({ kind, record }, sender, resolve));
   return { local, session, send, installed, listener, tabsList, forwardedMessages, removeTab: (id) => onTabRemoved(id), getReloadedTabId: () => reloadedTabId };
 }
+
+test('city queue Add persists until server acknowledgement and fresh idle summaries chain immediately', async t => {
+  const now = Date.parse('2026-11-13T08:33:46Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    const env = setup(), key = type + 'Queue', feature = type === 'building' ? 'building' : 'personalResearch';
+    const idKey = type === 'building' ? 'buildingId' : 'researchId';
+    env.tabsList.push({ id: 1, url: gameSender.url });
+    env.local.popupRpcEnabled = true; env.local.socketRefreshMode = 'direct';
+    const command = data => new Promise(resolve => env.listener({ kind: type + '-queue-action', ...data }, popupSender, resolve));
+    const item = { [idKey]: 40, currentLevel: 1, nextLevel: 2, durationMs: 30000 };
+    const added = await command({ action: 'add', item });
+    assert.equal(added.ok, true);
+    assert.equal(env.local[key].items.length, 1, 'Missing occupancy cannot consume an added item');
+    assert.equal(env.forwardedMessages.at(-1).msg.calls[0].name, 'getSummary');
+    assert.ok(env.local[key + 'Logs'].some(log => log.action === 'enqueue'));
+    await Promise.all([command({ action: 'sync' }), command({ action: 'sync' })]);
+    assert.equal(env.forwardedMessages.length, 1, 'Summary verification is throttled');
+    const summary = (queues, levels = []) => rpc([{ name: 'getSummary', feature, ident: 'summary' }],
+      [{ ident: 'summary', result: { response: { queues, [type === 'building' ? 'buildings' : 'completedResearches']: levels } } }],
+      new Date(Date.now()).toISOString());
+    await env.send('api-record', summary([]), { ...gameSender, tab: { id: 1 } });
+    const sent = env.forwardedMessages.at(-1).msg.calls;
+    assert.ok(sent.some(call => call.name === (type === 'building' ? 'startConstruction' : 'startResearch')));
+    assert.equal(env.local[key].items.length, 1, 'Transport acknowledgement must not remove the item');
+    assert.ok(env.local[key].pendingRequest);
+    const count = env.forwardedMessages.length;
+    await Promise.all([command({ action: 'sync' }), command({ action: 'sync' })]);
+    assert.equal(env.forwardedMessages.length, count, 'Concurrent triggers cannot send duplicate starts');
+    const calls = sent.map((call, i) => ({ ...call, ident: String(i) }));
+    const responses = calls.map(call => ({ ident: call.ident, result: { response: call.name === 'getSummary'
+      ? { queues: [{ [idKey]: 40, level: 2, startDate: now, durationMs: 30000 }] } : {} } }));
+    await env.send('api-record', rpc(calls, responses, new Date(Date.now()).toISOString()), { ...gameSender, tab: { id: 1 } });
+    assert.equal(env.local[key].items.length, 0);
+    assert.ok(env.local[key + 'Logs'].some(log => log.action === 'start' && log.status === 'success'));
+    await command({ action: 'add', item: { ...item, [idKey]: 41 } });
+    env.local[key].wakeAt = now + 8 * 3600000; // A previous incorrect wait must not gate a new idle snapshot.
+    await env.send('api-record', summary([], [{ [idKey]: 40, level: 2 }]), { ...gameSender, tab: { id: 1 } });
+    assert.ok(env.forwardedMessages.at(-1).msg.calls.some(call => call.args?.[idKey] === 41 && call.name.startsWith('start')));
+    const duplicate = await command({ action: 'add', item: { ...item, [idKey]: 41 } });
+    assert.equal(duplicate.ok, false);
+    assert.match(duplicate.error, /already queued/);
+    assert.equal(env.local[key].items.length, 1);
+    assert.ok(env.local[key + 'Logs'].some(log => log.action === 'error'));
+  }
+});
+
+test('city queue stale waits are verified and completion is neither duplicated nor falsely logged', async t => {
+  const now = Date.parse('2026-11-13T08:33:46Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    const env = setup(), key = type + 'Queue', feature = type === 'building' ? 'building' : 'personalResearch';
+    const idKey = type === 'building' ? 'buildingId' : 'researchId';
+    env.tabsList.push({ id: 1, url: gameSender.url });
+    env.local.popupRpcEnabled = true; env.local.socketRefreshMode = 'piggyback';
+    env.local[key] = { enabled: true, items: [] };
+    env.local.rpcCache = { [type + 'Status']: { method: 'getSummary', updatedAt: new Date(now - 120000).toISOString(),
+      data: { queues: [{ [idKey]: 40, level: 2, startDate: now, durationMs: 8 * 3600000 }] } } };
+    const command = () => new Promise(resolve => env.listener({ kind: type + '-queue-action', action: 'sync' }, popupSender, resolve));
+    await command();
+    assert.equal(env.forwardedMessages.length, 1);
+    assert.equal(env.forwardedMessages[0].msg.kind, 'queue-rpc');
+    assert.equal(env.forwardedMessages[0].msg.calls[0].name, 'getSummary');
+    const summary = rpc([{ name: 'getSummary', feature, ident: 's' }],
+      [{ ident: 's', result: { response: { queues: [{ [idKey]: 40, level: 2, startDate: now - 31000, duration: 30000 }] } } }],
+      new Date(now).toISOString());
+    await env.send('api-record', summary, { ...gameSender, tab: { id: 1 } });
+    const dispatched = env.forwardedMessages.at(-1).msg.calls;
+    assert.ok(dispatched[0].name.startsWith('complete'));
+    assert.equal(env.local[key + 'Logs'].some(log => log.action === 'complete'), false);
+    const count = env.forwardedMessages.length;
+    await command(); await command();
+    assert.equal(env.forwardedMessages.length, count);
+    const calls = dispatched.map((call, i) => ({ ...call, ident: String(i) }));
+    const result = rpc(calls, calls.map(call => ({ ident: call.ident,
+      result: { response: call.name === 'getSummary' ? { queues: [] } : {} } })), new Date(now).toISOString());
+    await env.send('api-record', result, { ...gameSender, tab: { id: 1 } });
+    await env.send('api-record', result, { ...gameSender, tab: { id: 1 } });
+    assert.equal(env.local[key + 'Logs'].filter(log => log.action === 'complete').length, 1);
+  }
+});
+
+test('city queue timed-out dispatch is verified before retrying and retains its item', async t => {
+  const now = Date.parse('2026-11-13T08:33:46Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  const env = setup();
+  env.tabsList.push({ id: 1, url: gameSender.url });
+  env.local.popupRpcEnabled = true; env.local.socketRefreshMode = 'direct';
+  env.local.rpcCache = { buildingStatus: { method: 'getSummary', updatedAt: new Date(now).toISOString(), data: { queues: [] } } };
+  const command = data => new Promise(resolve => env.listener({ kind: 'building-queue-action', ...data }, popupSender, resolve));
+  await command({ action: 'add', item: { buildingId: 40, currentLevel: 1, nextLevel: 2, durationMs: 30000 } });
+  const oldStart = env.forwardedMessages[0].msg.calls.find(call => call.name === 'startConstruction').args.startDate;
+  t.mock.timers.tick(120001);
+  await command({ action: 'sync' });
+  assert.equal(env.forwardedMessages.at(-1).msg.calls[0].name, 'getSummary');
+  assert.equal(env.local.buildingQueue.items.length, 1);
+  const summary = rpc([{ name: 'getSummary', feature: 'building', ident: 'recheck' }],
+    [{ ident: 'recheck', result: { response: { queues: [] } } }], new Date(Date.now()).toISOString());
+  await env.send('api-record', summary, { ...gameSender, tab: { id: 1 } });
+  const retry = env.forwardedMessages.at(-1).msg.calls.find(call => call.name === 'startConstruction');
+  assert.ok(retry.args.startDate > oldStart);
+  assert.equal(env.local.buildingQueue.items.length, 1);
+});
+
+test('city queue rejected starts retain targets and never fabricate occupancy or success', async t => {
+  const now = Date.parse('2026-11-13T08:33:46Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  for (const type of ['building', 'research']) {
+    const env = setup(), key = type + 'Queue', feature = type === 'building' ? 'building' : 'personalResearch';
+    const idKey = type === 'building' ? 'buildingId' : 'researchId';
+    env.tabsList.push({ id: 1, url: gameSender.url });
+    env.local.popupRpcEnabled = true; env.local.socketRefreshMode = 'direct';
+    env.local.rpcCache = { [type + 'Status']: { method: 'getSummary', updatedAt: new Date(now).toISOString(), data: { queues: [] } } };
+    await new Promise(resolve => env.listener({ kind: type + '-queue-action', action: 'add',
+      item: { [idKey]: 40, currentLevel: 1, nextLevel: 2, durationMs: 30000 } }, popupSender, resolve));
+    const calls = env.forwardedMessages.at(-1).msg.calls.map((call, i) => ({ ...call, ident: String(i) }));
+    await env.send('api-record', rpc(calls, calls.map(call => ({ ident: call.ident,
+      result: call.name.startsWith('start') ? { error: 'Not enough resources', response: {} } : { response: { queues: [] } } })),
+      new Date(now).toISOString()), { ...gameSender, tab: { id: 1 } });
+    assert.equal(env.local[key].items.length, 1);
+    assert.equal(env.local.rpcCache[type + 'Status'].data.queues.length, 0);
+    assert.equal(env.local[key + 'Logs'].some(log => log.action === 'start' && log.status === 'success'), false);
+    assert.ok(env.local[key + 'Logs'].some(log => log.status === 'error' && log.message.includes('Not enough resources')));
+  }
+});
+
+test('city queue invalid adds are logged and shared RPC settings never discard saved work', async () => {
+  const env = setup();
+  const command = data => new Promise(resolve => env.listener({ kind: 'building-queue-action', ...data }, popupSender, resolve));
+  assert.equal((await command({ action: 'add', item: { buildingId: NaN } })).ok, false);
+  assert.ok(env.local.buildingQueueLogs.some(log => log.action === 'error'));
+  assert.equal(env.local.buildingQueue, undefined);
+  const reply = await command({ action: 'add', item: { buildingId: 40, currentLevel: 1, nextLevel: 2, durationMs: 30000 } });
+  assert.equal(reply.ok, true);
+  assert.equal(env.local.buildingQueue.items.length, 1);
+  assert.equal(env.forwardedMessages.length, 0);
+});
 
 test('RPC queue totals aggregate live game tabs and remove closed tabs', async () => {
   const { local, listener, removeTab } = setup();

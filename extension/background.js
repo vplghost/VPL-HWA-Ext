@@ -294,274 +294,273 @@ async function appendQueueLog(type, logEntry) {
   }
 }
 
-async function advanceBuildingQueue(tabId) {
-  const triggerTime = Date.now();
-  if (!tabId) {
-    const activeTab = await findActiveGameTab();
-    tabId = activeTab?.id;
-  }
-  if (!tabId) return null;
-  const stored = await chrome.storage.local.get(['buildingQueue', 'rpcCache', 'popupRpcEnabled',
-    'socketRefreshMode', 'captureSettings']).catch(() => ({}));
-  const queue = stored.buildingQueue;
-  if (!queue || queue.enabled === false) return queue;
-  const helper = globalThis.hwaHelperBuildingQueue;
-  if (!helper) return queue;
+const cityQueueLanes = new Map();
+function advanceBuildingQueue(tabId, record) { return advanceCityQueue('building', tabId, record); }
+function advanceResearchQueue(tabId, record) { return advanceCityQueue('research', tabId, record); }
 
+function advanceCityQueue(type, tabId, record) {
+  return inCityQueueLane(type, async () => {
+    try { return await runCityQueue(type, tabId, record); }
+    catch (error) {
+      await appendQueueLog(type, { action: 'error', status: 'error',
+        message: 'Queue evaluation failed: ' + (error?.message || String(error)), error: error?.message || String(error) });
+      return (await chrome.storage.local.get([type + 'Queue']).catch(() => ({})))[type + 'Queue'];
+    }
+  });
+}
+
+function inCityQueueLane(type, operation) {
+  const previous = cityQueueLanes.get(type) || Promise.resolve();
+  const run = previous.catch(() => {}).then(operation);
+  cityQueueLanes.set(type, run);
+  return run.finally(() => { if (cityQueueLanes.get(type) === run) cityQueueLanes.delete(type); });
+}
+
+function cityQueueItems(raw) {
+  return (Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? Object.values(raw) : [])
+    .filter(item => item && typeof item === 'object');
+}
+
+function cityMutationResults(record, request) {
+  if (!record || record.method !== 'POST' || record.status !== 200 ||
+      record.endpoint !== 'https://api.hero-wars-alliance.com/api/rpc' ||
+      record.requestBodyTruncated || record.responseBodyTruncated) return null;
   try {
-    const plan = helper.planNextStep(queue, stored.rpcCache, triggerTime);
+    const calls = JSON.parse(record.requestBody).calls || [];
+    const results = JSON.parse(record.responseBody).results || [];
+    const matched = request.calls.filter(call => call.name !== 'getSummary').map(expected => {
+      const call = calls.find(call => call.name === expected.name && call.feature === expected.feature &&
+        Object.entries(expected.args || {}).every(([key, value]) => call.args?.[key] === value));
+      if (!call) return null;
+      const response = results.find(result => result.ident === call.ident)?.result;
+      if (!response) return null;
+      return { name: expected.name, ok: !response.error && !response.response?.error &&
+        Object.hasOwn(response, 'response'), error: response.error || response.response?.error };
+    });
+    return matched.every(Boolean) ? matched : null;
+  } catch { return null; }
+}
 
-    // Skip items that are already completed
-    if (Array.isArray(plan.skippedItems) && plan.skippedItems.length > 0) {
-      for (const skipped of plan.skippedItems) {
-        const bName = globalThis.hwaHelperNameMap?.building?.[skipped.buildingId] || `Building #${skipped.buildingId}`;
-        await appendQueueLog('building', {
-          action: 'skip_completed',
-          status: 'warn',
-          targetId: skipped.buildingId,
-          targetName: bName,
-          level: skipped.currentLevel,
-          nextLevel: skipped.nextLevel,
-          message: `${bName} (Lv.${skipped.currentLevel}) is already at or above target Lv.${skipped.nextLevel}. Removed from queue.`
-        });
-      }
-      queue.items = plan.remainingItemsAfterSkip || plan.remainingItems || [];
-      await chrome.storage.local.set({ buildingQueue: queue });
+async function runCityQueue(type, tabId, record) {
+  const now = Date.now();
+  if (!tabId) tabId = (await findActiveGameTab())?.id;
+  const key = type + 'Queue';
+  const stored = await chrome.storage.local.get([key, 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  const queue = stored[key];
+  if (!queue || queue.enabled === false) return queue;
+  const helper = type === 'building' ? globalThis.hwaHelperBuildingQueue : globalThis.hwaHelperResearchQueue;
+  if (!helper) {
+    await appendQueueLog(type, { action: 'error', status: 'error', message: 'Queue planner is unavailable.' });
+    return queue;
+  }
+  const feature = type === 'building' ? 'building' : 'personalResearch';
+  const status = stored.rpcCache?.[type + 'Status'];
+  const summaryTime = status?.method === 'getSummary' ? Date.parse(status.updatedAt) : NaN;
+  const fresh = Number.isFinite(summaryTime) && summaryTime <= now + 5000 && now - summaryTime <= 60000;
+  const save = async () => { queue.updatedAt = Math.max(Date.now(), (Number(queue.updatedAt) || 0) + 1); await chrome.storage.local.set({ [key]: queue }); };
+  const log = async (action, message, status = 'info', extra = {}) =>
+    appendQueueLog(type, { action, status, message, ...extra });
+  if (!Array.isArray(queue.items)) {
+    queue.items = cityQueueItems(queue.items);
+    await save();
+    await log('repair', 'Recovered a non-array saved queue. Check its targets before continuing.', 'warn');
+  }
+  const idKey = type === 'building' ? 'buildingId' : 'researchId';
+  const rawQueues = status?.data?.queues;
+  const observed = Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {});
+
+  async function verify(reason) {
+    if (!tabId) {
+      if (queue.lastBlocked !== 'tab') { queue.lastBlocked = 'tab'; await save(); await log('blocked', 'Queue saved, but no active game tab is available.', 'warn'); }
+      return;
     }
-
-    if (plan.action === 'wait') {
-      if (queue.wakeAt !== plan.wakeAt) {
-        queue.wakeAt = plan.wakeAt;
-        await chrome.storage.local.set({ buildingQueue: queue });
-        await appendQueueLog('building', {
-          action: 'wait',
-          status: 'info',
-          message: `Builder occupied until ${new Date(plan.wakeAt).toLocaleTimeString()}. Waiting...`,
-          wakeAt: plan.wakeAt
-        });
-      }
-      return queue;
+    if (queue.lastVerifiedAt != null && now - queue.lastVerifiedAt < 15000) return;
+    const dispatch = rpcMessageForSettings(stored, [{ name: 'getSummary', feature, args: {} }]);
+    if (!dispatch) {
+      if (queue.lastBlocked !== 'settings') { queue.lastBlocked = 'settings'; await save(); await log('blocked', 'Queue saved. RPC dispatch is disabled by shared settings.', 'warn'); }
+      return;
     }
+    queue.lastBlocked = null;
+    queue.lastVerifiedAt = now;
+    queue.wakeAt = now + 15000;
+    await save();
+    try {
+      const reply = await chrome.tabs.sendMessage(tabId, { ...dispatch, group: type + '-queue-check', expiresAt: now + 120000 });
+      if (reply?.error || reply?.ok === false) throw new Error(reply.error || 'Game tab rejected summary request.');
+      await log('verify', reason + ' Requested current server summary.');
+    } catch (error) {
+      await log('error', 'Could not verify queue: ' + (error?.message || String(error)), 'error');
+    }
+  }
 
-    if (plan.calls && plan.calls.length > 0) {
-      const dispatch = rpcMessageForSettings(stored, plan.calls);
-      if (!dispatch) {
-        await appendQueueLog('building', {
-          action: 'blocked',
-          status: 'warn',
-          message: 'RPC dispatch blocked by settings (popupRpcEnabled is disabled).'
-        });
+  if (queue.pendingRequest) {
+    const request = queue.pendingRequest;
+    if (request.tabId !== tabId) return queue;
+    const outcomes = cityMutationResults(record, request);
+    let confirmed = outcomes && outcomes.every(result => result.ok);
+    let startConfirmed = outcomes?.some(result => result.ok && result.name.startsWith('start'));
+    // A newer authoritative summary can recover acknowledgement after a service-worker restart.
+    if (!outcomes && fresh && summaryTime >= request.issuedAt) {
+      if (request.startedItem) {
+        startConfirmed = observed.some(item => Number(item[idKey]) === Number(request.startedItem[idKey]) &&
+          Number(item.level ?? item.nextLevel) >= Number(request.startedItem.nextLevel));
+        confirmed = startConfirmed;
+      } else {
+        confirmed = request.calls.filter(call => call.name.startsWith('complete')).every(call =>
+          !observed.some(item => Number(item[idKey]) === Number(call.args[idKey])));
+      }
+    }
+    if (startConfirmed) {
+      const item = request.startedItem;
+      const index = (queue.items || []).findIndex(value => item.queueItemId
+        ? value.queueItemId === item.queueItemId
+        : Number(value[idKey]) === Number(item[idKey]) && Number(value.nextLevel) === Number(item.nextLevel));
+      if (index >= 0) queue.items.splice(index, 1);
+      queue.lastStarted = item;
+    }
+    if (confirmed || outcomes) {
+      queue.pendingRequest = null;
+      queue.wakeAt = null;
+      await save();
+      if (confirmed) {
+        await log(request.startedItem ? 'start' : 'complete',
+          request.startedItem ? 'Server confirmed queued upgrade started.' : 'Server confirmed finished upgrades completed.',
+          'success', { targetId: request.startedItem?.[idKey], nextLevel: request.startedItem?.nextLevel });
+      } else {
+        queue.retryAt = now + 30000;
+        await save();
+        await log('error', 'Server rejected queue action: ' + JSON.stringify(outcomes.filter(result => !result.ok).map(result => result.error)), 'error');
+        await verify('Checking state after rejected action.');
         return queue;
       }
-
-      const startedItem = plan.startedItem;
-      const bName = startedItem
-        ? (globalThis.hwaHelperNameMap?.building?.[startedItem.buildingId] || `Building #${startedItem.buildingId}`)
-        : 'Buildings';
-
-      await appendQueueLog('building', {
-        action: 'trigger',
-        status: 'info',
-        targetId: startedItem?.buildingId,
-        targetName: bName,
-        nextLevel: startedItem?.nextLevel,
-        durationMs: startedItem?.durationMs,
-        message: plan.action === 'start'
-          ? `Starting upgrade of ${bName} to Lv.${startedItem.nextLevel}...`
-          : 'Completing finished building constructions...',
-        rpcCalls: plan.calls
-      });
-
-      try {
-        const response = await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'building-queue',
-          expiresAt: Date.now() + 120000 });
-        if (response && response.error) {
-          throw new Error(response.error);
-        }
-
-        if (plan.action === 'start') {
-          queue.items = plan.remainingItems;
-          queue.wakeAt = plan.wakeAt;
-          queue.lastStarted = plan.startedItem;
-          await appendQueueLog('building', {
-            action: 'start',
-            status: 'success',
-            targetId: startedItem.buildingId,
-            targetName: bName,
-            nextLevel: startedItem.nextLevel,
-            durationMs: startedItem.durationMs,
-            message: `Successfully dispatched upgrade for ${bName} to Lv.${startedItem.nextLevel}. Next wake at ${new Date(plan.wakeAt).toLocaleTimeString()}.`
-          });
-        } else if (plan.action === 'complete-only') {
-          queue.wakeAt = null;
-          await appendQueueLog('building', {
-            action: 'complete',
-            status: 'success',
-            message: 'Successfully completed finished building constructions.'
-          });
-        }
-        await chrome.storage.local.set({ buildingQueue: queue });
-      } catch (e) {
-        await appendQueueLog('building', {
-          action: 'error',
-          status: 'error',
-          targetId: startedItem?.buildingId,
-          targetName: bName,
-          nextLevel: startedItem?.nextLevel,
-          error: e?.message || String(e),
-          message: `RPC error executing building queue for ${bName}: ${e?.message || String(e)}`
-        });
-        console.warn('Failed to dispatch building queue to tab', e);
+    } else if (now < request.expiresAt) {
+      return queue;
+    } else {
+      // Do not retry a mutation against old occupancy data.
+      if (!fresh || summaryTime < request.expiresAt) {
+        await verify('Queue action acknowledgement timed out.');
+        return queue;
       }
-    } else if (plan.action === 'idle' && queue.wakeAt) {
-      queue.wakeAt = null;
-      await chrome.storage.local.set({ buildingQueue: queue });
+      queue.pendingRequest = null;
+      await save();
+      await log('retry', 'No start was observed after dispatch. Retrying from the verified server state.', 'warn');
     }
-  } catch (execError) {
-    await appendQueueLog('building', {
-      action: 'error',
-      status: 'error',
-      error: execError?.message || String(execError),
-      message: `Exception in building queue planning: ${execError?.message || String(execError)}`
-    });
-    console.error('Exception in advanceBuildingQueue', execError);
+  }
+  const hasWork = (queue.items || []).length > 0 || observed.length > 0 || Boolean(queue.wakeAt);
+  if (!hasWork) return queue;
+  if (!fresh) {
+    await verify('Cached occupancy is missing, stale, or estimated.');
+    return queue;
+  }
+  if (queue.retryAt > now) return queue;
+  if (!tabId) { await verify('Checking idle queue.'); return queue; }
+
+  const plan = helper.planNextStep(queue, stored.rpcCache, now);
+  if (plan.skippedItems?.length) {
+    queue.items = plan.remainingItemsAfterSkip;
+    await save();
+    for (const item of plan.skippedItems) await log('skip_completed', 'Removed already completed target ' + item[idKey] + ' level ' + item.nextLevel + '.', 'warn');
+  }
+  if (plan.action === 'wait') {
+    const observedEnd = plan.wakeAt - 1000;
+    const changedWait = queue.waitUntil !== observedEnd;
+    queue.waitUntil = observedEnd;
+    queue.wakeAt = Math.min(plan.wakeAt, now + 60000);
+    await save();
+    if (changedWait) await log('wait', 'Observed upgrade ends at ' + new Date(observedEnd).toLocaleTimeString() +
+      '. Occupancy will be checked again within 60 seconds.', 'info', { waitUntil: observedEnd, wakeAt: queue.wakeAt });
+    return queue;
+  }
+  queue.waitUntil = null;
+  if (!plan.calls?.length) {
+    queue.wakeAt = null;
+    await save();
+    return queue;
+  }
+  const invalidMutation = plan.calls.find(call => call.name !== 'getSummary' &&
+    (!Number.isInteger(Number(call.args?.[idKey])) || Number(call.args[idKey]) <= 0 ||
+      !Number.isInteger(Number(call.args?.nextLevel ?? call.args?.level)) || Number(call.args.nextLevel ?? call.args.level) <= 0));
+  if (invalidMutation) {
+    queue.retryAt = now + 30000;
+    await save();
+    await log('error', 'Queue planner produced an invalid target or level. Remove the invalid item before retrying.', 'error');
+    return queue;
+  }
+  const dispatch = rpcMessageForSettings(stored, plan.calls);
+  if (!dispatch) { await verify('Queue is idle.'); return queue; }
+  queue.pendingRequest = { calls: plan.calls, startedItem: plan.startedItem || null,
+    issuedAt: now, expiresAt: now + 120000, tabId };
+  queue.wakeAt = now + 120000;
+  await save();
+  try {
+    const reply = await chrome.tabs.sendMessage(tabId, { ...dispatch, group: type + '-queue', expiresAt: now + 120000 });
+    if (reply?.error || reply?.ok === false) throw new Error(reply.error || 'Game tab rejected queue command.');
+    await log('trigger', plan.startedItem ? 'Dispatched queued upgrade; awaiting server confirmation.'
+      : 'Dispatched completion; awaiting server confirmation.', 'info',
+      { targetId: plan.startedItem?.[idKey], nextLevel: plan.startedItem?.nextLevel, rpcCalls: plan.calls });
+  } catch (error) {
+    queue.pendingRequest = null;
+    queue.retryAt = now + 30000;
+    await save();
+    await log('error', 'Queue dispatch failed: ' + (error?.message || String(error)), 'error');
   }
   return queue;
 }
 
-async function advanceResearchQueue(tabId) {
-  const triggerTime = Date.now();
-  if (!tabId) {
-    const activeTab = await findActiveGameTab();
-    tabId = activeTab?.id;
-  }
-  if (!tabId) return null;
-  const stored = await chrome.storage.local.get(['researchQueue', 'rpcCache', 'popupRpcEnabled',
-    'socketRefreshMode', 'captureSettings']).catch(() => ({}));
-  const queue = stored.researchQueue;
-  if (!queue || queue.enabled === false) return queue;
-  const helper = globalThis.hwaHelperResearchQueue;
-  if (!helper) return queue;
+function mutateCityQueue(type, message) {
+  return inCityQueueLane(type, () => runCityQueueMutation(type, message));
+}
 
+async function runCityQueueMutation(type, message) {
+  const key = type + 'Queue';
+  const idKey = type === 'building' ? 'buildingId' : 'researchId';
   try {
-    const plan = helper.planNextStep(queue, stored.rpcCache, triggerTime);
-
-    // Skip items that are already completed
-    if (Array.isArray(plan.skippedItems) && plan.skippedItems.length > 0) {
-      for (const skipped of plan.skippedItems) {
-        const rName = globalThis.hwaHelperNameMap?.research?.[skipped.researchId] || `Research #${skipped.researchId}`;
-        await appendQueueLog('research', {
-          action: 'skip_completed',
-          status: 'warn',
-          targetId: skipped.researchId,
-          targetName: rName,
-          level: skipped.currentLevel,
-          nextLevel: skipped.nextLevel,
-          message: `${rName} (Lv.${skipped.currentLevel}) is already at or above target Lv.${skipped.nextLevel}. Removed from queue.`
-        });
-      }
-      queue.items = plan.remainingItemsAfterSkip || plan.remainingItems || [];
-      await chrome.storage.local.set({ researchQueue: queue });
+    const stored = await chrome.storage.local.get([key]);
+    const queue = { enabled: true, ...stored[key], items: cityQueueItems(stored[key]?.items) };
+    if (stored[key]?.items != null && !Array.isArray(stored[key].items)) {
+      await appendQueueLog(type, { action: 'repair', status: 'warn', message: 'Recovered a non-array saved queue before applying the action.' });
     }
-
-    if (plan.action === 'wait') {
-      if (queue.wakeAt !== plan.wakeAt) {
-        queue.wakeAt = plan.wakeAt;
-        await chrome.storage.local.set({ researchQueue: queue });
-        await appendQueueLog('research', {
-          action: 'wait',
-          status: 'info',
-          message: `Research Center occupied until ${new Date(plan.wakeAt).toLocaleTimeString()}. Waiting...`,
-          wakeAt: plan.wakeAt
-        });
+    const action = message.action || 'sync';
+    if (action === 'add') {
+      const item = message.item;
+      if (!item || !Number.isInteger(item[idKey]) || item[idKey] <= 0 ||
+          !Number.isInteger(item.nextLevel) || item.nextLevel <= 0 ||
+          !Number.isFinite(item.durationMs) || item.durationMs < 0 ||
+          !Number.isFinite(item.currentLevel) || item.currentLevel >= item.nextLevel) {
+        throw new Error('Invalid queue target, level, or duration.');
       }
-      return queue;
+      if (queue.items.some(value => value[idKey] === item[idKey] && value.nextLevel === item.nextLevel)) {
+        throw new Error('This target level is already queued.');
+      }
+      queue.items.push({ ...item, queueItemId: String(Date.now()) + '-' + Math.random().toString(36).slice(2), addedAt: Date.now() });
+    } else if (action === 'remove' || action === 'move') {
+      const index = queue.items.findIndex(value => message.item?.queueItemId
+        ? value.queueItemId === message.item.queueItemId
+        : value[idKey] === message.item?.[idKey] && value.nextLevel === message.item?.nextLevel);
+      if (index < 0) throw new Error('Queue changed before this action. Refresh and try again.');
+      const item = queue.items.splice(index, 1)[0];
+      if (action === 'move') {
+        const target = Math.max(0, Math.min(queue.items.length, index + (message.direction === 'up' ? -1 : 1)));
+        queue.items.splice(target, 0, item);
+      }
+    } else if (action === 'clear') queue.items = [];
+    else if (action === 'enabled') queue.enabled = message.enabled === true;
+    else if (action !== 'sync') throw new Error('Unknown queue action: ' + action);
+    if (action !== 'sync') {
+      queue.updatedAt = Math.max(Date.now(), (Number(queue.updatedAt) || 0) + 1);
+      await chrome.storage.local.set({ [key]: queue });
+      await appendQueueLog(type, { action: action === 'add' ? 'enqueue' : action, status: 'info',
+        message: action === 'add' ? 'Saved queue target ' + message.item[idKey] + ' level ' + message.item.nextLevel + '.'
+          : 'Queue action saved: ' + action + '.' });
     }
-
-    if (plan.calls && plan.calls.length > 0) {
-      const dispatch = rpcMessageForSettings(stored, plan.calls);
-      if (!dispatch) {
-        await appendQueueLog('research', {
-          action: 'blocked',
-          status: 'warn',
-          message: 'RPC dispatch blocked by settings (popupRpcEnabled is disabled).'
-        });
-        return queue;
-      }
-
-      const startedItem = plan.startedItem;
-      const rName = startedItem
-        ? (globalThis.hwaHelperNameMap?.research?.[startedItem.researchId] || `Research #${startedItem.researchId}`)
-        : 'Researches';
-
-      await appendQueueLog('research', {
-        action: 'trigger',
-        status: 'info',
-        targetId: startedItem?.researchId,
-        targetName: rName,
-        nextLevel: startedItem?.nextLevel,
-        durationMs: startedItem?.durationMs,
-        message: plan.action === 'start'
-          ? `Starting research of ${rName} to Lv.${startedItem.nextLevel}...`
-          : 'Completing finished research...',
-        rpcCalls: plan.calls
-      });
-
-      try {
-        const response = await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'research-queue',
-          expiresAt: Date.now() + 120000 });
-        if (response && response.error) {
-          throw new Error(response.error);
-        }
-
-        if (plan.action === 'start') {
-          queue.items = plan.remainingItems;
-          queue.wakeAt = plan.wakeAt;
-          queue.lastStarted = plan.startedItem;
-          await appendQueueLog('research', {
-            action: 'start',
-            status: 'success',
-            targetId: startedItem.researchId,
-            targetName: rName,
-            nextLevel: startedItem.nextLevel,
-            durationMs: startedItem.durationMs,
-            message: `Successfully dispatched research for ${rName} to Lv.${startedItem.nextLevel}. Next wake at ${new Date(plan.wakeAt).toLocaleTimeString()}.`
-          });
-        } else if (plan.action === 'complete-only') {
-          queue.wakeAt = null;
-          await appendQueueLog('research', {
-            action: 'complete',
-            status: 'success',
-            message: 'Successfully completed finished research.'
-          });
-        }
-        await chrome.storage.local.set({ researchQueue: queue });
-      } catch (e) {
-        await appendQueueLog('research', {
-          action: 'error',
-          status: 'error',
-          targetId: startedItem?.researchId,
-          targetName: rName,
-          nextLevel: startedItem?.nextLevel,
-          error: e?.message || String(e),
-          message: `RPC error executing research queue for ${rName}: ${e?.message || String(e)}`
-        });
-        console.warn('Failed to dispatch research queue to tab', e);
-      }
-    } else if (plan.action === 'idle' && queue.wakeAt) {
-      queue.wakeAt = null;
-      await chrome.storage.local.set({ researchQueue: queue });
-    }
-  } catch (execError) {
-    await appendQueueLog('research', {
-      action: 'error',
-      status: 'error',
-      error: execError?.message || String(execError),
-      message: `Exception in research queue planning: ${execError?.message || String(execError)}`
-    });
-    console.error('Exception in advanceResearchQueue', execError);
+    await runCityQueue(type);
+    const latest = await chrome.storage.local.get([key]);
+    return { ok: true, queue: latest[key] };
+  } catch (error) {
+    const reason = error?.message || String(error);
+    await appendQueueLog(type, { action: 'error', status: 'error', message: 'Queue action failed: ' + reason, error: reason });
+    return { ok: false, error: reason, logged: true };
   }
-  return queue;
 }
 
 function setupQueueAlarms() {
@@ -1105,14 +1104,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message?.kind === 'building-queue-action') {
-    pending = pending.then(async () => {
-      const tab = await findActiveGameTab();
-      if (tab) {
-        return advanceBuildingQueue(tab.id).then(() => ({ ok: true }));
-      }
-      return { ok: false, error: 'No active game tab found.' };
-    });
-    pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.then(() => mutateCityQueue('building', message));
+    pending.then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
     pending = pending.catch(() => {});
     return true;
   }
@@ -1131,14 +1124,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message?.kind === 'research-queue-action') {
-    pending = pending.then(async () => {
-      const tab = await findActiveGameTab();
-      if (tab) {
-        return advanceResearchQueue(tab.id).then(() => ({ ok: true }));
-      }
-      return { ok: false, error: 'No active game tab found.' };
-    });
-    pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.then(() => mutateCityQueue('research', message));
+    pending.then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
     pending = pending.catch(() => {});
     return true;
   }
@@ -1518,8 +1505,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id);
     if (sender.tab?.id) await updateTowerRun(record, sender.tab.id);
     if (sender.tab?.id) await updateDungeonRun(record, sender.tab.id);
-    if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id);
-    if (sender.tab?.id) await advanceResearchQueue(sender.tab.id);
+    if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id, record);
+    if (sender.tab?.id) await advanceResearchQueue(sender.tab.id, record);
     if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id);
     if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id);
     if (stored.popupRpcEnabled === true && sender.tab?.id) {

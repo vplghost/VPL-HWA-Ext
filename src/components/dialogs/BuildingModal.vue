@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useCityQueueActions } from '@/src/composables/useCityQueueActions';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getBuildingName } from '@/src/utils/metadata';
 import { formatDuration } from '@/src/utils/formatters';
@@ -43,6 +44,9 @@ const buildingQueue = ref<BuildingQueueState>({
   items: [],
 });
 
+const { commandQueue, queueError, queueBusy, applyQueueSnapshot } = useCityQueueActions('building', queue => {
+  buildingQueue.value = { enabled: queue.enabled !== false, items: Array.isArray(queue.items) ? queue.items : [] };
+});
 const isLoaded = ref(false);
 const queueLogs = ref<any[]>([]);
 const showLogs = ref(false);
@@ -58,11 +62,7 @@ async function clearLogs() {
 function onStorageChanged(changes: Record<string, chrome.storage.StorageChange>, area: string) {
   if (area !== 'local') return;
   if (changes.buildingQueue?.newValue) {
-    const n = changes.buildingQueue.newValue as Partial<BuildingQueueState>;
-    buildingQueue.value = {
-      enabled: n.enabled !== false,
-      items: Array.isArray(n.items) ? n.items : [],
-    };
+    applyQueueSnapshot(changes.buildingQueue.newValue);
   }
   if (changes.buildingQueueLogs?.newValue) {
     queueLogs.value = Array.isArray(changes.buildingQueueLogs.newValue) ? changes.buildingQueueLogs.newValue : [];
@@ -78,10 +78,7 @@ onMounted(async () => {
     try {
       const stored = await chrome.storage.local.get(['buildingQueue', 'buildingQueueLogs']) as { buildingQueue?: Partial<BuildingQueueState>; buildingQueueLogs?: unknown };
       if (stored.buildingQueue) {
-        buildingQueue.value = {
-          enabled: stored.buildingQueue.enabled !== false,
-          items: Array.isArray(stored.buildingQueue.items) ? stored.buildingQueue.items : [],
-        };
+        applyQueueSnapshot(stored.buildingQueue);
       }
       if (Array.isArray(stored.buildingQueueLogs)) {
         queueLogs.value = stored.buildingQueueLogs;
@@ -132,22 +129,7 @@ watch(
 );
 
 async function saveBuildingQueue() {
-  if (!isLoaded.value) return;
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    const stored = await chrome.storage.local.get(['buildingQueue']).catch(() => ({})) as { buildingQueue?: Partial<BuildingQueueState> };
-    const prev = stored?.buildingQueue || {};
-    await chrome.storage.local.set({
-      buildingQueue: {
-        ...prev,
-        enabled: buildingQueue.value.enabled,
-        items: buildingQueue.value.items,
-        updatedAt: Date.now(),
-      },
-    });
-    try {
-      chrome.runtime?.sendMessage?.({ kind: 'building-queue-action', action: 'sync' });
-    } catch {}
-  }
+  await commandQueue('enabled', { enabled: buildingQueue.value.enabled });
 }
 
 // Queues from cache
@@ -225,23 +207,17 @@ const queueTimeline = computed(() => {
 });
 
 function moveQueueItem(idx: number, direction: 'up' | 'down') {
-  const newIdx = direction === 'up' ? idx - 1 : idx + 1;
-  if (newIdx < 0 || newIdx >= buildingQueue.value.items.length) return;
-  if (idx < 0 || idx >= buildingQueue.value.items.length) return;
-  const item = buildingQueue.value.items.splice(idx, 1)[0];
-  if (!item) return;
-  buildingQueue.value.items.splice(newIdx, 0, item);
-  saveBuildingQueue();
+  const item = buildingQueue.value.items[idx];
+  if (item) void commandQueue('move', { item: { ...item }, direction });
 }
 
 function removeQueueItem(idx: number) {
-  buildingQueue.value.items.splice(idx, 1);
-  saveBuildingQueue();
+  const item = buildingQueue.value.items[idx];
+  if (item) void commandQueue('remove', { item: { ...item } });
 }
 
 function clearQueue() {
-  buildingQueue.value.items = [];
-  saveBuildingQueue();
+  void commandQueue('clear');
 }
 
 // Raw buildings from cache
@@ -427,14 +403,13 @@ function locateBuilding(b: any) {
   el?.focus();
 }
 
-function addToQueue(candidate: any) {
-  buildingQueue.value.items.push({
+async function addToQueue(candidate: any) {
+  await commandQueue('add', { item: {
     buildingId: Number(candidate.id),
     currentLevel: Number(candidate.currentLevel ?? candidate.level ?? 0),
     nextLevel: Number(candidate.nextLevel ?? 1),
     durationMs: Number(candidate.durationMs) || 60000,
-  });
-  saveBuildingQueue();
+  } });
 }
 
 const isStarting = ref<Record<string, boolean>>({});
@@ -715,6 +690,7 @@ async function refreshBuildings() {
               </div>
             </div>
 
+            <p v-if="queueError" role="alert" class="text-xs text-rose-600 dark:text-rose-400">{{ queueError }}</p>
             <!-- Queue list -->
             <div v-if="queueTimeline.items.length > 0" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
               <div
@@ -983,6 +959,7 @@ async function refreshBuildings() {
                     class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600 shrink-0"
                     :title="`Add ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel} to auto-build queue`"
                     :aria-label="`Queue ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel}`"
+                    :disabled="queueBusy"
                     @click="addToQueue(b)"
                   >
                     <span>➕</span>
