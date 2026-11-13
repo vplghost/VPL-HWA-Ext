@@ -133,6 +133,7 @@ test('Rejected troop actions never fabricate queues, collected units, or healing
   const previous = globalThis.chrome;
   t.after(() => { globalThis.chrome = previous; });
   const snapshot = {
+    buildingStatus: { data: { buildings: [{ buildingId: 41, level: 1 }] } },
     'getUnitSummary:unit': { data: { available: [{ unitId: 1, count: 2 }] } },
     'getTrainings:unit': { data: { trainingQueues: [{ unitId: 1, unitCount: 3, startDate: 1, duration: 10 }] } },
     'getHealing:unit': { data: { injuredUnits: [{ unitId: 1, count: 4 }], healing: { startDate: 1, duration: 1, units: [{ unitId: 1, count: 4 }] } } },

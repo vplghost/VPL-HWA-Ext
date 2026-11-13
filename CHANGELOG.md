@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.56 — 2026-11-13
+
+### Fixed
+
+- Derive troop stock limits from verified cumulative bonuses at each completed Drill Grounds and Camp level.
+- Count all three Drill Grounds independently and use the matching Camp for Marksmen, Spearmen and Infantry.
+- Remove guessed linear limits and training-batch research bonuses from stock capacity; existing excess troops no longer inflate the displayed limit.
+- Show unknown limits and block training until building data is synchronized; troop refresh now includes the building summary.
+
 ## 0.10.55 — 2026-11-13
 
 ### Fixed

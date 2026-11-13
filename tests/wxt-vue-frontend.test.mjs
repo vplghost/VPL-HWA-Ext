@@ -432,14 +432,11 @@ test('useTroopTraining exports normalizeArray and guards against non-array paylo
     }
   };
 
-  // Marksmen: 5000 + 10 * 1500 + 4 * 500 = 22,000
-  assert.equal(calculateTroopMax(0, mockCache, 12000), 22000);
-  // Spearmen: 5000 + 5 * 1500 + 4 * 500 = 14,500
-  assert.equal(calculateTroopMax(1, mockCache, 5000), 14500);
-  // Fallback when current total exceeds capacity:
-  assert.equal(calculateTroopMax(1, mockCache, 18000), 18000);
-  // Fallback when no buildings:
-  assert.equal(calculateTroopMax(0, {}, 3000), 10000);
+  // Verified cumulative permanent stock bonuses; trainingCapacity research is separate.
+  assert.equal(calculateTroopMax(0, mockCache, 12000), 9500);
+  assert.equal(calculateTroopMax(1, mockCache, 5000), 6150);
+  assert.equal(calculateTroopMax(1, mockCache, 18000), 6150, 'Overflow must not inflate the real limit');
+  assert.equal(calculateTroopMax(0, {}, 3000), null, 'Unknown buildings do not imply a guessed limit');
 
   const overview = await readFile(join(root, 'src/components/dashboard/TroopsOverview.vue'), 'utf8');
   assert.match(overview, /normalizeArray/, 'TroopsOverview must use normalizeArray');
@@ -1165,8 +1162,7 @@ test('ResearchModal accurately loads completedResearches and excludes max-level 
   assert.match(researchModal, /isMaxLevel/, 'Must compute isMaxLevel for completed techs');
   assert.match(researchModal, /r\.maxLevel > 0 && \(r\.currentLevel >= r\.maxLevel \|\| r\.nextLevel > r\.maxLevel\)/, 'Must filter out maxed-out techs from Next candidates');
 
-  const troopsUtil = await readFile(join(root, 'src/utils/troops.ts'), 'utf8');
-  assert.match(troopsUtil, /cache\?\.researchStatus\?\.data\?\.completedResearches/, 'troops.ts must query completedResearches');
+
 });
 
 test('Session recording, MQTT capture, and building/research controls operate seamlessly', async () => {

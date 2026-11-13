@@ -15,7 +15,7 @@ export interface TroopUnitState {
   healingEndsAt: number | null;
   trainingCount: number;
   trainingEndsAt: number | null;
-  maxTroops: number;
+  maxTroops: number | null;
 }
 
 export interface RpcCache {

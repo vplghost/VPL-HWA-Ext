@@ -34,8 +34,9 @@ function handleLevelChange(type: number, event: Event) {
 function getCardState(t: any) {
   const currentTotal = t.readyCount + t.hospitalCount + t.trainingCount;
   const maxTarget = t.maxTroops;
-  const remaining = maxTarget - currentTotal;
-  const canTrain = remaining > 0;
+  const limitKnown = Number.isSafeInteger(maxTarget) && maxTarget >= 0;
+  const remaining = limitKnown ? Math.max(0, maxTarget - currentTotal) : 0;
+  const canTrain = limitKnown && remaining > 0;
   const unitsToTrain = Math.min(26, Math.max(0, remaining));
 
   const queuesForType = normalizeArray(trainings.value?.trainingQueues).filter((q: any) => {
@@ -62,7 +63,7 @@ function getCardState(t: any) {
   const highestReadyLevel = levelsSorted.length > 0 ? levelsSorted[levelsSorted.length - 1][0] : 7;
   const selectedLevel = typeof savedLevel === 'number' && savedLevel >= 1 && savedLevel <= 9 ? savedLevel : highestReadyLevel;
 
-  const maxForBar = Math.max(maxTarget, currentTotal);
+  const maxForBar = Math.max(limitKnown ? maxTarget : 0, currentTotal);
   const readyPct = maxForBar > 0 ? (t.readyCount / maxForBar) * 100 : 0;
   const hospitalPct = maxForBar > 0 ? (t.hospitalCount / maxForBar) * 100 : 0;
   const trainingPct = maxForBar > 0 ? (t.trainingCount / maxForBar) * 100 : 0;
@@ -76,6 +77,7 @@ function getCardState(t: any) {
   return {
     currentTotal,
     maxTarget,
+    limitKnown,
     remaining,
     canTrain,
     unitsToTrain,
@@ -172,9 +174,9 @@ const troopCards = computed(() => {
             <div class="flex items-center gap-1.5 text-xs">
               <span
                 class="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
-                title="Troop limit based on Camp level and researches"
+                title="Troop stock limit from confirmed Drill Grounds and Camp levels"
               >
-                Cap: <strong class="text-slate-700 dark:text-slate-200 font-bold tabular-nums">{{ formatNumber(st.maxTarget) }}</strong>
+                Cap: <strong class="text-slate-700 dark:text-slate-200 font-bold tabular-nums">{{ st.limitKnown ? formatNumber(st.maxTarget) : 'Unknown' }}</strong>
               </span>
               <span class="text-slate-300 dark:text-slate-600">·</span>
               <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums">
@@ -245,6 +247,7 @@ const troopCards = computed(() => {
               <span v-else-if="st.activeQueue" class="text-indigo-600 dark:text-indigo-400 font-medium">
                 In training
               </span>
+              <span v-else-if="!st.limitKnown" class="text-amber-600 dark:text-amber-400">Sync building levels to determine the limit</span>
               <span v-else-if="!st.canTrain" class="text-amber-600 dark:text-amber-400 font-medium">
                 Max reached ({{ formatNumber(st.currentTotal) }})
               </span>
@@ -292,12 +295,12 @@ const troopCards = computed(() => {
                   :title="
                     st.canTrain && st.unitsToTrain > 0
                       ? `Train ${st.unitsToTrain} units (up to max ${formatNumber(st.maxTarget)})`
-                      : `Cannot train: total units (${formatNumber(st.currentTotal)}) reached max threshold (${formatNumber(st.maxTarget)})`
+                      : st.limitKnown ? `Cannot train: total units (${formatNumber(st.currentTotal)}) reached max threshold (${formatNumber(st.maxTarget)})` : 'Sync building levels before training'
                   "
                   @click="startTrain(t.type, st.selectedLevel)"
                 >
                   <span>⚔️</span>
-                  <span>{{ st.canTrain && st.unitsToTrain > 0 ? `Train (${st.unitsToTrain})` : 'Maxed' }}</span>
+                  <span>{{ st.canTrain && st.unitsToTrain > 0 ? `Train (${st.unitsToTrain})` : st.limitKnown ? 'Maxed' : 'Unknown limit' }}</span>
                 </button>
               </div>
 

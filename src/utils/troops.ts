@@ -1,3 +1,5 @@
+import { CAMP_LIMIT_BY_LEVEL, DRILL_GROUND_BUILDING_IDS, DRILL_GROUND_LIMIT_BY_LEVEL } from './troopLimitData.ts';
+
 export function getTroopType(unitId: number | string): { type: 0 | 1 | 2; level: number } | null {
   const id = Number(unitId);
   if (id >= 1 && id <= 9) return { type: 0, level: id };
@@ -25,55 +27,33 @@ export const CAMP_BUILDING_IDS: Record<number, number> = {
   2: 40, // Infantry Camp
 };
 
-export const CAMP_EXPANSION_RESEARCH_IDS = [3, 50, 59, 81, 90, 115, 125, 149, 158, 180, 189, 214, 224, 492];
-
-export function calculateTroopMax(
-  type: number,
-  cache: any,
-  currentTotal = 0
-): number {
+/** Stock limit, distinct from per-march capacity and per-batch trainingCapacity. */
+export function calculateTroopMax(type: number, cache: any, _currentTotal = 0): number | null {
   const campId = CAMP_BUILDING_IDS[type];
-  const buildings = normalizeArray(
-    cache?.buildingStatus?.data?.buildings ||
-    cache?.clan_getSummary?.data?.buildings ||
-    cache?.['buildingStatus']?.data?.buildings
-  );
-  const camp = buildings.find((b: any) => Number(b?.buildingId) === campId);
-  const campLevel = camp ? Number(camp.level) || 0 : 0;
-
-  // Direct capacity from building object if present
-  if (camp && typeof camp.capacity === 'number' && camp.capacity > 0) {
-    return Math.max(camp.capacity, currentTotal);
+  if (!campId) return null;
+  const raw = cache?.buildingStatus?.data?.buildings ?? cache?.['getSummary:building']?.data?.buildings;
+  if (raw == null) {
+    const unitSummary = cache?.['getUnitSummary:unit']?.data ?? cache?.getUnitSummary?.data;
+    const direct = unitSummary?.limits?.[type];
+    return Number.isSafeInteger(direct) && direct >= 0 ? direct : null;
   }
-
-  // Direct limits from unit summary if present
-  const unitSummary = cache?.['getUnitSummary:unit']?.data || cache?.getUnitSummary?.data;
-  if (unitSummary?.limits && typeof unitSummary.limits[type] === 'number' && unitSummary.limits[type] > 0) {
-    return Math.max(unitSummary.limits[type], currentTotal);
+  if (typeof raw !== 'object') return null;
+  const confirmed = new Map<number, number>();
+  for (const [key, value] of Object.entries(raw)) {
+    const building: any = value;
+    const id = Number(building?.buildingId ?? building?.id ?? (!Array.isArray(raw) ? key : NaN));
+    const rawLevel = typeof building === 'number' ? building : building?.level;
+    const level = rawLevel == null ? NaN : Number(rawLevel);
+    if (![campId, ...DRILL_GROUND_BUILDING_IDS].includes(id)) continue;
+    if (!Number.isInteger(level) || level < 0) return null;
+    confirmed.set(id, level);
   }
-
-  const researches = normalizeArray(
-    cache?.researchStatus?.data?.completedResearches ||
-    cache?.researchStatus?.data?.researches ||
-    cache?.clan_getSummary?.data?.completedResearches ||
-    cache?.clan_getSummary?.data?.researches ||
-    cache?.['researchStatus']?.data?.completedResearches ||
-    cache?.['researchStatus']?.data?.researches
-  );
-
-  let expansionBonus = 0;
-  for (const r of researches) {
-    const rId = Number(r?.researchId);
-    if (CAMP_EXPANSION_RESEARCH_IDS.includes(rId)) {
-      const lvl = Number(r?.level) || 0;
-      expansionBonus += lvl * 500;
-    }
+  let limit = 0;
+  for (const id of [campId, ...DRILL_GROUND_BUILDING_IDS]) {
+    const level = confirmed.get(id) ?? 0;
+    const value = (id === campId ? CAMP_LIMIT_BY_LEVEL : DRILL_GROUND_LIMIT_BY_LEVEL)[level];
+    if (value == null) return null; // Never extrapolate unsupported building levels.
+    limit += value;
   }
-
-  if (campLevel > 0) {
-    const baseCapacity = 5000 + (campLevel * 1500) + expansionBonus;
-    return Math.max(baseCapacity, currentTotal);
-  }
-
-  return Math.max(10000, currentTotal);
+  return limit;
 }

@@ -175,10 +175,9 @@ export function useTroopTraining() {
       }
     }
 
-    // Calculate maxTroops per type dynamically from Drill Grounds / Camps and researches
+    // Stock capacity comes from confirmed Drill Grounds and Camp building levels.
     for (const t of stats) {
-      const currentTotal = t.readyCount + t.hospitalCount + t.trainingCount;
-      t.maxTroops = calculateTroopMax(t.type, cache.value, currentTotal);
+      t.maxTroops = calculateTroopMax(t.type, cache.value);
     }
 
     return stats;
@@ -188,6 +187,7 @@ export function useTroopTraining() {
     isRefreshing.value = true;
     try {
       await dispatchRpc([
+        { name: 'getSummary', feature: 'building' },
         { name: 'getUnitSummary', feature: 'unit' },
         { name: 'getTrainings', feature: 'unit' },
         { name: 'getHealing', feature: 'unit' },
@@ -211,7 +211,7 @@ export function useTroopTraining() {
 
   async function startTrain(type: 0 | 1 | 2, chosenLevel: number) {
     const t = troopStats.value[type];
-    if (!t) return;
+    if (!t || t.maxTroops == null) return;
     const currentTotal = t.readyCount + t.hospitalCount + t.trainingCount;
     const remaining = t.maxTroops - currentTotal;
     if (remaining <= 0) return;
