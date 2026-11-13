@@ -65,7 +65,15 @@ interface QuestCardItem {
   tierInfo?: string;
   progress: number;
   reward: any;
-  state: 'ready' | 'inProgress' | 'done';
+  state: 'ready' | 'inProgress' | 'done' | 'cannotPerform';
+  isUnavailable?: boolean;
+}
+
+function isTowerChestQuest(id: string | number, title?: string): boolean {
+  const tid = Number(id);
+  if ([365, 10019, 10082, 10083, 10084, 10085, 10107].includes(tid)) return true;
+  if (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title)) return true;
+  return false;
 }
 
 function parseRewardText(reward: any): string {
@@ -103,6 +111,15 @@ const allItems = computed<QuestCardItem[]>(() => {
     ? `Resets ${new Date(nextResetTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : 'Daily reset';
 
+  const isTowerCleared = Boolean(
+    c?.towerStatus?.data?.isCleared ||
+    c?.towerStatus?.data?.state === 'win' ||
+    c?.towerStatus?.data?.state === 'completed' ||
+    c?.towerSession?.data?.completed ||
+    c?.magicTower_briefInfo?.data?.state === 'win' ||
+    c?.['magicTower_briefInfo']?.state === 'win'
+  );
+
   const rawQAll = c?.questGetAll?.data ?? c?.quest_getAll?.data;
   const qAll = normalizeArray(rawQAll);
 
@@ -119,13 +136,15 @@ const allItems = computed<QuestCardItem[]>(() => {
     seenIds.add(qIdStr);
     const qAllEntry = qAllMap.get(qIdStr);
 
-    const isReady = qAllEntry?.state === 2 || dq.state === 2;
-    const isDone = dq.state === 'completed' || dq.state === 3 || qAllEntry?.state === 3;
-    const state = isReady ? 'ready' : isDone ? 'done' : 'inProgress';
-
     const title = questData?.dailyTitle?.(dq) || qAllEntry?.name || `Daily Quest #${dq.id}`;
     const reward = qAllEntry?.reward || dq.reward || null;
     const progress = Number(qAllEntry?.progress ?? dq.progress) || 0;
+
+    const isReady = qAllEntry?.state === 2 || dq.state === 2;
+    const isDone = dq.state === 'completed' || dq.state === 3 || qAllEntry?.state === 3;
+    const isTowerChest = isTowerChestQuest(dq.id, title);
+    const isUnavailable = !isReady && !isDone && isTowerChest && isTowerCleared;
+    const state = isReady ? 'ready' : isDone ? 'done' : isUnavailable ? 'cannotPerform' : 'inProgress';
 
     items.push({
       id: dq.id,
@@ -133,9 +152,10 @@ const allItems = computed<QuestCardItem[]>(() => {
       categoryLabel: 'Daily Quest',
       title,
       state,
+      isUnavailable,
       progress,
       reward,
-      subtitle: resetText,
+      subtitle: isUnavailable ? '🔒 Tower cleared today • Cannot perform' : resetText,
     });
   }
 
@@ -159,10 +179,6 @@ const allItems = computed<QuestCardItem[]>(() => {
       seenIds.add(qIdStr);
       const qAllEntry = qAllMap.get(qIdStr);
 
-      const isReady = currentQ.state === 2 || qAllEntry?.state === 2;
-      const isDone = !activeQ && completedCount === groupQuests.length;
-      const state = isReady ? 'ready' : isDone ? 'done' : 'inProgress';
-
       const repeatLabel = group.repeatType === 'daily' ? 'Event Daily' : 'Event Chain';
       const questLocMap = (globalThis as any).hwaHelperPopupData?.questLocaleMap || {};
       const groupTitle = questData?.groupTitle
@@ -176,6 +192,12 @@ const allItems = computed<QuestCardItem[]>(() => {
             .replace(/\b\w/g, (c: string) => c.toUpperCase())
         : 'Special Quest';
 
+      const isReady = currentQ.state === 2 || qAllEntry?.state === 2;
+      const isDone = !activeQ && completedCount === groupQuests.length;
+      const isTowerChest = isTowerChestQuest(currentQ.id, groupTitle);
+      const isUnavailable = !isReady && !isDone && isTowerChest && isTowerCleared;
+      const state = isReady ? 'ready' : isDone ? 'done' : isUnavailable ? 'cannotPerform' : 'inProgress';
+
       const tierText = `Tier ${completedCount + (activeQ ? 1 : 0)} of ${groupQuests.length}`;
       const progress = Number(currentQ.progress ?? qAllEntry?.progress) || 0;
       const reward = currentQ.reward || qAllEntry?.reward || null;
@@ -188,9 +210,12 @@ const allItems = computed<QuestCardItem[]>(() => {
         title: groupTitle,
         tierInfo: tierText,
         state,
+        isUnavailable,
         progress,
         reward,
-        subtitle: `${evTitle}${evEndText ? ' · ' + evEndText : ''}`,
+        subtitle: isUnavailable
+          ? '🔒 Tower cleared today • Cannot perform'
+          : `${evTitle}${evEndText ? ' · ' + evEndText : ''}`,
       });
     }
   }
@@ -208,18 +233,26 @@ const allItems = computed<QuestCardItem[]>(() => {
     if (!isReady && !hasKnownName) continue;
 
     const title = q.name || recognizedDaily || recognizedTemplate || (isReady ? `Claimable Reward #${q.id}` : `Quest #${q.id}`);
+    const isTowerChest = isTowerChestQuest(q.id, title);
+    const isUnavailable = !isReady && isTowerChest && isTowerCleared;
     const category = recognizedDaily || recognizedTemplate ? 'daily' : 'story';
     const categoryLabel = isReady ? 'Claimable Reward' : (recognizedDaily || recognizedTemplate ? 'Daily Quest' : 'Quest');
+    const state = isReady ? 'ready' : isUnavailable ? 'cannotPerform' : 'inProgress';
 
     items.push({
       id: q.id,
       category,
       categoryLabel,
       title,
-      state: isReady ? 'ready' : 'inProgress',
+      state,
+      isUnavailable,
       progress: Number(q.progress) || 0,
       reward: q.reward || null,
-      subtitle: isReady ? '🎁 Reward ready to claim in game' : (recognizedDaily || recognizedTemplate ? 'Daily Task' : 'General Quest'),
+      subtitle: isUnavailable
+        ? '🔒 Tower cleared today • Cannot perform'
+        : isReady
+        ? '🎁 Reward ready to claim in game'
+        : (recognizedDaily || recognizedTemplate ? 'Daily Task' : 'General Quest'),
     });
   }
 
@@ -247,7 +280,7 @@ const filteredQuests = computed(() => {
     );
   }
 
-  const statePriority: Record<string, number> = { ready: 0, inProgress: 1, done: 2 };
+  const statePriority: Record<string, number> = { ready: 0, inProgress: 1, done: 2, cannotPerform: 3 };
   return [...normalizeArray(list)].sort((a, b) => (statePriority[a.state] ?? 9) - (statePriority[b.state] ?? 9));
 });
 
@@ -491,10 +524,12 @@ async function claimQuest(qId: string | number) {
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50'
                         : item.state === 'done'
                         ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                        : item.state === 'cannotPerform'
+                        ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700'
                         : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 dark:border dark:border-amber-700/50'
                     "
                   >
-                    {{ item.state === 'ready' ? 'Ready to Claim' : item.state === 'done' ? 'Completed' : 'In Progress' }}
+                    {{ item.state === 'ready' ? 'Ready to Claim' : item.state === 'done' ? 'Completed' : item.state === 'cannotPerform' ? 'Cannot Perform' : 'In Progress' }}
                   </span>
                 </div>
 

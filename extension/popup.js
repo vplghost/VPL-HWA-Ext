@@ -5933,7 +5933,7 @@ function renderTowerModal(cache = currentCache) {
         towerAutomationMessage = response?.ok ? 'Tower automation stopped.' : response?.error || 'Could not stop Tower automation.';
         render();
       });
-    } else {
+    } else if (!complete) {
       actionButton('Start Tower automation', async () => {
         const response = await chrome.runtime.sendMessage({
           kind: 'tower-run-start',
@@ -5943,7 +5943,9 @@ function renderTowerModal(cache = currentCache) {
         towerAutomationMessage = response?.ok ? 'Tower automation started. Running automatically...' :
           response?.error || 'Could not start Tower automation.';
         render();
-      }, !popupRpcEnabled || complete || selectedHeroes.length !== 5);
+      }, !popupRpcEnabled || selectedHeroes.length !== 5);
+    } else {
+      line(card, '✅ Tower cleared today • Auto climb disabled.', true);
     }
 
     line(card, 'Fully automatic: automatically executes battles, selects the optimal door towards priority buffs, collects free chests, and activates buffs.');

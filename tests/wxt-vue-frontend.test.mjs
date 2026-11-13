@@ -1282,6 +1282,27 @@ test('GuildVersusModal synchronizes all 6 sections with legacy HTML', async () =
   assert.match(gvs, /pts \/.*units/, 'GuildVersusModal must display rate formula in daily challenges');
 });
 
+test('Tower auto button hides and tower chest quests are marked unfulfillable when tower is cleared', async () => {
+  const towerModal = await readFile(join(root, 'src/components/dialogs/TowerModal.vue'), 'utf8');
+  assert.match(towerModal, /id="tower-modal-cleared-badge"/, 'TowerModal must display tower-modal-cleared-badge when isComplete');
+  assert.match(towerModal, /v-if="isComplete && !isRunning"/, 'TowerModal must gate cleared badge on isComplete and !isRunning');
+  assert.match(towerModal, /Tower Cleared Today/, 'TowerModal must show Tower Cleared Today label');
+
+  const towerTab = await readFile(join(root, 'src/components/tabs/TowerTab.vue'), 'utf8');
+  assert.match(towerTab, /id="tower-tab-cleared-badge"/, 'TowerTab must display tower-tab-cleared-badge when isCleared');
+  assert.match(towerTab, /v-if="isCleared && !isRunning"/, 'TowerTab must gate cleared badge on isCleared and !isRunning');
+
+  const questModal = await readFile(join(root, 'src/components/dialogs/QuestDetailModal.vue'), 'utf8');
+  assert.match(questModal, /isTowerChestQuest/, 'QuestDetailModal must identify tower chest quests');
+  assert.match(questModal, /cannotPerform/, 'QuestDetailModal must support cannotPerform state');
+  assert.match(questModal, /Cannot Perform/, 'QuestDetailModal must render Cannot Perform badge');
+
+  const questsTab = await readFile(join(root, 'src/components/tabs/QuestsTab.vue'), 'utf8');
+  assert.match(questsTab, /isTowerChestQuest/, 'QuestsTab must identify tower chest quests');
+  assert.match(questsTab, /unfulfillableQuests/, 'QuestsTab must filter unfulfillableQuests');
+  assert.match(questsTab, /Cannot Perform Today \(Tower Cleared\)/, 'QuestsTab must render Cannot Perform Today section');
+});
+
 
 
 

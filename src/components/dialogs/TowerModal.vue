@@ -21,7 +21,14 @@ const towerRunState = ref<any>(null);
 
 const session = computed(() => cache.value.towerSession?.data || {});
 const status = computed(() => cache.value.towerStatus?.data || {});
-const isComplete = computed(() => Boolean(session.value?.completed || status.value?.isCleared || status.value?.state === 'win'));
+const isComplete = computed(() => Boolean(
+  session.value?.completed ||
+  status.value?.isCleared ||
+  status.value?.state === 'win' ||
+  status.value?.state === 'completed' ||
+  (cache.value as any)?.magicTower_briefInfo?.data?.state === 'win' ||
+  (cache.value as any)?.['magicTower_briefInfo']?.state === 'win'
+));
 const floorNumber = computed(() => session.value?.floorNumber || (isComplete.value ? 25 : status.value?.floorNumber) || 1);
 
 const heroEntries = computed(() => {
@@ -308,9 +315,20 @@ watch(() => props.modelValue, (open) => {
             ↻ Refresh
           </button>
 
+          <!-- Tower Cleared Status Badge (Hides Start Auto when cleared) -->
+          <div
+            v-if="isComplete && !isRunning"
+            id="tower-modal-cleared-badge"
+            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+          >
+            <span>✅</span>
+            <span>Tower Cleared Today</span>
+          </div>
+
           <button
+            v-else
             type="button"
-            :disabled="isComplete || selectedHeroIds.length !== 5"
+            :disabled="selectedHeroIds.length !== 5"
             class="cursor-pointer px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             :class="
               isRunning
@@ -319,7 +337,7 @@ watch(() => props.modelValue, (open) => {
             "
             @click="toggleTowerRun"
           >
-            <span>{{ isComplete ? 'Tower Cleared' : isRunning ? '⏹ Stop Tower Run' : '▶ Start Auto Tower' }}</span>
+            <span>{{ isRunning ? '⏹ Stop Tower Run' : '▶ Start Auto Tower' }}</span>
           </button>
         </div>
       </section>

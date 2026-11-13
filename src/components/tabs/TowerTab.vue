@@ -7,7 +7,14 @@ const { cache, dispatchRpc } = useRpcCache();
 const isRunning = ref(false);
 
 const tower = computed(() => cache.value.towerStatus?.data || cache.value.towerGetInfo?.data);
-const isCleared = computed(() => tower.value?.isCleared === true);
+const isCleared = computed(() => Boolean(
+  tower.value?.isCleared ||
+  tower.value?.state === 'win' ||
+  tower.value?.state === 'completed' ||
+  cache.value.towerSession?.data?.completed ||
+  (cache.value as any)?.magicTower_briefInfo?.data?.state === 'win' ||
+  (cache.value as any)?.['magicTower_briefInfo']?.state === 'win'
+));
 const floorNumber = computed(() => tower.value?.floorNumber ?? 1);
 
 async function toggleTowerRun() {
@@ -57,9 +64,19 @@ async function refreshTower() {
             ↻ Refresh
           </button>
 
+          <!-- Tower Cleared Badge (Hides Start Auto when cleared) -->
+          <div
+            v-if="isCleared && !isRunning"
+            id="tower-tab-cleared-badge"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+          >
+            <span>✅</span>
+            <span>Tower Cleared Today</span>
+          </div>
+
           <button
+            v-else
             type="button"
-            :disabled="isCleared"
             class="cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold shadow-2xs transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             :class="
               isRunning
@@ -68,7 +85,7 @@ async function refreshTower() {
             "
             @click="toggleTowerRun"
           >
-            <span>{{ isCleared ? 'Tower Cleared' : isRunning ? '⏹ Stop Tower Run' : '▶ Start Auto Tower' }}</span>
+            <span>{{ isRunning ? '⏹ Stop Tower Run' : '▶ Start Auto Tower' }}</span>
           </button>
         </div>
       </div>

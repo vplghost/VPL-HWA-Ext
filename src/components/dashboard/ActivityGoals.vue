@@ -21,12 +21,21 @@ const activities = computed<ActivityRow[]>(() => {
 
   // Tower
   const tower = cache.value.towerStatus?.data;
+  const session = cache.value.towerSession?.data;
+  const isTowerCleared = Boolean(
+    tower?.isCleared ||
+    tower?.state === 'win' ||
+    tower?.state === 'completed' ||
+    session?.completed ||
+    (cache.value as any)?.magicTower_briefInfo?.data?.state === 'win' ||
+    (cache.value as any)?.['magicTower_briefInfo']?.state === 'win'
+  );
   rows.push({
     id: 'tower',
     title: 'Tower',
     icon: '🗼',
-    state: !tower ? 'unknown' : tower.isCleared ? 'done' : 'pending',
-    detail: !tower ? unknown : tower.isCleared ? 'Cleared today' : tower.floorNumber ? `Floor ${tower.floorNumber} / 25` : 'Ready to enter',
+    state: !tower && !session ? 'unknown' : isTowerCleared ? 'done' : 'pending',
+    detail: !tower && !session ? unknown : isTowerCleared ? 'Cleared today' : tower?.floorNumber ? `Floor ${tower.floorNumber} / 25` : 'Ready to enter',
     isInteractive: true,
   });
 

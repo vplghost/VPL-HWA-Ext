@@ -1004,6 +1004,7 @@
     if (cache?.magicTower_briefInfo?.data?.state === 'win') return true;
     if (cache?.['magicTower_briefInfo']?.data?.state === 'win') return true;
     if (cache?.['magicTower_briefInfo']?.state === 'win') return true;
+    if (cache?.towerSession?.data?.completed) return true;
     return false;
   }
 
@@ -1017,12 +1018,18 @@
     const roundQuestsMap = globalThis.hwaHelperClanVersusRoundQuests || {};
 
     function addOrMergeGoal({ key, title, category, eventName, amount = 1, unit = '', points = 0, stock = null, hint = '' }) {
-      const isTower = key === 'act:tower';
-      const isUnavailable = isTower && towerCleared;
-      const finalHint = (isTower && towerCleared)
+      const isTowerChest = key === 'act:tower' ||
+        (typeof key === 'string' && key.startsWith('act:daily_quest_') && (
+          [365, 10019, 10082, 10083, 10084, 10085, 10107].includes(Number(key.replace('act:daily_quest_', ''))) ||
+          (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title))
+        )) ||
+        (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title));
+
+      const isUnavailable = isTowerChest && towerCleared;
+      const finalHint = (isTowerChest && towerCleared)
         ? 'Tower cleared today • No more chests available until daily reset'
         : hint;
-      const isLimited = (isTower && towerCleared) ? false :
+      const isLimited = (isTowerChest && towerCleared) ? false :
         dailyLimitedKeys.has(key) || key.startsWith('act:daily_quest_');
 
       if (!goalsMap.has(key)) {
@@ -1051,7 +1058,7 @@
         if (existing.stock != null && existing.needed != null) {
           existing.inStock = existing.stock >= existing.needed;
         }
-        if (isTower && towerCleared) {
+        if (isTowerChest && towerCleared) {
           existing.isLimited = false;
           existing.isUnavailable = true;
           existing.hint = finalHint;

@@ -1099,3 +1099,32 @@ test('extractEventGoals safely handles object-shaped clanVersusStatus.battle.rou
     assert.ok(goals.all.some((g) => g.events?.some((e) => e.name === 'Guild Versus Round 2')));
   });
 });
+
+test('extractEventGoals marks tower chest activities as unavailable when tower is cleared', () => {
+  const cacheTowerCleared = {
+    towerStatus: {
+      data: { isCleared: true, state: 'win' }
+    },
+    clanVersusStatus: {
+      data: {
+        battle: { rounds: [{ index: 1, status: 'inProgress' }] },
+        info: { challenges: [{ id: 31, progress: 5 }] } // Open 1 Tower Chest
+      }
+    },
+    'getDailyQuests:quest': {
+      data: {
+        quests: [
+          { id: 365, state: 'inProgress', progress: 0 } // Open chests in Tower
+        ]
+      }
+    }
+  };
+
+  const goals = extractEventGoals(cacheTowerCleared);
+  assert.ok(goals && Array.isArray(goals.activities));
+  const towerChestGoal = goals.activities.find((g) => g.key === 'act:tower' || g.key === 'act:daily_quest_365');
+  assert.ok(towerChestGoal, 'Must find tower chest goal');
+  assert.equal(towerChestGoal.isUnavailable, true);
+  assert.equal(towerChestGoal.isLimited, false);
+  assert.match(towerChestGoal.hint, /Tower cleared today/);
+});
