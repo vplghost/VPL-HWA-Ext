@@ -1,0 +1,5246 @@
+{
+  "counts": {
+    "existing-bundled": 413,
+    "extracted": 65,
+    "skipped-inactive": 54,
+    "unresolved": 36
+  },
+  "inputs": {
+    "inventory": {
+      "rows": 418,
+      "sha256": "856ef30f4aa31db55c6d5a3fbb47fb5b9b7e519e09fa07b4c0c4a47f638a044f"
+    },
+    "resources": {
+      "rows": 150,
+      "sha256": "a638ea67fb6f689eecdbdf31d4412bea66c8522c4ee1dc53f09081071f6ebfd7"
+    }
+  },
+  "results": [
+    {
+      "category": "border",
+      "height": 84,
+      "icon": "assets/items/border/1.png",
+      "id": "1",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Avatar Frame",
+      "nameSource": "verified-metadata",
+      "pngSha256": "872a6bb772cc3bb992c4e8d4fcb3d11c26bd0d1f034a025b78fb9ee403aca990",
+      "sourceBytes": 3418,
+      "sourceMd5": "f1e21dab608c47b56afe9f5063c26cc1",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/border/blue_tower_frame.img",
+      "width": 84
+    },
+    {
+      "category": "border",
+      "height": 160,
+      "icon": "assets/items/border/127493.png",
+      "id": "127493",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Avatar Frame",
+      "nameSource": "verified-metadata",
+      "pngSha256": "d3af12c1b73401a21bb9af37e520cae7063b3643e25df950091915fcea201133",
+      "sourceBytes": 12457,
+      "sourceMd5": "a02d25bff0a1f1d4c7296dda2e990ce4",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0004/extends/icons/border/frame_halloween_season_31.img",
+      "width": 160
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/1.png",
+      "id": "1",
+      "imageStatus": "existing-bundled",
+      "name": "Arena coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/2.png",
+      "id": "2",
+      "imageStatus": "existing-bundled",
+      "name": "Grand Arena coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/3.png",
+      "id": "3",
+      "imageStatus": "existing-bundled",
+      "name": "Tower coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/4.png",
+      "id": "4",
+      "imageStatus": "existing-bundled",
+      "name": "Outland Coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/5.png",
+      "id": "5",
+      "imageStatus": "existing-bundled",
+      "name": "Soul coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/8.png",
+      "id": "8",
+      "imageStatus": "existing-bundled",
+      "name": "Intelligence Skin Stone",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/9.png",
+      "id": "9",
+      "imageStatus": "existing-bundled",
+      "name": "Strength Skin Stone",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/10.png",
+      "id": "10",
+      "imageStatus": "existing-bundled",
+      "name": "Agility Skin Stone",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/13.png",
+      "id": "13",
+      "imageStatus": "existing-bundled",
+      "name": "Summoning Sphere",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/14.png",
+      "id": "14",
+      "imageStatus": "existing-bundled",
+      "name": "Artifact Coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/18.png",
+      "id": "18",
+      "imageStatus": "existing-bundled",
+      "name": "Fairy Dust",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/19.png",
+      "id": "19",
+      "imageStatus": "existing-bundled",
+      "name": "Hydra Coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/20.png",
+      "id": "20",
+      "imageStatus": "existing-bundled",
+      "name": "Titan Skin Stone",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/21.png",
+      "id": "21",
+      "imageStatus": "existing-bundled",
+      "name": "Dungeon Coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/105.png",
+      "id": "105",
+      "imageStatus": "existing-bundled",
+      "name": "Guild War Trophy",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/106.png",
+      "id": "106",
+      "imageStatus": "existing-bundled",
+      "name": "Global Championship Trophy",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/1000.png",
+      "id": "1000",
+      "imageStatus": "existing-bundled",
+      "name": "Ticket",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/2006.png",
+      "id": "2006",
+      "imageStatus": "existing-bundled",
+      "name": "Hero's Way Coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40065.png",
+      "id": "40065",
+      "imageStatus": "existing-bundled",
+      "name": "Meta Cube",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40067.png",
+      "id": "40067",
+      "imageStatus": "existing-bundled",
+      "name": "Mastery Crystal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40077.png",
+      "id": "40077",
+      "imageStatus": "existing-bundled",
+      "name": "Rune Stone",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40078.png",
+      "id": "40078",
+      "imageStatus": "existing-bundled",
+      "name": "Rune Sphere",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40137.png",
+      "id": "40137",
+      "imageStatus": "existing-bundled",
+      "name": "Seer's orb",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40187.png",
+      "id": "40187",
+      "imageStatus": "existing-bundled",
+      "name": "Holiday Coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40188.png",
+      "id": "40188",
+      "imageStatus": "existing-bundled",
+      "name": "Guild Clash Trophy",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40191.png",
+      "id": "40191",
+      "imageStatus": "existing-bundled",
+      "name": "Brawl Token",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40192.png",
+      "id": "40192",
+      "imageStatus": "existing-bundled",
+      "name": "Booster Tokens",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40202.png",
+      "id": "40202",
+      "imageStatus": "existing-bundled",
+      "name": "Leonel Skin Coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/40209.png",
+      "id": "40209",
+      "imageStatus": "existing-bundled",
+      "name": "Adventure Coin",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/5.png",
+      "id": "5",
+      "imageStatus": "existing-bundled",
+      "name": "Smaller golden charm",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/6.png",
+      "id": "6",
+      "imageStatus": "existing-bundled",
+      "name": "Common golden charm",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/7.png",
+      "id": "7",
+      "imageStatus": "existing-bundled",
+      "name": "Rare golden charm",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/9.png",
+      "id": "9",
+      "imageStatus": "existing-bundled",
+      "name": "Smaller EXP potion",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/10.png",
+      "id": "10",
+      "imageStatus": "existing-bundled",
+      "name": "EXP potion",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/11.png",
+      "id": "11",
+      "imageStatus": "existing-bundled",
+      "name": "Big EXP potion",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/12.png",
+      "id": "12",
+      "imageStatus": "existing-bundled",
+      "name": "Huge EXP potion",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/14.png",
+      "id": "14",
+      "imageStatus": "existing-bundled",
+      "name": "Transfer ticket",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/16.png",
+      "id": "16",
+      "imageStatus": "existing-bundled",
+      "name": "Bottled Energy",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/20.png",
+      "id": "20",
+      "imageStatus": "existing-bundled",
+      "name": "Titan Potion",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/24.png",
+      "id": "24",
+      "imageStatus": "existing-bundled",
+      "name": "Spark of Power",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/29.png",
+      "id": "29",
+      "imageStatus": "existing-bundled",
+      "name": "Artifact Essence",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/30.png",
+      "id": "30",
+      "imageStatus": "existing-bundled",
+      "name": "Uncommon Artifact Essence",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/31.png",
+      "id": "31",
+      "imageStatus": "existing-bundled",
+      "name": "Rare Artifact Essence",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/32.png",
+      "id": "32",
+      "imageStatus": "existing-bundled",
+      "name": "Superior Artifact Essence",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/33.png",
+      "id": "33",
+      "imageStatus": "existing-bundled",
+      "name": "Flawless Artifact Essence",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/34.png",
+      "id": "34",
+      "imageStatus": "existing-bundled",
+      "name": "Artifact Scroll",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/35.png",
+      "id": "35",
+      "imageStatus": "existing-bundled",
+      "name": "Uncommon Artifact Scroll",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/36.png",
+      "id": "36",
+      "imageStatus": "existing-bundled",
+      "name": "Rare Artifact Scroll",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/37.png",
+      "id": "37",
+      "imageStatus": "existing-bundled",
+      "name": "Superior Artifact Scroll",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/38.png",
+      "id": "38",
+      "imageStatus": "existing-bundled",
+      "name": "Flawless Artifact Scroll",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/39.png",
+      "id": "39",
+      "imageStatus": "existing-bundled",
+      "name": "Artifact Metal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/40.png",
+      "id": "40",
+      "imageStatus": "existing-bundled",
+      "name": "Uncommon Artifact Metal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/41.png",
+      "id": "41",
+      "imageStatus": "existing-bundled",
+      "name": "Rare Artifact Metal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/42.png",
+      "id": "42",
+      "imageStatus": "existing-bundled",
+      "name": "Superior Artifact Metal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/43.png",
+      "id": "43",
+      "imageStatus": "existing-bundled",
+      "name": "Flawless Artifact Metal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/44.png",
+      "id": "44",
+      "imageStatus": "existing-bundled",
+      "name": "Chaos Core",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/45.png",
+      "id": "45",
+      "imageStatus": "existing-bundled",
+      "name": "Artifact Chest Key",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/46.png",
+      "id": "46",
+      "imageStatus": "existing-bundled",
+      "name": "Elemental Sphere",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/47.png",
+      "id": "47",
+      "imageStatus": "existing-bundled",
+      "name": "Chest of Defender Titans",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/48.png",
+      "id": "48",
+      "imageStatus": "existing-bundled",
+      "name": "Chest of Marksman Titans",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/49.png",
+      "id": "49",
+      "imageStatus": "existing-bundled",
+      "name": "Chest of Support Titans",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/50.png",
+      "id": "50",
+      "imageStatus": "existing-bundled",
+      "name": "Chest of Supertitans",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/51.png",
+      "id": "51",
+      "imageStatus": "existing-bundled",
+      "name": "Skin Stone Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/62.png",
+      "id": "62",
+      "imageStatus": "existing-bundled",
+      "name": "Artifact Essence Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/63.png",
+      "id": "63",
+      "imageStatus": "existing-bundled",
+      "name": "Artifact Scroll Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/64.png",
+      "id": "64",
+      "imageStatus": "existing-bundled",
+      "name": "Artifact Metal Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/65.png",
+      "id": "65",
+      "imageStatus": "existing-bundled",
+      "name": "Large Skin Stone Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/102.png",
+      "id": "102",
+      "imageStatus": "existing-bundled",
+      "name": "Epic Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/409.png",
+      "id": "409",
+      "imageStatus": "existing-bundled",
+      "name": "Mastery Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/1001.png",
+      "id": "1001",
+      "imageStatus": "existing-bundled",
+      "name": "Raid Ticket",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/40142.png",
+      "id": "40142",
+      "imageStatus": "existing-bundled",
+      "name": "Challenger's Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/40175.png",
+      "id": "40175",
+      "imageStatus": "existing-bundled",
+      "name": "Legendary Recipe Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/40228.png",
+      "id": "40228",
+      "imageStatus": "existing-bundled",
+      "name": "Heroes Trove",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/40230.png",
+      "id": "40230",
+      "imageStatus": "existing-bundled",
+      "name": "Titans Trove",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "id": "40248",
+      "imageStatus": "unresolved",
+      "name": "Sweet Treat",
+      "nameSource": "verified-metadata",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1001.png",
+      "id": "1001",
+      "imageStatus": "existing-bundled",
+      "name": "Selias' Legacy fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1002.png",
+      "id": "1002",
+      "imageStatus": "existing-bundled",
+      "name": "Harunian Sword fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1003.png",
+      "id": "1003",
+      "imageStatus": "existing-bundled",
+      "name": "Octavia's Blades fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1004.png",
+      "id": "1004",
+      "imageStatus": "existing-bundled",
+      "name": "Scythe of Redemption fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1007.png",
+      "id": "1007",
+      "imageStatus": "existing-bundled",
+      "name": "Staff of Rebirth fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1008.png",
+      "id": "1008",
+      "imageStatus": "existing-bundled",
+      "name": "On and Off fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1009.png",
+      "id": "1009",
+      "imageStatus": "existing-bundled",
+      "name": "Mean Koba fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1011.png",
+      "id": "1011",
+      "imageStatus": "existing-bundled",
+      "name": "Bracers of Hunger fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1012.png",
+      "id": "1012",
+      "imageStatus": "existing-bundled",
+      "name": "Hermit Drone fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1013.png",
+      "id": "1013",
+      "imageStatus": "existing-bundled",
+      "name": "DD-901 Arsenal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1015.png",
+      "id": "1015",
+      "imageStatus": "existing-bundled",
+      "name": "Noble Mk.2 fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1016.png",
+      "id": "1016",
+      "imageStatus": "existing-bundled",
+      "name": "Spear of Fate fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1017.png",
+      "id": "1017",
+      "imageStatus": "existing-bundled",
+      "name": "Mask of Anger fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1018.png",
+      "id": "1018",
+      "imageStatus": "existing-bundled",
+      "name": "Chart of Endless Stars fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1020.png",
+      "id": "1020",
+      "imageStatus": "existing-bundled",
+      "name": "Evil's Bane fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1022.png",
+      "id": "1022",
+      "imageStatus": "existing-bundled",
+      "name": "Ms. Whirligig fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1023.png",
+      "id": "1023",
+      "imageStatus": "existing-bundled",
+      "name": "Idol of Charm fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1026.png",
+      "id": "1026",
+      "imageStatus": "existing-bundled",
+      "name": "Devil's Contract fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1027.png",
+      "id": "1027",
+      "imageStatus": "existing-bundled",
+      "name": "Hammer of Righteous Judgment fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1028.png",
+      "id": "1028",
+      "imageStatus": "existing-bundled",
+      "name": "Spear of the Crimson Dawn fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1030.png",
+      "id": "1030",
+      "imageStatus": "existing-bundled",
+      "name": "Archivist's Staff fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1032.png",
+      "id": "1032",
+      "imageStatus": "existing-bundled",
+      "name": "Wand of the Thousand Suns fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1033.png",
+      "id": "1033",
+      "imageStatus": "existing-bundled",
+      "name": "Stormy Talisman fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1035.png",
+      "id": "1035",
+      "imageStatus": "existing-bundled",
+      "name": "Shavarakk's Blood fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1037.png",
+      "id": "1037",
+      "imageStatus": "existing-bundled",
+      "name": "Zarakkar Bones fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1038.png",
+      "id": "1038",
+      "imageStatus": "existing-bundled",
+      "name": "Blades of Many Truths fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1039.png",
+      "id": "1039",
+      "imageStatus": "existing-bundled",
+      "name": "Akhreb Ummi's Sting fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1041.png",
+      "id": "1041",
+      "imageStatus": "existing-bundled",
+      "name": "K'arkh's Essence fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1042.png",
+      "id": "1042",
+      "imageStatus": "existing-bundled",
+      "name": "Rakashi's Shield fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1043.png",
+      "id": "1043",
+      "imageStatus": "existing-bundled",
+      "name": "Celeste's Crown fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1047.png",
+      "id": "1047",
+      "imageStatus": "existing-bundled",
+      "name": "Hand of the Great Master fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1049.png",
+      "id": "1049",
+      "imageStatus": "existing-bundled",
+      "name": "Concubine's Khanjars fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1052.png",
+      "id": "1052",
+      "imageStatus": "existing-bundled",
+      "name": "Turban of the Grand Genie fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1053.png",
+      "id": "1053",
+      "imageStatus": "existing-bundled",
+      "name": "Ancestral Anvil fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1055.png",
+      "id": "1055",
+      "imageStatus": "existing-bundled",
+      "name": "Wand of Growth fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1058.png",
+      "id": "1058",
+      "imageStatus": "existing-bundled",
+      "name": "Phoenix Seal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1060.png",
+      "id": "1060",
+      "imageStatus": "existing-bundled",
+      "name": "Mirror of Truth fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1061.png",
+      "id": "1061",
+      "imageStatus": "existing-bundled",
+      "name": "Ancestor's Sword fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1062.png",
+      "id": "1062",
+      "imageStatus": "existing-bundled",
+      "name": "Prison of the Ancient God fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1064.png",
+      "id": "1064",
+      "imageStatus": "existing-bundled",
+      "name": "Archmage's feather fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1067.png",
+      "id": "1067",
+      "imageStatus": "existing-bundled",
+      "name": "Guiding Star fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1070.png",
+      "id": "1070",
+      "imageStatus": "existing-bundled",
+      "name": "Sir Dumpling fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1071.png",
+      "id": "1071",
+      "imageStatus": "existing-bundled",
+      "name": "Pain Cage fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1075.png",
+      "id": "1075",
+      "imageStatus": "existing-bundled",
+      "name": "Lord Beholder fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1076.png",
+      "id": "1076",
+      "imageStatus": "existing-bundled",
+      "name": "Holy Grenade fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1078.png",
+      "id": "1078",
+      "imageStatus": "existing-bundled",
+      "name": "Rootbreaker fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1079.png",
+      "id": "1079",
+      "imageStatus": "existing-bundled",
+      "name": "Crest of Goldmane fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/1504.png",
+      "id": "1504",
+      "imageStatus": "existing-bundled",
+      "name": "Demonic Reliquary fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/2003.png",
+      "id": "2003",
+      "imageStatus": "existing-bundled",
+      "name": "Manuscript of the Void fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/2004.png",
+      "id": "2004",
+      "imageStatus": "existing-bundled",
+      "name": "Alchemist's Folio fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/2005.png",
+      "id": "2005",
+      "imageStatus": "existing-bundled",
+      "name": "Tome of Arcane Knowledge fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/2006.png",
+      "id": "2006",
+      "imageStatus": "existing-bundled",
+      "name": "Defender's Covenant fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/2008.png",
+      "id": "2008",
+      "imageStatus": "existing-bundled",
+      "name": "Grimoire of Fortitude fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/2009.png",
+      "id": "2009",
+      "imageStatus": "existing-bundled",
+      "name": "Twin Blades Codex fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/2015.png",
+      "id": "2015",
+      "imageStatus": "existing-bundled",
+      "name": "Grimoire of Thorns fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/3001.png",
+      "id": "3001",
+      "imageStatus": "existing-bundled",
+      "name": "Ring of Intelligence fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/3003.png",
+      "id": "3003",
+      "imageStatus": "existing-bundled",
+      "name": "Ring of Agility fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11001.png",
+      "id": "11001",
+      "imageStatus": "existing-bundled",
+      "name": "Siungur's Aegis fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11002.png",
+      "id": "11002",
+      "imageStatus": "existing-bundled",
+      "name": "Siungur's Maelstrom fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11003.png",
+      "id": "11003",
+      "imageStatus": "existing-bundled",
+      "name": "Siungur's Bands fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11004.png",
+      "id": "11004",
+      "imageStatus": "existing-bundled",
+      "name": "Siungur's Staff fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11005.png",
+      "id": "11005",
+      "imageStatus": "existing-bundled",
+      "name": "Ragni's Hammer fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11006.png",
+      "id": "11006",
+      "imageStatus": "existing-bundled",
+      "name": "Ragni's Horn fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11007.png",
+      "id": "11007",
+      "imageStatus": "existing-bundled",
+      "name": "Ragni's Spark fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11008.png",
+      "id": "11008",
+      "imageStatus": "existing-bundled",
+      "name": "Ragni's Beast fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11009.png",
+      "id": "11009",
+      "imageStatus": "existing-bundled",
+      "name": "Andvari's Fists fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11010.png",
+      "id": "11010",
+      "imageStatus": "existing-bundled",
+      "name": "Andvari's Arrowslinger fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11011.png",
+      "id": "11011",
+      "imageStatus": "existing-bundled",
+      "name": "Andvari's Bulwark fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11012.png",
+      "id": "11012",
+      "imageStatus": "existing-bundled",
+      "name": "Andvari's Soul fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11013.png",
+      "id": "11013",
+      "imageStatus": "existing-bundled",
+      "name": "The Dark Star of Nephtis fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11014.png",
+      "id": "11014",
+      "imageStatus": "existing-bundled",
+      "name": "Nephtis's Destroyers fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11015.png",
+      "id": "11015",
+      "imageStatus": "existing-bundled",
+      "name": "Nephtis's Vambraces fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11016.png",
+      "id": "11016",
+      "imageStatus": "existing-bundled",
+      "name": "Nephtis's Reaper fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11017.png",
+      "id": "11017",
+      "imageStatus": "existing-bundled",
+      "name": "Belav's Elytra fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11018.png",
+      "id": "11018",
+      "imageStatus": "existing-bundled",
+      "name": "Belav's Crown fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11019.png",
+      "id": "11019",
+      "imageStatus": "existing-bundled",
+      "name": "Belav's Face fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11020.png",
+      "id": "11020",
+      "imageStatus": "existing-bundled",
+      "name": "Belav's Greatness fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11021.png",
+      "id": "11021",
+      "imageStatus": "existing-bundled",
+      "name": "Andvari's Root fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11022.png",
+      "id": "11022",
+      "imageStatus": "existing-bundled",
+      "name": "Ragni’s Eye fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11023.png",
+      "id": "11023",
+      "imageStatus": "existing-bundled",
+      "name": "Siungur's Mace fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11024.png",
+      "id": "11024",
+      "imageStatus": "existing-bundled",
+      "name": "Belav's Manuscript fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11025.png",
+      "id": "11025",
+      "imageStatus": "existing-bundled",
+      "name": "Nephtis's Horn fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11028.png",
+      "id": "11028",
+      "imageStatus": "existing-bundled",
+      "name": "Zorval's Grimoire fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/11029.png",
+      "id": "11029",
+      "imageStatus": "existing-bundled",
+      "name": "Zorval's Amulet fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/12001.png",
+      "id": "12001",
+      "imageStatus": "existing-bundled",
+      "name": "Fire Crown fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/12002.png",
+      "id": "12002",
+      "imageStatus": "existing-bundled",
+      "name": "Earth Crown fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/12003.png",
+      "id": "12003",
+      "imageStatus": "existing-bundled",
+      "name": "Water Crown fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/12004.png",
+      "id": "12004",
+      "imageStatus": "existing-bundled",
+      "name": "Crown of Darkness fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/12005.png",
+      "id": "12005",
+      "imageStatus": "existing-bundled",
+      "name": "Crown of Light fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/12006.png",
+      "id": "12006",
+      "imageStatus": "existing-bundled",
+      "name": "Elarite Crown fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/13001.png",
+      "id": "13001",
+      "imageStatus": "existing-bundled",
+      "name": "Attack Seal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/13002.png",
+      "id": "13002",
+      "imageStatus": "existing-bundled",
+      "name": "Balance Seal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/13003.png",
+      "id": "13003",
+      "imageStatus": "existing-bundled",
+      "name": "Defense Seal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/13004.png",
+      "id": "13004",
+      "imageStatus": "existing-bundled",
+      "name": "Summon Seal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/13006.png",
+      "id": "13006",
+      "imageStatus": "existing-bundled",
+      "name": "Chthonic Balance Seal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentArtifact",
+      "icon": "assets/items/artifact/13007.png",
+      "id": "13007",
+      "imageStatus": "existing-bundled",
+      "name": "Chthonic Defense Seal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/47.png",
+      "id": "47",
+      "imageStatus": "existing-bundled",
+      "name": "Brothers fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/48.png",
+      "id": "48",
+      "imageStatus": "existing-bundled",
+      "name": "Skull Crusher fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/49.png",
+      "id": "49",
+      "imageStatus": "existing-bundled",
+      "name": "Dawnguard fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/50.png",
+      "id": "50",
+      "imageStatus": "existing-bundled",
+      "name": "Sword of Storms fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/56.png",
+      "id": "56",
+      "imageStatus": "existing-bundled",
+      "name": "Dragon´s Heart fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/57.png",
+      "id": "57",
+      "imageStatus": "existing-bundled",
+      "name": "Needle fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/58.png",
+      "id": "58",
+      "imageStatus": "existing-bundled",
+      "name": "Sacred Rosary fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/59.png",
+      "id": "59",
+      "imageStatus": "existing-bundled",
+      "name": "Serenity Stone fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/60.png",
+      "id": "60",
+      "imageStatus": "existing-bundled",
+      "name": "Enchanted Lute fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/61.png",
+      "id": "61",
+      "imageStatus": "existing-bundled",
+      "name": "Splitter fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/62.png",
+      "id": "62",
+      "imageStatus": "existing-bundled",
+      "name": "Portal Gem fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/74.png",
+      "id": "74",
+      "imageStatus": "existing-bundled",
+      "name": "Storm Hammer fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/75.png",
+      "id": "75",
+      "imageStatus": "existing-bundled",
+      "name": "Magic Hat fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/76.png",
+      "id": "76",
+      "imageStatus": "existing-bundled",
+      "name": "Scorching Quiver fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/77.png",
+      "id": "77",
+      "imageStatus": "existing-bundled",
+      "name": "Sacrificial Dagger fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/91.png",
+      "id": "91",
+      "imageStatus": "existing-bundled",
+      "name": "Flaming Heart fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/92.png",
+      "id": "92",
+      "imageStatus": "existing-bundled",
+      "name": "Giant-Slayer fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/93.png",
+      "id": "93",
+      "imageStatus": "existing-bundled",
+      "name": "Pastor´s Seal fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/95.png",
+      "id": "95",
+      "imageStatus": "existing-bundled",
+      "name": "Hand of Glory fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/97.png",
+      "id": "97",
+      "imageStatus": "existing-bundled",
+      "name": "Advisor fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/98.png",
+      "id": "98",
+      "imageStatus": "existing-bundled",
+      "name": "Funeral Totem fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/167.png",
+      "id": "167",
+      "imageStatus": "existing-bundled",
+      "name": "Alchemist´s Set fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/168.png",
+      "id": "168",
+      "imageStatus": "existing-bundled",
+      "name": "Lycanthrope´s Fang fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/169.png",
+      "id": "169",
+      "imageStatus": "existing-bundled",
+      "name": "La Mort´s Map fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/170.png",
+      "id": "170",
+      "imageStatus": "existing-bundled",
+      "name": "Harunian Helm fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/171.png",
+      "id": "171",
+      "imageStatus": "existing-bundled",
+      "name": "Enigma´s Chronicles fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/172.png",
+      "id": "172",
+      "imageStatus": "existing-bundled",
+      "name": "Throwing Knives fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/173.png",
+      "id": "173",
+      "imageStatus": "existing-bundled",
+      "name": "Gro Bulgor´s Poleaxe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/174.png",
+      "id": "174",
+      "imageStatus": "existing-bundled",
+      "name": "Enchanted Chain fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/175.png",
+      "id": "175",
+      "imageStatus": "existing-bundled",
+      "name": "Citadel Guardian fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/176.png",
+      "id": "176",
+      "imageStatus": "existing-bundled",
+      "name": "Riversar´s Tiara fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/177.png",
+      "id": "177",
+      "imageStatus": "existing-bundled",
+      "name": "Hellion Harpoon fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentGear",
+      "icon": "assets/items/gear/178.png",
+      "id": "178",
+      "imageStatus": "existing-bundled",
+      "name": "Thieves Guild Sign fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/1.png",
+      "id": "1",
+      "imageStatus": "existing-bundled",
+      "name": "Aurora fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/2.png",
+      "id": "2",
+      "imageStatus": "existing-bundled",
+      "name": "Galahad fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/3.png",
+      "id": "3",
+      "imageStatus": "existing-bundled",
+      "name": "Keira fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/4.png",
+      "id": "4",
+      "imageStatus": "existing-bundled",
+      "name": "Astaroth fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/5.png",
+      "id": "5",
+      "imageStatus": "existing-bundled",
+      "name": "Kai fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/7.png",
+      "id": "7",
+      "imageStatus": "existing-bundled",
+      "name": "Thea fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/8.png",
+      "id": "8",
+      "imageStatus": "existing-bundled",
+      "name": "Daredevil fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/9.png",
+      "id": "9",
+      "imageStatus": "existing-bundled",
+      "name": "Heidi fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/10.png",
+      "id": "10",
+      "imageStatus": "existing-bundled",
+      "name": "Faceless fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/11.png",
+      "id": "11",
+      "imageStatus": "existing-bundled",
+      "name": "Chabba fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/12.png",
+      "id": "12",
+      "imageStatus": "existing-bundled",
+      "name": "Arachne fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/14.png",
+      "id": "14",
+      "imageStatus": "existing-bundled",
+      "name": "Fox fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/15.png",
+      "id": "15",
+      "imageStatus": "existing-bundled",
+      "name": "Ginger fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/16.png",
+      "id": "16",
+      "imageStatus": "existing-bundled",
+      "name": "Dante fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/17.png",
+      "id": "17",
+      "imageStatus": "existing-bundled",
+      "name": "Mojo fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/18.png",
+      "id": "18",
+      "imageStatus": "existing-bundled",
+      "name": "Judge fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/19.png",
+      "id": "19",
+      "imageStatus": "existing-bundled",
+      "name": "Dark Star fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/20.png",
+      "id": "20",
+      "imageStatus": "existing-bundled",
+      "name": "Artemis fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/21.png",
+      "id": "21",
+      "imageStatus": "existing-bundled",
+      "name": "Markus fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/22.png",
+      "id": "22",
+      "imageStatus": "existing-bundled",
+      "name": "Peppy fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/23.png",
+      "id": "23",
+      "imageStatus": "existing-bundled",
+      "name": "Lian fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/25.png",
+      "id": "25",
+      "imageStatus": "existing-bundled",
+      "name": "Ishmael fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/27.png",
+      "id": "27",
+      "imageStatus": "existing-bundled",
+      "name": "Luther fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/28.png",
+      "id": "28",
+      "imageStatus": "existing-bundled",
+      "name": "Qing Mao fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/29.png",
+      "id": "29",
+      "imageStatus": "existing-bundled",
+      "name": "Dorian fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/30.png",
+      "id": "30",
+      "imageStatus": "existing-bundled",
+      "name": "Cornelius fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/32.png",
+      "id": "32",
+      "imageStatus": "existing-bundled",
+      "name": "Helios fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/33.png",
+      "id": "33",
+      "imageStatus": "existing-bundled",
+      "name": "Lars fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/34.png",
+      "id": "34",
+      "imageStatus": "existing-bundled",
+      "name": "Krista fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/35.png",
+      "id": "35",
+      "imageStatus": "existing-bundled",
+      "name": "Jorgen fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/36.png",
+      "id": "36",
+      "imageStatus": "existing-bundled",
+      "name": "Maya fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/37.png",
+      "id": "37",
+      "imageStatus": "existing-bundled",
+      "name": "Jhu fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/38.png",
+      "id": "38",
+      "imageStatus": "existing-bundled",
+      "name": "Elmir fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/39.png",
+      "id": "39",
+      "imageStatus": "existing-bundled",
+      "name": "Ziri fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/40.png",
+      "id": "40",
+      "imageStatus": "existing-bundled",
+      "name": "Nebula fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/41.png",
+      "id": "41",
+      "imageStatus": "existing-bundled",
+      "name": "K'arkh fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/42.png",
+      "id": "42",
+      "imageStatus": "existing-bundled",
+      "name": "Rufus fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/43.png",
+      "id": "43",
+      "imageStatus": "existing-bundled",
+      "name": "Celeste fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/44.png",
+      "id": "44",
+      "imageStatus": "existing-bundled",
+      "name": "Astrid and Lucas fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/45.png",
+      "id": "45",
+      "imageStatus": "existing-bundled",
+      "name": "Satori fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/46.png",
+      "id": "46",
+      "imageStatus": "existing-bundled",
+      "name": "Martha fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/47.png",
+      "id": "47",
+      "imageStatus": "existing-bundled",
+      "name": "Andvari fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/49.png",
+      "id": "49",
+      "imageStatus": "existing-bundled",
+      "name": "Yasmine fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/50.png",
+      "id": "50",
+      "imageStatus": "existing-bundled",
+      "name": "Isaac fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/51.png",
+      "id": "51",
+      "imageStatus": "existing-bundled",
+      "name": "Xe'Sha fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/53.png",
+      "id": "53",
+      "imageStatus": "existing-bundled",
+      "name": "Fafnir fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/54.png",
+      "id": "54",
+      "imageStatus": "existing-bundled",
+      "name": "Iris fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/55.png",
+      "id": "55",
+      "imageStatus": "existing-bundled",
+      "name": "Mushy and Shroom fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/56.png",
+      "id": "56",
+      "imageStatus": "existing-bundled",
+      "name": "Julius fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/62.png",
+      "id": "62",
+      "imageStatus": "existing-bundled",
+      "name": "Soleil fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/64.png",
+      "id": "64",
+      "imageStatus": "existing-bundled",
+      "name": "Folio fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/67.png",
+      "id": "67",
+      "imageStatus": "existing-bundled",
+      "name": "Polaris fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/70.png",
+      "id": "70",
+      "imageStatus": "existing-bundled",
+      "name": "Somna fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/71.png",
+      "id": "71",
+      "imageStatus": "existing-bundled",
+      "name": "Electra von Grave fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/72.png",
+      "id": "72",
+      "imageStatus": "existing-bundled",
+      "name": "Byrna fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/76.png",
+      "id": "76",
+      "imageStatus": "existing-bundled",
+      "name": "Crow fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/77.png",
+      "id": "77",
+      "imageStatus": "existing-bundled",
+      "name": "Eva fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/79.png",
+      "id": "79",
+      "imageStatus": "existing-bundled",
+      "name": "Leonel fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/500.png",
+      "id": "500",
+      "imageStatus": "existing-bundled",
+      "name": "Sebastian fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/501.png",
+      "id": "501",
+      "imageStatus": "existing-bundled",
+      "name": "Corvus fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/502.png",
+      "id": "502",
+      "imageStatus": "existing-bundled",
+      "name": "Morrigan fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/503.png",
+      "id": "503",
+      "imageStatus": "existing-bundled",
+      "name": "Alvanor fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentHero",
+      "icon": "assets/heroes/504.png",
+      "id": "504",
+      "imageStatus": "existing-bundled",
+      "name": "Tristan fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/146.png",
+      "id": "146",
+      "imageStatus": "existing-bundled",
+      "name": "Hand of Midas - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/147.png",
+      "id": "147",
+      "imageStatus": "existing-bundled",
+      "name": "Wiseman´s Crown - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/148.png",
+      "id": "148",
+      "imageStatus": "existing-bundled",
+      "name": "Spear of a Dragon fighter - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/149.png",
+      "id": "149",
+      "imageStatus": "existing-bundled",
+      "name": "Lion´s armor - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/150.png",
+      "id": "150",
+      "imageStatus": "existing-bundled",
+      "name": "Fold arbalest - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/151.png",
+      "id": "151",
+      "imageStatus": "existing-bundled",
+      "name": "Armor of Thieves´ Prince - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/152.png",
+      "id": "152",
+      "imageStatus": "existing-bundled",
+      "name": "Tome of Fate - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/153.png",
+      "id": "153",
+      "imageStatus": "existing-bundled",
+      "name": "Archangel's Wrath - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/154.png",
+      "id": "154",
+      "imageStatus": "existing-bundled",
+      "name": "Morana's Glaive - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/155.png",
+      "id": "155",
+      "imageStatus": "existing-bundled",
+      "name": "Panoptic Orb - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/156.png",
+      "id": "156",
+      "imageStatus": "existing-bundled",
+      "name": "Cosmic Tremor - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/157.png",
+      "id": "157",
+      "imageStatus": "existing-bundled",
+      "name": "Book of Prophecies - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/158.png",
+      "id": "158",
+      "imageStatus": "existing-bundled",
+      "name": "Angel of Vengeance - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/159.png",
+      "id": "159",
+      "imageStatus": "existing-bundled",
+      "name": "Selena's Sickle - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/160.png",
+      "id": "160",
+      "imageStatus": "existing-bundled",
+      "name": "Diviner's Orb - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/161.png",
+      "id": "161",
+      "imageStatus": "existing-bundled",
+      "name": "World Tremor - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/162.png",
+      "id": "162",
+      "imageStatus": "existing-bundled",
+      "name": "Dragon Shield - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/163.png",
+      "id": "163",
+      "imageStatus": "existing-bundled",
+      "name": "Siren´s Song - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/164.png",
+      "id": "164",
+      "imageStatus": "existing-bundled",
+      "name": "Dragon´s Tooth - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/165.png",
+      "id": "165",
+      "imageStatus": "existing-bundled",
+      "name": "Original Word - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/166.png",
+      "id": "166",
+      "imageStatus": "existing-bundled",
+      "name": "Wasp - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/190.png",
+      "id": "190",
+      "imageStatus": "existing-bundled",
+      "name": "Alucard´s Amulet - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/191.png",
+      "id": "191",
+      "imageStatus": "existing-bundled",
+      "name": "Sphere of Power - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/192.png",
+      "id": "192",
+      "imageStatus": "existing-bundled",
+      "name": "Staff of Neutralization - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/193.png",
+      "id": "193",
+      "imageStatus": "existing-bundled",
+      "name": "Blade of the Immortals - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/194.png",
+      "id": "194",
+      "imageStatus": "existing-bundled",
+      "name": "Blued Plate Armor - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/195.png",
+      "id": "195",
+      "imageStatus": "existing-bundled",
+      "name": "Asklepius´ Staff - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/196.png",
+      "id": "196",
+      "imageStatus": "existing-bundled",
+      "name": "Radiant Armor - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/197.png",
+      "id": "197",
+      "imageStatus": "existing-bundled",
+      "name": "All-Seeing Eye - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/198.png",
+      "id": "198",
+      "imageStatus": "existing-bundled",
+      "name": "Creator´s Feathering - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/199.png",
+      "id": "199",
+      "imageStatus": "existing-bundled",
+      "name": "Aquant´s Trident - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/200.png",
+      "id": "200",
+      "imageStatus": "existing-bundled",
+      "name": "Trickster's Cane - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/204.png",
+      "id": "204",
+      "imageStatus": "existing-bundled",
+      "name": "Ruler's Globus - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/205.png",
+      "id": "205",
+      "imageStatus": "existing-bundled",
+      "name": "Dwarven Hardbane - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/206.png",
+      "id": "206",
+      "imageStatus": "existing-bundled",
+      "name": "Oracle's Censer - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/214.png",
+      "id": "214",
+      "imageStatus": "existing-bundled",
+      "name": "Staff of Stubbornness - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/215.png",
+      "id": "215",
+      "imageStatus": "existing-bundled",
+      "name": "Unity of Extremes - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/216.png",
+      "id": "216",
+      "imageStatus": "existing-bundled",
+      "name": "Light of Distant Stars - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/217.png",
+      "id": "217",
+      "imageStatus": "existing-bundled",
+      "name": "Oppressor's Crown - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/221.png",
+      "id": "221",
+      "imageStatus": "existing-bundled",
+      "name": "Tiara of Wisdom - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/222.png",
+      "id": "222",
+      "imageStatus": "existing-bundled",
+      "name": "Shield Breaker - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/223.png",
+      "id": "223",
+      "imageStatus": "existing-bundled",
+      "name": "Amulet of Hatred - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/224.png",
+      "id": "224",
+      "imageStatus": "existing-bundled",
+      "name": "Arcane Destabilizer - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/225.png",
+      "id": "225",
+      "imageStatus": "existing-bundled",
+      "name": "Spell Fury - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/226.png",
+      "id": "226",
+      "imageStatus": "existing-bundled",
+      "name": "Last Stand Brooch - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/227.png",
+      "id": "227",
+      "imageStatus": "existing-bundled",
+      "name": "Primordial Life - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/229.png",
+      "id": "229",
+      "imageStatus": "existing-bundled",
+      "name": "Titan's Strength Helmet - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/231.png",
+      "id": "231",
+      "imageStatus": "existing-bundled",
+      "name": "Cuirass of Spell Protection - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/232.png",
+      "id": "232",
+      "imageStatus": "existing-bundled",
+      "name": "Retribution Chestplate - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/233.png",
+      "id": "233",
+      "imageStatus": "existing-bundled",
+      "name": "Platemail of Vitality - Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/243.png",
+      "id": "243",
+      "imageStatus": "existing-bundled",
+      "name": "Recurve Bow—Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/247.png",
+      "id": "247",
+      "imageStatus": "existing-bundled",
+      "name": "Mind Ring—Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/248.png",
+      "id": "248",
+      "imageStatus": "existing-bundled",
+      "name": "Whisper Ring—Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/251.png",
+      "id": "251",
+      "imageStatus": "existing-bundled",
+      "name": "Viper Kiss—Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentScroll",
+      "icon": "assets/items/scroll/256.png",
+      "id": "256",
+      "imageStatus": "existing-bundled",
+      "name": "Runic Mantle—Recipe fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentSkin",
+      "height": 160,
+      "icon": "assets/items/skin/327.png",
+      "id": "327",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Cascade Mythical Skin fragment",
+      "nameSource": "verified-metadata",
+      "pngSha256": "34dade4227c3083ef3179dd26561854a14fada960fe74fa17f000c06779faebd",
+      "sourceBytes": 13957,
+      "sourceMd5": "cd8fbee210378c6e47638a4836620d54",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/hero/skin_0327.img",
+      "width": 160
+    },
+    {
+      "category": "fragmentSkin",
+      "height": 160,
+      "icon": "assets/items/skin/1004.png",
+      "id": "1004",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Sebastian Dark Depths Skin fragment",
+      "nameSource": "verified-metadata",
+      "pngSha256": "c44b691585951d312dd41339cbbe947db24e0939f9af8ddc518261fea779398f",
+      "sourceBytes": 13920,
+      "sourceMd5": "2b9a72e13acc169385a2e939bd322ad7",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/hero/skin_1004.img",
+      "width": 160
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4000.png",
+      "id": "4000",
+      "imageStatus": "existing-bundled",
+      "name": "Sigurd fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4001.png",
+      "id": "4001",
+      "imageStatus": "existing-bundled",
+      "name": "Nova fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4002.png",
+      "id": "4002",
+      "imageStatus": "existing-bundled",
+      "name": "Mairi fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4004.png",
+      "id": "4004",
+      "imageStatus": "existing-bundled",
+      "name": "Tydus fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4010.png",
+      "id": "4010",
+      "imageStatus": "existing-bundled",
+      "name": "Moloch fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4011.png",
+      "id": "4011",
+      "imageStatus": "existing-bundled",
+      "name": "Vulcan fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4012.png",
+      "id": "4012",
+      "imageStatus": "existing-bundled",
+      "name": "Ignis fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4014.png",
+      "id": "4014",
+      "imageStatus": "existing-bundled",
+      "name": "Asherona fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4020.png",
+      "id": "4020",
+      "imageStatus": "existing-bundled",
+      "name": "Angus fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4021.png",
+      "id": "4021",
+      "imageStatus": "existing-bundled",
+      "name": "Sylva fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4022.png",
+      "id": "4022",
+      "imageStatus": "existing-bundled",
+      "name": "Avalon fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4023.png",
+      "id": "4023",
+      "imageStatus": "existing-bundled",
+      "name": "Eden fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4024.png",
+      "id": "4024",
+      "imageStatus": "existing-bundled",
+      "name": "Verdoc fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4030.png",
+      "id": "4030",
+      "imageStatus": "existing-bundled",
+      "name": "Brustar fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4031.png",
+      "id": "4031",
+      "imageStatus": "existing-bundled",
+      "name": "Keros fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4032.png",
+      "id": "4032",
+      "imageStatus": "existing-bundled",
+      "name": "Mort fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4034.png",
+      "id": "4034",
+      "imageStatus": "existing-bundled",
+      "name": "Umbra fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4040.png",
+      "id": "4040",
+      "imageStatus": "existing-bundled",
+      "name": "Rigel fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4041.png",
+      "id": "4041",
+      "imageStatus": "existing-bundled",
+      "name": "Amon fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4042.png",
+      "id": "4042",
+      "imageStatus": "existing-bundled",
+      "name": "Iyari fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4044.png",
+      "id": "4044",
+      "imageStatus": "existing-bundled",
+      "name": "Lumira fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4050.png",
+      "id": "4050",
+      "imageStatus": "existing-bundled",
+      "name": "Pallant fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4052.png",
+      "id": "4052",
+      "imageStatus": "existing-bundled",
+      "name": "Orm fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "fragmentTitan",
+      "icon": "assets/titans/4053.png",
+      "id": "4053",
+      "imageStatus": "existing-bundled",
+      "name": "Metida fragment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/1.png",
+      "id": "1",
+      "imageStatus": "existing-bundled",
+      "name": "Orcish Knuckles",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/2.png",
+      "id": "2",
+      "imageStatus": "existing-bundled",
+      "name": "Wooden Shield",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/3.png",
+      "id": "3",
+      "imageStatus": "existing-bundled",
+      "name": "Quiver",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/4.png",
+      "id": "4",
+      "imageStatus": "existing-bundled",
+      "name": "Oil Lamp",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/5.png",
+      "id": "5",
+      "imageStatus": "existing-bundled",
+      "name": "Traveller´s Shoes",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/6.png",
+      "id": "6",
+      "imageStatus": "existing-bundled",
+      "name": "Giant´s Belt",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/7.png",
+      "id": "7",
+      "imageStatus": "existing-bundled",
+      "name": "Apprentice´s Mantle",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/8.png",
+      "id": "8",
+      "imageStatus": "existing-bundled",
+      "name": "Steel Pauldron",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/9.png",
+      "id": "9",
+      "imageStatus": "existing-bundled",
+      "name": "Lucky Dice",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/10.png",
+      "id": "10",
+      "imageStatus": "existing-bundled",
+      "name": "Sledgehammer",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/11.png",
+      "id": "11",
+      "imageStatus": "existing-bundled",
+      "name": "Traveller´s Staff",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/12.png",
+      "id": "12",
+      "imageStatus": "existing-bundled",
+      "name": "Ashen Bow",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/13.png",
+      "id": "13",
+      "imageStatus": "existing-bundled",
+      "name": "Imperial Shield",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/14.png",
+      "id": "14",
+      "imageStatus": "existing-bundled",
+      "name": "Orcish Yatagan",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/15.png",
+      "id": "15",
+      "imageStatus": "existing-bundled",
+      "name": "Dagger",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/16.png",
+      "id": "16",
+      "imageStatus": "existing-bundled",
+      "name": "Censer",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/17.png",
+      "id": "17",
+      "imageStatus": "existing-bundled",
+      "name": "Lucky Arrow",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/21.png",
+      "id": "21",
+      "imageStatus": "existing-bundled",
+      "name": "Branch of Antiaris",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/22.png",
+      "id": "22",
+      "imageStatus": "existing-bundled",
+      "name": "Light Crystal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/23.png",
+      "id": "23",
+      "imageStatus": "existing-bundled",
+      "name": "Tracker's Boots",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/24.png",
+      "id": "24",
+      "imageStatus": "existing-bundled",
+      "name": "Guardian's Shield",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/25.png",
+      "id": "25",
+      "imageStatus": "existing-bundled",
+      "name": "Fire Sword",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/26.png",
+      "id": "26",
+      "imageStatus": "existing-bundled",
+      "name": "Lost Ring",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/27.png",
+      "id": "27",
+      "imageStatus": "existing-bundled",
+      "name": "Cuirass",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/28.png",
+      "id": "28",
+      "imageStatus": "existing-bundled",
+      "name": "Cain's Seal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/29.png",
+      "id": "29",
+      "imageStatus": "existing-bundled",
+      "name": "Reaper",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/30.png",
+      "id": "30",
+      "imageStatus": "existing-bundled",
+      "name": "Band of Enlightenment",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/31.png",
+      "id": "31",
+      "imageStatus": "existing-bundled",
+      "name": "Cursed Dagger",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/32.png",
+      "id": "32",
+      "imageStatus": "existing-bundled",
+      "name": "Midnight Crystal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/39.png",
+      "id": "39",
+      "imageStatus": "existing-bundled",
+      "name": "Portal Key",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/41.png",
+      "id": "41",
+      "imageStatus": "existing-bundled",
+      "name": "Victor´s Helmet",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/43.png",
+      "id": "43",
+      "imageStatus": "existing-bundled",
+      "name": "Poleaxe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/47.png",
+      "id": "47",
+      "imageStatus": "existing-bundled",
+      "name": "Brothers",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/48.png",
+      "id": "48",
+      "imageStatus": "existing-bundled",
+      "name": "Skull Crusher",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/49.png",
+      "id": "49",
+      "imageStatus": "existing-bundled",
+      "name": "Dawnguard",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/50.png",
+      "id": "50",
+      "imageStatus": "existing-bundled",
+      "name": "Sword of Storms",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/51.png",
+      "id": "51",
+      "imageStatus": "existing-bundled",
+      "name": "Ancient Amulet",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/65.png",
+      "id": "65",
+      "imageStatus": "existing-bundled",
+      "name": "Thunderfoot Boots",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/69.png",
+      "id": "69",
+      "imageStatus": "existing-bundled",
+      "name": "Tracker´s Shield",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/70.png",
+      "id": "70",
+      "imageStatus": "existing-bundled",
+      "name": "Punishing Hand",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/75.png",
+      "id": "75",
+      "imageStatus": "existing-bundled",
+      "name": "Magic Hat",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/76.png",
+      "id": "76",
+      "imageStatus": "existing-bundled",
+      "name": "Scorching Quiver",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/77.png",
+      "id": "77",
+      "imageStatus": "existing-bundled",
+      "name": "Sacrificial Dagger",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/89.png",
+      "id": "89",
+      "imageStatus": "existing-bundled",
+      "name": "Folding Crossbow",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/93.png",
+      "id": "93",
+      "imageStatus": "existing-bundled",
+      "name": "Pastor´s Seal",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/94.png",
+      "id": "94",
+      "imageStatus": "existing-bundled",
+      "name": "Minotaur´s Head",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/96.png",
+      "id": "96",
+      "imageStatus": "existing-bundled",
+      "name": "Desert Blade",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/167.png",
+      "id": "167",
+      "imageStatus": "existing-bundled",
+      "name": "Alchemist´s Set",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/172.png",
+      "id": "172",
+      "imageStatus": "existing-bundled",
+      "name": "Throwing Knives",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/1.png",
+      "id": "1",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "337bf0719b1b3de4a5d96775af1f836e3fea0d2cd563ac6e769d58a02e4a4f46",
+      "sourceBytes": 12188,
+      "sourceMd5": "db91cd1f29485414697ba2da4f7a90e0",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/universal_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Somna Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "5a684ae8806fb6e862ccc7a9db5baf55ba2c91e28d28eb69c24aebc6a07df495",
+      "sourceBytes": 12524,
+      "sourceMd5": "a2408b8e93611afc4565588212fc3014",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/somna_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/3.png",
+      "id": "3",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Arachne Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "9ae482a0dd2fd8c03b3f9f34e48a41621db94c0709e30c50c8b5f790d78a0a7a",
+      "sourceBytes": 11156,
+      "sourceMd5": "5b800704b9b1719d819c5e610e171f8c",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/arahna_patron_coin_160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/5.png",
+      "id": "5",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Folio Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "9df7a7e5bb88e0fce19586907c90d41d66891df991abdff814de5ddb2c447d41",
+      "sourceBytes": 13118,
+      "sourceMd5": "d47eec8d5c954851cff121e81e4e5f62",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/foliant_patron_coin_160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/13.png",
+      "id": "13",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Dante Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "1be0a55bb6fdb56be8317d7b82c76498fda0f7902121f51eb7795554afb3ff16",
+      "sourceBytes": 13691,
+      "sourceMd5": "ead32b72ad162ad6dd67ee633ae014bf",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/dante_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/14.png",
+      "id": "14",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Drayne Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "9f78255d4300bc6bee7b7a9bf6924a4d6faa1f0df713a23161e2d18be45c0074",
+      "sourceBytes": 11394,
+      "sourceMd5": "e31afac329aeb4cd27920582e3aabc41",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/drayne_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/15.png",
+      "id": "15",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Alvanor Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "c50f083ef641fcb874e1b10770fec54d9fb36b08dff57b3d2059a7371c6a26b9",
+      "sourceBytes": 11118,
+      "sourceMd5": "f8912b38f48b2e1c1a9bbc40771705c8",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/alvanor_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/16.png",
+      "id": "16",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Oya Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "316ba69d793adf312a2bf7a1fca46c9bc9c109b6b41a4232bc93f9d93ad50e7e",
+      "sourceBytes": 11193,
+      "sourceMd5": "94e351d672bb012587e1f6eee61e55a9",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/oya_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/18.png",
+      "id": "18",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Miu Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "c4f2a8d359ed96d6bd503743dc910ccfe864b852d20337cf9f502c8af4eefd78",
+      "sourceBytes": 11186,
+      "sourceMd5": "38e89e574c8d43bd5df9787a4a7a6c7d",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/hero74_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/20.png",
+      "id": "20",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Lian Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "519060794079ba9b78f3d1822e84c147b8f18136fe18007c62f8d5c581386b0c",
+      "sourceBytes": 11295,
+      "sourceMd5": "d64ffc0dd6ae531e33f1d9031b536fc2",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/lian_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/27.png",
+      "id": "27",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Peech Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "348f7b0a90cbf8d7577bcfbfa059b8bc94f8acdc4f39f68ed3ad2ab5d75c36c0",
+      "sourceBytes": 11762,
+      "sourceMd5": "b823353bd27fbc4044bec87350f02885",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/peech_patron_coin_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "patron",
+      "height": 160,
+      "icon": "assets/items/patron/57.png",
+      "id": "57",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Eva Relic Shard",
+      "nameSource": "verified-metadata",
+      "pngSha256": "0be018e2e6fbecf81f61f9d8933fd4c4a9b2cb034e24fff67a335eb950391134",
+      "sourceBytes": 11877,
+      "sourceMd5": "7f05ae0d37637e3f6cc80aaa58142f92",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/resource_with_background/coin/eva_patron_coin_160.img",
+      "width": 160
+    },
+    {
+      "category": "scroll",
+      "icon": "assets/items/scroll/141.png",
+      "id": "141",
+      "imageStatus": "existing-bundled",
+      "name": "Screaming blade - Recipe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "scroll",
+      "icon": "assets/items/scroll/142.png",
+      "id": "142",
+      "imageStatus": "existing-bundled",
+      "name": "Axe - Recipe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "scroll",
+      "icon": "assets/items/scroll/143.png",
+      "id": "143",
+      "imageStatus": "existing-bundled",
+      "name": "Traitor´s shield - Recipe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "scroll",
+      "icon": "assets/items/scroll/144.png",
+      "id": "144",
+      "imageStatus": "existing-bundled",
+      "name": "Voodoo doll - Recipe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "scroll",
+      "icon": "assets/items/scroll/145.png",
+      "id": "145",
+      "imageStatus": "existing-bundled",
+      "name": "Soul catcher - Recipe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "scroll",
+      "icon": "assets/items/scroll/159.png",
+      "id": "159",
+      "imageStatus": "existing-bundled",
+      "name": "Selena's Sickle - Recipe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "scroll",
+      "icon": "assets/items/scroll/161.png",
+      "id": "161",
+      "imageStatus": "existing-bundled",
+      "name": "World Tremor - Recipe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/100008.png",
+      "id": "100008",
+      "imageStatus": "existing-bundled",
+      "name": "Holiday Particle",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "coin",
+      "icon": "assets/items/coin/1031.png",
+      "id": "1031",
+      "imageStatus": "existing-bundled",
+      "name": "Horn of Summoning",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/105.png",
+      "id": "105",
+      "imageStatus": "existing-bundled",
+      "name": "Silver Casket",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/15.png",
+      "id": "15",
+      "imageStatus": "existing-bundled",
+      "name": "Bronze casket",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/231.png",
+      "id": "231",
+      "imageStatus": "existing-bundled",
+      "name": "Green Artifact Box",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/233.png",
+      "id": "233",
+      "imageStatus": "existing-bundled",
+      "name": "Violet Artifact Box",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/40239.png",
+      "id": "40239",
+      "imageStatus": "existing-bundled",
+      "name": "Nature Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/40241.png",
+      "id": "40241",
+      "imageStatus": "existing-bundled",
+      "name": "Mystery Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/40243.png",
+      "id": "40243",
+      "imageStatus": "existing-bundled",
+      "name": "Eternity Chest",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "consumable",
+      "id": "40251",
+      "imageStatus": "unresolved",
+      "name": "Holiday Chest",
+      "nameSource": "verified-metadata",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "consumable",
+      "icon": "assets/items/consumable/78.png",
+      "id": "78",
+      "imageStatus": "existing-bundled",
+      "name": "Boxy's Gift",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "energy",
+      "height": 160,
+      "icon": "assets/items/energy/0.png",
+      "id": "0",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Energy",
+      "nameSource": "provided-export-label",
+      "pngSha256": "50d0e474300e50a8d65ed75b973b06d45e2c90b4369a2ab01539c378a7a7a3e0",
+      "sourceBytes": 10353,
+      "sourceMd5": "d8767aca9e511d667969537d311ffe26",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/quest/quest_1.img",
+      "width": 160
+    },
+    {
+      "category": "gear",
+      "icon": "assets/items/gear/91.png",
+      "id": "91",
+      "imageStatus": "existing-bundled",
+      "name": "Flaming Heart",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "gold",
+      "height": 160,
+      "icon": "assets/items/gold/0.png",
+      "id": "0",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Gold",
+      "nameSource": "provided-export-label",
+      "pngSha256": "59bf649cc6ddb38cef70fa47bc02582474f47153ae5a3bdb8b7af0971ceba9da",
+      "sourceBytes": 13076,
+      "sourceMd5": "7ca16441739bec080d87889fa5f97aaa",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/quest/quest_7.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/10.png",
+      "id": "10",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Wood (100K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "56a130ad3cd265c2b1bb18fe2452d1a449bed1e17a0f81e3bdc07bcad69c683c",
+      "sourceBytes": 9051,
+      "sourceMd5": "f2d8714e20e8a4cb352c23f2d10c8850",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/wood/strategic_lootbox_chanced_10_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/11.png",
+      "id": "11",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Food (100K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "b002c6f270866842d9c8d839a71d7fd51d9ef39b2d6a44baccbdaea212a49ce7",
+      "sourceBytes": 9072,
+      "sourceMd5": "e7d87e7029175663be2a2179a946be8d",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/food/strategic_lootbox_chanced_11_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/12.png",
+      "id": "12",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Stone (100K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "9b38414dec978791633c18e404c715c59f949b7653a58891e0d2cd75df8a92d9",
+      "sourceBytes": 7980,
+      "sourceMd5": "fd6e5c510727376f47759d8b56322a9d",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/stone/strategic_lootbox_chanced_12_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/13.png",
+      "id": "13",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Iron (100K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "0cecaf5a2fa881d01b8d96aee976f98d6310722b595d211d76c0f13c51766e11",
+      "sourceBytes": 8153,
+      "sourceMd5": "d8c1a78ea0e398bcbb8dd59ad30d5cff",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/iron/strategic_lootbox_chanced_13_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/14.png",
+      "id": "14",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Wood (1M)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "49b1ff08f6c6dec4aca875368e5851801109f8b46af6a56794c15d1f487f46e5",
+      "sourceBytes": 9476,
+      "sourceMd5": "fd5ad03c901962c072ebb57ba2e829e2",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/wood/strategic_lootbox_chanced_14_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/15.png",
+      "id": "15",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Food (1M)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "23caccd7991f36f5f6cb48f13149e3fa86596e0d31b3051ab85398ce8deff04e",
+      "sourceBytes": 9213,
+      "sourceMd5": "e447f40c33e363a960f1424af44b40b7",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/food/strategic_lootbox_chanced_15_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Wood (10K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "4dbff9f86c2eb6ea33283722644a7b662ff764875ed506d8dcd0c4956c02f93d",
+      "sourceBytes": 7927,
+      "sourceMd5": "aacbc7377ea700efb773f24312d3126d",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/wood/strategic_lootbox_chanced_2_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/23.png",
+      "id": "23",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "World Energy (10)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "06b705e387c541c3578be88e4e075557249607f963bf0bc1adb8270629a535d2",
+      "sourceBytes": 8135,
+      "sourceMd5": "e1ad91b6e6bf8e8d0c16232d5a159134",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/lootBox/strategic_lootbox_chanced_23_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/25.png",
+      "id": "25",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Trophy Soul Casket",
+      "nameSource": "verified-metadata",
+      "pngSha256": "884e4b7c95e9f5237c4f1fa427427d6cc57562024adf9e451af6f51a11defce9",
+      "sourceBytes": 13021,
+      "sourceMd5": "d18052545db339ce6cf6eeb2ec510fb1",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/lootBox/strategic_lootbox_chanced_25_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/26.png",
+      "id": "26",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Elemental Casket",
+      "nameSource": "verified-metadata",
+      "pngSha256": "2ee2d645c71f9cb980b07400c448782b20eedf337d2d9751c515cb413a61bdcf",
+      "sourceBytes": 12941,
+      "sourceMd5": "eb70ccb704b0036d430000e3ef96b92a",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/lootBox/strategic_lootbox_chanced_26_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/27.png",
+      "id": "27",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Tomes Casket",
+      "nameSource": "verified-metadata",
+      "pngSha256": "8a2be23680adda7987a1df5d91e16dfb5826e9401a191eb3df1d41a8d05edcbc",
+      "sourceBytes": 12934,
+      "sourceMd5": "2a215690b4e1b895154731157695a515",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/lootBox/strategic_lootbox_chanced_27_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/28.png",
+      "id": "28",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Realm Casket",
+      "nameSource": "verified-metadata",
+      "pngSha256": "4b7be7feff3d238ef750b395d45e1377e977820e297ef1fea6265bd6bd2c6bc5",
+      "sourceBytes": 11455,
+      "sourceMd5": "4a8728dcc071a0454df6805abd054e2c",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/lootBox/strategic_lootbox_chanced_28_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/3.png",
+      "id": "3",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Food (10K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "471207509d897652b7b96e820e73fd260de3d25489703c6b601b299dd20d6627",
+      "sourceBytes": 7955,
+      "sourceMd5": "b2cf664246b6354bd2fc6cfd29f4141d",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/food/strategic_lootbox_chanced_3_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 256,
+      "icon": "assets/items/lootboxChanced/31.png",
+      "id": "31",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Random Resource Chest (10K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "5bb53e5defc3bbd32da456ea4eec3033d17c8ae61fb78d2c3625442bdbc74029",
+      "sourceBytes": 20432,
+      "sourceMd5": "5786a042a34d145ffdc67602d7fafebd",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/resource_chance/strategic_lootbox_chanced_31_icon.img",
+      "width": 256
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 256,
+      "icon": "assets/items/lootboxChanced/32.png",
+      "id": "32",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Random Resource Chest (100K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "7e96bec515f5299a087f1aa7ed2e8763762eedf91f0ffb2b62eae092824cdcee",
+      "sourceBytes": 20304,
+      "sourceMd5": "0a2194d693b2c0922f62f75e3371ae4f",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/resource_chance/strategic_lootbox_chanced_32_icon.img",
+      "width": 256
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/4.png",
+      "id": "4",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Stone (10K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "c620ead4c31f6233ee146696e9530889b0bf7f9724ecafeed8c407a09ece8fff",
+      "sourceBytes": 7691,
+      "sourceMd5": "6e10f56395c6d29c7d59537c7d2a0233",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/stone/strategic_lootbox_chanced_4_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/5.png",
+      "id": "5",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Iron (10K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "86821b0a37ce6bb8e5bca67775515b43ecdf2ab118f80c1f836e7179d26f0e79",
+      "sourceBytes": 7761,
+      "sourceMd5": "9b911291af237edbb7b8461d4e08e0e0",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/iron/strategic_lootbox_chanced_5_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/6.png",
+      "id": "6",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Wood (1K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "c10bd7335ada0d6523e077e548529562a63e618829ef542fb7292c62dd01ee4e",
+      "sourceBytes": 8031,
+      "sourceMd5": "b1f25dac13d5b38803d6244f8c7f3ae5",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/wood/strategic_lootbox_chanced_6_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/7.png",
+      "id": "7",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Food (1K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "2f30d6f486d475dbed5289bcbc9b00344ef40c7d5b375ec3ae74d831ec25ce46",
+      "sourceBytes": 8116,
+      "sourceMd5": "cc08cd7d3d04f83ab19fe209ff77013b",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/food/strategic_lootbox_chanced_7_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/8.png",
+      "id": "8",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Stone (1K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "60f53b030b641dcf4e667e8d1014d7ed4616d5bdddf43257de1edd9cd9e344fd",
+      "sourceBytes": 8110,
+      "sourceMd5": "6f78beab4148b0cc2217ac9afa41d465",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/stone/strategic_lootbox_chanced_8_icon.img",
+      "width": 160
+    },
+    {
+      "category": "lootboxChanced",
+      "height": 160,
+      "icon": "assets/items/lootboxChanced/9.png",
+      "id": "9",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Iron (1K)",
+      "nameSource": "verified-metadata",
+      "pngSha256": "fce35014a34f561e7de6a79e8e9f3f93c57aaaddcb43cfe745ae3d418229f6e6",
+      "sourceBytes": 7720,
+      "sourceMd5": "8780aa815513e228ff044a89120a8f28",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_packs/iron/strategic_lootbox_chanced_9_icon.img",
+      "width": 160
+    },
+    {
+      "category": "material",
+      "height": 160,
+      "icon": "assets/items/material/1.png",
+      "id": "1",
+      "imageStatus": "extracted",
+      "mapping": "manifest-exact-resource-name",
+      "name": "Elarite",
+      "nameSource": "verified-metadata",
+      "pngSha256": "1a15b5f3f37854d9266de6c4d5774316d14986601e1fb52160625d71e3f03ff2",
+      "sourceBytes": 5574,
+      "sourceMd5": "06122b7ffe833093fb35d826f6a81f1f",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/materials/material_elarite_icon.img",
+      "width": 160
+    },
+    {
+      "category": "material",
+      "id": "12",
+      "imageStatus": "unresolved",
+      "name": "Honor Marks",
+      "nameSource": "verified-metadata",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "material",
+      "id": "14",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "material",
+      "height": 160,
+      "icon": "assets/items/material/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "manifest-exact-resource-name",
+      "name": "Iron",
+      "nameSource": "verified-metadata",
+      "pngSha256": "38c9d6d7843996ed4b64d034103c8c6c951441660dbe1eba3cb7f01658acaaa2",
+      "sourceBytes": 4998,
+      "sourceMd5": "baad38e89fde54b3d7bb480bab35505c",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/materials/material_iron_icon.img",
+      "width": 160
+    },
+    {
+      "category": "material",
+      "height": 160,
+      "icon": "assets/items/material/3.png",
+      "id": "3",
+      "imageStatus": "extracted",
+      "mapping": "manifest-exact-resource-name",
+      "name": "Stone",
+      "nameSource": "verified-metadata",
+      "pngSha256": "fd95081a0964f0a477d8ccd334f7edc0e9336c3a7ce4ccf48d643a92f471c172",
+      "sourceBytes": 6394,
+      "sourceMd5": "ee6f194a391c6b7baea7ecd8cf968708",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/materials/material_stone_icon.img",
+      "width": 160
+    },
+    {
+      "category": "material",
+      "height": 160,
+      "icon": "assets/items/material/4.png",
+      "id": "4",
+      "imageStatus": "extracted",
+      "mapping": "manifest-exact-resource-name",
+      "name": "Wood",
+      "nameSource": "verified-metadata",
+      "pngSha256": "95a2ff3d027e5dc0ae4a4e51b74674c4d11354a51a2c40d1eb8786cfa9a7ed32",
+      "sourceBytes": 5525,
+      "sourceMd5": "033b9039c065d342b9d654a891d56c6b",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/materials/material_wood_icon.img",
+      "width": 160
+    },
+    {
+      "category": "material",
+      "height": 160,
+      "icon": "assets/items/material/5.png",
+      "id": "5",
+      "imageStatus": "extracted",
+      "mapping": "manifest-exact-resource-name",
+      "name": "Food",
+      "nameSource": "verified-metadata",
+      "pngSha256": "4b6d9ef73c060f8491fe778e8d95420d37bb7c16f6c2d588a11511931f5ad963",
+      "sourceBytes": 5733,
+      "sourceMd5": "1a316b585e9f5c85f884cf79c2802244",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/materials/material_food_icon.img",
+      "width": 160
+    },
+    {
+      "category": "material",
+      "id": "6",
+      "imageStatus": "unresolved",
+      "name": "Infantry Manual",
+      "nameSource": "verified-metadata",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "material",
+      "id": "7",
+      "imageStatus": "unresolved",
+      "name": "Spearmen Manual",
+      "nameSource": "verified-metadata",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "material",
+      "id": "8",
+      "imageStatus": "unresolved",
+      "name": "Marksmen Manual",
+      "nameSource": "verified-metadata",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "10",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "11",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "12",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "13",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "14",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "15",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "16",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "17",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "18",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "19",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "height": 160,
+      "icon": "assets/items/refillable/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Skill points",
+      "nameSource": "verified-metadata",
+      "pngSha256": "47e9b8e93fb2c37703fe856e60eab170dd9664b4e499ff80286d48ced4c5a77d",
+      "sourceBytes": 10954,
+      "sourceMd5": "5eb578af1a0827063dc2bbe8be17630c",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/refillable/skill_point_icon.img",
+      "width": 160
+    },
+    {
+      "category": "refillable",
+      "id": "20",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "21",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "22",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "23",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "24",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "25",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "26",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "27",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "28",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "29",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "3",
+      "imageStatus": "unresolved",
+      "name": "Bronze Free Chest",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "30",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "31",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "32",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "33",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "34",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "35",
+      "imageStatus": "unresolved",
+      "name": "Diamond Free Chest",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "36",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "37",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "38",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "39",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "4",
+      "imageStatus": "unresolved",
+      "name": "Gold Free Chest",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "40",
+      "imageStatus": "unresolved",
+      "name": "Blue Egg Chest",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "41",
+      "imageStatus": "unresolved",
+      "name": "Purple Egg Chest",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "42",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "43",
+      "imageStatus": "unresolved",
+      "name": "Blue Easter Chest",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "44",
+      "imageStatus": "unresolved",
+      "name": "Purple Easter Chest",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "45",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "5",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "50",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1776045600000,
+      "id": "506",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1780884000000,
+      "id": "507",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1785722400000,
+      "id": "508",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1788141600000,
+      "id": "509",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "id": "51",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1790560800000,
+      "id": "510",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1792980000000,
+      "id": "511",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "height": 160,
+      "icon": "assets/items/refillable/512.png",
+      "id": "512",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "pngSha256": "6dc9f70438f0a05fb98c72c0059532bac938a8553fba8fd08d1b4d6e9341b3df",
+      "sourceBytes": 12214,
+      "sourceMd5": "bb0f69c2a0e2e15684c26a42d5e44b9f",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/refillable/energy_hero68_icon_160.img",
+      "width": 160
+    },
+    {
+      "category": "refillable",
+      "id": "52",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "53",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "54",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "id": "55",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "56",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "id": "57",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "height": 160,
+      "icon": "assets/items/refillable/58.png",
+      "id": "58",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Fuel",
+      "nameSource": "verified-metadata",
+      "pngSha256": "469663147c4dad093932b8ffb58aafc135fa8e2879f44fe214c8a068b91aa3c5",
+      "sourceBytes": 10843,
+      "sourceMd5": "f97abbc26417b1dd74681a0d99aae7f5",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/refillable/fuel_sky_arena_icon.img",
+      "width": 160
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1716767999000,
+      "id": "59",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "id": "6",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "height": 800,
+      "icon": "assets/items/refillable/60.png",
+      "id": "60",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Draft Coin",
+      "nameSource": "verified-metadata",
+      "pngSha256": "1041052d1cd9b84da71ecb22f1f8052dfcd414476aca498144dbcc227ff87ef1",
+      "sourceBytes": 192714,
+      "sourceMd5": "d560971c12d7f19b7a70d0e401245441",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/refillable/drafts_chip_icon.img",
+      "width": 800
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1722823200000,
+      "id": "61",
+      "imageStatus": "skipped-inactive",
+      "name": "Astral Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1730080800000,
+      "id": "64",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "id": "65",
+      "imageStatus": "unresolved",
+      "name": "Available Reroll Coins",
+      "nameSource": "verified-metadata",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1734911999000,
+      "id": "66",
+      "imageStatus": "skipped-inactive",
+      "name": "Slice of Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1737338400000,
+      "id": "67",
+      "imageStatus": "skipped-inactive",
+      "name": "Energy Cookie",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "height": 160,
+      "icon": "assets/items/refillable/68.png",
+      "id": "68",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Event Boss Battles",
+      "nameSource": "provided-export-label",
+      "pngSha256": "8ecef71916c8d130a479ba9f949d7da2b9ecb3e4abf565e58b425d175c50c9d8",
+      "sourceBytes": 10578,
+      "sourceMd5": "00d7591b26db7b49511953746e3747c2",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/refillable/icon_energy_adv_ny2025_160x160.img",
+      "width": 160
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1742176800000,
+      "id": "69",
+      "imageStatus": "skipped-inactive",
+      "name": "Carnevil Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "id": "7",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1744596000000,
+      "id": "70",
+      "imageStatus": "skipped-inactive",
+      "name": "Carnevil Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1747015200000,
+      "id": "71",
+      "imageStatus": "skipped-inactive",
+      "name": "Star Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1749434400000,
+      "id": "72",
+      "imageStatus": "skipped-inactive",
+      "name": "Energetic Lightning",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "id": "73",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1751853600000,
+      "id": "75",
+      "imageStatus": "skipped-inactive",
+      "name": "Honk Capsule",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1756692000000,
+      "id": "76",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1754272800000,
+      "id": "77",
+      "imageStatus": "skipped-inactive",
+      "name": "Guardian Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "id": "78",
+      "imageStatus": "unresolved",
+      "name": null,
+      "nameSource": "unresolved",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1761530400000,
+      "id": "79",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "id": "8",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1759111200000,
+      "id": "80",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1766368800000,
+      "id": "81",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1763949600000,
+      "id": "82",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1771207200000,
+      "id": "83",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1768788000000,
+      "id": "84",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1773626400000,
+      "id": "85",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1778464800000,
+      "id": "86",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "expiresAt": 1783303200000,
+      "id": "87",
+      "imageStatus": "skipped-inactive",
+      "name": "Adventure Energy",
+      "nameSource": "verified-metadata",
+      "visibility": "expired"
+    },
+    {
+      "category": "refillable",
+      "id": "88",
+      "imageStatus": "skipped-inactive",
+      "name": null,
+      "nameSource": "unresolved",
+      "visibility": "internal-counter"
+    },
+    {
+      "category": "scroll",
+      "icon": "assets/items/scroll/162.png",
+      "id": "162",
+      "imageStatus": "existing-bundled",
+      "name": "Dragon Shield - Recipe",
+      "nameSource": "verified-metadata"
+    },
+    {
+      "category": "speedUpConstruction",
+      "height": 256,
+      "icon": "assets/items/speedUpConstruction/1.png",
+      "id": "1",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "1m Construction Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "54665e9c4a780968157974926ed6935b22fc48b608bcb0581b7e3d741e6652f3",
+      "sourceBytes": 14931,
+      "sourceMd5": "8838ca313584e06c778ab670c4fd31b9",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_construction_1_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpConstruction",
+      "height": 256,
+      "icon": "assets/items/speedUpConstruction/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "5m Construction Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "2d29ae7fb6175356b71c98c8fc7a46bede4c4b0fb24a758fe12a0426c0aa3f72",
+      "sourceBytes": 14976,
+      "sourceMd5": "f58b433ea643e14785cf4f1d7452c7ae",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_construction_2_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpConstruction",
+      "height": 256,
+      "icon": "assets/items/speedUpConstruction/3.png",
+      "id": "3",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "1h Construction Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "a8296f771031a5aaec4c404770a2faaac6b1824f3a223581c81f727e4110dd64",
+      "sourceBytes": 14784,
+      "sourceMd5": "bff6372256f4d946ac8e070209e05f89",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_construction_3_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpResearch",
+      "height": 256,
+      "icon": "assets/items/speedUpResearch/1.png",
+      "id": "1",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "1m Research Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "8f0433fcea2390909b723b76b1fd49b9e68470c6309014d782d60de9a1c7d348",
+      "sourceBytes": 15308,
+      "sourceMd5": "84bc18d39a78506fa747536f531e4039",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_research_1_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpResearch",
+      "height": 256,
+      "icon": "assets/items/speedUpResearch/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "5m Research Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "58aac2548ba3b3b034ee7079daf2548f0e06caa16bb80a763da606502d4bc4fe",
+      "sourceBytes": 15391,
+      "sourceMd5": "d21931a9fe0c40bc8c0f5e9c72febc93",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_research_2_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpResearch",
+      "height": 256,
+      "icon": "assets/items/speedUpResearch/5.png",
+      "id": "5",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "8h Research Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "7ba822166879ce1c5a6588620d1c53f78de189dc65f771dd9859015958c6f107",
+      "sourceBytes": 16633,
+      "sourceMd5": "d0e6c6ebdf194f11d6fd7cb4b6c1ace6",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_research_5_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpUnitHealing",
+      "height": 256,
+      "icon": "assets/items/speedUpUnitHealing/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "5m Healing Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "d258546c31fdbf56c13b26a21563eed5e6666cb93f1c623232f4ad7e4642dfb4",
+      "sourceBytes": 14631,
+      "sourceMd5": "175c95792ed1ee97ff0a39b46c4bd038",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_unit_healing_2_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpUnitTraining",
+      "height": 256,
+      "icon": "assets/items/speedUpUnitTraining/1.png",
+      "id": "1",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "1m Training Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "759a6e37deade36e2b535878fb5aaa95b1416832fba0c6120bb3253df550c038",
+      "sourceBytes": 15740,
+      "sourceMd5": "9b0147354c01be8515491e1d82a62ef1",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_unit_training_1_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpUnitTraining",
+      "height": 256,
+      "icon": "assets/items/speedUpUnitTraining/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "5m Training Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "1aec9574c2c1de91ff5c04887182dc5c19dd8f403b4938ffc51fe477692b4f6d",
+      "sourceBytes": 15845,
+      "sourceMd5": "5351d6c1b57ac826c91c0e6e6c569605",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_unit_training_2_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpUnitTraining",
+      "height": 256,
+      "icon": "assets/items/speedUpUnitTraining/5.png",
+      "id": "5",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "8h Training Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "ef1cdb41c0470030b17d1c0a708bad828397981525ffd807d15e834345bbc46a",
+      "sourceBytes": 17154,
+      "sourceMd5": "aeff880059e5d45802355f308376806e",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_unit_training_5_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpUniversal",
+      "height": 256,
+      "icon": "assets/items/speedUpUniversal/1.png",
+      "id": "1",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "1m General Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "5f317425636ad8b505cad4705285b3fedc648f743fcdab17807fe59499a3846e",
+      "sourceBytes": 13542,
+      "sourceMd5": "92afd0b49d2b4be428ad871991651b89",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_universal_1_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpUniversal",
+      "height": 256,
+      "icon": "assets/items/speedUpUniversal/2.png",
+      "id": "2",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "5m General Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "f54b1372e59d06fc8c02343deea41d551775444f074a31410d5cf4151efbe5bc",
+      "sourceBytes": 13571,
+      "sourceMd5": "2cba7cd2ece9b3824147df1855ee82ad",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_universal_2_icon.img",
+      "width": 256
+    },
+    {
+      "category": "speedUpUniversal",
+      "height": 256,
+      "icon": "assets/items/speedUpUniversal/3.png",
+      "id": "3",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "1h General Speedup",
+      "nameSource": "verified-metadata",
+      "pngSha256": "fe8762ef54edc03cbcd542d7b66998364f593f0b1c6f80e2908eabaae0b34e57",
+      "sourceBytes": 13381,
+      "sourceMd5": "cf8afbd2a9574cbf2170606a7707997b",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/resource_icons/speed_up/icons/speed_up_universal_3_icon.img",
+      "width": 256
+    },
+    {
+      "category": "starMoney",
+      "height": 160,
+      "icon": "assets/items/starMoney/0.png",
+      "id": "0",
+      "imageStatus": "extracted",
+      "mapping": "metadata-texture",
+      "name": "Emeralds",
+      "nameSource": "provided-export-label",
+      "pngSha256": "0cb59f131a12de9a9ff32aa51ec8ec630beb2a7f9ec11be2c3be6643f44ddddc",
+      "sourceBytes": 10119,
+      "sourceMd5": "430acdfcf06e470c20a39425eda277f9",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/icons/quest/quest_2.img",
+      "width": 160
+    },
+    {
+      "category": "teleporter",
+      "height": 256,
+      "icon": "assets/items/teleporter/1.png",
+      "id": "1",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": "Advanced Teleport",
+      "nameSource": "verified-metadata",
+      "pngSha256": "7722e2b9bcb4f20f607beadd550adfdace22ee8c7beea5c0b068e5232c8e84da",
+      "sourceBytes": 22657,
+      "sourceMd5": "73aee2b639f6fee50b6bfedcfbe50203",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/teleports/strategic_teleporter_1_icon.img",
+      "width": 256
+    },
+    {
+      "category": "teleporter",
+      "height": 256,
+      "icon": "assets/items/teleporter/6.png",
+      "id": "6",
+      "imageStatus": "extracted",
+      "mapping": "manifest-typed-resource-id",
+      "name": null,
+      "nameSource": "unresolved",
+      "pngSha256": "a3d637e5582128deaceba2bfbe71d5f3427646c702103b2f53df155548a4fa62",
+      "sourceBytes": 21393,
+      "sourceMd5": "ceade779bf44a61fb6d7c970f714071c",
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0001/extends/strategic/teleports/strategic_teleporter_6_icon.img",
+      "width": 256
+    },
+    {
+      "category": "world-energy",
+      "id": "0",
+      "imageStatus": "unresolved",
+      "name": "World Energy",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    },
+    {
+      "category": "world-refillable",
+      "id": "6",
+      "imageStatus": "unresolved",
+      "name": "Free Teleport",
+      "nameSource": "provided-export-label",
+      "reason": "No unambiguous metadata/typed manifest mapping in verified snapshot"
+    }
+  ],
+  "source": {
+    "clientVersion": "1.293.1010",
+    "library": {
+      "md5": "1357804ab5ab599e3522f8cbdeb75802",
+      "size": 5582751,
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0054/d973530195826f1575a002f97a3f30e9/lib/splitlib.json.zip"
+    },
+    "limitation": "Latest manifest URL no longer matches captured dffc6e1e901230a6e303f6dcf03c8254. Textures use the cached MD5-verified 1.293.0 manifest snapshot; unsupported/newer mappings remain unresolved.",
+    "locale": {
+      "md5": "def7ae37ac67df119f41eae76690c092",
+      "size": 683124,
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0054/d973530195826f1575a002f97a3f30e9/locale/en.json.gz"
+    },
+    "manifest": {
+      "entries": 17360,
+      "iconEntries": 7746,
+      "inventory": {
+        "embedded_library": {
+          "bytes": 67250976,
+          "entries": 14
+        },
+        "extends/async_ingame_images": {
+          "bytes": 857238,
+          "entries": 7
+        },
+        "extends/background": {
+          "bytes": 34206813,
+          "entries": 135
+        },
+        "extends/battle_pass_universal": {
+          "bytes": 25936625,
+          "entries": 66
+        },
+        "extends/battleground": {
+          "bytes": 22917219,
+          "entries": 34
+        },
+        "extends/boss_icons": {
+          "bytes": 28682,
+          "entries": 1
+        },
+        "extends/boss_maps": {
+          "bytes": 1091715,
+          "entries": 3
+        },
+        "extends/comics_units": {
+          "bytes": 99497380,
+          "entries": 1040
+        },
+        "extends/comix": {
+          "bytes": 89277553,
+          "entries": 140
+        },
+        "extends/creeps": {
+          "bytes": 52109521,
+          "entries": 68
+        },
+        "extends/direct_checkout": {
+          "bytes": 70035,
+          "entries": 5
+        },
+        "extends/epic_art": {
+          "bytes": 1507610,
+          "entries": 27
+        },
+        "extends/feature_hub": {
+          "bytes": 1936623,
+          "entries": 50
+        },
+        "extends/from_internal": {
+          "bytes": 3048127,
+          "entries": 16
+        },
+        "extends/gacha_hub": {
+          "bytes": 1227111,
+          "entries": 19
+        },
+        "extends/gacha_wheel": {
+          "bytes": 1182138,
+          "entries": 5
+        },
+        "extends/gui": {
+          "bytes": 234524560,
+          "entries": 1805
+        },
+        "extends/hero_art": {
+          "bytes": 41092075,
+          "entries": 195
+        },
+        "extends/hero_chest": {
+          "bytes": 4293463,
+          "entries": 148
+        },
+        "extends/hero_sets": {
+          "bytes": 1721068,
+          "entries": 74
+        },
+        "extends/hero_story": {
+          "bytes": 880323,
+          "entries": 10
+        },
+        "extends/heroes": {
+          "bytes": 515881114,
+          "entries": 413
+        },
+        "extends/icons": {
+          "bytes": 109056366,
+          "entries": 7746
+        },
+        "extends/isometric_map_assets": {
+          "bytes": 18666542,
+          "entries": 75
+        },
+        "extends/live_ops": {
+          "bytes": 15269822,
+          "entries": 125
+        },
+        "extends/live_ops_hub": {
+          "bytes": 683850,
+          "entries": 33
+        },
+        "extends/magic_tower": {
+          "bytes": 264436,
+          "entries": 45
+        },
+        "extends/playable": {
+          "bytes": 15575067,
+          "entries": 13
+        },
+        "extends/player_email_collect": {
+          "bytes": 249026,
+          "entries": 4
+        },
+        "extends/single_offer": {
+          "bytes": 8988657,
+          "entries": 31
+        },
+        "extends/soundtracks": {
+          "bytes": 1538404,
+          "entries": 2
+        },
+        "extends/special_quest_backgrounds": {
+          "bytes": 23717051,
+          "entries": 558
+        },
+        "extends/start_preloader": {
+          "bytes": 15084289,
+          "entries": 58
+        },
+        "extends/strategic": {
+          "bytes": 17768852,
+          "entries": 829
+        },
+        "extends/titans": {
+          "bytes": 167680996,
+          "entries": 40
+        },
+        "extends/user_flags": {
+          "bytes": 209946,
+          "entries": 152
+        },
+        "extends/videos": {
+          "bytes": 4019484498,
+          "entries": 637
+        },
+        "extends/webview": {
+          "bytes": 8119766,
+          "entries": 5
+        },
+        "extends/wishing_wheel": {
+          "bytes": 937280,
+          "entries": 5
+        },
+        "external_library": {
+          "bytes": 130863894,
+          "entries": 587
+        },
+        "internal": {
+          "bytes": 2219793,
+          "entries": 8
+        },
+        "lib": {
+          "bytes": 5572457,
+          "entries": 1
+        },
+        "locale": {
+          "bytes": 9297492,
+          "entries": 13
+        },
+        "project_library": {
+          "bytes": 3402247604,
+          "entries": 2118
+        }
+      },
+      "md5": "c40122f2b0fb79fc5e133f9b9f9d5ee3",
+      "size": 612695,
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/d973530195826f1575a002f97a3f30e9/index.latest.json.gz?hash=c40122f2b0fb79fc5e133f9b9f9d5ee3"
+    },
+    "staticVersion": "1.293.0"
+  }
+}

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getItemName, downloadJson } from '@/src/utils/metadata';
+import { getItemIcon } from '@/src/utils/itemResources';
 import { formatNumber } from '@/src/utils/formatters';
 
 const { cache, dispatchRpc } = useRpcCache();
@@ -159,30 +160,14 @@ const categorizedSections = computed<CategorySection[]>(() => {
   return sections;
 });
 
+const failedIcons = ref<Set<string>>(new Set());
 function getItemImgSrc(item: InventoryEntry): string {
-  let path = '';
-  if (item.category === 'fragmentHero') {
-    path = `assets/heroes/${item.id}.png`;
-  } else if (item.category === 'fragmentTitan') {
-    path = `assets/titans/${item.id}.png`;
-  } else if (item.category === 'gear' || item.category === 'fragmentGear') {
-    path = `assets/items/gear/${item.id}.png`;
-  } else if (item.category === 'consumable') {
-    path = `assets/items/consumable/${item.id}.png`;
-  } else if (item.category === 'scroll' || item.category === 'fragmentScroll') {
-    path = `assets/items/scroll/${item.id}.png`;
-  } else if (item.category === 'fragmentArtifact') {
-    path = `assets/items/fragmentArtifact/${item.id}.png`;
-  } else if (item.category === 'artifact') {
-    path = `assets/items/artifact/${item.id}.png`;
-  } else if (item.category === 'coin') {
-    path = `assets/items/coin/${item.id}.png`;
-  }
-
-  if (path && typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
-    return chrome.runtime.getURL(path);
-  }
-  return path;
+  if (failedIcons.value.has(`${item.category}:${item.id}`)) return '';
+  const path = getItemIcon(item.category, item.id);
+  return path && typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL(path) : path || '';
+}
+function handleItemImageError(item: InventoryEntry) {
+  failedIcons.value = new Set(failedIcons.value).add(`${item.category}:${item.id}`);
 }
 
 function getCategoryIcon(cat: string): string {
@@ -361,6 +346,7 @@ function exportItemsJson() {
               :alt="item.name"
               class="size-full object-contain rounded-lg"
               loading="lazy"
+              @error="handleItemImageError(item)"
             />
             <span v-else class="text-xl">
               {{ getCategoryIcon(item.category) }}
@@ -401,6 +387,7 @@ function exportItemsJson() {
                       :alt="item.name"
                       class="size-full object-contain"
                       loading="lazy"
+                      @error="handleItemImageError(item)"
                     />
                     <span v-else class="text-xs">{{ getCategoryIcon(item.category) }}</span>
                   </div>

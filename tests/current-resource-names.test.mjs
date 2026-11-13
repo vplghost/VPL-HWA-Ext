@@ -9,7 +9,7 @@ import { extractStrategicResourceNames } from '../scripts/lib/strategic-resource
 import { resourceLabel } from '../src/utils/resourceData.ts';
 
 const context = {};
-for (const name of ['data-names', 'name-map']) {
+for (const name of ['data-names', 'item-resources', 'name-map']) {
   vm.runInNewContext(await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
 }
 const metadata = (await readFile(new URL('../src/utils/metadata.ts', import.meta.url), 'utf8'))
