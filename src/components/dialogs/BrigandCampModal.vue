@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useDialogTeamSelection } from '@/src/composables/useDialogTeamSelection';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { getHeroMetadata, getItemName } from '@/src/utils/metadata';
 import { getAmountAt } from '@/src/utils/resourceData';
@@ -12,6 +13,8 @@ const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
 const { cache, dispatchRpc } = useRpcCache();
 const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const { customTeams } = useAccountTeams(accountId);
+const rememberedTeam = useDialogTeamSelection('brigand', accountId);
+const selectedPreset = ref('');
 const owned = computed<Record<string, any>>(() => cache.value.heroGetAll?.data || {});
 const heroes = computed(() => Object.entries(owned.value).map(([id, hero]) => ({
   id: Number(id), name: getHeroMetadata(id)?.name || `Hero #${id}`, power: Number(hero.power) || 0,
@@ -93,17 +96,30 @@ const validation = computed(() => summary.value && !selectedCamp.value
   : campAttackError(campId.value, heroIds.value, owned.value, energy.value));
 const alreadyWon = computed(() => result.value?.data?.success && result.value.data.campId === campId.value.trim());
 
-function selectTeam(ids: number[]) {
+function selectTeam(ids: number[], preset = '', persist = true) {
   heroIds.value = campHeroIds(ids).filter(id => !!owned.value[String(id)]);
+  selectedPreset.value = preset;
+  if (persist) void rememberedTeam.saveSelection({ teamId: preset, heroIds: [...heroIds.value] });
 }
+function selectCustomTeam(event: Event) {
+  const id = (event.target as HTMLSelectElement).value;
+  const team = customTeams.value.find(team => team.id === id);
+  if (team) selectTeam(team.heroIds, id);
+}
+watch([rememberedTeam.selection, owned], () => {
+  const saved = rememberedTeam.selection.value;
+  if (saved?.heroIds) selectTeam(saved.heroIds, saved.teamId || '', false);
+});
 function toggleHero(id: number) {
   if (heroIds.value.includes(id)) heroIds.value = heroIds.value.filter(hero => hero !== id);
   else if (heroIds.value.length < 5) heroIds.value = [...heroIds.value, id];
+  selectedPreset.value = '';
+  void rememberedTeam.saveSelection({ heroIds: [...heroIds.value], teamId: '' });
 }
 watch(() => props.modelValue, open => {
-  if (open && !heroIds.value.length) selectTeam(savedTeam.value);
+  if (open && !heroIds.value.length) selectTeam(savedTeam.value, '', false);
 });
-watch(savedTeam, ids => { if (props.modelValue && !heroIds.value.length) selectTeam(ids); });
+watch(savedTeam, ids => { if (props.modelValue && !heroIds.value.length) selectTeam(ids, '', false); });
 watch(accountId, () => {
   clearTimeout(timer);
   clearTimeout(searchTimer);
@@ -112,6 +128,7 @@ watch(accountId, () => {
   searchError.value = '';
   pending.value = null;
   heroIds.value = [];
+  selectedPreset.value = '';
   campId.value = '';
   message.value = '';
   error.value = '';
@@ -197,7 +214,7 @@ async function attack() {
       <div class="flex flex-wrap items-center gap-2">
         <strong>Team · {{ heroIds.length }}/5 heroes</strong>
         <button class="text-xs text-orange-600 disabled:opacity-50" :disabled="!!pending || !savedTeam.length" @click="selectTeam(savedTeam)">Use Brigand Camp team</button>
-        <select class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs" :disabled="!!pending" aria-label="Use custom team" @change="selectTeam(customTeams.find(team => team.id === ($event.target as HTMLSelectElement).value)?.heroIds || [])">
+        <select :value="selectedPreset" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs" :disabled="!!pending" aria-label="Use custom team" @change="selectCustomTeam">
           <option value="">Custom team…</option>
           <option v-for="team in customTeams" :key="team.id" :value="team.id">{{ team.name }}</option>
         </select>

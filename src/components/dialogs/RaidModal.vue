@@ -160,7 +160,7 @@ onMounted(async () => {
         if (stored.raidPreferences.waitSeconds) waitSeconds.value = stored.raidPreferences.waitSeconds;
         if (stored.raidPreferences.minMembers) minMembers.value = stored.raidPreferences.minMembers;
         if (stored.raidPreferences.autoCancel !== undefined) autoCancel.value = stored.raidPreferences.autoCancel;
-        if (stored.raidPreferences.rallyTeam) selectedTeamId.value = stored.raidPreferences.rallyTeam;
+        // Team restoration is owned by useSquadTeams and its account-specific storage.
         if (stored.raidPreferences.targetMobId) selectedMobId.value = stored.raidPreferences.targetMobId;
       }
       if (stored.raidQueue) {
@@ -426,7 +426,7 @@ async function stopRaidQueue() {
     aria-modal="true"
     aria-labelledby="raid-dialog-title"
     class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
-    @click.self="close"
+
   >
     <div
       class="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-indigo-200 bg-slate-50 p-0 shadow-xl dark:bg-slate-900 dark:border-indigo-900/50 overflow-hidden"

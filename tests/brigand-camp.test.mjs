@@ -94,6 +94,7 @@ test('actual Brigand dialog prevents duplicate sends and waits for server result
   const context = { computed, ref, shallowRef, watch: (...args) => { const stop = watch(...args); stops.push(stop); return stop; },
     onMounted() {}, onUnmounted() {}, defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     useRpcCache: () => ({ cache: state, dispatchRpc: batch => { calls.push(batch); return new Promise(resolve => callbacks.push(resolve)); } }),
+    useDialogTeamSelection: () => ({ selection: ref(null), saveSelection: async () => true }),
     useAccountTeams: () => ({ customTeams: ref([]) }), getHeroMetadata: () => ({}), getItemName: () => '',
     BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls, campSearchCalls, availableCamps, getAmountAt,
     setTimeout: fn => { timers.push(fn); return timers.length; }, clearTimeout() {}, clearInterval() {}, Date };

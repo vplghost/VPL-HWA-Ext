@@ -221,7 +221,7 @@ function handleImgError(e: Event) {
       aria-modal="true"
       aria-labelledby="draft-modal-title"
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
-      @click.self="close"
+
     >
       <div
         class="relative flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden dark:border-slate-800 dark:bg-slate-900 animate-in zoom-in-95 duration-150"

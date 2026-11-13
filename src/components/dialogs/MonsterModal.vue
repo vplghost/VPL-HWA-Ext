@@ -116,7 +116,7 @@ onMounted(async () => {
       const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; monsterPreferences?: {mobLevel?: number; teamId?: string; targetMobId?: string}; monsterQueue?: {running?: boolean; phase?: string} }>(['monsterPreferences', 'monsterQueue', 'popupRpcEnabled', 'socketRefreshMode']);
       if (stored.monsterPreferences) {
         if (stored.monsterPreferences.mobLevel) mobLevel.value = stored.monsterPreferences.mobLevel;
-        if (stored.monsterPreferences.teamId) selectedTeamId.value = stored.monsterPreferences.teamId;
+        // Team restoration is owned by useSquadTeams and its account-specific storage.
         if (stored.monsterPreferences.targetMobId) selectedMobId.value = stored.monsterPreferences.targetMobId;
       }
       if (stored.monsterQueue) {
@@ -181,6 +181,7 @@ async function savePreferences() {
     await chrome.storage.local.set({
       monsterPreferences: {
         mobLevel: mobLevel.value,
+        accountId: cache.value.accountStatus?.data?.id,
         teamId: selectedTeamId.value,
         targetMobId: selectedMobId.value,
       },
@@ -351,7 +352,7 @@ async function stopMonsterQueue() {
     aria-modal="true"
     aria-labelledby="monster-dialog-title"
     class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
-    @click.self="close"
+
   >
     <div
       class="w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl border border-amber-200 bg-slate-50 p-0 shadow-xl dark:bg-slate-900 dark:border-amber-900/50 overflow-hidden"

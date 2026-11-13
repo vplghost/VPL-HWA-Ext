@@ -1,4 +1,5 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { useDialogTeamSelection } from './useDialogTeamSelection';
 import { selectSquadStorage } from '../utils/squadStorage';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata, starGlowClass } from '@/src/utils/metadata';
@@ -28,8 +29,8 @@ export interface TroopSummaryBlock {
 }
 
 export function useSquadTeams(
-  preferenceStorageKey: 'raidPreferences' | 'monsterPreferences',
-  teamFieldKey: 'rallyTeam' | 'teamId'
+  preferenceStorageKey: 'raidPreferences' | 'monsterPreferences' | 'autoGatherSettings',
+  teamFieldKey: 'rallyTeam' | 'teamId' | 'selectedTeam'
 ) {
   const { cache, dispatchRpc } = useRpcCache();
 
@@ -40,6 +41,12 @@ export function useSquadTeams(
   const isRefreshingTroops = ref<boolean>(false);
 
   const accountId = computed(() => cache.value.accountStatus?.data?.id);
+  const rememberedTeam = useDialogTeamSelection(preferenceStorageKey, accountId);
+  watch([rememberedTeam.selection, rememberedTeam.loaded], () => {
+    if (rememberedTeam.loaded.value && rememberedTeam.selection.value?.teamId) {
+      selectedTeamId.value = rememberedTeam.selection.value.teamId;
+    }
+  });
   const heroesData = computed(() => cache.value.heroGetAll?.data || {});
   const unitSummaryData = computed(() => cache.value['getUnitSummary:unit']?.data || cache.value.inventoryGet?.data?.unit || {});
   const marchData = computed(() => normalizeArray(cache.value.marchStatus?.data?.marches));
@@ -79,7 +86,7 @@ export function useSquadTeams(
         if (revision !== loadRevision || currentAccount !== accountId.value) return;
         const selection = selectSquadStorage(stored, currentAccount, preferenceStorageKey, teamFieldKey);
         customTeams.value = selection.teams;
-        selectedTeamId.value = selection.selected;
+        selectedTeamId.value = rememberedTeam.selection.value?.teamId || selection.selected;
         capacitySettings.value = stored.troopCapacitySettings;
       } catch (_) {}
     }
@@ -269,6 +276,10 @@ export function useSquadTeams(
 
   async function handleTeamChange(newTeamId: string) {
     selectedTeamId.value = newTeamId;
+    const selectedAccount = accountId.value;
+    ++loadRevision; // An older roster/preferences read must not undo this choice.
+    await rememberedTeam.saveSelection({ teamId: newTeamId });
+    if (selectedAccount !== accountId.value) return;
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       try {
         const currentAccount = accountId.value;

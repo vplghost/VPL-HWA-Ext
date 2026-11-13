@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.55 — 2026-11-13
+
+### Fixed
+
+- Restore the last selected team separately for each account and dialog: Guild Raid, Solo Monster, Gathering, Brigand Camp and Tower.
+- Preserve team choices across popup reloads and unrelated option saves; prevent stale storage reads from overwriting a newer choice.
+- Remember Brigand custom teams and manual hero selections, and Tower's selected hero slots.
+- Keep dialogs open when clicking the backdrop; explicit close buttons and Escape remain available.
+
 ## 0.10.54 — 2026-11-13
 
 ### Added

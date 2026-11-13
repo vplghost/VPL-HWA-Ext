@@ -42,7 +42,7 @@ const {
   getHeroName,
   getHeroAvatarUrl,
   getHeroGlow,
-} = useSquadTeams('autoGatherSettings' as any, 'selectedTeam' as any);
+} = useSquadTeams('autoGatherSettings', 'selectedTeam');
 
 interface AutoGatherSettings {
   enabled: boolean;

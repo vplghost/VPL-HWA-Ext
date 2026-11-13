@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
+import { useDialogTeamSelection } from '@/src/composables/useDialogTeamSelection';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { towerSettingsForAccount } from '@/src/utils/dialogRpc';
 import { getHeroMetadata } from '@/src/utils/metadata';
@@ -15,6 +16,8 @@ const emit = defineEmits<{
 }>();
 
 const { cache, dispatchRpc } = useRpcCache();
+const towerAccountId = computed(() => cache.value.accountStatus?.data?.id ?? cache.value.userGetInfo?.data?.id);
+const rememberedTeam = useDialogTeamSelection('tower', towerAccountId);
 
 const isRunning = ref(false);
 const towerAutomationMessage = ref('');
@@ -48,6 +51,9 @@ const heroEntries = computed(() => {
 
 // Selected Tower Team (5 heroes)
 const selectedHeroIds = ref<number[]>([]);
+watch(rememberedTeam.selection, selection => {
+  if (selection?.heroIds) selectedHeroIds.value = [...selection.heroIds];
+});
 
 // Buff definitions & categories
 const buffGroups = [
@@ -96,14 +102,23 @@ function initBuffOrder(saved?: number[]) {
   buffOrder.value = merged.length > 0 ? merged : defaultOrder;
 }
 
+watch(towerAccountId, () => {
+  selectedHeroIds.value = [];
+  void loadTowerSettings();
+});
+
 // Storage sync
 async function loadTowerSettings() {
+  const accountId = towerAccountId.value;
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
       const stored = await chrome.storage.local.get(['towerAutomationSettings', 'towerRun']);
-      const accountId = cache.value.accountStatus?.data?.id ?? cache.value.userGetInfo?.data?.id;
+      if (accountId !== towerAccountId.value) return;
       const settings = towerSettingsForAccount(stored.towerAutomationSettings, accountId);
-      selectedHeroIds.value = settings.heroes?.length === 5 ? [...settings.heroes] : [];
+      await rememberedTeam.loadSelection();
+      if (accountId !== towerAccountId.value) return;
+      const savedHeroes = rememberedTeam.selection.value?.heroIds ?? settings.heroes;
+      selectedHeroIds.value = savedHeroes?.length === 5 ? [...savedHeroes] : [];
       initBuffOrder(settings.buffPriority);
       if (stored.towerRun) {
         towerRunState.value = stored.towerRun as { phase?: string };
@@ -125,6 +140,8 @@ async function loadTowerSettings() {
 async function saveTowerSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     const accountId = cache.value.accountStatus?.data?.id ?? cache.value.userGetInfo?.data?.id ?? null;
+    await rememberedTeam.saveSelection({ heroIds: [...selectedHeroIds.value] });
+    if (accountId !== towerAccountId.value) return;
     await chrome.storage.local.set({
       towerAutomationSettings: {
         accountId,
