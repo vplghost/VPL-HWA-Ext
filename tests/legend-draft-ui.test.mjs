@@ -686,4 +686,11 @@ test('DraftModal tracks match status, live timer, opponent profile, and match re
   assert.match(code, /enemyAttackHeroes/, 'Must track enemyAttackHeroes counter');
   assert.match(code, /getHeroStar/, 'Must extract hero stars');
   assert.match(code, /getHeroAvatar/, 'Must extract hero avatars');
+
+  // Candidate Hero Pool & Error Logging
+  assert.match(code, /id="draft-candidate-pool"/, 'Must have #draft-candidate-pool element');
+  assert.match(code, /poolCandidates/, 'Must track poolCandidates');
+  assert.match(code, /id="draft-server-error"/, 'Must have #draft-server-error element');
+  assert.match(code, /lastError/, 'Must track lastError');
+  assert.match(code, /id="draft-refresh-btn"/, 'Must have #draft-refresh-btn');
 });

@@ -117,6 +117,26 @@ const observedChoices = computed(() => {
   return (globalThis as any).hwaHelperPopupData?.observedDraftChoices?.(matchId.value) || null;
 });
 
+const poolCandidates = computed<number[]>(() => {
+  const raw = (cache.value as any).legendDraft?.candidates;
+  return Array.isArray(raw) ? raw : [];
+});
+
+const lastError = computed(() => draftStatus.value.lastError || null);
+const lastErrorCode = computed(() => draftStatus.value.lastErrorCode || null);
+const lastErrorAction = computed(() => draftStatus.value.lastErrorAction || null);
+
+const isRefreshing = ref(false);
+
+async function refreshDraft() {
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([{ name: 'randomDraft_getInfo' }]);
+  } finally {
+    isRefreshing.value = false;
+  }
+}
+
 const lastResult = computed(() => draftStatus.value.lastResult || null);
 const isWin = computed(() => {
   if (!lastResult.value) return false;
@@ -221,17 +241,33 @@ function handleImgError(e: Event) {
             </span>
           </div>
 
-          <button
-            id="draft-modal-close"
-            type="button"
-            class="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 focus:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            aria-label="Close dialog"
-            @click="close"
-          >
-            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div class="flex items-center gap-1.5">
+            <button
+              id="draft-refresh-btn"
+              type="button"
+              class="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 focus:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+              :class="{ 'animate-spin': isRefreshing }"
+              title="Refresh Draft info"
+              aria-label="Refresh Draft info"
+              @click="refreshDraft"
+            >
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+            </button>
+
+            <button
+              id="draft-modal-close"
+              type="button"
+              class="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 focus:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              aria-label="Close dialog"
+              @click="close"
+            >
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Body -->
@@ -333,6 +369,19 @@ function handleImgError(e: Event) {
             </div>
             <div v-if="bpExpReward" class="font-bold text-amber-600 dark:text-amber-400">
               +{{ bpExpReward }} BP EXP
+            </div>
+          </div>
+
+          <!-- Server Error Alert -->
+          <div
+            v-if="lastError"
+            id="draft-server-error"
+            class="rounded-xl border border-red-300 bg-red-50/90 p-3 text-xs text-red-900 flex items-start gap-2.5 dark:border-red-800 dark:bg-red-950/60 dark:text-red-200 shadow-2xs"
+          >
+            <span class="text-base leading-none">❌</span>
+            <div class="space-y-0.5">
+              <div class="font-bold">Server reported error: "{{ lastError }}"{{ lastErrorCode ? ` (Code: ${lastErrorCode})` : '' }}</div>
+              <div v-if="lastErrorAction" class="text-[11px] text-red-700 dark:text-red-300">Action: {{ lastErrorAction }}</div>
             </div>
           </div>
 
@@ -549,6 +598,44 @@ function handleImgError(e: Event) {
                     <span class="text-[10px] mt-1">Empty Slot</span>
                   </div>
                 </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Candidate Hero Pool -->
+          <div
+            v-if="poolCandidates.length > 0"
+            id="draft-candidate-pool"
+            class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60"
+          >
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700/60">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <span>🏊</span> Candidate Hero Pool
+              </h3>
+              <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                {{ poolCandidates.length }} heroes
+              </span>
+            </div>
+
+            <div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
+              <div
+                v-for="cId in poolCandidates"
+                :key="'candidate-' + cId"
+                class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-800 text-xs shadow-2xs"
+              >
+                <div class="size-6 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0">
+                  <img
+                    v-if="getHeroAvatar(cId)"
+                    :src="getHeroAvatar(cId)!"
+                    :alt="getHeroName(cId)"
+                    class="size-full object-cover"
+                    @error="handleImgError"
+                  />
+                  <div v-else class="size-full flex items-center justify-center text-[10px] font-bold text-slate-500">
+                    {{ getHeroName(cId).charAt(0) }}
+                  </div>
+                </div>
+                <span class="font-medium text-slate-800 dark:text-slate-200">{{ getHeroName(cId) }}</span>
               </div>
             </div>
           </div>
