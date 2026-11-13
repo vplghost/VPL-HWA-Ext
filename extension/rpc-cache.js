@@ -3675,7 +3675,7 @@
           }
           const sorted = Array.from(msgMap.values()).sort((a, b) => Number(b.ctime || 0) - Number(a.ctime || 0));
           const recordTimeSec = Math.floor((Date.parse(entry.updatedAt) || Date.now()) / 1000);
-          const cutoffSec = recordTimeSec - (3 * 24 * 60 * 60); // Auto clear messages older than 3 days
+          const cutoffSec = recordTimeSec - (7 * 24 * 60 * 60); // Auto clear messages older than 7 days
           const mergedMessages = sorted.filter((m) => !m.ctime || Number(m.ctime) >= cutoffSec);
           const activeUserIds = new Set(mergedMessages.map((m) => String(m.userId)));
           const prunedUsers = Object.fromEntries(
@@ -4310,11 +4310,11 @@
     const next = { ...cache };
     let changed = false;
 
-    // 1. Prune guildChat (drop messages older than 3 days relative to last chat update and orphaned users)
+    // 1. Prune guildChat (drop messages older than 7 days relative to last chat update and orphaned users)
     if (next.guildChat?.data) {
       const existing = next.guildChat.data;
       const refTimeMs = Date.parse(next.guildChat.updatedAt) || now;
-      const cutoffSec = Math.floor(refTimeMs / 1000) - (3 * 86400);
+      const cutoffSec = Math.floor(refTimeMs / 1000) - (7 * 86400);
       const rawMsgs = Array.isArray(existing.messages)
         ? existing.messages
         : (existing.messages && typeof existing.messages === 'object' ? Object.values(existing.messages) : []);

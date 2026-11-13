@@ -29,16 +29,32 @@ interface ChatMsg {
   text: string;
   time: string;
   isMe: boolean;
+  ctime: number;
 }
 
-const messages = computed<ChatMsg[]>(() => {
-  const raw = Array.isArray(chatData.value.messages) ? chatData.value.messages : [];
-  return raw.map((m: any, idx: number) => {
+const displayLimit = ref(50);
+
+const allMessages = computed<ChatMsg[]>(() => {
+  const raw = Array.isArray(chatData.value.messages)
+    ? chatData.value.messages
+    : (chatData.value.messages && typeof chatData.value.messages === 'object' ? Object.values(chatData.value.messages) : []);
+  
+  const cutoffSec = Math.floor(Date.now() / 1000) - (7 * 86400); // 7-day retention
+  const valid = raw.filter((m: any) => {
+    const ctime = Number(m?.ctime || 0);
+    return !ctime || ctime >= cutoffSec;
+  });
+
+  // Sort chronologically ascending: oldest at top, newest at bottom
+  valid.sort((a: any, b: any) => Number(a?.ctime || 0) - Number(b?.ctime || 0));
+
+  return valid.map((m: any, idx: number) => {
     const uId = String(m.userId ?? m.authorId ?? '');
     const user = users.value[uId] || {};
     const name = user.name || (uId === myId.value ? 'You' : `Player #${uId}`);
     const text = m.data?.text || m.text || '';
-    const ts = Number(m.ctime) * 1000 || Date.now();
+    const ctime = Number(m.ctime) || 0;
+    const ts = ctime * 1000 || Date.now();
     const time = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const isMe = uId === myId.value;
 
@@ -49,14 +65,43 @@ const messages = computed<ChatMsg[]>(() => {
       text,
       time,
       isMe,
+      ctime,
     };
   });
 });
 
-const messageCount = computed(() => messages.value.length);
+const hasMoreOlder = computed(() => allMessages.value.length > displayLimit.value);
+
+const messages = computed<ChatMsg[]>(() => {
+  if (allMessages.value.length <= displayLimit.value) {
+    return allMessages.value;
+  }
+  return allMessages.value.slice(-displayLimit.value);
+});
+
+const messageCount = computed(() => allMessages.value.length);
 
 function close() {
   emit('update:modelValue', false);
+}
+
+function loadOlderMessages() {
+  if (!messagesContainer.value || !hasMoreOlder.value) return;
+  const container = messagesContainer.value;
+  const previousScrollHeight = container.scrollHeight;
+  const previousScrollTop = container.scrollTop;
+  displayLimit.value = Math.min(allMessages.value.length, displayLimit.value + 50);
+  nextTick(() => {
+    container.scrollTop = container.scrollHeight - previousScrollHeight + previousScrollTop;
+  });
+}
+
+function handleScroll() {
+  if (!messagesContainer.value) return;
+  const container = messagesContainer.value;
+  if (container.scrollTop <= 15 && hasMoreOlder.value) {
+    loadOlderMessages();
+  }
 }
 
 async function refreshChat() {
@@ -106,7 +151,21 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      displayLimit.value = 50;
       scrollToBottom();
+    }
+  }
+);
+
+watch(
+  () => allMessages.value.length,
+  (newCount, oldCount) => {
+    if (newCount > oldCount && props.modelValue && messagesContainer.value) {
+      const container = messagesContainer.value;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+      if (isNearBottom) {
+        scrollToBottom();
+      }
     }
   }
 );
@@ -165,7 +224,18 @@ watch(
       id="guild-chat-messages"
       ref="messagesContainer"
       class="h-80 overflow-y-auto p-3 space-y-2.5 bg-slate-50/50 dark:bg-slate-900/40 text-xs"
+      @scroll="handleScroll"
     >
+      <div v-if="hasMoreOlder" class="text-center py-1">
+        <button
+          type="button"
+          class="rounded-lg bg-slate-200/60 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-slate-200 dark:hover:bg-slate-700/80 cursor-pointer transition-colors"
+          @click="loadOlderMessages"
+        >
+          ↑ Load older messages ({{ allMessages.length - messages.length }} older)
+        </button>
+      </div>
+
       <div v-if="messages.length === 0" class="h-full flex items-center justify-center text-center text-slate-400 text-xs p-4">
         No guild messages yet. Chat messages received from game or sent here will appear in real time.
       </div>
@@ -208,7 +278,7 @@ watch(
         placeholder="Send a message to guild..."
         maxlength="250"
         autocomplete="off"
-        class="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+        class="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-800"
       />
 
       <button

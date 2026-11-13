@@ -816,11 +816,11 @@ test('chatGetAll extracts clan and announcement messages and merges deduplicated
   assert.equal(state2.guildChat.data.users.u1.name, 'MemberBob');
 });
 
-test('chatGetAll automatically purges guild chat messages older than 3 days', () => {
+test('chatGetAll automatically purges guild chat messages older than 7 days', () => {
   const atNow = '2026-11-05T12:00:00.000Z';
   const nowSec = Math.floor(Date.parse(atNow) / 1000); // 1793880000 approx
   const twoDaysAgo = String(nowSec - 2 * 86400);
-  const fourDaysAgo = String(nowSec - 4 * 86400);
+  const eightDaysAgo = String(nowSec - 8 * 86400);
 
   const chatRecord = record([
     { name: 'chatGetAll', ident: 'chat-purge', args: { chatType: 'clan' } }
@@ -828,7 +828,7 @@ test('chatGetAll automatically purges guild chat messages older than 3 days', ()
     { ident: 'chat-purge', result: { response: {
       messages: [
         { id: 'recent', userId: 'u1', messageType: 'text', chatType: 'clan', ctime: twoDaysAgo, data: { text: 'Recent 2d message' } },
-        { id: 'old', userId: 'u2', messageType: 'text', chatType: 'clan', ctime: fourDaysAgo, data: { text: 'Expired 4d message' } }
+        { id: 'old', userId: 'u2', messageType: 'text', chatType: 'clan', ctime: eightDaysAgo, data: { text: 'Expired 8d message' } }
       ],
       users: {
         u1: { id: 'u1', name: 'ActiveUser' },
