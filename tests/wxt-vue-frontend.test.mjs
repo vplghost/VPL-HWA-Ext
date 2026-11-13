@@ -654,7 +654,9 @@ test('App.vue and tab toolbars use responsive container widths and balanced tool
   assert.match(items, /btn-toolbar-refresh-items/, 'ItemsTab must keep refresh button');
 
   const resources = await readFile(join(root, 'src/components/tabs/ResourcesTab.vue'), 'utf8');
-  assert.match(resources, /flex-col lg:flex-row/, 'ResourcesTab must use responsive flex-col lg:flex-row toolbar layout');
+  assert.match(resources, /flex flex-wrap items-center/, 'Resources toolbar must wrap to its available width');
+  assert.ok(resources.includes('grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))]'),
+    'Resource columns must follow available container width with a narrow-screen minimum');
   assert.match(resources, /btn-toolbar-export-resources/, 'ResourcesTab must keep export button');
   assert.match(resources, /btn-toolbar-refresh-resources/, 'ResourcesTab must keep refresh button');
 });

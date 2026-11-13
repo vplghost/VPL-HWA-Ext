@@ -171,6 +171,15 @@ export function resourceLabel(entry: ResourceEntry | undefined): string {
   return entry?.data?.name || rawKey || 'Resource';
 }
 
+export function isListedInventoryItem(entry: ResourceEntry | undefined, inventory: Record<string, any> | null | undefined): boolean {
+  const parts = entry?.key?.split(':');
+  if (!parts || parts.length !== 3 || parts[0] !== 'resource') return false;
+  const category = parts[1]!, id = parts[2]!;
+  const items = inventory?.[category];
+  // Match ItemsTab: only own entries in category collections with positive stock.
+  return items != null && typeof items === 'object' && Object.hasOwn(items, id) && Number(items[id]) > 0;
+}
+
 export function isSelectableForHeader(entry: ResourceEntry | undefined): boolean {
   if (!entry?.key) return false;
   return !['resource:energy', 'resource:world-energy', 'resource:refillable:62', 'resource:world-refillable:62'].includes(entry.key);

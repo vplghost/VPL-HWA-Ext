@@ -3,7 +3,7 @@ id: doc-5977b0645ae33e48fc00a5b8f7c90347
 title: RPC Cache Pipeline
 description: Passive RPC interception, delta reduction, resource keys, and action deduplication in HWA Helper
 createdAt: '2026-11-02T06:43:06.566Z'
-updatedAt: '2026-11-06T04:21:46.278Z'
+updatedAt: '2026-11-13T17:21:04.831Z'
 tags:
   - architecture,cache,rpc
 ---
@@ -43,3 +43,14 @@ A failed 40-second capture showed 17 successful game RPC batches and zero append
 ## Protocol reference catalog
 
 The captured API/MQTT evidence index is @doc/api/observed-protocol-index. It links 177 RPC method/feature contracts, nine captured MQTT event types, source hashes, and detailed world-map command workflows. Use @doc/api/mqtt-processing-and-refresh to distinguish events observed in raw logs from additional names currently supported only by implementation/tests. This catalog is descriptive evidence, not a claim that every indexed method is safe to replay.
+
+
+## Resources view versus Items (2026-11-14)
+
+Implemented by @task-VHE-ZZ3KDC. Inventory-derived `resource:<category>:<id>` mirror keys remain in the cache for header pins and other consumers. Presentation deduplication must not delete or rewrite those records.
+
+`isListedInventoryItem` in `src/utils/resourceData.ts` matches the actual ItemsTab list: the same category and exact ID must be an own entry in an inventory category collection and have positive numeric quantity. Only those duplicates are hidden by ResourcesTab. A matching name or numeric ID in another category does not hide a resource. Missing inventory, absent IDs and zero stock do not establish a duplicate. Gold, refillables, materials and other unmatched balances stay visible; the view reacts when an inventory snapshot arrives or changes.
+
+Resources search, pinned-only filtering, shown count and JSON export use the same deduplicated list. Its pinned badge counts only resources remaining in that view; existing saved header pin choices remain intact, including hidden inventory items. Export no longer delegates to the unfiltered generic raw resource table. This is a tab-level view rule, not a cache reduction or header-selection policy change.
+
+The grid follows available container width with `repeat(auto-fill,minmax(min(100%,12rem),1fr))`, compact cards and icon-only accessible pin controls. The toolbar wraps instead of requiring viewport-based fixed columns. `tests/resources-view.test.mjs` exercises the actual SFC state/template, inventory updates, category collisions, pin preservation, filtered exports and controls. The production CSS was checked for the compiled grid declaration.

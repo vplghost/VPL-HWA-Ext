@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.66 — 2026-11-14
+
+### Changed
+
+- Hide Resources entries already listed in Items using exact category/ID and positive inventory quantity, retaining unmatched balances and header pin preferences.
+- Keep search, pinned counts and JSON export consistent with the deduplicated Resources view.
+- Fit resource cards to the available width with an automatic compact grid, a wrapping toolbar and smaller accessible pin controls.
+
 ## 0.10.65 — 2026-11-14
 
 ### Fixed

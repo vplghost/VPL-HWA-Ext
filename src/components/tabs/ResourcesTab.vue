@@ -10,10 +10,11 @@ import {
   resourceAppearance,
   resourceLabel,
   isSelectableForHeader,
+  isListedInventoryItem,
 } from '@/src/utils/resourceData';
 
 const { cache, dispatchRpc } = useRpcCache();
-const { resourceSelection, togglePin, isPinned } = useResourceSelection();
+const { togglePin, isPinned } = useResourceSelection();
 
 const now = useNow();
 const search = ref('');
@@ -23,7 +24,8 @@ const isRefreshing = ref(false);
 const allResources = computed(() => {
   const list: any[] = [];
   for (const [key, val] of Object.entries(cache.value)) {
-    if (key.startsWith('resource:') && val?.data && Number.isFinite(val.data.amount)) {
+    if (key.startsWith('resource:') && val?.data && Number.isFinite(val.data.amount) &&
+        !isListedInventoryItem({ key }, cache.value.inventoryGet?.data)) {
       const entry = { key, data: val.data };
       const label = resourceLabel(entry);
       const isSelectable = isSelectableForHeader(entry);
@@ -42,6 +44,8 @@ const allResources = computed(() => {
   }
   return list;
 });
+
+const pinnedResourceCount = computed(() => allResources.value.filter(resource => resource.isPinned).length);
 
 const filteredResources = computed(() => {
   const q = search.value.trim().toLowerCase();
@@ -66,33 +70,25 @@ async function refreshResources() {
 }
 
 function exportResourcesJson() {
-  const popupData = (globalThis as any).hwaHelperPopupData;
-  const exported = popupData?.exportTableData?.('resources', cache.value, search.value);
-  if (Array.isArray(exported) && exported.length > 0) {
-    downloadJson('hwa-resources.json', exported);
-  } else {
-    downloadJson(
-      'hwa-resources.json',
-      filteredResources.value.map((r) => ({
-        key: r.key,
-        name: r.label,
-        amount: r.amount,
-        cap: r.cap,
-      }))
-    );
-  }
+  downloadJson('hwa-resources.json', filteredResources.value.map(resource => ({
+    key: resource.key,
+    name: resource.label,
+    amount: resource.amount,
+    cap: resource.cap,
+  })));
 }
 </script>
 
 <template>
   <div class="space-y-4">
     <!-- Filter Toolbar -->
-    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-      <div class="flex items-center gap-2 flex-1 min-w-0">
-        <div class="relative w-full sm:w-64 shrink-0">
+    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-2xs flex flex-wrap items-center gap-2">
+      <div class="flex items-center gap-2 flex-1 min-w-0 basis-64">
+        <div class="relative min-w-0 flex-1">
           <input
             v-model="search"
             type="search"
+            aria-label="Search resources"
             placeholder="Search resource name or ID..."
             class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
           />
@@ -108,13 +104,13 @@ function exportResourcesJson() {
           @click="filterPinnedOnly = !filterPinnedOnly"
         >
           <span>📌 Pinned only</span>
-          <span v-if="resourceSelection.length > 0" class="rounded-full bg-blue-600 px-1.5 text-[10px] text-white">
-            {{ resourceSelection.length }}
+          <span v-if="pinnedResourceCount > 0" class="rounded-full bg-blue-600 px-1.5 text-[10px] text-white">
+            {{ pinnedResourceCount }}
           </span>
         </button>
       </div>
 
-      <div class="flex items-center justify-between lg:justify-end gap-2 text-xs shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800">
+      <div class="flex items-center gap-2 text-xs shrink-0 sm:ml-auto">
         <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 tabular-nums">
           {{ formatResourceAmount(filteredResources.length) }} resources
         </span>
@@ -152,15 +148,15 @@ function exportResourcesJson() {
       No resources found matching search query.
     </div>
 
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
+    <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-2">
       <div
         v-for="r in filteredResources"
         :key="r.key"
-        class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xs flex items-center justify-between gap-2 transition-colors hover:border-slate-300 dark:hover:border-slate-700"
+        class="min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-xs flex items-center justify-between gap-2 transition-colors hover:border-slate-300 dark:hover:border-slate-700"
       >
-        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
           <span
-            class="size-8 rounded-lg flex items-center justify-center text-base shrink-0 ring-1"
+            class="size-7 rounded-md flex items-center justify-center text-sm shrink-0 ring-1"
             :class="r.appearance.classes"
           >
             {{ r.appearance.icon }}
@@ -184,20 +180,15 @@ function exportResourcesJson() {
             :aria-checked="r.isPinned"
             role="checkbox"
             :title="r.isPinned ? 'Unpin from header' : 'Pin to header'"
-            :aria-label="`${r.isPinned ? 'Unpin' : 'Pin'} ${r.label} to header`"
-            class="cursor-pointer inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors"
+            :aria-label="`${r.isPinned ? 'Unpin' : 'Pin'} ${r.label} ${r.isPinned ? 'from' : 'to'} header`"
+            class="cursor-pointer inline-flex size-7 items-center justify-center rounded-md text-xs transition-colors"
             :class="r.isPinned
               ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 ring-1 ring-blue-300 dark:ring-blue-800'
               : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
             @click.stop="togglePin(r.key)"
           >
-            <input
-              type="checkbox"
-              tabindex="-1"
-              :checked="r.isPinned"
-              class="size-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
-            />
-            <span class="text-[11px]">{{ r.isPinned ? 'Pinned' : 'Pin' }}</span>
+            <span aria-hidden="true">📌</span>
+            <span class="sr-only">{{ r.isPinned ? 'Pinned' : 'Pin' }}</span>
           </button>
         </div>
       </div>
