@@ -112,6 +112,7 @@ test('actual dialog targets nested fragments, computes progress and blocks unrel
     buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory,
     hwaHelperCampaignMissions: globalThis.hwaHelperCampaignMissions,
     testCache: data, raidCalls: 0,
+    useCampaignMissionHistory: () => ({ recent: ref([]), record: async () => {} }),
   };
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
   vm.runInNewContext(js + '\nglobalThis.api = {selectedGearId, selectedRecipeNodeId, recipeTree, selectRecipeNode, candidateMissions, missionId, targetItemProgress, sessionFarmedCount, localRaidResult, canFarmSelectedTarget, isNodeRequirementMet, executeSequentialLoop, loopStatusMsg};', context);

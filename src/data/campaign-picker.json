@@ -1,0 +1,4000 @@
+{
+  "source": {
+    "staticVersion": "1.293.0",
+    "localeMd5": "def7ae37ac67df119f41eae76690c092",
+    "libraryMd5": "1357804ab5ab599e3522f8cbdeb75802",
+    "chapterNameKey": "LIB_WORLD_<id>",
+    "missionNameKey": "LIB_MISSION_NAME_<id>"
+  },
+  "chapters": {
+    "1": "Ruled by Fire",
+    "2": "Distorted Magic",
+    "3": "Hardan´s Plateau",
+    "4": "Deadlands",
+    "5": "Cadang Thicket",
+    "6": "Chaos Realm",
+    "7": "Split of Tribes",
+    "8": "Blazing Heart",
+    "9": "Archipelago",
+    "10": "Cursed Waters",
+    "11": "Nordland",
+    "12": "Boundless Snow",
+    "13": "Crystal Throne"
+  },
+  "missions": {
+    "1": {
+      "name": "1-1: Rescuing a Friend",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 3
+        },
+        {
+          "category": "gear",
+          "id": 4
+        },
+        {
+          "category": "gear",
+          "id": 5
+        },
+        {
+          "category": "fragmentHero",
+          "id": 7
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "2": {
+      "name": "1-2: The Chase",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 7
+        },
+        {
+          "category": "gear",
+          "id": 8
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "3": {
+      "name": "1-3: Unexpected Allies",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 1
+        },
+        {
+          "category": "gear",
+          "id": 2
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "4": {
+      "name": "1-4: Smoky Crossroads",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 9
+        },
+        {
+          "category": "gear",
+          "id": 3
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "5": {
+      "name": "1-5: Merchant Camp",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 13
+        },
+        {
+          "category": "gear",
+          "id": 14
+        },
+        {
+          "category": "fragmentHero",
+          "id": 15
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "6": {
+      "name": "1-6: City Gate",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 4
+        },
+        {
+          "category": "gear",
+          "id": 15
+        },
+        {
+          "category": "gear",
+          "id": 5
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "7": {
+      "name": "1-7: City on Fire",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 15
+        },
+        {
+          "category": "gear",
+          "id": 16
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "8": {
+      "name": "1-8: Scorching Pavement",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 17
+        },
+        {
+          "category": "gear",
+          "id": 13
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "9": {
+      "name": "1-9: Elder´s House",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 14
+        },
+        {
+          "category": "gear",
+          "id": 10
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "10": {
+      "name": "1-10: Marax the Titan´s Domain",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 11
+        },
+        {
+          "category": "gear",
+          "id": 12
+        },
+        {
+          "category": "fragmentHero",
+          "id": 17
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "11": {
+      "name": "2-1: Wilheim",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 21
+        },
+        {
+          "category": "gear",
+          "id": 1
+        },
+        {
+          "category": "fragmentHero",
+          "id": 4
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "12": {
+      "name": "2-2: Reaper´s Cabin",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 24
+        },
+        {
+          "category": "gear",
+          "id": 1
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "13": {
+      "name": "2-3: Outskirts",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 25
+        },
+        {
+          "category": "gear",
+          "id": 2
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "14": {
+      "name": "2-4: Overgrown Path",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 26
+        },
+        {
+          "category": "gear",
+          "id": 7
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "15": {
+      "name": "2-5: Thick Forest",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 27
+        },
+        {
+          "category": "gear",
+          "id": 8
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "16": {
+      "name": "2-6: Outskirts of Wilheim",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 22
+        },
+        {
+          "category": "gear",
+          "id": 2
+        },
+        {
+          "category": "fragmentHero",
+          "id": 2
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "17": {
+      "name": "2-7: Monolith of Meron",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 28
+        },
+        {
+          "category": "gear",
+          "id": 9
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "18": {
+      "name": "2-8: Secret Ford",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 21
+        },
+        {
+          "category": "gear",
+          "id": 3
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "19": {
+      "name": "2-9: River of Oblivion",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 22
+        },
+        {
+          "category": "gear",
+          "id": 4
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "20": {
+      "name": "2-10: Magic Thicket",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 23
+        },
+        {
+          "category": "gear",
+          "id": 10
+        },
+        {
+          "category": "fragmentHero",
+          "id": 4
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "21": {
+      "name": "2-11: Marax´ Trace",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 23
+        },
+        {
+          "category": "gear",
+          "id": 5
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "22": {
+      "name": "2-12: Nameless Road",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 15
+        },
+        {
+          "category": "scroll",
+          "id": 141
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "23": {
+      "name": "2-13: Deadlands",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 29
+        },
+        {
+          "category": "gear",
+          "id": 16
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "24": {
+      "name": "2-14: Seal of Fire",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 17
+        },
+        {
+          "category": "scroll",
+          "id": 142
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "25": {
+      "name": "2-15: Lava Fracture",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 24
+        },
+        {
+          "category": "gear",
+          "id": 11
+        },
+        {
+          "category": "fragmentHero",
+          "id": 1
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "26": {
+      "name": "3-1: Outpost",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 25
+        },
+        {
+          "category": "gear",
+          "id": 12
+        },
+        {
+          "category": "fragmentHero",
+          "id": 6
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "27": {
+      "name": "3-2: Rocky Wasteland",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 30
+        },
+        {
+          "category": "gear",
+          "id": 13
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "28": {
+      "name": "3-3: Grog´s Stairway",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 14
+        },
+        {
+          "category": "scroll",
+          "id": 143
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "29": {
+      "name": "3-4: Dusty Cliff",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 31
+        },
+        {
+          "category": "gear",
+          "id": 10
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "30": {
+      "name": "3-5: Rotten Ravine",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 11
+        },
+        {
+          "category": "scroll",
+          "id": 144
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "31": {
+      "name": "3-6: Living Mountains",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 26
+        },
+        {
+          "category": "gear",
+          "id": 3
+        },
+        {
+          "category": "fragmentHero",
+          "id": 3
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "32": {
+      "name": "3-7: Dilapidated Bridge",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 32
+        },
+        {
+          "category": "gear",
+          "id": 12
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "33": {
+      "name": "3-8: Scorched Lands",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 7
+        },
+        {
+          "category": "scroll",
+          "id": 145
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "34": {
+      "name": "3-9: Road of Mourning",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 8
+        },
+        {
+          "category": "fragmentGear",
+          "id": 47
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "35": {
+      "name": "3-10: Sanctuary of The Ancestors",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 27
+        },
+        {
+          "category": "gear",
+          "id": 4
+        },
+        {
+          "category": "fragmentHero",
+          "id": 14
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "36": {
+      "name": "3-11: Fir Valley",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 9
+        },
+        {
+          "category": "fragmentGear",
+          "id": 48
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "37": {
+      "name": "3-12: Camp Approach",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 13
+        },
+        {
+          "category": "fragmentGear",
+          "id": 49
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "38": {
+      "name": "3-13: Orcish Patrol",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 14
+        },
+        {
+          "category": "fragmentGear",
+          "id": 50
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "39": {
+      "name": "3-14: Frontier Camp",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 56
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "40": {
+      "name": "3-15: Leader´s Tent",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 15
+        },
+        {
+          "category": "gear",
+          "id": 16
+        },
+        {
+          "category": "gear",
+          "id": 17
+        },
+        {
+          "category": "fragmentHero",
+          "id": 17
+        },
+        {
+          "category": "consumable",
+          "id": 9
+        }
+      ]
+    },
+    "41": {
+      "name": "4-1: Shepherds´ Lands",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 21
+        },
+        {
+          "category": "fragmentGear",
+          "id": 56
+        },
+        {
+          "category": "fragmentHero",
+          "id": 9
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "42": {
+      "name": "4-2: Dry Wind",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 21
+        },
+        {
+          "category": "gear",
+          "id": 15
+        },
+        {
+          "category": "fragmentGear",
+          "id": 57
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "43": {
+      "name": "4-3: Edge of Dusk",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 22
+        },
+        {
+          "category": "gear",
+          "id": 16
+        },
+        {
+          "category": "fragmentGear",
+          "id": 58
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "44": {
+      "name": "4-4: Surrounding Highway",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 23
+        },
+        {
+          "category": "gear",
+          "id": 17
+        },
+        {
+          "category": "fragmentGear",
+          "id": 59
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "45": {
+      "name": "4-5: Trial by Darkness",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 24
+        },
+        {
+          "category": "gear",
+          "id": 3
+        },
+        {
+          "category": "fragmentGear",
+          "id": 60
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "46": {
+      "name": "4-6: Burnt Canyon",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 22
+        },
+        {
+          "category": "fragmentGear",
+          "id": 57
+        },
+        {
+          "category": "fragmentHero",
+          "id": 15
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "47": {
+      "name": "4-7: Ashes and Coal",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 25
+        },
+        {
+          "category": "gear",
+          "id": 4
+        },
+        {
+          "category": "fragmentGear",
+          "id": 61
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "48": {
+      "name": "4-8: At Worlds´ End",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 26
+        },
+        {
+          "category": "gear",
+          "id": 5
+        },
+        {
+          "category": "fragmentGear",
+          "id": 62
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "49": {
+      "name": "4-9: Bottomless Chasm",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 27
+        },
+        {
+          "category": "gear",
+          "id": 11
+        },
+        {
+          "category": "fragmentGear",
+          "id": 74
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "50": {
+      "name": "4-10: Necropolis",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 23
+        },
+        {
+          "category": "fragmentGear",
+          "id": 58
+        },
+        {
+          "category": "fragmentHero",
+          "id": 3
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "51": {
+      "name": "4-11: Granite of Silence",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 28
+        },
+        {
+          "category": "gear",
+          "id": 7
+        },
+        {
+          "category": "fragmentGear",
+          "id": 75
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "52": {
+      "name": "4-12: Death Shroud",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 29
+        },
+        {
+          "category": "gear",
+          "id": 8
+        },
+        {
+          "category": "fragmentGear",
+          "id": 76
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "53": {
+      "name": "4-13: In the Afterlife",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 30
+        },
+        {
+          "category": "gear",
+          "id": 9
+        },
+        {
+          "category": "fragmentGear",
+          "id": 77
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "54": {
+      "name": "4-14: Atrium",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 31
+        },
+        {
+          "category": "gear",
+          "id": 13
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 146
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "55": {
+      "name": "4-15: Gravehall Estate",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 24
+        },
+        {
+          "category": "fragmentGear",
+          "id": 59
+        },
+        {
+          "category": "fragmentHero",
+          "id": 7
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "56": {
+      "name": "5-1: Smagard Terraces",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 32
+        },
+        {
+          "category": "gear",
+          "id": 14
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 147
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "57": {
+      "name": "5-2: Obelisk",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 25
+        },
+        {
+          "category": "fragmentGear",
+          "id": 60
+        },
+        {
+          "category": "fragmentHero",
+          "id": 2
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "58": {
+      "name": "5-3: Emerald Dust",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 15
+        },
+        {
+          "category": "fragmentGear",
+          "id": 47
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 148
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "59": {
+      "name": "5-4: Exit from Gravehall",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 16
+        },
+        {
+          "category": "fragmentGear",
+          "id": 48
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 149
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "60": {
+      "name": "5-5: Blinding Light",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 17
+        },
+        {
+          "category": "fragmentGear",
+          "id": 49
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 150
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "61": {
+      "name": "5-6: Flourishing Life",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 26
+        },
+        {
+          "category": "fragmentGear",
+          "id": 61
+        },
+        {
+          "category": "fragmentHero",
+          "id": 1
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "62": {
+      "name": "5-7: Poisonous Lashes",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 10
+        },
+        {
+          "category": "fragmentGear",
+          "id": 50
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 151
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "63": {
+      "name": "5-8: Hemlock Thicket",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 21
+        },
+        {
+          "category": "gear",
+          "id": 12
+        },
+        {
+          "category": "fragmentGear",
+          "id": 91
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "64": {
+      "name": "5-9: Dangerous Shores",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 22
+        },
+        {
+          "category": "gear",
+          "id": 11
+        },
+        {
+          "category": "fragmentGear",
+          "id": 92
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "65": {
+      "name": "5-10: Drowner´s Bridge",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 27
+        },
+        {
+          "category": "fragmentGear",
+          "id": 62
+        },
+        {
+          "category": "fragmentHero",
+          "id": 4
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "66": {
+      "name": "5-11: Uninvited Guest",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 23
+        },
+        {
+          "category": "scroll",
+          "id": 142
+        },
+        {
+          "category": "fragmentGear",
+          "id": 93
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "67": {
+      "name": "5-12: Enemy Hearth",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 24
+        },
+        {
+          "category": "scroll",
+          "id": 143
+        },
+        {
+          "category": "fragmentGear",
+          "id": 94
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "68": {
+      "name": "5-13: Halt",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 25
+        },
+        {
+          "category": "scroll",
+          "id": 144
+        },
+        {
+          "category": "fragmentGear",
+          "id": 95
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "69": {
+      "name": "5-14: Purple Wilds",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 26
+        },
+        {
+          "category": "scroll",
+          "id": 145
+        },
+        {
+          "category": "fragmentGear",
+          "id": 96
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "70": {
+      "name": "5-15: Illwood",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 28
+        },
+        {
+          "category": "fragmentGear",
+          "id": 91
+        },
+        {
+          "category": "fragmentHero",
+          "id": 17
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "71": {
+      "name": "6-1: Backwater",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 27
+        },
+        {
+          "category": "fragmentGear",
+          "id": 97
+        },
+        {
+          "category": "fragmentGear",
+          "id": 47
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "72": {
+      "name": "6-2: Wretched Goosefoot",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 29
+        },
+        {
+          "category": "fragmentGear",
+          "id": 92
+        },
+        {
+          "category": "fragmentHero",
+          "id": 14
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "73": {
+      "name": "6-3: Bogger",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 28
+        },
+        {
+          "category": "fragmentGear",
+          "id": 98
+        },
+        {
+          "category": "fragmentGear",
+          "id": 48
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "74": {
+      "name": "6-4: Damp Area",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 31
+        },
+        {
+          "category": "fragmentGear",
+          "id": 91
+        },
+        {
+          "category": "fragmentGear",
+          "id": 49
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "75": {
+      "name": "6-5: Mandrake Flowers",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 32
+        },
+        {
+          "category": "fragmentGear",
+          "id": 50
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 162
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "76": {
+      "name": "6-6: Forlorn Churchyard",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 30
+        },
+        {
+          "category": "fragmentGear",
+          "id": 93
+        },
+        {
+          "category": "fragmentHero",
+          "id": 9
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "77": {
+      "name": "6-7: Frigid Place",
+      "drops": [
+        {
+          "category": "scroll",
+          "id": 141
+        },
+        {
+          "category": "fragmentGear",
+          "id": 92
+        },
+        {
+          "category": "fragmentGear",
+          "id": 56
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "78": {
+      "name": "6-8: Misty Cliff",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 21
+        },
+        {
+          "category": "fragmentGear",
+          "id": 57
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 163
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "79": {
+      "name": "6-9: Morth Chrone´s Lands",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 22
+        },
+        {
+          "category": "fragmentGear",
+          "id": 93
+        },
+        {
+          "category": "fragmentGear",
+          "id": 58
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "80": {
+      "name": "6-10: Ritual Circle",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 31
+        },
+        {
+          "category": "fragmentGear",
+          "id": 94
+        },
+        {
+          "category": "fragmentHero",
+          "id": 8
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "81": {
+      "name": "6-11: Tarrot´s Arches",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 23
+        },
+        {
+          "category": "fragmentGear",
+          "id": 59
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 164
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "82": {
+      "name": "6-12: Eternal Night",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 24
+        },
+        {
+          "category": "fragmentGear",
+          "id": 95
+        },
+        {
+          "category": "fragmentGear",
+          "id": 60
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "83": {
+      "name": "6-13: Game of Shadows",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 25
+        },
+        {
+          "category": "fragmentGear",
+          "id": 61
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 165
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "84": {
+      "name": "6-14: Trapper´s Nets",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 26
+        },
+        {
+          "category": "fragmentGear",
+          "id": 95
+        },
+        {
+          "category": "fragmentGear",
+          "id": 62
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "85": {
+      "name": "6-15: Thorn Arches",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 27
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 166
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 146
+        },
+        {
+          "category": "fragmentHero",
+          "id": 17
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "86": {
+      "name": "7-1: Toll Gate",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 32
+        },
+        {
+          "category": "fragmentGear",
+          "id": 95
+        },
+        {
+          "category": "fragmentHero",
+          "id": 3
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "87": {
+      "name": "7-2: Weapon Stands",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 29
+        },
+        {
+          "category": "gear",
+          "id": 28
+        },
+        {
+          "category": "fragmentGear",
+          "id": 96
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "88": {
+      "name": "7-3: Gnawed Bones",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 30
+        },
+        {
+          "category": "fragmentGear",
+          "id": 97
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 147
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "89": {
+      "name": "7-4: Torchlit Passage",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 31
+        },
+        {
+          "category": "fragmentGear",
+          "id": 98
+        },
+        {
+          "category": "fragmentGear",
+          "id": 74
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "90": {
+      "name": "7-5: Training Fields",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 32
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 162
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 148
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "91": {
+      "name": "7-6: Blood of the Earth",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 96
+        },
+        {
+          "category": "fragmentGear",
+          "id": 47
+        },
+        {
+          "category": "fragmentHero",
+          "id": 4
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "92": {
+      "name": "7-7: Blood and Sweat",
+      "drops": [
+        {
+          "category": "scroll",
+          "id": 141
+        },
+        {
+          "category": "fragmentGear",
+          "id": 75
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 163
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "93": {
+      "name": "7-8: Break of Times",
+      "drops": [
+        {
+          "category": "scroll",
+          "id": 142
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 164
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 149
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "94": {
+      "name": "7-9: Bridge over the Chasm",
+      "drops": [
+        {
+          "category": "scroll",
+          "id": 143
+        },
+        {
+          "category": "fragmentGear",
+          "id": 76
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 161
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "95": {
+      "name": "7-10: Titan Plains",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 97
+        },
+        {
+          "category": "fragmentGear",
+          "id": 48
+        },
+        {
+          "category": "fragmentHero",
+          "id": 7
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "96": {
+      "name": "7-11: Battle of Santar",
+      "drops": [
+        {
+          "category": "scroll",
+          "id": 144
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 165
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 150
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "97": {
+      "name": "7-12: Great Split",
+      "drops": [
+        {
+          "category": "scroll",
+          "id": 145
+        },
+        {
+          "category": "fragmentGear",
+          "id": 77
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 160
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "98": {
+      "name": "7-13: Path of War",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 47
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 166
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 151
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "99": {
+      "name": "7-14: Mortal Wound",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 91
+        },
+        {
+          "category": "fragmentGear",
+          "id": 48
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 159
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "100": {
+      "name": "7-15: Burial Mound",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 98
+        },
+        {
+          "category": "fragmentGear",
+          "id": 49
+        },
+        {
+          "category": "fragmentHero",
+          "id": 2
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "101": {
+      "name": "8-1: Fire-Worshippers´ Capital",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 91
+        },
+        {
+          "category": "fragmentGear",
+          "id": 50
+        },
+        {
+          "category": "fragmentHero",
+          "id": 8
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "102": {
+      "name": "8-2: Monolith of Guile",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 92
+        },
+        {
+          "category": "fragmentGear",
+          "id": 56
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 158
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "103": {
+      "name": "8-3: Anthracite Palace",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 93
+        },
+        {
+          "category": "fragmentGear",
+          "id": 57
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 157
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "104": {
+      "name": "8-4: Basalts",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 58
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 156
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 162
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "105": {
+      "name": "8-5: Monolith of Deceit",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 94
+        },
+        {
+          "category": "fragmentGear",
+          "id": 59
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 152
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "106": {
+      "name": "8-6: Soul of the Volcano",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 92
+        },
+        {
+          "category": "fragmentGear",
+          "id": 56
+        },
+        {
+          "category": "fragmentHero",
+          "id": 6
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "107": {
+      "name": "8-7: Monolith of Enmity",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 74
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 160
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 163
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "108": {
+      "name": "8-8: Foundry",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 95
+        },
+        {
+          "category": "fragmentGear",
+          "id": 60
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 153
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "109": {
+      "name": "8-9: Torture Chamber",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 75
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 159
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 164
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "110": {
+      "name": "8-10: Flaming Gates",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 93
+        },
+        {
+          "category": "fragmentGear",
+          "id": 57
+        },
+        {
+          "category": "fragmentHero",
+          "id": 20
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "111": {
+      "name": "8-11: Monolith of Pain",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 96
+        },
+        {
+          "category": "fragmentGear",
+          "id": 61
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 154
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "112": {
+      "name": "8-12: Monolith of Groans",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 76
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 158
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 165
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "113": {
+      "name": "8-13: Shore of Despair",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 97
+        },
+        {
+          "category": "fragmentGear",
+          "id": 62
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 155
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "114": {
+      "name": "8-14: Lava River",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 77
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 157
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 166
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "115": {
+      "name": "8-15: Furnace of Horror",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 98
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 162
+        },
+        {
+          "category": "fragmentHero",
+          "id": 17
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "116": {
+      "name": "9-1: Shore",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 94
+        },
+        {
+          "category": "fragmentGear",
+          "id": 95
+        },
+        {
+          "category": "fragmentGear",
+          "id": 96
+        },
+        {
+          "category": "fragmentHero",
+          "id": 1
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "117": {
+      "name": "9-2: Abandoned Lighthouse",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 28
+        },
+        {
+          "category": "gear",
+          "id": 2
+        },
+        {
+          "category": "fragmentGear",
+          "id": 167
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "118": {
+      "name": "9-3: Sea Lanes",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 5
+        },
+        {
+          "category": "scroll",
+          "id": 143
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 190
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "119": {
+      "name": "9-4: Grig´s Strand",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 32
+        },
+        {
+          "category": "gear",
+          "id": 7
+        },
+        {
+          "category": "fragmentGear",
+          "id": 175
+        },
+        {
+          "category": "fragmentGear",
+          "id": 170
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "120": {
+      "name": "9-5: Mainland",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 8
+        },
+        {
+          "category": "scroll",
+          "id": 141
+        },
+        {
+          "category": "fragmentGear",
+          "id": 173
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "121": {
+      "name": "9-6: Treasure Island",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 9
+        },
+        {
+          "category": "fragmentGear",
+          "id": 178
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 152
+        },
+        {
+          "category": "fragmentHero",
+          "id": 22
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "122": {
+      "name": "9-7: Dunes",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 10
+        },
+        {
+          "category": "gear",
+          "id": 30
+        },
+        {
+          "category": "fragmentGear",
+          "id": 174
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "123": {
+      "name": "9-8: Cape of Despair",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 12
+        },
+        {
+          "category": "scroll",
+          "id": 142
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 191
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "124": {
+      "name": "9-9: Transit Point",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 1
+        },
+        {
+          "category": "fragmentGear",
+          "id": 50
+        },
+        {
+          "category": "fragmentGear",
+          "id": 169
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "125": {
+      "name": "9-10: Pirate Den",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 177
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 153
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 146
+        },
+        {
+          "category": "fragmentHero",
+          "id": 8
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "126": {
+      "name": "9-11: Secret Route",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 29
+        },
+        {
+          "category": "fragmentGear",
+          "id": 176
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 147
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "127": {
+      "name": "9-12: Pariah´s Mooring",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 7
+        },
+        {
+          "category": "fragmentGear",
+          "id": 168
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 148
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "128": {
+      "name": "9-13: Warstream",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 30
+        },
+        {
+          "category": "fragmentGear",
+          "id": 177
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 150
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "129": {
+      "name": "9-14: Dead Man´s Strait",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 8
+        },
+        {
+          "category": "fragmentGear",
+          "id": 178
+        },
+        {
+          "category": "fragmentGear",
+          "id": 171
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 151
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "130": {
+      "name": "9-15: Coral Reef",
+      "drops": [
+        {
+          "category": "scroll",
+          "id": 144
+        },
+        {
+          "category": "fragmentGear",
+          "id": 176
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 154
+        },
+        {
+          "category": "fragmentHero",
+          "id": 14
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "131": {
+      "name": "10-1: Flying Dutchman",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 175
+        },
+        {
+          "category": "fragmentGear",
+          "id": 76
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 160
+        },
+        {
+          "category": "fragmentHero",
+          "id": 9
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "132": {
+      "name": "10-2: Shipwreck",
+      "drops": [
+        {
+          "category": "scroll",
+          "id": 145
+        },
+        {
+          "category": "fragmentGear",
+          "id": 168
+        },
+        {
+          "category": "fragmentGear",
+          "id": 49
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "133": {
+      "name": "10-3: Rough Sea",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 47
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 147
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 193
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "134": {
+      "name": "10-4: Outer Vortex",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 50
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 149
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 192
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "135": {
+      "name": "10-5: Roaring Abyss",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 9
+        },
+        {
+          "category": "fragmentGear",
+          "id": 169
+        },
+        {
+          "category": "fragmentGear",
+          "id": 57
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "136": {
+      "name": "10-6: Whirlpool",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 29
+        },
+        {
+          "category": "fragmentGear",
+          "id": 174
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 155
+        },
+        {
+          "category": "fragmentHero",
+          "id": 22
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "137": {
+      "name": "10-7: Salvation´s Run",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 48
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 194
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 146
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "138": {
+      "name": "10-8: Strait of Fortune",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 1
+        },
+        {
+          "category": "fragmentGear",
+          "id": 58
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 195
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "139": {
+      "name": "10-9: Seaman´s Song",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 10
+        },
+        {
+          "category": "fragmentGear",
+          "id": 167
+        },
+        {
+          "category": "fragmentGear",
+          "id": 59
+        },
+        {
+          "category": "fragmentGear",
+          "id": 172
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "140": {
+      "name": "10-10: Sirens",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 2
+        },
+        {
+          "category": "fragmentGear",
+          "id": 173
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 156
+        },
+        {
+          "category": "fragmentHero",
+          "id": 15
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "141": {
+      "name": "10-11: Becalmed Waters",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 12
+        },
+        {
+          "category": "fragmentGear",
+          "id": 174
+        },
+        {
+          "category": "fragmentGear",
+          "id": 61
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "142": {
+      "name": "10-12: Shallow Waters",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 31
+        },
+        {
+          "category": "fragmentGear",
+          "id": 62
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 200
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "143": {
+      "name": "10-13: Sea Lane",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 74
+        },
+        {
+          "category": "fragmentGear",
+          "id": 49
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 199
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "144": {
+      "name": "10-14: Dark Waters",
+      "drops": [
+        {
+          "category": "gear",
+          "id": 5
+        },
+        {
+          "category": "fragmentGear",
+          "id": 173
+        },
+        {
+          "category": "fragmentGear",
+          "id": 75
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "145": {
+      "name": "10-15: Kraken´s Cave",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 167
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 157
+        },
+        {
+          "category": "fragmentHero",
+          "id": 32
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "146": {
+      "name": "11-1: Longship Moorings",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 168
+        },
+        {
+          "category": "fragmentGear",
+          "id": 57
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 155
+        },
+        {
+          "category": "fragmentHero",
+          "id": 33
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "147": {
+      "name": "11-2: Old Docks",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 169
+        },
+        {
+          "category": "fragmentGear",
+          "id": 58
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 161
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "148": {
+      "name": "11-3: Jorn's Hut",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 168
+        },
+        {
+          "category": "fragmentGear",
+          "id": 59
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 152
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "149": {
+      "name": "11-4: Worn Rut",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 169
+        },
+        {
+          "category": "fragmentGear",
+          "id": 60
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 153
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "150": {
+      "name": "11-5: Mark of Doom",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 173
+        },
+        {
+          "category": "fragmentGear",
+          "id": 61
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 154
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "151": {
+      "name": "11-6: Grimling Camp",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 62
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 190
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 157
+        },
+        {
+          "category": "fragmentHero",
+          "id": 20
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "152": {
+      "name": "11-7: Mountain Tunnel",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 176
+        },
+        {
+          "category": "fragmentGear",
+          "id": 74
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 155
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "153": {
+      "name": "11-8: The Bear Corner",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 175
+        },
+        {
+          "category": "fragmentGear",
+          "id": 75
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 156
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "154": {
+      "name": "11-9: Hunters' Dugouts",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 174
+        },
+        {
+          "category": "fragmentGear",
+          "id": 176
+        },
+        {
+          "category": "fragmentGear",
+          "id": 76
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "155": {
+      "name": "11-10: Doomsdale",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 77
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 200
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 193
+        },
+        {
+          "category": "fragmentHero",
+          "id": 34
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "156": {
+      "name": "11-11: Everfrost",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 167
+        },
+        {
+          "category": "fragmentGear",
+          "id": 177
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 146
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "157": {
+      "name": "11-12: Cold Ridge",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 175
+        },
+        {
+          "category": "fragmentGear",
+          "id": 178
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 147
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "158": {
+      "name": "11-13: Berserker Gorge",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 177
+        },
+        {
+          "category": "fragmentGear",
+          "id": 167
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 148
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "159": {
+      "name": "11-14: Crystal Waters",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 178
+        },
+        {
+          "category": "fragmentGear",
+          "id": 168
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 149
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "160": {
+      "name": "11-15: Gunar the Ferocious's Grotto",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 204
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 194
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 150
+        },
+        {
+          "category": "fragmentHero",
+          "id": 32
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "161": {
+      "name": "12-1: Glass Lake",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 205
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 195
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 151
+        },
+        {
+          "category": "fragmentHero",
+          "id": 33
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "162": {
+      "name": "12-2: Depths of Solitude",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 173
+        },
+        {
+          "category": "fragmentGear",
+          "id": 56
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 190
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "163": {
+      "name": "12-3: A Slippery Path",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 174
+        },
+        {
+          "category": "fragmentGear",
+          "id": 57
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 191
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "164": {
+      "name": "12-4: Ice Ridges",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 175
+        },
+        {
+          "category": "fragmentGear",
+          "id": 58
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 193
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "165": {
+      "name": "12-5: Labyrinth of Past Hopes",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 176
+        },
+        {
+          "category": "fragmentGear",
+          "id": 59
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 192
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "166": {
+      "name": "12-6: The Lost Wonder",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 60
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 206
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 196
+        },
+        {
+          "category": "fragmentHero",
+          "id": 6
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "167": {
+      "name": "12-7: Cliff Path",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 177
+        },
+        {
+          "category": "fragmentGear",
+          "id": 61
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 196
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "168": {
+      "name": "12-8: Frigid Place",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 178
+        },
+        {
+          "category": "fragmentGear",
+          "id": 62
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 197
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "169": {
+      "name": "12-9: Cold Fire",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 74
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 198
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 190
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "170": {
+      "name": "12-10: Runic Millstone",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 75
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 214
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 197
+        },
+        {
+          "category": "fragmentHero",
+          "id": 34
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "171": {
+      "name": "12-11: Guardian Border",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 76
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 204
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 191
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "172": {
+      "name": "12-12: Touch of the Frost",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 77
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 205
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 192
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "173": {
+      "name": "12-13: Path of the Skalds",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 206
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 193
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 146
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "174": {
+      "name": "12-14: The Dying Hearth",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 214
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 205
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 147
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "175": {
+      "name": "12-15: Jarl's Estate",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 215
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 198
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 148
+        },
+        {
+          "category": "fragmentHero",
+          "id": 32
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "176": {
+      "name": "13-1: Perilous Pass",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 206
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 149
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 222
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "177": {
+      "name": "13-2: Wolfsfang Cliff",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 216
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 199
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 150
+        },
+        {
+          "category": "fragmentHero",
+          "id": 33
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "178": {
+      "name": "13-3: Stone Steps",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 167
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 151
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 223
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "179": {
+      "name": "13-4: Unhappy Meeting",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 168
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 156
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 224
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "180": {
+      "name": "13-5: Hangman's Crossing",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 169
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 155
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 225
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "181": {
+      "name": "13-6: Stonemasons' Village",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 217
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 200
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 161
+        },
+        {
+          "category": "fragmentHero",
+          "id": 22
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "182": {
+      "name": "13-7: Thawed Snow",
+      "drops": [
+        {
+          "category": "fragmentGear",
+          "id": 173
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 215
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 152
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "183": {
+      "name": "13-8: Dangerous Ravine",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 216
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 194
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 153
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "184": {
+      "name": "13-9: Warmer, Warmer",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 217
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 195
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 154
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "185": {
+      "name": "13-10: Valley of Geysers",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 191
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 204
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 157
+        },
+        {
+          "category": "fragmentHero",
+          "id": 34
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "186": {
+      "name": "13-11: Fetid Springs",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 198
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 196
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 155
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "187": {
+      "name": "13-12: Feast",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 199
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 197
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 156
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "188": {
+      "name": "13-13: Distribution",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 200
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 166
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 226
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "189": {
+      "name": "13-14: Crystal Bridge",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 204
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 157
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 227
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    },
+    "190": {
+      "name": "13-15: Escape from Winter",
+      "drops": [
+        {
+          "category": "fragmentScroll",
+          "id": 192
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 205
+        },
+        {
+          "category": "fragmentScroll",
+          "id": 158
+        },
+        {
+          "category": "fragmentHero",
+          "id": 32
+        },
+        {
+          "category": "consumable",
+          "id": 10
+        }
+      ]
+    }
+  }
+}

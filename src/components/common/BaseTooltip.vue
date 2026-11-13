@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, useSlots } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -21,7 +21,8 @@ const coords = ref<{ left: number; top?: number; bottom?: number }>({ left: 0 })
 let showTimeout: any = null;
 let hideTimeout: any = null;
 
-const hasContent = computed(() => Boolean(props.content && props.content.trim().length > 0));
+const slots = useSlots();
+const hasContent = computed(() => Boolean(slots.content || (props.content && props.content.trim().length > 0)));
 
 watch(() => props.content, () => {
   if (isVisible.value) {
@@ -112,6 +113,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (showTimeout) clearTimeout(showTimeout);
+  if (hideTimeout) clearTimeout(hideTimeout);
   if (typeof window !== 'undefined') {
     window.removeEventListener('scroll', handleScroll, true);
     window.removeEventListener('resize', handleScroll);
@@ -144,7 +146,7 @@ onUnmounted(() => {
         class="pointer-events-none rounded-lg border border-slate-700/60 dark:border-slate-600/60 bg-slate-900/95 dark:bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium leading-relaxed text-slate-100 shadow-xl backdrop-blur-sm whitespace-pre-line text-left max-w-xs transition-opacity duration-150"
         role="tooltip"
       >
-        {{ content }}
+        <slot name="content">{{ content }}</slot>
       </div>
     </Teleport>
   </div>

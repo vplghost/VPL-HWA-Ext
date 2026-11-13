@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import RecipeTreeNode from './RecipeTreeNode.vue';
+import CampaignMissionPicker from './CampaignMissionPicker.vue';
+import MissionDropTooltip from './MissionDropTooltip.vue';
+import pickerData from '@/src/data/campaign-picker.json';
+import { useCampaignMissionHistory } from '@/src/composables/useCampaignMissionHistory';
 import { findRecipeNode, recipeMissions, recipeFarmCategory } from '@/src/utils/recipeTree';
 import { waitForCampaignRaidResult } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
@@ -30,7 +34,12 @@ const loopStatusMsg = ref('');
 const campaignRaidSequential = ref(false);
 const localRaidResult = ref<any>(null);
 
-const quickMissions = [135, 10, 20, 50, 80, 100, 120, 150];
+const accountId = computed(() => cache.value.accountStatus?.data?.id);
+const missionHistory = useCampaignMissionHistory(accountId);
+const recentMissions = computed(() => missionHistory.recent.value.filter(id => Boolean((globalThis as any).hwaHelperCampaignMissions?.missions?.[id])));
+function missionName(id: number) {
+  return (pickerData.missions as Record<string, { name: string }>)[id]?.name || `Mission #${id}`;
+}
 
 const selectedGearId = ref<number | string | null>(null);
 const selectedRecipeNodeId = ref<string | null>(null);
@@ -148,6 +157,10 @@ watch(
   () => {
     if (props.modelValue) {
       loadDisabledMissions();
+    }
+    if (modalContext.selectedCampaignGearId == null) {
+      selectedGearId.value = null;
+      selectedRecipeNodeId.value = null;
     }
     if (modalContext.selectedCampaignGearId != null) {
       selectedGearId.value = modalContext.selectedCampaignGearId;
@@ -356,6 +369,7 @@ async function waitForRaidResult(prevUpdatedAt?: string, timeoutMs = 3500) {
 }
 
 async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: boolean; drops?: any; error?: string }> {
+  const raidMission = Number(missionId.value), raidAccount = accountId.value;
   await ensureRpcEnabled();
 
   const tries = getTriesInfo(missionId.value);
@@ -392,6 +406,7 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
       if (!raidRes.pending) disableMissionToday(missionId.value);
       return { ok: false, pending: raidRes.pending, error: raidRes.error || 'Raid rejected by server' };
     }
+    await missionHistory.record(raidMission, raidAccount);
     return { ok: true, drops: raidRes.drops };
   } catch (err: any) {
     // Secondary fallback via background message
@@ -414,6 +429,7 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
           disableMissionToday(missionId.value);
           return { ok: false, error: raidRes.error };
         }
+        await missionHistory.record(raidMission, raidAccount);
         return { ok: true, drops: raidRes.drops };
       }
       if (res?.error) {
@@ -708,90 +724,24 @@ const hasDropItems = computed(() => {
 
           <!-- Mission Setup & Candidate Chips -->
           <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs">
-            <div class="flex items-center justify-between gap-2">
-              <label class="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                Target Campaign Mission
-              </label>
-              <div class="flex items-center gap-1.5">
-                <span class="text-2xs text-slate-400">Mission ID:</span>
-                <input
-                  id="campaign-mission-input"
-                  v-model.number="missionId"
-                  :disabled="isRaidRunning"
-                  type="number"
-                  min="1"
-                  max="300"
-                  class="w-20 rounded border border-slate-300 px-2 py-1 text-center font-bold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 focus:outline-hidden"
-                />
-              </div>
-            </div>
-
-            <!-- Candidate Missions Chips (from item drop data) -->
-            <div v-if="candidateMissions.length > 0" class="space-y-1">
-              <div class="text-2xs font-medium text-slate-400">Recommended missions dropping this item:</div>
+            <div class="font-bold text-slate-800 dark:text-slate-200 text-xs">Target Campaign Mission</div>
+            <CampaignMissionPicker v-model="missionId" :disabled="isRaidRunning" :is-mission-disabled="isMissionDisabled" :mission-status="getMissionTooltip" />
+            <div v-if="candidateMissions.length || !selectedGearId" class="space-y-1.5">
+              <div class="text-2xs font-medium text-slate-400">{{ selectedGearId ? 'Recommended missions dropping this item:' : 'Recently farmed missions' }}</div>
               <div class="flex flex-wrap gap-1.5">
-                <button
-                  v-for="m in candidateMissions"
-                  :key="m.id"
-                  type="button"
-                  :disabled="isRaidRunning || isMissionDisabled(m.id)"
-                  class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-all inline-flex items-center gap-1.5"
-                  :class="[
-                    isMissionDisabled(m.id)
-                      ? 'opacity-50 cursor-not-allowed bg-slate-100 text-slate-400 border-dashed border-slate-300 dark:bg-slate-800/40 dark:border-slate-700 line-through'
-                      : missionId === m.id
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 hover:border-indigo-400'
-                  ]"
-                  :title="getMissionTooltip(m.id)"
-                  @click="!isMissionDisabled(m.id) && (missionId = m.id)"
-                >
-                  <span v-if="m.isHeroic" title="Hero Mission (Daily Limit)">🦸</span>
-                  <span>Mission #{{ m.id }} (Ch.{{ m.chapter }}-{{ m.index }})</span>
-                  <span
-                    v-if="m.isHeroic"
-                    class="text-3xs px-1 py-0.5 rounded font-bold"
-                    :class="missionId === m.id ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'"
-                  >
-                    {{ getTriesBadge(m.id) }}
-                  </span>
-                </button>
+                <MissionDropTooltip v-for="id in (selectedGearId ? candidateMissions.map((m: any) => Number(m.id)) : recentMissions)" :key="id" :mission-id="id" :status="getMissionTooltip(id)">
+                  <button type="button" :disabled="isRaidRunning" :aria-disabled="isMissionDisabled(id)" class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-colors inline-flex items-center gap-1.5" :class="[isMissionDisabled(id) ? 'opacity-50 border-dashed line-through' : '', missionId === id ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300']" @click="!isMissionDisabled(id) && (missionId = id)">
+                    <span v-if="isHeroic(id)" aria-hidden="true">🦸</span>
+                    <span>{{ missionName(id) }}</span>
+                    <span v-if="isHeroic(id)" class="text-3xs">{{ getTriesBadge(id) }}</span>
+                  </button>
+                </MissionDropTooltip>
               </div>
+              <p v-if="!selectedGearId && !recentMissions.length" class="text-xs text-slate-500">No farmed missions yet. Successfully raided missions will appear here.</p>
             </div>
-
-            <!-- Quick Jump Chips -->
-            <div v-else-if="!selectedGearId" class="flex flex-wrap gap-1.5">
-              <button
-                v-for="qId in quickMissions"
-                :key="qId"
-                type="button"
-                :disabled="isRaidRunning || isMissionDisabled(qId)"
-                class="cursor-pointer px-2 py-1 rounded text-2xs font-semibold border transition-all inline-flex items-center gap-1.5"
-                :class="[
-                  isMissionDisabled(qId)
-                    ? 'opacity-50 cursor-not-allowed bg-slate-100 text-slate-400 border-dashed border-slate-300 dark:bg-slate-800/40 dark:border-slate-700 line-through'
-                    : missionId === qId
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 hover:border-indigo-400'
-                ]"
-                :title="getMissionTooltip(qId)"
-                @click="!isMissionDisabled(qId) && (missionId = qId)"
-              >
-                <span v-if="isHeroic(qId)" title="Hero Mission (Daily Limit)">🦸</span>
-                <span>Mission #{{ qId }}</span>
-                <span
-                  v-if="isHeroic(qId)"
-                  class="text-3xs px-1 py-0.5 rounded font-bold"
-                  :class="missionId === qId ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'"
-                >
-                  {{ getTriesBadge(qId) }}
-                </span>
-              </button>
-            </div>
-
             <p v-if="selectedGearId && !candidateMissions.length" class="text-xs text-slate-500 dark:text-slate-400">
-            This item has no direct campaign drops. Select a component below it to farm, or craft it when the ingredients are ready.
-          </p>
+              This item has no direct campaign drops. Select a component below it to farm, or craft it when the ingredients are ready.
+            </p>
 
           <!-- Warning if Selected Mission is Exhausted or Disabled -->
             <div

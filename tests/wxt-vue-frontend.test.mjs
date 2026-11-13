@@ -167,7 +167,7 @@ test('QuestDetailModal and CampaignRaidModal have 1:1 ID parity with HTML dialog
   assert.match(campContent, /id="campaign-dialog-title"/, 'Must have #campaign-dialog-title');
   assert.match(campContent, /id="campaign-dialog-status"/, 'Must have #campaign-dialog-status');
   assert.match(campContent, /id="campaign-dialog-body"/, 'Must have #campaign-dialog-body');
-  assert.match(campContent, /id="campaign-mission-input"/, 'Must have mission input');
+  assert.match(campContent, /CampaignMissionPicker/, 'Must use chapter/mission picker');
 });
 
 test('DungeonModal has 1:1 ID parity and controls matching HTML dungeon-modal', async () => {
@@ -301,7 +301,7 @@ test('CampaignRaidModal has Recipe Tree hierarchy, loop controls, auto-stop, max
   assert.match(camp, /id="campaign-dialog-title"/, 'Must have #campaign-dialog-title');
   assert.match(camp, /id="campaign-dialog-status"/, 'Must have #campaign-dialog-status');
   assert.match(camp, /id="campaign-dialog-body"/, 'Must have #campaign-dialog-body');
-  assert.match(camp, /id="campaign-mission-input"/, 'Must have #campaign-mission-input');
+  assert.match(camp, /CampaignMissionPicker/, 'Must use chapter/mission picker');
   assert.match(camp, /buildGearRecipeTree/, 'Must use buildGearRecipeTree');
   assert.match(camp, /candidateMissions/, 'Must compute candidate missions');
   assert.match(camp, /Crafting Recipe Tree/, 'Must have Crafting Recipe Tree');

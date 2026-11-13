@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.72 — 2026-11-14
+
+### Changed
+
+- Replace Brigand Camp individual hero picking with the shared saved-team options and a read-only hero preview, preserving remembered choices.
+- Replace Campaign Mission ID entry with chapter-name and mission dropdowns; show possible item drops with bundled images and names on hover or keyboard focus.
+- Show the five most recently successfully farmed missions when no target item is selected, saved separately per account.
+
+### Added
+
+- Generate campaign picker names and positive-chance item drops for 13 chapters and 190 missions from checksum-verified locale and splitlib data.
+
 ## 0.10.71 — 2026-11-14
 
 ### Changed

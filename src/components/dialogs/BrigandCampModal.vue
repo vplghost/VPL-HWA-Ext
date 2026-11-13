@@ -4,7 +4,9 @@ import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useDialogTeamSelection } from '@/src/composables/useDialogTeamSelection';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
-import { getHeroMetadata, getItemName } from '@/src/utils/metadata';
+import { getHeroMetadata, getItemName, starGlowClass } from '@/src/utils/metadata';
+import { teamOptions as getTeamOptions } from '@/src/utils/experimentalData';
+import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { getAmountAt } from '@/src/utils/resourceData';
 import { BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls, campSearchCalls, availableCamps } from '@/src/utils/brigandCamp';
 
@@ -16,9 +18,12 @@ const { customTeams } = useAccountTeams(accountId);
 const rememberedTeam = useDialogTeamSelection('brigand', accountId);
 const selectedPreset = ref('');
 const owned = computed<Record<string, any>>(() => cache.value.heroGetAll?.data || {});
-const heroes = computed(() => Object.entries(owned.value).map(([id, hero]) => ({
-  id: Number(id), name: getHeroMetadata(id)?.name || `Hero #${id}`, power: Number(hero.power) || 0,
-})).sort((a, b) => b.power - a.power));
+const teamOptions = computed(() => {
+  const options = getTeamOptions(cache.value.teamGetAll?.data, owned.value, customTeams.value);
+  return [{ id: 'camp', label: 'Brigand Camp team', heroIds: savedTeam.value }, ...options.filter((team: any) => !team.id.startsWith('globalMapCamp:'))];
+});
+function heroName(id: number) { return getHeroMetadata(id)?.name || `Hero #${id}`; }
+function heroAvatar(id: number) { return getHeroMetadata(id)?.avatarFile || ''; }
 const now = ref(Date.now());
 let energyTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => { energyTimer = setInterval(() => { now.value = Date.now(); }, 1000); });
@@ -96,30 +101,31 @@ const validation = computed(() => summary.value && !selectedCamp.value
   : campAttackError(campId.value, heroIds.value, owned.value, energy.value));
 const alreadyWon = computed(() => result.value?.data?.success && result.value.data.campId === campId.value.trim());
 
-function selectTeam(ids: number[], preset = '', persist = true) {
+function selectTeam(ids: number[], preset = 'camp', persist = true) {
   heroIds.value = campHeroIds(ids).filter(id => !!owned.value[String(id)]);
   selectedPreset.value = preset;
   if (persist) void rememberedTeam.saveSelection({ teamId: preset, heroIds: [...heroIds.value] });
 }
-function selectCustomTeam(event: Event) {
-  const id = (event.target as HTMLSelectElement).value;
-  const team = customTeams.value.find(team => team.id === id);
+function selectSavedTeam(id: string) {
+  if (pending.value) return;
+  const team = teamOptions.value.find((team: any) => team.id === id);
   if (team) selectTeam(team.heroIds, id);
 }
-watch([rememberedTeam.selection, owned], () => {
+watch([rememberedTeam.selection, owned, teamOptions, pending], () => {
+  if (pending.value) return;
   const saved = rememberedTeam.selection.value;
-  if (saved?.heroIds) selectTeam(saved.heroIds, saved.teamId || '', false);
-});
-function toggleHero(id: number) {
-  if (heroIds.value.includes(id)) heroIds.value = heroIds.value.filter(hero => hero !== id);
-  else if (heroIds.value.length < 5) heroIds.value = [...heroIds.value, id];
-  selectedPreset.value = '';
-  void rememberedTeam.saveSelection({ heroIds: [...heroIds.value], teamId: '' });
-}
+  const id = saved?.teamId || selectedPreset.value || 'camp';
+  const team = teamOptions.value.find((team: any) => team.id === id || team.id === `custom:${id}`);
+  if (team) selectTeam(team.heroIds, team.id, false);
+  else if (saved?.heroIds?.length) {
+    const matching = teamOptions.value.find((team: any) => JSON.stringify(team.heroIds) === JSON.stringify(campHeroIds(saved.heroIds)));
+    selectTeam(matching?.heroIds || savedTeam.value, matching?.id || 'camp', false);
+  } else selectTeam(savedTeam.value, 'camp', false);
+}, { immediate: true });
 watch(() => props.modelValue, open => {
-  if (open && !heroIds.value.length) selectTeam(savedTeam.value, '', false);
+  if (open && !heroIds.value.length) selectTeam(savedTeam.value, 'camp', false);
 });
-watch(savedTeam, ids => { if (props.modelValue && !heroIds.value.length) selectTeam(ids, '', false); });
+watch(savedTeam, ids => { if (props.modelValue && !heroIds.value.length) selectTeam(ids, 'camp', false); });
 watch(accountId, () => {
   clearTimeout(timer);
   clearTimeout(searchTimer);
@@ -211,20 +217,23 @@ async function attack() {
         <p v-if="selectedCamp" class="text-xs text-orange-600">Selected: Level {{ selectedCamp.campConfigId }} · {{ selectedCamp.id }}</p>
       </section>
       <p class="text-xs text-slate-500">Attack sends a camp victory request directly; it does not open the in-game battle.</p>
-      <div class="flex flex-wrap items-center gap-2">
-        <strong>Team · {{ heroIds.length }}/5 heroes</strong>
-        <button class="text-xs text-orange-600 disabled:opacity-50" :disabled="!!pending || !savedTeam.length" @click="selectTeam(savedTeam)">Use Brigand Camp team</button>
-        <select :value="selectedPreset" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs" :disabled="!!pending" aria-label="Use custom team" @change="selectCustomTeam">
-          <option value="">Custom team…</option>
-          <option v-for="team in customTeams" :key="team.id" :value="team.id">{{ team.name }}</option>
+      <section class="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+        <label for="brigand-team-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400">Select Team</label>
+        <select id="brigand-team-select" :value="selectedPreset" :disabled="!!pending" class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm" @change="selectSavedTeam(($event.target as HTMLSelectElement).value)">
+          <option v-for="team in teamOptions" :key="team.id" :value="team.id">{{ team.label }} ({{ team.heroIds.length }}/5)</option>
         </select>
-      </div>
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
-        <button v-for="hero in heroes" :key="hero.id" :aria-pressed="heroIds.includes(hero.id)" :disabled="!!pending || (!heroIds.includes(hero.id) && heroIds.length >= 5)" class="rounded-lg border p-2 text-left disabled:opacity-50" :class="heroIds.includes(hero.id) ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/40' : 'border-slate-200 dark:border-slate-700'" @click="toggleHero(hero.id)">
-          <span class="font-semibold">{{ hero.name }}</span><span class="block text-xs text-slate-500">Power {{ hero.power.toLocaleString() }}</span>
-        </button>
-        <p v-if="!heroes.length" class="col-span-full text-xs text-slate-500">Sync heroes to select a team.</p>
-      </div>
+        <div v-if="heroIds.length" class="flex flex-wrap items-center gap-2" aria-label="Selected camp team">
+          <span v-for="id in heroIds" :key="id" class="hero-hover-trigger inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700">
+            <span class="size-6 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border" :class="starGlowClass(Number(owned[String(id)]?.star) || 1)">
+              <img v-if="heroAvatar(id)" :src="heroAvatar(id)" :alt="heroName(id)" class="size-full object-cover" />
+              <span v-else aria-hidden="true">👤</span>
+            </span>
+            <span>{{ heroName(id) }}</span>
+            <HeroHoverCard :hero-id="id" :hero="owned[String(id)]" :inventory="cache.inventoryGet?.data" />
+          </span>
+        </div>
+        <p v-else class="text-xs text-amber-600 dark:text-amber-400">Select a saved team or sync the Brigand Camp team.</p>
+      </section>
       <p v-if="error" role="alert" class="text-red-600 dark:text-red-400">{{ error }}</p>
       <p v-if="message" role="status" class="text-slate-600 dark:text-slate-300">{{ message }}</p>
       <p v-if="alreadyWon" class="text-emerald-600">This camp has already been defeated. Choose another camp.</p>

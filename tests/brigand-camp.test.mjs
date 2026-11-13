@@ -90,21 +90,28 @@ test('actual Brigand dialog prevents duplicate sends and waits for server result
   const source = await readFile(new URL('../src/components/dialogs/BrigandCampModal.vue', import.meta.url), 'utf8');
   const setup = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import .*;\r?$/gm, '');
   const state = ref({ ...baseline(), accountStatus: { data: { id: 1 } }, heroGetAll: { data: Object.fromEntries(heroes.map(id => [id, { power: id }])) } });
-  const calls = [], callbacks = [], timers = [], stops = [];
+  const calls = [], callbacks = [], timers = [], stops = [], savedChoices = [];
   const context = { computed, ref, shallowRef, watch: (...args) => { const stop = watch(...args); stops.push(stop); return stop; },
     onMounted() {}, onUnmounted() {}, defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     useRpcCache: () => ({ cache: state, dispatchRpc: batch => { calls.push(batch); return new Promise(resolve => callbacks.push(resolve)); } }),
-    useDialogTeamSelection: () => ({ selection: ref(null), saveSelection: async () => true }),
-    useAccountTeams: () => ({ customTeams: ref([]) }), getHeroMetadata: () => ({}), getItemName: () => '',
+    useDialogTeamSelection: () => ({ selection: ref({ teamId: 'sample', heroIds: heroes }), saveSelection: async value => { savedChoices.push(value); return true; } }),
+    useAccountTeams: () => ({ customTeams: ref([]) }), getTeamOptions: () => [{ id: 'custom:sample', label: 'Sample', heroIds: heroes }], getHeroMetadata: () => ({}), getItemName: () => '',
     BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls, campSearchCalls, availableCamps, getAmountAt,
     setTimeout: fn => { timers.push(fn); return timers.length; }, clearTimeout() {}, clearInterval() {}, Date };
   t.after(() => stops.forEach(stop => stop()));
   const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
-  vm.runInNewContext(js + '\nglobalThis.api = { attack, pending, message, error, campId, heroIds, validation, searchCamps, searchPending, searchError, searchMessage, camps, filteredCamps, chooseCamp, campLevel, now };', context);
+  vm.runInNewContext(js + '\nglobalThis.api = { attack, pending, message, error, campId, heroIds, validation, searchCamps, searchPending, searchError, searchMessage, camps, filteredCamps, chooseCamp, campLevel, now, selectSavedTeam, selectedPreset, teamOptions };', context);
   const ui = context.api;
+  assert.equal(ui.selectedPreset.value, 'custom:sample', 'Restore old custom-team IDs to the shared prefixed option');
+  ui.selectSavedTeam('custom:sample');
+  assert.equal(savedChoices.at(-1).teamId, 'custom:sample');
+  assert.deepEqual([...ui.heroIds.value], heroes);
+  assert.doesNotMatch(source, /toggleHero|v-for="hero in heroes"/, 'Camp selection must not allow individual hero picking');
   ui.campId.value = campId;
   ui.heroIds.value = heroes;
   const sending = ui.attack();
+  ui.selectSavedTeam('camp');
+  assert.equal(ui.selectedPreset.value, 'custom:sample', 'Team cannot change while a camp attack is pending');
   await ui.attack();
   assert.equal(calls.length, 1);
   callbacks.shift()({ ok: true, queued: true });
