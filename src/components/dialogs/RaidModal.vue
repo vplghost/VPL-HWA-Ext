@@ -692,20 +692,32 @@ async function stopRaidQueue() {
               </select>
             </div>
 
-            <!-- Minimum Members -->
+            <!-- Auto-cancel and member threshold -->
             <div>
               <label for="raid-min-members" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Minimum Members
               </label>
-              <input
-                id="raid-min-members"
-                v-model.number="minMembers"
-                type="number"
-                min="1"
-                max="6"
-                class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
-                @change="savePreferences"
-              />
+              <div class="flex items-stretch overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+                <label class="flex flex-1 min-w-0 items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300" title="Cancel the rally in the last 10 seconds if members are below this minimum">
+                  <input
+                    id="raid-auto-cancel"
+                    v-model="autoCancel"
+                    type="checkbox"
+                    class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 shrink-0"
+                    @change="savePreferences"
+                  />
+                  <span>Auto-cancel · last 10s</span>
+                </label>
+                <input
+                  id="raid-min-members"
+                  v-model.number="minMembers"
+                  type="number"
+                  min="1"
+                  max="6"
+                  class="w-16 shrink-0 border-0 border-l border-slate-300 dark:border-slate-700 bg-transparent px-2 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                  @change="savePreferences"
+                />
+              </div>
             </div>
           </div>
 
@@ -734,18 +746,6 @@ async function stopRaidQueue() {
             <p v-if="autoEnergyMessage" role="status" class="text-xs text-indigo-600 dark:text-indigo-300">{{ autoEnergyMessage }}</p>
           </div>
 
-          <!-- Auto Cancel Checkbox -->
-          <label class="flex items-center gap-2 cursor-pointer pt-1">
-            <input
-              v-model="autoCancel"
-              type="checkbox"
-              class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-              @change="savePreferences"
-            />
-            <span class="text-xs text-slate-700 dark:text-slate-300 font-medium">
-              Auto-cancel rally in last 10 seconds if squad members &lt; {{ minMembers }}
-            </span>
-          </label>
         </section>
 
         <!-- Map Missing Warning & Locate Action -->

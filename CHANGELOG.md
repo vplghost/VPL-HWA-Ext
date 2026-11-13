@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.57 — 2026-11-13
+
+### Changed
+
+- Combine Raid auto-cancel and minimum-member controls into one compact input group, with the shorter label “Auto-cancel · last 10s”.
+
 ## 0.10.56 — 2026-11-13
 
 ### Fixed
