@@ -796,7 +796,11 @@ test('isDebugOrEventResource identifies test, unmapped, and inactive event resou
 
   // Unmapped fallback labels
   assert.equal(isDebugOrEventResource({ key: 'resource:coin:100011', data: { label: 'coin #100011', amount: 50 } }), true);
-  assert.equal(isDebugOrEventResource({ key: 'resource:material:8', data: { label: 'material #8', amount: 2 } }), true);
+  assert.equal(isDebugOrEventResource({ key: 'resource:material:8', data: { label: 'material #8', amount: 2 } }), false,
+    'Marksmen Manual has a verified current name and must remain visible');
+  assert.equal(isDebugOrEventResource({ key: 'resource:lootboxChanced:27', data: { label: 'lootboxChanced #27', amount: 1 } }), false,
+    'Tomes Casket is a real current resource, not an unmapped debug entry');
+  assert.equal(isDebugOrEventResource({ key: 'resource:material:999999', data: { label: 'material #999999', amount: 2 } }), true);
 
   // Event refillables with 0 balance or Event Energy / Refillable #
   assert.equal(isDebugOrEventResource({ key: 'resource:refillable:10', data: { label: 'Refillable #10', amount: 0 } }), true);

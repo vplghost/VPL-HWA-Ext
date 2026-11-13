@@ -1,0 +1,11 @@
+{
+  "gameVersion": "1.293.1010",
+  "timeline": [
+    {
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-10T02:39:50.645Z",
+      "requestBody": "{\"calls\":[{\"name\":\"indexGet\",\"ident\":\"index\"}]}",
+      "responseBody": "{\"results\":[{\"ident\":\"index\",\"result\":{\"response\":{\"staticVersionUrl\":\"https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/\",\"locale\":{\"en.json.gz\":{\"path\":\"locale\",\"version\":\"v0054/d973530195826f1575a002f97a3f30e9\",\"size\":683124,\"md5\":\"def7ae37ac67df119f41eae76690c092\"}}}}}]}"
+    }
+  ]
+}

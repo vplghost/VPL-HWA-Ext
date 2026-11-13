@@ -15,7 +15,7 @@
   function building(id) { return lookup('building', id) || (id ? `Building #${id}` : null); }
   function research(id) { return lookup('research', id) || (id ? `Research #${id}` : null); }
   function item(category, id) {
-    const group = itemGroups[category];
+    const group = itemGroups[category] || category;
     const name = group && lookup(group, id);
     return name ? (category.startsWith('fragment') ? `${name} fragment` : name) : null;
   }

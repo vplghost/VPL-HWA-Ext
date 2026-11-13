@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.65 — 2026-11-14
+
+### Fixed
+
+- Refresh verified English names for game client 1.293.1010 and add 236 item/resource names, including `lootboxChanced #27` → Tomes Casket.
+- Resolve lootboxes, materials, construction/research/training/healing/general speedups, teleporters and talismans consistently in Items and Resources.
+- Keep newly named resources visible while preserving fallbacks for untranslated IDs; require an explicit current capture when regenerating names.
+
 ## 0.10.64 — 2026-11-14
 
 ### Fixed

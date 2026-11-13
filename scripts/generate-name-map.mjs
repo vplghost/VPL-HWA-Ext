@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { extractStrategicResourceNames } from './lib/strategic-resource-names.mjs';
 
 const root = resolve(import.meta.dirname, '..');
-const input = resolve(process.argv[2] ?? join(root, 'temp/tracking-data/hwa-api-2026-11-01_latest.json'));
+if (!process.argv[2]) throw new Error('Pass a current game export containing indexGet; refusing a stale default capture');
+const input = resolve(process.argv[2]);
 const exported = JSON.parse(await readFile(input, 'utf8'));
 const records = Array.isArray(exported) ? exported : (exported.timeline || exported.records);
 if (!Array.isArray(records)) throw new Error('Expected exported API records or a game timeline');
@@ -35,9 +37,15 @@ if (base.protocol !== 'https:' || base.hostname !== 'heroesmobile-a-cdn.nextersg
   throw new Error('Unexpected CDN asset metadata');
 }
 const assetUrl = new URL(`${entry.version}/${entry.path}/en.json.gz`, base).href;
-const response = await fetch(assetUrl);
-if (!response.ok) throw new Error(`CDN returned HTTP ${response.status}`);
-const compressed = Buffer.from(await response.arrayBuffer());
+let compressed;
+if (process.argv[3]) {
+  // Cached bytes must pass the same pinned indexGet size/MD5 checks.
+  compressed = await readFile(resolve(process.argv[3]));
+} else {
+  const response = await fetch(assetUrl);
+  if (!response.ok) throw new Error(`CDN returned HTTP ${response.status}`);
+  compressed = Buffer.from(await response.arrayBuffer());
+}
 if (compressed.length !== entry.size ||
     createHash('md5').update(compressed).digest('hex') !== entry.md5) {
   throw new Error('CDN locale file does not match indexGet size/hash');
@@ -51,6 +59,7 @@ const prefixes = {
   coin: 'LIB_COIN_NAME_',
   artifact: 'LIB_ARTIFACT_NAME_',
   skin: 'LIB_SKIN_NAME_',
+  talisman: 'LIB_TALISMAN_NAME_',
   research: 'STRATEGIC_BASE_INTERFACE_RESEARCH_'
 };
 const names = {};
@@ -72,6 +81,8 @@ for (const [key, value] of Object.entries(locale)) {
     }
   }
 }
+Object.assign(names, extractStrategicResourceNames(locale));
+
 // The upstream English locale currently contains these non-English entries or omissions.
 const englishCorrections = {
   hero: { 5016: 'Golem' },
@@ -99,6 +110,8 @@ for (const [group, corrections] of Object.entries(englishCorrections)) {
   Object.assign(names[group], corrections);
 }
 const output = `// Generated from ${assetUrl}\n` +
-  `globalThis.hwaHelperNameData = ${JSON.stringify({ assetUrl, assetMd5: entry.md5, assetSize: entry.size, names })};\n`;
+  `globalThis.hwaHelperNameData = ${JSON.stringify({ assetUrl, assetMd5: entry.md5, assetSize: entry.size,
+    clientVersion: typeof exported.gameVersion === 'string' ? exported.gameVersion : null,
+    indexCapturedAt: index.timestamp, names })};\n`;
 await writeFile(join(root, 'extension/data-names.js'), output);
 console.log(`Generated name map from ${assetUrl}: ${Object.entries(names).map(([k, v]) => `${k}=${Object.keys(v).length}`).join(', ')}`);
