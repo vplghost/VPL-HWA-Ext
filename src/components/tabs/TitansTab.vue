@@ -450,7 +450,7 @@ function exportTitansJson() {
               </span>
             </div>
 
-            <!-- Name and Element -->
+            <!-- Name, Element and Role -->
             <div class="min-w-0 flex-1">
               <div class="font-bold text-xs text-slate-900 dark:text-slate-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" :title="t.name">
                 {{ t.name }}
@@ -458,6 +458,9 @@ function exportTitansJson() {
               <div class="flex items-center gap-1 text-[10px] text-slate-400 truncate mt-0.5">
                 <span>{{ getElementIcon(t.element) }}</span>
                 <span>{{ t.element }}</span>
+              </div>
+              <div class="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5" :title="`Role: ${t.role}`">
+                Role: {{ t.role }}
               </div>
             </div>
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.71 — 2026-11-14
+
+### Changed
+
+- Display titan roles below the element on grid cards using the same metadata as the table, with a tooltip for truncated text.
+
 ## 0.10.70 — 2026-11-14
 
 ### Changed
