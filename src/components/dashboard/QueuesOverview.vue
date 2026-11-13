@@ -1,181 +1,103 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
-import { formatDuration } from '@/src/utils/formatters';
-import { normalizeArray } from '@/src/utils/troops';
+import { useNow } from '@/src/composables/useNow';
+import { dashboardQueues, dashboardMarches } from '@/src/utils/dashboardState';
+import { getBuildingName, getResearchName } from '@/src/utils/metadata';
+import { formatMarchTooltip } from '@/src/utils/marchTooltip';
+import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 
 const { cache } = useRpcCache();
 const { openModal } = useModals();
-const now = ref(Date.now());
-let timer: any = null;
+const now = useNow();
 
-onMounted(() => {
-  timer = setInterval(() => {
-    now.value = Date.now();
-  }, 1000);
-});
-
-onUnmounted(() => {
-  if (timer) clearInterval(timer);
-});
-
-// Building Queue
-const buildingQueue = computed(() => {
-  const status = cache.value.buildingStatus?.data || cache.value.building_getQueue?.data;
-  if (!status) return null;
-  const queue = normalizeArray(Array.isArray(status) ? status : (status.queue || status.queues));
-  const active = queue.find((q: any) => {
-    const end = q?.finishTime || (q?.startDate && q?.duration ? q.startDate + q.duration : null);
-    return end && end > now.value;
-  });
-  if (!active) return null;
-  const end = active.finishTime || (active.startDate + active.duration);
-  const remainingSec = Math.max(0, Math.ceil((end - now.value) / 1000));
-  return {
-    name: active.name || `Building #${active.buildingId || active.id || 'Upgrade'}`,
-    level: active.level || active.targetLevel,
-    remainingSec,
-    timerText: formatDuration(remainingSec),
-  };
-});
-
-// Research Queue
-const researchQueue = computed(() => {
-  const status = cache.value.researchStatus?.data || cache.value.research_getQueue?.data;
-  if (!status) return null;
-  const queue = normalizeArray(Array.isArray(status) ? status : (status.queue || status.queues));
-  const active = queue.find((q: any) => {
-    const end = q?.finishTime || (q?.startDate && q?.duration ? q.startDate + q.duration : null);
-    return end && end > now.value;
-  });
-  if (!active) return null;
-  const end = active.finishTime || (active.startDate + active.duration);
-  const remainingSec = Math.max(0, Math.ceil((end - now.value) / 1000));
-  return {
-    name: active.name || `Research #${active.researchId || active.id || 'Tech'}`,
-    level: active.level || active.targetLevel,
-    remainingSec,
-    timerText: formatDuration(remainingSec),
-  };
-});
-
-// Active Marches
-const marches = computed(() => {
-  const list = normalizeArray(cache.value.marchStatus?.data?.marches);
-  return list
-    .filter((m: any) => {
-      const end = m.endTime || (m.startTime && m.duration ? m.startTime + m.duration : null);
-      return end && end > now.value;
-    })
-    .map((m: any) => {
-      const end = m.endTime || (m.startTime + m.duration);
-      const remainingSec = Math.max(0, Math.ceil((end - now.value) / 1000));
-      return {
-        id: m.id || m.marchId,
-        type: m.type || 'March',
-        target: m.targetName || `Target #${m.targetId || ''}`,
-        remainingSec,
-        timerText: formatDuration(remainingSec),
-      };
-    });
-});
+const buildingQueue = computed(() => dashboardQueues(cache.value, 'building', now.value));
+const researchQueue = computed(() => dashboardQueues(cache.value, 'research', now.value));
+const queueGroups = computed(() => [
+  { id: 'building', title: 'Building Queue', icon: '🏗️', ...buildingQueue.value,
+    rows: buildingQueue.value.rows.map((row) => ({ ...row, name: getBuildingName(row.entityId) })) },
+  { id: 'research', title: 'Research Queue', icon: '🔬', ...researchQueue.value,
+    rows: researchQueue.value.rows.map((row) => ({ ...row, name: getResearchName(row.entityId) })) },
+]);
+const marches = computed(() => dashboardMarches(cache.value, now.value));
+const marchesKnown = computed(() => cache.value.marchStatus?.data?.marches != null);
+function handleMarchClick(category: string) {
+  if (category === 'raid') openModal('raid');
+  else if (category === 'gather') openModal('gathering');
+  else if (category === 'monster') openModal('monster');
+}
 </script>
 
 <template>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-    <!-- Active Queues (Building & Research) -->
     <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-3 space-y-2 shadow-2xs">
       <div class="flex items-center justify-between">
         <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-          <span>⏱️</span> Queues Status
+          <span>⏱️</span> Queue Status
         </h4>
         <span class="text-[10px] text-slate-400">Construction & Academy</span>
       </div>
-
-      <div class="space-y-1.5 text-xs">
-        <!-- Building Queue Row (Clickable) -->
-        <div
-          class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
-          title="Click to view city buildings and upgrade queues"
-          @click="openModal('building')"
+      <div v-for="group in queueGroups" :key="group.id" class="space-y-1.5 text-xs">
+        <button
+          type="button"
+          class="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-left cursor-pointer transition-colors"
+          :aria-label="`Open ${group.title}`"
+          @click="group.id === 'building' ? openModal('building') : openModal('research')"
         >
-          <div class="flex items-center gap-2">
-            <span class="text-base">🏗️</span>
-            <div>
-              <div class="font-semibold text-slate-800 dark:text-slate-200">
-                {{ buildingQueue ? `${buildingQueue.name} (Lv.${buildingQueue.level || '?'})` : 'Building Queue' }}
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold text-slate-800 dark:text-slate-200">{{ group.icon }} {{ group.title }}</span>
+            <span v-if="!group.rows.length" class="text-[11px] text-slate-400">
+              {{ group.state === 'unknown' ? 'Waiting for game data' : 'Idle' }}
+            </span>
+            <span v-else class="text-[10px] text-slate-400">{{ group.rows.length }} upgrades</span>
+          </div>
+          <div v-for="row in group.rows" :key="row.id" class="flex items-center justify-between gap-2 mt-2">
+            <div class="min-w-0">
+              <div class="font-medium text-slate-800 dark:text-slate-200 truncate">
+                {{ row.name }}<span v-if="row.level != null"> (Lv.{{ row.level }})</span>
               </div>
               <div class="text-[10px] text-slate-400">
-                {{ buildingQueue ? 'In progress · Click to manage' : 'Idle · Click to view buildings' }}
+                {{ row.state === 'ready' ? 'Ready to finish · Click to manage' : row.state === 'active' ? 'In progress · Click to manage' : 'Timing unavailable · Click to manage' }}
               </div>
             </div>
+            <span
+              class="shrink-0 px-2 py-0.5 rounded text-[11px] font-mono font-semibold"
+              :class="row.state === 'ready' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'"
+            >{{ row.timerText }}</span>
           </div>
-          <span
-            class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold"
-            :class="buildingQueue ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'"
-          >
-            {{ buildingQueue ? buildingQueue.timerText : 'Idle' }}
-          </span>
-        </div>
-
-        <!-- Research Queue Row (Clickable) -->
-        <div
-          class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
-          title="Click to view academy research tree and upgrades"
-          @click="openModal('research')"
-        >
-          <div class="flex items-center gap-2">
-            <span class="text-base">🔬</span>
-            <div>
-              <div class="font-semibold text-slate-800 dark:text-slate-200">
-                {{ researchQueue ? `${researchQueue.name} (Lv.${researchQueue.level || '?'})` : 'Research Queue' }}
-              </div>
-              <div class="text-[10px] text-slate-400">
-                {{ researchQueue ? 'In progress · Click to manage' : 'Idle · Click to view research' }}
-              </div>
-            </div>
-          </div>
-          <span
-            class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold"
-            :class="researchQueue ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'"
-          >
-            {{ researchQueue ? researchQueue.timerText : 'Idle' }}
-          </span>
-        </div>
+        </button>
       </div>
     </div>
 
-    <!-- Active Marches -->
     <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-3 space-y-2 shadow-2xs">
       <div class="flex items-center justify-between">
         <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
           <span>🚩</span> Active Marches
         </h4>
-        <span class="text-[10px] text-slate-400 tabular-nums">{{ marches.length }} deploying</span>
+        <span class="text-[10px] text-slate-400 tabular-nums">{{ marches.length }} active</span>
       </div>
-
       <div v-if="marches.length === 0" class="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/40 text-center text-xs text-slate-400">
-        No active squad marches outside city
+        {{ marchesKnown ? 'No active squad marches outside city' : 'Waiting for game data' }}
       </div>
-
-      <div v-else class="space-y-1.5 max-h-32 overflow-y-auto pr-1">
-        <div
-          v-for="m in marches"
-          :key="m.id"
-          class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between text-xs"
-        >
-          <div class="flex items-center gap-2">
-            <span>⚔️</span>
-            <div>
-              <div class="font-semibold text-slate-800 dark:text-slate-200">{{ m.type }}</div>
-              <div class="text-[10px] text-slate-400 truncate max-w-40">{{ m.target }}</div>
+      <div v-else class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+        <BaseTooltip v-for="m in marches" :key="m.id" class="w-full" :text="formatMarchTooltip(m.march, now, cache)" position="bottom">
+          <button
+            type="button"
+            class="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between gap-2 text-left text-xs"
+            :class="{ 'cursor-pointer': m.category !== 'other' }"
+            @click="handleMarchClick(m.category)"
+          >
+            <div class="flex items-center gap-2 min-w-0">
+              <span>{{ m.icon }}</span>
+              <div class="min-w-0">
+                <div class="font-semibold text-slate-800 dark:text-slate-200">{{ m.title }} · {{ m.stage }}</div>
+                <div class="text-[10px] text-slate-400 truncate max-w-40">{{ m.target }}</div>
+              </div>
             </div>
-          </div>
-          <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-mono font-semibold text-[11px]">
-            {{ m.timerText }}
-          </span>
-        </div>
+            <span class="shrink-0 px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-mono font-semibold text-[11px]">{{ m.timerText }}</span>
+          </button>
+        </BaseTooltip>
       </div>
     </div>
   </div>

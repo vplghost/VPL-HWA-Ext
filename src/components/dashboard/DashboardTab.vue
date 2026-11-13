@@ -70,6 +70,19 @@ async function refreshAllDashboard() {
     { name: 'getHealing', feature: 'unit' },
     { name: 'inventoryGet' },
     { name: 'clan_getSummary' },
+    { name: 'getSummary', feature: 'building' },
+    { name: 'getSummary', feature: 'personalResearch' },
+    { name: 'getMarches', feature: 'march' },
+    { name: 'magicTower_briefInfo' },
+    { name: 'arenaGetAll' },
+    { name: 'userGetInfo' },
+    { name: 'refillableGetAll', feature: 'refillable' },
+    { name: 'clanBoss_getAll' },
+    { name: 'questGetAll' },
+    { name: 'getDailyQuests', feature: 'quest', args: {} },
+    { name: 'user_getNextDayTime' },
+    { name: 'dungeonGetInfo' },
+    { name: 'titanGetAll' },
   ]);
 }
 </script>

@@ -121,8 +121,8 @@ test('resource clock ticks while mounted and stops after unmount', (t) => {
 });
 
 test('dashboard uses canonical quest cache and brief-only completed Tower state', () => {
-  assert.equal(towerActivityState({ magicTower_briefInfo: { data: { state: 'win' } } }).state, 'done');
-  assert.equal(towerActivityState({ magicTower_briefInfo: { state: 'win' } }).detail, 'Cleared today');
+  assert.equal(towerActivityState({ magicTower_briefInfo: { updatedAt: new Date().toISOString(), data: { state: 'win' } } }).state, 'done');
+  assert.equal(towerActivityState({ magicTower_briefInfo: { updatedAt: new Date().toISOString(), state: 'win' } }).detail, 'Cleared today');
   assert.equal(towerActivityState({}).state, 'unknown');
   assert.equal(readyQuestCount({ questGetAll: { data: [{ state: 2 }, { state: '2' }, { state: 3 }] } }), 2);
   assert.equal(readyQuestCount({ quest_getAll: { data: { 42: { state: 2 } } } }), 1);

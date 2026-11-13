@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { towerActivityState, readyQuestCount } from '@/src/composables/activityState';
+import { useNow } from '@/src/composables/useNow';
+import '@/src/utils/metadata';
+import { towerActivityState, arenaActivityState, dungeonActivityState, observedToday, readyQuestCount } from '@/src/composables/activityState';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 
 const { cache } = useRpcCache();
+const now = useNow();
 const { openModal } = useModals();
 
 interface ActivityRow {
@@ -21,7 +24,7 @@ const activities = computed<ActivityRow[]>(() => {
   const unknown = 'Waiting for game data';
 
   // Tower
-  const towerState = towerActivityState(cache.value);
+  const towerState = towerActivityState(cache.value, now.value);
   rows.push({
     id: 'tower',
     title: 'Tower',
@@ -30,57 +33,41 @@ const activities = computed<ActivityRow[]>(() => {
     isInteractive: true,
   });
 
-  // Arena
-  const arena = cache.value.arenaGetAll?.data;
-  const arenaBattles = cache.value['resource:refillable:6']?.data?.amount;
-  rows.push({
-    id: 'arena',
-    title: 'Arena',
-    icon: '⚔️',
-    state: typeof arenaBattles === 'number' && arenaBattles > 0 ? 'pending' : 'info',
-    detail: arena ? `Rank ${arena.arenaPlace ?? '—'} · ${arenaBattles ?? '—'} battles left today` : unknown,
-  });
+  // Arena counters are independent; missing or stale counters are unknown.
+  rows.push({ id: 'arena', title: 'Arena', icon: '⚔️',
+    ...arenaActivityState(cache.value, false, now.value) });
+  rows.push({ id: 'grand-arena', title: 'Grand Arena', icon: '🛡️',
+    ...arenaActivityState(cache.value, true, now.value) });
 
-  // Grand Arena
-  const grandBattles = cache.value['resource:refillable:21']?.data?.amount;
-  rows.push({
-    id: 'grand-arena',
-    title: 'Grand Arena',
-    icon: '🛡️',
-    state: typeof grandBattles === 'number' && grandBattles > 0 ? 'pending' : 'info',
-    detail: arena ? `Rank ${arena.grandPlace ?? '—'} · ${grandBattles ?? '—'} battles left today` : unknown,
-  });
-
-  // Guild Dungeon
-  const dungeon = cache.value.dungeonStatus?.data;
-  rows.push({
-    id: 'dungeon',
-    title: 'Guild Dungeon',
-    icon: '🏰',
-    state: dungeon ? 'pending' : 'unknown',
-    detail: !dungeon ? unknown : `${Number(dungeon.dungeonActivity) || 0} activity points · Floor ${dungeon.floorNumber ?? '—'}`,
-    isInteractive: true,
-  });
+  rows.push({ id: 'dungeon', title: 'Guild Dungeon', icon: '🏰',
+    ...dungeonActivityState(cache.value, now.value), isInteractive: true });
 
   // Hydra
-  const hydra = cache.value.clanBoss_getAll?.data;
-  const tries = hydra ? (Number(hydra.tries) || 0) + (Number(hydra.superTries) || 0) : 0;
+  const hydraEntry = cache.value.clanBoss_getAll;
+  const hydra = observedToday(hydraEntry, now.value, cache.value.questResetStatus?.data?.nextDayAt) ? hydraEntry.data : null;
+  const knownTries = hydra && Number.isInteger(hydra.tries) && hydra.tries >= 0 &&
+    Number.isInteger(hydra.superTries) && hydra.superTries >= 0;
+  const tries = knownTries ? hydra.tries + hydra.superTries : null;
   rows.push({
     id: 'hydra',
     title: 'Hydra',
     icon: '🐉',
-    state: !hydra ? 'unknown' : tries > 0 ? 'pending' : 'info',
-    detail: !hydra ? unknown : `${hydra.tries ?? 0} regular · ${hydra.superTries ?? 0} super tries left`,
+    state: tries === null ? 'unknown' : tries > 0 ? 'pending' : 'done',
+    detail: !knownTries ? unknown : `${hydra.tries ?? 0} regular · ${hydra.superTries ?? 0} super tries left`,
   });
 
   // Daily Quests
-  const pendingQuests = readyQuestCount(cache.value);
+  const questEntry = cache.value.questGetAll ?? cache.value.quest_getAll;
+  const questsKnown = observedToday(questEntry, now.value, cache.value.questResetStatus?.data?.nextDayAt);
+  const pendingQuests = questsKnown ? readyQuestCount(cache.value) : 0;
+  const dailies = (globalThis as any).hwaHelperQuestData?.dailyQuests(cache.value, now.value);
+  const remainingDailies = dailies?.filter((quest: any) => quest.state === 'inProgress').length;
   rows.push({
     id: 'quests',
     title: 'Daily Quests',
     icon: '📜',
-    state: pendingQuests > 0 ? 'pending' : 'info',
-    detail: `${pendingQuests} quest rewards ready to claim`,
+    state: pendingQuests > 0 || remainingDailies > 0 ? 'pending' : questsKnown ? 'info' : 'unknown',
+    detail: !questsKnown && !dailies ? unknown : `${remainingDailies != null ? `${remainingDailies} daily quests remaining · ` : ''}${questsKnown ? pendingQuests : '—'} quest rewards ready to claim`,
     isInteractive: true,
   });
 
