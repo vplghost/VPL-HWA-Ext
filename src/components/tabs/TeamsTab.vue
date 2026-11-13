@@ -158,7 +158,7 @@ function openEditTeam(team: CustomTeam) {
 
 function cloneServerTeamToCustom(st: { label: string; heroIds: number[] }) {
   editingTeamId.value = null;
-  formName.value = `${st.label} Lineup`;
+  formName.value = `${st.label} Team`;
   formMaxTroops.value = '';
   selectedHeroIds.value = st.heroIds.slice(0, 5);
   heroSearch.value = '';
@@ -286,7 +286,7 @@ function getTeamPower(memberIds: number[]): number {
           <span>Teams Management</span>
         </h2>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Server-saved battle lineups and custom presets for Raids, Monsters, and Gathering.
+          Server-saved battle teams and custom presets for Raids, Monsters, and Gathering.
         </p>
       </div>
 
@@ -362,7 +362,7 @@ function getTeamPower(memberIds: number[]): number {
       <div>
         <div class="flex items-center justify-between text-xs mb-1.5">
           <span class="font-medium text-slate-700 dark:text-slate-300">
-            Selected Lineup: <span class="font-bold text-blue-600 dark:text-blue-400">{{ selectedHeroIds.length }}/5</span>
+            Selected Team: <span class="font-bold text-blue-600 dark:text-blue-400">{{ selectedHeroIds.length }}/5</span>
           </span>
           <span v-if="selectedHeroIds.length > 0" class="text-slate-500 font-mono text-[11px]">
             Total Power: {{ formatNumber(getTeamPower(selectedHeroIds)) }}
@@ -507,12 +507,12 @@ function getTeamPower(memberIds: number[]): number {
       </div>
     </div>
 
-    <!-- SECTION 1: SERVER-SAVED LINEUPS -->
+    <!-- SECTION 1: SERVER-SAVED TEAMS -->
     <div id="server-teams-section" class="space-y-2.5">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
           <span>🏰</span>
-          <span>Server-Saved Lineups</span>
+          <span>Server-Saved Teams</span>
           <span class="text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">
             {{ serverTeams.length }}
           </span>
@@ -521,7 +521,7 @@ function getTeamPower(memberIds: number[]): number {
       </div>
 
       <div v-if="serverTeams.length === 0" class="p-6 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-        No server-saved teams loaded yet. Click "Refresh" or launch the game to synchronize lineups.
+        No server-saved teams loaded yet. Click "Refresh" or launch the game to synchronize teams.
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
@@ -603,7 +603,7 @@ function getTeamPower(memberIds: number[]): number {
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
           <span>⚙️</span>
-          <span>Custom Preset Lineups</span>
+          <span>Custom Preset Teams</span>
           <span class="text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">
             {{ customTeams.length }}
           </span>

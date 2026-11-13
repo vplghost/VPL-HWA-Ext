@@ -192,7 +192,7 @@
         ? null
         : (heroes.length === 0
           ? 'No alive titans remaining in pool for this element.'
-          : `Lineup has fallen titan(s): ${lineupInfo.deadTitans.join(', ')}`)
+          : `Team has fallen titan(s): ${lineupInfo.deadTitans.join(', ')}`)
     };
   }
 
@@ -215,7 +215,7 @@
         chosen: null,
         canAttack: false,
         reason: options.requireIntactLineup
-          ? 'All available doors require lineups with casualties. Halting dungeon automation.'
+          ? 'All available doors require teams with casualties. Halting dungeon automation.'
           : 'All available doors have no viable alive titans remaining.',
         evaluations
       };
@@ -234,7 +234,7 @@
 
     const best = viable[0];
     const statusNote = best.deadCount === 0
-      ? 'intact lineup'
+      ? 'intact team'
       : `${best.deadCount} fallen titan(s) in pool, ${best.heroes.length} alive deployed`;
     return {
       chosen: best,

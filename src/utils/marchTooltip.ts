@@ -273,7 +273,7 @@ export function formatRaidQueueTooltip(queue: any): string {
     `Status: ${phase} · Rounds left: ${count}`,
   ];
   if (heroNames.length > 0) {
-    lines.push(`Lineup (${heroNames.length}/5): ${heroNames.join(', ')}`);
+    lines.push(`Team (${heroNames.length}/5): ${heroNames.join(', ')}`);
   }
   lines.push('(Click to view Raid dialog)');
   return lines.join('\n');
@@ -292,7 +292,7 @@ export function formatMonsterQueueTooltip(queue: any): string {
     `Status: ${phase} · Target level: ${lvl}`,
   ];
   if (heroNames.length > 0) {
-    lines.push(`Lineup (${heroNames.length}/5): ${heroNames.join(', ')}`);
+    lines.push(`Team (${heroNames.length}/5): ${heroNames.join(', ')}`);
   }
   lines.push('(Click to view Monster dialog)');
   return lines.join('\n');

@@ -198,12 +198,12 @@ test('Legend Draft UI renders 5 steps, 3 candidate cards per step, and lock butt
   sampleCache.legendDraftStatus.data.defenceHeroes = [78, 76, 25, 37, 69];
   sampleCache.legendDraftStatus.data.lastPickAction = 'saveDefence';
   context.renderDraft(sampleCache);
-  assert.match(statusEl.textContent, /Defense lineup locked/);
-  assert.match(viewEl.textContent, /Lineup successfully locked/);
+  assert.match(statusEl.textContent, /Defense team locked/);
+  assert.match(viewEl.textContent, /Team successfully locked/);
   assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
 });
 
-test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => {
+test('Legend Draft UI renders enemy team when in Attack Stage 4', async () => {
   const viewEl = new MockElement('div');
   const statusEl = new MockElement('div');
   const searchEl = new MockElement('input');
@@ -232,7 +232,7 @@ test('Legend Draft UI renders enemy lineup when in Attack Stage 4', async () => 
 
   context.renderDraft(attackCache);
 
-  assert.match(viewEl.textContent, /Opponent Defense Lineup/);
+  assert.match(viewEl.textContent, /Opponent Defense Team/);
   assert.match(viewEl.textContent, /Cleaver/);
   assert.match(viewEl.textContent, /Attack Draft/);
   // When candidates cannot be auto-probed, 15-hero planner is replaced by error notice
@@ -311,11 +311,11 @@ test('Legend Draft UI supports defense/attack review and hides pick slots after 
   attackBtn.dispatchEvent('click');
   context.renderDraft(completedCache);
 
-  // Verify view switched to attack lineup
-  assert.match(viewEl.textContent, /Your Attack Lineup/);
+  // Verify view switched to attack team
+  assert.match(viewEl.textContent, /Your Attack Team/);
   assert.match(viewEl.textContent, /Qing Mao/);
   assert.match(viewEl.textContent, /Drayne/);
-  assert.match(viewEl.textContent, /Opponent Defense Lineup/);
+  assert.match(viewEl.textContent, /Opponent Defense Team/);
   // Pick slots matrix must still be omitted
   assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
 });
@@ -389,8 +389,8 @@ test('Legend Draft UI does NOT lock defense at match start and shows step picker
   context.renderDraft(freshDraftCache);
 
   // Defense MUST NOT be locked at the start of stage 2
-  assert.doesNotMatch(viewEl.textContent, /Defense Lineup locked!/);
-  assert.doesNotMatch(statusEl.textContent, /Defense lineup locked/);
+  assert.doesNotMatch(viewEl.textContent, /Defense Team locked!/);
+  assert.doesNotMatch(statusEl.textContent, /Defense team locked/);
 
   // 15 Candidate Heroes Matrix MUST NOT be rendered; warning and step picker are shown
   assert.doesNotMatch(viewEl.textContent, /Manual Candidate Planner/);
@@ -563,8 +563,8 @@ test('Legend Draft hero picking retains all 5 picks without wipe-out, auto-switc
 
   // Crucial check: all 5 picks must be retained and NOT wiped out on re-render
   assert.match(statusEl.textContent, /Selected 5\/5 steps/);
-  assert.match(viewEl.textContent, /Lock Defense Lineup \(5 Heroes\)/);
-  assert.match(viewEl.textContent, /Lock & Submit Defense Lineup \(5\/5 Heroes\)/);
+  assert.match(viewEl.textContent, /Lock Defense Team \(5 Heroes\)/);
+  assert.match(viewEl.textContent, /Lock & Submit Defense Team \(5\/5 Heroes\)/);
 
   // Now simulate server advancing to Attack stage (stageId = 4)
   activeDraftCache.legendDraftStatus.data.stageId = 4;
@@ -573,8 +573,8 @@ test('Legend Draft hero picking retains all 5 picks without wipe-out, auto-switc
   context.renderDraft(activeDraftCache);
 
   // View mode must have automatically switched to Attack Draft!
-  assert.match(viewEl.textContent, /Your Attack Lineup/);
-  assert.match(viewEl.textContent, /Opponent Defense Lineup/);
+  assert.match(viewEl.textContent, /Your Attack Team/);
+  assert.match(viewEl.textContent, /Opponent Defense Team/);
   assert.match(statusEl.textContent, /Attack Draft/);
 });
 
@@ -599,9 +599,9 @@ test('Legend Draft displays server rejection error banner and keeps slots editab
   };
 
   context.renderDraft(errorCache);
-  assert.match(viewEl.textContent, /Server rejected lineup: "Invalid heroes list"/);
+  assert.match(viewEl.textContent, /Server rejected team: "Invalid heroes list"/);
   assert.match(viewEl.textContent, /Error code: 5/);
-  assert.doesNotMatch(viewEl.textContent, /Lineup successfully locked/);
+  assert.doesNotMatch(viewEl.textContent, /Team successfully locked/);
   assert.match(viewEl.textContent, /Step 1/);
 });
 
@@ -675,11 +675,11 @@ test('DraftModal tracks match status, live timer, opponent profile, and match re
   assert.match(code, /userDifRating/, 'Must track userDifRating delta');
   assert.match(code, /draftBpExp/, 'Must track draftBpExp reward');
 
-  // Defense & Attack Lineup Switcher
+  // Defense & Attack Team Switcher
   assert.match(code, /id="draft-tab-defense"/, 'Must have #draft-tab-defense button');
   assert.match(code, /id="draft-tab-attack"/, 'Must have #draft-tab-attack button');
 
-  // Lineup tracking
+  // Team tracking
   assert.match(code, /defenceHeroes/, 'Must track defenceHeroes from RPC');
   assert.match(code, /attackHeroes/, 'Must track attackHeroes from RPC');
   assert.match(code, /enemyDefenceHeroes/, 'Must track enemyDefenceHeroes counter');

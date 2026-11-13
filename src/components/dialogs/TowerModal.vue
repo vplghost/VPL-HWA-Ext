@@ -350,7 +350,7 @@ watch(() => props.modelValue, (open) => {
         </div>
       </div>
 
-      <!-- Tower Team Lineup (5 Hero Selectors) -->
+      <!-- Tower Team (5 Hero Selectors) -->
       <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs">
         <div class="flex items-center justify-between gap-2 flex-wrap">
           <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">

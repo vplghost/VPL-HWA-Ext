@@ -550,7 +550,7 @@ test('TeamsTab supports hero and titan avatars, star glow, hover cards, and mixe
   assert.match(teamsTab, /<HeroHoverCard[\s\S]*?v-else/, 'TeamsTab must render HeroHoverCard for heroes');
 });
 
-test('RaidModal and MonsterModal support team selection, lineup previews, troop capacity and allocation', async () => {
+test('RaidModal and MonsterModal support team selection, team previews, troop capacity and allocation', async () => {
   const raidModal = await readFile(join(root, 'src/components/dialogs/RaidModal.vue'), 'utf8');
   const monsterModal = await readFile(join(root, 'src/components/dialogs/MonsterModal.vue'), 'utf8');
   const squadComposable = await readFile(join(root, 'src/composables/useSquadTeams.ts'), 'utf8');
@@ -822,7 +822,7 @@ test('Header march tooltips provide comprehensive details on time, stage, heroes
   });
   assert.match(raidQTooltip, /Raid Queue Active \(Level 25 Boss\)/);
   assert.match(raidQTooltip, /Status: searching · Rounds left: 4/);
-  assert.match(raidQTooltip, /Lineup \(2\/5\):/);
+  assert.match(raidQTooltip, /Team \(2\/5\):/);
 
   const monsterQTooltip = formatMonsterQueueTooltip({
     phase: 'attacking',

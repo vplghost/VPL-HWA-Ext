@@ -254,7 +254,7 @@ async function dispatchSquadToMine(mine: any) {
   await ensureRpcEnabled();
   const team = selectedTeam.value;
   if (!team || team.heroIds.length !== 5) {
-    searchStatus.value = '⚠️ Please select a complete 5-hero lineup first.';
+    searchStatus.value = '⚠️ Please select a complete 5-hero team first.';
     return;
   }
 
@@ -331,11 +331,11 @@ async function recallMarch(march: any) {
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div class="space-y-4 text-xs">
-      <!-- Section 1: Lineup & Squad Parameters -->
+      <!-- Section 1: Team & Squad Parameters -->
       <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs">
         <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span>👥</span> Gathering Squad Lineup & Troop Capacity
+            <span>👥</span> Gathering Team & Troop Capacity
           </h3>
           <span v-if="selectedTeam" class="text-2xs font-mono text-slate-400">
             ID: {{ selectedTeam.id }}
@@ -344,7 +344,7 @@ async function recallMarch(march: any) {
 
         <div>
           <label for="gather-team-select" class="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Select Lineup
+            Select Team
           </label>
           <select
             id="gather-team-select"
@@ -358,7 +358,7 @@ async function recallMarch(march: any) {
           </select>
         </div>
 
-        <!-- Lineup Chips Preview -->
+        <!-- Team Chips Preview -->
         <div v-if="selectedTeam && selectedTeam.heroIds.length > 0" class="flex flex-wrap items-center gap-2">
           <span
             v-for="hid in selectedTeam.heroIds"
@@ -502,7 +502,7 @@ async function recallMarch(march: any) {
             </span>
           </template>
           <template v-else>
-            Auto-gathering is currently paused. Check the box above to automatically search and send teams.
+            Auto-gathering is currently paused. Check the box above to automatically search and dispatch squads.
           </template>
         </div>
       </section>

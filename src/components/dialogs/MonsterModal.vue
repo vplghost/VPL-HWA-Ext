@@ -278,7 +278,7 @@ async function startMonsterQueue(count = mobCount.value) {
   }
 
   if (heroIds.length !== 5) {
-    statusMessage.value = '⚠️ Select a complete 5-hero lineup first.';
+    statusMessage.value = '⚠️ Select a complete 5-hero team first.';
     return;
   }
 
@@ -434,7 +434,7 @@ async function stopMonsterQueue() {
           <!-- Team Selector -->
           <div>
             <label for="monster-team-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-              Select Lineup
+              Select Team
             </label>
             <select
               id="monster-team-select"
@@ -453,7 +453,7 @@ async function stopMonsterQueue() {
             </select>
           </div>
 
-          <!-- Selected Team Lineup Preview -->
+          <!-- Selected Team Preview -->
           <div v-if="selectedTeam && selectedTeam.heroIds.length > 0" class="space-y-1.5">
             <div class="text-xs font-medium text-slate-600 dark:text-slate-400">
               Active March Heroes ({{ selectedTeam.heroIds.length }}/5):
@@ -491,7 +491,7 @@ async function stopMonsterQueue() {
             </div>
           </div>
           <div v-else class="text-xs text-amber-600 dark:text-amber-400 font-medium">
-            ⚠️ No complete 5-hero squad selected. Please select or configure a lineup.
+            ⚠️ No complete 5-hero team selected. Please select or configure a team.
           </div>
 
           <!-- Troop Allocation Summary -->

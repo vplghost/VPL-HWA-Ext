@@ -69,7 +69,7 @@ test('Settings persists 600/950 defaults and serializes capacity changes without
   assert.equal(stored.troopCapacitySettings.base, 1000);
 });
 
-test('rally form persists chosen lineup and last searched level, updates troop allocation and restricts waits', async () => {
+test('rally form persists chosen team and last searched level, updates troop allocation and restricts waits', async () => {
   const heroes = Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, { level: 30, star: 2, power: id, troopCapacity: 500 + id }]));
   const stored = {}; const sent = [];
   const cache = { accountStatus: { data: { id: 10 } }, heroGetAll: { data: heroes },
@@ -350,9 +350,9 @@ test('Monster dialog searches by level, starts selected team attack and shows re
   assert.equal(sent.at(-1).options.count, 3);
   assert.equal(saved.saved, true);
 
-  // Lineup label includes hero names in parentheses
+  // Team label includes hero names in parentheses
   const labels = section().all('label');
-  assert.match(labels[0].textContent, /Lineup \(Hero 1 · Hero 2 · Hero 3 · Hero 4 · Hero 5\)/, 'Monster lineup label contains hero names');
+  assert.match(labels[0].textContent, /Team \(Hero 1 · Hero 2 · Hero 3 · Hero 4 · Hero 5\)/, 'Monster team label contains hero names');
 
   // When queue is running, Start queue is hidden and Stop queue is shown inline
   context.monsterQueueState = { phase: 'active', options: { count: 5 } };
@@ -632,10 +632,10 @@ test('Gathering dialog groups inputs into rows and displays title status', async
   context.render();
   assert.equal(gatherIcon.textContent, '⛏️', 'Idle gathering must set icon to ⛏️');
 
-  // Lineup label includes hero names in parentheses and Troops input is on the same row (teamRow)
+  // Team label includes hero names in parentheses and Troops input is on the same row (teamRow)
   const teamRowLabels = gather().children[1].all('label');
-  assert.equal(teamRowLabels.length, 2, 'teamRow must have exactly Lineup and Troops labels on same row');
-  assert.match(teamRowLabels[0].textContent, /Lineup \(/, 'Lineup label contains lineup parentheses');
+  assert.equal(teamRowLabels.length, 2, 'teamRow must have exactly Team and Troops labels on same row');
+  assert.match(teamRowLabels[0].textContent, /Team \(/, 'Team label contains team parentheses');
   assert.match(teamRowLabels[1].textContent, /Troops \(unit ID:count\)/, 'Troops label is on same row');
 });
 

@@ -315,7 +315,7 @@ async function startRaidQueue(count = raidCount.value) {
   }
 
   if (heroIds.length !== 5) {
-    statusMessage.value = '⚠️ Select a complete 5-hero lineup first.';
+    statusMessage.value = '⚠️ Select a complete 5-hero team first.';
     return;
   }
 
@@ -480,7 +480,7 @@ async function stopRaidQueue() {
           <!-- Team Selector -->
           <div>
             <label for="raid-team-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-              Select Lineup
+              Select Team
             </label>
             <select
               id="raid-team-select"
@@ -499,7 +499,7 @@ async function stopRaidQueue() {
             </select>
           </div>
 
-          <!-- Selected Team Lineup Preview -->
+          <!-- Selected Team Preview -->
           <div v-if="selectedTeam && selectedTeam.heroIds.length > 0" class="space-y-1.5">
             <div class="text-xs font-medium text-slate-600 dark:text-slate-400">
               Active March Heroes ({{ selectedTeam.heroIds.length }}/5):
@@ -537,7 +537,7 @@ async function stopRaidQueue() {
             </div>
           </div>
           <div v-else class="text-xs text-amber-600 dark:text-amber-400 font-medium">
-            ⚠️ No complete 5-hero squad selected. Please select or configure a lineup.
+            ⚠️ No complete 5-hero team selected. Please select or configure a team.
           </div>
 
           <!-- Troop Allocation Summary -->

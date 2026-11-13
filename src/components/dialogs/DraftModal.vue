@@ -283,7 +283,7 @@ function handleImgError(e: Event) {
                 </span>
               </div>
               <div class="text-[11px] text-slate-600 dark:text-slate-400">
-                Draft counter heroes, lock team lineups, and battle players in real-time draft matches.
+                Draft counter heroes, lock teams, and battle players in real-time draft matches.
               </div>
               <div v-if="countdownSeconds > 0" id="draft-countdown-row" class="flex items-center gap-2 pt-1 text-xs text-slate-500 dark:text-slate-400">
                 <span>Time remaining:</span>
@@ -434,18 +434,18 @@ function handleImgError(e: Event) {
             </div>
 
             <span class="text-xs text-slate-500 dark:text-slate-400 font-medium px-2">
-              {{ draftViewMode === 'attack' ? 'Viewing Attack Draft lineup & Opponent Defense counter' : 'Viewing Defense Draft lineup & Opponent Attack' }}
+              {{ draftViewMode === 'attack' ? 'Viewing Attack Draft team & Opponent Defense counter' : 'Viewing Defense Draft team & Opponent Attack' }}
             </span>
           </div>
 
-          <!-- Opponent Counter Lineup -->
+          <!-- Opponent Counter Team -->
           <div
             v-if="draftViewMode === 'attack' && enemyDefenceHeroes.length > 0"
             id="draft-enemy-counter-card"
             class="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2 dark:border-amber-900/40 dark:bg-amber-950/20"
           >
             <div class="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-              <span>🛡️ Opponent Defense Lineup (5 heroes to counter):</span>
+              <span>🛡️ Opponent Defense Team (5 heroes to counter):</span>
             </div>
             <div class="flex flex-wrap gap-2">
               <div
@@ -496,7 +496,7 @@ function handleImgError(e: Event) {
             class="rounded-xl border border-red-200 bg-red-50/50 p-3 space-y-2 dark:border-red-900/40 dark:bg-red-950/20"
           >
             <div class="text-xs font-bold text-red-900 dark:text-red-200 flex items-center gap-1.5">
-              <span>⚔️ Opponent Attack Lineup (5 heroes deployed against your defense):</span>
+              <span>⚔️ Opponent Attack Team (5 heroes deployed against your defense):</span>
             </div>
             <div class="flex flex-wrap gap-2">
               <div
@@ -526,12 +526,12 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
-          <!-- User Lineup Display (5 Slots) -->
+          <!-- User Team Display (5 Slots) -->
           <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
             <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700/60">
               <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                 <span>{{ draftViewMode === 'attack' ? '⚔️' : '🛡️' }}</span>
-                <span>{{ draftViewMode === 'attack' ? 'Your Attack Lineup' : 'Your Defense Lineup' }}</span>
+                <span>{{ draftViewMode === 'attack' ? 'Your Attack Team' : 'Your Defense Team' }}</span>
               </h3>
               <span class="text-[11px] text-slate-500 dark:text-slate-400">
                 {{ currentLineupHeroes.length === 5 ? '✓ 5/5 Heroes Locked' : (currentLineupHeroes.length > 0 ? `${currentLineupHeroes.length}/5 Heroes Selected` : 'No heroes recorded yet') }}

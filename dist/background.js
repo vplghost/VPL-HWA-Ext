@@ -910,7 +910,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
       const transition = controller.start(message.options, tab.id, accountId,
         Date.now(), stored.rpcCache || {}, globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
-      if (!transition) return { ok: false, error: 'Refresh troops and search for this boss before starting. Check the selected lineup and target.' };
+      if (!transition) return { ok: false, error: 'Refresh troops and search for this boss before starting. Check the selected team and target.' };
       const state = await saveRaidTransition(transition, stored);
       return { ok: state.phase !== 'stopped', queued: stored.socketRefreshMode !== 'direct', phase: state.phase, error: state.reason };
     });
@@ -946,7 +946,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const transition = controller.start(message.options, tab.id, accountId,
         Date.now(), stored.rpcCache || {},
         globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
-      if (!transition) return { ok: false, error: 'Refresh troops and search for this monster before starting. Check the lineup and target.' };
+      if (!transition) return { ok: false, error: 'Refresh troops and search for this monster before starting. Check the team and target.' };
       const state = await saveMonsterTransition(transition, stored);
       return { ok: state.phase !== 'stopped', queued: stored.socketRefreshMode !== 'direct', error: state.reason };
     });
@@ -1362,7 +1362,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (!['saveDefence', 'saveAttack'].includes(message.action) ||
                 !Array.isArray(message.heroes) || message.heroes.length !== 5 ||
                 message.heroes.some((id) => !Number.isInteger(id))) {
-              sendResponse({ ok: false, error: 'Invalid Draft lineup.' }); return;
+              sendResponse({ ok: false, error: 'Invalid Draft team.' }); return;
             }
             calls = [{ name: message.action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack',
               args: { heroes: message.heroes } }, { name: 'randomDraft_getInfo' }];

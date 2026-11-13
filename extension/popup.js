@@ -2362,7 +2362,7 @@ function renderDraft(cache, target = view) {
     rpcAlert.innerHTML = `
       <div class="flex items-center gap-2">
         <span class="text-base leading-none">⚠️</span>
-        <span>Popup RPC is currently disabled. Enable it to submit your Legend Draft lineup.</span>
+        <span>Popup RPC is currently disabled. Enable it to submit your Legend Draft team.</span>
       </div>
     `;
     const enableBtn = document.createElement('button');
@@ -2382,7 +2382,7 @@ function renderDraft(cache, target = view) {
     modeAlert.innerHTML = `
       <div class="flex items-center gap-2">
         <span class="text-base leading-none">⚡</span>
-        <span>Recommended: Switch to <strong>Direct RPC</strong> to submit your lineup immediately (avoids delays from native game queues).</span>
+        <span>Recommended: Switch to <strong>Direct RPC</strong> to submit your team immediately (avoids delays from native game queues).</span>
       </div>
     `;
     const switchDirectBtn = document.createElement('button');
@@ -2444,19 +2444,19 @@ function renderDraft(cache, target = view) {
   const switcherDesc = document.createElement('span');
   switcherDesc.className = 'text-xs text-slate-500 font-medium px-2';
   switcherDesc.textContent = isViewingAttack ?
-    'Viewing Attack Draft lineup & Opponent Defense counter' :
-    'Viewing Defense Draft lineup & Opponent Attack';
+    'Viewing Attack Draft team & Opponent Defense counter' :
+    'Viewing Defense Draft team & Opponent Attack';
   switcherCard.append(switcherDesc);
   container.append(switcherCard);
 
-  // 3. Counter Lineup Card
+  // 3. Counter Team Card
   if (isViewingAttack && draft.enemyDefenceHeroes?.length) {
     const enemyLineupCard = document.createElement('div');
     enemyLineupCard.className = 'rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2';
     
     const enemyTitle = document.createElement('div');
     enemyTitle.className = 'text-xs font-bold text-amber-900 flex items-center gap-1.5';
-    enemyTitle.innerHTML = `<span>🛡️ Opponent Defense Lineup (5 heroes to counter):</span>`;
+    enemyTitle.innerHTML = `<span>🛡️ Opponent Defense Team (5 heroes to counter):</span>`;
     enemyLineupCard.append(enemyTitle);
 
     const enemySlotRow = document.createElement('div');
@@ -2491,7 +2491,7 @@ function renderDraft(cache, target = view) {
     
     const enemyTitle = document.createElement('div');
     enemyTitle.className = 'text-xs font-bold text-red-900 flex items-center gap-1.5';
-    enemyTitle.innerHTML = `<span>⚔️ Opponent Attack Lineup (5 heroes deployed against your defense):</span>`;
+    enemyTitle.innerHTML = `<span>⚔️ Opponent Attack Team (5 heroes deployed against your defense):</span>`;
     enemyLineupCard.append(enemyTitle);
 
     const enemySlotRow = document.createElement('div');
@@ -2508,7 +2508,7 @@ function renderDraft(cache, target = view) {
     container.append(enemyLineupCard);
   }
 
-  // 4. Lineup Display / Step Picking Slots
+  // 4. Team Display / Step Picking Slots
   const teamSection = document.createElement('div');
   teamSection.className = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3';
   
@@ -2519,13 +2519,13 @@ function renderDraft(cache, target = view) {
   teamTitleCol.className = 'space-y-0.5';
   const teamTitle = document.createElement('h3');
   teamTitle.className = 'text-sm font-bold text-slate-800 flex items-center gap-1.5';
-  teamTitle.textContent = isViewingAttack ? '⚔️ Your Attack Lineup:' : '🛡️ Your Defense Lineup:';
+  teamTitle.textContent = isViewingAttack ? '⚔️ Your Attack Team:' : '🛡️ Your Defense Team:';
   teamTitleCol.append(teamTitle);
 
   const teamSub = document.createElement('div');
   teamSub.className = 'text-xs text-slate-500';
   if (isModeLocked) {
-    teamSub.textContent = `✓ Lineup locked (${val.count}/5 heroes)`;
+    teamSub.textContent = `✓ Team locked (${val.count}/5 heroes)`;
   } else if (isActivelyDrafting) {
     teamSub.textContent = val.valid ? '✓ Selected 5/5 heroes (5 steps completed)' :
       `Selected: ${val.count}/5 steps • Click any step to choose candidate`;
@@ -2547,7 +2547,7 @@ function renderDraft(cache, target = view) {
       'px-4 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-400 cursor-not-allowed border border-slate-200';
     lockBtn.disabled = !val.valid || !popupRpcEnabled;
     lockBtn.textContent = popupRpcEnabled ?
-      (isViewingAttack ? 'Lock Attack Lineup (5 Heroes)' : 'Lock Defense Lineup (5 Heroes)') :
+      (isViewingAttack ? 'Lock Attack Team (5 Heroes)' : 'Lock Defense Team (5 Heroes)') :
       'Enable popup RPC calls to submit';
     if (val.valid && popupRpcEnabled) {
       lockBtn.addEventListener('click', () => {
@@ -2557,7 +2557,7 @@ function renderDraft(cache, target = view) {
         chrome.runtime?.sendMessage?.({ kind: 'draft-action', action, heroes: val.heroes }, (response) => {
           if (!response?.ok) {
             lockBtn.disabled = false;
-            lockBtn.textContent = response?.error || 'Could not submit lineup';
+            lockBtn.textContent = response?.error || 'Could not submit team';
           } else if (response.queued) lockBtn.textContent = 'Queued for next game RPC...';
           else setTimeout(render, 500);
         });
@@ -2567,7 +2567,7 @@ function renderDraft(cache, target = view) {
   } else if (isModeLocked) {
     const lockedTag = document.createElement('span');
     lockedTag.className = 'px-3 py-1 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800 flex items-center gap-1';
-    lockedTag.textContent = '✓ Lineup successfully locked';
+    lockedTag.textContent = '✓ Team successfully locked';
     teamHeaderActions.append(lockedTag);
   }
   teamHeader.append(teamHeaderActions);
@@ -2689,7 +2689,7 @@ function renderDraft(cache, target = view) {
   }
   teamSection.append(slotsGrid);
 
-  // Step-by-step hero picker form when lineup is not locked
+  // Step-by-step hero picker form when team is not locked
   if (!isModeLocked) {
     if (draft.lastError && (draft.lastErrorAction === (isViewingAttack ? 'saveAttack' : 'saveDefence'))) {
       const errorAlert = document.createElement('div');
@@ -2697,9 +2697,9 @@ function renderDraft(cache, target = view) {
       errorAlert.innerHTML = `
         <span class="text-base leading-none">❌</span>
         <div class="space-y-0.5">
-          <div class="font-bold">Server rejected lineup: "${draft.lastError}"${draft.lastErrorCode ? ` (Error code: ${draft.lastErrorCode})` : ''}</div>
+          <div class="font-bold">Server rejected team: "${draft.lastError}"${draft.lastErrorCode ? ` (Error code: ${draft.lastErrorCode})` : ''}</div>
           <div class="text-[11px] text-red-800">
-            In Legend Draft, the server only accepts heroes offered in the 3 choices for each step (Step 1 → Step 5) shown on screen. The submitted lineup contains an invalid hero. Please consult the game screen to select the matching hero for each step.
+            In Legend Draft, the server only accepts heroes offered in the 3 choices for each step (Step 1 → Step 5) shown on screen. The submitted team contains an invalid hero. Please consult the game screen to select the matching hero for each step.
           </div>
         </div>
       `;
@@ -2730,7 +2730,7 @@ function renderDraft(cache, target = view) {
 
     const pickerTitle = document.createElement('div');
     pickerTitle.className = 'text-xs font-bold text-slate-800 flex items-center gap-1.5';
-    pickerTitle.innerHTML = `<span>🎯 Select Hero for <strong>Step ${activeDraftStep + 1}</strong>:</span> <span class="text-[11px] font-normal text-slate-500">(${isViewingAttack ? 'Attack Lineup' : 'Defense Lineup'})</span>`;
+    pickerTitle.innerHTML = `<span>🎯 Select Hero for <strong>Step ${activeDraftStep + 1}</strong>:</span> <span class="text-[11px] font-normal text-slate-500">(${isViewingAttack ? 'Attack Team' : 'Defense Team'})</span>`;
     pickerTop.append(pickerTitle);
 
     const stepPills = document.createElement('div');
@@ -3053,7 +3053,7 @@ function renderDraft(cache, target = view) {
         'px-4 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-400 cursor-not-allowed border border-slate-200';
       submitDirectBtn.disabled = !popupRpcEnabled;
       submitDirectBtn.textContent = popupRpcEnabled ?
-        `✓ Lock & Submit ${isViewingAttack ? 'Attack Lineup' : 'Defense Lineup'} (5/5 Heroes)` :
+        `✓ Lock & Submit ${isViewingAttack ? 'Attack Team' : 'Defense Team'} (5/5 Heroes)` :
         'Enable Popup RPC to Submit';
       if (popupRpcEnabled) {
         submitDirectBtn.addEventListener('click', () => {
@@ -3063,7 +3063,7 @@ function renderDraft(cache, target = view) {
           chrome.runtime?.sendMessage?.({ kind: 'draft-action', action, heroes: val.heroes }, (response) => {
             if (!response?.ok) {
               submitDirectBtn.disabled = false;
-              submitDirectBtn.textContent = response?.error || 'Could not submit lineup';
+              submitDirectBtn.textContent = response?.error || 'Could not submit team';
             } else if (response.queued) submitDirectBtn.textContent = 'Queued for next game RPC...';
             else setTimeout(render, 500);
           });
@@ -3084,7 +3084,7 @@ function renderDraft(cache, target = view) {
     lockedCard.className = 'rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 text-center space-y-1';
     lockedCard.innerHTML = `
       <div class="text-sm font-bold text-emerald-900 flex items-center justify-center gap-1.5">
-        <span>✓</span> <span>${isViewingAttack ? 'Attack' : 'Defense'} Lineup locked!</span>
+        <span>✓</span> <span>${isViewingAttack ? 'Attack' : 'Defense'} Team locked!</span>
       </div>
       <div class="text-xs text-emerald-700">The 5 heroes for this stage are locked.</div>
     `;
@@ -3094,7 +3094,7 @@ function renderDraft(cache, target = view) {
     idleCard.className = 'rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-center space-y-1.5';
     idleCard.innerHTML = `
       <div class="text-sm font-bold text-slate-800">Legend Draft: Not in match</div>
-      <div class="text-xs text-slate-500 max-w-md mx-auto">Start a Legend Draft match in Hero Wars to activate live assistance. You can also pick heroes for each step below to test draft lineups.</div>
+      <div class="text-xs text-slate-500 max-w-md mx-auto">Start a Legend Draft match in Hero Wars to activate live assistance. You can also pick heroes for each step below to test draft teams.</div>
     `;
     container.append(idleCard);
   }
@@ -3400,7 +3400,7 @@ function renderDraft(cache, target = view) {
   const stageDesc = globalThis.hwaHelperPopupData.draftStageDescription(stageId);
   const matchPrefix = draft.matchId ? `Match #${draft.matchId} • ` : '';
   const pickInfo = isActivelyDrafting ? ` • Selected ${val.count}/5 steps` :
-    (val.count === 5 ? ` • ${isViewingAttack ? 'Attack' : 'Defense'} lineup locked (5 heroes)` : '');
+    (val.count === 5 ? ` • ${isViewingAttack ? 'Attack' : 'Defense'} team locked (5 heroes)` : '');
   if (target === view) status.textContent = `${matchPrefix}${stageDesc}${pickInfo}`;
   return container;
 }
@@ -4096,7 +4096,7 @@ function renderDungeonCombatLogSection(data, container) {
       fallenBox.append(fallenTitansList);
       card.append(fallenBox);
 
-      // Deployed lineup
+      // Deployed team
       if (Array.isArray(b.deployed) && b.deployed.length > 0) {
         const teamBox = document.createElement('div');
         teamBox.className = 'flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-500 dark:text-slate-400';
@@ -7355,7 +7355,7 @@ function renderMonster(cache) {
     monsterSelection.teamId = teamSelect.value; saveMonsterPreferences(); render();
   });
   const lineupLabel = (team?.heroIds || []).map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed';
-  field(section, `Lineup (${lineupLabel})`, teamSelect);
+  field(section, `Team (${lineupLabel})`, teamSelect);
 
   const cap = data.capacityModel(team?.heroIds, heroes, cache.troopCapacityEvidence?.data,
     troopCapacitySettings, cache.accountStatus?.data?.id).total;
@@ -7572,7 +7572,7 @@ function renderExperimental(cache, raidOnly = false) {
     });
     const lineupLabel = teams.find((team) => team.id === experimentalSelection[key])?.heroIds
       .map((id) => globalThis.hwaHelperNameMap.hero(id) || `#${id}`).join(' · ') || 'No complete team observed';
-    field(section, `Lineup (${lineupLabel})`, select);
+    field(section, `Team (${lineupLabel})`, select);
     const selected = teams.find((team) => team.id === experimentalSelection[key]);
     return selected;
   };
@@ -7606,7 +7606,7 @@ function renderExperimental(cache, raidOnly = false) {
   troopHeader.className = 'flex items-center gap-2 text-xs leading-5 text-slate-600';
   const troopLabel = document.createElement('span');
   troopLabel.textContent = `Troops: ${optimized.reduce((sum, unit) => sum + unit.count, 0)} / ${rallyCapacity ?? 0}`;
-  troopLabel.title = rallyTeam?.maxTroops != null ? 'Custom maximum' : model.observed ? 'Observed lineup' : 'Estimated capacity';
+  troopLabel.title = rallyTeam?.maxTroops != null ? 'Custom maximum' : model.observed ? 'Observed team' : 'Estimated capacity';
   troopHeader.append(troopLabel); rally.append(troopHeader);
   const refreshTroops = button(troopHeader, '↻', () => chrome.runtime.sendMessage({ kind: 'refresh-rpc',
     calls: [{ name: 'heroGetAll' }, { name: 'getUnitSummary', feature: 'unit' }] }), !popupRpcEnabled);
@@ -7852,7 +7852,7 @@ function renderExperimental(cache, raidOnly = false) {
   }
   const gather = card('Gather troops');
 
-  // Row 1: Lineup & Troops
+  // Row 1: Team & Troops
   const teamRow = document.createElement('div');
   teamRow.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3 items-end';
   gather.append(teamRow);
@@ -7861,7 +7861,7 @@ function renderExperimental(cache, raidOnly = false) {
     ? `Troops (unit ID:count · max ${formatNumber(gatherTeam.maxTroops)})`
     : 'Troops (unit ID:count)';
   makeUnitsInput(teamRow, troopsLabel);
-  note(gather, 'The default lineup selects the five available heroes with the lowest recorded power.');
+  note(gather, 'The default team selects the five available heroes with the lowest recorded power.');
 
   // Row 2: Search Parameters (Resource + Level + Find button)
   const searchRow = document.createElement('div');
