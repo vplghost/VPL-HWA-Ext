@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UnitStars from '@/src/components/common/UnitStars.vue';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata } from '@/src/utils/metadata';
@@ -468,7 +469,7 @@ function handleImgError(e: Event) {
                 <div class="flex flex-col">
                   <span class="font-bold text-[11px] text-slate-800 dark:text-slate-200">{{ getHeroName(hId) }}</span>
                   <span v-if="getHeroStar('enemyDefence', hId)" class="text-[9px] font-bold text-amber-600 dark:text-amber-400">
-                    ★{{ getHeroStar('enemyDefence', hId) }}
+                    <UnitStars :count="getHeroStar('enemyDefence', hId)" compact="prefix" />
                   </span>
                 </div>
               </div>
@@ -519,7 +520,7 @@ function handleImgError(e: Event) {
                 <div class="flex flex-col">
                   <span class="font-bold text-[11px] text-slate-800 dark:text-slate-200">{{ getHeroName(hId) }}</span>
                   <span v-if="getHeroStar('enemyAttack', hId)" class="text-[9px] font-bold text-red-600 dark:text-red-400">
-                    ★{{ getHeroStar('enemyAttack', hId) }}
+                    <UnitStars :count="getHeroStar('enemyAttack', hId)" compact="prefix" />
                   </span>
                 </div>
               </div>
@@ -587,7 +588,7 @@ function handleImgError(e: Event) {
                       v-if="getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', (currentLineupHeroes[i - 1] ?? 0))"
                       class="text-[10px] font-bold text-amber-600 dark:text-amber-400"
                     >
-                      ★{{ getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', (currentLineupHeroes[i - 1] ?? 0)) }}
+                      <UnitStars :count="getHeroStar(draftViewMode === 'attack' ? 'attack' : 'defense', (currentLineupHeroes[i - 1] ?? 0))" compact="prefix" />
                     </div>
                   </div>
                 </template>

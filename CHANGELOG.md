@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.70 — 2026-11-14
+
+### Changed
+
+- Show one stylized Absolute star for six-star heroes and titans across roster cards/tables, hover cards, hero details, Draft and Dungeon enemy lineups, matching the legacy HTML icon.
+- Share unit-star rendering and accessible rating labels while preserving lower ratings and artifact/battle-result stars.
+
 ## 0.10.69 — 2026-11-14
 
 ### Changed

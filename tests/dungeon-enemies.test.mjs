@@ -8,6 +8,7 @@ import { parse, compile } from '@vue/compiler-dom';
 import { renderToString } from '@vue/server-renderer';
 import { normalizeArray } from '../src/utils/troops.ts';
 import { formatNumber } from '../src/utils/formatters.ts';
+import UnitStars from './helpers/unit-stars.mjs';
 
 const source = await readFile(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
 const script = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
@@ -30,7 +31,7 @@ function setup(data) {
     defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     onMounted() {}, onUnmounted() {}, watch() {} };
   vm.runInNewContext(js + '\nglobalThis.api = { doors, activeBattle, floorNumber, handleImgError };', context);
-  const html = () => renderToString(Vue.createSSRApp({ setup: () => ({ ...context.api, formatNumber }), render }));
+  const html = () => renderToString(Vue.createSSRApp({ components: { UnitStars }, setup: () => ({ ...context.api, formatNumber }), render }));
   return { cache, api: context.api, html };
 }
 
@@ -49,6 +50,14 @@ test('Dungeon renders captured door.team Titans with names, levels, stars, eleme
   assert.doesNotMatch(door1, /Hyperion/);
   assert.match(door2, /Hyperion/); assert.match(door2, /4★/);
   assert.doesNotMatch(door2, /Ignis|Verdoc/);
+});
+
+test('six-star enemy Titans use the shared Absolute icon instead of a numeric badge', async () => {
+  const runtime = setup({ currentFloorDoors: [{ team: [{ id: 4012, star: 6 }] }] });
+  const html = await runtime.html();
+  assert.match(html, /aria-label="6 stars \(Absolute\)"/);
+  assert.match(html, /justice-star/);
+  assert.doesNotMatch(html, /6★|★★★★★★/);
 });
 
 test('Dungeon roster handles object collections, missing metadata and legacy enemies without inventing stats', async () => {

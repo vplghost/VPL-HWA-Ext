@@ -229,7 +229,7 @@ test('HeroDetailModal has 1:1 parity with legacy HTML hero-dialog', async () => 
   assert.match(content, /btn-upgrade-skill/, 'Must have btn-upgrade-skill class');
   assert.match(content, /heroUpgradeSkill/, 'Must call heroUpgradeSkill RPC');
   assert.match(content, /Farm Equipment/, 'Must have Farm Equipment action');
-  assert.match(content, /justice-star/, 'Must support 6-star justice star');
+  assert.match(content, /<UnitStars :count="starCount"/, 'Must use shared unit stars with Absolute support');
   assert.match(content, /craft-fragment/, 'Must support fragment quick-crafting');
 });
 

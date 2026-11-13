@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UnitStars from '@/src/components/common/UnitStars.vue';
 import { ref, computed } from 'vue';
 import { useStoredFavorites } from '@/src/composables/useStoredFavorites';
 import { useRpcCache } from '@/src/composables/useRpcCache';
@@ -505,13 +506,7 @@ function exportHeroesJson() {
 
             <!-- Star -->
             <td class="px-3 py-2">
-              <span v-if="h.star >= 6" class="text-amber-400 font-bold flex items-center gap-0.5">
-                <span>★★★★★</span>
-                <span class="text-amber-300 font-black">★</span>
-              </span>
-              <span v-else class="text-amber-400 tracking-wider">
-                {{ '★'.repeat(h.star) }}
-              </span>
+              <UnitStars :count="h.star" />
             </td>
 
             <!-- Equipment Rank -->
@@ -628,8 +623,7 @@ function exportHeroesJson() {
         <!-- Power & Stars Footer -->
         <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-slate-800/80">
           <div class="flex items-center text-amber-400 text-[10px]">
-            <span v-if="h.star >= 6" class="font-bold">★★★★★★</span>
-            <span v-else>{{ '★'.repeat(h.star) }}</span>
+            <UnitStars :count="h.star" />
           </div>
           <div class="font-bold text-indigo-600 dark:text-indigo-400 tabular-nums text-[11px] font-mono">
             {{ formatNumber(h.power) }}

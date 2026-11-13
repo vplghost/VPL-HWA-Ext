@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UnitStars from '@/src/components/common/UnitStars.vue';
 import { computed } from 'vue';
 import { getTitanMetadata, getTitanSoulProgress, starGlowClass } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
@@ -140,19 +141,7 @@ const artifactsList = computed(() => {
 
         <!-- Stars Display -->
         <div class="flex items-center gap-1 text-xs">
-          <template v-if="starCount >= 6">
-            <span class="text-amber-400 font-bold flex items-center gap-0.5">
-              <span>★★★★★</span>
-              <span class="text-amber-300 font-black">★</span>
-              <span class="text-[10px] text-amber-200 ml-1 font-semibold">Absolute</span>
-            </span>
-          </template>
-          <template v-else-if="starCount >= 1">
-            <span class="text-amber-400 tracking-wider">
-              {{ '★'.repeat(starCount) }}
-            </span>
-          </template>
-          <span v-else class="text-slate-400">Stars: —</span>
+          <UnitStars :count="starCount" />
         </div>
 
         <!-- Power -->

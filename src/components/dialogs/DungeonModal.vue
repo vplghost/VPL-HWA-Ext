@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UnitStars from '@/src/components/common/UnitStars.vue';
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getTitanMetadata } from '@/src/utils/metadata';
@@ -481,9 +482,7 @@ function handleImgError(e: Event) {
                         <div class="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-500 dark:text-slate-400">
                           <span v-if="enemy.element">{{ enemy.element }}</span>
                           <span v-if="enemy.level != null">Lv. {{ enemy.level }}</span>
-                          <span v-if="enemy.star != null" class="text-amber-600 dark:text-amber-400" :aria-label="`${enemy.star} stars`">
-                            {{ enemy.star }}★
-                          </span>
+                          <UnitStars v-if="enemy.star != null" :count="enemy.star" compact="suffix" />
                           <span class="font-mono">#{{ enemy.id }}</span>
                         </div>
                       </div>

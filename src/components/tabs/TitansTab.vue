@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UnitStars from '@/src/components/common/UnitStars.vue';
 import { ref, computed } from 'vue';
 import { useStoredFavorites } from '@/src/composables/useStoredFavorites';
 import { useRpcCache } from '@/src/composables/useRpcCache';
@@ -506,7 +507,7 @@ function exportTitansJson() {
         <!-- Power & Stars Footer -->
         <div class="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100 dark:border-slate-800">
           <div class="flex items-center text-amber-400 text-[10px]">
-            <span v-for="s in t.star" :key="s">★</span>
+            <UnitStars :count="t.star" />
           </div>
           <div class="font-bold text-indigo-600 dark:text-indigo-400 tabular-nums text-[11px]">
             ⚡ {{ formatNumber(t.power) }}
@@ -699,7 +700,7 @@ function exportTitansJson() {
 
             <!-- Stars -->
             <td class="px-2.5 py-2 text-center text-amber-400 text-xs">
-              <span v-for="s in t.star" :key="s">★</span>
+              <UnitStars :count="t.star" />
             </td>
 
             <!-- Soul stones progress -->
