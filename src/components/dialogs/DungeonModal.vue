@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getTitanMetadata } from '@/src/utils/metadata';
+import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
 
 const props = defineProps<{
@@ -77,7 +78,22 @@ const casualtiesList = computed<any[]>(() => {
 });
 
 const doors = computed<any[]>(() => {
-  return Array.isArray(dungeonData.value.currentFloorDoors) ? dungeonData.value.currentFloorDoors : [];
+  return normalizeArray(dungeonData.value.currentFloorDoors).filter((door: any) => door && typeof door === 'object')
+    .map((door: any) => ({
+      ...door,
+      enemies: normalizeArray(door.team ?? door.enemies).map((unit: any) => {
+        const rawId = unit && typeof unit === 'object' ? unit.id : unit;
+        const id = typeof rawId === 'number' || typeof rawId === 'string' ? Number(rawId) : NaN;
+        if (!Number.isInteger(id) || id <= 0) return null;
+        const meta = getTitanMetadata(id);
+        const level = unit?.level != null && Number.isInteger(Number(unit.level)) && Number(unit.level) >= 0
+          ? Number(unit.level) : null;
+        const star = unit?.star != null && Number.isInteger(Number(unit.star)) && Number(unit.star) >= 0
+          ? Number(unit.star) : null;
+        return { id, name: meta?.name || `Titan ${id}`, element: meta?.element || '',
+          avatar: meta?.hasAvatar ? meta.avatarFile || `assets/titans/${id}.png` : null, level, star };
+      }).filter(Boolean),
+    }));
 });
 
 const titanEntries = computed(() => {
@@ -443,14 +459,37 @@ function handleImgError(e: Event) {
                   </span>
                 </div>
 
-                <div v-if="door.enemies && door.enemies.length" class="flex flex-wrap items-center gap-1">
-                  <span
-                    v-for="(en, eIdx) in door.enemies"
-                    :key="eIdx"
-                    class="rounded bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[10px] border border-slate-200 dark:border-slate-700"
-                  >
-                    {{ getTitanName(en.id || en) }}
-                  </span>
+                <div class="space-y-2">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Enemy Titans
+                  </div>
+                  <ul v-if="door.enemies.length" class="space-y-1.5" :aria-label="`Door ${Number(idx) + 1} enemy Titans`">
+                    <li
+                      v-for="(enemy, eIdx) in door.enemies"
+                      :key="`${enemy.id}:${eIdx}`"
+                      class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900/60"
+                    >
+                      <img
+                        v-if="enemy.avatar"
+                        :src="enemy.avatar"
+                        alt=""
+                        class="size-8 shrink-0 rounded-full object-cover"
+                        @error="handleImgError"
+                      />
+                      <div class="min-w-0 flex-1">
+                        <div class="text-xs font-semibold text-slate-800 dark:text-slate-100">{{ enemy.name }}</div>
+                        <div class="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-500 dark:text-slate-400">
+                          <span v-if="enemy.element">{{ enemy.element }}</span>
+                          <span v-if="enemy.level != null">Lv. {{ enemy.level }}</span>
+                          <span v-if="enemy.star != null" class="text-amber-600 dark:text-amber-400" :aria-label="`${enemy.star} stars`">
+                            {{ enemy.star }}★
+                          </span>
+                          <span class="font-mono">#{{ enemy.id }}</span>
+                        </div>
+                      </div>
+                    </li>
+                  </ul>
+                  <p v-else class="text-[11px] text-slate-400 dark:text-slate-500">Enemy Titan data unavailable.</p>
                 </div>
               </div>
             </div>

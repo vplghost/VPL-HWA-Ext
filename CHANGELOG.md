@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.64 — 2026-11-14
+
+### Fixed
+
+- Display enemy Titans from each current-floor Dungeon door's actual team data, with names, portraits, elements, levels and stars.
+- Keep each door's roster separate and provide clear fallbacks when enemy data or metadata is unavailable.
+
 ## 0.10.63 — 2026-11-13
 
 ### Fixed
