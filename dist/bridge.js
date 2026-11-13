@@ -1,3 +1,34 @@
+let bridgeContextInvalidated = false;
+const bridgeTimers = new Set();
+
+function bridgeTimeout(callback, delay) {
+  if (bridgeContextInvalidated) return;
+  const id = setTimeout(() => {
+    bridgeTimers.delete(id);
+    if (!bridgeContextInvalidated) callback();
+  }, delay);
+  bridgeTimers.add(id);
+  return id;
+}
+
+function clearBridgeTimeout(id) {
+  clearTimeout(id);
+  bridgeTimers.delete(id);
+}
+
+// Chrome can throw before returning a Promise when the extension was reloaded.
+function sendBridgeMessage(message) {
+  if (bridgeContextInvalidated) return Promise.resolve();
+  try {
+    return Promise.resolve(chrome.runtime.sendMessage(message)).catch(error => {
+      handleContextInvalidated(error, false);
+    });
+  } catch (error) {
+    handleContextInvalidated(error, false);
+    return Promise.resolve();
+  }
+}
+
 let currentSettings = null;
 let popupRpcEnabled = false;
 let socketRefreshMode = 'piggyback';
@@ -17,6 +48,7 @@ function sendControl() {
 }
 
 window.addEventListener('message', (event) => {
+  if (bridgeContextInvalidated) return;
   if (event.source !== window || event.origin !== location.origin) return;
   if (event.data?.source !== 'hwa-helper-api') return;
   if (event.data.kind === 'ready') return sendControl();
@@ -119,7 +151,7 @@ window.addEventListener('message', (event) => {
   try {
     const p = chrome.runtime?.sendMessage?.({ kind: 'api-record', record: event.data.record });
     if (p && typeof p.then === 'function') {
-      p.then(() => syncRecordingState()).catch(() => {});
+      p.then(() => syncRecordingState()).catch(error => handleContextInvalidated(error, false));
     }
   } catch {
     // Extension context was invalidated; ignore safely
@@ -187,7 +219,7 @@ try {
       const gv = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_game_version') : null) ||
         (typeof window !== 'undefined' ? window.hwaHelperGameVersion : null);
       if (gv) {
-        chrome.storage.local.set({ cachedGameVersion: String(gv) }).catch(() => {});
+        chrome.storage.local.set({ cachedGameVersion: String(gv) }).catch(error => handleContextInvalidated(error, false));
       }
     } catch (_) {}
   })?.catch?.(() => {
@@ -201,6 +233,7 @@ try {
 
 try {
   chrome.storage?.onChanged?.addListener?.((changes, area) => {
+    if (bridgeContextInvalidated) return;
     if (area === 'local' && 'gameRecordingActive' in changes) {
       recordingStateObserved = true;
       const nextActive = changes.gameRecordingActive.newValue === true;
@@ -218,26 +251,26 @@ try {
     if ('buildingQueue' in changes) scheduleBuildingWake(changes.buildingQueue.newValue);
     if ('researchQueue' in changes) scheduleResearchWake(changes.researchQueue.newValue);
     if (('captureSettings' in changes || 'popupRpcEnabled' in changes) && typeof raidWakeTimer !== 'undefined') {
-      chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'buildingQueue', 'researchQueue']).then((stored) => {
+      Promise.resolve().then(() => chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'buildingQueue', 'researchQueue'])).then((stored) => {
         if (stored.raidQueue && !['stopped', 'complete'].includes(stored.raidQueue.phase)) {
-          chrome.runtime.sendMessage({ kind: 'raid-queue-tick' }).catch(() => {});
+          sendBridgeMessage({ kind: 'raid-queue-tick' }).catch(error => handleContextInvalidated(error, false));
         }
         if (stored.monsterQueue && !['stopped', 'complete'].includes(stored.monsterQueue.phase)) {
-          chrome.runtime.sendMessage({ kind: 'monster-queue-tick' }).catch(() => {});
+          sendBridgeMessage({ kind: 'monster-queue-tick' }).catch(error => handleContextInvalidated(error, false));
         }
         if (stored.towerRun && !['stopped', 'complete'].includes(stored.towerRun.phase)) {
-          chrome.runtime.sendMessage({ kind: 'tower-run-tick' }).catch(() => {});
+          sendBridgeMessage({ kind: 'tower-run-tick' }).catch(error => handleContextInvalidated(error, false));
         }
         if (stored.dungeonRun && !['stopped', 'complete'].includes(stored.dungeonRun.phase)) {
-          chrome.runtime.sendMessage({ kind: 'dungeon-run-tick' }).catch(() => {});
+          sendBridgeMessage({ kind: 'dungeon-run-tick' }).catch(error => handleContextInvalidated(error, false));
         }
         if (stored.buildingQueue && stored.buildingQueue.enabled !== false && Number.isFinite(stored.buildingQueue.wakeAt)) {
-          chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).catch(() => {});
+          sendBridgeMessage({ kind: 'building-queue-tick' }).catch(error => handleContextInvalidated(error, false));
         }
         if (stored.researchQueue && stored.researchQueue.enabled !== false && Number.isFinite(stored.researchQueue.wakeAt)) {
-          chrome.runtime.sendMessage({ kind: 'research-queue-tick' }).catch(() => {});
+          sendBridgeMessage({ kind: 'research-queue-tick' }).catch(error => handleContextInvalidated(error, false));
         }
-      }).catch(() => {});
+      }).catch(error => handleContextInvalidated(error, false));
     }
     if ('captureSettings' in changes) currentSettings = changes.captureSettings.newValue || {};
     if ('popupRpcEnabled' in changes) popupRpcEnabled = changes.popupRpcEnabled.newValue === true;
@@ -250,6 +283,7 @@ try {
 } catch {}
 
 chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
+  if (bridgeContextInvalidated) return;
   if (message?.kind === 'drop-rpc-group') {
     window.postMessage({ source: 'hwa-helper-control', kind: message.kind, group: message.group }, location.origin);
     sendResponse?.({ ok: true });
@@ -314,10 +348,10 @@ let raidEnergyTimer;
 const raidEnergySession = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 function scheduleRaidEnergy(enabled) {
   if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') return;
-  clearTimeout(raidEnergyTimer);
+  clearBridgeTimeout(raidEnergyTimer);
   if (!enabled) return;
-  chrome.runtime.sendMessage({ kind: 'raid-energy-tick', sessionId: raidEnergySession }).catch(() => {});
-  raidEnergyTimer = setTimeout(() => scheduleRaidEnergy(true), 30000);
+  sendBridgeMessage({ kind: 'raid-energy-tick', sessionId: raidEnergySession }).catch(error => handleContextInvalidated(error, false));
+  raidEnergyTimer = bridgeTimeout(() => scheduleRaidEnergy(true), 30000);
 }
 try {
   chrome.storage?.local?.get?.('raidEnergyAuto')?.then?.(stored => scheduleRaidEnergy(stored.raidEnergyAuto?.enabled === true)).catch?.(() => {});
@@ -325,12 +359,12 @@ try {
 let raidWakeTimer;
 function scheduleRaidWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
-  clearTimeout(raidWakeTimer);
+  clearBridgeTimeout(raidWakeTimer);
   if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
-  raidWakeTimer = setTimeout(() => {
-    chrome.runtime.sendMessage({ kind: 'raid-queue-tick' }).then((response) => {
+  raidWakeTimer = bridgeTimeout(() => {
+    sendBridgeMessage({ kind: 'raid-queue-tick' }).then((response) => {
       if (response?.watch) return chrome.storage.local.get('raidQueue').then((stored) => scheduleRaidWake(stored.raidQueue));
-    }).catch(() => {});
+    }).catch(error => handleContextInvalidated(error, false));
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('raidQueue')?.then?.((stored) => scheduleRaidWake(stored.raidQueue))?.catch?.(() => {}); } catch {}
@@ -338,12 +372,12 @@ try { chrome.storage?.local?.get?.('raidQueue')?.then?.((stored) => scheduleRaid
 let monsterWakeTimer;
 function scheduleMonsterWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
-  clearTimeout(monsterWakeTimer);
+  clearBridgeTimeout(monsterWakeTimer);
   if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
-  monsterWakeTimer = setTimeout(() => {
-    chrome.runtime.sendMessage({ kind: 'monster-queue-tick' }).then((response) => {
+  monsterWakeTimer = bridgeTimeout(() => {
+    sendBridgeMessage({ kind: 'monster-queue-tick' }).then((response) => {
       if (response?.watch) return chrome.storage.local.get('monsterQueue').then((stored) => scheduleMonsterWake(stored.monsterQueue));
-    }).catch(() => {});
+    }).catch(error => handleContextInvalidated(error, false));
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('monsterQueue')?.then?.((stored) => scheduleMonsterWake(stored.monsterQueue))?.catch?.(() => {}); } catch {}
@@ -351,12 +385,12 @@ try { chrome.storage?.local?.get?.('monsterQueue')?.then?.((stored) => scheduleM
 let towerWakeTimer;
 function scheduleTowerWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
-  clearTimeout(towerWakeTimer);
+  clearBridgeTimeout(towerWakeTimer);
   if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
-  towerWakeTimer = setTimeout(() => {
-    chrome.runtime.sendMessage({ kind: 'tower-run-tick' }).then((response) => {
+  towerWakeTimer = bridgeTimeout(() => {
+    sendBridgeMessage({ kind: 'tower-run-tick' }).then((response) => {
       if (response?.watch) return chrome.storage.local.get('towerRun').then((stored) => scheduleTowerWake(stored.towerRun));
-    }).catch(() => {});
+    }).catch(error => handleContextInvalidated(error, false));
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('towerRun')?.then?.((stored) => scheduleTowerWake(stored.towerRun))?.catch?.(() => {}); } catch {}
@@ -364,12 +398,12 @@ try { chrome.storage?.local?.get?.('towerRun')?.then?.((stored) => scheduleTower
 let dungeonWakeTimer;
 function scheduleDungeonWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
-  clearTimeout(dungeonWakeTimer);
+  clearBridgeTimeout(dungeonWakeTimer);
   if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
-  dungeonWakeTimer = setTimeout(() => {
-    chrome.runtime.sendMessage({ kind: 'dungeon-run-tick' }).then((response) => {
+  dungeonWakeTimer = bridgeTimeout(() => {
+    sendBridgeMessage({ kind: 'dungeon-run-tick' }).then((response) => {
       if (response?.watch) return chrome.storage.local.get('dungeonRun').then((stored) => scheduleDungeonWake(stored.dungeonRun));
-    }).catch(() => {});
+    }).catch(error => handleContextInvalidated(error, false));
   }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
 }
 try { chrome.storage?.local?.get?.('dungeonRun')?.then?.((stored) => scheduleDungeonWake(stored.dungeonRun))?.catch?.(() => {}); } catch {}
@@ -377,24 +411,24 @@ try { chrome.storage?.local?.get?.('dungeonRun')?.then?.((stored) => scheduleDun
 let buildingWakeTimer;
 function scheduleBuildingWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
-  clearTimeout(buildingWakeTimer);
+  clearBridgeTimeout(buildingWakeTimer);
   if (!state || state.enabled === false) return;
   const hasItems = Array.isArray(state.items) && state.items.length > 0;
   if (!Number.isFinite(state.wakeAt)) {
     if (hasItems) {
-      buildingWakeTimer = setTimeout(() => {
-        chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).then((response) => {
+      buildingWakeTimer = bridgeTimeout(() => {
+        sendBridgeMessage({ kind: 'building-queue-tick' }).then((response) => {
           if (response?.watch) return chrome.storage.local.get('buildingQueue').then((stored) => scheduleBuildingWake(stored.buildingQueue));
-        }).catch(() => {});
+        }).catch(error => handleContextInvalidated(error, false));
       }, 100);
     }
     return;
   }
   const delay = Math.max(100, Math.min(2147483647, state.wakeAt - Date.now()));
-  buildingWakeTimer = setTimeout(() => {
-    chrome.runtime.sendMessage({ kind: 'building-queue-tick' }).then((response) => {
+  buildingWakeTimer = bridgeTimeout(() => {
+    sendBridgeMessage({ kind: 'building-queue-tick' }).then((response) => {
       if (response?.watch) return chrome.storage.local.get('buildingQueue').then((stored) => scheduleBuildingWake(stored.buildingQueue));
-    }).catch(() => {});
+    }).catch(error => handleContextInvalidated(error, false));
   }, delay);
 }
 try { chrome.storage?.local?.get?.('buildingQueue')?.then?.((stored) => scheduleBuildingWake(stored.buildingQueue))?.catch?.(() => {}); } catch {}
@@ -402,30 +436,34 @@ try { chrome.storage?.local?.get?.('buildingQueue')?.then?.((stored) => schedule
 let researchWakeTimer;
 function scheduleResearchWake(state) {
   if (typeof clearTimeout !== 'function' || typeof setTimeout !== 'function') return;
-  clearTimeout(researchWakeTimer);
+  clearBridgeTimeout(researchWakeTimer);
   if (!state || state.enabled === false) return;
   const hasItems = Array.isArray(state.items) && state.items.length > 0;
   if (!Number.isFinite(state.wakeAt)) {
     if (hasItems) {
-      researchWakeTimer = setTimeout(() => {
-        chrome.runtime.sendMessage({ kind: 'research-queue-tick' }).then((response) => {
+      researchWakeTimer = bridgeTimeout(() => {
+        sendBridgeMessage({ kind: 'research-queue-tick' }).then((response) => {
           if (response?.watch) return chrome.storage.local.get('researchQueue').then((stored) => scheduleResearchWake(stored.researchQueue));
-        }).catch(() => {});
+        }).catch(error => handleContextInvalidated(error, false));
       }, 100);
     }
     return;
   }
   const delay = Math.max(100, Math.min(2147483647, state.wakeAt - Date.now()));
-  researchWakeTimer = setTimeout(() => {
-    chrome.runtime.sendMessage({ kind: 'research-queue-tick' }).then((response) => {
+  researchWakeTimer = bridgeTimeout(() => {
+    sendBridgeMessage({ kind: 'research-queue-tick' }).then((response) => {
       if (response?.watch) return chrome.storage.local.get('researchQueue').then((stored) => scheduleResearchWake(stored.researchQueue));
-    }).catch(() => {});
+    }).catch(error => handleContextInvalidated(error, false));
   }, delay);
 }
 try { chrome.storage?.local?.get?.('researchQueue')?.then?.((stored) => scheduleResearchWake(stored.researchQueue))?.catch?.(() => {}); } catch {}
 
-function handleContextInvalidated(err) {
+function handleContextInvalidated(err, notifyUser = true) {
   if (err?.message?.includes('Extension context invalidated')) {
+    bridgeContextInvalidated = true;
+    for (const timer of bridgeTimers) clearTimeout(timer);
+    bridgeTimers.clear();
+    if (!notifyUser) return;
     const notify = typeof alert === 'function' ? alert : (typeof window !== 'undefined' && window.alert ? window.alert : console.warn);
     notify('HWA Helper extension was updated or reloaded. Please refresh this game page to reconnect.');
   }

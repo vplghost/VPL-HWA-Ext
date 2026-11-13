@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.62 — 2026-11-13
+
+### Fixed
+
+- Prevent uncaught “Extension context invalidated” errors from game-page queue wake timers after extension reloads or updates.
+- Catch synchronous messaging failures and asynchronous rejections, cancel stale bridge timers, and prevent late callbacks from rescheduling automation.
+
 ## 0.10.61 — 2026-11-13
 
 ### Fixed
