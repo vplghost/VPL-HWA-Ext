@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.80 — 2026-11-14
+
+### Added
+
+- Add opt-in Smart gathering: current-day quest priorities with a 2% final-chain margin, nearest mines with estimated gathering time over one hour, queue slot release and confirmed interrupted-mine resumption.
+- Allow Priority Rally Auto Join to recall a gathering squad with estimated return under 29 seconds, then recheck the rally before joining.
+- Track smart gathering requirements, sequential tasks and the incoming-attack capture still needed for attack avoidance.
+
+### Fixed
+
+- Keep Smart gathering state scoped to the current account, require fresh march/troop snapshots and identify the actual outpost endpoint when estimating return travel.
+
 ## 0.10.79 — 2026-11-14
 
 ### Added

@@ -18,6 +18,8 @@ importScripts('building-data.js');
 importScripts('building-queue.js');
 importScripts('research-data.js');
 importScripts('research-queue.js');
+importScripts('smart-gather-data.js');
+importScripts('smart-gather.js');
 importScripts('auto-gather.js');
 
 const RECORD_STATE_KEY = 'recordingState';
@@ -210,9 +212,64 @@ async function evaluateRaidEnergy(tabId, sessionId, now = Date.now()) {
   } });
 }
 
+async function deferQueueForGathering(type, options, tabId, accountId, stored, now) {
+  const smart = globalThis.hwaHelperSmartGather, settings = stored.autoGatherSettings;
+  if (!smart || !settings?.enabled || !settings.smartEnabled || accountId == null) return null;
+  const data = globalThis.hwaHelperExperimentalData;
+  if (!options?.mapId || !Number.isFinite(options.center?.x) || !Number.isFinite(options.center?.y) ||
+      options.heroIds?.length !== 5 || new Set(options.heroIds).size !== 5 ||
+      !Number.isInteger(options.count) || options.count < 1 || options.count > 100 ||
+      (type === 'raid' ? !data.bossConfigId(options.level) || !data.rallyWaitOptions.includes(options.waitSeconds) ||
+        !Number.isInteger(options.minMembers) || options.minMembers < 1 || options.minMembers > 6
+        : !data.soloMonsterConfigIds(options.level))) return null;
+  if (!smart.fresh(stored.rpcCache?.marchStatus, now) || !smart.fresh(stored.rpcCache?.['getUnitSummary:unit'], now))
+    return { error: 'Refresh current marches and troops before starting this queue.' };
+  const demand = smart.recallForQueue(stored.rpcCache || {}, globalThis.hwaHelperAutoGather.normalizeAutoGatherSettings(settings), options, now);
+  if (!demand) return null;
+  if (!demand.march) return { error: demand.reason };
+  let runtime = smart.sync(stored.smartGatherState, null, stored.rpcCache, now);
+  if (runtime.pending || runtime.reservation) return { error: 'Wait for the current Smart gathering operation before starting a queue.' };
+  const march = demand.march, map = smart.context(stored.rpcCache);
+  if (!map.mapId || !march.mineConfigId && !stored.rpcCache.mineMap?.[march.mineId]?.mineConfigId)
+    return { error: 'Refresh world map and mine configuration before releasing a gathering squad.' };
+  const id = type + ':gather:' + now + ':' + tabId;
+  const call = { name: 'stopMineGathering', feature: 'mine', args: { squadId: march.squadId } };
+  runtime = { ...runtime, error: null, reservation: { type, queueId: id },
+    pending: { call, sentAt: now, phase: 'sent', mine: { mineId: march.mineId, mapId: map.mapId,
+      configId: march.mineConfigId ?? stored.rpcCache.mineMap[march.mineId].mineConfigId,
+      coordinates: march.targetCoordinates || stored.rpcCache.mineMap?.[march.mineId]?.coordinates } },
+    status: 'Recalling nearest gathering squad for ' + type + ' queue' };
+  await chrome.storage.local.set({ smartGatherState: runtime });
+  return { state: { id, tabId, accountId, options, started: 0, completed: 0, phase: 'waiting_gather',
+    sentAt: now, wakeAt: now + 5000, current: null, bossQueue: { remain_raid_count: options.count, queue: [] } },
+    calls: [call], expiresAt: now + 30000 };
+}
+
+async function advanceGatherQueue(type, record, stored, tabId) {
+  const key = type + 'Queue', queue = stored[key], now = Date.now();
+  const controller = type === 'raid' ? globalThis.hwaHelperRaidQueue : globalThis.hwaHelperMonsterQueue;
+  const save = type === 'raid' ? saveRaidTransition : saveMonsterTransition;
+  const runtime = globalThis.hwaHelperSmartGather.sync(stored.smartGatherState, record, stored.rpcCache || {}, now);
+  if (String(queue.accountId) !== String(runtime.accountId) || runtime.reservation?.queueId !== queue.id) {
+    return save({ state: controller.stop(queue, 'Gathering reservation no longer matches this account/queue.') }, stored);
+  }
+  await chrome.storage.local.set({ smartGatherState: runtime });
+  if (runtime.error || !rpcMessageForSettings(stored, []))
+    return save({ state: controller.stop(queue, runtime.error || 'RPC disabled while waiting for gathering squad.') }, stored);
+  if (runtime.pending) {
+    const calls = now >= queue.wakeAt ? [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }] : [];
+    return save({ state: { ...queue, wakeAt: calls.length ? now + 5000 : queue.wakeAt }, calls }, stored);
+  }
+  runtime.reservation = null;
+  await chrome.storage.local.set({ smartGatherState: runtime });
+  const transition = controller.start(queue.options, tabId, queue.accountId, now, stored.rpcCache || {},
+    globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
+  return save(transition || { state: controller.stop(queue, 'Team or target unavailable after gathering return. Refresh and start again.') }, stored);
+}
 async function updateRaidQueue(record, tabId) {
-  const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
+  const stored = await chrome.storage.local.get(['raidQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings', 'smartGatherState']);
   const state = stored.raidQueue;
+  if (state?.phase === 'waiting_gather' && state.tabId === tabId) return advanceGatherQueue('raid', record, stored, tabId);
   if (globalThis.hwaHelperRaidQueue.terminal(state) || state.tabId !== tabId) return state;
   return saveRaidTransition(globalThis.hwaHelperRaidQueue.advance(state, record, stored.rpcCache, Date.now(),
     globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings)), stored);
@@ -240,7 +297,8 @@ async function saveMonsterTransition(transition, stored) {
 
 async function updateMonsterQueue(record, tabId) {
   const stored = await chrome.storage.local.get(['monsterQueue', 'rpcCache', 'popupRpcEnabled',
-    'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
+    'socketRefreshMode', 'captureSettings', 'troopCapacitySettings', 'smartGatherState']);
+  if (stored.monsterQueue?.phase === 'waiting_gather' && stored.monsterQueue.tabId === tabId) return advanceGatherQueue('monster', record, stored, tabId);
   if (globalThis.hwaHelperMonsterQueue.terminal(stored.monsterQueue) || stored.monsterQueue.tabId !== tabId) return stored.monsterQueue;
   return saveMonsterTransition(globalThis.hwaHelperMonsterQueue.advance(stored.monsterQueue,
     record, stored.rpcCache, Date.now(),
@@ -740,6 +798,10 @@ chrome.storage.onChanged?.addListener?.((changes, area) => {
   pending = pending.then(async () => {
     const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'dungeonRun', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
     const modeChanged = changes.socketRefreshMode && changes.socketRefreshMode.oldValue !== changes.socketRefreshMode.newValue;
+    if (modeChanged || changes.popupRpcEnabled?.newValue === false || changes.captureSettings?.newValue?.interceptEnabled === false) {
+      const tab = await findActiveGameTab();
+      if (tab?.id) await chrome.tabs.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
+    }
     if (!globalThis.hwaHelperRaidQueue.terminal(stored.raidQueue)) {
       const state = modeChanged ? globalThis.hwaHelperRaidQueue.stop(stored.raidQueue, 'RPC mode changed. Queue stopped.') : stored.raidQueue;
       await saveRaidTransition({ state }, stored);
@@ -779,13 +841,27 @@ async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
     if (call.name !== 'getRallyById' || call.feature !== 'rally' || !result?.response?.rally) continue;
     const rally = result.response.rally;
     const rallyId = rally.rallyId;
-    if (!rallyId || attemptedAutoJoinRallies.has(rallyId)) continue;
+    if (!rallyId) continue;
 
     const configId = rally.target?.objectConfigId ?? rally.mob?.mobConfigId;
     const level = globalThis.hwaHelperExperimentalData.bossLevel(configId);
     if (level === null || level < minLevel) continue;
 
-    const myId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
+    const myId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id;
+    const attemptKey = String(myId) + ':' + rallyId;
+    if (attemptedAutoJoinRallies.has(attemptKey)) continue;
+    const smart = stored.autoGatherSettings?.enabled && stored.autoGatherSettings.smartEnabled ? globalThis.hwaHelperSmartGather : null;
+    let runtime = smart ? smart.sync(stored.smartGatherState, record, cache, Date.now()) : null;
+    const unavailable = rally.route || Number.isInteger(rally.membersCapacityLeft) && rally.membersCapacityLeft <= 0 ||
+      Number.isFinite(rally.plannedStartTime) && rally.plannedStartTime - Date.now() < 3000;
+    if (unavailable && runtime?.reservation?.rallyId === rallyId && runtime.reservation.type === 'rally') {
+      runtime.reservation = null;
+      stored.smartGatherState = runtime;
+      await chrome.storage.local.set({ smartGatherState: runtime });
+    }
+    if (rally.route || smart && !Number.isFinite(rally.plannedStartTime)) continue;
+    const knownRally = globalThis.hwaHelperSmartGather?.list(cache.experimentalRallyTargets?.data).find(row => row.rallyId === rallyId);
+    if (Number.isFinite(knownRally?.rallyVersion) && Number.isFinite(rally.rallyVersion) && rally.rallyVersion < knownRally.rallyVersion) continue;
     if (myId != null) {
       if (String(rally.leader?.userId) === String(myId)) continue;
       if (Array.isArray(rally.members) && rally.members.some((m) => String(m.userId) === String(myId))) continue;
@@ -797,6 +873,37 @@ async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
     const summary = cache['getUnitSummary:unit']?.data;
     const marches = cache.marchStatus?.data?.marches;
     if (!heroes || !summary) continue;
+    if (smart && (!marches || !summary.squads || !smart.fresh(cache.marchStatus, Date.now()) || !smart.fresh(cache['getUnitSummary:unit'], Date.now()))) continue;
+    if (smart) {
+      if (smart.activeQueue(stored) || runtime.error || runtime.pending ||
+          runtime.attemptedRallies?.includes(rallyId) || runtime.reservation && runtime.reservation.rallyId !== rallyId) continue;
+      const settings = globalThis.hwaHelperAutoGather.normalizeAutoGatherSettings(stored.autoGatherSettings);
+      if (smart.list(marches).length >= settings.maxMarches) {
+        const release = smart.recallForRally(cache, stored, rally, Date.now());
+        if (!release || runtime.reservation) {
+          runtime.notice = { at: Date.now(), message: 'Rally skipped: no gathering squad can return in under 29s before it starts' };
+          stored.smartGatherState = runtime;
+          await chrome.storage.local.set({ smartGatherState: runtime });
+          continue;
+        }
+        const info = cache.mineMap?.[release.march.mineId];
+        const configId = release.march.mineConfigId ?? info?.mineConfigId, map = smart.context(cache);
+        if (!configId || !map.mapId) continue;
+        const call = { name: 'stopMineGathering', feature: 'mine', args: { squadId: release.march.squadId } };
+        runtime = { ...runtime, reservation: { type: 'rally', rallyId, mapId: rally.mapId, expiresAt: rally.plannedStartTime - 3000 },
+          pending: { call, sentAt: Date.now(), phase: 'sent', mine: { mineId: release.march.mineId, mapId: map.mapId,
+            configId, coordinates: release.march.targetCoordinates || info?.coordinates } },
+          status: 'Releasing gathering slot for rally · estimated return ' + Math.ceil(release.ms / 1000) + 's' };
+        const dispatch = rpcMessageForSettings(stored, [call]);
+        if (dispatch) {
+          await chrome.storage.local.set({ smartGatherState: runtime });
+          stored.smartGatherState = runtime;
+          await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'smart-gather',
+            expiresAt: Math.min(Date.now() + 30000, rally.plannedStartTime - release.ms - 3000) }).catch(() => {});
+        }
+        continue;
+      }
+    }
 
     const availableHeroIds = globalThis.hwaHelperExperimentalData.availableHeroIds(heroes, summary, marches);
     const teamSetting = stored.priorityAutoJoin?.teamId || stored.raidPreferences?.teamId || 'highest';
@@ -845,10 +952,16 @@ async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
     const joinCall = globalThis.hwaHelperExperimentalData.buildJoinRallyCall(rally.mapId, rallyId, squad);
     if (!joinCall) continue;
 
-    attemptedAutoJoinRallies.add(rallyId);
     const dispatch = rpcMessageForSettings(stored, [joinCall]);
     if (dispatch) {
-      chrome.tabs?.sendMessage?.(tabId, dispatch)?.catch?.(() => {});
+      attemptedAutoJoinRallies.add(attemptKey);
+      if (smart) {
+        runtime.attemptedRallies = [...(runtime.attemptedRallies || []), rallyId].slice(-100);
+        runtime.pending = { call: joinCall, sentAt: Date.now(), phase: 'sent' };
+        await chrome.storage.local.set({ smartGatherState: runtime });
+        stored.smartGatherState = runtime;
+      }
+      chrome.tabs?.sendMessage?.(tabId, { ...dispatch, ...(smart ? { group: 'smart-gather', expiresAt: rally.plannedStartTime - 3000 } : {}) })?.catch?.(() => {});
     }
   }
 }
@@ -857,13 +970,99 @@ let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType = null;
 let lastAutoGatherPendingLevel = null;
 
+async function tickAutoGather(reset = false) {
+  const stored = await chrome.storage.local.get(['rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings',
+    'autoGatherSettings', 'smartGatherState', 'troopCapacitySettings', 'raidQueue', 'monsterQueue', 'priorityAutoJoin']);
+  const tab = await findActiveGameTab();
+  if (reset) {
+    if (tab?.id) await chrome.tabs.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
+    if (stored.smartGatherState) {
+      stored.smartGatherState = { ...stored.smartGatherState, error: null, nearest: null };
+      if (stored.smartGatherState.pending && !['stopMineGathering', 'attackMine', 'joinRally'].includes(stored.smartGatherState.pending.call?.name))
+        stored.smartGatherState.pending = null;
+      await chrome.storage.local.set({ smartGatherState: stored.smartGatherState });
+    }
+  }
+  if (tab?.id) await evaluateAutoGather(null, stored.rpcCache || {}, stored, tab.id);
+}
+async function evaluateSmartGather(record, cache, stored, tabId, now = Date.now()) {
+  const smart = globalThis.hwaHelperSmartGather;
+  if (cache.accountStatus?.data?.id == null) return;
+  let state = smart.sync(stored.smartGatherState, record, cache, now);
+  if (!rpcMessageForSettings(stored, [])) {
+    state.status = 'Smart gathering paused by shared RPC settings';
+    await chrome.storage.local.set({ smartGatherState: state });
+    return;
+  }
+  if (state.reservation?.queueId && smart.activeQueue(stored)?.id !== state.reservation.queueId) state.reservation = null;
+  if (state.reservation?.type === 'rally' && !stored.priorityAutoJoin?.enabled) state.reservation = null;
+  let calls = [];
+  let reason = state.error;
+  if (state.pending) {
+    reason = state.pending.phase === 'returning' ? 'Waiting for recalled gathering squad to return' : 'Waiting for game confirmation';
+    if (['returning', 'refresh'].includes(state.pending.phase) && now - (state.lastRefreshAt || 0) >= 5000) {
+      calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
+      state.lastRefreshAt = now;
+    }
+  } else if (!state.error && state.reservation?.type === 'rally' && now < state.reservation.expiresAt) {
+    reason = 'Rechecking rally capacity and start time after gathering return';
+    if (now - (state.lastRefreshAt || 0) >= 5000) {
+      const call = { name: 'getRallyById', feature: 'rally', args: { rallyId: state.reservation.rallyId, mapId: state.reservation.mapId } };
+      calls = [call];
+      state.lastRefreshAt = now;
+      state.pending = { call, sentAt: now, phase: 'sent' };
+    }
+  } else if (!state.error && state.reservation?.type === 'joinedRally') {
+    const reservation = state.reservation;
+    const exists = smart.list(cache.marchStatus?.data?.marches).some(m => m.squadId === reservation.squadId);
+    const deployed = smart.list(cache['getUnitSummary:unit']?.data?.squads).some(s => (s.id ?? s.squadId) === reservation.squadId);
+    if (Date.parse(cache.marchStatus?.updatedAt) >= reservation.confirmedAt &&
+        Date.parse(cache['getUnitSummary:unit']?.updatedAt) >= reservation.confirmedAt && !exists && !deployed) state.reservation = null;
+    else if (now - (state.lastRefreshAt || 0) >= 5000) {
+      calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
+      state.lastRefreshAt = now;
+    }
+    reason = 'Waiting for rally team to return before resuming gathering';
+  } else if (!state.error) {
+    if (state.reservation?.type === 'rally') state.reservation = null;
+    const plan = globalThis.hwaHelperAutoGather.planAutoGather(cache, { ...stored, smartGatherState: state }, now);
+    reason = plan.reason || (plan.action === 'gather' ? 'Dispatching gathering squad' : 'Searching for resource mine');
+    calls = plan.calls || (plan.call ? [plan.call] : []);
+    if (calls.length && now - (state.lastPlanAt || 0) < 5000) calls = [];
+    if (calls.length) {
+      state.lastPlanAt = now;
+      if (plan.nearest) state.nearest = plan.nearest;
+      state.pending = { ...plan.pending, call: calls[0], sentAt: now, phase: 'sent' };
+    }
+  }
+  const dispatch = calls.length ? rpcMessageForSettings(stored, calls) : null;
+  if (dispatch) {
+    await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'smart-gather', expiresAt: now + 30000 }).catch(() => {
+      state.pending = null; state.error = 'Game tab disconnected; restart Smart gathering';
+    });
+  }
+  state.status = state.error || (state.notice?.at + 30000 > now ? state.notice.message : null) || reason || 'Waiting';
+  state.updatedAt = now;
+  await chrome.storage.local.set({ smartGatherState: state });
+  stored.smartGatherState = state;
+}
 async function evaluateAutoGather(record, currentCache, stored, tabId) {
-  if (stored.popupRpcEnabled !== true || !stored.autoGatherSettings?.enabled || !tabId) return;
+  if (!tabId) return;
+  if (stored.smartGatherState && globalThis.hwaHelperSmartGather &&
+      (stored.popupRpcEnabled !== true || !stored.autoGatherSettings?.enabled || !stored.autoGatherSettings.smartEnabled)) {
+    const state = globalThis.hwaHelperSmartGather.sync(stored.smartGatherState, record, currentCache, Date.now());
+    await chrome.storage.local.set({ smartGatherState: state });
+  }
+  if (stored.popupRpcEnabled !== true || !stored.autoGatherSettings?.enabled) return;
 
   const helper = globalThis.hwaHelperAutoGather;
   if (!helper) return;
 
   const now = Date.now();
+  if (stored.autoGatherSettings.smartEnabled && globalThis.hwaHelperSmartGather) {
+    await evaluateSmartGather(record, currentCache, stored, tabId, now);
+    return;
+  }
   const isLoad = helper.isGameLoadRecord(record);
   const isReturn = helper.isMarchReturnRecord(record, stored.rpcCache, currentCache, now);
   const isMineSearch = typeof record?.responseBody === 'string' &&
@@ -1020,6 +1219,20 @@ async function handleControl(kind) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (['auto-gather-start', 'auto-gather-stop', 'smart-gather-tick'].includes(message?.kind) &&
+      (sender.url?.startsWith('chrome-extension://' + chrome.runtime.id + '/') ||
+       message.kind === 'smart-gather-tick' && isGameUrl(sender.url) && sender.tab?.id)) {
+    pending = pending.then(async () => {
+      if (message.kind === 'auto-gather-stop') {
+        const tab = await findActiveGameTab();
+        if (tab?.id) await chrome.tabs.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
+      } else await tickAutoGather(message.kind === 'auto-gather-start');
+      return { ok: true };
+    });
+    pending.then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
   if (message?.kind === 'raid-energy-config' &&
       sender.url?.startsWith('chrome-extension://' + chrome.runtime.id + '/')) {
     pending = pending.then(async () => {
@@ -1050,7 +1263,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (['raid-queue-start', 'raid-queue-stop'].includes(message?.kind) &&
       sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     pending = pending.then(async () => {
-      const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
+      const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'troopCapacitySettings', 'autoGatherSettings', 'smartGatherState']);
       const controller = globalThis.hwaHelperRaidQueue;
       if (message.kind === 'raid-queue-stop') {
         if (!controller.terminal(stored.raidQueue)) await saveRaidTransition({ state: controller.stop(stored.raidQueue,
@@ -1066,7 +1279,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
       if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
       const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
-      const transition = controller.start(message.options, tab.id, accountId,
+      const deferred = await deferQueueForGathering(message.kind.startsWith('raid') ? 'raid' : 'monster',
+        message.options, tab.id, accountId, stored, Date.now());
+      if (deferred?.error) return { ok: false, error: deferred.error };
+      const transition = deferred || controller.start(message.options, tab.id, accountId,
         Date.now(), stored.rpcCache || {}, globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
       if (!transition) return { ok: false, error: 'Refresh troops and search for this boss before starting. Check the selected team and target.' };
       const state = await saveRaidTransition(transition, stored);
@@ -1087,7 +1303,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
     pending = pending.then(async () => {
       const stored = await chrome.storage.local.get(['monsterQueue', 'raidQueue', 'rpcCache', 'popupRpcEnabled',
-        'socketRefreshMode', 'captureSettings', 'troopCapacitySettings']);
+        'socketRefreshMode', 'captureSettings', 'troopCapacitySettings', 'autoGatherSettings', 'smartGatherState']);
       const controller = globalThis.hwaHelperMonsterQueue;
       if (message.kind === 'monster-queue-stop') {
         if (!controller.terminal(stored.monsterQueue)) await saveMonsterTransition({ state: controller.stop(stored.monsterQueue,
@@ -1101,7 +1317,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const tab = tabs.find((candidate) => candidate.id && isGameUrl(candidate.url));
       if (!tab) return { ok: false, error: 'No active Hero Wars tab found.' };
       const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
-      const transition = controller.start(message.options, tab.id, accountId,
+      const deferred = await deferQueueForGathering(message.kind.startsWith('raid') ? 'raid' : 'monster',
+        message.options, tab.id, accountId, stored, Date.now());
+      if (deferred?.error) return { ok: false, error: deferred.error };
+      const transition = deferred || controller.start(message.options, tab.id, accountId,
         Date.now(), stored.rpcCache || {},
         globalThis.hwaHelperExperimentalData.normalizeCapacitySettings(stored.troopCapacitySettings));
       if (!transition) return { ok: false, error: 'Refresh troops and search for this monster before starting. Check the team and target.' };
@@ -1646,7 +1865,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   pending = pending.then(async () => {
     const stored = await chrome.storage.local.get(['rpcCache', 'captureSettings',
-      'popupRpcEnabled', 'socketRefreshMode', 'priorityAutoJoin', 'troopCapacitySettings', 'raidPreferences', 'customTeams', 'autoGatherSettings']);
+      'popupRpcEnabled', 'socketRefreshMode', 'priorityAutoJoin', 'troopCapacitySettings', 'raidPreferences', 'customTeams', 'autoGatherSettings', 'smartGatherState', 'raidQueue', 'monsterQueue']);
     if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
     if (record.requestBody && /"name"\s*:\s*"(?:mobileLogin|userLogin)"/.test(record.requestBody)) {
       await chrome.storage.session.remove('raidEnergyWatch');
@@ -1669,6 +1888,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab?.id) await updateDungeonRun(record, sender.tab.id);
     if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id, record);
     if (sender.tab?.id) await advanceResearchQueue(sender.tab.id, record);
+    Object.assign(stored, await chrome.storage.local.get(['smartGatherState', 'raidQueue', 'monsterQueue']));
     if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id);
     if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id);
     if (stored.popupRpcEnabled === true && sender.tab?.id) {

@@ -463,9 +463,12 @@
             if (!Array.isArray(stages)) continue;
             for (const m of stages) {
               if (m?.mapId && !marchMapId) marchMapId = m.mapId;
-              if (m?.route?.from?.coordinates && Number.isFinite(m.route.from.coordinates.x)) {
-                if (!marchCenter) marchCenter = m.route.from.coordinates;
-                if (m.route.leader?.userId) marchOutposts[m.route.leader.userId] = m.route.from.coordinates;
+              const route = m?.route;
+              const base = [route?.from, route?.to].find(point => point?.object?.objectType === 'outpost') ||
+                (route?.type !== 'returnToOutpost' && !route?.from?.object ? route?.from : null);
+              if (base?.coordinates && Number.isFinite(base.coordinates.x) && Number.isFinite(base.coordinates.y)) {
+                if (!marchCenter) marchCenter = base.coordinates;
+                if (route.leader?.userId) marchOutposts[route.leader.userId] = base.coordinates;
               }
               if (m?.target?.coordinates && Number.isFinite(m.target.coordinates.x) && !marchCenter) {
                 marchCenter = m.target.coordinates;
@@ -641,7 +644,7 @@
           const mineType = globalThis.hwaHelperMineTypes?.[mineConfigId] || 'mine';
           const mines = {};
           for (const m of result.response.mines) {
-            if (m?.mineId) mines[m.mineId] = { mineConfigId, mineType };
+            if (m?.mineId) mines[m.mineId] = { mineConfigId, mineType, coordinates: m.coordinates, mapId: call.args.mapId };
           }
           return [{ key: 'experimentalMineSearch', method: call.name,
             feature: call.feature, group: 'internal', data: {
@@ -2172,6 +2175,13 @@
           delete next.guildOutposts;
           delete next.heroGetAll;
           delete next.rallyPowerStatus;
+          delete next.marchStatus;
+          delete next.gatheringStatus;
+          delete next.mineMap;
+          delete next.experimentalMapContext;
+          delete next.experimentalMineSearch;
+          delete next['getUnitSummary:unit'];
+          delete next['getDailyQuests:quest'];
           delete next.expeditionStatus;
           delete next.expeditionCollectStatus;
           delete next.expeditionCollectReceipts;

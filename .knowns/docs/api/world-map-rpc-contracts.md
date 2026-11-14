@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-14T11:15:51.431Z'
+updatedAt: '2026-11-14T12:15:47.621Z'
 tags:
   - api
   - rpc
@@ -289,3 +289,16 @@ Implemented in `rallyPowerTooltip` and shared by Header and Dashboard via `forma
 - Participant hero payloads contain no power. Only the current player's matching hero profiles in `heroGetAll` contribute to known heroes power; foreign hero IDs never resolve against the local roster. Supplied level/color/star must match.
 - Missing participants/components produce a lower-bound subtotal suffixed `+` (for example `114k+`); no known values produce `—`. Without full details, the current march team is shown as a partial subtotal. Partial compact numbers round down; exact compact numbers round to nearest tenth.
 - Tooltip compares Rally / Boss for heroes, troops and combined power. A complete observed troop subtotal may coexist with an incomplete hero subtotal.
+
+## Smart gathering coordination (0.10.80)
+
+See @doc/specs/smart-auto-gathering and source `docs/Smart-auto-gathering.md`. Tasks @task-VHE-WBZH46, @task-VHE-XXCNGQ, @task-VHE-BCK7WZ and @task-VHE-1M0CGC implement the ready scope sequentially.
+
+- `smart-gather-data.js` packages MD5-verified quest/questChain/globalMapMine rows. Daily full-chain targets with the approved2% margin are food/wood255000, stone51000, iron15300.
+- `smart-gather.js` owns account-scoped daily baselines, nearest candidates, interrupted mines, confirmed mutation waits and rally reservations. Read refreshes are bounded; mutations are not retried on unknown outcomes. Unchanged quest snapshots preserve the estimation baseline; increased progress resets it to avoid counting credited resources again.
+- Smart gathering is explicit opt-in, respects shared RPC/dispatch policy and refreshes missing/stale march/unit inputs. It pauses for active raid/monster queues, uses the existing queue controllers after confirmed recall/return, probes interrupted mines before resuming, and consumes a resume target only on attackMine success.
+- Nearest searches keep one config per reply (levels1–10), sort by Euclidean distance from the identified own outpost and probe resourceAmount. Estimated duration uses configured gatheringSpeedPerMinute and must strictly exceed3600s. User approved this estimate; buffs can change actual time.
+- Priority rally preemption requires estimated return strictly under29000ms and enough rally start window, expires queued recall before the eligibility window closes, then rechecks details after confirmed return before join. A confirmed joined squad must return before interrupted gathering resumes.
+- getMarches return routes must contribute the outpost endpoint (usually route.to), not the mine/boss origin, to experimentalMapContext.outposts. Smart ETA never substitutes generic search center for an unknown own outpost.
+- Account switch clears gathering-sensitive cache inputs and runtime sync discards the old account state. Late recall acknowledgements are still recorded while automation is paused.
+- @task-VHE-CB9VBW remains blocked on hostile incoming-attack owner/target/impact timing capture, which the user will supply. Hospital formula is sum Infirmary capacities minus wounded troops; no automatic attack-avoidance trigger has been shipped.

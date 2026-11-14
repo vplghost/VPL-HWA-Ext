@@ -1,0 +1,137 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFile } from 'node:fs/promises';
+import '../extension/march-rules.js';
+import '../extension/experimental-data.js';
+import '../extension/smart-gather-data.js';
+import '../extension/smart-gather.js';
+import '../extension/auto-gather.js';
+const smart = globalThis.hwaHelperSmartGather;
+const now = Date.parse('2026-11-14T10:00:00Z');
+const at = new Date(now - 60000).toISOString();
+function cache() {
+  return { accountStatus: { data: { id: 1 } }, questResetStatus: { data: { nextDayAt: now + 3600000 } },
+    'getDailyQuests:quest': { updatedAt: at, data: { quests: [354, 357, 356, 355].map(id => ({ id, progress: 0, state: 'inProgress' })) } },
+    marchStatus: { updatedAt: at, data: { marches: [] } },
+    experimentalMapContext: { data: { mapId: 'map', center: { x: 0, y: 0 }, outposts: { 1: { x: 0, y: 0 } } } } };
+}
+test('daily final chain targets and priority match confirmed user rules', () => {
+  const c = cache();
+  let result = smart.dailyPlan(c, {}, now);
+  assert.equal(result.type, 'food');
+  assert.deepEqual(result.rows.map(row => [row.type, row.target]), [['food', 255000], ['iron', 15300], ['stone', 51000], ['wood', 255000]]);
+  c['getDailyQuests:quest'].data.quests[0].progress = 255000;
+  assert.equal(smart.dailyPlan(c, {}, now).type, 'iron');
+});
+test('first milestone completion is not full-chain completion; stale days require refresh', () => {
+  const c = cache();
+  c['getDailyQuests:quest'].data.quests[0] = { id: 354, progress: 50000, state: 'completed' };
+  assert.equal(smart.dailyPlan(c, {}, now).type, 'food');
+  c['getDailyQuests:quest'].updatedAt = new Date(now - 86400000).toISOString();
+  assert.equal(smart.dailyPlan(c, {}, now).action, 'refresh');
+  assert.equal(smart.dailyPlan(cache(), {}, now + 3600000).action, 'refresh');
+});
+test('observed daily progress and gathering increments are not counted twice', () => {
+  const c = cache(), m = { squadId: 's', mineId: 'mine', kind: 'food', stage: 'gathering',
+    gatheringStartedAt: now - 120000, gatheringDurationMs: 120000, gatheringTotalAmount: 100000 };
+  c.marchStatus.data.marches = [m];
+  assert.equal(smart.collectedSince(m, c, now - 60000, now), 50000);
+  assert.equal(smart.dailyPlan(c, {}, now).type, 'iron', 'do not dispatch another food squad');
+  c['getDailyQuests:quest'].data.quests[0].progress = 205000;
+  assert.equal(smart.dailyPlan(c, {}, now).action, 'recall');
+  delete m.gatheringTotalAmount;
+  assert.equal(smart.dailyPlan(c, {}, now).action, 'target', 'missing plan cannot trigger recall');
+});
+test('recall confirmation and fresh roster gate return; account changes discard state', () => {
+  const c = cache(), call = { name: 'stopMineGathering', feature: 'mine', args: { squadId: 's' } };
+  const state = { accountId: 1, pending: { call, sentAt: now, phase: 'sent' } };
+  const record = { method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc', timestamp: new Date(now + 1).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ...call, ident: '1' }] }), responseBody: JSON.stringify({ results: [{ ident: '1', result: { response: { squadId: 's', route: { startedAt: now, durationMs: 20000 } } } }] }) };
+  const confirmed = smart.sync(state, record, c, now + 1);
+  assert.equal(confirmed.pending.phase, 'returning');
+  assert.equal(smart.sync(confirmed, null, c, now + 21000).pending.phase, 'returning', 'ETA alone does not release slot');
+  c.marchStatus.updatedAt = new Date(now + 21000).toISOString();
+  c['getUnitSummary:unit'] = { updatedAt: c.marchStatus.updatedAt, data: { squads: [] } };
+  assert.equal(smart.sync(confirmed, null, c, now + 21000).pending, null);
+  c.accountStatus.data.id = 2;
+  assert.equal(smart.sync(confirmed, null, c, now + 21000).pending, undefined);
+});
+test('shared RPC and disabled smart mode preserve existing dispatch gates', () => {
+  assert.equal(globalThis.hwaHelperAutoGather.planAutoGather(cache(), { popupRpcEnabled: false, autoGatherSettings: { enabled: true, smartEnabled: true } }, now).action, 'idle');
+  assert.equal(globalThis.hwaHelperAutoGather.normalizeAutoGatherSettings({}).smartEnabled, false);
+});
+
+test('nearest mode scans levels, orders candidates and rejects exactly one hour', () => {
+  const c = cache(), state = { accountId: 1, interrupted: [] };
+  const first = smart.nearestPlan(c, state, 'food', now);
+  assert.equal(first.pending.level, 1);
+  assert.equal(first.call.args.fullOnly, true);
+  state.nearest = { ...first.nearest, levels: [1,2,3,4,5,6,7,8,9,10], candidates: [
+    { mineId: 'far', configId: 68, coordinates: { x: 20, y: 0 } },
+    { mineId: 'near', configId: 68, coordinates: { x: 10, y: 0 } }
+  ] };
+  const probe = smart.nearestPlan(c, state, 'food', now);
+  assert.equal(probe.call.args.mineId, 'near');
+  const response = amount => ({ method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc', timestamp: new Date(now + 1).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ...probe.call, ident: 'p' }] }), responseBody: JSON.stringify({ results: [{ ident: 'p', result: { response: { mineId: 'near', resourceAmount: amount } } }] }) });
+  state.pending = { ...probe.pending, call: probe.call, phase: 'sent', sentAt: now };
+  const perMinute = globalThis.hwaHelperSmartGatherData.mines[68].speedPerMinute;
+  const rejected = smart.sync(state, response(perMinute * 60), c, now + 1);
+  assert.equal(rejected.nearest.candidates.length, 1);
+  assert.equal(smart.nearestPlan(c, rejected, 'food', now + 2).call.args.mineId, 'far');
+  const accepted = smart.sync(state, response(perMinute * 60 + 1), c, now + 1);
+  assert.equal(smart.nearestPlan(c, accepted, 'food', now + 2).mine.mineId, 'near');
+  const changedMap = cache(); changedMap.experimentalMapContext.data.mapId = 'other';
+  assert.equal(smart.nearestPlan(changedMap, accepted, 'food', now).pending.level, 1);
+});
+
+test('rally preemption uses return distance and rejects 29s, unknown ETA and insufficient window', () => {
+  const c = cache();
+  const march = { squadId: 's', mineId: 'mine', stage: 'gathering', targetCoordinates: { x: 43.5, y: 0 } };
+  c.marchStatus.data.marches = [march];
+  const stored = { autoGatherSettings: { maxMarches: 1 } }, rally = { plannedStartTime: now + 60000 };
+  assert.equal(smart.returnMs(march, c), 29000);
+  assert.equal(smart.recallForRally(c, stored, rally, now), null);
+  march.targetCoordinates.x = 43;
+  assert.ok(smart.recallForRally(c, stored, rally, now));
+  assert.equal(smart.recallForRally(c, stored, { plannedStartTime: now + 30000 }, now), null);
+  delete march.targetCoordinates;
+  assert.equal(smart.recallForRally(c, stored, rally, now), null);
+});
+
+test('unchanged refreshed quest snapshots retain the gathering baseline', () => {
+  const c = cache(), state = {};
+  c.marchStatus.data.marches = [{ squadId: 's', mineId: 'mine', kind: 'food', stage: 'gathering',
+    gatheringStartedAt: now - 120000, gatheringDurationMs: 120000, gatheringTotalAmount: 100000 }];
+  const first = smart.dailyPlan(c, {}, now, state).rows[0].estimated;
+  c['getDailyQuests:quest'].updatedAt = new Date(now - 10000).toISOString();
+  assert.equal(smart.dailyPlan(c, {}, now, state).rows[0].estimated, first);
+});
+
+test('unknown account and restarting during an old nearest probe remain safe', () => {
+  assert.deepEqual(smart.sync(undefined, null, {}, now).interrupted, []);
+  const call = { name: 'getMineById', feature: 'mine', args: { mineId: 'old' } };
+  const state = { accountId: 1, nearest: null, pending: { purpose: 'nearestProbe', call, sentAt: now, mine: { mineId: 'old', configId: 68 } } };
+  const record = { method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc', timestamp: new Date(now + 1).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ...call, ident: 'p' }] }), responseBody: JSON.stringify({ results: [{ ident: 'p', result: { response: { mineId: 'old', resourceAmount: 10000000 } } }] }) };
+  assert.equal(smart.sync(state, record, cache(), now + 1).pending, null);
+});
+
+test('return route records the outpost destination and account change clears gathering inputs', async () => {
+  const context = { TextEncoder };
+  vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
+  const reducer = context.hwaHelperRpcCache;
+  const record = { method: 'POST', status: 200, timestamp: new Date(now).toISOString(), endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    requestBody: JSON.stringify({ calls: [{ name: 'getMarches', feature: 'march', ident: 'm' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'm', result: { response: { marches: { returnToOutpost: [{ squadId: 's', mapId: 'map', route: {
+      type: 'returnToOutpost', leader: { userId: 1 }, startedAt: now, durationMs: 10000,
+      from: { coordinates: { x: 20, y: 0 }, object: { objectType: 'mine' } },
+      to: { coordinates: { x: 0, y: 0 }, object: { objectType: 'outpost' } }
+    } }] } } } }] }) };
+  const first = reducer.merge({ accountStatus: { data: { id: 1 } } }, [record]).cache;
+  assert.equal(first.experimentalMapContext.data.outposts[1].x, 0);
+  const switched = reducer.merge(first, [{ key: 'accountStatus', updatedAt: new Date(now + 1).toISOString(), data: { id: 2 } }]).cache;
+  assert.equal(switched.marchStatus, undefined);
+  assert.equal(switched.experimentalMapContext, undefined);
+});

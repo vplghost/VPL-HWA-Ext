@@ -51,14 +51,16 @@ const {
 
 interface AutoGatherSettings {
   enabled: boolean;
+  smartEnabled: boolean;
   maxMarches: number;
-  mineLevel: number;
+  mineLevel: number | 'nearest';
   mineType: string;
   lastAutoMineType: string | null;
 }
 
 const autoSettings = ref<AutoGatherSettings>({
   enabled: false,
+  smartEnabled: false,
   maxMarches: 3,
   mineLevel: 10,
   mineType: 'rotate',
@@ -72,6 +74,12 @@ const isSearching = ref(false);
 const searchStatus = ref<string>('');
 const isDispatching = ref<string | null>(null);
 
+const smartStatus = ref('');
+function onGatherStorage(changes: Record<string, chrome.storage.StorageChange>, area: string) {
+  if (area !== 'local') return;
+  if (changes.smartGatherState) smartStatus.value = (changes.smartGatherState.newValue as { status?: string } | undefined)?.status || '';
+  if (changes.autoGatherSettings?.newValue) autoSettings.value = { ...autoSettings.value, ...changes.autoGatherSettings.newValue };
+}
 const now = ref(Date.now());
 let timer: number | null = null;
 
@@ -80,11 +88,13 @@ onMounted(async () => {
     now.value = Date.now();
   }, 1000);
 
+  if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.addListener(onGatherStorage);
   await loadSquadData();
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
-      const stored = await chrome.storage.local.get(['autoGatherSettings', 'popupRpcEnabled', 'socketRefreshMode']);
+      const stored = await chrome.storage.local.get(['autoGatherSettings', 'popupRpcEnabled', 'socketRefreshMode', 'smartGatherState']);
+      smartStatus.value = (stored.smartGatherState as { status?: string } | undefined)?.status || '';
       if (stored.autoGatherSettings) {
         autoSettings.value = { ...autoSettings.value, ...stored.autoGatherSettings };
       }
@@ -104,6 +114,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.removeListener(onGatherStorage);
 });
 
 async function ensureRpcEnabled() {
@@ -119,6 +130,7 @@ async function ensureRpcEnabled() {
 }
 
 async function saveAutoSettings() {
+  if (!autoSettings.value.smartEnabled && autoSettings.value.mineLevel === 'nearest') autoSettings.value.mineLevel = 10;
   await ensureRpcEnabled();
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     await chrome.storage.local.set({ autoGatherSettings: autoSettings.value });
@@ -139,7 +151,7 @@ function toggleAutoGather() {
 // Next target mine type in rotation
 const nextTargetType = computed(() => {
   if (autoSettings.value.mineType !== 'rotate') return autoSettings.value.mineType;
-  const types = ['food', 'wood', 'stone', 'iron'];
+  const types = autoSettings.value.smartEnabled ? ['food', 'iron', 'stone', 'wood'] : ['food', 'wood', 'stone', 'iron'];
   const last = autoSettings.value.lastAutoMineType;
   if (!last || !types.includes(last)) return 'food';
   const idx = types.indexOf(last);
@@ -436,6 +448,14 @@ async function recallMarch(march: any) {
           </label>
         </div>
 
+        <label class="flex items-center gap-2 text-xs font-semibold text-emerald-900 dark:text-emerald-100">
+          <input v-model="autoSettings.smartEnabled" type="checkbox" @change="saveAutoSettings" />
+          Smart gathering · daily resource priorities and activity coordination
+        </label>
+        <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-600 dark:text-slate-400" role="status">
+          {{ smartStatus || 'Waiting for current game data' }}
+        </p>
+        <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-500">Attack avoidance is awaiting attack detection data.</p>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <label class="block font-medium text-slate-700 dark:text-slate-300">
             Mine Target Type
@@ -444,7 +464,7 @@ async function recallMarch(march: any) {
               class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               @change="saveAutoSettings"
             >
-              <option value="rotate">🔄 Auto Rotate (Food → Wood → Stone → Iron)</option>
+              <option value="rotate">{{ autoSettings.smartEnabled ? 'Daily priorities (Food → Iron → Stone → Wood)' : 'Auto Rotate (Food → Wood → Stone → Iron)' }}</option>
               <option value="food">🍞 Food Only</option>
               <option value="wood">🌲 Wood Only</option>
               <option value="stone">◆ Stone Only</option>
@@ -460,6 +480,7 @@ async function recallMarch(march: any) {
               class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               @change="saveAutoSettings"
             >
+              <option v-if="autoSettings.smartEnabled" value="nearest">Nearest · estimated &gt;1h</option>
               <option v-for="lvl in 10" :key="lvl" :value="11 - lvl">
                 Level {{ 11 - lvl }}{{ lvl === 1 ? ' (Highest Yield)' : '' }}
               </option>
@@ -482,7 +503,8 @@ async function recallMarch(march: any) {
         <div class="rounded-lg bg-white/70 dark:bg-slate-900/60 p-2.5 text-[11px] text-slate-600 dark:text-slate-400">
           <template v-if="autoSettings.enabled">
             <span>Dispatches automatically on game load or when marches return to base if active marches &lt; {{ autoSettings.maxMarches }}. </span>
-            <span v-if="autoSettings.mineType === 'rotate'">
+            <span v-if="autoSettings.smartEnabled">{{ smartStatus }}</span>
+            <span v-else-if="autoSettings.mineType === 'rotate'">
               Cycling: Next target is <strong>{{ (nextTargetType || 'gold').toUpperCase() }} (Lv.{{ autoSettings.mineLevel }})</strong>.
             </span>
             <span v-else>

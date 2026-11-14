@@ -12,7 +12,7 @@
     const maxMarches = Number.isInteger(raw.maxMarches) && raw.maxMarches >= 1 && raw.maxMarches <= 10
       ? raw.maxMarches
       : 3;
-    const mineLevel = Number.isInteger(raw.mineLevel) && raw.mineLevel >= 1 && raw.mineLevel <= 10
+    const mineLevel = raw.smartEnabled === true && raw.mineLevel === 'nearest' ? 'nearest' : Number.isInteger(raw.mineLevel) && raw.mineLevel >= 1 && raw.mineLevel <= 10
       ? raw.mineLevel
       : 5;
     const mineType = typeof raw.mineType === 'string' && (raw.mineType === 'rotate' || BASIC_MINE_TYPES.includes(raw.mineType))
@@ -24,6 +24,7 @@
 
     return {
       enabled: raw.enabled === true,
+      smartEnabled: raw.smartEnabled === true,
       maxMarches,
       mineLevel,
       mineType,
@@ -112,8 +113,26 @@
       return { action: 'idle', reason: 'Auto-gather disabled' };
     }
 
+    const smart = settings.smartEnabled ? globalThis.hwaHelperSmartGather : null;
+    let daily = null;
+    if (smart && (!cache.marchStatus?.data?.marches || !cache['getUnitSummary:unit']?.data?.squads ||
+        !smart.fresh(cache.marchStatus, now) || !smart.fresh(cache['getUnitSummary:unit'], now))) return {
+      action: 'refresh', reason: 'Refreshing current marches, troops and gathering plans',
+      calls: [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' },
+        { name: 'getMineSummary', feature: 'mine' }, { name: 'heroGetAll' }] };
+    if (smart && smart.activeQueue(stored)) return { action: 'wait', reason: 'Gathering paused while raid/monster queue is active' };
+    const resume = smart?.resumePlan(cache, stored.smartGatherState, now);
+    if (resume && resume.action !== 'target') return resume;
+    if (smart && !resume && settings.mineType === 'rotate') {
+      daily = smart.dailyPlan(cache, { ...settings, lastAutoMineType: stored.smartGatherState?.lastAutoMineType || settings.lastAutoMineType }, now, stored.smartGatherState);
+      if (daily.action === 'refresh') return { action: 'refresh', reason: daily.reason,
+        calls: [{ name: 'getDailyQuests', feature: 'quest', args: {} }, { name: 'user_getNextDayTime' }] };
+      if (daily.action === 'wait') return daily;
+      if (daily.action === 'recall') return { action: 'recall', reason: daily.reason,
+        call: { name: 'stopMineGathering', feature: 'mine', args: { squadId: daily.march.squadId } } };
+    }
     const marches = safeList(cache?.marchStatus?.data?.marches);
-    const activeCount = countActiveMarches(marches, now);
+    const activeCount = smart ? marches.length : countActiveMarches(marches, now);
     if (activeCount >= settings.maxMarches) {
       return {
         action: 'wait',
@@ -146,8 +165,11 @@
       return { action: 'wait', reason: `Fewer than 5 heroes available (${availableHeroIds.length})` };
     }
 
-    const targetMineType = resolveNextMineType(settings.mineType, settings.lastAutoMineType);
-    const targetMineLevel = settings.mineLevel;
+    const targetMineType = resume?.type || daily?.type || resolveNextMineType(settings.mineType, settings.lastAutoMineType);
+    const nearest = smart && !resume && settings.mineLevel === 'nearest'
+      ? smart.nearestPlan(cache, stored.smartGatherState, targetMineType, now) : null;
+    if (nearest && nearest.action !== 'target') return nearest;
+    const targetMineLevel = resume?.level || nearest?.level || settings.mineLevel;
     const configId = data.mineConfigId(targetMineType, targetMineLevel);
     if (!configId) return { action: 'wait', reason: 'Invalid mine configuration' };
 
@@ -158,7 +180,7 @@
         .map((m) => m?.mineId || m?.target?.objectId || m?.targetId)
         .filter(Boolean)
     );
-    const matchingMines = (mineSearch?.mineConfigId === configId)
+    const matchingMines = resume ? [resume.mine] : nearest ? [nearest.mine] : (mineSearch?.mineConfigId === configId)
       ? safeList(mineSearch?.mines).filter((m) => m?.mineId && !activeMineIds.has(m.mineId))
       : [];
 
@@ -188,6 +210,7 @@
         mineLevel: targetMineLevel,
         mineId: selectedMine.mineId,
         call: gatherCall,
+        pending: { mineType: targetMineType, ...(resume ? { resumeMineId: selectedMine.mineId } : {}) },
         nextLastAutoMineType: targetMineType
       };
     }
