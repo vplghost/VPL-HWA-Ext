@@ -46,6 +46,9 @@
   const migratedReadFeatures = new Map([
     ['getInfo', 'clanVersus'],
     ['getCampSummary', 'camp'],
+    ['getMineSummary', 'mine'],
+    ['user_getClanInfo', ''],
+    ['getUserClanMembersOutposts', 'globalMap'],
     ['getDailyQuests', 'quest'],
     ['getSpecialQuestState', 'quest'],
     ['magicTower_briefInfo', ''],

@@ -75,6 +75,7 @@ onMounted(async () => {
       { name: 'getSummary', feature: 'building' },
       { name: 'getSummary', feature: 'personalResearch' },
       { name: 'getMarches', feature: 'march' },
+      { name: 'getMineSummary', feature: 'mine' },
     ]).catch(() => {});
   }
 

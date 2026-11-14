@@ -1,5 +1,7 @@
 import { normalizeArray } from './troops.ts';
 import { formatDuration } from './formatters.ts';
+import { gatheringProgress } from './gatheringProgress.ts';
+import { bossLevel, soloMonsterLevel } from './experimentalData.ts';
 import { getMarchBadgeInfo, isMarchExpired } from './resourceData.ts';
 
 const timestampMs = (value: unknown): number | null => {
@@ -54,15 +56,19 @@ export function dashboardMarches(cache: Record<string, any>, now = Date.now()) {
         : waiting ? march.rally?.waitUntil ?? march.endsAt
         : traveling ? arrival ?? march.endsAt : march.endsAt;
       const remaining = Number.isFinite(end) ? Math.max(0, Math.ceil((end - now) / 1000)) : null;
+      const gathering = badge.category === 'gather' ? gatheringProgress(march, now, cache) : null;
+      const level = badge.category === 'raid' ? bossLevel(march.rally?.mobConfigId ?? march.mobConfigId)
+        : badge.category === 'monster' ? soloMonsterLevel(march.mobConfigId) : null;
+      const target = gathering?.target || march.targetName || (badge.category === 'raid' ? `Guild Boss${level ? ` · Lv.${level}` : ''}`
+        : badge.category === 'monster' ? `World Monster${level ? ` · Lv.${level}` : ''}` : returning ? 'Returning to outpost' : 'Active squad march');
       return {
+        gathering,
         id: `${march.id ?? march.marchId ?? march.squadId ?? index}`,
-        march, category: badge.category, icon: badge.icon, stage,
+        march, category: badge.category, icon: badge.icon, stage: gathering?.phase || stage,
         title: badge.category === 'raid' ? 'Guild Raid' : badge.category === 'gather' ? 'Gathering'
           : badge.category === 'monster' ? 'Solo Monster' : 'Squad March',
-        target: march.targetName || (march.mineId ? `Mine #${march.mineId}`
-          : march.mobId || march.rally?.mobId ? `Target #${march.mobId ?? march.rally.mobId}`
-          : `Squad #${march.squadId ?? march.id ?? '—'}`),
-        timerText: fighting ? 'In battle' : remaining === null ? 'Active'
+        target,
+        timerText: gathering ? (gathering.remainingSeconds == null ? 'In progress' : gathering.remainingSeconds > 0 ? formatDuration(gathering.remainingSeconds) : 'Awaiting update') : fighting ? 'In battle' : remaining === null ? 'Active'
           : remaining > 0 ? formatDuration(remaining) : 'Awaiting update',
       };
     });

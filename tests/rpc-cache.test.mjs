@@ -512,7 +512,10 @@ test('march snapshots classify resource mines and movement without retaining raw
   assert.equal(projected[0].endsAt, Date.parse(at) + 600000);
   assert.equal(projected[4].endsAt, Date.parse(at) + 300000);
   assert.equal(projected[0].squadId, 'wood-squad');
-  assert.equal(JSON.stringify(entries).includes('473'), false);
+  assert.equal(projected[0].targetCoordinates.x, 473);
+  assert.equal(projected[0].gatheringStartedAt, Date.parse(at));
+  assert.equal(projected[0].gatheringDurationMs, 600000);
+  assert.equal(projected[0].route, undefined);
   const cleared = record([{ name: 'getMarches', feature: 'march', ident: 'later' }],
     [{ ident: 'later', result: { response: { marches: {}, scoutMarches: {} } } }],
     '2026-11-01T13:45:00.000Z');

@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
+import GatheringProgress from '@/src/components/common/GatheringProgress.vue';
 import { formatNumber, formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import { isMarchExpired, getMarchBadgeInfo } from '@/src/utils/resourceData';
+import { gatheringProgress } from '@/src/utils/gatheringProgress';
 import {
   getMineConfigId,
   buildSquad,
@@ -22,7 +24,10 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { cache } = useRpcCache();
+const { cache, dispatchRpc } = useRpcCache();
+watch(() => props.modelValue, open => {
+  if (open) void dispatchRpc([{ name: 'getMineSummary', feature: 'mine' }, { name: 'getMarches', feature: 'march' }]);
+}, { immediate: true });
 
 const {
   selectedTeamId,
@@ -156,36 +161,19 @@ const gatheringMarches = computed(() => {
       return isMine;
     })
     .map((m: any) => {
-      const isReturning = m.kind === 'return' || m.stage === 'returnToOutpost';
-      const isMoving =
-        m.stage === 'moveToTargetInSolo' ||
-        (Number.isFinite(m.targetArrivalAt) && now.value < m.targetArrivalAt) ||
-        (Number.isFinite(m.endsAt) && now.value < m.endsAt && m.stage !== 'gathering');
-      const targetTime = isReturning
-        ? (m.endsAt || m.returnAt)
-        : isMoving
-        ? (m.targetArrivalAt || m.endsAt)
-        : null;
-      const remainingSec = targetTime && targetTime > now.value
-        ? Math.max(0, Math.ceil((targetTime - now.value) / 1000))
-        : 0;
-
-      let stageText = 'Gathering at mine';
-      if (isReturning) {
-        stageText = 'Returning';
-      } else if (isMoving && remainingSec > 0) {
-        stageText = 'Marching to mine';
-      }
-
-      return {
-        id: m.id || m.squadId,
-        squadId: m.squadId || m.id,
-        kind: m.kind,
-        stage: stageText,
-        remainingSec,
-        timerText: (isReturning || isMoving) && remainingSec > 0 ? formatDuration(remainingSec) : 'In progress',
-      };
+      const progress = gatheringProgress(m, now.value, cache.value);
+      return { ...m, id: m.id || m.squadId, squadId: m.squadId || m.id,
+        progress, stage: progress.phase,
+        timerText: progress.remainingSeconds == null ? 'In progress' : progress.remainingSeconds > 0 ? formatDuration(progress.remainingSeconds) : 'Awaiting update' };
     });
+});
+
+const gatheringOverall = computed(() => {
+  const rows = gatheringMarches.value.map(march => march.progress);
+  if (!rows.length || rows.some(row => row.total == null || row.collected == null)) return null;
+  const total = rows.reduce((sum, row) => sum + row.total!, 0);
+  const collected = rows.reduce((sum, row) => sum + row.collected!, 0);
+  return total > 0 ? { total, collected, progress: Math.round(collected / total * 1000) / 10 } : null;
 });
 
 // Found full mines matching search criteria
@@ -565,7 +553,7 @@ async function recallMarch(march: any) {
                   Mine #{{ Number(idx) + 1 }} · ({{ mine.coordinates?.x ?? '?' }}, {{ mine.coordinates?.y ?? '?' }})
                 </div>
                 <div class="text-[11px] text-slate-400">
-                  Resource: {{ formatNumber(mine.resourceCount || mine.resAmount || 0) }}
+                  {{ manualMineType.charAt(0).toUpperCase() + manualMineType.slice(1) }} · Lv.{{ manualMineLevel }}
                 </div>
               </div>
 
@@ -589,6 +577,9 @@ async function recallMarch(march: any) {
           <span class="text-xs font-normal text-slate-400">{{ gatheringMarches.length }} active</span>
         </h3>
 
+        <div v-if="gatheringOverall" class="text-xs text-teal-700 dark:text-teal-300 flex items-center justify-between">
+          <span>Overall collection progress</span><span class="font-mono font-semibold">{{ gatheringOverall.progress }}%</span>
+        </div>
         <div v-if="gatheringMarches.length === 0" class="p-4 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-lg">
           No gathering marches currently active.
         </div>
@@ -602,8 +593,9 @@ async function recallMarch(march: any) {
             <div class="flex items-center gap-2">
               <span class="text-base">⛏️</span>
               <div>
-                <span class="font-bold text-slate-800 dark:text-slate-200">Squad #{{ march.id }}</span>
+                <span class="font-bold text-slate-800 dark:text-slate-200">{{ march.progress.target }}</span>
                 <span class="text-[11px] text-slate-400 ml-2">{{ march.stage }}</span>
+                <GatheringProgress :progress="march.progress" />
               </div>
             </div>
 

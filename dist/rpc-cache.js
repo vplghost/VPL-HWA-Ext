@@ -27,6 +27,8 @@
     startHealing: 'teams',
     completeHealing: 'teams',
     questGetAll: 'other',
+    user_getClanInfo: 'other',
+    'getUserClanMembersOutposts:globalMap': 'other',
     arenaGetAll: 'other',
     expeditionGet: 'other',
     dailyBonusGetInfo: 'other',
@@ -54,6 +56,7 @@
     'attackMine:mine': 'header',
     'stopMineGathering:mine': 'header',
     'searchMine:mine': 'other',
+    'getMineSummary:mine': 'header',
     'getChunks:globalMap': 'other',
     'getRoutesByIds:globalMap': 'other',
     'getPage:report': 'header',
@@ -284,7 +287,19 @@
               stage.toLowerCase().includes('rally') ? 'raid' : 'attack');
           marches.push({ squadId: typeof march.squadId === 'string' ? march.squadId : null,
             ...(typeof (route?.routeId ?? march.routeId) === 'string' ? { routeId: route?.routeId ?? march.routeId } : {}),
-            kind, stage, endsAt: Number.isFinite(endsAt) ? endsAt : null });
+            kind, stage, endsAt: Number.isFinite(endsAt) ? endsAt : null,
+            ...(targetType === 'mine' ? {
+              mineId: march.targetId || march.target?.objectId || null,
+              mineConfigId: march.target?.objectConfigId,
+              targetCoordinates: march.targetCoordinates || march.target?.coordinates,
+              startedAt, durationMs: duration,
+              ...(stage === 'interactionWithTarget' || stage === 'gathering' ? {
+                gatheringStartedAt: startedAt, gatheringDurationMs: duration,
+                gatheringEndsAt: Number.isFinite(endsAt) ? endsAt : null,
+              } : {}),
+            } : {}),
+            ...(stage === 'returnToOutpost' && Number.isFinite(startedAt) ? { gatheringStoppedAt: startedAt } : {}),
+          });
         }
       }
     }
@@ -587,6 +602,22 @@
             updatedAt: record.timestamp
           });
           return actions;
+        }
+        if (call.name === 'user_getClanInfo' && result?.response && !result.error && !result.response.error && Object.hasOwn(result.response, 'clanData')) {
+          return [{ key: 'guildRosterAction', method: call.name, feature: null, group: 'internal',
+            data: { clanData: result.response.clanData || null, selfRole: result.response.clanRole }, updatedAt: record.timestamp }];
+        }
+        if (key === 'getUserClanMembersOutposts:globalMap' && !result?.error && Array.isArray(result?.response?.outposts)) {
+          return [{ key: 'guildOutpostsAction', method: call.name, feature: call.feature, group: 'internal',
+            data: { outposts: result.response.outposts }, updatedAt: record.timestamp }];
+        }
+        if (key === 'getMineSummary:mine' && !result?.error && Array.isArray(result?.response?.gatherings)) {
+          return [{ key: 'gatheringStatus', method: call.name, feature: call.feature, group: 'header',
+            data: { gatherings: result.response.gatherings.map(item => ({
+              mineId: item.mineId, squadId: item.squadId, startedAt: item.startedAt,
+              plannedDurationMs: item.plannedDurationMs ?? item.plannedDuration,
+              plannedGatheredResourceAmount: item.plannedGatheredResourceAmount,
+            })) }, updatedAt: record.timestamp }];
         }
         if (key === 'searchMine:mine' && Array.isArray(result?.response?.mines) && Array.isArray(call.args?.mineConfigIds)) {
           const mineConfigId = call.args.mineConfigIds[0];
@@ -2073,6 +2104,77 @@
           entry.data = { ...entry.data, mobs: mobs.filter((mob) =>
             mob && !won.some((item) => item?.mapId === entry.data?.mapId && item?.mobId === mob?.mobId)) };
         }
+        if (entry.key === 'accountStatus' && next.accountStatus?.data?.id != null && entry.data?.id != null &&
+            String(next.accountStatus.data.id) !== String(entry.data.id) && (!next.accountStatus.updatedAt || next.accountStatus.updatedAt <= entry.updatedAt)) {
+          delete next.guildStatus;
+          delete next.guildOutposts;
+          changed = true;
+        }
+        if (entry.key === 'guildRosterAction') {
+          const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id;
+          if (accountId == null || next.guildStatus?.updatedAt > entry.updatedAt) continue;
+          const raw = entry.data.clanData?.clan;
+          const previous = next.guildStatus?.data;
+          if (!raw?.id) {
+            next.guildStatus = { key: 'guildStatus', method: entry.method, group: 'other',
+              data: { accountId: String(accountId), guild: null, members: {}, outposts: {} }, updatedAt: entry.updatedAt };
+            delete next.guildOutposts;
+            changed = true;
+            continue;
+          }
+          const members = {};
+          const stats = new Map(normalizeArrayData(entry.data.clanData.membersStat).map(row => [String(row.userId), row]));
+          for (const [id, member] of Object.entries(raw.members || {})) {
+            if (!member || !/^\d+$/.test(String(member.id ?? id)) || (member.clanId != null && String(member.clanId) !== String(raw.id))) continue;
+            members[String(member.id ?? id)] = { ...member, stats: stats.get(String(member.id ?? id)) || {}, observedAt: entry.updatedAt };
+          }
+          if (!Object.hasOwn(members, String(accountId))) continue; // user_getClanInfo is the active player's own Guild.
+          const sameGuild = previous?.accountId === String(accountId) && String(previous?.guild?.id) === String(raw.id);
+          const outposts = {};
+          const pendingOutposts = next.guildOutposts?.data;
+          const observations = pendingOutposts?.accountId === String(accountId) &&
+            (!pendingOutposts.guildId || String(pendingOutposts.guildId) === String(raw.id)) ? pendingOutposts.rows || {} : {};
+          for (const [id, outpost] of Object.entries({ ...(sameGuild ? previous.outposts || {} : {}), ...observations })) {
+            if (Object.hasOwn(members, id)) outposts[id] = outpost;
+          }
+          const { members: ignored, ...guild } = raw;
+          next.guildStatus = { key: 'guildStatus', method: entry.method, group: 'other',
+            data: { accountId: String(accountId), guild, selfRole: entry.data.selfRole,
+              members, outposts, stats: entry.data.clanData.stat || {}, serverResetTime: entry.data.clanData.serverResetTime },
+            updatedAt: entry.updatedAt };
+          if (!sameGuild && pendingOutposts?.guildId && String(pendingOutposts.guildId) !== String(raw.id)) delete next.guildOutposts;
+          else if (pendingOutposts?.accountId === String(accountId)) next.guildOutposts = { ...next.guildOutposts,
+            data: { accountId: String(accountId), guildId: String(raw.id), rows: outposts } };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'guildOutpostsAction') {
+          const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id;
+          if (accountId == null || next.guildOutposts?.updatedAt > entry.updatedAt) continue;
+          const status = next.guildStatus?.data;
+          const sameAccount = status?.accountId === String(accountId);
+          const guildId = sameAccount ? status.guild?.id : null;
+          const rows = {};
+          for (const outpost of entry.data.outposts.slice(0, 500)) {
+            if (outpost?.userId == null || !/^\d+$/.test(String(outpost.userId)) || (sameAccount && !Object.hasOwn(status.members || {}, String(outpost.userId)))) continue;
+            rows[String(outpost.userId)] = { ...outpost, observedAt: entry.updatedAt };
+          }
+          next.guildOutposts = { key: 'guildOutposts', method: entry.method, group: 'other',
+            data: { accountId: String(accountId), guildId: guildId ? String(guildId) : null, rows }, updatedAt: entry.updatedAt };
+          if (sameAccount && status.guild) {
+            next.guildStatus = { ...next.guildStatus, data: { ...status, outposts: { ...status.outposts, ...rows } } };
+          }
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'gatheringStatus') {
+          if (next.gatheringStatus?.updatedAt > entry.updatedAt) continue;
+          const plans = { ...(next.gatheringStatus?.data?.plans || {}) };
+          for (const row of entry.data.gatherings) if (row.squadId && row.mineId) plans[row.squadId] = { ...row, observedAt: entry.updatedAt };
+          const ids = Object.keys(plans).sort((a, b) => (plans[b].observedAt || '').localeCompare(plans[a].observedAt || ''));
+          for (const id of ids.slice(100)) delete plans[id];
+          entry.data = { ...entry.data, plans };
+        }
         if (entry.key === 'freeAlchemySpinAction') {
           const receipts = normalizeArrayData(next.freeAlchemySpinReceipts?.data);
           if (receipts.some(receipt => receipt?.token === entry.data.token)) continue;
@@ -2476,7 +2578,8 @@
                 ...prev,
                 kind: 'return',
                 stage: 'returnToOutpost',
-                previousKind: prev.kind,
+                previousKind: prev.kind === 'return' ? prev.previousKind : prev.kind,
+                gatheringStoppedAt: entry.data.startedAt,
                 endsAt: entry.data.returnAt,
                 returnAt: entry.data.returnAt,
                 remainingResourceAmount: entry.data.remainingResourceAmount
@@ -4329,6 +4432,16 @@
           const previous = normalizeArrayData(next.marchStatus?.data?.marches);
           const incoming = normalizeArrayData(entry.data?.marches);
           entry.data.marches = incoming.map((march) => {
+            const plan = next.gatheringStatus?.data?.plans?.[march.squadId];
+            if (plan && (!march.mineId || march.mineId === plan.mineId)) {
+              const info = next.mineMap?.[plan.mineId];
+              march = { ...march, mineId: plan.mineId,
+                gatheringStartedAt: plan.startedAt, gatheringDurationMs: plan.plannedDurationMs,
+                gatheringEndsAt: Number.isFinite(plan.startedAt) && Number.isFinite(plan.plannedDurationMs) ? plan.startedAt + plan.plannedDurationMs : null,
+                gatheringTotalAmount: plan.plannedGatheredResourceAmount,
+                ...(march.stage === 'returnToOutpost' ? { previousKind: info?.mineType || 'mine' } : {}),
+              };
+            }
             const prior = previous.find((item) => item.squadId &&
               item.squadId === march.squadId);
             if (!prior) return march;
@@ -4355,6 +4468,14 @@
                 returnAt, returnEstimated: returning ? false : prior.returnEstimated };
             }
             const enriched = { ...march };
+            const wasGathering = prior.mineId || ['wood', 'food', 'stone', 'iron', 'mine'].includes(prior.kind) || ['wood', 'food', 'stone', 'iron', 'mine'].includes(prior.previousKind);
+            if (wasGathering) {
+              for (const field of ['gatheringStartedAt', 'gatheringDurationMs', 'gatheringEndsAt', 'gatheringTotalAmount', 'targetCoordinates']) {
+                if (enriched[field] == null && prior[field] != null) enriched[field] = prior[field];
+              }
+              if (march.stage === 'returnToOutpost') enriched.previousKind = prior.kind === 'return' ? prior.previousKind : prior.kind;
+              if (!enriched.gatheringStoppedAt && prior.gatheringStoppedAt) enriched.gatheringStoppedAt = prior.gatheringStoppedAt;
+            }
             if (prior.mineId && !enriched.mineId) enriched.mineId = prior.mineId;
             if (prior.mineConfigId && !enriched.mineConfigId) enriched.mineConfigId = prior.mineConfigId;
             if (prior.team && !enriched.team) enriched.team = prior.team;

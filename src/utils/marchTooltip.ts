@@ -1,9 +1,9 @@
 import { formatNumber } from './formatters.ts';
 import { normalizeArray } from './troops.ts';
+import { gatheringProgress } from './gatheringProgress.ts';
 import {
   bossLevel,
   soloMonsterLevel,
-  getMineTypeLevel,
 } from './experimentalData.ts';
 
 /**
@@ -171,49 +171,14 @@ export function formatMarchTooltip(march: any, now = Date.now(), cache: any = {}
 
   // ==================== GATHERING ====================
   if (isMine) {
-    let mineType = march.kind !== 'return' && march.kind !== 'mine' ? march.kind : null;
-    let mineLevel: number | null = null;
-    if (march.mineConfigId) {
-      const info = getMineTypeLevel(march.mineConfigId);
-      if (info) {
-        mineType = info.type;
-        mineLevel = info.level;
-      }
-    }
-    if (!mineType && cache?.mineMap?.[march.mineId]) {
-      const mInfo = cache.mineMap[march.mineId];
-      if (mInfo?.mineType) mineType = mInfo.mineType;
-      if (mInfo?.mineConfigId) {
-        const info = getMineTypeLevel(mInfo.mineConfigId);
-        if (info) {
-          mineType = info.type;
-          mineLevel = info.level;
-        }
-      }
-    }
-
-    const typeCap = mineType ? mineType.charAt(0).toUpperCase() + mineType.slice(1) : 'Resource';
-    const lvlText = mineLevel ? ` (Lv.${mineLevel})` : '';
-    lines.push(`⛏️ Gathering · ${typeCap} Mine${lvlText}`);
-
-    const isTraveling = march.stage === 'moveToTargetInSolo' && Number.isFinite(march.targetArrivalAt) && now < march.targetArrivalAt;
-    if (isReturning) {
-      const retTime = march.endsAt || march.returnAt ? formatMarchDuration((march.endsAt || march.returnAt) - now) : 'In progress';
-      lines.push(`Status: Returning to outpost · ${retTime} remaining`);
-    } else if (isTraveling) {
-      const arrTime = formatMarchDuration(march.targetArrivalAt - now);
-      lines.push(`Status: Traveling to mine · ${arrTime} to arrival`);
-    } else {
-      const remTime = march.endsAt && march.endsAt > now ? formatMarchDuration(march.endsAt - now) : 'In progress';
-      lines.push(`Status: Gathering resources · ${remTime}`);
-    }
-
-    if (heroNames.length > 0) {
-      lines.push(`Heroes (${heroNames.length}/5): ${heroNames.join(', ')}`);
-    }
-    if (troopsText) {
-      lines.push(`Troops: ${troopsText}`);
-    }
+    const progress = gatheringProgress(march, now, cache);
+    lines.push(`⛏️ Gathering · ${progress.target}`);
+    const remaining = progress.remainingSeconds == null ? 'Timing unavailable' : formatMarchDuration(progress.remainingSeconds * 1000);
+    lines.push(`Status: ${progress.phase === 'Gathering' ? 'Gathering resources' : progress.phase} · ${remaining}`);
+    if (progress.progress != null) lines.push(`Collection progress: ${progress.progress}%`);
+    if (progress.collected != null) lines.push(`Estimated collected: ${formatNumber(progress.collected)} ${progress.resource}${progress.total != null ? ` / ${formatNumber(progress.total)}` : ''}`);
+    if (heroNames.length > 0) lines.push(`Heroes (${heroNames.length}/5): ${heroNames.join(', ')}`);
+    if (troopsText) lines.push(`Troops: ${troopsText}`);
     lines.push('(Click to view Gathering dialog)');
     return lines.join('\n');
   }

@@ -1,9 +1,9 @@
 ---
 id: doc-a6f335cb1ecfe4f9e42b56b8b7fa18f3
 title: Guild Features
-description: Guild chat FAB, reverse-scroll ordering, last-read timestamp tracking, unread badge computation, and view isolation from main popup content
+description: Guild member/outpost snapshots, account/Guild scope, member statistics, chat FAB and API Log dialog routing
 createdAt: '2026-11-03T14:32:55.942Z'
-updatedAt: '2026-11-13T02:30:24.642Z'
+updatedAt: '2026-11-14T01:53:00.503Z'
 tags:
   - guild
   - guild-chat
@@ -70,3 +70,23 @@ getUnreadChatCount(messages, lastReadTime) in popup-data.js:
 - Symbols: renderGuildChat, updateGuildChatBadge, markChatRead in extension/popup.js
 - Symbols: getUnreadChatCount in extension/popup-data.js
 - Symbols: rpc-cache.js line 3678 (merge) and line 4317 (prune) in extension/rpc-cache.js
+
+
+## Guild member and outpost tab (2026-11-14)
+
+Implemented by @task-VHE-6WM927. Use **Guild** in the UI, matching current official locale `UI_MAINMENU_CLAN`/`MECHANIC_UNLOCKED_CLAN`; preserve wire method names containing `clan`. `clan_getSummary` belongs to city building/research data and is not the Guild roster.
+
+Observed contracts in `hwa-game-record-202611100940_dungeon.json` and `hwa-game-record-202611112214_increase_skill.json`:
+
+- `user_getClanInfo` (no feature/args) returns `clanData.clan` with Guild ID/title/owner/level/description/custom role names and `members` keyed by player ID. Member fields include name, level, clanId/clanRole, avatar/border, server and Unix-second lastLoginTime. `clanData.membersStat[]` joins by userId and contains today/total activity, today/total dungeon activity, recorded raidDamage and wasChampion.
+- `getUserClanMembersOutposts` with feature `globalMap` and empty args returns `outposts[]`: userId, username, outpostId, outpostLevel, coordinates, mapId and flag. Coordinates are useful display data; UUIDs are internal correlation data. A replay of the first capture yields30members and30outposts.
+
+The passive reducer creates `guildStatus` and `guildOutposts`. Own-account identity must be known, and the own player must belong to the returned roster. A roster is authoritative for membership; departed/foreign members do not survive into the current view. Outposts can arrive before or after the roster, are matched by exact user ID, and are bound to the active account/Guild once known. Changing account clears these stores; changing Guild discards prior-Guild outpost associations. Empty acknowledgements and failures are not no-Guild snapshots; explicit `clanData:null` clears membership. Timestamp guards reject older snapshots. The latest known outpost for remaining members is retained, with its observation timestamp, when a later partial outpost response omits it.
+
+`GuildTab.vue` shows member basics, official/custom roles, activity/Titanite, outpost level/coordinates and last login. Member expansion shows recorded totals, server and observation times. Missing fields show unavailable states rather than fabricated zeros. Search/filter/sort and filtered JSON export are supported. Owner/255 is Guild Master; roles4/3 follow the repository's verified Officer/Member mapping and server custom role names; unknown role codes remain unavailable. Refresh uses `userGetInfo`, `user_getClanInfo`, and `getUserClanMembersOutposts:globalMap`, respecting global RPC settings and strict read allowlists. Raw account/outpost/map IDs are not printed in the table.
+
+Regression coverage is in `tests/guild-data.test.mjs`: both response arrival orders, foreign member filtering, account/Guild/no-Guild transitions, unknown roles, actual SFC rendering, filters, refresh and export.
+
+## Log dialog and FAB routing (2026-11-14)
+
+Implemented by @task-VHE-WEDXQP. API Log is now `LogModal.vue`, reusing the existing log viewer and recording/filter/sort/clear/export behavior. The FAB opens Guild Chat or API Log without replacing the active tab. Tower/Dungeon FAB entries are removed; Dashboard activity launchers and their global dialogs remain. TabNav/Settings discard the obsolete Log tab ID and include Guild while retaining other tab visibility/order preferences. ModalDialog supplies the existing explicit-dismissal/backdrop policy. `tests/log-dialog-navigation.test.mjs` covers routing and legacy tab-setting normalization.

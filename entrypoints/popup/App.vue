@@ -9,11 +9,12 @@ import TitansTab from '@/src/components/tabs/TitansTab.vue';
 import ItemsTab from '@/src/components/tabs/ItemsTab.vue';
 import ResourcesTab from '@/src/components/tabs/ResourcesTab.vue';
 import TeamsTab from '@/src/components/tabs/TeamsTab.vue';
+import GuildTab from '@/src/components/tabs/GuildTab.vue';
 import EventsTab from '@/src/components/tabs/EventsTab.vue';
 import GoalsTab from '@/src/components/tabs/GoalsTab.vue';
 import QuestsTab from '@/src/components/tabs/QuestsTab.vue';
 import SettingsTab from '@/src/components/tabs/SettingsTab.vue';
-import LogTab from '@/src/components/tabs/LogTab.vue';
+import LogModal from '@/src/components/dialogs/LogModal.vue';
 
 import { useModals } from '@/src/composables/useModals';
 import BuildingModal from '@/src/components/dialogs/BuildingModal.vue';
@@ -55,10 +56,11 @@ const { modalState, modalContext } = useModals();
               activeTab === 'items' ? ItemsTab :
               activeTab === 'resources' ? ResourcesTab :
               activeTab === 'teams' ? TeamsTab :
+              activeTab === 'guild' ? GuildTab :
               activeTab === 'events' ? EventsTab :
               activeTab === 'goals' ? GoalsTab :
               activeTab === 'settings' ? SettingsTab :
-              LogTab
+              DashboardTab
             "
           />
         </KeepAlive>
@@ -82,6 +84,7 @@ const { modalState, modalContext } = useModals();
       <DraftModal v-model="modalState.draft" />
       <GuildVersusModal v-model="modalState.guildVersus" />
       <GuildChatPanel v-model="modalState.guildChat" />
+      <LogModal v-model="modalState.log" />
     </div>
   </div>
 </template>

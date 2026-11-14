@@ -48,7 +48,7 @@ test('marches retain normalized gathering, battle and return stages and remove o
   } }) };
   const rows = dashboardMarches(cache, now);
   assert.deepEqual(rows.map(row => row.id), ['g', 'r', 'm', 'back', 'wait']);
-  assert.deepEqual(rows.map(row => row.stage), ['Traveling', 'In battle', 'In battle', 'Returning', 'Preparing rally']);
+  assert.deepEqual(rows.map(row => row.stage), ['Traveling to mine', 'In battle', 'In battle', 'Returning', 'Preparing rally']);
   assert.deepEqual(rows.map(row => row.category), ['gather', 'raid', 'monster', 'raid', 'raid']);
   assert.equal(dashboardMarches(cache, now + 11000)[0].stage, 'Gathering');
   assert.equal(dashboardMarches(cache, now + 21000).some(row => row.id === 'back'), false);

@@ -16,7 +16,7 @@ const DEFAULT_TABS = [
   { id: 'teams', label: 'Teams', icon: '⚔️' },
   { id: 'events', label: 'Events', icon: '🎉' },
   { id: 'goals', label: 'Goals', icon: '🎯' },
-  { id: 'log', label: 'Log', icon: '📜' },
+  { id: 'guild', label: 'Guild', icon: '🛡️' },
 ];
 
 const props = defineProps<{

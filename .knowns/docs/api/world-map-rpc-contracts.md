@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-13T11:16:08.665Z'
+updatedAt: '2026-11-14T01:55:08.354Z'
 tags:
   - api
   - rpc
@@ -254,3 +254,17 @@ Regression coverage: `tests/healing-sync.test.mjs`, `tests/background.test.mjs`,
 See @doc/architecture/raid-target-recovery-and-natural-energy-trigger. Missing/undated/future/older-than-five-minute searches no longer block queue startup; refresh roster and search automatically. Fresh candidate batches still run in order. The prior search-only-when-exhausted rule has explicit stale/invalid batch exceptions: five-minute expiry or a confirmed nonexistent/expired/unavailable target rejection clears the old batch and searches again. Preserve remaining count and failed/won exclusions. This does not change confirmed win+return sequencing or insufficient-energy stops.
 
 Account-bound auto raid settings use the Raid dialog's team, level, wait, count, troop cap and cancellation options. A 30-second document heartbeat detects only a below-to-exact-threshold natural refill transition with continuous observations; startup/reload, above threshold, item gains, offline catch-up, active conflicting queues and disabled RPC do not start/defer raids. Global RPC mode/enabled flags are never changed by Raid preferences. The full behavior and regression evidence are in the linked architecture document.
+
+
+## Gathering amount estimates from getMineSummary (2026-11-14)
+
+Implemented by @task-VHE-N23JRD. `getMineSummary` uses feature `mine` and empty args. `response.gatherings[]` supplies `mineId`, `squadId`, millisecond `startedAt`, `plannedDurationMs` (legacy `plannedDuration` is also milliseconds in the observed payload), and `plannedGatheredResourceAmount`. In `hwa-game-record-202611112214_increase_skill.json`, one plan has start1794407868742,duration34829722,total375000. The same method appears in `hwa-game-record-202611100940_dungeon.json` with7,500,000resource plans.
+
+`gatheringProgress` matches the same squad and mine, computes `clamp((now-startedAt)/plannedDurationMs,0,1)`, multiplies by the server's planned total and floors the displayed estimate. The estimate describes resources collected at the mine, not resources delivered to inventory; it never credits the resource balance. Returning marches freeze the estimate at the server return route's start time. Outbound travel has0collected; missing or invalid timing/quantity stays unknown rather than substituting mine stock or an invented rate.
+
+`extractMarches` retains gathering timers, mine config/type, mine identity and useful target coordinates from `interactionWithTarget` records. `gatheringStatus` stores active plans plus at most100recent squad plans so recall/return snapshots can still show frozen collection totals. Stale snapshots cannot replace newer data. Dialog opening and Dashboard refresh request the narrowly allowlisted `getMineSummary:mine` alongside marches under normal RPC settings.
+
+The Gathering dialog and Dashboard Active Marches share `GatheringProgress.vue`; Header/Dashboard tooltips share the same helper. They display resource type, estimate/total, percentage and remaining time. Overall dialog progress is total estimated collected divided by total planned quantities when all displayed marches have valid quantities. Internal squad/mine identifiers remain available for recall/correlation but are not rendered in gathering cards or targets. The Dashboard tooltip now uses the actual BaseTooltip `content`/`placement` props.
+
+
+Popup/Header initialization also requests `getMineSummary:mine` once alongside the existing march snapshot refresh, so Dashboard estimates can populate without first opening the Gathering dialog. This remains a normal shared-policy read, not polling.

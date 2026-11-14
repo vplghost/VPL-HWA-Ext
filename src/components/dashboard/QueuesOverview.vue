@@ -7,6 +7,7 @@ import { dashboardQueues, dashboardMarches } from '@/src/utils/dashboardState';
 import { getBuildingName, getResearchName } from '@/src/utils/metadata';
 import { formatMarchTooltip } from '@/src/utils/marchTooltip';
 import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
+import GatheringProgress from '@/src/components/common/GatheringProgress.vue';
 
 const { cache } = useRpcCache();
 const { openModal } = useModals();
@@ -81,7 +82,7 @@ function handleMarchClick(category: string) {
         {{ marchesKnown ? 'No active squad marches outside city' : 'Waiting for game data' }}
       </div>
       <div v-else class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-        <BaseTooltip v-for="m in marches" :key="m.id" class="w-full" :text="formatMarchTooltip(m.march, now, cache)" position="bottom">
+        <BaseTooltip v-for="m in marches" :key="m.id" class="w-full" :content="formatMarchTooltip(m.march, now, cache)" placement="bottom">
           <button
             type="button"
             class="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between gap-2 text-left text-xs"
@@ -93,6 +94,7 @@ function handleMarchClick(category: string) {
               <div class="min-w-0">
                 <div class="font-semibold text-slate-800 dark:text-slate-200">{{ m.title }} · {{ m.stage }}</div>
                 <div class="text-[10px] text-slate-400 truncate max-w-40">{{ m.target }}</div>
+                <GatheringProgress v-if="m.gathering" :progress="m.gathering" />
               </div>
             </div>
             <span class="shrink-0 px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-mono font-semibold text-[11px]">{{ m.timerText }}</span>

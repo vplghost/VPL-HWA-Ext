@@ -14,7 +14,8 @@ export type ModalName =
   | 'draft'
   | 'guildVersus'
   | 'questDetail'
-  | 'guildChat';
+  | 'guildChat'
+  | 'log';
 
 const modalState = reactive<Record<ModalName, boolean>>({
   building: false,
@@ -31,6 +32,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   guildVersus: false,
   questDetail: false,
   guildChat: false,
+  log: false,
 });
 
 const modalContext = reactive<{

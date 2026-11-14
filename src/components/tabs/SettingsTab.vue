@@ -40,7 +40,7 @@ const DEFAULT_TAB_ITEMS = [
   { id: 'teams', label: 'Teams' },
   { id: 'events', label: 'Events' },
   { id: 'goals', label: 'Goals' },
-  { id: 'log', label: 'Log' },
+  { id: 'guild', label: 'Guild' },
 ];
 
 interface TabSettingItem {

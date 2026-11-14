@@ -40,11 +40,10 @@ function close() {
   isOpen.value = false;
 }
 
-function handleAction(action: 'chat' | 'tower' | 'dungeon') {
+function handleAction(action: 'chat' | 'log') {
   close();
   if (action === 'chat') openModal('guildChat');
-  else if (action === 'tower') openModal('tower');
-  else if (action === 'dungeon') openModal('dungeon');
+  else if (action === 'log') openModal('log');
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -113,38 +112,9 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <!-- Tower -->
           <div class="flex items-center gap-2">
-            <span class="rounded bg-slate-900/80 px-2 py-0.5 text-[11px] font-medium text-white shadow-xs">
-              Tower
-            </span>
-            <button
-              id="tower-fab"
-              type="button"
-              title="Tower"
-              aria-label="Open Tower dialog"
-              class="cursor-pointer flex size-10 items-center justify-center rounded-full bg-violet-600 hover:bg-violet-500 text-white shadow-md text-base transition-transform hover:scale-105"
-              @click="handleAction('tower')"
-            >
-              🗼
-            </button>
-          </div>
-
-          <!-- Titan Dungeon -->
-          <div class="flex items-center gap-2">
-            <span class="rounded bg-slate-900/80 px-2 py-0.5 text-[11px] font-medium text-white shadow-xs">
-              Titan Dungeon
-            </span>
-            <button
-              id="dungeon-fab"
-              type="button"
-              title="Titan Dungeon"
-              aria-label="Open Titan Dungeon dialog"
-              class="cursor-pointer flex size-10 items-center justify-center rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-md text-base transition-transform hover:scale-105"
-              @click="handleAction('dungeon')"
-            >
-              🏰
-            </button>
+            <span class="rounded bg-slate-900/80 px-2 py-0.5 text-[11px] font-medium text-white shadow-xs">API Log</span>
+            <button id="log-fab" type="button" title="API Log" aria-label="Open API Log dialog" class="cursor-pointer flex size-10 items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-white shadow-md text-base transition-transform hover:scale-105" @click="handleAction('log')">📋</button>
           </div>
         </nav>
       </transition>

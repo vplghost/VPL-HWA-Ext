@@ -74,6 +74,7 @@ async function refreshAllDashboard() {
     { name: 'getSummary', feature: 'building' },
     { name: 'getSummary', feature: 'personalResearch' },
     { name: 'getMarches', feature: 'march' },
+    { name: 'getMineSummary', feature: 'mine' },
     { name: 'magicTower_briefInfo' },
     { name: 'arenaGetAll' },
     { name: 'userGetInfo' },
