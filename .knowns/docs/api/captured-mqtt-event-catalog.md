@@ -1,9 +1,9 @@
 ---
 id: doc-0d0028b9e4a3bb19e742de8b5ea769ed
 title: Captured MQTT Event Catalog
-description: Nine MQTT event types observed in raw captures, with structural payload schemas and source evidence
+description: Captured MQTT event schemas and provenance, including rally membership/departure evidence.
 createdAt: '2026-11-06T04:06:02.037Z'
-updatedAt: '2026-11-06T04:06:02.037Z'
+updatedAt: '2026-11-14T08:03:14.634Z'
 tags:
   - mqtt
   - api
@@ -153,3 +153,12 @@ $.pushUserId: number
 $.squadId: string
 $.startedAt: number
 ```
+
+
+## rallyMembersUpdated
+
+Additional source: `temp/tracking-data/hwa-game-record-202611141452_expedition_collect.json`, SHA256 `638211e935dbf800beec4da59a5cf3a3c0586f7388af90cb40d638e94b0f0b0b`.11occurrences. Received QoS1UTF8PUBLISH on `hwm/pub/clan/305081`; envelope `{method:"msg",result:{type:"rallyMembersUpdated",body:{rallyId:string,rallyVersion:number}}}`. Two rally IDs with versions7..11and6..11. Payload invalidates membership; it does not contain members themselves. Implementation and RPC correlation: @doc/api/mqtt-processing-and-refresh.
+
+## rallyStarted
+
+Same source/hash as rallyMembersUpdated above.2occurrences,07:52:15.773Z and07:52:24.455Z, same transport/topic/envelope with type `rallyStarted`, body `{rallyId:string,rallyVersion:13}`. Correlated getRallyById replies supply the actual outbound route, which starts earlier than plannedStartTime. Notification alone is neither a victory nor base-return confirmation. See @doc/api/world-map-rpc-contracts. Added by @task-VHE-GN1AQ2.

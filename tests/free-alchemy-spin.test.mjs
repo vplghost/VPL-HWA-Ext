@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { computed, ref, shallowRef, watch, nextTick } from 'vue';
+import { freeAlchemyAvailability, freeAlchemyTimer } from '../src/utils/freeAlchemySpin.ts';
 
 const context = { TextEncoder };
 vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
@@ -67,6 +68,7 @@ test('actual dashboard button sends only free RPC, waits through queued ack/time
   const cache = ref({ accountStatus: { data: { id: 1 } } }), props = { hasGameTab: true };
   const calls = [], callbacks = [], timers = [], stops = [];
   const boundary = { computed, ref, shallowRef, Date, defineProps: () => props,
+    useNow: () => ref(Date.now()), freeAlchemyAvailability, freeAlchemyTimer,
     watch: (...args) => { const stop = watch(...args); stops.push(stop); return stop; }, onUnmounted() {},
     useRpcCache: () => ({ cache, dispatchRpc: batch => { calls.push(batch); return new Promise(resolve => callbacks.push(resolve)); } }),
     setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {},

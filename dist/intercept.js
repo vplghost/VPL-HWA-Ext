@@ -47,6 +47,8 @@
     ['getInfo', 'clanVersus'],
     ['getCampSummary', 'camp'],
     ['getMineSummary', 'mine'],
+    ['expeditionGet', ''],
+    ['user_getNextDayTime', ''],
     ['user_getClanInfo', ''],
     ['getUserClanMembersOutposts', 'globalMap'],
     ['getDailyQuests', 'quest'],
@@ -72,6 +74,17 @@
     'missionRaid', 'mission_raid', 'heroUpgradeSkill',
     'heroInsertItem', 'inventoryCraftFragments', 'inventoryCraftRecipe']);
   function isHelperAction(call) {
+    if (call?.name === 'expeditionFarm') {
+      return !call.feature && Object.keys(call.args || {}).length === 1 &&
+        Number.isInteger(call.args?.expeditionId) && call.args.expeditionId >= 0;
+    }
+    if (call?.name === 'artifact_expeditionStart') {
+      return !call.feature && Object.keys(call.args || {}).length === 2 &&
+        Number.isInteger(call.args?.expeditionId) && call.args.expeditionId >= 0 &&
+        Array.isArray(call.args.heroes) && call.args.heroes.length <= 5 &&
+        call.args.heroes.every(id => Number.isInteger(id) && id > 0) &&
+        new Set(call.args.heroes).size === call.args.heroes.length;
+    }
     if (call?.name === 'refillable_alchemyUseVideo') {
       return !call.feature && call.args?.type === 'alchemy' && Object.keys(call.args).length === 1;
     }
@@ -346,7 +359,7 @@
       const calls = event.data.calls;
       const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null) || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
-      if (calls.some(call => (typeof call === 'string' ? call : call?.name) === 'refillable_alchemyUseVideo' && !isHelperAction(call))) return;
+      if (calls.some(call => ['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) && !isHelperAction(call))) return;
       let headersToUse = lastRpcHeaders;
       if (!headersToUse && typeof sessionStorage !== 'undefined') {
         try {

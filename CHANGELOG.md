@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.10.78 — 2026-11-14
+
+### Added
+
+- Add Collect to ready expeditions, with confirmed in-game collection sync, released heroes, exactly-once returned rewards and quest progress updates.
+- Record captured rally RPC/MQTT membership and departure contracts, and refresh tracked rallies when rallyStarted arrives.
+
+### Fixed
+
+- Use authoritative rally departure/arrival routes instead of obsolete planned start times, reject lower-version details and avoid membership cancellation after departure.
+- Preserve expedition observation dates across overnight collection so unrelated stale slots cannot start.
+
+## 0.10.77 — 2026-11-14
+
+### Added
+
+- Add an Expeditions card to Dashboard Activities and a dialog with per-expedition progress, countdowns, finish times, hero assignments and visible VIP/subscription lock reasons.
+- Start eligible expeditions with automatically selected owned heroes, preventing overlapping teams and waiting for each server confirmation before continuing.
+
+### Fixed
+
+- Recognize a completed boss room on the final Tower floor as Done, including existing caches and getAll snapshots that omit the top-level win state.
+- Refresh complete Tower and expedition snapshots through the shared RPC policy.
+
+## 0.10.76 — 2026-11-14
+
+### Fixed
+
+- Show a live countdown in the Free Spin tooltip and disable the button until the observed eight-hour refill or daily game reset, whichever comes first.
+- Handle captured top-level free-spin quota errors, retain authoritative refill timing, and clear stale availability when switching accounts.
+
 ## 0.10.75 — 2026-11-14
 
 ### Added

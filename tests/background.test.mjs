@@ -1077,6 +1077,18 @@ test('auto-join push starts a rally march and refreshes its details', async () =
     ['getRallyById']);
 });
 
+test('captured rallyStarted refreshes only tracked own rallies under global RPC policy', async () => {
+  for (const tracked of [true, false]) {
+    const { local, send, forwardedMessages } = setup();
+    local.popupRpcEnabled = true;
+    local.rpcCache = { marchStatus: { data: { marches: tracked ? [{ squadId: 'own', rally: { id: 'rally-started' } }] : [] } } };
+    await send('api-record', socket('rallyStarted', { rallyId: 'rally-started', rallyVersion: 13 },
+      '2026-11-14T07:52:15.773Z'), { ...gameSender, tab: { id: 42 } });
+    assert.equal(forwardedMessages.length, tracked ? 1 : 0);
+    if (tracked) assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, call => call.name), ['getRallyById', 'getMarches']);
+  }
+});
+
 test('priority auto-join joins guild rally when boss level meets or exceeds threshold', async () => {
   const { local, send, forwardedMessages } = setup();
   local.popupRpcEnabled = true;

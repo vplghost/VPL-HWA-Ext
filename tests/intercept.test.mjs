@@ -629,6 +629,77 @@ test('camp discovery is a feature-scoped Piggyback read with native results pres
   }
 });
 
+test('expedition collection accepts only the exact ID payload and piggybacks once', async () => {
+  for (const mode of ['direct', 'piggyback']) {
+    const batches = [];
+    const { window } = setup(async (_url, options) => {
+      const request = JSON.parse(options.body); batches.push(request.calls);
+      return new Response(JSON.stringify({ results: request.calls.map(call => ({
+        ident: call.ident, result: { response: call.name === 'expeditionFarm' ? { reward: { consumable: { 35: 7 } }, newExpedition: null } : {} }
+      })) }), { status: 200 });
+    }, true, { Response, Headers });
+    const origin = 'https://www.hero-wars-alliance.com';
+    window.postMessage({ source: 'hwa-helper-config', kind: 'control', popupRpcEnabled: true, socketRefreshMode: mode }, origin);
+    const post = calls => window.postMessage({ source: 'hwa-helper-control', kind: mode === 'direct' ? 'refresh-rpc' : 'queue-rpc', calls }, origin);
+    for (const call of ['expeditionFarm', { name: 'expeditionFarm', args: { expeditionId: 1, buy: true } },
+      { name: 'expeditionFarm', args: { expeditionId: -1 } }, { name: 'expeditionFarm', feature: 'paid', args: { expeditionId: 1 } }]) post([call]);
+    assert.equal(batches.length, 0);
+    const call = { name: 'expeditionFarm', args: { expeditionId: 1 } }; post([call]);
+    if (mode === 'direct') { assert.equal(batches.length, 1); continue; }
+    post([call]);
+    const send = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+      method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] })
+    });
+    const response = await send();
+    assert.deepEqual(batches[0].map(call => call.name), ['userGetInfo', 'expeditionFarm']);
+    assert.equal(JSON.parse(await response.text()).results.length, 1);
+    await send(); assert.deepEqual(batches[1].map(call => call.name), ['userGetInfo']);
+  }
+});
+
+test('Direct expedition start accepts only the observed bounded hero payload', async () => {
+  const sent = [];
+  const { window } = setup(async (_url, options) => {
+    sent.push(JSON.parse(options.body).calls);
+    return new Response(JSON.stringify({ results: [] }), { status: 200 });
+  }, true, { Response, Headers });
+  const origin = 'https://www.hero-wars-alliance.com';
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', popupRpcEnabled: true, socketRefreshMode: 'direct' }, origin);
+  const post = calls => window.postMessage({ source: 'hwa-helper-control', kind: 'refresh-rpc', calls }, origin);
+  post(['artifact_expeditionStart']);
+  for (const args of [{ expeditionId: 1, heroes: [1, 1] }, { expeditionId: 1, heroes: [1], buy: true },
+    { expeditionId: -1, heroes: [] }, { expeditionId: 1, heroes: [1, 2, 3, 4, 5, 6] }]) {
+    post([{ name: 'artifact_expeditionStart', args }]);
+  }
+  assert.equal(sent.length, 0);
+  post([{ name: 'artifact_expeditionStart', args: { expeditionId: 4, heroes: [15, 16, 72, 2, 56] } }]);
+  post([{ name: 'artifact_expeditionStart', args: { expeditionId: 7, heroes: [] } }]);
+  assert.equal(sent.length, 2);
+});
+
+test('expedition start piggybacks once with isolated result and expeditionGet is feature bounded', async () => {
+  const batches = [];
+  const { window } = setup(async (_url, options) => {
+    const request = JSON.parse(options.body); batches.push(request.calls);
+    return new Response(JSON.stringify({ results: request.calls.map(call => ({
+      ident: call.ident, result: { response: call.name === 'artifact_expeditionStart' ? { endTime: 1794641843 } : [] }
+    })) }), { status: 200 });
+  }, true, { Response, Headers });
+  const post = calls => window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls }, 'https://www.hero-wars-alliance.com');
+  post([{ name: 'expeditionGet', feature: 'other' }]);
+  post([{ name: 'artifact_expeditionStart', args: { expeditionId: 4, heroes: [1, 1] } }]);
+  const call = { name: 'artifact_expeditionStart', args: { expeditionId: 4, heroes: [15, 16, 72, 2, 56] } };
+  post([call]); post([call]);
+  const send = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] })
+  });
+  const response = await send();
+  assert.deepEqual(batches[0].map(call => call.name), ['userGetInfo', 'artifact_expeditionStart']);
+  assert.equal(JSON.parse(await response.text()).results.length, 1);
+  await send();
+  assert.deepEqual(batches[1].map(call => call.name), ['userGetInfo']);
+});
+
 test('Direct free alchemy accepts only the exact free call shape', async () => {
   const sent = [];
   const { window } = setup(async (_url, options) => {

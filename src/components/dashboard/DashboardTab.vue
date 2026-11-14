@@ -76,6 +76,7 @@ async function refreshAllDashboard() {
     { name: 'getMarches', feature: 'march' },
     { name: 'getMineSummary', feature: 'mine' },
     { name: 'magicTower_briefInfo' },
+    { name: 'magicTower_getAll' },
     { name: 'arenaGetAll' },
     { name: 'userGetInfo' },
     { name: 'refillableGetAll', feature: 'refillable' },
@@ -85,6 +86,8 @@ async function refreshAllDashboard() {
     { name: 'user_getNextDayTime' },
     { name: 'dungeonGetInfo' },
     { name: 'titanGetAll' },
+    { name: 'expeditionGet' },
+    { name: 'heroGetAll' },
   ]);
 }
 </script>

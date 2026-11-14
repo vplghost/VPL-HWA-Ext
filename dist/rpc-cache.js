@@ -401,8 +401,24 @@
     try {
       const request = JSON.parse(record.requestBody);
       const response = JSON.parse(record.responseBody);
-      if (!Array.isArray(request.calls) || !Array.isArray(response.results)) return [];
-      const results = new Map(response.results.map((result) => [result.ident, result.result || result]));
+      if (!Array.isArray(request.calls)) return [];
+      // Some RPC failures are top-level, with the rejected call attached.
+      const failedCall = response.error?.call;
+      const failureMatches = ['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(failedCall?.name) &&
+        request.calls.some(call => call.ident && call.ident === failedCall.ident &&
+          call.name === failedCall.name && !call.feature && !failedCall.feature &&
+          (call.name === 'refillable_alchemyUseVideo'
+            ? call.args?.type === 'alchemy' && failedCall.args?.type === 'alchemy' &&
+              Object.keys(call.args).length === 1 && Object.keys(failedCall.args).length === 1
+            : Number.isInteger(call.args?.expeditionId) && call.args.expeditionId >= 0 &&
+              call.args.expeditionId === failedCall.args?.expeditionId &&
+              (call.name === 'expeditionFarm'
+                ? Object.keys(call.args).length === 1 && Object.keys(failedCall.args || {}).length === 1
+                : Object.keys(call.args).length === 2 && Object.keys(failedCall.args || {}).length === 2 &&
+                  Array.isArray(call.args.heroes) && JSON.stringify(call.args.heroes) === JSON.stringify(failedCall.args.heroes))));
+      if (!Array.isArray(response.results) && !failureMatches) return [];
+      const results = new Map((response.results || []).map((result) => [result.ident, result.result || result]));
+      if (failureMatches) results.set(failedCall.ident, { error: response.error });
       const actions = request.calls.flatMap((call) => {
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
@@ -484,6 +500,7 @@
           }
           const actions = [{ key: 'rallyAction', method: call.name, feature: call.feature,
             group: 'internal', data: { action: 'details', rallyId: rally.rallyId,
+              rallyVersion: rally.rallyVersion, route: rally.route,
               mapId: rally.mapId, mobId: rally.mob?.mobId || rally.target?.objectId,
               mobConfigId: targetConfigId,
               leader: rally.leader,
@@ -1442,14 +1459,17 @@
         }
         if ((call.name === 'magicTower_briefInfo' || call.name === 'magicTower_getAll') && result?.response) {
           const resp = result.response;
-          const isCleared = resp.state === 'win' || resp.state === 'completed';
+          const finalFloor = globalThis.hwaHelperTowerRules?.finalFloor;
+          const completedBoss = Number.isInteger(finalFloor) && Number(resp.floorData?.floorNumber) === finalFloor &&
+            normalizeArrayData(resp.floorData?.rooms).some(room => room?.type === 'boss_battle' && room.state === 'room_completed');
+          const isCleared = resp.state === 'win' || resp.state === 'completed' || completedBoss;
           return [{
             key: 'towerStatus',
             method: call.name,
             feature: null,
             group: 'other',
             data: {
-              state: resp.state || (resp.floorData ? 'inProgress' : 'unknown'),
+              state: isCleared ? 'win' : resp.state || (resp.floorData ? 'inProgress' : 'unknown'),
               isCleared,
               ...(resp.skipState != null ? { skipState: resp.skipState } : {}),
               deadHeroesCount: resp.deadHeroesCount ?? 0,
@@ -1483,14 +1503,56 @@
             updatedAt: record.timestamp
           }];
         }
+        if (call.name === 'expeditionGet' && !call.feature && !result?.error && Array.isArray(result?.response)) {
+          return [{ key: 'expeditionGet', method: call.name, group: 'other', data: result.response, updatedAt: record.timestamp },
+          { key: 'expeditionSnapshotAction', method: call.name, group: 'internal',
+            data: result.response, updatedAt: record.timestamp }];
+        }
+        if (call.name === 'expeditionFarm') {
+          if (call.feature || !call.ident || !result || Object.keys(call.args || {}).length !== 1 ||
+              !Number.isInteger(call.args?.expeditionId) || call.args.expeditionId < 0) return [];
+          const response = result.response;
+          const error = result.error || response?.error;
+          const success = !error && response && typeof response === 'object' &&
+            response.reward && typeof response.reward === 'object' && !Array.isArray(response.reward) &&
+            Object.hasOwn(response, 'newExpedition') &&
+            (response.newExpedition === null || typeof response.newExpedition === 'object' && !Array.isArray(response.newExpedition));
+          return [{ key: 'expeditionCollectAction', method: call.name, group: 'internal',
+            data: { token: call.ident, expeditionId: call.args.expeditionId, success: !!success,
+              reward: success ? response.reward : {}, newExpedition: success ? response.newExpedition : undefined,
+              error: success ? null : String(typeof error === 'object' ? error?.description || error?.message || error?.name : error || 'No confirmed expedition collection.').slice(0, 200),
+              quests: success && Array.isArray(result.quests) ? result.quests : [] }, updatedAt: record.timestamp }];
+        }
+        if (call.name === 'artifact_expeditionStart') {
+          const args = call.args;
+          if (call.feature || !call.ident || !result || Object.keys(args || {}).length !== 2 ||
+              !Number.isInteger(args?.expeditionId) || args.expeditionId < 0 || !Array.isArray(args.heroes) ||
+              args.heroes.length > 5 || args.heroes.some(id => !Number.isInteger(id) || id <= 0) ||
+              new Set(args.heroes).size !== args.heroes.length) return [];
+          const error = result.error || result.response?.error;
+          const endTime = result.response?.endTime;
+          const success = !error && Number.isFinite(endTime) && endTime > 0;
+          return [{ key: 'expeditionStartAction', method: call.name, group: 'internal',
+            data: { token: call.ident, expeditionId: args.expeditionId, heroes: args.heroes,
+              success, endTime: success ? endTime : null,
+              error: success ? null : String(typeof error === 'object' ? error?.description || error?.message || error?.name : error || 'No confirmed expedition start.').slice(0, 200),
+              quests: Array.isArray(result.quests) ? result.quests : [] }, updatedAt: record.timestamp }];
+        }
         if (call.name === 'refillable_alchemyUseVideo') {
           if (call.args?.type !== 'alchemy' || call.feature || Object.keys(call.args || {}).length !== 1 || !call.ident || !result) return [];
           const rows = Array.isArray(result.response) ? result.response : [];
           const gold = rows.reduce((sum, row) => sum + (Number.isFinite(Number(row?.reward?.gold)) && Number(row.reward.gold) > 0 ? Number(row.reward.gold) : 0), 0);
           const error = result.error || result.response?.error || (!gold ? 'No confirmed free spin reward received.' : null);
+          const description = typeof error === 'object' ? error?.description : String(error || '');
+          const exhausted = description?.match(/Refillable 53\. Has 0 need 1\. Last refill (\d+) now (\d+) delta \d+/);
+          const observedAt = Date.parse(record.timestamp);
+          const remaining = exhausted ? Number(exhausted[1]) + 28800 - Number(exhausted[2]) : null;
+          const cooldownUntil = !error ? observedAt + 28800000
+            : error?.name === 'NotEnough' && remaining != null && remaining > 0 && remaining <= 28800
+              ? observedAt + remaining * 1000 : null;
           return [{ key: 'freeAlchemySpinAction', method: call.name, feature: null, group: 'internal',
             data: { token: call.ident, success: !error, error: error ? String(typeof error === 'object' ? error.message || error.description || JSON.stringify(error) : error).slice(0, 200) : null,
-              gold: error ? 0 : gold, results: rows, quests: Array.isArray(result.quests) ? result.quests : [] },
+              gold: error ? 0 : gold, cooldownUntil, results: rows, quests: Array.isArray(result.quests) ? result.quests : [] },
             updatedAt: record.timestamp }];
         }
         if (call.name === 'clanClash_claimReward') {
@@ -1636,7 +1698,7 @@
             const label = rule?.label || `Refillable #${item.id}`;
             const cap = rule?.capFromTeamLevel && Number.isInteger(teamLevel) && teamLevel > 0 ?
               (teamLevel === 1 ? 60 : 60 + teamLevel) : rule?.cap;
-            const timed = rule && Number.isFinite(item.lastRefill) && Number.isFinite(cap) ? {
+            const timed = item.id === 53 && Number.isFinite(item.lastRefill) ? { lastRefillAt: item.lastRefill * 1000 } : rule && Number.isFinite(item.lastRefill) && Number.isFinite(cap) ? {
               lastRefillAt: item.lastRefill * 1000, refillEveryMs: rule.interval,
               refillAmount: 1, cap, renewable: true
             } : {};
@@ -2108,6 +2170,15 @@
             String(next.accountStatus.data.id) !== String(entry.data.id) && (!next.accountStatus.updatedAt || next.accountStatus.updatedAt <= entry.updatedAt)) {
           delete next.guildStatus;
           delete next.guildOutposts;
+          delete next.heroGetAll;
+          delete next.expeditionStatus;
+          delete next.expeditionCollectStatus;
+          delete next.expeditionCollectReceipts;
+          delete next.expeditionStartStatus;
+          delete next.expeditionGet;
+          delete next.freeAlchemySpinStatus;
+          delete next.freeAlchemySpinReceipts;
+          delete next['resource:refillable:53'];
           changed = true;
         }
         if (entry.key === 'guildRosterAction') {
@@ -2174,6 +2245,92 @@
           const ids = Object.keys(plans).sort((a, b) => (plans[b].observedAt || '').localeCompare(plans[a].observedAt || ''));
           for (const id of ids.slice(100)) delete plans[id];
           entry.data = { ...entry.data, plans };
+        }
+        if (entry.key === 'expeditionSnapshotAction') {
+          if (next.expeditionStatus?.updatedAt > entry.updatedAt) continue;
+          const incomingAccount = entries.find(item => item.key === 'accountStatus' && item.updatedAt >= entry.updatedAt);
+          const accountId = incomingAccount?.data?.id ?? next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id;
+          // Do not bind a snapshot to a guessed account.
+          if (accountId == null) continue;
+          const rows = entry.data.filter(row => row && Number.isInteger(row.id) && row.id >= 0 &&
+            Number.isInteger(row.slotId) && row.slotId >= 1 && row.slotId <= 8).map(row => ({ ...row, observedAt: entry.updatedAt }));
+          const previous = next.expeditionStatus?.data;
+          const newerStarts = String(previous?.accountId) === String(accountId) ? previous.rows || [] : [];
+          for (const started of newerStarts) {
+            const mutationAt = started.collectedAt || started.startedAt;
+            if (!mutationAt || mutationAt < entry.updatedAt) continue;
+            const index = rows.findIndex(row => row.slotId === started.slotId);
+            if (index >= 0) rows[index] = { ...rows[index], ...started };
+          }
+          next.expeditionStatus = { key: 'expeditionStatus', method: entry.method, group: 'header',
+            data: { rows, accountId: String(accountId) }, updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'expeditionCollectAction') {
+          const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id;
+          const receipts = normalizeArrayData(next.expeditionCollectReceipts?.data);
+          if (accountId == null || receipts.some(receipt => receipt?.token === entry.data.token)) continue;
+          next.expeditionCollectReceipts = { key: 'expeditionCollectReceipts', method: entry.method, group: 'internal',
+            data: [...receipts, { token: entry.data.token, at: entry.updatedAt }].slice(-100), updatedAt: entry.updatedAt };
+          if (!next.expeditionCollectStatus || next.expeditionCollectStatus.updatedAt <= entry.updatedAt) {
+            next.expeditionCollectStatus = { key: 'expeditionCollectStatus', method: entry.method, group: 'internal',
+              data: { ...entry.data, accountId: String(accountId) }, updatedAt: entry.updatedAt };
+          }
+          if (entry.data.success) {
+            const status = next.expeditionStatus;
+            if (String(status?.data?.accountId) === String(accountId) && status.updatedAt <= entry.updatedAt) {
+              const replacement = entry.data.newExpedition;
+              const rows = status.data.rows.map(row => {
+                if (row.id !== entry.data.expeditionId) return row;
+                if (replacement === null) return { ...row, status: 3, heroes: [], endTime: 0,
+                  collectedAt: entry.updatedAt, observedAt: entry.updatedAt };
+                // Only accept a complete server-shaped replacement in the same slot.
+                if (Number.isInteger(replacement?.id) && replacement.id >= 0 && replacement.slotId === row.slotId &&
+                    [0, 1, 2, 3].includes(replacement.status) && Array.isArray(replacement.heroes)) {
+                  return { ...replacement, collectedAt: entry.updatedAt, observedAt: entry.updatedAt };
+                }
+                // An unfamiliar replacement needs expeditionGet; do not keep a collectable old row.
+                return { ...row, status: null, collectedAt: entry.updatedAt, observedAt: entry.updatedAt };
+              });
+              next.expeditionStatus = { ...status, data: { ...status.data, rows }, updatedAt: entry.updatedAt };
+            }
+            const actions = extractRewardActions(record, { name: entry.method, ident: entry.data.token }, entry.data.reward, 'expeditionCollect');
+            entries.push(...actions.filter(action => !entries.some(snapshot => snapshot.key === action.data.resourceKey && snapshot.updatedAt >= entry.updatedAt)));
+            const questEntry = next.questGetAll;
+            const sameBatchQuests = entries.some(snapshot => snapshot.key === 'questGetAll' && snapshot.updatedAt >= entry.updatedAt);
+            if (entry.data.quests.length && !sameBatchQuests && (!questEntry?.updatedAt || questEntry.updatedAt <= entry.updatedAt)) {
+              const quests = Array.isArray(questEntry?.data) ? [...questEntry.data] : { ...(questEntry?.data || {}) };
+              for (const quest of entry.data.quests) {
+                if (!Number.isInteger(quest?.id)) continue;
+                if (Array.isArray(quests)) {
+                  const index = quests.findIndex(item => Number(item?.id) === quest.id);
+                  if (index < 0) quests.push(quest); else quests[index] = { ...quests[index], ...quest };
+                } else quests[quest.id] = { ...quests[quest.id], ...quest };
+              }
+              next.questGetAll = { key: 'questGetAll', method: entry.method, group: 'other', data: quests, updatedAt: entry.updatedAt };
+            }
+          }
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'expeditionStartAction') {
+          const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id;
+          const prior = next.expeditionStartStatus;
+          if (accountId == null || prior?.updatedAt > entry.updatedAt || prior?.data?.token === entry.data.token) continue;
+          next.expeditionStartStatus = { key: 'expeditionStartStatus', method: entry.method, group: 'internal',
+            data: { ...entry.data, accountId: String(accountId) }, updatedAt: entry.updatedAt };
+          const status = next.expeditionStatus;
+          if (entry.data.success && String(status?.data?.accountId) === String(accountId)) {
+            const rows = status.data.rows.map(row => row.id === entry.data.expeditionId &&
+                (!row.startedAt || row.startedAt <= entry.updatedAt) && status.updatedAt <= entry.updatedAt
+              ? { ...row, status: 2, heroes: [...entry.data.heroes], endTime: entry.data.endTime,
+                  attemptsLeft: Number.isInteger(row.attemptsLeft) ? Math.max(0, row.attemptsLeft - 1) : row.attemptsLeft,
+                  startedAt: entry.updatedAt, collectedAt: null, observedAt: entry.updatedAt } : row);
+            next.expeditionStatus = { ...status, data: { ...status.data, rows }, updatedAt: entry.updatedAt };
+          }
+          changed = true;
+          continue;
         }
         if (entry.key === 'freeAlchemySpinAction') {
           const receipts = normalizeArrayData(next.freeAlchemySpinReceipts?.data);
@@ -2338,6 +2495,10 @@
           continue;
         }
         if (entry.key === 'rallyAction') {
+          const knownRally = normalizeArrayData(next.experimentalRallyTargets?.data).find(item => item?.rallyId === entry.data.rallyId);
+          if (entry.data.action === 'details' && (knownRally?.observedAt > entry.updatedAt ||
+              Number.isFinite(knownRally?.rallyVersion) && Number.isFinite(entry.data.rallyVersion) &&
+              entry.data.rallyVersion < knownRally.rallyVersion)) continue;
           if (['create', 'socketAutojoined', 'join'].includes(entry.data.action)) changed = observeSquad(next, entry.data.team, entry.method, entry.updatedAt) || changed;
           if (entry.data.action === 'details') {
             const accountId = next.accountStatus?.data?.id;
@@ -2354,7 +2515,8 @@
           if (['create', 'details'].includes(entry.data.action) && entry.data.mobId && entry.data.mapId) {
             next.experimentalRallyTargets = { key: 'experimentalRallyTargets', group: 'internal',
               method: entry.method, updatedAt: entry.updatedAt,
-              data: [{ rallyId: entry.data.rallyId, mobId: entry.data.mobId, mapId: entry.data.mapId },
+              data: [{ rallyId: entry.data.rallyId, mobId: entry.data.mobId, mapId: entry.data.mapId,
+                rallyVersion: entry.data.rallyVersion ?? knownRally?.rallyVersion, observedAt: entry.updatedAt },
                 ...normalizeArrayData(next.experimentalRallyTargets?.data).filter((item) => item.rallyId !== entry.data.rallyId)].slice(0, 200) };
           }
           const current = next.marchStatus;
@@ -2479,6 +2641,20 @@
                   returnMs: entry.data.returnMs
                 }
               });
+            }
+            const route = entry.data.route;
+            const durationMs = route?.durationMs ?? route?.duration;
+            const routeIndex = marches.findIndex(march => march.rally?.id === entry.data.rallyId);
+            if (routeIndex >= 0 && marches[routeIndex].stage !== 'returnToOutpost' &&
+                Number.isFinite(route?.startedAt) && Number.isFinite(durationMs) && durationMs >= 0 &&
+                route.to?.object?.objectId === entry.data.mobId) {
+              const march = marches[routeIndex];
+              const arrivalAt = route.startedAt + durationMs;
+              marches[routeIndex] = { ...march, routeId: route.routeId, startedAt: route.startedAt,
+                durationMs, targetArrivalAt: arrivalAt, endsAt: arrivalAt,
+                stage: Date.parse(entry.updatedAt) < arrivalAt ? 'moveToTargetInRally' : 'battle',
+                rally: { ...march.rally, rallyVersion: entry.data.rallyVersion, plannedStartTime: entry.data.waitUntil,
+                  waitUntil: route.startedAt, arrivalAt, outboundMs: durationMs } };
             }
           } else if (entry.data.action === 'cancel') {
             if (index < 0) continue;

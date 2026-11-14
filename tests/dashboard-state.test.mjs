@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { ref, computed } from 'vue';
+import { expeditionActivity } from '../src/utils/expeditions.ts';
 import { dashboardQueues, dashboardMarches, queueEndMs } from '../src/utils/dashboardState.ts';
 import { towerActivityState, arenaActivityState, dungeonActivityState, observedToday, readyQuestCount } from '../src/composables/activityState.ts';
 
@@ -148,7 +149,7 @@ async function setupComponent(file, expose, initial = {}) {
   const context = { computed, ref, useNow: () => clock, useRpcCache: () => ({ cache }),
     useModals: () => ({ openModal: id => opened.push(id) }), dashboardQueues, dashboardMarches,
     getBuildingName: id => `Building ${id}`, getResearchName: id => `Research ${id}`,
-    towerActivityState, arenaActivityState, observedToday, dungeonActivityState: (cache, time) => dungeonActivityState(cache, time, meta), readyQuestCount };
+    expeditionActivity, towerActivityState, arenaActivityState, observedToday, dungeonActivityState: (cache, time) => dungeonActivityState(cache, time, meta), readyQuestCount };
   const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
   vm.runInNewContext(js + '\nglobalThis.exposed = {' + expose + '};', context);
   return { ...context.exposed, cache, clock, opened };
@@ -171,8 +172,10 @@ test('dashboard queue SFC reacts to snapshots, countdown expiry and march dialog
 });
 
 test('daily activity SFC reacts to exhaustion, new attempts and day rollover', async () => {
-  const view = await setupComponent('ActivityGoals.vue', 'activities', { ...dungeon(),
+  const view = await setupComponent('ActivityGoals.vue', 'activities, handleActivityClick', { ...dungeon(),
     towerStatus: entry({ isCleared: true }), 'resource:refillable:6': entry({ amount: 0 }) });
+  view.handleActivityClick({ id: 'expeditions' });
+  assert.deepEqual(view.opened, ['expeditions']);
   const state = id => view.activities.value.find(row => row.id === id).state;
   assert.equal(state('tower'), 'done'); assert.equal(state('arena'), 'done'); assert.equal(state('dungeon'), 'done');
   assert.equal(state('hydra'), 'unknown'); assert.equal(state('quests'), 'unknown');

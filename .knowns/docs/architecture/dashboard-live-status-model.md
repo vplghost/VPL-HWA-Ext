@@ -3,7 +3,7 @@ id: doc-d229300ad19a499cc8f6e79fc5ea4df4
 title: Dashboard Live Status Model
 description: Vue Dashboard queue/march sources, countdown lifecycle, and evidence-based daily activity completion and reset rules.
 createdAt: '2026-11-13T05:20:28.286Z'
-updatedAt: '2026-11-13T13:53:55.687Z'
+updatedAt: '2026-11-14T07:48:08.447Z'
 tags:
   - dashboard
   - queues
@@ -45,3 +45,10 @@ Regression coverage: tests/tower-session.test.mjs and tests/dashboard-state.test
 ## Tower denominator from splitlib (2026-11-13)
 
 The Tower progress denominator comes from shared generated `hwaHelperTowerRules.floorCount`, currently 23. Floor number alone never proves completion, including an unexpected floor above the configured count. The fallback boss-win history must belong to the configured final floor. Source and refresh instructions: @doc/architecture/tower-floor-count-from-splitlib.
+
+
+## Expeditions and completed Tower snapshots (2026-11-14)
+
+@task-VHE-03VDQ4 adds the Expeditions card to Activities, with aggregate progress and a timer/auto-start dialog. Canonical contract and verified VIP/subscription/hero rules: @doc/api/expedition-rpc-contract-and-dashboard-automation.
+
+Tower `magicTower_getAll` can represent completion without any top-level `state`: the observed `floorData.floorNumber=23` contains a `boss_battle` room with `state=room_completed`. Earlier reduction converted that snapshot into `inProgress/isCleared=false`, overwriting a successful brief snapshot or session. Extraction now treats an explicitly completed boss room on the configured final floor as completion. The Activity view also recognizes that evidence in existing cached floorData/session rooms, so replay is not required. Standing on the final floor, an initial boss room or a completed ordinary room is insufficient. Freshness and a newer reset/new-run snapshot retain precedence. Tests in `tests/expeditions.test.mjs` cover getAll alone, both brief/getAll orders, legacy caches and negative/reset/day cases.

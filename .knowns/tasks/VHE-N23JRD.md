@@ -5,7 +5,7 @@ status: done
 priority: medium
 labels: []
 createdAt: '2026-11-14T01:27:18.075Z'
-updatedAt: '2026-11-14T01:59:06.894Z'
+updatedAt: '2026-11-14T03:16:33.327Z'
 completedAt: '2026-11-14T01:59:06.894Z'
 timeSpent: 805
 ---
@@ -42,5 +42,7 @@ User supplied the missing source: getMineSummary returns gathering start time, e
 Resolved numerical estimate source from captured getMineSummary:mine: startedAt/plannedDurationMs/plannedGatheredResourceAmount (375000 over34829722ms example). Formula clamps elapsed/duration to0..1, multiplies directly and floors quantity. Shared UI shows type, estimate/total/progress on Gathering cards and Dashboard Active Marches, plus Header tooltip; overall Gathering panel uses collected/total weighted progress. Plans retained bounded100by squad for return display; recall freezes at server route.startedAt, no cache resource credit for estimates. Corrected Dashboard tooltip prop from text/position to content/placement. Target/squad IDs retained internally but hidden in gathering cards/targets. Three focused tests pass for captured-shaped amounts, timings, recall freeze, missing data and no ID leakage. Full validation/release pending combined Log/Guild work.
 
 Completed in shared release0.10.75 with @task-VHE-WEDXQP and @task-VHE-6WM927. Final717tests:705pass,0fail,12optional skips; typecheck and production build passed. Formula/phase/recall regression tests use actual-shaped getMineSummary values; existing march/tooltip regressions retained. Header popup initialization refreshes summary once under global settings. Review PASS P1=0/P2=0/P3=0. Docs @doc/api/world-map-rpc-contracts validated. System Decision Impact: none — implements the user's explicit server-timer estimate within established passive cache/UI calculation conventions and does not modify authoritative delivered resource balances.
+
+Knowledge extraction (2026-11-14): verified against commit 2aa8564 and gatheringProgress; canonical @doc/api/world-map-rpc-contracts retained, fast recall @memory/as1ewe added. Existing documentation already covers the reusable server-plan estimate/return-freeze pattern; no duplicate doc or System Decision created.
 <!-- SECTION:NOTES:END -->
 

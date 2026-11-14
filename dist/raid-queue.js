@@ -263,8 +263,17 @@
       for (const { call, result } of replies) {
         const rally = result?.response?.rally;
         if (call.name === 'getRallyById' && call.args?.rallyId === current.rallyId && rally?.rallyId === current.rallyId) {
+          if (Number.isFinite(current.rallyVersion) && Number.isFinite(rally.rallyVersion) && rally.rallyVersion < current.rallyVersion) continue;
           current.members = data.rallyMembers(rally); current.membersAt = Date.parse(record.timestamp);
-          if (Number.isFinite(rally.plannedStartTime)) current.waitUntil = rally.plannedStartTime;
+          if (Number.isFinite(rally.rallyVersion)) current.rallyVersion = rally.rallyVersion;
+          const durationMs = rally.route?.durationMs ?? rally.route?.duration;
+          if (Number.isFinite(rally.route?.startedAt) && Number.isFinite(durationMs) && durationMs >= 0 &&
+              rally.route?.to?.object?.objectId === current.mobId) {
+            current.waitUntil = rally.route.startedAt;
+            current.arrivalAt = rally.route.startedAt + durationMs;
+            current.departed = true;
+            current.memberChecked = true;
+          } else if (!current.departed && Number.isFinite(rally.plannedStartTime)) current.waitUntil = rally.plannedStartTime;
         }
         if (call.name === 'cancelRally' && call.args?.rallyId === current.rallyId && result?.response && !result.error) {
           consumeBoss(state, true);

@@ -37,6 +37,21 @@ function members(state, count, at = 43000) {
   return queue.advance(state, rpc([{ name: 'getRallyById', feature: 'rally', args: { rallyId: 'rally' } }], [{ rally }], at), {}, at + 1).state;
 }
 
+test('an authoritative early rally route prevents cancellation at the old planned departure', () => {
+  let state = active();
+  const rally = { rallyId: 'rally', rallyVersion: 13, plannedStartTime: 65000,
+    leader: { userId: 10 }, members: [], route: { startedAt: 20000, durationMs: 30345,
+      to: { object: { objectId: 'boss' } } } };
+  const call = { name: 'getRallyById', feature: 'rally', args: { rallyId: 'rally' } };
+  state = queue.advance(state, rpc([call], [{ rally }], 21000), {}, 21001).state;
+  assert.equal(state.current.waitUntil, 20000); assert.equal(state.current.arrivalAt, 50345);
+  assert.equal(state.current.memberChecked, true); assert.equal(state.current.departed, true);
+  state = queue.advance(state, rpc([call], [{ rally: { ...rally, rallyVersion: 10, route: undefined } }], 22000), {}, 22001).state;
+  assert.equal(state.current.waitUntil, 20000);
+  const check = queue.advance(state, null, {}, 55000);
+  assert.ok(!check.calls.some(call => call.name === 'cancelRally'));
+});
+
 test('weakest queue recalculates available heroes after roster refresh', () => {
   const roster = { ...heroes, 6: { power: 600 }, 7: { power: 700 } };
   const units = { ...inventory, squads: [{ heroes: [{ id: 1 }, { heroId: 2 }] }] };

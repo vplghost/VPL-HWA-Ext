@@ -934,6 +934,11 @@ function socketRefreshCalls(record, cache) {
     return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } },
       { name: 'getMarches', feature: 'march' }];
   }
+  if (type === 'rallyStarted' && typeof body?.rallyId === 'string' &&
+      cache?.marchStatus?.data?.marches?.some((march) => march.rally?.id === body.rallyId)) {
+    return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } },
+      { name: 'getMarches', feature: 'march' }];
+  }
   if (type === 'rallyMembersUpdated' && typeof body?.rallyId === 'string' &&
       cache?.marchStatus?.data?.marches?.some((march) => march.rally?.id === body.rallyId)) {
     return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } }];
@@ -1688,6 +1693,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         { name: 'refillableGetAll', feature: 'refillable' },
         { name: 'inventoryGet' }
       ]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+    }
+    const expeditionCollect = cacheResult.cache.expeditionCollectStatus;
+    if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
+        expeditionCollect?.data?.success && expeditionCollect.updatedAt === record.timestamp &&
+        expeditionCollect.data.token !== stored.rpcCache?.expeditionCollectStatus?.data?.token) {
+      const dispatch = rpcMessageForSettings(stored, [{ name: 'expeditionGet' }, { name: 'inventoryGet' }, { name: 'questGetAll' }]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+    }
+    const expeditionStart = cacheResult.cache.expeditionStartStatus;
+    if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
+        expeditionStart?.data?.success && expeditionStart.updatedAt === record.timestamp &&
+        expeditionStart.data.token !== stored.rpcCache?.expeditionStartStatus?.data?.token) {
+      const dispatch = rpcMessageForSettings(stored, [{ name: 'expeditionGet' }, { name: 'questGetAll' }]);
       if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
     const spinStatus = cacheResult.cache.freeAlchemySpinStatus;

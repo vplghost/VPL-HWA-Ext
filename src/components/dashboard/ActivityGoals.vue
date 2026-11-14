@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { expeditionActivity } from '@/src/utils/expeditions';
 import { useNow } from '@/src/composables/useNow';
 import '@/src/utils/metadata';
 import { towerActivityState, arenaActivityState, dungeonActivityState, observedToday, readyQuestCount } from '@/src/composables/activityState';
@@ -17,6 +18,7 @@ interface ActivityRow {
   state: 'pending' | 'done' | 'info' | 'unknown';
   detail: string;
   isInteractive?: boolean;
+  progress?: number;
 }
 
 const activities = computed<ActivityRow[]>(() => {
@@ -71,12 +73,14 @@ const activities = computed<ActivityRow[]>(() => {
     isInteractive: true,
   });
 
+  rows.push(expeditionActivity(cache.value, now.value));
   return rows;
 });
 
 function handleActivityClick(act: ActivityRow) {
   if (act.id === 'tower') openModal('tower');
   else if (act.id === 'dungeon') openModal('dungeon');
+  else if (act.id === 'expeditions') openModal('expeditions');
   else if (act.id === 'quests') openModal('questDetail');
 }
 </script>
@@ -111,6 +115,7 @@ function handleActivityClick(act: ActivityRow) {
               <span v-if="act.isInteractive" class="text-[10px] text-violet-500 font-normal">↗</span>
             </div>
             <div class="text-[10px] text-slate-400 truncate">{{ act.detail }}</div>
+            <progress v-if="act.progress != null" :value="act.progress" max="100" class="h-1.5 w-full min-w-32 accent-violet-600" :aria-label="`${act.title} progress`" />
           </div>
         </div>
 

@@ -3,7 +3,7 @@ id: doc-efa631bed6e5592db82be3e99ebeef3c
 title: MQTT Processing and Refresh
 description: Captured versus implemented MQTT events, direct reduction, refresh routing, dispatch gates and remaining evidence gaps
 createdAt: '2026-11-06T04:08:00.363Z'
-updatedAt: '2026-11-06T08:36:33.805Z'
+updatedAt: '2026-11-14T08:03:14.505Z'
 tags:
   - mqtt
   - api
@@ -61,7 +61,6 @@ These are conditional expectations read from `extractSocket` and `socketRefreshC
 | `returnFromMobCompleted` | String `squadId` | Removes completed rally march. |
 | `randomDraft_statusChanged` | Type name; body is not treated as full Draft state | Requests `randomDraft_getInfo`. |
 | `questUpdateAll` | Type name | Requests `questGetAll` and `questGetEvents`. |
-| `rallyMembersUpdated` | String `rallyId` matching an existing local rally march | Requests `getRallyById` for that rally. |
 | `returnToOutpostFromMob` | Type name | Requests `getMarches`. |
 
 Do not implement `routeToMineCompleted` by copying the differently named `returnFromMobCompleted` contract. Capture and domain identity matter more than similar names.
@@ -104,3 +103,14 @@ Implementation anchors: `extractSocket`, `socketRefreshCalls`, `hwaHelperRpcCach
 ## Optional local carrier trigger
 
 The new shared `mqtt-piggyback` mode can locally inject a bounded mapChunksUpdated notification using a recently observed native template to ask the game for a carrier RPC. Synthetic notifications are excluded from raw MQTT capture and cache reduction; they are not new server evidence and do not change the captured event inventory. See @doc/architecture/mqtt-assisted-piggyback for gating, framing, status, live-verification limits and why native request bodies are preserved.
+
+
+## Captured rally membership and departure (2026-11-14)
+
+@task-VHE-GN1AQ2 verifies13received MQTT PUBLISH packets in `hwa-game-record-202611141452_expedition_collect.json` (SHA256 `638211e935dbf800beec4da59a5cf3a3c0586f7388af90cb40d638e94b0f0b0b`):11rallyMembersUpdated and2rallyStarted, QoS1, UTF8, topic `hwm/pub/clan/305081`, endpoint `wss://emqx-hwmb-wss.nextersglobal.com/mqtt`.
+
+Envelope: `{method:"msg",result:{type:"rallyMembersUpdated"|"rallyStarted",body:{rallyId:string,rallyVersion:number}}}`. These are invalidation hints, not full rally/member/route snapshots. Repeated or skipped versions occur: do not require contiguous versions and do not infer a successful battle from departure.
+
+For705830d9…, membership versions7/8/9/10/11precede rallyStarted13at07:52:15.773Z. RPC version13at07:52:16.845Z includes actual route start1794642735636and30345ms travel. Forf87ceaa5…, membership versions6..11precede rallyStarted13at07:52:24.455Z; RPC version13at07:52:25.713Z includes route start1794642744337and42935ms travel. Both depart before plannedStartTime.
+
+Current use: rallyMembersUpdated requests getRallyById for a tracked local rally; rallyStarted requests getRallyById plus getMarches for that same local scope. Global RPC enable/dispatch policy still applies. A foreign rally's notification does not create a march or attach another player's squad. Route/version reduction and queue behavior are documented in @doc/api/world-map-rpc-contracts. This capture contains no battle result/return completion proof. Tests: `tests/background.test.mjs`, `tests/rally-observed-start.test.mjs`, `tests/raid-queue.test.mjs`.

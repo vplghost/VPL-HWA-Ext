@@ -22,6 +22,8 @@ export function towerActivityState(cache: Record<string, any>, now = Date.now())
     .map((entry) => entry.data ?? entry);
   const cleared = current.some((data) => data.isCleared === true || data.completed === true ||
     ['win', 'completed'].includes(data.state) ||
+    (Number(data.floorData?.floorNumber ?? data.floorNumber) === TOWER_FLOOR_COUNT &&
+      normalizeArray(data.floorData?.rooms ?? data.rooms).some((room: any) => room?.type === 'boss_battle' && room.state === 'room_completed')) ||
     (Number(data.floorNumber) === TOWER_FLOOR_COUNT && normalizeArray(data.history).some((event: any) => event?.action === 'endBattle' &&
       event.win === true && Number(event.floor) === Number(data.floorNumber) &&
       (!event.at || observedToday({ updatedAt: event.at }, now, cache.questResetStatus?.data?.nextDayAt)) &&

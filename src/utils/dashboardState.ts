@@ -47,7 +47,7 @@ export function dashboardMarches(cache: Record<string, any>, now = Date.now()) {
       const arrival = march.targetArrivalAt ?? march.rally?.arrivalAt;
       const waiting = march.stage === 'waitingForRallyStart' || (march.rally?.waitUntil > now);
       const fighting = !returning && !waiting && (['battle', 'battleInRally'].includes(march.stage) ||
-        (badge.category === 'monster' && Number.isFinite(arrival) && arrival <= now));
+        (['monster', 'raid'].includes(badge.category) && Number.isFinite(arrival) && arrival <= now));
       const traveling = !returning && !waiting && !fighting &&
         (String(march.stage).startsWith('moveTo') && (!Number.isFinite(arrival) || arrival > now));
       const stage = returning ? 'Returning' : waiting ? 'Preparing rally' : fighting ? 'In battle'

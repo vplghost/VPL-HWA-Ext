@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-14T01:55:08.354Z'
+updatedAt: '2026-11-14T08:03:13.787Z'
 tags:
   - api
   - rpc
@@ -84,9 +84,18 @@ The implemented resource reducer charges 25 World Energy on creation and dedupli
 
 ### getRallyById:rally
 
-Request `{"rallyId":"RALLY_ID"}`; observed response `response.rally` includes leader/member squads, target, leader coordinates and planned start. Use the local account's leader/member squad when displaying the team; another guild member's rally is not automatically the user's march.
+Request `{"rallyId":"RALLY_ID"}` with feature `rally`. Response `response.rally` includes `rallyId,rallyVersion,clanId,mapId,mapType,leader,members,membersCapacityLeft,unitsCapacityLeft,mob,target,leaderCoordinates,createdAt,plannedStartTime` and an optional outbound `route`. Leader/member squads identify their own hero/unit rosters; members also expose joinedAt, eta and optional routes to the leader. Use the current account's leader/member squad; another Guild member's rally is not automatically a local march.
 
-Current reducer estimates legs from coordinates and `hwaHelperRouteSpeeds` until authoritative routes arrive. Such durations are estimates. Match updates by rally/squad identity. Do not attach an unrelated guild rally's team or route.
+Additional evidence from @task-VHE-GN1AQ2: `hwa-game-record-202611141452_expedition_collect.json`, SHA256 `638211e935dbf800beec4da59a5cf3a3c0586f7388af90cb40d638e94b0f0b0b`, contains14getRallyById calls for2rallies:8for705830d9… and6forf87ceaa5…. Versions advance to13. As members reach the leader, their individual route disappears; eta1775001600000is already in the past and must not be treated as a future route duration. membersCapacityLeft0with5members and unitsCapacityLeft400000do not prove any account's available troop stock.
+
+| Rally | Planned start ms | Actual route start ms | Duration ms | Arrival ms |
+|---|---:|---:|---:|---:|
+| 705830d9… | 1794642997979 | 1794642735636 | 30345 | 1794642765981 |
+| f87ceaa5… | 1794643002956 | 1794642744337 | 42935 | 1794642787272 |
+
+Actual departure precedes planned start by over4minutes in both cases. An authoritative route whose target object matches the rally mob now supplies departure, duration and arrival; plannedStartTime remains provenance. Lower-version details cannot regress newer data. Only an owned/correlated march receives route/team enrichment; refreshes never manufacture a foreign march. Returning marches are not regressed to outbound.
+
+Dashboard uses actual arrival to display travel/expected battle phase. Managed raid queue marks departure confirmed and bypasses member cancellation tied to the obsolete planned start; this does not count a win or return. Until a route arrives, coordinate/speed-derived leg durations remain estimates. MQTT notifications trigger scoped reads, not synthesized routes or rewards: @doc/api/mqtt-processing-and-refresh.
 
 ## Mine search, dispatch and recall
 
