@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.10.86 — 2026-11-15
+
+### Fixed
+
+- Skip occupied interrupted/nearest mines reported by getMineById instead of attempting a PvE gather against another player.
+- Recognize errorCode-only RPC rejections immediately. BattleTypeMismatch excludes the rejected mine and continues toward a different free target; other mutation errors stop with the actual code.
+
+## 0.10.85 — 2026-11-15
+
+### Fixed
+
+- Wait for Chrome's asynchronous tab-query callback before selecting the game tab, restoring Auto-Gather start and periodic processing that synchronous test mocks previously hid.
+- Show the pending RPC/mode, retry expired read-only requests up to three times, and keep unconfirmed gathering mutations protected from automatic retry.
+- Allow feature-bounded mine probes and incoming-march reads in Piggyback/MQTT queues; clarify the F5 recovery message when the game RPC bridge is unavailable.
+
+## 0.10.84 — 2026-11-15
+
+### Fixed
+
+- Restore own base coordinates from the game-load outpost summary so Smart gathering can replenish configured teams after reload without waiting for world-map chunks.
+- Prefer the active player's known base over viewport/mine coordinates when searching gathering targets; retain sequential server-confirmed squad dispatch.
+
+## 0.10.83 — 2026-11-15
+
+### Changed
+
+- Recall threatened gathering squads in the final 10 seconds only when wounded troops exceed 50% of total Infirmary capacity. Exactly 50% does not trigger; squad size no longer sets the hospital threshold.
+
 ## 0.10.82 — 2026-11-14
 
 ### Fixed

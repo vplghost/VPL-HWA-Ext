@@ -118,6 +118,26 @@ test('unknown account and restarting during an old nearest probe remain safe', (
   assert.equal(smart.sync(state, record, cache(), now + 1).pending, null);
 });
 
+test('expired read requests recover with a bounded retry count while mutations never auto-retry', () => {
+  const c = cache(), call = { name: 'getMineById', feature: 'mine', args: { mineId: 'mine' } };
+  let state = { accountId: 1 };
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    state.pending = { call, phase: 'sent', sentAt: now, expiresAt: now + 30000 };
+    state = smart.sync(state, null, c, now + 30000);
+    assert.equal(state.pending, null);
+    assert.equal(state.readTimeout.attempts, attempt);
+    assert.equal(Boolean(state.error), attempt === 3);
+  }
+  assert.match(state.error, /getMineById:mine.*3 attempts/);
+  const mutation = { accountId: 1, pending: { call: { name: 'attackMine', feature: 'mine', args: { mineId: 'mine' } }, sentAt: now, phase: 'sent', expiresAt: now + 30000 } };
+  const waiting = smart.sync(mutation, null, c, now + 30000);
+  assert.equal(waiting.pending.call.name, 'attackMine');
+  assert.equal(waiting.readTimeout, undefined);
+  const failed = smart.sync(waiting, null, c, now + 120001);
+  assert.match(failed.error, /attackMine confirmation timed out/);
+  assert.equal(failed.pending, null);
+});
+
 test('return route records the outpost destination and account change clears gathering inputs', async () => {
   const context = { TextEncoder };
   vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);

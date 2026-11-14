@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-14T12:41:05.708Z'
+updatedAt: '2026-11-14T18:26:40.365Z'
 tags:
   - api
   - rpc
@@ -302,3 +302,19 @@ See @doc/specs/smart-auto-gathering and source `docs/Smart-auto-gathering.md`. T
 - getMarches return routes must contribute the outpost endpoint (usually route.to), not the mine/boss origin, to experimentalMapContext.outposts. Smart ETA never substitutes generic search center for an unknown own outpost.
 - Account switch clears gathering-sensitive cache inputs and runtime sync discards the old account state. Late recall acknowledgements are still recorded while automation is paused.
 - @task-VHE-CB9VBW is implemented in0.10.81 after the user supplied late-load/full-attack captures. Contracts, source hashes, Infirmary capacity and timed recall behavior: @doc/api/mine-incoming-attack-and-timed-withdrawal.
+
+## Own outpost recovery on reload (0.10.84)
+
+@task-VHE-B86D4M / @doc/specs/smart-auto-gathering: getOutpostSummary:outpost args{} returns the authenticated player's mapId and coordinates, even before world-map getChunks. hwa-game-record-202611150055_relaod.json timeline14 returns map5929afff-c3a6-495d-8f2c-37e7c509a4dc and own606,376; getMarches' generic center587,340 is the current mine, not the base. rpc-cache consumes successful own summaries as account-scoped experimentalMapContext.outposts[activeAccount], requiring known identity, finite coordinates and non-stale observation times. Different maps replace the outpost set; account switch clears context. Auto-gather prefers identified own coordinates over generic center; Smart nearest mode already requires own identity. Do not wait for a getChunks viewport or infer the base from an interaction target.
+
+Reproduction and full proof boundaries: tests/gather-reload.test.mjs and sanitized tests/fixtures/gather-reload-20261115.json. Captured startup data plus simulated confirmed server responses exercise filling three configured slots from one active squad; actual popup settings are not included in the source capture.
+
+## Occupied mine probes and errorCode-only rejection (0.10.86)
+
+@task-VHE-P3VDNA: hwa-game-record-202611150120.json SHA2563a09485085ef2760d6a5975f031624123863640dc62e6dc9c1f61af32e0ea97f (extension0.10.85/client1.293.1010) provides direct request/response evidence. Timeline26 at18:20:07.856Z getMineById:mine returns mineca3a0a11-a6c6-4c26-8a14-84644551317a with resourceAmount5708965 AND gathering.user for another player. Timeline33 at18:20:13.345Z sends attackMine:mine battleType=pve to that same mine; server responds HTTP200/results[].result.response={errorCode:BattleTypeMismatch}, with no error field and no squadId/route. HTTP200 and a response object do not establish mutation success.
+
+Vacant getMineById samples in hwa-game-record-202611061040_gathering.json timeline41 and hwa-game-record-202611061045_search_mines.json timelines5/14 contain mineId/resourceAmount with gathering absent. Any non-null gathering object is treated as occupied, including own/unknown occupant; do not approve a resume/nearest target solely because resources remain or estimated duration exceeds1h.
+
+Smart rpcFailure recognizes result.error, response.error and nonzero/nonempty errorCode (result or response). Confirmed BattleTypeMismatch on attackMine releases the rejected pending request, removes interrupted/resume/nearest references, and excludes that mine for60s (bounded50 entries). Other mutation failures stop with the actual code. This is recovery from a server-confirmed rejection toward a different target; unconfirmed mutations are not retried. Automatic requests retain battleType=pve and never escalate to PvP. Resume, nearest candidates and cached ordinary Smart searches all honor exclusions.
+
+Sanitized real responses: tests/fixtures/gather-occupied-20261115.json; tests/gather-reload.test.mjs verifies occupied resume/nearest skips, free target selection and immediate errorCode recognition. Actual Chrome background→bridge→MAIN Direct fixture test scripts/browser-gather-acceptance.mjs <new-temp-profile> occupied-race proves an occupied interrupted mine is never attacked, one race-rejected mine is not resent, two distinct successful free targets fill1→3 squads and pending clears at3/3. Evidence docs/acceptance/gather-occupied-2026-11-15.json. The backend in this browser test is local simulation; no live-account completion is claimed.

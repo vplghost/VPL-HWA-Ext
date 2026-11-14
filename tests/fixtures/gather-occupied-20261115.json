@@ -1,0 +1,25 @@
+{
+  "source": "hwa-game-record-202611150120.json",
+  "records": [
+    {
+      "sourceIndex": 26,
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "transport": "fetch",
+      "timestamp": "2026-11-14T18:20:07.856Z",
+      "requestBody": "{\"calls\":[{\"name\":\"getMineById\",\"args\":{\"mineId\":\"ca3a0a11-a6c6-4c26-8a14-84644551317a\"},\"ident\":\"0053659c6f1e9ad8000dc45085381857\",\"feature\":\"mine\"}]}",
+      "responseBody": "{\"results\":[{\"ident\":\"0053659c6f1e9ad8000dc45085381857\",\"result\":{\"response\":{\"mineId\":\"ca3a0a11-a6c6-4c26-8a14-84644551317a\",\"resourceAmount\":5708965,\"gathering\":{\"user\":{\"userId\":2},\"startedAt\":1794669224063,\"speed\":12963.525000033742,\"plannedDuration\":26423207}}}}],\"date\":1794680408.325026}"
+    },
+    {
+      "sourceIndex": 33,
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "transport": "fetch",
+      "timestamp": "2026-11-14T18:20:13.345Z",
+      "requestBody": "{\"calls\":[{\"name\":\"attackMine\",\"args\":{\"mapId\":\"5929afff-c3a6-495d-8f2c-37e7c509a4dc\",\"mineId\":\"ca3a0a11-a6c6-4c26-8a14-84644551317a\",\"battleType\":\"pve\",\"squad\":{\"heroes\":[{\"heroId\":42},{\"heroId\":11},{\"heroId\":44},{\"heroId\":26},{\"heroId\":32}],\"units\":[{\"unitId\":7,\"count\":1398},{\"unitId\":17,\"count\":1398},{\"unitId\":27,\"count\":1398}]}},\"ident\":\"00051cfa41f1fa91000494adc46a1c3d\",\"feature\":\"mine\"}]}",
+      "responseBody": "{\"results\":[{\"ident\":\"00051cfa41f1fa91000494adc46a1c3d\",\"result\":{\"response\":{\"errorCode\":\"BattleTypeMismatch\"}}}],\"date\":1794680413.8195467}"
+    }
+  ]
+}

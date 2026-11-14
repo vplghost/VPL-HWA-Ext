@@ -1,0 +1,143 @@
+{
+  "mode": "direct",
+  "scenario": "occupied-resume-and-target-race",
+  "localFixtureOnly": true,
+  "calls": [
+    [],
+    [
+      "getMarches"
+    ],
+    [
+      "getMineById"
+    ],
+    [],
+    [
+      "getMineById"
+    ],
+    [],
+    [
+      "searchMine"
+    ],
+    [],
+    [],
+    [
+      "getIncomingMarches"
+    ],
+    [
+      "attackMine"
+    ],
+    [],
+    [
+      "searchMine"
+    ],
+    [],
+    [
+      "attackMine"
+    ],
+    [
+      "getMarches",
+      "getUnitSummary"
+    ],
+    [],
+    [
+      "getIncomingMarches"
+    ],
+    [
+      "searchMine"
+    ],
+    [],
+    [
+      "attackMine"
+    ],
+    [
+      "getMarches",
+      "getUnitSummary"
+    ]
+  ],
+  "errors": [],
+  "attackTargets": [
+    {
+      "mineId": "test-mine-1",
+      "battleType": "pve"
+    },
+    {
+      "mineId": "test-mine-2",
+      "battleType": "pve"
+    },
+    {
+      "mineId": "test-mine-3",
+      "battleType": "pve"
+    }
+  ],
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/157.0.8103.52",
+    "revision": "@0985600c06a688b9c669e74afde7dacd5aaed047",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "jsVersion": "15.7.112.23"
+  },
+  "extension": "0.10.86",
+  "state": {
+    "count": 3,
+    "state": {
+      "accountId": 1,
+      "dailyBaseline": {
+        "dayStart": 1794597916599,
+        "resources": {
+          "food": {
+            "progress": 261212,
+            "since": 1794680716599
+          },
+          "iron": {
+            "progress": 144942,
+            "since": 1794680716599
+          },
+          "stone": {
+            "progress": 1262683,
+            "since": 1794680716599
+          },
+          "wood": {
+            "progress": 6495688,
+            "since": 1794680716599
+          }
+        }
+      },
+      "defense": {
+        "attempted": [],
+        "pending": null,
+        "refreshAt": 1794680747666,
+        "status": "",
+        "waiting": []
+      },
+      "error": null,
+      "interrupted": [],
+      "lastAutoMineType": "stone",
+      "lastPlanAt": 1794680752726,
+      "lastRefreshAt": 1794680752745,
+      "nearest": null,
+      "notice": {
+        "at": 1794680732560,
+        "expiresAt": 1794680737560,
+        "message": "Skipping unavailable mine (BattleTypeMismatch); finding a free mine"
+      },
+      "pending": null,
+      "rejectedMines": [
+        {
+          "expiresAt": 1794680782440,
+          "mineId": "test-occupied",
+          "reason": "occupied"
+        },
+        {
+          "expiresAt": 1794680792560,
+          "mineId": "test-mine-1",
+          "reason": "BattleTypeMismatch"
+        }
+      ],
+      "resumeCandidate": null,
+      "status": "Current marches limit reached (3/3)",
+      "updatedAt": 1794680752766,
+      "wakeAt": null
+    }
+  },
+  "passed": true
+}

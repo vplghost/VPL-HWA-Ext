@@ -657,6 +657,12 @@
           return [{ key: 'guildOutpostsAction', method: call.name, feature: call.feature, group: 'internal',
             data: { outposts: result.response.outposts }, updatedAt: record.timestamp }];
         }
+        if (key === 'getOutpostSummary:outpost' && !result?.error && !result?.response?.error &&
+            typeof result?.response?.mapId === 'string' && result.response.mapId &&
+            Number.isFinite(result.response.coordinates?.x) && Number.isFinite(result.response.coordinates?.y)) {
+          return [{ key: 'ownOutpostAction', method: call.name, feature: call.feature, group: 'internal',
+            data: { mapId: result.response.mapId, coordinates: result.response.coordinates }, updatedAt: record.timestamp }];
+        }
         if (key === 'getMineSummary:mine' && !result?.error && Array.isArray(result?.response?.gatherings)) {
           return [{ key: 'gatheringStatus', method: call.name, feature: call.feature, group: 'header',
             data: { gatherings: result.response.gatherings.map(item => ({
@@ -2257,6 +2263,18 @@
             updatedAt: next.incomingMineAttacks?.updatedAt > entry.updatedAt ? next.incomingMineAttacks.updatedAt : entry.updatedAt,
             data: { accountId: String(accountId), snapshotAt, ended: tombstones,
               attacks: Object.fromEntries(Object.entries(attacks).sort((a, b) => b[1].observedAt - a[1].observedAt).slice(0, 30)) } };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'ownOutpostAction') {
+          const accountId = next.accountStatus?.data?.id, at = Date.parse(entry.updatedAt);
+          if (accountId == null || !Number.isFinite(at) || Date.parse(next.accountStatus?.updatedAt) > at ||
+              next.experimentalMapContext?.updatedAt > entry.updatedAt) continue;
+          const previous = next.experimentalMapContext?.data;
+          const sameMap = previous?.mapId === entry.data.mapId;
+          next.experimentalMapContext = { key: 'experimentalMapContext', method: entry.method, feature: entry.feature,
+            group: 'internal', updatedAt: entry.updatedAt, data: { mapId: entry.data.mapId,
+              center: entry.data.coordinates, outposts: { ...(sameMap ? previous.outposts : {}), [accountId]: entry.data.coordinates } } };
           changed = true;
           continue;
         }

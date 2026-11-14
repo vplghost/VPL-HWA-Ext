@@ -3,7 +3,7 @@ id: doc-0387b165a8c4de930cfa0bf94b5311ad
 title: Smart auto gathering
 description: Execution scope, verified evidence, scenarios and missing information for smart auto-gathering
 createdAt: '2026-11-14T11:50:18.441Z'
-updatedAt: '2026-11-14T12:44:33.853Z'
+updatedAt: '2026-11-14T18:26:40.597Z'
 tags:
   - spec
   - gathering
@@ -18,7 +18,7 @@ Canonical task/spec tracking for `docs/Smart-auto-gathering.md`. AC-1 through AC
 - D1: Smart rules run only with Auto-Gather, explicit Smart gathering and shared RPC enabled. Manual gathering stays explicit.
 - D2: Daily order food → iron → stone → wood; target ceil(final milestone × 1.02), never sum milestones (user confirmed).
 - D3: Server responses confirm mutations; dispatch acknowledgement is not completion. Fresh march and unit observations gate released slots/heroes.
-- D4: User permits estimated return ETA from configured speed/coordinates and estimated gathering duration from configured mine speed/remaining amount. Own outpost coordinates must be identified. Attack ownership/ETA must be captured before enabling defense. Hospital free capacity = sum Infirmary capacity minus wounded troops.
+- D4: User permits estimated return ETA from configured speed/coordinates and estimated gathering duration from configured mine speed/remaining amount. Own outpost coordinates must be identified. Attack ownership/ETA must be captured before enabling defense. Hospital free capacity = sum Infirmary capacity minus wounded troops. Per user update2026-11-15, attacked-mine defense triggers only when wounded troops exceed50% of positive total Infirmary capacity; exactly50% does not trigger. Squad size does not set this threshold.
 - D5: Execute tasks sequentially, preserve account isolation, shared RPC settings and established raid lifecycle.
 
 ## Task Links
@@ -77,7 +77,7 @@ Chỉ ghi mine gián đoạn sau recall thành công. Trước quay lại dùng 
 
 Hospital trống = **max(0, tổng sức chứa các Infirmary − tổng troops bị thương)**, theo xác nhận của người dùng. Nếu một dữ liệu đầu vào thiếu thì capacity còn trống là chưa biết.
 
-Khi có dữ liệu xác thực về đội địch tấn công đúng mine đang gather và số troops lớn hơn hospital trống, recall đúng squad một lần trong **0 < ETA va chạm ≤10 giây**. Sau khi về base thì gather tiếp theo các ưu tiên trên. Đã xác minh RPC getIncomingMarches và MQTT marchAttackDetected/Ended từ hai capture mới. Chi tiết, SHA256 và timing ở @doc/api/mine-incoming-attack-and-timed-withdrawal. Recall tại impact−10s, hết hạn tại impact; Piggyback cần game RPC trước deadline.
+Khi có dữ liệu xác thực về đội địch tấn công đúng mine đang gather và tổng troops bị thương vượt 50% tổng sức chứa Infirmary, recall đúng squad một lần trong **0 < ETA va chạm ≤10 giây**. Sau khi về base thì gather tiếp theo các ưu tiên trên. Đã xác minh RPC getIncomingMarches và MQTT marchAttackDetected/Ended từ hai capture mới. Chi tiết, SHA256 và timing ở @doc/api/mine-incoming-attack-and-timed-withdrawal. Recall tại impact−10s, hết hạn tại impact; Piggyback cần game RPC trước deadline.
 
 ## Bằng chứng và thông tin cần bổ sung
 
@@ -98,7 +98,7 @@ Khi có dữ liệu xác thực về đội địch tấn công đúng mine đan
 - AC-3: Queue chỉ start sau khi slot/heroes đã về thật; auto-gather dừng trong queue và quay lại mine sau terminal.
 - AC-4: Nearest chọn gần nhất trong ứng viên estimated >3600s; không nhận 3600s; mine cũ được miễn threshold.
 - AC-5: Auto-join không recall ở 29s hoặc ETA không biết; kiểm tra lại rally sau khi về, không recall/join trùng.
-- AC-6: Defense cần đủ owner/mine/ETA/capacity; recall đúng squad, một lần mỗi attack, trong [impact−10s, impact).
+- AC-6: Defense cần đủ owner/mine/ETA/capacity dương và thương binh >50% tổng capacity; đúng50% không recall; recall đúng squad, một lần mỗi attack, trong [impact−10s, impact).
 
 Kịch bản kiểm thử: RPC tắt; smart tắt; account đổi; reset qua ngày; quest mới chỉ hoàn thành mốc đầu; hai đội cùng resource; amount/ETA thiếu; mine cạn sau search; recall bị từ chối; worker khởi động lại; queue cancel khi đội chưa về; rally full/start trong lúc recall; piggyback trễ; đúng 29s và 3600s.
 
@@ -124,7 +124,7 @@ Sau mỗi task: test theo AC, review diff, cập nhật Knowns; cuối đợt ch
 - [x] AC-3: Raid/monster queues wait for gathering recall and confirmed return, suppress gather while active, then validate and resume interrupted mines.
 - [x] AC-4: Nearest mine mode orders candidates across levels, probes remaining resources and requires estimated >3600s; validated interrupted mines bypass threshold.
 - [x] AC-5: Priority rally preemption requires estimated return <29s plus start window, then rechecks rally and joins once after confirmed return.
-- [x] AC-6: Verified hostile incoming routes target an own gathering mine; insufficient hospital space triggers a single deadline-checked recall in final10s. Missing/stale inputs refresh without guessing.
+- [x] AC-6: Verified hostile incoming routes target an own gathering mine; hospital occupancy strictly above50% triggers a single deadline-checked recall in final10s. Missing/stale inputs refresh without guessing.
 
 ## Scenarios
 
@@ -151,3 +151,37 @@ Release0.10.80 completed AC-1…AC-5 with762 tests,750 passed,12 optional skippe
 ## Delivery verification for0.10.81
 
 All six task scopes implemented. Incoming contracts/hashes: @doc/api/mine-incoming-attack-and-timed-withdrawal. Verification:775 tests,763 passed,12 optional skipped; typecheck, validated WXT build and strict SDD validation pass. AC-6 covers insufficient/sufficient/unknown hospital, exact10s/impact bounds, full/late-load attacks, snapshot/version/terminal/account guards, overlapping recalls, confirmed return, safe mine resume, Piggyback expiry and queue cleanup on account/Smart disable. Bridge test proves absolute wake scheduling without a storage-update loop. Direct sends at wake; Piggyback requires natural game traffic before impact. No live in-game validation is claimed.
+
+## Occupancy threshold update — 0.10.83
+
+@task-VHE-N7EWFF implements the user's2026-11-15 change: attacked-mine recall eligibility is strictly wounded >0.5 × total Infirmary capacity. Exactly50% does not trigger. This replaces the former comparison of defending squad size against hospital free space in SG-6/AC-6. The recorded0.10.81 delivery notes describe the earlier rule only. Positive known capacity and fresh building/healing/march/unit inputs remain mandatory; unknown/stale/zero capacity requests refresh. Final10s window, ownership/account isolation, shared RPC mode and confirmation-driven return/resume stay in force. No live-game validation is claimed.
+
+## Reload recovery — 0.10.84
+
+@task-VHE-B86D4M investigates temp/tracking-data/hwa-game-record-202611150055_relaod.json (SHA256174af2d3cde7564f24c3de092f8e3c21487c2a26cb2a5bd77f9bbb5969215055). Capture extension0.10.83/client1.293.1010, exported2026-11-14T17:55:36.937Z. It shows1 current mine squad, available units7245/7240/7240 of unit7/17/27, all resource daily chains completed and no incoming attacks. The user reports maxMarches3; settings and persisted automation state are not included in the export.
+
+Confirmed blocker: getOutpostSummary:outpost at timeline14 (17:55:19.055Z) returns current mapId and own coordinates606,376, but the reducer ignored that response. Smart context therefore lacked own outpost coordinates until getChunks at timeline39 (17:55:32.043Z). Replay reproduces the wait and, after fix, nearest search starts from timeline14. Another reproduced bug: getMarches sets a generic center to the deployed mine587,340, and fixed-level gathering preferred that center even after own base was known.
+
+The reducer now binds successful valid own-outpost summaries to the current known account, discards responses older than account/context observations, isolates different maps, and clears state on account change. Auto-gather prefers outposts[currentAccount] before a generic viewport center. Shared RPC/queue gates, slot cap, troop availability and server-confirmed mutation lifecycle are retained.
+
+Regression tests/gather-reload.test.mjs uses sanitized tests/fixtures/gather-reload-20261115.json (no request headers/auth; account name/ID replaced). It replays real startup RPCs without getChunks; then a controlled backend simulation proves1→2→3 gathering squads, fresh roster confirmation between sends and no fourth squad. Simulated successful search/dispatch responses are test inputs, not additional observed game evidence. The short capture has no helper searchMine/attackMine requests and cannot establish all popup settings or any prior persisted error; no live-game fix confirmation is claimed.
+
+## Direct confirmation timeout follow-up — 0.10.85
+
+@task-VHE-D0K20G follows the user's Direct-mode report and hwa-game-record-202611150108.json. This capture has exactly one native getMineSummary/getMarches RPC at18:08:03.029Z, exported18:08:13.298Z, extension0.10.84. It contains no helper RPC or persisted pending state; the user separately reported Waiting for game confirmation followed by timeout, and a research-queue receiving-end-does-not-exist error.
+
+Confirmed independent source defect: findActiveGameTab used `new Promise(resolve => chrome.tabs.query(filter, resolve) || resolve([]))`. Chrome's callback API returns undefined before asynchronously invoking its callback, so the Promise resolved[] immediately and both start/reset and periodic Smart ticks found no game tab. Previous tests synchronously invoked the callback and therefore concealed the defect. Both query paths now wait for the callback; regression uses asynchronous callbacks and fallback selection.
+
+Read-only pending requests expire at their30s dispatch deadline and retry at most3 times before a named connection error. Exact method/feature and sent phase classify reads; attackMine, stopMineGathering and joinRally are not automatically retried. Existing server-confirmed mutation/roster gates remain. Status names the awaited RPC and Direct/queued mode; explicit Auto-Gather start clears old retry/error state. A missing content-script receiver after extension reload still requires F5 in the game page; the helper now names that recovery action instead of silently waiting.
+
+Also corrected omitted feature-bounded getMineById:mine and getIncomingMarches:march queue compatibility; these were separate Piggyback/MQTT gaps and are not claimed as the user's Direct cause.
+
+Actual Chrome157 fixture acceptance: scripts/browser-gather-acceptance.mjs runs unpacked0.10.85 with real callback timing, storage, worker, content bridge and MAIN interception. All game HTTP requests are fulfilled locally. Auto-Gather start then periodic wake-ups send two additional squads, reconcile server responses/current rosters and reach Current marches limit reached(3/3). Evidence docs/acceptance/gather-2026-11-15.json; this is browser integration evidence with a simulated backend, not a live-account result. Full suite793 tests:781 passed,12 optional skips; typecheck and validated build PASS.
+
+## Occupied interrupted mine follow-up — 0.10.86
+
+@task-VHE-P3VDNA / @doc/api/world-map-rpc-contracts documents the new0.10.85 capture with actual helper RPCs. Unlike the previous one-record timeout export, this log proves the request reached the server: getMineById reported another gatherer, then attackMine:pve received errorCode-only BattleTypeMismatch. Existing resume/nearest validation ignored gathering and error checks ignored errorCode, leaving a rejected mutation pending.
+
+Resume/nearest probes now require no gathering object, valid matching mineId/resources and the existing duration rules. Occupied or explicitly race-rejected targets are removed from interrupted/resume/nearest selection and temporarily excluded from ordinary Smart cached searches for60s (bounded50 records). BattleTypeMismatch selects a different free target; other mutation errors stop with the actual code. No automatic PvP and no retries of unconfirmed mutations.
+
+Verification: tests/gather-reload.test.mjs uses sanitized captured occupied/errorCode replies. Real Chrome157 Direct fixture acceptance with occupied-resume-and-target-race ends with3 squads, zero pending and status3/3; only distinct PvE targets are requested and the occupied interrupted mine is not attacked. Checked-in evidence docs/acceptance/gather-occupied-2026-11-15.json. Full suite796 tests:784 passed,12 optional private-capture skips; typecheck, validated build and diff whitespace checks PASS. Game responses in the Chrome acceptance are controlled fixtures, not a live-game outcome.

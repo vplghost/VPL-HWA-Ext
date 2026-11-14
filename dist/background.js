@@ -365,10 +365,16 @@ async function updateDungeonRun(record, tabId) {
 
 async function findActiveGameTab() {
   const queryPatterns = GAME_ORIGINS.map((o) => `${o}/*`);
-  const tabs = await new Promise((resolve) => chrome.tabs?.query?.({ url: queryPatterns }, resolve) || resolve([]));
+  const tabs = await new Promise((resolve) => {
+    if (!chrome.tabs?.query) return resolve([]);
+    chrome.tabs.query({ url: queryPatterns }, resolve);
+  });
   const tab = (tabs || []).find((t) => t.id && isGameUrl(t.url));
   if (tab) return tab;
-  const allTabs = await new Promise((resolve) => chrome.tabs?.query?.({}, resolve) || resolve([]));
+  const allTabs = await new Promise((resolve) => {
+    if (!chrome.tabs?.query) return resolve([]);
+    chrome.tabs.query({}, resolve);
+  });
   return (allTabs || []).find((t) => t.id && isGameUrl(t.url)) || null;
 }
 
@@ -984,7 +990,7 @@ async function tickAutoGather(reset = false) {
     if (tab?.id) await chrome.tabs.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
     if (tab?.id && !stored.autoGatherSettings?.smartEnabled) await dropMineDefenseRpc(tab.id);
     if (stored.smartGatherState) {
-      stored.smartGatherState = { ...stored.smartGatherState, error: null, nearest: null };
+      stored.smartGatherState = { ...stored.smartGatherState, error: null, nearest: null, readTimeout: null, notice: null };
       if (stored.smartGatherState.pending && !['stopMineGathering', 'attackMine', 'joinRally'].includes(stored.smartGatherState.pending.call?.name))
         stored.smartGatherState.pending = null;
       await chrome.storage.local.set({ smartGatherState: stored.smartGatherState });
@@ -1087,7 +1093,10 @@ async function evaluateSmartGather(record, cache, stored, tabId, now = Date.now(
   let calls = [];
   let reason = state.error;
   if (state.pending) {
-    reason = state.pending.phase === 'returning' ? 'Waiting for recalled gathering squad to return' : 'Waiting for game confirmation';
+    const method = state.pending.call.name + (state.pending.call.feature ? ':' + state.pending.call.feature : '');
+    reason = state.pending.phase === 'returning' ? 'Waiting for recalled gathering squad to return' :
+      state.pending.phase === 'refresh' ? `Confirming ${method} with current march/unit snapshots` :
+      `Waiting for ${method} response · ${stored.socketRefreshMode === 'direct' ? 'Direct' : 'queued; requires a game RPC carrier'}`;
     if (['returning', 'refresh'].includes(state.pending.phase) && now - (state.lastRefreshAt || 0) >= 5000) {
       calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
       state.lastRefreshAt = now;
@@ -1120,16 +1129,16 @@ async function evaluateSmartGather(record, cache, stored, tabId, now = Date.now(
     if (calls.length) {
       state.lastPlanAt = now;
       if (plan.nearest) state.nearest = plan.nearest;
-      state.pending = { ...plan.pending, call: calls[0], sentAt: now, phase: 'sent' };
+      state.pending = { ...plan.pending, call: calls[0], sentAt: now, expiresAt: now + 30000, phase: 'sent' };
     }
   }
   const dispatch = calls.length ? rpcMessageForSettings(stored, calls) : null;
   if (dispatch) {
     await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'smart-gather', expiresAt: now + 30000 }).catch(() => {
-      state.pending = null; state.error = 'Game tab disconnected; restart Smart gathering';
+      state.pending = null; state.error = 'Game tab RPC bridge unavailable; press F5 in the game tab and restart Smart gathering';
     });
   }
-  state.status = state.error || (state.notice?.at + 30000 > now ? state.notice.message : null) || reason || 'Waiting';
+  state.status = state.error || ((state.notice?.expiresAt ?? state.notice?.at + 30000) > now ? state.notice.message : null) || reason || 'Waiting';
   state.updatedAt = now;
   await chrome.storage.local.set({ smartGatherState: state });
   stored.smartGatherState = state;

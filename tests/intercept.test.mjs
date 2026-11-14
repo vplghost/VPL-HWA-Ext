@@ -69,6 +69,24 @@ async function waitForMessage(messages) {
   assert.ok(messages.length > 0, 'expected an API record');
 }
 
+test('Smart gathering mine probes and incoming reads cross the actual queued carrier with feature bounds', async () => {
+  for (const mode of ['piggyback', 'mqtt-piggyback']) {
+    const batches = [];
+    const env = setup(async (_url, options) => {
+      const calls = JSON.parse(options.body).calls; batches.push(calls);
+      return new Response(JSON.stringify({ results: calls.map(call => ({ ident: call.ident, result: { response: {} } })) }), { headers: { 'content-type': 'application/json' } });
+    }, true, { Response, Headers });
+    env.window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true, popupRpcEnabled: true, socketRefreshMode: mode }, 'https://www.hero-wars-alliance.com');
+    env.window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [
+      { name: 'getMineById', feature: 'mine', args: { mineId: 'mine' } },
+      { name: 'getIncomingMarches', feature: 'march' },
+      { name: 'getMineById', feature: 'wrong' }, { name: 'getIncomingMarches', feature: 'wrong' }
+    ] }, 'https://www.hero-wars-alliance.com');
+    await env.window.fetch('https://api.hero-wars-alliance.com/api/rpc', { method: 'POST', body: JSON.stringify({ calls: [{ name: 'getMarches', feature: 'march', ident: 'natural' }] }) });
+    assert.deepEqual(batches[0].map(c => [c.name, c.feature]), [['getMarches', 'march'], ['getMineById', 'mine'], ['getIncomingMarches', 'march']]);
+  }
+});
+
 test('raid cancellation expires before departure and stopping a group preserves unrelated requests', async () => {
   let clock = 1000;
   class Clock extends Date { static now() { return clock; } }

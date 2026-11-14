@@ -148,7 +148,7 @@
       ...cache?.experimentalMapContext?.data
     };
     const mapId = context.mapId;
-    const center = context.center || context.outposts?.[cache?.accountStatus?.data?.id];
+    const center = context.outposts?.[cache?.accountStatus?.data?.id] || context.center;
     if (!mapId || !Number.isFinite(center?.x) || !Number.isFinite(center?.y)) {
       return { action: 'wait', reason: 'Map ID or center coordinates unavailable' };
     }
@@ -176,6 +176,7 @@
     // Check if matching mine search results exist with full mines
     const mineSearch = cache?.experimentalMineSearch?.data;
     const activeMineIds = new Set([
+      ...(smart ? smart.blockedMineIds(stored.smartGatherState, now) : []),
       ...(smart ? globalThis.hwaHelperMineDefense?.unsafeMineIds(cache, stored.smartGatherState, now) || [] : []),
       ...marches
         .map((m) => m?.mineId || m?.target?.objectId || m?.targetId)

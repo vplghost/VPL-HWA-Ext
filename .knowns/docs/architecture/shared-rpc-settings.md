@@ -3,7 +3,7 @@ id: doc-ae23757efba5a35e23544c6e9aabb147
 title: Shared RPC Settings
 description: User rule that every helper RPC inherits shared enable and dispatch mode settings unless an explicit feature override exists
 createdAt: '2026-11-06T04:21:46.197Z'
-updatedAt: '2026-11-13T02:30:57.138Z'
+updatedAt: '2026-11-14T18:15:50.066Z'
 tags:
   - rpc
   - settings
@@ -63,3 +63,9 @@ Related references: @doc/architecture/rpc-cache-pipeline, @doc/architecture/auto
 ## Queue visibility
 
 The header RPC queue count is published by the actual page interceptor (pc-queue-status), forwarded by the bridge and aggregated per game tab in background session state. It counts unique pending RPC calls rather than batches or in-flight requests. Action expiry publishes a new count even when no game fetch occurs; closing a game tab removes its count. The bridge forwards counts only, never command payloads. This replaces the shelved Wheel badge: @doc/archive/shelved-wheel-of-fortune.
+
+## Smart gathering confirmation recovery (0.10.85)
+
+@task-VHE-D0K20G preserves shared mode selection. Pending status names method:feature and Direct versus waiting for a natural queued carrier. Exact read-only pending calls may expire at their30s dispatch deadline and retry at most3 times; unconfirmed attackMine/stopMineGathering/joinRally are never classified as retryable reads. MAIN queued-read compatibility now includes getMineById:mine and getIncomingMarches:march, rejecting unrelated features. The reported Direct stall was a different bug: asynchronous Chrome tab queries resolved an empty list before their callback. See @doc/specs/smart-auto-gathering, tests/gather-reload.test.mjs, tests/intercept.test.mjs and docs/acceptance/gather-2026-11-15.json.
+
+After reloading/updating the extension, an existing game tab can have an invalidated/missing content bridge; F5 the game page reconnects it. Clear a prior terminal Smart timeout through explicit Auto-Gather restart. A missing receiver is not an RPC acknowledgement and does not establish any server mutation outcome.

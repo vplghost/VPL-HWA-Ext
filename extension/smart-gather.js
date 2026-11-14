@@ -31,6 +31,27 @@
   function activeQueue(stored) {
     return [stored.raidQueue, stored.monsterQueue].find(q => q && !['complete', 'stopped'].includes(q.phase));
   }
+  function blockedMineIds(state, now) {
+    return new Set(list(state?.rejectedMines).filter(row => row.expiresAt > now).map(row => row.mineId));
+  }
+  function skipMine(state, mineId, now, reason) {
+    if (!mineId) return;
+    state.rejectedMines = [...list(state.rejectedMines).filter(row => row.mineId !== mineId && row.expiresAt > now),
+      { mineId, expiresAt: now + 60000, reason }].slice(-50);
+    state.interrupted = list(state.interrupted).filter(row => row.mineId !== mineId);
+    if (state.resumeCandidate?.mineId === mineId) state.resumeCandidate = null;
+    if (state.nearest) {
+      state.nearest.candidates = list(state.nearest.candidates).filter(row => row.mineId !== mineId);
+      if (state.nearest.selected?.mineId === mineId) state.nearest.selected = null;
+    }
+    state.notice = { at: now, expiresAt: now + 5000, message: `Skipping unavailable mine (${reason}); finding a free mine` };
+  }
+  function rpcFailure(result) {
+    const response = result?.response;
+    const code = response?.errorCode ?? result?.errorCode;
+    const error = result?.error || response?.error || (code != null && code !== 0 && code !== '0' && code !== '' ? code : null);
+    return error ? typeof error === 'object' ? error.message || JSON.stringify(error) : String(error) : null;
+  }
   function recallForRally(cache, stored, rally, now) {
     const marches = list(cache.marchStatus?.data?.marches);
     if (marches.length < globalThis.hwaHelperAutoGather.normalizeAutoGatherSettings(stored.autoGatherSettings).maxMarches) return null;
@@ -59,12 +80,14 @@
     const sameCenter = state?.nearest?.center?.x === map.center?.x && state?.nearest?.center?.y === map.center?.y;
     const nearest = state?.nearest?.type === type && state.nearest.mapId === map.mapId && sameCenter
       ? state.nearest : { mapId: map.mapId, center: map.center, type, levels: [], candidates: [], startedAt: now };
+    if (nearest.selected && blockedMineIds(state, now).has(nearest.selected.mineId)) nearest.selected = null;
     const level = Array.from({ length: 10 }, (_, i) => i + 1).find(level => !nearest.levels.includes(level));
     if (level) return { action: 'search', reason: 'Finding nearest ' + type + ' mine: level ' + level + '/10', nearest,
       call: data.buildMineSearchCall(map.mapId, map.center, type, level), pending: { purpose: 'nearestSearch', level, configId: data.mineConfigId(type, level) } };
     if (nearest.selected && now - nearest.selected.checkedAt < 30000) return { action: 'target', mine: nearest.selected,
       type, level: globalThis.hwaHelperSmartGatherData.mines[nearest.selected.configId].level };
     const active = new Set([...list(cache.marchStatus?.data?.marches).map(m => m.mineId).filter(Boolean),
+      ...blockedMineIds(state, now),
       ...(globalThis.hwaHelperMineDefense?.unsafeMineIds(cache, state, now) || [])]);
     const candidate = nearest.candidates.filter(m => !active.has(m.mineId)).sort((a, b) =>
       Math.hypot(a.coordinates.x - map.center.x, a.coordinates.y - map.center.y) -
@@ -76,7 +99,7 @@
   }
   function resumePlan(cache, state, now = Date.now()) {
     const mapId = context(cache).mapId;
-    const unsafe = globalThis.hwaHelperMineDefense?.unsafeMineIds(cache, state, now) || new Set();
+    const unsafe = new Set([...(globalThis.hwaHelperMineDefense?.unsafeMineIds(cache, state, now) || []), ...blockedMineIds(state, now)]);
     const mine = list(state?.interrupted).find(row => row.mapId === mapId && !unsafe.has(row.mineId));
     if (!mine) return null;
     if (list(cache.marchStatus?.data?.marches).some(m => m.mineId === mine.mineId && m.stage !== 'returnToOutpost' && m.kind !== 'return'))
@@ -139,12 +162,30 @@
       return (req.calls || []).map(call => ({ call, result: res.results?.find(row => row.ident === call.ident)?.result }));
     } catch { return []; }
   }
+  const readFeatures = new Map([
+    ['getMarches', 'march'], ['getUnitSummary', 'unit'], ['getMineSummary', 'mine'],
+    ['heroGetAll', ''], ['getDailyQuests', 'quest'], ['user_getNextDayTime', ''],
+    ['searchMine', 'mine'], ['getMineById', 'mine'], ['getRallyById', 'rally']
+  ]);
+  function pendingRead(pending) {
+    return pending?.phase === 'sent' && readFeatures.has(pending.call?.name) &&
+      readFeatures.get(pending.call.name) === (pending.call.feature || '');
+  }
   function sync(raw, record, cache, now) {
     const accountId = cache.accountStatus?.data?.id;
     const state = raw && accountId != null && String(raw.accountId) === String(accountId) ? structuredClone(raw) : { accountId, interrupted: [] };
     const pending = state.pending;
     if (!pending) return state;
     const reply = Date.parse(record?.timestamp) >= pending.sentAt ? replies(record).find(row => matches(row.call, pending.call)) : null;
+    if (reply && pendingRead(pending)) delete state.readTimeout;
+    const failure = rpcFailure(reply?.result);
+    if (reply && failure && pending.call.name !== 'joinRally') {
+      state.pending = null;
+      if (pending.call.name === 'attackMine' && failure === 'BattleTypeMismatch') {
+        skipMine(state, pending.call.args.mineId, now, failure);
+      } else state.error = `${pending.call.name} rejected by game: ${failure}; restart Smart gathering to retry`;
+      return state;
+    }
     if (reply && pending.purpose === 'nearestSearch' && !reply.result?.error && Array.isArray(reply.result?.response?.mines)) {
       const nearest = state.nearest;
       if (nearest) {
@@ -165,7 +206,8 @@
       const amount = reply.result?.response?.resourceAmount;
       const info = globalThis.hwaHelperSmartGatherData?.mines[pending.mine.configId];
       const duration = finite(amount) && info?.speedPerMinute > 0 ? amount / info.speedPerMinute * 60 : null;
-      if (!reply.result?.error && !reply.result?.response?.error && reply.result?.response?.mineId === pending.mine.mineId && duration > 3600) {
+      if (reply.result?.response?.gathering) skipMine(state, pending.mine.mineId, now, 'occupied');
+      if (!failure && !reply.result?.response?.gathering && reply.result?.response?.mineId === pending.mine.mineId && duration > 3600) {
         state.nearest.selected = { ...pending.mine, checkedAt: now, estimatedSeconds: duration };
       } else {
         state.nearest.candidates = state.nearest.candidates.filter(m => m.mineId !== pending.mine.mineId);
@@ -176,7 +218,8 @@
     }
     if (reply && pending.purpose === 'resume') {
       const amount = reply.result?.response?.resourceAmount;
-      if (!reply.result?.error && !reply.result?.response?.error && finite(amount) && amount > 0 && reply.result.response.mineId === pending.mine.mineId) {
+      if (reply.result?.response?.gathering) skipMine(state, pending.mine.mineId, now, 'occupied');
+      if (!failure && !reply.result?.response?.gathering && finite(amount) && amount > 0 && reply.result.response.mineId === pending.mine.mineId) {
         state.resumeCandidate = { mineId: pending.mine.mineId, checkedAt: now };
       } else {
         state.interrupted = list(state.interrupted).filter(m => m.mineId !== pending.mine.mineId);
@@ -187,10 +230,10 @@
     }
     if (reply && pending.call.name === 'joinRally') {
       const squadId = reply.result?.response?.squadId;
-      if (!reply.result?.error && !reply.result?.response?.error && squadId) {
+      if (!failure && squadId) {
         state.reservation = { type: 'joinedRally', rallyId: pending.call.args.rallyId, squadId, confirmedAt: Date.parse(record.timestamp) };
         state.pending = null;
-      } else if (reply.result?.error || reply.result?.response?.error) {
+      } else if (failure) {
         state.reservation = null; state.pending = null; state.notice = { at: now, message: 'Rally join rejected; resuming interrupted gathering' };
       }
       return state;
@@ -225,10 +268,18 @@
       const deployed = list(cache['getUnitSummary:unit']?.data?.squads).some(s => (s.squadId ?? s.id) === squadId);
       if (marchFresh && unitsFresh && (wait.phase === 'returning' ? !exists && !deployed : exists)) state.pending = null;
     }
-    if (state.pending && now - (state.pending.returnAt || state.pending.sentAt) > 120000) {
-      state.pending = null; state.error = 'Smart gathering confirmation timed out; refresh game and restart Smart gathering';
+    if (state.pending && pendingRead(state.pending) && now >= (state.pending.expiresAt || state.pending.sentAt + 30000)) {
+      const key = state.pending.call.name + ':' + (state.pending.call.feature || '');
+      const attempts = state.readTimeout?.key === key ? state.readTimeout.attempts + 1 : 1;
+      state.pending = null;
+      state.readTimeout = { key, attempts };
+      state.notice = { at: now, message: `Retrying expired read ${key} (${attempts}/3)` };
+      if (attempts >= 3) state.error = `Read ${key} timed out after 3 attempts; press F5 in the game tab and restart Smart gathering`;
+    } else if (state.pending && now - (state.pending.returnAt || state.pending.sentAt) > 120000) {
+      const name = state.pending.call.name;
+      state.pending = null; state.error = `Smart gathering ${name} confirmation timed out; refresh game and restart Smart gathering`;
     }
     return state;
   }
-  globalThis.hwaHelperSmartGather = { list, finite, fresh, order, gathering, typeOf, context, returnMs, collectedSince, activeQueue, recallForRally, recallForQueue, nearestPlan, resumePlan, dailyPlan, replies, sync };
+  globalThis.hwaHelperSmartGather = { list, finite, fresh, order, gathering, typeOf, context, returnMs, collectedSince, activeQueue, blockedMineIds, rpcFailure, recallForRally, recallForQueue, nearestPlan, resumePlan, dailyPlan, replies, sync };
 })();

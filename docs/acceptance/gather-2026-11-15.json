@@ -1,0 +1,91 @@
+{
+  "mode": "direct",
+  "localFixtureOnly": true,
+  "calls": [
+    [],
+    [
+      "getMarches"
+    ],
+    [
+      "searchMine"
+    ],
+    [],
+    [
+      "attackMine"
+    ],
+    [
+      "getMarches",
+      "getUnitSummary"
+    ],
+    [],
+    [
+      "searchMine"
+    ],
+    [],
+    [
+      "getIncomingMarches"
+    ],
+    [
+      "attackMine"
+    ],
+    [
+      "getMarches",
+      "getUnitSummary"
+    ]
+  ],
+  "errors": [],
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/157.0.8103.52",
+    "revision": "@0985600c06a688b9c669e74afde7dacd5aaed047",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "jsVersion": "15.7.112.23"
+  },
+  "extension": "0.10.85",
+  "state": {
+    "count": 3,
+    "state": {
+      "accountId": 1,
+      "dailyBaseline": {
+        "dayStart": 1794597246708,
+        "resources": {
+          "food": {
+            "progress": 261212,
+            "since": 1794680046708
+          },
+          "iron": {
+            "progress": 144942,
+            "since": 1794680046708
+          },
+          "stone": {
+            "progress": 1262683,
+            "since": 1794680046708
+          },
+          "wood": {
+            "progress": 6495688,
+            "since": 1794680046708
+          }
+        }
+      },
+      "defense": {
+        "attempted": [],
+        "pending": null,
+        "refreshAt": 1794680062836,
+        "status": "",
+        "waiting": []
+      },
+      "error": null,
+      "interrupted": [],
+      "lastAutoMineType": "stone",
+      "lastPlanAt": 1794680062836,
+      "lastRefreshAt": 1794680062886,
+      "nearest": null,
+      "notice": null,
+      "pending": null,
+      "status": "Current marches limit reached (3/3)",
+      "updatedAt": 1794680062908,
+      "wakeAt": null
+    }
+  },
+  "passed": true
+}

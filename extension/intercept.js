@@ -47,6 +47,8 @@
     ['getInfo', 'clanVersus'],
     ['getCampSummary', 'camp'],
     ['getMineSummary', 'mine'],
+    ['getMineById', 'mine'],
+    ['getIncomingMarches', 'march'],
     ['expeditionGet', ''],
     ['user_getNextDayTime', ''],
     ['user_getClanInfo', ''],

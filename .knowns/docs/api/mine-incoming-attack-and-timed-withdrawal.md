@@ -3,7 +3,7 @@ id: doc-faf9031aaab728d187e1eebf6ef53dd4
 title: Mine incoming attack and timed withdrawal
 description: Verified incoming-march RPC/MQTT, hospital capacity and timed recall evidence from Nov14 attack captures
 createdAt: '2026-11-14T12:31:09.369Z'
-updatedAt: '2026-11-14T12:38:22.346Z'
+updatedAt: '2026-11-14T17:38:57.929Z'
 tags:
   - rpc
   - mqtt
@@ -40,7 +40,7 @@ Observed results lag planned impact by a fraction of a second. Expire queued rec
 
 Building IDs162/174/175 are Infirmary1/2/3. Sum healingCapacity absolute rewards cumulatively through each completed building level; each level bonus is an increment, not the total. Metadata generator verifies building/buildingLevel/bonus MD5 filenames and packages capacities.
 
-Captured levels:162 L19=11900,174 L18=11200; total23100. `getHealing:unit.injuredUnits` totals11188, so free11912. Healing queue units are already part of injuredUnits; do not add them again or assume elapsed healing timer completed the server mutation. Threatened captured squads have4194 and4065 troops, so the original insufficient-capacity rule correctly does not recall with those captured hospital values. Tests simulate a fuller hospital to prove the positive path.
+Captured levels:162 L19=11900,174 L18=11200; total23100. `getHealing:unit.injuredUnits` totals11188, so free11912. Healing queue units are already part of injuredUnits; do not add them again or assume elapsed healing timer completed the server mutation. Captured occupancy11188/23100 ≈48.43%, so current defense does not recall. Per user change2026-11-15 (@task-VHE-N7EWFF), eligibility is wounded > total capacity ×0.5, with known positive total capacity. Exactly11550/23100 (50%) does not trigger;11551/23100 does. Squad size is not compared against remaining hospital space. Healing queue units remain included only once.
 
 ## Resume and limitations
 
@@ -50,8 +50,8 @@ Captured levels:162 L19=11900,174 L18=11200; total23100. `getHealing:unit.injure
 
 `incomingMineAttacks` stores normalized account-scoped routes, versions, snapshot times and bounded terminal route/enemy-squad tombstones. Newer snapshots remove absent threats without erasing newer MQTT deltas; terminal attacks cannot revive from replay. Stale mine-completion events cannot retire newer attacks.
 
-`mine-defense.js` uses current building/healing/march/unit snapshots. It compares the actual defending squad's troops with hospital free space. It schedules the wake at impact−10s through the content bridge and an MV3 alarm fallback, rechecks all eligibility at wake, and sends stopMineGathering with expiresAt=impact. Different attacked squads retain independent confirmations and RPC groups. Unknown/stale capacity or troop data causes refresh; no unsafe default is used.
+`mine-defense.js` uses current building/healing/march/unit snapshots. It recalls when current wounded troops strictly exceed50% of total Infirmary capacity, independently of defending squad size. Known positive capacity and fresh defending squad observations remain required. It schedules the wake at impact−10s through the content bridge and an MV3 alarm fallback, rechecks all eligibility at wake, and sends stopMineGathering with expiresAt=impact. Different attacked squads retain independent confirmations and RPC groups. Unknown/stale capacity or troop data causes refresh; no unsafe default is used.
 
 Successful recall acknowledgement feeds the existing confirmed-return and interrupted-mine lifecycle. Defensive resume targets are excluded until after the attack and a fresh getChunks observation confirms vacancy; known hostile or unknown occupancy causes normal gathering to choose another safe candidate. Pausing/disabling RPC cancels queued defense groups without pretending that already-sent recalls did not happen.
 
-Tests: tests/mine-defense.test.mjs uses the checked-in minimal capture fixture tests/fixtures/mine-attacks-20261114.json, the actual reducer, planner and background controller. Covers late-load hydration, captured sufficient capacity, simulated crowded hospital, exact10s/impact bounds, MQTT/end/replay/version/account guards, overlapping attacks, successful recall acknowledgement and Piggyback expiry. Live game validation remains pending user operation after extension reload.
+Tests: tests/mine-defense.test.mjs uses the checked-in minimal capture fixture tests/fixtures/mine-attacks-20261114.json, the actual reducer, planner and background controller. Covers late-load hydration, captured below-threshold occupancy, below/equal/above50% boundaries, squad-size independence, unknown/stale/zero capacity, exact10s/impact bounds, MQTT/end/replay/version/account guards, overlapping attacks, successful recall acknowledgement and Piggyback expiry. Live game validation remains pending user operation after extension reload.

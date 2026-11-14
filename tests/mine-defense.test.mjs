@@ -25,7 +25,7 @@ function environment() {
 function crowdHospital(cache) { cache['getHealing:unit'].data.injuredUnits = [{ unitId: 7, count: 23000 }]; }
 function socket(type, body, time) { return { transport: 'websocket', direction: 'received', encoding: 'utf8', endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt', timestamp: new Date(time).toISOString(), payload: JSON.stringify({ result: { type, body } }) }; }
 
-test('late-load RPC identifies mine and exact impact; actual captured hospital has enough room', () => {
+test('late-load RPC identifies mine and exact impact; captured hospital occupancy is below 50%', () => {
   const { helper, cache, attack, clock } = environment();
   assert.equal(attack.routeId, '476a2092-9cd5-4e24-8bfb-e67b9df03f59');
   assert.equal(attack.impactAt, 1794658795363);
@@ -33,6 +33,48 @@ test('late-load RPC identifies mine and exact impact; actual captured hospital h
   assert.equal(helper.hospital(cache, clock.now).wounded, 11188);
   assert.equal(helper.hospital(cache, clock.now).free, 11912);
   assert.equal(helper.plan(cache, {}, clock.now), null);
+});
+
+test('defense requires strictly above 50% infirmary occupancy, regardless of defending squad size', () => {
+  const { helper, cache, clock } = environment();
+  const healing = cache['getHealing:unit'].data;
+  const march = cache.marchStatus.data.marches.find(m => m.mineId === Object.values(cache.incomingMineAttacks.data.attacks)[0].mineId);
+  const squad = cache['getUnitSummary:unit'].data.squads.find(s => (s.squadId ?? s.id) === march.squadId);
+  squad.units = [{ count: 20000 }];
+  for (const wounded of [0, 11549, 11550]) {
+    healing.injuredUnits = [{ count: wounded }];
+    assert.equal(helper.plan(cache, {}, clock.now), null, `No recall with ${wounded}/23100 wounded, even if the squad exceeds free space`);
+  }
+  squad.units = [{ count: 1 }];
+  healing.injuredUnits = [{ count: 11551 }];
+  const plan = helper.plan(cache, {}, clock.now);
+  assert.equal(plan.action, 'recall', 'Above 50% recalls even when a one-troop squad fits the remaining space');
+  assert.match(plan.reason, /above 50%/);
+});
+
+test('unknown, stale or zero infirmary capacity cannot authorize recall above the threshold', () => {
+  for (const mode of ['missing', 'stale', 'zero']) {
+    const { helper, cache, clock } = environment(); crowdHospital(cache);
+    if (mode === 'missing') delete cache.buildingStatus;
+    if (mode === 'stale') cache.buildingStatus.updatedAt = new Date(clock.now - 60001).toISOString();
+    if (mode === 'zero') cache.buildingStatus.data.buildings = [];
+    assert.equal(helper.plan(cache, {}, clock.now).action, 'refresh', mode);
+  }
+});
+
+test('background rechecks the 50% occupancy threshold at the scheduled recall time', async () => {
+  const { ctx, cache, local, clock, attack, sent, alarms } = environment();
+  cache['getHealing:unit'].data.injuredUnits = [{ count: 11551 }];
+  clock.now = attack.impactAt - 10001;
+  await ctx.runDefense(null, cache, local, 1, clock.now);
+  assert.ok(alarms.some(a => a.when === attack.impactAt - 10000));
+  cache['getHealing:unit'].data.injuredUnits = [{ count: 11550 }];
+  clock.now++;
+  await ctx.runDefense(null, cache, local, 1, clock.now);
+  assert.equal(sent.some(msg => msg.calls?.some(call => call.name === 'stopMineGathering')), false);
+  cache['getHealing:unit'].data.injuredUnits = [{ count: 11551 }];
+  await ctx.runDefense(null, cache, local, 1, clock.now + 1);
+  assert.equal(sent.filter(msg => msg.calls?.[0]?.name === 'stopMineGathering').length, 1);
 });
 
 test('full hospital recalls only within [impact-10s, impact), using defending squad not enemy squad', () => {

@@ -37,7 +37,7 @@
       if (!march || state?.attempted?.includes(attack.routeId + ':' + march.squadId)) continue;
       const base = { attack, march, wakeAt: now < attack.impactAt - 10000 ? attack.impactAt - 10000 : Math.min(now + 1000, attack.impactAt) };
       const room = hospital(cache, now), summary = cache['getUnitSummary:unit'];
-      if (!room || !fresh(cache.marchStatus, now) || !fresh(summary, now)) return { ...base, action: 'refresh', reason: 'Refreshing hospital and threatened gathering squad' };
+      if (!room || room.capacity <= 0 || !fresh(cache.marchStatus, now) || !fresh(summary, now)) return { ...base, action: 'refresh', reason: 'Refreshing hospital and threatened gathering squad' };
       const squad = list(summary.data?.squads).find(s => (s.squadId ?? s.id) === march.squadId);
       const units = squad?.units;
       if (!Array.isArray(units) || !units.length) return { ...base, action: 'refresh', reason: 'Threatened squad troops unavailable' };
@@ -47,11 +47,11 @@
         if (!Number.isSafeInteger(n) || n < 0) return { ...base, action: 'refresh', reason: 'Threatened squad troop count unknown' };
         count += n;
       }
-      if (count <= room.free) continue;
+      if (room.wounded <= room.capacity * 0.5) continue;
       if (now < attack.impactAt - 10000) return { ...base, action: 'wait', reason: 'Mine threatened · recall scheduled for final 10s', room, count };
       const configId = march.mineConfigId ?? cache.mineMap?.[march.mineId]?.mineConfigId;
       if (!configId) return { ...base, action: 'refresh', reason: 'Threatened mine configuration unavailable' };
-      return { ...base, action: 'recall', reason: 'Withdrawing threatened gatherers · insufficient hospital space',
+      return { ...base, action: 'recall', reason: 'Withdrawing threatened gatherers · Infirmary occupancy above 50%',
         call: { name: 'stopMineGathering', feature: 'mine', args: { squadId: march.squadId } },
         mine: { mineId: march.mineId, mapId: attack.mapId, configId, coordinates: march.targetCoordinates,
           resumeAfter: attack.impactAt + 1000, defense: true }, room, count };

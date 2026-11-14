@@ -44,7 +44,7 @@ Chỉ ghi mine gián đoạn sau recall thành công. Trước quay lại dùng 
 
 Hospital trống = **max(0, tổng sức chứa các Infirmary − tổng troops bị thương)**, theo xác nhận của người dùng. Nếu một dữ liệu đầu vào thiếu thì capacity còn trống là chưa biết.
 
-Khi có dữ liệu xác thực về đội địch tấn công đúng mine đang gather và số troops lớn hơn hospital trống, recall đúng squad một lần trong **0 < ETA va chạm ≤10 giây**. Sau khi về base thì gather tiếp theo các ưu tiên trên. Đã xác minh trigger bằng hai capture `hwa-game-record-202611141920_firstattack.json` và `hwa-game-record-202611141923_under_attack2.json`: RPC `getIncomingMarches` hỗ trợ load giữa attack; MQTT `marchAttackDetected` hỗ trợ nhận từ đầu. Impact = startedAt + durationMs; lịch recall tại impact−10s, hết hạn tại impact. Giữ RPC mode chung; Piggyback cần có RPC game trong cửa sổ này.
+Khi có dữ liệu xác thực về đội địch tấn công đúng mine đang gather và tổng troops bị thương vượt 50% tổng sức chứa Infirmary, recall đúng squad một lần trong **0 < ETA va chạm ≤10 giây**. Sau khi về base thì gather tiếp theo các ưu tiên trên. Đã xác minh trigger bằng hai capture `hwa-game-record-202611141920_firstattack.json` và `hwa-game-record-202611141923_under_attack2.json`: RPC `getIncomingMarches` hỗ trợ load giữa attack; MQTT `marchAttackDetected` hỗ trợ nhận từ đầu. Impact = startedAt + durationMs; lịch recall tại impact−10s, hết hạn tại impact. Giữ RPC mode chung; Piggyback cần có RPC game trong cửa sổ này.
 
 ## Bằng chứng và thông tin cần bổ sung
 
@@ -86,10 +86,14 @@ Sau mỗi task: test theo AC, review diff, cập nhật Knowns; cuối đợt ch
 
 ## Kết quả đợt triển khai
 
-Bản 0.10.81: task 1–6 đã triển khai, bao gồm timed mine defense. Bật Auto-Gather Automation + Smart gathering để sử dụng. Chỉ rút khi tổng troops của squad bị đe dọa lớn hơn hospital trống; đủ chỗ thì giữ nguyên gather.
+Bản 0.10.81: task 1–6 đã triển khai, bao gồm timed mine defense. Bật Auto-Gather Automation + Smart gathering để sử dụng. Rule hiện tại: chỉ rút khi tổng troops bị thương > 50% tổng sức chứa Infirmary; đúng 50% hoặc thấp hơn thì giữ nguyên gather. Ngưỡng này không phụ thuộc số troops của squad bị đe dọa; capacity phải biết, dương và dữ liệu còn mới.
 
 Hai capture mới được ghi nhận tại @doc/api/mine-incoming-attack-and-timed-withdrawal, cùng SHA256, RPC/MQTT fields, giờ impact và fixture rút gọn trong tests/fixtures/mine-attacks-20261114.json. Ví dụ log đầu: Infirmary 11900+11200=23100; wounded11188; free11912, đủ cho squad4194 nên không rút theo rule.
 
 Kiểm thử gồm late-load, MQTT từ đầu, terminal/version/replay/account guards, biên 10s/impact, hospital thiếu/đủ/unknown, recall đồng thời các mine, xác nhận return/resume và Piggyback deadline. Chưa thử trực tiếp trong tài khoản game. Piggyback cần RPC game trước impact; không cam kết gửi đúng hạn nếu không có RPC tự nhiên.
 
 Sau defensive recall, mine cũ chỉ được ưu tiên khi đã qua impact và getChunks mới xác nhận không có người chiếm. Nếu còn enemy hoặc chưa rõ owner, helper chọn mine gather khác; không tự chuyển sang đánh PvP.
+
+Từ 0.10.84, reload game khôi phục tọa độ base từ `getOutpostSummary`, không cần chờ mở bản đồ để nhận `getChunks`. Khi tìm mine, ưu tiên tọa độ base của account hiện tại; vị trí mine/viewport trong snapshot march không thay thế base. Nếu cấu hình tối đa 3 đội và chỉ có 1 đội đang gather, helper bổ sung tuần tự đến 3 đội khi đủ heroes/troops/slot và server đã xác nhận từng lần gửi. Chế độ RPC chung và ưu tiên raid/monster vẫn áp dụng.
+
+Từ 0.10.86, trước khi quay lại mine gián đoạn hoặc chọn mine nearest, phản hồi `getMineById` có `gathering` sẽ khiến helper bỏ mine đó, kể cả còn nhiều tài nguyên. Nếu mine bị chiếm giữa lúc chọn và gửi, server trả `errorCode: BattleTypeMismatch` thì helper bỏ target, tạm loại mine đó 60 giây và tìm mine trống khác. Không chuyển sang PvP. Các lỗi mutation khác hiển thị mã lỗi ngay; không tiếp tục chờ như thể đã gửi quân thành công.
