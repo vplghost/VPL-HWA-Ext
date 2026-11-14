@@ -933,8 +933,9 @@ test('Resilient object-array handling and healing RPC dispatch permissions preve
 test('Prevent TypeError Symbol(Symbol.iterator) regressions on startup with object-shaped storage/cache', async () => {
   // 1. GuildVersusModal chestNumbers safe normalization
   const guildVersusModal = await readFile(join(root, 'src/components/dialogs/GuildVersusModal.vue'), 'utf8');
-  assert.match(guildVersusModal, /const raw = vsStatus\.value\.chestNumbers;/, 'GuildVersusModal must safely extract raw chestNumbers');
-  assert.match(guildVersusModal, /Object\.keys\(raw\)\.map\(Number\)/, 'GuildVersusModal must handle object dictionary chestNumbers');
+  assert.match(guildVersusModal, /guildVersusView\(cache\.value\)/, 'GuildVersusModal must use the unknown-aware normalized view');
+  const { guildVersusView } = await import('../src/utils/guildVersusView.ts');
+  assert.deepEqual(guildVersusView({ clanVersusStatus: { data: { chestNumbers: { 1: true, 3: true } } } }).claimed, [1, 3]);
 
   // 2. TowerModal buff order safe normalization
   const towerModal = await readFile(join(root, 'src/components/dialogs/TowerModal.vue'), 'utf8');
@@ -1249,8 +1250,8 @@ test('GuildVersusModal synchronizes all 6 sections with legacy HTML', async () =
 
   // Section 1: Matchup Banner
   assert.match(gvs, /Theme:\s*\{\{\s*currentTheme\s*\}\}/, 'GuildVersusModal must dynamically display currentTheme');
-  assert.match(gvs, /clanRoundPoints\.toLocaleString\(\)/, 'GuildVersusModal must format clan round points');
-  assert.match(gvs, /enemyRoundPoints\.toLocaleString\(\)/, 'GuildVersusModal must format enemy round points');
+  assert.match(gvs, /displayMetric\(clanRoundPoints\)/, 'GuildVersusModal must format known clan points and preserve unknown');
+  assert.match(gvs, /displayMetric\(enemyRoundPoints\)/, 'GuildVersusModal must format known enemy points and preserve unknown');
 
   // Section 2: Personal Points
   assert.match(gvs, /isStaleVersusDay/, 'GuildVersusModal must evaluate isStaleVersusDay');

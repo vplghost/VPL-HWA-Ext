@@ -3,7 +3,7 @@ id: doc-d4f1f3ade11beab1a38873ea0a61f4d8
 title: WXT Vue Tailwind Conventions
 description: Durable migration conventions for WXT-only packaging, Vue state, Tailwind v4, RPC ownership, lifecycle, strict typecheck and acceptance.
 createdAt: '2026-11-13T03:59:20.802Z'
-updatedAt: '2026-11-13T04:02:20.719Z'
+updatedAt: '2026-11-14T14:52:07.002Z'
 tags:
   - architecture
   - wxt
@@ -87,3 +87,11 @@ Ghi nhận ngày 2026-11-13 từ review extension 0.10.52, task @task-VHE-HRA25T
 Bằng chứng repository: wxt.config.ts, scripts/build.mjs, scripts/validate-extension.mjs, entrypoints/popup, useRpcCache, useAccountTeams, useNow, useStoredFavorites, tests/vue-runtime-state.test.mjs và tests/vue-dialog-setup.test.mjs.
 
 Bổ sung từ review tích hợp: quest_multiFarm phải đi qua runtime message kind claim-rewards để background chọn queue-claim trong piggyback/MQTT. Dùng đúng tên RPC nhưng sai envelope vẫn có thể bị whitelist loại bỏ. Test phải kiểm tra cả envelope và calls, không chỉ helper payload.
+
+## Browser fixture acceptance — extraction 2026-11-14
+
+@task-VHE-HHA1TB and @doc/audits/backlog-acceptance-audit-2026-11-14 establish a reusable real-Chrome integration layer between unit tests and live game acceptance. scripts/browser-cdp.mjs connects to a caller-created disposable profile; scripts/browser-backlog-acceptance.mjs loads both artifacts, fulfills all fixture game requests locally, drives production Vue rendering, account-scoped teams and queued/rejected read transport. Use only a NEW profile under repo/temp; the driver replaces that profile's tabs/extensions. Keep Fetch interception alive while the fixture target exists. Foreground the target for matchMedia events: a background target can delay change delivery and produce a false app failure.
+
+Proof boundaries matter: a compiled v-model callback opening a dialog proves rendering; it does not prove every user entry point or focus trap. A queued read and a successful mocked carrier do not establish successful game mutations, Unity actions or broker packets. Attach a per-feature limitation table and leave a precise follow-up rather than claiming live parity.
+
+@task-VHE-VT9095 provides guildVersusView, metric/displayMetric and challengeConvertedPoints as an unknown-aware view pattern: normalize finite nonnegative reported metrics to number|null and reported booleans to boolean|null, preserve 0/false, and keep rule metadata separate from observed account state. Require known claims, eligibility and a positive verified threshold before Ready; static rules alone do not establish eligibility. Detailed evidence: @doc/architecture/goals-tracking and tests/guild-versus-unknown.test.mjs.

@@ -229,7 +229,7 @@ test('getDetailedQuests aggregates daily quests and event quests with correct st
   assert.ok(q346);
   assert.equal(q346.state, 'ready');
   assert.equal(q346.category, 'daily');
-  assert.equal(q346.title, 'Complete a building upgrade');
+  assert.equal(q346.title, 'Upgrade 1 building');
   assert.deepEqual(q346.reward, { gold: 10000, stamina: 50 });
 
   // Event quest 101

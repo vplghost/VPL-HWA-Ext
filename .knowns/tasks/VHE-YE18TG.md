@@ -5,7 +5,7 @@ status: blocked
 priority: medium
 labels: []
 createdAt: '2026-11-07T11:50:16.465Z'
-updatedAt: '2026-11-07T11:58:16.353Z'
+updatedAt: '2026-11-14T14:50:41.190Z'
 timeSpent: 157
 ---
 # Show raid total power in result and countdown
@@ -37,5 +37,7 @@ User clarified total power means all raid participants. Captured getRallyById sq
 Inspected temp/tracking-data/hwa-game-record-202611071854_rally_power.json: getRallyById responses at timeline 3/25/47 have leader/member squads with heroId, level, color, star and units, but zero power fields anywhere in the file. The only sampled getRallyAttackDefenders power is the enemy defender, not raid participants. background.js socketRefreshCalls already queues getRallyById on rallyMembersUpdated for tracked raids via existing RPC dispatch settings. Awaiting an authoritative power source or evidence of the displayed game value; no code change made.
 
 User requested on 2026-11-07 to temporarily shelve this feature because the supplied log contains no raid total power. Resume only when an authoritative power field, computation contract, or suitable capture becomes available. No implementation changes are pending.
+
+2026-11-14 backlog audit: still intentionally shelved. @task-VHE-G173WD already displays the known local hero lower bound (e.g. 114k+) versus boss power; it does not establish all-participant total power or historical result power. Incoming mine-attack squad power belongs to an enemy attack and is not an authoritative rally-member source. Resume gate remains a capture/formula proving every rally participant's hero/troop contribution. No AC checked without that evidence.
 <!-- SECTION:NOTES:END -->
 

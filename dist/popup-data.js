@@ -1020,7 +1020,7 @@
     function addOrMergeGoal({ key, title, category, eventName, amount = 1, unit = '', points = 0, stock = null, hint = '' }) {
       const isTowerChest = key === 'act:tower' ||
         (typeof key === 'string' && key.startsWith('act:daily_quest_') && (
-          [365, 10019, 10082, 10083, 10084, 10085, 10107].includes(Number(key.replace('act:daily_quest_', ''))) ||
+          [10019, 10082, 10083, 10084, 10085, 10107].includes(Number(key.replace('act:daily_quest_', ''))) ||
           (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title))
         )) ||
         (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title));

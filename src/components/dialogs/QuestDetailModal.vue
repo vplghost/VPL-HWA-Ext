@@ -67,6 +67,7 @@ interface QuestCardItem {
   subtitle: string;
   tierInfo?: string;
   progress: number;
+  target?: number;
   reward: any;
   state: 'ready' | 'inProgress' | 'done' | 'cannotPerform';
   isUnavailable?: boolean;
@@ -74,7 +75,7 @@ interface QuestCardItem {
 
 function isTowerChestQuest(id: string | number, title?: string): boolean {
   const tid = Number(id);
-  if ([365, 10019, 10082, 10083, 10084, 10085, 10107].includes(tid)) return true;
+  if ([10019, 10082, 10083, 10084, 10085, 10107].includes(tid)) return true;
   if (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title)) return true;
   return false;
 }
@@ -157,6 +158,7 @@ const allItems = computed<QuestCardItem[]>(() => {
       state,
       isUnavailable,
       progress,
+      target: questData?.dailyDefinition?.(dq.id)?.condition?.target,
       reward,
       subtitle: isUnavailable ? '🔒 Tower cleared today • Cannot perform' : resetText,
     });
@@ -529,11 +531,11 @@ async function claimQuest(qId: string | number) {
 
                 <!-- Card Middle: Progress & Tier -->
                 <div
-                  v-if="item.tierInfo || item.progress > 0"
+                  v-if="item.tierInfo || item.target || item.progress > 0"
                   class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/40 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300 font-medium"
                 >
                   <span v-if="item.tierInfo">{{ item.tierInfo }}</span>
-                  <span v-if="item.progress > 0">Progress: {{ item.progress.toLocaleString() }}</span>
+                  <span v-if="item.target || item.progress > 0">Progress: {{ item.progress.toLocaleString() }}<template v-if="item.target"> / {{ item.target.toLocaleString() }}</template></span>
                 </div>
 
                 <!-- Card Footer: Rewards & Claim -->

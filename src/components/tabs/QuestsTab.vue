@@ -27,7 +27,7 @@ const isTowerCleared = computed(() => Boolean(
 
 function isTowerChestQuest(id: string | number, title?: string): boolean {
   const tid = Number(id);
-  if ([365, 10019, 10082, 10083, 10084, 10085, 10107].includes(tid)) return true;
+  if ([10019, 10082, 10083, 10084, 10085, 10107].includes(tid)) return true;
   if (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title)) return true;
   return false;
 }

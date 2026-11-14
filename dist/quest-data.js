@@ -20,32 +20,37 @@
     133: 'Season Battle Pass'
   };
 
+  // BEGIN GENERATED DAILY QUESTS — npm run quests:update
   const dailyTitles = {
-    346: 'Complete a building upgrade',
-    348: 'Complete a personal research',
-    349: 'Train units in barracks',
-    350: 'Heal wounded units',
-    351: 'Claim Daily Free Energy (Noon Bonus)',
-    352: 'Claim Daily Free Energy (Evening Bonus)',
-    353: 'Claim Daily Free Energy (Night Bonus)',
-    354: 'Gather food on world map',
-    355: 'Gather wood on world map',
-    356: 'Gather stone on world map',
-    357: 'Gather iron on world map',
-    358: 'Spend energy on battles',
-    359: 'Gather 100,000 wood on world map',
-    360: 'Gather 100,000 stone on world map',
-    361: 'Defeat monsters on world map',
-    362: 'Help clan members',
-    363: 'Win 5 camp battles',
-    365: 'Open chests in Tower',
-    366: 'Fight in Arena or Grand Arena',
-    367: 'Send heroes on Expeditions',
-    368: 'Level up a hero or skill',
-    369: 'Open free heroic chest',
-    370: 'Complete daily activity goals',
-    2413: 'Fight in Titan Dungeon'
+    "346": "Upgrade 1 building",
+    "348": "Train 10 Infantry",
+    "349": "Train 10 Spearmen",
+    "350": "Train 10 Marksmen",
+    "351": "Train 30 Infantry",
+    "352": "Train 30 Spearmen",
+    "353": "Train 30 Marksmen",
+    "354": "Collect 50,000 units of Food on the map",
+    "355": "Collect 50,000 units of Wood on the map",
+    "356": "Collect 10,000 units of Stone on the map",
+    "357": "Collect 3,000 units of Iron on the map",
+    "358": "Collect 250,000 units of Food on the map",
+    "359": "Collect 250,000 units of Wood on the map",
+    "360": "Collect 50,000 units of Stone on the map",
+    "361": "Collect 15,000 units of Iron on the map",
+    "362": "Clear Brigand Camp 1 time",
+    "363": "Clear Brigand Camp 5 times",
+    "364": "Clear Brigand Camp 10 times",
+    "365": "Gather 1 time resources on the map",
+    "366": "Gather 2 times resources on the map",
+    "367": "Gather 4 times resources on the map",
+    "368": "Defeat Boss 1 time",
+    "369": "Defeat Boss 2 times",
+    "370": "Defeat Boss 3 times",
+    "2413": "Start Research"
   };
+  const dailyDefinitions = {"346":{"chainId":127,"phase":1,"transferProgress":true,"condition":{"args":{},"name":"buildingCompletedAny","target":1},"translationMethod":"buildingLevelAny","localeKey":"LIB_QUEST_TRANSLATE_BUILDINGLEVELANY","template":"Upgrade %param1% $m(building|buildings|buildings)","label":"[Daily 4X] Улучшить 1 здание"},"348":{"chainId":129,"phase":1,"transferProgress":true,"condition":{"args":{"unitType":"front"},"name":"unitsTrained","target":10},"translationMethod":"unitsTrained","localeKey":"LIB_QUEST_TRANSLATE_UNITSTRAINED","template":"Train %param1% %param2%","label":"[Daily 4X] Обучить 10 пехотинцев"},"349":{"chainId":130,"phase":1,"transferProgress":true,"condition":{"args":{"unitType":"middle"},"name":"unitsTrained","target":10},"translationMethod":"unitsTrained","localeKey":"LIB_QUEST_TRANSLATE_UNITSTRAINED","template":"Train %param1% %param2%","label":"[Daily 4X] Обучить 10 копейщиков"},"350":{"chainId":131,"phase":1,"transferProgress":true,"condition":{"args":{"unitType":"back"},"name":"unitsTrained","target":10},"translationMethod":"unitsTrained","localeKey":"LIB_QUEST_TRANSLATE_UNITSTRAINED","template":"Train %param1% %param2%","label":"[Daily 4X] Обучить 10 стрелков"},"351":{"chainId":129,"phase":2,"transferProgress":true,"condition":{"args":{"unitType":"front"},"name":"unitsTrained","target":30},"translationMethod":"unitsTrained","localeKey":"LIB_QUEST_TRANSLATE_UNITSTRAINED","template":"Train %param1% %param2%","label":"[Daily 4X] Обучить 30 пехотинцев"},"352":{"chainId":130,"phase":2,"transferProgress":true,"condition":{"args":{"unitType":"middle"},"name":"unitsTrained","target":30},"translationMethod":"unitsTrained","localeKey":"LIB_QUEST_TRANSLATE_UNITSTRAINED","template":"Train %param1% %param2%","label":"[Daily 4X] Обучить 30 копейщиков"},"353":{"chainId":131,"phase":2,"transferProgress":true,"condition":{"args":{"unitType":"back"},"name":"unitsTrained","target":30},"translationMethod":"unitsTrained","localeKey":"LIB_QUEST_TRANSLATE_UNITSTRAINED","template":"Train %param1% %param2%","label":"[Daily 4X] Обучить 30 стрелков"},"354":{"chainId":420,"phase":1,"transferProgress":true,"condition":{"args":{"resourceId":5,"resourceType":"material"},"name":"globalMapResourceTypeGathered","target":50000},"translationMethod":"globalMapResourceTypeGathered","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED","template":"Collect %param1% units of %param2% on the map","label":"[Daily 4X] Собрать 50 000 еды"},"355":{"chainId":132,"phase":1,"transferProgress":true,"condition":{"args":{"resourceId":4,"resourceType":"material"},"name":"globalMapResourceTypeGathered","target":50000},"translationMethod":"globalMapResourceTypeGathered","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED","template":"Collect %param1% units of %param2% on the map","label":"[Daily 4X] Собрать 50 000 дерева"},"356":{"chainId":133,"phase":1,"transferProgress":true,"condition":{"args":{"resourceId":3,"resourceType":"material"},"name":"globalMapResourceTypeGathered","target":10000},"translationMethod":"globalMapResourceTypeGathered","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED","template":"Collect %param1% units of %param2% on the map","label":"[Daily 4X] Собрать 10 000 камня"},"357":{"chainId":134,"phase":1,"transferProgress":true,"condition":{"args":{"resourceId":2,"resourceType":"material"},"name":"globalMapResourceTypeGathered","target":3000},"translationMethod":"globalMapResourceTypeGathered","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED","template":"Collect %param1% units of %param2% on the map","label":"[Daily 4X] Собрать 3 000 железа"},"358":{"chainId":420,"phase":2,"transferProgress":true,"condition":{"args":{"resourceId":5,"resourceType":"material"},"name":"globalMapResourceTypeGathered","target":250000},"translationMethod":"globalMapResourceTypeGathered","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED","template":"Collect %param1% units of %param2% on the map","label":"[Daily 4X] Собрать 250 000 еды"},"359":{"chainId":132,"phase":2,"transferProgress":true,"condition":{"args":{"resourceId":4,"resourceType":"material"},"name":"globalMapResourceTypeGathered","target":250000},"translationMethod":"globalMapResourceTypeGathered","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED","template":"Collect %param1% units of %param2% on the map","label":"[Daily 4X] Собрать 250 000 дерева"},"360":{"chainId":133,"phase":2,"transferProgress":true,"condition":{"args":{"resourceId":3,"resourceType":"material"},"name":"globalMapResourceTypeGathered","target":50000},"translationMethod":"globalMapResourceTypeGathered","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED","template":"Collect %param1% units of %param2% on the map","label":"[Daily 4X] Собрать 50 000 камня"},"361":{"chainId":134,"phase":2,"transferProgress":true,"condition":{"args":{"resourceId":2,"resourceType":"material"},"name":"globalMapResourceTypeGathered","target":15000},"translationMethod":"globalMapResourceTypeGathered","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED","template":"Collect %param1% units of %param2% on the map","label":"[Daily 4X] Собрать 15 000 железа"},"362":{"chainId":135,"phase":1,"transferProgress":true,"condition":{"args":{},"name":"globalMapCampVictories","target":1},"translationMethod":"globalMapCampVictories","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPCAMPVICTORIES","template":"Clear Brigand Camp %param1% $m(time|times|times)","label":"[Daily 4X] Пройти лагерь на 4х карте 1 раз"},"363":{"chainId":135,"phase":2,"transferProgress":true,"condition":{"args":{},"name":"globalMapCampVictories","target":5},"translationMethod":"globalMapCampVictories","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPCAMPVICTORIES","template":"Clear Brigand Camp %param1% $m(time|times|times)","label":"[Daily 4X] Пройти лагерь  на 4х карте 5 раз"},"364":{"chainId":135,"phase":3,"transferProgress":true,"condition":{"args":{},"name":"globalMapCampVictories","target":10},"translationMethod":"globalMapCampVictories","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPCAMPVICTORIES","template":"Clear Brigand Camp %param1% $m(time|times|times)","label":"[Daily 4X] Пройти лагерь  на 4х карте 10 раз"},"365":{"chainId":136,"phase":1,"transferProgress":true,"condition":{"args":{},"name":"globalMapResourceGatheringCount","target":1},"translationMethod":"globalMapResourceGatheringCount","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCEGATHERINGCOUNT","template":"Gather %param1% $m(time|times|times) resources on the map","label":"[Daily 4X] Собрать ресурсы 1 раз"},"366":{"chainId":136,"phase":2,"transferProgress":true,"condition":{"args":{},"name":"globalMapResourceGatheringCount","target":2},"translationMethod":"globalMapResourceGatheringCount","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCEGATHERINGCOUNT","template":"Gather %param1% $m(time|times|times) resources on the map","label":"[Daily 4X] Собрать ресурсы 2 раза"},"367":{"chainId":136,"phase":3,"transferProgress":true,"condition":{"args":{},"name":"globalMapResourceGatheringCount","target":4},"translationMethod":"globalMapResourceGatheringCount","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCEGATHERINGCOUNT","template":"Gather %param1% $m(time|times|times) resources on the map","label":"[Daily 4X] Собрать ресурсы 4 раза"},"368":{"chainId":137,"phase":1,"transferProgress":true,"condition":{"args":{},"name":"globalMapMobRallyKills","target":1},"translationMethod":"globalMapMobRallyKills","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPMOBRALLYKILLS","template":"Defeat Boss %param1% $m(time|times|times)","label":"[Daily 4X] Победить босса на карте 1 раз"},"369":{"chainId":137,"phase":2,"transferProgress":true,"condition":{"args":{},"name":"globalMapMobRallyKills","target":2},"translationMethod":"globalMapMobRallyKills","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPMOBRALLYKILLS","template":"Defeat Boss %param1% $m(time|times|times)","label":"[Daily 4X] Победить босса на карте 2 раза"},"370":{"chainId":137,"phase":3,"transferProgress":true,"condition":{"args":{},"name":"globalMapMobRallyKills","target":3},"translationMethod":"globalMapMobRallyKills","localeKey":"LIB_QUEST_TRANSLATE_GLOBALMAPMOBRALLYKILLS","template":"Defeat Boss %param1% $m(time|times|times)","label":"[Daily 4X] Победить босса на карте 3 раза"},"2413":{"chainId":2097,"phase":1,"transferProgress":true,"condition":{"args":{},"name":"personalResearchStartAny","target":1},"translationMethod":"personalResearchStartAny","localeKey":"LIB_QUEST_TRANSLATE_PERSONALRESEARCHSTARTANY","template":"Start Research","label":"[Daily 4X] Начни исследование 1 раз"}};
+  const dailySources = {"quest":{"url":"https://hwmb-remote-config-cdn.nextersglobal.com/config/quest/b1b8d8f88d714ab34604dfb22f4af15e.json","md5":"b1b8d8f88d714ab34604dfb22f4af15e"},"questChain":{"url":"https://hwmb-remote-config-cdn.nextersglobal.com/config/questChain/822f98416eb5676f77ccec2b31f4ff07.json","md5":"822f98416eb5676f77ccec2b31f4ff07"},"questCondition":{"url":"https://hwmb-remote-config-cdn.nextersglobal.com/config/questCondition/77aaa411dcaed96d34387d51ce95a4e3.json","md5":"77aaa411dcaed96d34387d51ce95a4e3"},"dailyQuestPack":{"url":"https://hwmb-remote-config-cdn.nextersglobal.com/config/dailyQuestPack/0a33f101c05956c1ba1a84489a8db7a8.json","md5":"0a33f101c05956c1ba1a84489a8db7a8"},"locale":{"url":"https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0054/d973530195826f1575a002f97a3f30e9/locale/en.json.gz","md5":"def7ae37ac67df119f41eae76690c092","size":683124}};
+  // END GENERATED DAILY QUESTS
 
   const localeTitles = {
     QUEST_TAB_NAME_SKINSTONES_SPEND: { title: 'Spend Hero Skin Stones', category: 'Resources', unit: 'stones', amount: 100 },
@@ -226,6 +231,8 @@
 
   const getCatalog = () => ({
     dailyTitles: { ...dailyTitles },
+    dailyDefinitions: { ...dailyDefinitions },
+    dailySources: { ...dailySources },
     viewTitles: { ...viewTitles },
     hiddenViewIds: Array.from(hiddenViewIds),
     localeTitles: { ...localeTitles },
@@ -238,6 +245,7 @@
     dailyQuests, visibleEvents, visibleMetadata, visibleGroups, nextReset,
     title, dailyTitle, dailyTitles, viewTitles, hiddenViewIds, localeTitles,
     questTemplates, groupTitle, questTemplateTitle, isRecognizedQuest,
+    dailyDefinitions, dailySources, dailyDefinition: (id) => dailyDefinitions[id] || null,
     registerRuntimeDefinitions, getCatalog, exportCatalogJson
   };
 })();

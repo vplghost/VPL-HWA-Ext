@@ -1,0 +1,1084 @@
+{
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/157.0.8103.52",
+    "revision": "@0985600c06a688b9c669e74afde7dacd5aaed047",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "jsVersion": "15.7.112.23"
+  },
+  "artifacts": [
+    {
+      "artifact": "dist",
+      "id": "aagbklaimblpfibeeeeifnedakclbpce",
+      "checks": [
+        {
+          "name": "standalone mounted",
+          "details": true
+        },
+        {
+          "name": "service worker loaded",
+          "details": true
+        },
+        {
+          "name": "empty: tab Dashboard",
+          "details": true
+        },
+        {
+          "name": "empty: tab Heroes",
+          "details": true
+        },
+        {
+          "name": "empty: tab Items",
+          "details": true
+        },
+        {
+          "name": "empty: tab Resources",
+          "details": true
+        },
+        {
+          "name": "empty: tab Titans",
+          "details": true
+        },
+        {
+          "name": "empty: tab Teams",
+          "details": true
+        },
+        {
+          "name": "empty: tab Events",
+          "details": true
+        },
+        {
+          "name": "empty: tab Goals",
+          "details": true
+        },
+        {
+          "name": "empty: tab Guild",
+          "details": true
+        },
+        {
+          "name": "empty: settings",
+          "details": false
+        },
+        {
+          "name": "empty: dialog BuildingModal",
+          "details": [
+            {
+              "text": "🏗️\nCity Buildings & Construction\nIdle\n✕\n🏗️\nACTIVE CONSTRUCTION QUEUE\n↻ refresh\n✅\nBuilder is curren",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog ResearchModal",
+          "details": [
+            {
+              "text": "🔬\nAcademy Research Tree\nIdle\n✕\n🔬\nACTIVE RESEARCH QUEUE\n↻ refresh\n✅\nAcademy is currently idle\nNo te",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog RaidModal",
+          "details": [
+            {
+              "text": "⚔️\nRally raid\nIdle\n✕\n👥\nBATTLE SQUAD & TROOP DEPLOYMENT\n🗺️\nMap: Not detected\nSelect Team\n5 lowest p",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog GatheringModal",
+          "details": [
+            {
+              "text": "Gathering & Resource Automation\n✕\n👥\nGATHERING TEAM & TROOP CAPACITY\nID: weakest\nSelect Team\n5 lowes",
+              "label": "Gathering & Resource Automation"
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog MonsterModal",
+          "details": [
+            {
+              "text": "👾\nMonster attack\nIdle\n✕\n👥\nBATTLE SQUAD & TROOP DEPLOYMENT\n🗺️\nMap: Not detected\nSelect Team\n5 lowe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog BrigandCampModal",
+          "details": [
+            {
+              "text": "⛺\nBrigand Camp\n✕\nWorld Energy: Unknown\n\n10 per camp · Levels 1–3\n\nSync Team & Energy\nAvailable Camps",
+              "label": "Brigand Camp"
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog CampaignRaidModal",
+          "details": [
+            {
+              "text": "⚔️\nCampaign Raid & Equipment Farm\nStory mission progression & item drops\n✕\n⚡\nCampaign Mission Raid\nR",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog HeroDetailModal",
+          "details": [
+            {
+              "text": "🦸\nHero #\n✕\n⚠️\nHero not found\nThis hero data has not been captured yet. Use \"Refresh Heroes\" to upda",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog TowerModal",
+          "details": [
+            {
+              "text": "Tower Automation\n✕\n🗼\nMagic Tower Auto-Climb\nFloor 1 / 23\n\nAutomates door selection, skull buff purc",
+              "label": "Tower Automation"
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog DungeonModal",
+          "details": [
+            {
+              "text": "Titan Dungeon\nFloor 1\nRefresh\nCurrent Floor\nFloor 1\nIn progress\nPersonal Titanite\n0\nEarned today\nChe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog ExpeditionsModal",
+          "details": [
+            {
+              "text": "⛵\nExpeditions\n✕\n\nChoose available heroes automatically. Locked expeditions remain visible.\n\nRefresh\n",
+              "label": "Expeditions"
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog QuestDetailModal",
+          "details": [
+            {
+              "text": "📜\nQuest Details\n0 in progress · 0 total\n✕\nAll (0)\nDaily (0)\nEvent (0)\nReady (0)\n🔄\nRefresh\n📥\nExpor",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog DraftModal",
+          "details": [
+            {
+              "text": "Legend Draft\nNot Registered\n⚔️\nLegend Draft Arena\nDraft counter heroes, lock teams, and battle playe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog GuildVersusModal",
+          "details": [
+            {
+              "text": "Guild Versus\n— League\nBattle #— • Round — of 6\nTheme: —\n—\nServer —\n—\nScore: —\nVS\n—\nServer —\n—\nScore:",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog GuildChatPanel",
+          "details": [
+            {
+              "text": "Guild Chat\n0\nNo guild messages yet. Chat messages received from game or sent here will appear in rea",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog LogModal",
+          "details": [
+            {
+              "text": "📋\nAPI Log\n✕\n🔍\nClear\nExport JSON\n0 / 0 entries\nNewest first\nOldest first\nSlowest first\nFastest firs",
+              "label": "API Log"
+            }
+          ]
+        },
+        {
+          "name": "partial: tab Dashboard",
+          "details": true
+        },
+        {
+          "name": "partial: tab Heroes",
+          "details": true
+        },
+        {
+          "name": "partial: tab Items",
+          "details": true
+        },
+        {
+          "name": "partial: tab Resources",
+          "details": true
+        },
+        {
+          "name": "partial: tab Titans",
+          "details": true
+        },
+        {
+          "name": "partial: tab Teams",
+          "details": true
+        },
+        {
+          "name": "partial: tab Events",
+          "details": true
+        },
+        {
+          "name": "partial: tab Goals",
+          "details": true
+        },
+        {
+          "name": "partial: tab Guild",
+          "details": true
+        },
+        {
+          "name": "partial: settings",
+          "details": false
+        },
+        {
+          "name": "partial: dialog BuildingModal",
+          "details": [
+            {
+              "text": "🏗️\nCity Buildings & Construction\nIdle\n✕\n🏗️\nACTIVE CONSTRUCTION QUEUE\n↻ refresh\n✅\nBuilder is curren",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog ResearchModal",
+          "details": [
+            {
+              "text": "🔬\nAcademy Research Tree\nIdle\n✕\n🔬\nACTIVE RESEARCH QUEUE\n↻ refresh\n✅\nAcademy is currently idle\nNo te",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog RaidModal",
+          "details": [
+            {
+              "text": "⚔️\nRally raid\nIdle\n✕\n👥\nBATTLE SQUAD & TROOP DEPLOYMENT\n🗺️\nMap: Not detected\nSelect Team\n5 lowest p",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog GatheringModal",
+          "details": [
+            {
+              "text": "Gathering & Resource Automation\n✕\n👥\nGATHERING TEAM & TROOP CAPACITY\nID: weakest\nSelect Team\n5 lowes",
+              "label": "Gathering & Resource Automation"
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog MonsterModal",
+          "details": [
+            {
+              "text": "👾\nMonster attack\nIdle\n✕\n👥\nBATTLE SQUAD & TROOP DEPLOYMENT\n🗺️\nMap: Not detected\nSelect Team\n5 lowe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog BrigandCampModal",
+          "details": [
+            {
+              "text": "⛺\nBrigand Camp\n✕\nWorld Energy: Unknown\n\n10 per camp · Levels 1–3\n\nSync Team & Energy\nAvailable Camps",
+              "label": "Brigand Camp"
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog CampaignRaidModal",
+          "details": [
+            {
+              "text": "⚔️\nCampaign Raid & Equipment Farm\nStory mission progression & item drops\n✕\n⚡\nCampaign Mission Raid\nR",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog HeroDetailModal",
+          "details": [
+            {
+              "text": "🦸\nAurora\n#1\n✕\n★\nAurora\nFront\nTank\nWay of Nature\nLevel:\n1\nRank:\nWhite\nPower:\n⚔️ 0\nSoul Stones:\nnull ",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog TowerModal",
+          "details": [
+            {
+              "text": "Tower Automation\n✕\n🗼\nMagic Tower Auto-Climb\nFloor 1 / 23\n\nAutomates door selection, skull buff purc",
+              "label": "Tower Automation"
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog DungeonModal",
+          "details": [
+            {
+              "text": "Titan Dungeon\nFloor 1\nRefresh\nCurrent Floor\nFloor 1\nIn progress\nPersonal Titanite\n0\nEarned today\nChe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog ExpeditionsModal",
+          "details": [
+            {
+              "text": "⛵\nExpeditions\n✕\n\nChoose available heroes automatically. Locked expeditions remain visible.\n\nRefresh\n",
+              "label": "Expeditions"
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog QuestDetailModal",
+          "details": [
+            {
+              "text": "📜\nQuest Details\n0 in progress · 0 total\n✕\nAll (0)\nDaily (0)\nEvent (0)\nReady (0)\n🔄\nRefresh\n📥\nExpor",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog DraftModal",
+          "details": [
+            {
+              "text": "Legend Draft\nNot Registered\n⚔️\nLegend Draft Arena\nDraft counter heroes, lock teams, and battle playe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog GuildVersusModal",
+          "details": [
+            {
+              "text": "Guild Versus\n— League\nBattle #— • Round — of 6\nTheme: —\n—\nServer —\n0\nScore: —\nVS\n—\nServer —\n0\nScore:",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog GuildChatPanel",
+          "details": [
+            {
+              "text": "Guild Chat\n0\nNo guild messages yet. Chat messages received from game or sent here will appear in rea",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog LogModal",
+          "details": [
+            {
+              "text": "📋\nAPI Log\n✕\n🔍\nClear\nExport JSON\n0 / 0 entries\nNewest first\nOldest first\nSlowest first\nFastest firs",
+              "label": "API Log"
+            }
+          ]
+        },
+        {
+          "name": "quest #364 locale title and progress 5/10; #365 unaffected by tower",
+          "details": true
+        },
+        {
+          "name": "theme light",
+          "details": true
+        },
+        {
+          "name": "theme dark",
+          "details": true
+        },
+        {
+          "name": "theme system",
+          "details": true
+        },
+        {
+          "name": "system theme responds to change",
+          "details": true
+        },
+        {
+          "name": "keyboard Escape closes shortcuts",
+          "details": true
+        },
+        {
+          "name": "keyboard Tab focus",
+          "details": {
+            "tag": "BODY",
+            "aria": null
+          }
+        },
+        {
+          "name": "account A to B isolates teams",
+          "details": true
+        },
+        {
+          "name": "cache deletion clears account teams",
+          "details": true
+        },
+        {
+          "name": "MAIN intercept and isolated content bridge installed",
+          "details": true
+        },
+        {
+          "name": "RPC disabled rejects dispatch",
+          "details": {
+            "ok": false,
+            "error": "Popup RPC calls are disabled in Settings."
+          }
+        },
+        {
+          "name": "mount does not enable RPC",
+          "details": true
+        },
+        {
+          "name": "piggyback: queued ack does not complete cache",
+          "details": {
+            "ok": true,
+            "queued": true,
+            "error": null
+          }
+        },
+        {
+          "name": "piggyback: natural carrier resolves read",
+          "details": true
+        },
+        {
+          "name": "mqtt: queued ack does not complete cache",
+          "details": {
+            "ok": true,
+            "queued": true,
+            "error": null
+          }
+        },
+        {
+          "name": "mqtt: natural carrier resolves read",
+          "details": true
+        },
+        {
+          "name": "direct rejected RPC leaves data unknown",
+          "details": {
+            "ok": true,
+            "queued": false,
+            "error": null
+          }
+        },
+        {
+          "name": "recorder start/stop/export",
+          "details": {
+            "start": {
+              "active": true,
+              "nextIndex": 0,
+              "nextInteractionIndex": 0,
+              "error": null
+            },
+            "stop": {
+              "active": false,
+              "error": null,
+              "nextIndex": 1,
+              "nextInteractionIndex": 0
+            },
+            "exportKeys": [
+              "extensionVersion",
+              "gameVersion",
+              "records",
+              "interactions"
+            ]
+          }
+        },
+        {
+          "name": "extension action popup",
+          "details": [
+            {
+              "type": "page",
+              "url": "chrome-extension://aagbklaimblpfibeeeeifnedakclbpce/popup.html"
+            },
+            {
+              "type": "page",
+              "url": "chrome-extension://aagbklaimblpfibeeeeifnedakclbpce/popup.html"
+            }
+          ]
+        },
+        {
+          "name": "standalone reload retains mount",
+          "details": true
+        }
+      ],
+      "requests": [
+        [],
+        [
+          "userGetInfo"
+        ],
+        [
+          "userGetInfo",
+          "heroGetAll"
+        ],
+        [
+          "userGetInfo",
+          "getSummary",
+          "getSummary",
+          "getMarches",
+          "getUnitSummary",
+          "heroGetAll"
+        ],
+        [
+          "heroGetAll"
+        ],
+        [
+          "userGetInfo"
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "artifact": ".output/chrome-mv3",
+      "id": "pmlmnnfoabgdcdlbgngpioepdcpmmclb",
+      "checks": [
+        {
+          "name": "standalone mounted",
+          "details": true
+        },
+        {
+          "name": "service worker loaded",
+          "details": true
+        },
+        {
+          "name": "empty: tab Dashboard",
+          "details": true
+        },
+        {
+          "name": "empty: tab Heroes",
+          "details": true
+        },
+        {
+          "name": "empty: tab Items",
+          "details": true
+        },
+        {
+          "name": "empty: tab Resources",
+          "details": true
+        },
+        {
+          "name": "empty: tab Titans",
+          "details": true
+        },
+        {
+          "name": "empty: tab Teams",
+          "details": true
+        },
+        {
+          "name": "empty: tab Events",
+          "details": true
+        },
+        {
+          "name": "empty: tab Goals",
+          "details": true
+        },
+        {
+          "name": "empty: tab Guild",
+          "details": true
+        },
+        {
+          "name": "empty: settings",
+          "details": false
+        },
+        {
+          "name": "empty: dialog BuildingModal",
+          "details": [
+            {
+              "text": "🏗️\nCity Buildings & Construction\nIdle\n✕\n🏗️\nACTIVE CONSTRUCTION QUEUE\n↻ refresh\n✅\nBuilder is curren",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog ResearchModal",
+          "details": [
+            {
+              "text": "🔬\nAcademy Research Tree\nIdle\n✕\n🔬\nACTIVE RESEARCH QUEUE\n↻ refresh\n✅\nAcademy is currently idle\nNo te",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog RaidModal",
+          "details": [
+            {
+              "text": "⚔️\nRally raid\nIdle\n✕\n👥\nBATTLE SQUAD & TROOP DEPLOYMENT\n🗺️\nMap: Not detected\nSelect Team\n5 lowest p",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog GatheringModal",
+          "details": [
+            {
+              "text": "Gathering & Resource Automation\n✕\n👥\nGATHERING TEAM & TROOP CAPACITY\nID: weakest\nSelect Team\n5 lowes",
+              "label": "Gathering & Resource Automation"
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog MonsterModal",
+          "details": [
+            {
+              "text": "👾\nMonster attack\nIdle\n✕\n👥\nBATTLE SQUAD & TROOP DEPLOYMENT\n🗺️\nMap: Not detected\nSelect Team\n5 lowe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog BrigandCampModal",
+          "details": [
+            {
+              "text": "⛺\nBrigand Camp\n✕\nWorld Energy: Unknown\n\n10 per camp · Levels 1–3\n\nSync Team & Energy\nAvailable Camps",
+              "label": "Brigand Camp"
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog CampaignRaidModal",
+          "details": [
+            {
+              "text": "⚔️\nCampaign Raid & Equipment Farm\nStory mission progression & item drops\n✕\n⚡\nCampaign Mission Raid\nR",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog HeroDetailModal",
+          "details": [
+            {
+              "text": "🦸\nHero #\n✕\n⚠️\nHero not found\nThis hero data has not been captured yet. Use \"Refresh Heroes\" to upda",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog TowerModal",
+          "details": [
+            {
+              "text": "Tower Automation\n✕\n🗼\nMagic Tower Auto-Climb\nFloor 1 / 23\n\nAutomates door selection, skull buff purc",
+              "label": "Tower Automation"
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog DungeonModal",
+          "details": [
+            {
+              "text": "Titan Dungeon\nFloor 1\nRefresh\nCurrent Floor\nFloor 1\nIn progress\nPersonal Titanite\n0\nEarned today\nChe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog ExpeditionsModal",
+          "details": [
+            {
+              "text": "⛵\nExpeditions\n✕\n\nChoose available heroes automatically. Locked expeditions remain visible.\n\nRefresh\n",
+              "label": "Expeditions"
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog QuestDetailModal",
+          "details": [
+            {
+              "text": "📜\nQuest Details\n0 in progress · 0 total\n✕\nAll (0)\nDaily (0)\nEvent (0)\nReady (0)\n🔄\nRefresh\n📥\nExpor",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog DraftModal",
+          "details": [
+            {
+              "text": "Legend Draft\nNot Registered\n⚔️\nLegend Draft Arena\nDraft counter heroes, lock teams, and battle playe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog GuildVersusModal",
+          "details": [
+            {
+              "text": "Guild Versus\n— League\nBattle #— • Round — of 6\nTheme: —\n—\nServer —\n—\nScore: —\nVS\n—\nServer —\n—\nScore:",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog GuildChatPanel",
+          "details": [
+            {
+              "text": "Guild Chat\n0\nNo guild messages yet. Chat messages received from game or sent here will appear in rea",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "empty: dialog LogModal",
+          "details": [
+            {
+              "text": "📋\nAPI Log\n✕\n🔍\nClear\nExport JSON\n0 / 0 entries\nNewest first\nOldest first\nSlowest first\nFastest firs",
+              "label": "API Log"
+            }
+          ]
+        },
+        {
+          "name": "partial: tab Dashboard",
+          "details": true
+        },
+        {
+          "name": "partial: tab Heroes",
+          "details": true
+        },
+        {
+          "name": "partial: tab Items",
+          "details": true
+        },
+        {
+          "name": "partial: tab Resources",
+          "details": true
+        },
+        {
+          "name": "partial: tab Titans",
+          "details": true
+        },
+        {
+          "name": "partial: tab Teams",
+          "details": true
+        },
+        {
+          "name": "partial: tab Events",
+          "details": true
+        },
+        {
+          "name": "partial: tab Goals",
+          "details": true
+        },
+        {
+          "name": "partial: tab Guild",
+          "details": true
+        },
+        {
+          "name": "partial: settings",
+          "details": false
+        },
+        {
+          "name": "partial: dialog BuildingModal",
+          "details": [
+            {
+              "text": "🏗️\nCity Buildings & Construction\nIdle\n✕\n🏗️\nACTIVE CONSTRUCTION QUEUE\n↻ refresh\n✅\nBuilder is curren",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog ResearchModal",
+          "details": [
+            {
+              "text": "🔬\nAcademy Research Tree\nIdle\n✕\n🔬\nACTIVE RESEARCH QUEUE\n↻ refresh\n✅\nAcademy is currently idle\nNo te",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog RaidModal",
+          "details": [
+            {
+              "text": "⚔️\nRally raid\nIdle\n✕\n👥\nBATTLE SQUAD & TROOP DEPLOYMENT\n🗺️\nMap: Not detected\nSelect Team\n5 lowest p",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog GatheringModal",
+          "details": [
+            {
+              "text": "Gathering & Resource Automation\n✕\n👥\nGATHERING TEAM & TROOP CAPACITY\nID: weakest\nSelect Team\n5 lowes",
+              "label": "Gathering & Resource Automation"
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog MonsterModal",
+          "details": [
+            {
+              "text": "👾\nMonster attack\nIdle\n✕\n👥\nBATTLE SQUAD & TROOP DEPLOYMENT\n🗺️\nMap: Not detected\nSelect Team\n5 lowe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog BrigandCampModal",
+          "details": [
+            {
+              "text": "⛺\nBrigand Camp\n✕\nWorld Energy: Unknown\n\n10 per camp · Levels 1–3\n\nSync Team & Energy\nAvailable Camps",
+              "label": "Brigand Camp"
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog CampaignRaidModal",
+          "details": [
+            {
+              "text": "⚔️\nCampaign Raid & Equipment Farm\nStory mission progression & item drops\n✕\n⚡\nCampaign Mission Raid\nR",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog HeroDetailModal",
+          "details": [
+            {
+              "text": "🦸\nAurora\n#1\n✕\n★\nAurora\nFront\nTank\nWay of Nature\nLevel:\n1\nRank:\nWhite\nPower:\n⚔️ 0\nSoul Stones:\nnull ",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog TowerModal",
+          "details": [
+            {
+              "text": "Tower Automation\n✕\n🗼\nMagic Tower Auto-Climb\nFloor 1 / 23\n\nAutomates door selection, skull buff purc",
+              "label": "Tower Automation"
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog DungeonModal",
+          "details": [
+            {
+              "text": "Titan Dungeon\nFloor 1\nRefresh\nCurrent Floor\nFloor 1\nIn progress\nPersonal Titanite\n0\nEarned today\nChe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog ExpeditionsModal",
+          "details": [
+            {
+              "text": "⛵\nExpeditions\n✕\n\nChoose available heroes automatically. Locked expeditions remain visible.\n\nRefresh\n",
+              "label": "Expeditions"
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog QuestDetailModal",
+          "details": [
+            {
+              "text": "📜\nQuest Details\n0 in progress · 0 total\n✕\nAll (0)\nDaily (0)\nEvent (0)\nReady (0)\n🔄\nRefresh\n📥\nExpor",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog DraftModal",
+          "details": [
+            {
+              "text": "Legend Draft\nNot Registered\n⚔️\nLegend Draft Arena\nDraft counter heroes, lock teams, and battle playe",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog GuildVersusModal",
+          "details": [
+            {
+              "text": "Guild Versus\n— League\nBattle #— • Round — of 6\nTheme: —\n—\nServer —\n0\nScore: —\nVS\n—\nServer —\n0\nScore:",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog GuildChatPanel",
+          "details": [
+            {
+              "text": "Guild Chat\n0\nNo guild messages yet. Chat messages received from game or sent here will appear in rea",
+              "label": null
+            }
+          ]
+        },
+        {
+          "name": "partial: dialog LogModal",
+          "details": [
+            {
+              "text": "📋\nAPI Log\n✕\n🔍\nClear\nExport JSON\n0 / 0 entries\nNewest first\nOldest first\nSlowest first\nFastest firs",
+              "label": "API Log"
+            }
+          ]
+        },
+        {
+          "name": "quest #364 locale title and progress 5/10; #365 unaffected by tower",
+          "details": true
+        },
+        {
+          "name": "theme light",
+          "details": true
+        },
+        {
+          "name": "theme dark",
+          "details": true
+        },
+        {
+          "name": "theme system",
+          "details": true
+        },
+        {
+          "name": "system theme responds to change",
+          "details": true
+        },
+        {
+          "name": "keyboard Escape closes shortcuts",
+          "details": true
+        },
+        {
+          "name": "keyboard Tab focus",
+          "details": {
+            "tag": "BODY",
+            "aria": null
+          }
+        },
+        {
+          "name": "account A to B isolates teams",
+          "details": true
+        },
+        {
+          "name": "cache deletion clears account teams",
+          "details": true
+        },
+        {
+          "name": "MAIN intercept and isolated content bridge installed",
+          "details": true
+        },
+        {
+          "name": "RPC disabled rejects dispatch",
+          "details": {
+            "ok": false,
+            "error": "Popup RPC calls are disabled in Settings."
+          }
+        },
+        {
+          "name": "mount does not enable RPC",
+          "details": true
+        },
+        {
+          "name": "piggyback: queued ack does not complete cache",
+          "details": {
+            "ok": true,
+            "queued": true,
+            "error": null
+          }
+        },
+        {
+          "name": "piggyback: natural carrier resolves read",
+          "details": true
+        },
+        {
+          "name": "mqtt: queued ack does not complete cache",
+          "details": {
+            "ok": true,
+            "queued": true,
+            "error": null
+          }
+        },
+        {
+          "name": "mqtt: natural carrier resolves read",
+          "details": true
+        },
+        {
+          "name": "direct rejected RPC leaves data unknown",
+          "details": {
+            "ok": true,
+            "queued": false,
+            "error": null
+          }
+        },
+        {
+          "name": "recorder start/stop/export",
+          "details": {
+            "start": {
+              "active": true,
+              "nextIndex": 0,
+              "nextInteractionIndex": 0,
+              "error": null
+            },
+            "stop": {
+              "active": false,
+              "error": null,
+              "nextIndex": 1,
+              "nextInteractionIndex": 0
+            },
+            "exportKeys": [
+              "extensionVersion",
+              "gameVersion",
+              "records",
+              "interactions"
+            ]
+          }
+        },
+        {
+          "name": "extension action popup",
+          "details": [
+            {
+              "type": "page",
+              "url": "chrome-extension://pmlmnnfoabgdcdlbgngpioepdcpmmclb/popup.html"
+            },
+            {
+              "type": "page",
+              "url": "chrome-extension://pmlmnnfoabgdcdlbgngpioepdcpmmclb/popup.html"
+            }
+          ]
+        },
+        {
+          "name": "standalone reload retains mount",
+          "details": true
+        }
+      ],
+      "requests": [
+        [],
+        [
+          "userGetInfo"
+        ],
+        [
+          "userGetInfo",
+          "heroGetAll"
+        ],
+        [
+          "userGetInfo",
+          "getSummary",
+          "getSummary",
+          "getMarches",
+          "getUnitSummary",
+          "heroGetAll"
+        ],
+        [
+          "heroGetAll"
+        ],
+        [
+          "userGetInfo"
+        ]
+      ],
+      "errors": []
+    }
+  ],
+  "limitations": [
+    "Game HTML and every network response are local fixtures; no live account or game mutation was used.",
+    "Dialogs are opened through their compiled Vue v-model callbacks; this proves rendering, not every UI entry point.",
+    "MQTT mode queue routing is exercised; no live broker, encrypted packet or Unity engine is present.",
+    "Long-running automation completion, server validation and manual visual/accessibility acceptance remain live checks."
+  ],
+  "passed": true
+}

@@ -42,6 +42,9 @@ onUnmounted(() => {
   <Teleport to="body">
     <div
       v-if="modelValue"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="title"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
 
     >
@@ -60,6 +63,7 @@ onUnmounted(() => {
 
           <button
             type="button"
+            :aria-label="`Close ${title}`"
             class="cursor-pointer size-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             @click="close"
           >

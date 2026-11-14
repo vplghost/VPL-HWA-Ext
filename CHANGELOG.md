@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.82 — 2026-11-14
+
+### Fixed
+
+- Display unknown Guild Versus metrics and eligibility when server data is missing, preserve reported zero/false values, and require verified rules and eligibility before showing chest readiness.
+- Remove invented guild, league, battle/round, participation and schedule fallback values.
+- Extract daily quest names from verified remote configuration and English locale: #364 is “Clear Brigand Camp 10 times”, with captured progress shown as 5 / 10. Correct adjacent training, gathering, boss and research labels; stop treating #365 gathering as a Tower chest quest.
+- Add accessible dialog titles/close labels and reusable isolated Chrome acceptance checks for both extension artifacts.
+
+
 ## 0.10.81 — 2026-11-14
 
 ### Added

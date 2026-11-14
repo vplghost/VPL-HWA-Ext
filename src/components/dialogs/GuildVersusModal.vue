@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
-import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
+import { guildVersusView, displayMetric, metric, metricPercent, challengeConvertedPoints } from '@/src/utils/guildVersusView';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -16,66 +16,27 @@ const { cache } = useRpcCache();
 
 const vsStatus = computed(() => cache.value.clanVersusStatus?.data || {});
 const battle = computed(() => vsStatus.value.battle || {});
-const info = computed(() => vsStatus.value.info || {});
 const rewards = computed(() => vsStatus.value.rewards || {});
 
-const clan = computed(() => battle.value.clan || { name: '4-LEAF CLOVER', server: '—' });
-const enemyClan = computed(() => battle.value.enemyClan || { name: 'Opponent', server: '—' });
+const view = computed(() => guildVersusView(cache.value));
+const clan = computed(() => view.value.clan);
+const enemyClan = computed(() => view.value.enemyClan);
+const league = computed(() => view.value.league);
+const battleNumber = computed(() => view.value.battleNumber);
+const roundNumber = computed(() => view.value.roundNumber);
+const clanRoundPoints = computed(() => view.value.clanPoints);
+const enemyRoundPoints = computed(() => view.value.enemyPoints);
+const clanPct = computed(() => view.value.clanPct);
+const enemyPct = computed(() => view.value.enemyPct);
+const isStaleVersusDay = computed(() => view.value.stale);
+const personalRoundPoints = computed(() => view.value.personalRoundPoints);
+const personalBattlePoints = computed(() => view.value.personalBattlePoints);
+const personalSeasonPoints = computed(() => view.value.personalSeasonPoints);
+const clanRank = computed(() => rewards.value.userClanRank != null ? '#' + rewards.value.userClanRank : '—');
+const seasonRank = computed(() => rewards.value.seasonClanRank != null ? '#' + rewards.value.seasonClanRank : '—');
+const thresholds = computed<Record<number, number>>(() => (globalThis as any).hwaHelperClanVersusChestThresholds || {});
 
-const league = computed(() => {
-  const l = battle.value.league || (info.value.league ? `League #${info.value.league}` : 'Bronze');
-  return l.charAt(0).toUpperCase() + l.slice(1);
-});
-
-const battleNumber = computed(() => info.value.battleNumber ?? 4);
-const roundNumber = computed(() => info.value.roundNumber ?? 1);
-
-const clanRoundPoints = computed(() => battle.value.clanRoundPoints ?? 0);
-const enemyRoundPoints = computed(() => battle.value.enemyClanRoundPoints ?? 0);
-const totalPoints = computed(() => clanRoundPoints.value + enemyRoundPoints.value || 1);
-const clanPct = computed(() => Math.round((clanRoundPoints.value / totalPoints.value) * 100));
-const enemyPct = computed(() => 100 - clanPct.value);
-
-const isStaleVersusDay = computed(() => {
-  return (
-    Boolean(cache.value?.clanVersusStatus?.updatedAt) &&
-    new Date(cache.value.clanVersusStatus.updatedAt).toDateString() !== new Date().toDateString()
-  );
-});
-
-const personalRoundPoints = computed(() => (isStaleVersusDay.value ? 0 : (vsStatus.value.score ?? rewards.value.userRoundPoints ?? 0)));
-const personalBattlePoints = computed(() => (isStaleVersusDay.value ? 0 : (rewards.value.userBattlePoints ?? personalRoundPoints.value)));
-const personalSeasonPoints = computed(() => rewards.value.userSeasonPoints ?? 0);
-const clanRank = computed(() => (rewards.value.userClanRank ? `#${rewards.value.userClanRank}` : '—'));
-const seasonRank = computed(() => (rewards.value.seasonClanRank ? `#${rewards.value.seasonClanRank}` : '—'));
-
-const thresholds: Record<number, number> = {
-  1: 25000,
-  2: 100000,
-  3: 400000,
-  4: 600000,
-  5: 1000000,
-  6: 1500000,
-  7: 2000000,
-  8: 3000000,
-  9: 4500000,
-};
-
-const defaultChestRewards: Record<number, Record<string, number>> = {
-  1: { energy: 50, gold: 30000, 'consumable:20': 250, 'consumable:40228': 1, 'consumable:40230': 1 },
-  2: { energy: 100, gold: 60000, 'consumable:20': 500, 'consumable:40228': 2, 'consumable:40230': 2 },
-  3: { 'patron:1': 1, energy: 200, 'consumable:20': 1250, 'consumable:40228': 3, 'consumable:40230': 3, 'material:12': 50 },
-  4: { energy: 200, 'coin:40077': 250, 'consumable:40228': 3, 'consumable:40230': 3, 'speedUpResearch:2': 3 },
-  5: { energy: 300, 'coin:40077': 350, 'consumable:40228': 4, 'consumable:40230': 4, 'speedUpResearch:2': 6 },
-  6: { 'patron:1': 1, energy: 400, 'consumable:40232': 2, 'consumable:40228': 5, 'consumable:40230': 5, 'material:12': 100, 'speedUpResearch:2': 15 },
-  7: { energy: 400, 'coin:40077': 550, 'consumable:40228': 5, 'consumable:40230': 5, 'material:12': 50, 'speedUpResearch:2': 8 },
-  8: { energy: 600, 'coin:40077': 750, 'consumable:40228': 7, 'consumable:40230': 7, 'material:12': 100, 'speedUpResearch:2': 15 },
-  9: { 'patron:1': 2, energy: 1000, 'consumable:40232': 5, 'consumable:40228': 5, 'consumable:40230': 5, 'material:12': 200, 'speedUpResearch:2': 25 },
-};
-
-const chestRewardsMap = computed(() => {
-  return (globalThis as any).hwaHelperClanVersusRewards || defaultChestRewards;
-});
+const chestRewardsMap = computed(() => (globalThis as any).hwaHelperClanVersusRewards || {});
 
 function formatRewardItem(key: string, amount: number) {
   if (key === 'energy') return `+${amount.toLocaleString()} Energy`;
@@ -93,32 +54,28 @@ function formatRewardItem(key: string, amount: number) {
   return `+${amount} ${key}`;
 }
 
-const claimedChests = computed<number[]>(() => {
-  if (isStaleVersusDay.value) return [];
-  const raw = vsStatus.value.chestNumbers;
-  if (Array.isArray(raw)) return raw.map(Number).filter(Number.isFinite);
-  if (raw && typeof raw === 'object') {
-    return Object.keys(raw).map(Number).filter(Number.isFinite);
-  }
-  return [];
-});
-const claimedCount = computed(() => claimedChests.value.length);
-
-const targetChestNum = computed(() => {
-  const set = new Set(claimedChests.value);
-  for (let c = 1; c <= 9; c++) {
-    if (!set.has(c)) return c;
-  }
-  return 9;
-});
-
+const claimedChests = computed<number[]>(() => view.value.claimed);
+const claimedCount = computed(() => view.value.claimedCount);
+const targetChestNum = computed(() => view.value.targetChest);
+function chestReady(c: number): boolean {
+  const score = metric(personalRoundPoints.value), target = metric(thresholds.value[c]);
+  return view.value.claimsKnown && view.value.personalEligible === true && view.value.guildEligible === true &&
+    score != null && target != null && target > 0 && score >= target;
+}
+function chestLabel(c: number): string {
+  if (claimedChests.value.includes(c)) return 'Claimed';
+  if (!view.value.claimsKnown || personalRoundPoints.value == null || metric(thresholds.value[c]) == null ||
+      view.value.personalEligible == null || view.value.guildEligible == null) return 'Unknown';
+  return chestReady(c) ? 'Ready' : 'Locked';
+}
+function chestProgress(c: number) { return metricPercent(personalRoundPoints.value, thresholds.value[c]); }
 const isStackMode = ref(true);
 const activeChestNum = ref(1);
 
 watch(
   () => targetChestNum.value,
   (tgt) => {
-    activeChestNum.value = tgt;
+    activeChestNum.value = tgt || 1;
   },
   { immediate: true }
 );
@@ -128,27 +85,10 @@ const roundQuestsMap = computed(() => {
   return (globalThis as any).hwaHelperClanVersusRoundQuests || {};
 });
 
-const currentRound = computed(() => {
-  const rounds = normalizeArray(battle.value.rounds);
-  return rounds.find((r: any) => r.status === 'inProgress') || rounds[0] || {};
-});
-
-const currentTheme = computed(() => {
-  return currentRound.value?.theme || roundQuestsMap.value[roundNumber.value]?.theme || 'Radar Training';
-});
-
-const roundsList = computed(() => {
-  const raw = normalizeArray(battle.value?.rounds);
-  if (raw.length > 0) return raw;
-  return [
-    { index: 1, theme: 'Radar Training & Titan Power', score: 1, points: clanRoundPoints.value, enemyPoints: enemyRoundPoints.value, status: 'inProgress' },
-    { index: 2, theme: 'City Development & Gathering', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
-    { index: 3, theme: 'Research & Wilderness', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
-    { index: 4, theme: 'Hero Advancement & Equipment', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
-    { index: 5, theme: 'Military Training & Outland', score: 2, points: 0, enemyPoints: 0, status: 'soon' },
-    { index: 6, theme: 'Grand Finale & PvP Clash', score: 4, points: 0, enemyPoints: 0, status: 'soon' },
-  ];
-});
+const currentRound = computed(() => view.value.rounds.find((r: any) => r.status === 'inProgress') ||
+  view.value.rounds.find((r: any) => r.index === roundNumber.value) || {});
+const currentTheme = computed(() => currentRound.value?.theme || (roundNumber.value != null ? roundQuestsMap.value[roundNumber.value]?.theme : null) || '—');
+const roundsList = computed(() => view.value.rounds);
 
 function getResourceStock(target: string | number): number | null {
   const pData = (globalThis as any).hwaHelperPopupData;
@@ -162,28 +102,22 @@ function getQuestDisplayName(q: { label: string }): string {
 }
 
 // Section 5: Guild Requirements
-const curUsers = computed(() => info.value?.currentNumActiveUsers ?? 28);
-const minUsers = computed(() => info.value?.numActiveUsers ?? 5);
-const weeklyAct = computed(() => info.value?.weeklyUserActivity ?? 2450);
-const personalSat = computed(() => info.value?.personalRequirementsIsSatisfied ?? true);
-const guildSat = computed(() => info.value?.guildRequirementsIsSatisfied ?? true);
+const curUsers = computed(() => view.value.currentUsers);
+const minUsers = computed(() => view.value.requiredUsers);
+const weeklyAct = computed(() => view.value.weeklyActivity);
+const personalSat = computed(() => view.value.personalEligible);
+const guildSat = computed(() => view.value.guildEligible);
 
 // Section 6: Daily Challenges
 const challengeNames = computed(() => (globalThis as any).hwaHelperClanVersusChallengeNames || {});
 const challengePoints = computed(() => (globalThis as any).hwaHelperClanVersusChallengePoints || {});
 const challengeSteps = computed(() => (globalThis as any).hwaHelperClanVersusChallengeSteps || {});
 
-const challenges = computed(() => normalizeArray(info.value?.challenges));
-
+const challenges = computed(() => view.value.challenges || []);
 const totalChallengePts = computed(() => {
-  let total = 0;
-  for (const ch of challenges.value) {
-    const progress = Number(ch.progress || 0);
-    const step = Number(challengeSteps.value[ch.id] || 1);
-    const ptsPerStep = Number(challengePoints.value[ch.id] || 0);
-    total += Math.floor(progress / step) * ptsPerStep;
-  }
-  return total;
+  if (view.value.challenges == null) return null;
+  const totals = challenges.value.map((ch: any) => getChallengeConvertedPts(ch));
+  return totals.some((n: number | null) => n == null) ? null : totals.reduce((sum: number, n: number | null) => sum + n!, 0);
 });
 
 function getChallengeDisplayName(ch: any): string {
@@ -193,11 +127,8 @@ function getChallengeDisplayName(ch: any): string {
   return stock != null ? `${cleanName} (${stock.toLocaleString()})` : cleanName;
 }
 
-function getChallengeConvertedPts(ch: any): number {
-  const progress = Number(ch.progress || 0);
-  const step = Number(challengeSteps.value[ch.id] || 1);
-  const ptsPerStep = Number(challengePoints.value[ch.id] || 0);
-  return Math.floor(progress / step) * ptsPerStep;
+function getChallengeConvertedPts(ch: any): number | null {
+  return challengeConvertedPoints(ch, challengePoints.value, challengeSteps.value);
 }
 
 function close() {
@@ -273,16 +204,16 @@ onUnmounted(() => {
           <!-- Section 1: Matchup Banner -->
           <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/60">
             <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-3">
-              <span>Battle #{{ battleNumber }} • Round {{ roundNumber }} of 6</span>
+              <span>Battle #{{ displayMetric(battleNumber) }} • Round {{ displayMetric(roundNumber) }} of 6</span>
               <span class="font-semibold text-emerald-700 dark:text-emerald-400">Theme: {{ currentTheme }}</span>
             </div>
 
             <div class="grid grid-cols-5 items-center gap-2 mb-3">
               <div class="col-span-2 min-w-0">
-                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">{{ clan.name }}</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400">Server {{ clan.server || '—' }}</div>
-                <div class="text-emerald-700 dark:text-emerald-400 font-black text-base sm:text-lg tabular-nums mt-0.5">{{ clanRoundPoints.toLocaleString() }}</div>
-                <div class="text-[11px] text-slate-500 dark:text-slate-400">Score: <strong class="text-slate-800 dark:text-slate-200">{{ battle.clanBattleScore ?? 0 }}</strong></div>
+                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">{{ clan.name || '—' }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Server {{ clan.server ?? '—' }}</div>
+                <div class="text-emerald-700 dark:text-emerald-400 font-black text-base sm:text-lg tabular-nums mt-0.5">{{ displayMetric(clanRoundPoints) }}</div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400">Score: <strong class="text-slate-800 dark:text-slate-200">{{ displayMetric(battle.clanBattleScore) }}</strong></div>
               </div>
 
               <div class="col-span-1 text-center">
@@ -290,20 +221,20 @@ onUnmounted(() => {
               </div>
 
               <div class="col-span-2 min-w-0 text-right">
-                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">{{ enemyClan.name }}</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400">Server {{ enemyClan.server || '—' }}</div>
-                <div class="text-rose-700 dark:text-rose-400 font-black text-base sm:text-lg tabular-nums mt-0.5">{{ enemyRoundPoints.toLocaleString() }}</div>
-                <div class="text-[11px] text-slate-500 dark:text-slate-400">Score: <strong class="text-slate-800 dark:text-slate-200">{{ battle.enemyClanBattleScore ?? 0 }}</strong></div>
+                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">{{ enemyClan.name || '—' }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Server {{ enemyClan.server ?? '—' }}</div>
+                <div class="text-rose-700 dark:text-rose-400 font-black text-base sm:text-lg tabular-nums mt-0.5">{{ displayMetric(enemyRoundPoints) }}</div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400">Score: <strong class="text-slate-800 dark:text-slate-200">{{ displayMetric(battle.enemyClanBattleScore) }}</strong></div>
               </div>
             </div>
 
             <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden flex">
-              <div class="bg-emerald-500 h-2.5" :style="{ width: `${clanPct}%` }"></div>
-              <div class="bg-rose-500 h-2.5" :style="{ width: `${enemyPct}%` }"></div>
+              <div class="bg-emerald-500 h-2.5" :style="{ width: `${clanPct ?? 0}%` }"></div>
+              <div class="bg-rose-500 h-2.5" :style="{ width: `${enemyPct ?? 0}%` }"></div>
             </div>
             <div class="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
-              <span>{{ clanPct }}%</span>
-              <span>{{ enemyPct }}%</span>
+              <span>{{ displayMetric(clanPct) }}%</span>
+              <span>{{ displayMetric(enemyPct) }}%</span>
             </div>
           </div>
 
@@ -311,19 +242,19 @@ onUnmounted(() => {
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Round Points</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ personalRoundPoints.toLocaleString() }}</div>
-              <div class="text-[10px] text-slate-400 dark:text-slate-500">{{ isStaleVersusDay ? 'New round starting' : 'Current round' }}</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ displayMetric(personalRoundPoints) }}</div>
+              <div class="text-[10px] text-slate-400 dark:text-slate-500">{{ isStaleVersusDay ? 'Waiting for current data' : 'Current round' }}</div>
             </div>
 
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Battle Points</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ personalBattlePoints.toLocaleString() }}</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ displayMetric(personalBattlePoints) }}</div>
               <div class="text-[10px] text-slate-400 dark:text-slate-500">This battle</div>
             </div>
 
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
               <div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Season Points</div>
-              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ formatNumber(personalSeasonPoints) }}</div>
+              <div class="text-base font-bold text-slate-900 dark:text-slate-100 tabular-nums my-0.5">{{ displayMetric(personalSeasonPoints) }}</div>
               <div class="text-[10px] text-slate-400 dark:text-slate-500">Season Rank {{ seasonRank }}</div>
             </div>
 
@@ -340,7 +271,7 @@ onUnmounted(() => {
               <div class="flex items-center gap-2">
                 <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">🎁 Milestone Chests</h3>
                 <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50">
-                  {{ claimedCount }} / 9 Claimed
+                  {{ displayMetric(claimedCount) }} / 9 Claimed
                 </span>
               </div>
 
@@ -368,16 +299,16 @@ onUnmounted(() => {
             <!-- Target progress banner -->
             <div class="rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
               <div class="flex justify-between font-medium text-slate-700 dark:text-slate-300">
-                <span>Target: <strong class="text-amber-800 dark:text-amber-300">Chest {{ targetChestNum }}</strong> ({{ ((thresholds[targetChestNum] ?? Infinity) || 0).toLocaleString() }} pts)</span>
+                <span>Target: <strong class="text-amber-800 dark:text-amber-300">Chest {{ targetChestNum || '—' }}</strong> ({{ displayMetric(thresholds[targetChestNum]) }} pts)</span>
                 <span class="font-bold text-slate-900 dark:text-slate-100">
-                  {{ Math.min(100, Math.round((personalRoundPoints / ((thresholds[targetChestNum] ?? Infinity) || 1)) * 100)) }}%
-                  ({{ personalRoundPoints.toLocaleString() }} / {{ ((thresholds[targetChestNum] ?? Infinity) || 0).toLocaleString() }})
+                  {{ displayMetric(chestProgress(targetChestNum)) }}%
+                  ({{ displayMetric(personalRoundPoints) }} / {{ displayMetric(thresholds[targetChestNum]) }})
                 </span>
               </div>
               <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
                 <div
                   class="bg-amber-500 h-2 rounded-full transition-all duration-300"
-                  :style="{ width: `${Math.min(100, Math.round((personalRoundPoints / ((thresholds[targetChestNum] ?? Infinity) || 1)) * 100))}%` }"
+                  :style="{ width: `${chestProgress(targetChestNum) ?? 0}%` }"
                 ></div>
               </div>
             </div>
@@ -394,18 +325,18 @@ onUnmounted(() => {
                     ? 'bg-slate-900 text-white border-slate-900 shadow-xs dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100' + (c === targetChestNum ? ' ring-2 ring-amber-400' : '')
                     : claimedChests.includes(c)
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
-                    : personalRoundPoints >= (thresholds[c] ?? Infinity)
+                    : chestReady(c)
                     ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
                     : c === targetChestNum
                     ? 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-2 ring-amber-400 font-bold hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800/60'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 dark:bg-slate-800/70 dark:text-slate-300 dark:border-slate-700'
                 "
-                :title="`Chest ${c} (${((thresholds[c] ?? Infinity) || 0).toLocaleString()} pts)${c === targetChestNum ? ' - Target' : ''}`"
+                :title="`Chest ${c} (${displayMetric(thresholds[c])} pts)${c === targetChestNum ? ' - Target' : ''}`"
                 @click="activeChestNum = c"
               >
                 <span class="font-mono">№ {{ c }}</span>
                 <span class="text-[10px]">
-                  {{ claimedChests.includes(c) ? '✓' : personalRoundPoints >= (thresholds[c] ?? Infinity) ? '★' : c === targetChestNum ? '🎯' : '🔒' }}
+                  {{ chestLabel(c) === 'Unknown' ? '?' : claimedChests.includes(c) ? '✓' : chestReady(c) ? '★' : c === targetChestNum ? '🎯' : '🔒' }}
                 </span>
               </button>
             </div>
@@ -421,7 +352,7 @@ onUnmounted(() => {
                 :class="
                   claimedChests.includes(activeChestNum)
                     ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-100/50 shadow-sm dark:border-emerald-600/60 dark:from-emerald-950/40 dark:via-slate-800/90 dark:to-emerald-950/30'
-                    : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity)
+                    : chestReady(activeChestNum)
                     ? 'border-amber-400 bg-gradient-to-br from-amber-50/80 via-white to-amber-100/60 shadow-md dark:border-amber-500/70 dark:from-amber-950/40 dark:via-slate-800/90 dark:to-amber-950/30'
                     : activeChestNum === targetChestNum
                     ? 'border-indigo-400 bg-gradient-to-br from-indigo-50/60 via-white to-amber-50/40 shadow-md ring-2 ring-indigo-200 dark:border-indigo-500/70 dark:ring-indigo-900/50 dark:from-indigo-950/40 dark:via-slate-800/90 dark:to-slate-800'
@@ -444,14 +375,14 @@ onUnmounted(() => {
                     :class="
                       claimedChests.includes(activeChestNum)
                         ? 'bg-emerald-600 text-white'
-                        : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity)
+                        : chestReady(activeChestNum)
                         ? 'bg-amber-500 text-white animate-pulse'
                         : activeChestNum === targetChestNum
                         ? 'bg-indigo-600 text-white'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                     "
                   >
-                    {{ claimedChests.includes(activeChestNum) ? '✓ Claimed' : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity) ? '★ Ready to Claim' : activeChestNum === targetChestNum ? '🎯 Target Chest' : '🔒 Locked' }}
+                    {{ chestLabel(activeChestNum) }}
                   </span>
                 </div>
 
@@ -463,14 +394,14 @@ onUnmounted(() => {
                     :class="
                       claimedChests.includes(activeChestNum)
                         ? 'text-emerald-700 dark:text-emerald-400'
-                        : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity)
+                        : chestReady(activeChestNum)
                         ? 'text-amber-800 dark:text-amber-400'
                         : activeChestNum === targetChestNum
                         ? 'text-indigo-900 dark:text-indigo-300'
                         : 'text-slate-700 dark:text-slate-300'
                     "
                   >
-                    {{ ((thresholds[activeChestNum] ?? Infinity) || 0).toLocaleString() }} pts
+                    {{ displayMetric(thresholds[activeChestNum]) }} pts
                   </span>
                 </div>
 
@@ -480,17 +411,17 @@ onUnmounted(() => {
                     <span>Progress</span>
                     <span
                       class="tabular-nums font-bold"
-                      :class="claimedChests.includes(activeChestNum) || personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity) ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'"
+                      :class="claimedChests.includes(activeChestNum) || chestReady(activeChestNum) ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'"
                     >
-                      {{ Math.min(100, Math.round((personalRoundPoints / ((thresholds[activeChestNum] ?? Infinity) || 1)) * 100)) }}%
-                      ({{ personalRoundPoints.toLocaleString() }} / {{ ((thresholds[activeChestNum] ?? Infinity) || 0).toLocaleString() }})
+                      {{ displayMetric(chestProgress(activeChestNum)) }}%
+                      ({{ displayMetric(personalRoundPoints) }} / {{ displayMetric(thresholds[activeChestNum]) }})
                     </span>
                   </div>
                   <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
                     <div
                       class="h-1.5 rounded-full transition-all duration-300"
-                      :class="claimedChests.includes(activeChestNum) ? 'bg-emerald-500' : personalRoundPoints >= (thresholds[activeChestNum] ?? Infinity) ? 'bg-amber-500' : 'bg-indigo-500'"
-                      :style="{ width: `${Math.min(100, Math.round((personalRoundPoints / ((thresholds[activeChestNum] ?? Infinity) || 1)) * 100))}%` }"
+                      :class="claimedChests.includes(activeChestNum) ? 'bg-emerald-500' : chestReady(activeChestNum) ? 'bg-amber-500' : 'bg-indigo-500'"
+                      :style="{ width: `${chestProgress(activeChestNum) ?? 0}%` }"
                     ></div>
                   </div>
                 </div>
@@ -546,7 +477,7 @@ onUnmounted(() => {
                 :class="
                   claimedChests.includes(c)
                     ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
-                    : personalRoundPoints >= (thresholds[c] ?? Infinity)
+                    : chestReady(c)
                     ? 'border-amber-300 bg-amber-50/60 dark:border-amber-700/50 dark:bg-amber-950/30'
                     : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800/60'
                 "
@@ -559,16 +490,16 @@ onUnmounted(() => {
                       :class="
                         claimedChests.includes(c)
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
-                          : personalRoundPoints >= (thresholds[c] ?? Infinity)
+                          : chestReady(c)
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
                           : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
                       "
                     >
-                      {{ claimedChests.includes(c) ? 'Claimed' : personalRoundPoints >= (thresholds[c] ?? Infinity) ? 'Ready' : 'Locked' }}
+                      {{ chestLabel(c) }}
                     </span>
                   </div>
                   <div class="text-[10px] text-slate-400 font-mono mb-2">
-                    {{ ((thresholds[c] ?? Infinity) || 0).toLocaleString() }} pts
+                    {{ displayMetric(thresholds[c]) }} pts
                   </div>
 
                   <!-- Reward snippet -->
@@ -593,6 +524,7 @@ onUnmounted(() => {
               <span class="text-xs text-slate-500 dark:text-slate-400">Click round to view point-earning quests</span>
             </div>
 
+            <p v-if="!roundsList.length" class="text-slate-500">Round schedule unavailable</p>
             <div class="space-y-2">
               <details
                 v-for="r in roundsList"
@@ -618,7 +550,7 @@ onUnmounted(() => {
                         {{ roundQuestsMap[r.index]?.theme || r.theme || `Round ${r.index}` }}
                       </div>
                       <div class="text-[10px] text-slate-500 dark:text-slate-400">
-                        Reward: {{ r.score || roundQuestsMap[r.index]?.battlePoints || 1 }} Battle Point{{ (r.score || roundQuestsMap[r.index]?.battlePoints || 1) > 1 ? 's' : '' }} • {{ (roundQuestsMap[r.index]?.quests || []).length }} Quests
+                        Reward: {{ displayMetric(r.score ?? roundQuestsMap[r.index]?.battlePoints) }} Battle Point{{ (r.score ?? roundQuestsMap[r.index]?.battlePoints ?? 0) > 1 ? 's' : '' }} • {{ (roundQuestsMap[r.index]?.quests || []).length }} Quests
                       </div>
                     </div>
                   </div>
@@ -626,7 +558,7 @@ onUnmounted(() => {
                   <div class="text-right shrink-0 ml-2">
                     <div v-if="r.status === 'inProgress'">
                       <div class="font-black text-emerald-800 dark:text-emerald-400 tabular-nums">
-                        {{ formatNumber(r.points || 0) }} vs {{ formatNumber(r.enemyPoints || 0) }}
+                        {{ displayMetric(r.points) }} vs {{ displayMetric(r.enemyPoints) }}
                       </div>
                       <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
                         <span class="size-1.5 rounded-full bg-emerald-500 animate-ping"></span>In Progress
@@ -634,7 +566,7 @@ onUnmounted(() => {
                     </div>
                     <div v-else-if="r.status === 'finished'">
                       <div class="font-bold text-slate-700 dark:text-slate-300">
-                        {{ formatNumber(r.points || 0) }} vs {{ formatNumber(r.enemyPoints || 0) }}
+                        {{ displayMetric(r.points) }} vs {{ displayMetric(r.enemyPoints) }}
                       </div>
                       <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Finished</span>
                     </div>
@@ -679,13 +611,13 @@ onUnmounted(() => {
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
               <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
                 <div class="text-slate-500 dark:text-slate-400 text-[11px]">Active Members</div>
-                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">{{ curUsers }} / {{ minUsers }} req</div>
-                <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">✓ Satisfied</span>
+                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">{{ displayMetric(curUsers) }} / {{ displayMetric(minUsers) }} req</div>
+                <span class="text-[10px] font-semibold text-slate-500">{{ curUsers == null || minUsers == null ? 'Unknown' : curUsers >= minUsers ? 'Satisfied' : 'Pending' }}</span>
               </div>
 
               <div class="rounded-lg bg-slate-50 p-2.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
                 <div class="text-slate-500 dark:text-slate-400 text-[11px]">Weekly Activity</div>
-                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">{{ weeklyAct.toLocaleString() }}</div>
+                <div class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">{{ displayMetric(weeklyAct) }}</div>
                 <span class="text-[10px] text-slate-400 dark:text-slate-500">Total guild score</span>
               </div>
 
@@ -695,7 +627,7 @@ onUnmounted(() => {
                   class="font-bold text-sm mt-0.5"
                   :class="personalSat ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'"
                 >
-                  {{ personalSat ? 'Eligible' : 'Pending' }}
+                  {{ personalSat == null ? 'Unknown' : personalSat ? 'Eligible' : 'Pending' }}
                 </div>
                 <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                   {{ personalSat ? '✓ Qualified' : 'Action needed' }}
@@ -708,10 +640,10 @@ onUnmounted(() => {
                   class="font-bold text-sm mt-0.5"
                   :class="guildSat ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'"
                 >
-                  {{ guildSat ? 'Eligible' : 'Pending' }}
+                  {{ guildSat == null ? 'Unknown' : guildSat ? 'Eligible' : 'Pending' }}
                 </div>
                 <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                  {{ guildSat ? '✓ Qualified' : 'Action needed' }}
+                  {{ guildSat == null ? 'Awaiting data' : guildSat ? '✓ Qualified' : 'Action needed' }}
                 </span>
               </div>
             </div>
@@ -719,15 +651,14 @@ onUnmounted(() => {
 
           <!-- Section 6: Daily Challenges -->
           <div
-            v-if="challenges.length > 0"
             class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60"
           >
             <div class="flex items-center justify-between flex-wrap gap-1">
               <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                🎯 Daily Challenges ({{ challenges.length }})
+                🎯 Daily Challenges ({{ view.challenges == null ? '—' : challenges.length }})
               </h3>
               <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-900 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60">
-                Total: {{ totalChallengePts.toLocaleString() }} pts
+                Total: {{ displayMetric(totalChallengePts) }} pts
               </span>
             </div>
 
@@ -745,29 +676,29 @@ onUnmounted(() => {
                     {{ getChallengeDisplayName(ch) }}
                   </span>
                   <span
-                    v-if="challengePoints[ch.id] > 0"
+                    v-if="challengePoints[ch.id] != null && challengeSteps[ch.id] > 0"
                     class="text-[10px] text-slate-500 dark:text-slate-400 font-mono"
                   >
-                    +{{ Number(challengePoints[ch.id] || 0).toLocaleString() }} pts / {{ Number(challengeSteps[ch.id] || 1).toLocaleString() }} {{ (challengeSteps[ch.id] || 1) > 1 ? 'units' : 'action' }}
+                    +{{ displayMetric(challengePoints[ch.id]) }} pts / {{ displayMetric(challengeSteps[ch.id]) }} {{ challengeSteps[ch.id] > 1 ? 'units' : 'action' }}
                   </span>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
                   <span
                     class="rounded bg-white px-2 py-0.5 font-bold text-slate-900 border border-slate-200 tabular-nums dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700"
-                    :title="`Progress: ${Number(ch.progress || 0).toLocaleString()}`"
+                    :title="`Progress: ${displayMetric(ch.progress)}`"
                   >
-                    {{ Number(ch.progress || 0).toLocaleString() }}
+                    {{ displayMetric(ch.progress) }}
                   </span>
                   <span
                     class="rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
                     :class="
-                      getChallengeConvertedPts(ch) > 0
+                      (getChallengeConvertedPts(ch) ?? 0) > 0
                         ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60'
                         : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700'
                     "
                     :title="challengePoints[ch.id] > 0 ? `${Number(challengePoints[ch.id]).toLocaleString()} pts per ${Number(challengeSteps[ch.id]) === 1 ? 'completion' : `${Number(challengeSteps[ch.id]).toLocaleString()} units`}` : ''"
                   >
-                    {{ getChallengeConvertedPts(ch).toLocaleString() }} pts
+                    {{ displayMetric(getChallengeConvertedPts(ch)) }} pts
                   </span>
                 </div>
               </div>
