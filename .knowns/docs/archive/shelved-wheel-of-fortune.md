@@ -3,7 +3,7 @@ id: doc-2ac6388a8df3d976339f644736738138
 title: Shelved Wheel of Fortune
 description: Wheel/Free Spin feature suspended by user, preserved source snapshot and conditions for resuming work
 createdAt: '2026-11-06T04:32:14.933Z'
-updatedAt: '2026-11-06T04:32:14.933Z'
+updatedAt: '2026-11-14T01:17:29.600Z'
 tags:
   - archive
   - wheel
@@ -27,3 +27,8 @@ The former header location now displays the actual number of RPC calls awaiting 
 ## Resume condition
 
 A future explicit user instruction is required. On resumption, obtain fresh wire/UI evidence before trusting the archived cooldown assumptions; the archive records the old implementation, not a current validated game contract.
+
+
+## Scoped free video action added 2026-11-14
+
+The user's explicit request in @task-VHE-8SXKQF implements only a small Dashboard Quick Actions button for the freshly captured `refillable_alchemyUseVideo({type:"alchemy"})` contract. Current splitlib identifies `alchemy_video` as refillable53, distinct from the archived `alchemy_free`62 logic. The old62header badge, historical cooldown assumptions and executable tracking remain shelved; this archive remains a historical reference. See @doc/architecture/rpc-cache-pipeline for the new video action, server-confirmed gold/quest processing and authoritative quota refresh.

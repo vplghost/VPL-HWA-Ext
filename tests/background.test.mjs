@@ -687,6 +687,31 @@ test('game interactions persist locally only while recording and export beside A
   assert.equal(Object.hasOwn(local, 'interaction:0'), false);
 });
 
+test('free alchemy receipt refreshes gold, free-attempt quota and quests once under shared RPC settings', async () => {
+  for (const mode of ['direct', 'piggyback', 'disabled', 'failed']) {
+    const env = setup();
+    env.local.popupRpcEnabled = mode !== 'disabled';
+    env.local.socketRefreshMode = mode === 'direct' ? 'direct' : 'piggyback';
+    const event = rpc([{ name: 'refillable_alchemyUseVideo', ident: 'spin', args: { type: 'alchemy' } }],
+      [{ ident: 'spin', result: mode === 'failed' ? { error: 'videoNotAvailable' } : { response: [{ reward: { gold: 73800 }, crit: 2 }] } }]);
+    const sender = { ...gameSender, tab: { id: 42 } };
+    await env.send('api-record', event, sender);
+    const active = ['direct', 'piggyback'].includes(mode);
+    assert.equal(env.forwardedMessages.length, active ? 1 : 0);
+    if (!active) continue;
+    assert.equal(env.forwardedMessages[0].msg.kind, mode === 'direct' ? 'refresh-rpc' : 'queue-rpc');
+    assert.deepEqual(Array.from(env.forwardedMessages[0].msg.calls, call => call.name), ['userGetInfo', 'questGetAll']);
+    await env.send('api-record', event, sender);
+    assert.equal(env.forwardedMessages.length, 1);
+    const snapshot = rpc([{ name: 'userGetInfo', ident: 'info' }], [{ ident: 'info', result: {
+      response: { gold: 73800, refillable: [{ id: 53, amount: 0 }] }
+    } }], '2026-11-14T00:00:00Z');
+    await env.send('api-record', snapshot, sender);
+    assert.equal(env.local.rpcCache['resource:gold'].data.amount, 73800);
+    assert.equal(env.local.rpcCache['resource:refillable:53'].data.amount, 0);
+  }
+});
+
 test('Guild Clash claim refreshes authoritative reward balances under shared settings without replaying the claim', async () => {
   for (const mode of ['direct', 'piggyback', 'disabled', 'failed']) {
     const env = setup();

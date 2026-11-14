@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.74 — 2026-11-14
+
+### Added
+
+- Add a compact Free Spin icon button to Dashboard Quick Actions for the captured free Emerald Exchange video RPC, with queued/pending/error feedback and duplicate-click protection.
+
+### Fixed
+
+- Credit confirmed free-spin gold once and update quest progress without claiming quest rewards or multiplying the returned prize again by crit.
+- Refresh authoritative gold, free-attempt quota and quest snapshots after successful spins under the shared RPC policy; restrict the new action to the exact free alchemy arguments.
+
 ## 0.10.73 — 2026-11-14
 
 ### Fixed

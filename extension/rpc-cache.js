@@ -47,6 +47,7 @@
     'getEventInfo:fortress': 'events',
     clanClash_getCurrentState: 'events',
     clanClash_claimReward: 'events',
+    refillable_alchemyUseVideo: 'header',
     brawl_getAll: 'events',
     heroEvolve: 'heroes',
     titanEvolve: 'titans',
@@ -1451,6 +1452,16 @@
             updatedAt: record.timestamp
           }];
         }
+        if (call.name === 'refillable_alchemyUseVideo') {
+          if (call.args?.type !== 'alchemy' || call.feature || Object.keys(call.args || {}).length !== 1 || !call.ident || !result) return [];
+          const rows = Array.isArray(result.response) ? result.response : [];
+          const gold = rows.reduce((sum, row) => sum + (Number.isFinite(Number(row?.reward?.gold)) && Number(row.reward.gold) > 0 ? Number(row.reward.gold) : 0), 0);
+          const error = result.error || result.response?.error || (!gold ? 'No confirmed free spin reward received.' : null);
+          return [{ key: 'freeAlchemySpinAction', method: call.name, feature: null, group: 'internal',
+            data: { token: call.ident, success: !error, error: error ? String(typeof error === 'object' ? error.message || error.description || JSON.stringify(error) : error).slice(0, 200) : null,
+              gold: error ? 0 : gold, results: rows, quests: Array.isArray(result.quests) ? result.quests : [] },
+            updatedAt: record.timestamp }];
+        }
         if (call.name === 'clanClash_claimReward') {
           const response = result?.response;
           if (!call.ident || result?.error || !response || typeof response !== 'object' ||
@@ -2061,6 +2072,35 @@
           const mobs = normalizeArrayData(entry.data?.mobs);
           entry.data = { ...entry.data, mobs: mobs.filter((mob) =>
             mob && !won.some((item) => item?.mapId === entry.data?.mapId && item?.mobId === mob?.mobId)) };
+        }
+        if (entry.key === 'freeAlchemySpinAction') {
+          const receipts = normalizeArrayData(next.freeAlchemySpinReceipts?.data);
+          if (receipts.some(receipt => receipt?.token === entry.data.token)) continue;
+          next.freeAlchemySpinReceipts = { key: 'freeAlchemySpinReceipts', method: entry.method, group: 'internal',
+            data: [...receipts, { token: entry.data.token, at: entry.updatedAt }].slice(-100), updatedAt: entry.updatedAt };
+          if (!next.freeAlchemySpinStatus || next.freeAlchemySpinStatus.updatedAt <= entry.updatedAt) {
+            next.freeAlchemySpinStatus = { key: 'freeAlchemySpinStatus', method: entry.method, group: 'internal',
+              data: { ...entry.data }, updatedAt: entry.updatedAt };
+          }
+          if (entry.data.success) {
+            const actions = extractRewardActions(record, { name: entry.method, ident: entry.data.token }, { gold: entry.data.gold }, 'freeAlchemy');
+            entries.push(...actions.filter(action => !entries.some(snapshot => snapshot.key === action.data.resourceKey && snapshot.updatedAt >= entry.updatedAt)));
+            const questEntry = next.questGetAll;
+            const sameBatchQuests = entries.some(snapshot => snapshot.key === 'questGetAll' && snapshot.updatedAt >= entry.updatedAt);
+            if (entry.data.quests.length && !sameBatchQuests && (!questEntry || !questEntry.updatedAt || questEntry.updatedAt <= entry.updatedAt)) {
+              const quests = Array.isArray(questEntry?.data) ? [...questEntry.data] : { ...(questEntry?.data || {}) };
+              for (const quest of entry.data.quests) {
+                if (!Number.isInteger(quest?.id)) continue;
+                if (Array.isArray(quests)) {
+                  const index = quests.findIndex(item => Number(item?.id) === quest.id);
+                  if (index < 0) quests.push(quest); else quests[index] = { ...quests[index], ...quest };
+                } else quests[quest.id] = { ...quests[quest.id], ...quest };
+              }
+              next.questGetAll = { key: 'questGetAll', method: entry.method, group: 'other', data: quests, updatedAt: entry.updatedAt };
+            }
+          }
+          changed = true;
+          continue;
         }
         if (entry.key === 'clanClashClaimAction') {
           const claims = normalizeArrayData(next.clanClashClaimStatus?.data?.claims);

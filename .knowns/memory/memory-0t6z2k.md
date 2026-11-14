@@ -1,25 +1,27 @@
 ---
 id: 0t6z2k
-title: Wheel feature is shelved until explicitly resumed
+title: 'Archived Wheel #62 remains shelved; Dashboard free video action is active'
 key: wheel-feature-is-shelved-until-explicitly-resumed
 layer: project
 category: preference
 status: active
 confidence: high
-lastVerified: '2026-11-06T04:32:15.061Z'
+lastVerified: '2026-11-14T01:17:29.658Z'
 ttlDays: 90
 sources:
-  - User instruction on 2026-11-06
-  - '@task-VHE-8D82V9'
+  - User instruction on2026-11-06 to shelve Wheel/Free Spin
+  - User request on2026-11-14 for free refillable_alchemyUseVideo in Dashboard Quick Actions
+  - '@task-VHE-8SXKQF'
   - '@doc/archive/shelved-wheel-of-fortune'
 tags:
   - wheel
   - shelved
+  - alchemy
   - user-preference
 createdAt: '2026-11-06T04:32:15.061Z'
-updatedAt: '2026-11-06T04:32:15.061Z'
+updatedAt: '2026-11-14T01:17:29.669Z'
 ---
 
-The user instructed on 2026-11-06 to shelve Wheel/Free Spin and stop development/tracking until new instructions. Live badge and tracking were removed; historical code is preserved in archive/wheel/free-spin.snapshot.txt and @doc/archive/shelved-wheel-of-fortune. The header position now shows RPC queue count.
+The user shelved the former Wheel header/tracking on2026-11-06. Following the user's2026-11-14 request, @task-VHE-8SXKQF implements a small Dashboard Quick Actions free alchemy video button using the fresh refillable_alchemyUseVideo({type:"alchemy"}) capture. The old refillable62header badge and archived cooldown assumptions remain inactive; current library identifies alchemy_video as53. Archive remains at @doc/archive/shelved-wheel-of-fortune.
 
-**Why:** The user explicitly paused this feature and reassigned its UI space to queue visibility.
+**Why:** The user explicitly requested the scoped free video action in Dashboard Quick Actions; this does not authorize restoring the old Wheel header UI or its unverified assumptions.

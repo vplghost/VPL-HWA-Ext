@@ -1690,6 +1690,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ]);
       if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
+    const spinStatus = cacheResult.cache.freeAlchemySpinStatus;
+    if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
+        spinStatus?.data?.success && spinStatus.updatedAt === record.timestamp &&
+        spinStatus.data.token !== stored.rpcCache?.freeAlchemySpinStatus?.data?.token) {
+      const dispatch = rpcMessageForSettings(stored, [{ name: 'userGetInfo' }, { name: 'questGetAll' }]);
+      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+    }
     const clashClaimList = raw => Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? Object.values(raw) : [];
     const clashClaims = clashClaimList(cacheResult.cache.clanClashClaimStatus?.data?.claims);
     const previousClashClaims = clashClaimList(stored.rpcCache?.clanClashClaimStatus?.data?.claims);

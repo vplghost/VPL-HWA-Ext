@@ -629,6 +629,49 @@ test('camp discovery is a feature-scoped Piggyback read with native results pres
   }
 });
 
+test('Direct free alchemy accepts only the exact free call shape', async () => {
+  const sent = [];
+  const { window } = setup(async (_url, options) => {
+    sent.push(JSON.parse(options.body).calls);
+    return new Response(JSON.stringify({ results: [] }), { status: 200 });
+  }, true, { Response, Headers });
+  const origin = 'https://www.hero-wars-alliance.com';
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', popupRpcEnabled: true, socketRefreshMode: 'direct' }, origin);
+  const post = calls => window.postMessage({ source: 'hwa-helper-control', kind: 'refresh-rpc', calls }, origin);
+  post(['refillable_alchemyUseVideo']);
+  post([{ name: 'refillable_alchemyUseVideo', args: { type: 'paid' } }]);
+  post([{ name: 'refillable_alchemyUseVideo', args: { type: 'alchemy', count: 10 } }]);
+  assert.equal(sent.length, 0);
+  post([{ name: 'refillable_alchemyUseVideo', args: { type: 'alchemy' } }]);
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0][0].args, { type: 'alchemy' });
+});
+
+test('free alchemy spin is a single-use piggyback mutation restricted to the captured free arguments', async () => {
+  const batches = [];
+  const { window } = setup(async (_url, options) => {
+    const request = JSON.parse(options.body); batches.push(request.calls);
+    return new Response(JSON.stringify({ results: request.calls.map(call => ({
+      ident: call.ident, result: { response: call.name === 'refillable_alchemyUseVideo' ? [{ reward: { gold: 73800 }, crit: 2 }] : {} }
+    })) }), { status: 200 });
+  }, true, { Response, Headers });
+  const post = calls => window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls }, 'https://www.hero-wars-alliance.com');
+  post([{ name: 'refillable_alchemyUseVideo', args: { type: 'paid' } }]);
+  post([{ name: 'refillable_alchemyUseVideo', args: { type: 'alchemy', emeralds: 20 } }]);
+  post([{ name: 'refillable_alchemyUseVideo', feature: 'refillable', args: { type: 'alchemy' } }]);
+  const call = { name: 'refillable_alchemyUseVideo', args: { type: 'alchemy' } };
+  post([call]); post([call]);
+  const send = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
+    method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] })
+  });
+  const response = await send();
+  assert.deepEqual(batches[0].map(call => call.name), ['userGetInfo', 'refillable_alchemyUseVideo']);
+  assert.deepEqual(batches[0][1].args, { type: 'alchemy' });
+  assert.equal(JSON.parse(await response.text()).results.length, 1, 'Helper reward does not change the native response');
+  await send();
+  assert.deepEqual(batches[1].map(call => call.name), ['userGetInfo']);
+});
+
 test('Brigand camp action piggybacks once and hides helper result from native client', async () => {
   const batches = [];
   const { window } = setup(async (_url, options) => {

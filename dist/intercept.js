@@ -68,6 +68,12 @@
     'startHealing', 'startTraining', 'completeTraining',
     'missionRaid', 'mission_raid', 'heroUpgradeSkill',
     'heroInsertItem', 'inventoryCraftFragments', 'inventoryCraftRecipe']);
+  function isHelperAction(call) {
+    if (call?.name === 'refillable_alchemyUseVideo') {
+      return !call.feature && call.args?.type === 'alchemy' && Object.keys(call.args).length === 1;
+    }
+    return helperActionMethods.has(call?.name);
+  }
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok, error = null) => window.postMessage({
@@ -257,11 +263,11 @@
       if (Number.isFinite(event.data.expiresAt) && Date.now() >= event.data.expiresAt) return;
       for (const call of event.data.calls) {
         if (!(isClaim ? claimQueueMethods.has(call?.name) :
-            isPiggybackRead(call) || helperActionMethods.has(call?.name))) continue;
+            isPiggybackRead(call) || isHelperAction(call))) continue;
         const safe = { name: call.name, args: call.args || {},
           ...(call.feature ? { feature: call.feature } : {}) };
         const key = JSON.stringify(safe);
-        if (event.data.calls.some((item) => helperActionMethods.has(item?.name) || claimActionMethods.has(item?.name)) &&
+        if (event.data.calls.some((item) => isHelperAction(item) || claimActionMethods.has(item?.name)) &&
             isPiggybackRead(call)) queuedRpcCalls.delete(key);
         if (!queuedRpcCalls.has(key)) {
           if (queuedRpcCalls.size >= 64) {
@@ -273,7 +279,7 @@
           }
           queuedRpcCalls.set(key, safe);
           if (typeof event.data.group === 'string') queuedRpcGroups.set(key, event.data.group);
-          if (helperActionMethods.has(call.name) || Number.isFinite(event.data.expiresAt)) {
+          if (isHelperAction(call) || Number.isFinite(event.data.expiresAt)) {
             queuedActionExpiry.set(key, Math.min(Date.now() + 120000, event.data.expiresAt || Infinity));
           }
         }
@@ -337,6 +343,7 @@
       const calls = event.data.calls;
       const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null) || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
+      if (calls.some(call => (typeof call === 'string' ? call : call?.name) === 'refillable_alchemyUseVideo' && !isHelperAction(call))) return;
       let headersToUse = lastRpcHeaders;
       if (!headersToUse && typeof sessionStorage !== 'undefined') {
         try {
@@ -1095,7 +1102,7 @@
       const consumed = [];
       const claimIds = [];
       const hasActions = [...queuedRpcCalls.values()].some((call) =>
-        helperActionMethods.has(call.name) || claimActionMethods.has(call.name));
+        isHelperAction(call) || claimActionMethods.has(call.name));
       for (const [key, call] of queuedRpcCalls) {
         if (!existing.has(key) || (hasActions && isPiggybackRead(call))) {
           const ident = Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16) +

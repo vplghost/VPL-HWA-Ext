@@ -3,7 +3,7 @@ id: doc-5977b0645ae33e48fc00a5b8f7c90347
 title: RPC Cache Pipeline
 description: Passive RPC interception, delta reduction, resource keys, and action deduplication in HWA Helper
 createdAt: '2026-11-02T06:43:06.566Z'
-updatedAt: '2026-11-13T23:56:05.910Z'
+updatedAt: '2026-11-14T01:17:29.498Z'
 tags:
   - architecture,cache,rpc
 ---
@@ -68,3 +68,14 @@ When an explicit reward payload is present, the existing `extractRewardActions` 
 
 
 Guild Clash explicit-delta compatibility also skips a resource delta when the same RPC batch includes an authoritative snapshot for that resource, regardless of call order. This prevents adding a reward again on top of a balance that already includes it; regression coverage tests both snapshot-before-claim and claim-before-snapshot batches.
+
+
+## Free Alchemy video spin (2026-11-14)
+
+Implemented by @task-VHE-8SXKQF. Capture `temp/tracking-data/hwa-game-record-202611140651_roll_wheel_emerald_exchange.json` (client1.293.1010; SHA-256 `af747b7aa6446a56281d4502bfbcc09078a536ef3e78aefd7dee0f7a119033e7`) contains `refillable_alchemyUseVideo` with exactly `{ type: "alchemy" }` at `2026-11-13T23:50:55.872Z`. Response is `[{ reward: { gold: 73800 }, crit: 2 }]`; `result.quests` separately updates quests10006/10044/10020. Credit73800gold once: `crit` is metadata, not another multiplier, and quest.reward is an unclaimed future reward, not part of spin winnings.
+
+Dashboard Quick Actions mounts `FreeAlchemySpinButton.vue`, a small accessible icon button. It uses global RPC policy, blocks repeat clicks while dispatch/result are pending, handles server rejection and exposes status in tooltip/live text without shifting the layout. Transport acknowledgement is not completion. A30-second message does not unlock or automatically retry an uncertain mutation. The interceptor permits only the exact free method/type/no-feature/one-argument contract as a single-use bounded Piggyback action; paid alchemy methods and parameter variants are not added. Direct dispatch also rejects altered arguments for this method.
+
+`freeAlchemySpinAction` reduction keeps a100-token receipt history, a last-result `freeAlchemySpinStatus`, credits confirmed gold through shared resource deltas and updates array/object quest caches while preserving unrelated quests. Newer and same-batch authoritative snapshots take precedence. Successful new receipts request `userGetInfo` and `questGetAll` under existing settings, updating balances and main refillable state even when the original response contains no quota fields. Failed receipts never award gold or quest prizes.
+
+Verified current splitlib refillable metadata identifies53as `alchemy_video` (maxValue1,refillSeconds28800,refillByReset1),19as paid `alchemy`,62as `alchemy_free`. Runtime does not decrement a guessed refillable ID, infer a ready/cooldown flag from the amount alone, or reuse archived62cooldown assumptions: the game validates free-spin availability and authoritative `userGetInfo` supplies the resulting quota. This scoped video action does not restore the archived Wheel header badge or tracking for62. The original trace contains ad telemetry with provider `substitute`, but no extra reward-claim RPC; telemetry is not synthesized.
