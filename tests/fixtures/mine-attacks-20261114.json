@@ -1,0 +1,83 @@
+{
+  "sourceFiles": [
+    "hwa-game-record-202611141920_firstattack.json",
+    "hwa-game-record-202611141923_under_attack2.json"
+  ],
+  "accountId": 1216438103,
+  "rpc": {
+    "getSummary": {
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-14T12:19:24.728Z",
+      "requestBody": "{\"calls\": [{\"name\": \"getSummary\", \"feature\": \"building\", \"args\": {}, \"ident\": \"e\"}]}",
+      "responseBody": "{\"results\": [{\"ident\": \"e\", \"result\": {\"response\": {\"buildings\": [{\"buildingId\": 162, \"level\": 19, \"initialBuildDate\": 1791336376480}, {\"buildingId\": 174, \"level\": 18, \"initialBuildDate\": 1793202277802}]}}}]}"
+    },
+    "getMarches": {
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-14T12:19:24.728Z",
+      "requestBody": "{\"calls\": [{\"name\": \"getMarches\", \"feature\": \"march\", \"args\": {}, \"ident\": \"e\"}]}",
+      "responseBody": "{\"results\": [{\"ident\": \"e\", \"result\": {\"response\": {\"marches\": {\"waitingForRallyStart\": [], \"moveToRallyLeader\": [], \"moveToTargetInSolo\": [], \"moveToTargetInRally\": [], \"interactionWithTarget\": [{\"squadId\": \"708cf95e-5e9c-4dc3-89df-dbc4c0efc50b\", \"mapId\": \"5929afff-c3a6-495d-8f2c-37e7c509a4dc\", \"target\": {\"objectId\": \"1bd88fce-8abf-41d7-82ae-18096bcb344d\", \"objectType\": \"mine\", \"objectConfigId\": 76, \"coordinates\": {\"x\": 589, \"y\": 396}}, \"targetId\": \"1bd88fce-8abf-41d7-82ae-18096bcb344d\", \"targetType\": \"mine\", \"targetCoordinates\": {\"x\": 589, \"y\": 396}, \"startedAt\": 1794653372711, \"duration\": 34804131, \"durationMs\": 34804131}, {\"squadId\": \"0c64e739-6dcc-4067-889e-58ac500e95be\", \"mapId\": \"5929afff-c3a6-495d-8f2c-37e7c509a4dc\", \"target\": {\"objectId\": \"d6f536c0-4feb-4855-89a9-2e470da96a3b\", \"objectType\": \"mine\", \"objectConfigId\": 86, \"coordinates\": {\"x\": 601, \"y\": 390}}, \"targetId\": \"d6f536c0-4feb-4855-89a9-2e470da96a3b\", \"targetType\": \"mine\", \"targetCoordinates\": {\"x\": 601, \"y\": 390}, \"startedAt\": 1794646093406, \"duration\": 34829722, \"durationMs\": 34829722}], \"returnToOutpost\": []}, \"scoutMarches\": {\"moveToTargetInSolo\": [], \"returnToOutpost\": []}, \"clans\": []}}}]}"
+    },
+    "getUnitSummary": {
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-14T12:19:24.728Z",
+      "requestBody": "{\"calls\": [{\"name\": \"getUnitSummary\", \"feature\": \"unit\", \"args\": {}, \"ident\": \"e\"}]}",
+      "responseBody": "{\"results\": [{\"ident\": \"e\", \"result\": {\"response\": {\"squads\": [{\"id\": \"0c64e739-6dcc-4067-889e-58ac500e95be\", \"version\": 1, \"heroes\": [{\"id\": 38}, {\"id\": 43}, {\"id\": 35}, {\"id\": 33}, {\"id\": 34}], \"units\": [{\"id\": 7, \"state\": {\"survived\": 1355, \"lightlyInjured\": 0, \"injured\": 0, \"lost\": 0}}, {\"id\": 17, \"state\": {\"survived\": 1355, \"lightlyInjured\": 0, \"injured\": 0, \"lost\": 0}}, {\"id\": 27, \"state\": {\"survived\": 1355, \"lightlyInjured\": 0, \"injured\": 0, \"lost\": 0}}]}, {\"id\": \"708cf95e-5e9c-4dc3-89df-dbc4c0efc50b\", \"version\": 1, \"heroes\": [{\"id\": 42}, {\"id\": 11}, {\"id\": 44}, {\"id\": 26}, {\"id\": 32}], \"units\": [{\"id\": 7, \"state\": {\"survived\": 1398, \"lightlyInjured\": 0, \"injured\": 0, \"lost\": 0}}, {\"id\": 17, \"state\": {\"survived\": 1398, \"lightlyInjured\": 0, \"injured\": 0, \"lost\": 0}}, {\"id\": 27, \"state\": {\"survived\": 1398, \"lightlyInjured\": 0, \"injured\": 0, \"lost\": 0}}]}], \"available\": []}}}]}"
+    },
+    "getIncomingMarches": {
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-14T12:19:32.995Z",
+      "requestBody": "{\"calls\": [{\"name\": \"getIncomingMarches\", \"feature\": \"march\", \"args\": {}, \"ident\": \"e\"}]}",
+      "responseBody": "{\"results\": [{\"ident\": \"e\", \"result\": {\"response\": {\"attacks\": [{\"mapId\": \"5929afff-c3a6-495d-8f2c-37e7c509a4dc\", \"target\": {\"objectId\": \"1bd88fce-8abf-41d7-82ae-18096bcb344d\", \"objectType\": \"mine\", \"objectConfigId\": 76, \"coordinates\": {\"x\": 589, \"y\": 396}}, \"route\": {\"routeId\": \"476a2092-9cd5-4e24-8bfb-e67b9df03f59\", \"type\": \"toTargetPvp\", \"version\": 1, \"leader\": {\"userId\": 1216271427}, \"strongestHeroId\": 501, \"members\": [], \"from\": {\"coordinates\": {\"x\": 484, \"y\": 450}, \"objectSizeId\": 6, \"object\": {\"objectId\": \"00000000-0000-0000-0000-000043d47e48\", \"objectType\": \"outpost\", \"objectSizeId\": 6}}, \"to\": {\"coordinates\": {\"x\": 589, \"y\": 396}, \"objectSizeId\": 4, \"object\": {\"objectId\": \"1bd88fce-8abf-41d7-82ae-18096bcb344d\", \"objectType\": \"mine\", \"objectSizeId\": 4}}, \"startedAt\": 1794658736820, \"duration\": 58543, \"durationMs\": 58543}, \"squads\": [{\"squad\": {\"squadId\": \"543b82f4-6164-42be-b309-26831ffd27ed\"}}]}], \"scouts\": [], \"clans\": [{\"clanId\": 304509, \"tag\": \"xxx\", \"icon\": {\"flagColor1\": 9, \"flagColor2\": 7, \"flagShape\": 7, \"iconColor\": 18, \"iconShape\": 56, \"border\": 412}, \"name\": \"\\u3010\\u2605\\u3011 Continental  \\u3010\\u2605\\u3011\"}]}}}]}"
+    },
+    "getHealing": {
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-14T12:19:33.325Z",
+      "requestBody": "{\"calls\": [{\"name\": \"getHealing\", \"feature\": \"unit\", \"args\": {}, \"ident\": \"e\"}]}",
+      "responseBody": "{\"results\": [{\"ident\": \"e\", \"result\": {\"response\": {\"injuredUnits\": [{\"unitConfigId\": 7, \"unitId\": 7, \"count\": 3725}, {\"unitConfigId\": 17, \"unitId\": 17, \"count\": 3732}, {\"unitConfigId\": 27, \"unitId\": 27, \"count\": 3731}]}}}]}"
+    }
+  },
+  "mqtt": [
+    {
+      "transport": "websocket",
+      "direction": "received",
+      "encoding": "utf8",
+      "endpoint": "wss://emqx-hwmb-wss.nextersglobal.com/mqtt",
+      "timestamp": "2026-11-14T12:21:02.061Z",
+      "payload": "{\"result\": {\"type\": \"marchAttackDetected\", \"body\": {\"mapId\": \"5929afff-c3a6-495d-8f2c-37e7c509a4dc\", \"target\": {\"objectId\": \"1bd88fce-8abf-41d7-82ae-18096bcb344d\", \"objectType\": \"mine\", \"objectConfigId\": 76, \"coordinates\": {\"x\": 589, \"y\": 396}}, \"route\": {\"routeId\": \"83fbcf4f-6806-4bc6-95f4-272b309434da\", \"type\": \"toTargetPvp\", \"version\": 1, \"leader\": {\"userId\": 1216271427}, \"strongestHeroId\": 79, \"members\": [], \"from\": {\"coordinates\": {\"x\": 484, \"y\": 450}, \"objectSizeId\": 6, \"object\": {\"objectId\": \"00000000-0000-0000-0000-000043d47e48\", \"objectType\": \"outpost\", \"objectSizeId\": 6}}, \"to\": {\"coordinates\": {\"x\": 589, \"y\": 396}, \"objectSizeId\": 4, \"object\": {\"objectId\": \"1bd88fce-8abf-41d7-82ae-18096bcb344d\", \"objectType\": \"mine\", \"objectSizeId\": 4}}, \"startedAt\": 1794658862070, \"duration\": 58543, \"durationMs\": 58543}, \"squads\": [{\"squad\": {\"squadId\": \"92359ac8-4b4a-44d7-9975-f00972a0e34c\"}}], \"pushUserId\": 1216438103}}}"
+    },
+    {
+      "transport": "websocket",
+      "direction": "received",
+      "encoding": "utf8",
+      "endpoint": "wss://emqx-hwmb-wss.nextersglobal.com/mqtt",
+      "timestamp": "2026-11-14T12:22:01.505Z",
+      "payload": "{\"result\": {\"type\": \"marchAttackEnded\", \"body\": {\"squadId\": \"92359ac8-4b4a-44d7-9975-f00972a0e34c\", \"mapId\": \"5929afff-c3a6-495d-8f2c-37e7c509a4dc\", \"pushUserId\": 1216438103}}}"
+    },
+    {
+      "transport": "websocket",
+      "direction": "received",
+      "encoding": "utf8",
+      "endpoint": "wss://emqx-hwmb-wss.nextersglobal.com/mqtt",
+      "timestamp": "2026-11-14T12:22:14.503Z",
+      "payload": "{\"result\": {\"type\": \"marchAttackDetected\", \"body\": {\"mapId\": \"5929afff-c3a6-495d-8f2c-37e7c509a4dc\", \"target\": {\"objectId\": \"d6f536c0-4feb-4855-89a9-2e470da96a3b\", \"objectType\": \"mine\", \"objectConfigId\": 86, \"coordinates\": {\"x\": 601, \"y\": 390}}, \"route\": {\"routeId\": \"fc41ce6e-f2f6-4317-a438-36fadd085b4c\", \"type\": \"toTargetPvp\", \"version\": 1, \"leader\": {\"userId\": 1216271427}, \"strongestHeroId\": 70, \"members\": [], \"from\": {\"coordinates\": {\"x\": 484, \"y\": 450}, \"objectSizeId\": 6, \"object\": {\"objectId\": \"00000000-0000-0000-0000-000043d47e48\", \"objectType\": \"outpost\", \"objectSizeId\": 6}}, \"to\": {\"coordinates\": {\"x\": 601, \"y\": 390}, \"objectSizeId\": 4, \"object\": {\"objectId\": \"d6f536c0-4feb-4855-89a9-2e470da96a3b\", \"objectType\": \"mine\", \"objectSizeId\": 4}}, \"startedAt\": 1794658934563, \"duration\": 65058, \"durationMs\": 65058}, \"squads\": [{\"squad\": {\"squadId\": \"bda02ef3-5e12-4a6d-bf42-3ff3a20676df\"}}], \"pushUserId\": 1216438103}}}"
+    },
+    {
+      "transport": "websocket",
+      "direction": "received",
+      "encoding": "utf8",
+      "endpoint": "wss://emqx-hwmb-wss.nextersglobal.com/mqtt",
+      "timestamp": "2026-11-14T12:23:19.934Z",
+      "payload": "{\"result\": {\"type\": \"marchAttackEnded\", \"body\": {\"squadId\": \"bda02ef3-5e12-4a6d-bf42-3ff3a20676df\", \"mapId\": \"5929afff-c3a6-495d-8f2c-37e7c509a4dc\", \"pushUserId\": 1216438103}}}"
+    }
+  ]
+}

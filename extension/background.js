@@ -20,6 +20,8 @@ importScripts('research-data.js');
 importScripts('research-queue.js');
 importScripts('smart-gather-data.js');
 importScripts('smart-gather.js');
+importScripts('mine-defense-data.js');
+importScripts('mine-defense.js');
 importScripts('auto-gather.js');
 
 const RECORD_STATE_KEY = 'recordingState';
@@ -760,6 +762,7 @@ chrome.alarms?.onAlarm?.addListener?.(async (alarm) => {
   if (alarm.name === 'hwa-building-queue-recovery' || alarm.name === 'hwa-research-queue-recovery') {
     await advanceCityQueue(alarm.name === 'hwa-building-queue-recovery' ? 'building' : 'research');
   }
+  if (alarm.name === 'hwa-mine-defense') await tickAutoGather();
   if (alarm.name === 'hwa-queue-watch') {
     const tab = await findActiveGameTab();
     if (tab?.id) {
@@ -800,7 +803,10 @@ chrome.storage.onChanged?.addListener?.((changes, area) => {
     const modeChanged = changes.socketRefreshMode && changes.socketRefreshMode.oldValue !== changes.socketRefreshMode.newValue;
     if (modeChanged || changes.popupRpcEnabled?.newValue === false || changes.captureSettings?.newValue?.interceptEnabled === false) {
       const tab = await findActiveGameTab();
-      if (tab?.id) await chrome.tabs.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
+      if (tab?.id) {
+        await chrome.tabs.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
+        await dropMineDefenseRpc(tab.id);
+      }
     }
     if (!globalThis.hwaHelperRaidQueue.terminal(stored.raidQueue)) {
       const state = modeChanged ? globalThis.hwaHelperRaidQueue.stop(stored.raidQueue, 'RPC mode changed. Queue stopped.') : stored.raidQueue;
@@ -976,6 +982,7 @@ async function tickAutoGather(reset = false) {
   const tab = await findActiveGameTab();
   if (reset) {
     if (tab?.id) await chrome.tabs.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
+    if (tab?.id && !stored.autoGatherSettings?.smartEnabled) await dropMineDefenseRpc(tab.id);
     if (stored.smartGatherState) {
       stored.smartGatherState = { ...stored.smartGatherState, error: null, nearest: null };
       if (stored.smartGatherState.pending && !['stopMineGathering', 'attackMine', 'joinRally'].includes(stored.smartGatherState.pending.call?.name))
@@ -985,13 +992,94 @@ async function tickAutoGather(reset = false) {
   }
   if (tab?.id) await evaluateAutoGather(null, stored.rpcCache || {}, stored, tab.id);
 }
+async function dropMineDefenseRpc(tabId) {
+  const stored = await chrome.storage.local.get('smartGatherState');
+  const defense = stored.smartGatherState?.defense;
+  const groups = new Set(['mine-defense', ...[defense?.pending, ...(defense?.waiting || [])].filter(Boolean).map(p => 'mine-defense:' + p.attackRouteId)]);
+  for (const group of groups) await chrome.tabs.sendMessage(tabId, { kind: 'drop-rpc-group', group }).catch(() => {});
+}
+async function evaluateMineDefense(record, cache, stored, state, tabId, now) {
+  const helper = globalThis.hwaHelperMineDefense;
+  if (!helper) return { state, hold: false };
+  state = helper.sync(state, record, cache, now);
+  const defense = state.defense, plan = helper.plan(cache, defense, now);
+  state.wakeAt = plan?.wakeAt || null;
+  if (plan?.wakeAt > now) chrome.alarms?.create?.('hwa-mine-defense', { when: plan.wakeAt });
+  if (defense.pending && plan?.action === 'recall' && defense.pending.call.args.squadId !== plan.march.squadId) {
+    defense.waiting = [...(defense.waiting || []), defense.pending].slice(-20);
+    defense.pending = null;
+  }
+  for (const request of [defense.pending, ...(defense.waiting || [])].filter(Boolean)) {
+    if (!cache.incomingMineAttacks?.data?.attacks?.[request.attackRouteId] || now >= request.impactAt)
+      await chrome.tabs.sendMessage(tabId, { kind: 'drop-rpc-group', group: 'mine-defense:' + request.attackRouteId }).catch(() => {});
+  }
+  const pending = defense.pending;
+  let calls = [], expiresAt = now + 15000, group = 'mine-defense';
+  if (pending) {
+    const active = cache.incomingMineAttacks?.data?.attacks?.[pending.attackRouteId];
+    if (!active || now >= pending.impactAt) {
+      await chrome.tabs.sendMessage(tabId, { kind: 'drop-rpc-group', group: 'mine-defense:' + pending.attackRouteId }).catch(() => {});
+    }
+    if (now - (defense.refreshAt || 0) >= 3000) {
+      calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
+      defense.refreshAt = now;
+    }
+    defense.status = pending.phase === 'returning' ? 'Threatened squad returning to base' : 'Awaiting defensive recall confirmation';
+  } else if (plan?.action === 'refresh' && now - (defense.refreshAt || 0) >= 5000) {
+    calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' },
+      { name: 'getHealing', feature: 'unit' }, { name: 'getSummary', feature: 'building' },
+      { name: 'getIncomingMarches', feature: 'march', args: {} }];
+    defense.refreshAt = now;
+    defense.status = plan.reason;
+  } else if (plan?.action === 'recall') {
+    const key = plan.attack.routeId + ':' + plan.march.squadId;
+    defense.attempted = [...(defense.attempted || []), key].slice(-100);
+    defense.pending = { call: plan.call, sentAt: now, phase: 'sent', mine: plan.mine,
+      attackRouteId: plan.attack.routeId, impactAt: plan.attack.impactAt };
+    calls = [plan.call]; expiresAt = plan.attack.impactAt; group = 'mine-defense:' + plan.attack.routeId;
+    defense.status = stored.socketRefreshMode === 'direct' ? plan.reason : 'Defensive recall queued · needs game RPC before impact';
+  } else defense.status = plan?.reason || '';
+  if (!calls.length && defense.waiting?.length && now - (defense.refreshAt || 0) >= 3000) {
+    calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
+    defense.refreshAt = now;
+  }
+  if (!calls.length && !defense.pending && now - (cache.incomingMineAttacks?.data?.snapshotAt || 0) > 15000 &&
+      now - (defense.refreshAt || 0) >= 5000) {
+    calls = [{ name: 'getIncomingMarches', feature: 'march', args: {} }];
+    defense.refreshAt = now;
+  }
+  if (calls.length) {
+    const dispatch = rpcMessageForSettings(stored, calls);
+    if (dispatch) {
+      await chrome.storage.local.set({ smartGatherState: state });
+      await chrome.tabs.sendMessage(tabId, { ...dispatch, group, expiresAt }).catch(() => {
+        defense.status = 'Defensive recall could not reach the game tab';
+      });
+    }
+  }
+  return { state, hold: Boolean(defense.pending || defense.waiting?.length || plan && plan.action !== 'monitor') };
+}
 async function evaluateSmartGather(record, cache, stored, tabId, now = Date.now()) {
   const smart = globalThis.hwaHelperSmartGather;
   if (cache.accountStatus?.data?.id == null) return;
+  if (stored.smartGatherState?.accountId != null &&
+      String(stored.smartGatherState.accountId) !== String(cache.accountStatus.data.id)) {
+    await dropMineDefenseRpc(tabId);
+    await chrome.tabs.sendMessage(tabId, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
+  }
   let state = smart.sync(stored.smartGatherState, record, cache, now);
   if (!rpcMessageForSettings(stored, [])) {
     state.status = 'Smart gathering paused by shared RPC settings';
     await chrome.storage.local.set({ smartGatherState: state });
+    return;
+  }
+  const defense = await evaluateMineDefense(record, cache, stored, state, tabId, now);
+  state = defense.state;
+  if (defense.hold) {
+    state.status = state.defense.status || 'Monitoring threatened mine';
+    state.updatedAt = now;
+    await chrome.storage.local.set({ smartGatherState: state });
+    stored.smartGatherState = state;
     return;
   }
   if (state.reservation?.queueId && smart.activeQueue(stored)?.id !== state.reservation.queueId) state.reservation = null;
@@ -1051,6 +1139,7 @@ async function evaluateAutoGather(record, currentCache, stored, tabId) {
   if (stored.smartGatherState && globalThis.hwaHelperSmartGather &&
       (stored.popupRpcEnabled !== true || !stored.autoGatherSettings?.enabled || !stored.autoGatherSettings.smartEnabled)) {
     const state = globalThis.hwaHelperSmartGather.sync(stored.smartGatherState, record, currentCache, Date.now());
+    globalThis.hwaHelperMineDefense?.sync(state, record, currentCache, Date.now());
     await chrome.storage.local.set({ smartGatherState: state });
   }
   if (stored.popupRpcEnabled !== true || !stored.autoGatherSettings?.enabled) return;
@@ -1118,6 +1207,9 @@ function socketRefreshCalls(record, cache) {
     body = event?.body;
   } catch (_) { return []; }
   if (type === 'randomDraft_statusChanged') return [{ name: 'randomDraft_getInfo' }];
+  if (['marchAttackDetected', 'marchAttackEnded', 'gatheringMineCompleted', 'returnFromMineCompleted'].includes(type))
+    return [{ name: 'getIncomingMarches', feature: 'march', args: {} }, { name: 'getMarches', feature: 'march' },
+      { name: 'getUnitSummary', feature: 'unit' }, { name: 'getHealing', feature: 'unit' }];
   if (type === 'newReport') return [{ name: 'getPage', feature: 'report',
     args: { limit: 10, cursor: null } }];
   if (type === 'questUpdateAll') return [
@@ -1225,6 +1317,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pending = pending.then(async () => {
       if (message.kind === 'auto-gather-stop') {
         const tab = await findActiveGameTab();
+        if (tab?.id) await dropMineDefenseRpc(tab.id);
         if (tab?.id) await chrome.tabs.sendMessage(tab.id, { kind: 'drop-rpc-group', group: 'smart-gather' }).catch(() => {});
       } else await tickAutoGather(message.kind === 'auto-gather-start');
       return { ok: true };
@@ -1902,7 +1995,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         { name: 'getSummary', feature: 'building' },
         { name: 'getSummary', feature: 'personalResearch' },
         { name: 'getMarches', feature: 'march' },
-        { name: 'getUnitSummary', feature: 'unit' }
+        { name: 'getUnitSummary', feature: 'unit' },
+        { name: 'getIncomingMarches', feature: 'march', args: {} }
       ]);
       if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }

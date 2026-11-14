@@ -285,7 +285,7 @@
             stage === 'returnToOutpost' ? 'return' :
             mineType || (targetType === 'mine' ? 'mine' :
               stage.toLowerCase().includes('rally') ? 'raid' : 'attack');
-          marches.push({ squadId: typeof march.squadId === 'string' ? march.squadId : null,
+          marches.push({ mapId: march.mapId, squadId: typeof march.squadId === 'string' ? march.squadId : null,
             ...(typeof (route?.routeId ?? march.routeId) === 'string' ? { routeId: route?.routeId ?? march.routeId } : {}),
             kind, stage, endsAt: Number.isFinite(endsAt) ? endsAt : null,
             ...(targetType === 'mine' ? {
@@ -325,6 +325,19 @@
     return Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) * 10000 / speed);
   }
 
+  function normalizeIncomingAttack(raw) {
+    const route = raw?.route, target = raw?.target, duration = route?.durationMs ?? route?.duration;
+    const attackerId = route?.leader?.userId;
+    if (typeof raw?.mapId !== 'string' || target?.objectType !== 'mine' || typeof target.objectId !== 'string' ||
+        route?.type !== 'toTargetPvp' || typeof route.routeId !== 'string' ||
+        route.to?.object?.objectType !== 'mine' || route.to.object.objectId !== target.objectId ||
+        attackerId == null || raw.leaderUserInfo?.id != null && String(raw.leaderUserInfo.id) !== String(attackerId) ||
+        !Number.isFinite(route.startedAt) || !Number.isFinite(duration) || duration <= 0 ||
+        !Number.isInteger(route.version) || route.version < 0) return null;
+    return { routeId: route.routeId, mapId: raw.mapId, mineId: target.objectId, attackerId: String(attackerId),
+      version: route.version, startedAt: route.startedAt, impactAt: route.startedAt + duration,
+      enemySquadIds: (raw.squads || []).map(row => row?.squad?.squadId).filter(id => typeof id === 'string') };
+  }
   function extractSocket(record) {
     if (record?.transport !== 'websocket' || record.direction !== 'received' ||
         record.encoding !== 'utf8' || record.payloadTruncated ||
@@ -337,6 +350,16 @@
       const entry = (key, group, data, feature = null) => ({
         key, method: type, feature, group, data, updatedAt: record.timestamp
       });
+      if (type === 'marchAttackDetected') {
+        const attack = normalizeIncomingAttack(body);
+        return attack ? [entry('incomingMineAction', 'internal', { action: 'detected', accountId: body.pushUserId, attacks: [attack] })] : [];
+      }
+      if (type === 'marchAttackEnded' && typeof body.squadId === 'string')
+        return [entry('incomingMineAction', 'internal', { action: 'ended', accountId: body.pushUserId, enemySquadId: body.squadId, mapId: body.mapId })];
+      if (type === 'routeCompleted' && typeof body.routeId === 'string')
+        return [entry('incomingMineAction', 'internal', { action: 'routeEnded', routeId: body.routeId })];
+      if (type === 'gatheringMineCompleted' && typeof body.mineId === 'string')
+        return [entry('incomingMineAction', 'internal', { action: 'mineEnded', accountId: body.pushUserId, mineId: body.mineId })];
       if (type === 'specialQuestEvents' && Array.isArray(body.events)) {
         return [entry('specialQuestStatus', 'events', {
           events: body.events, accountId: body.pushUserId ?? null
@@ -451,6 +474,9 @@
               mapId: call.args.mapId, center: call.args.center
             }, updatedAt: record.timestamp }];
         }
+        if (key === 'getIncomingMarches:march' && !result?.error && Array.isArray(result?.response?.attacks))
+          return [{ key: 'incomingMineAction', method: call.name, feature: call.feature, group: 'internal',
+            data: { action: 'snapshot', attacks: result.response.attacks.map(normalizeIncomingAttack).filter(Boolean) }, updatedAt: record.timestamp }];
         if (key === 'getMarches:march' && result?.response?.marches) {
           const marches = extractMarches(result.response);
           const actions = [{ key: 'marchStatus', method: call.name, feature: call.feature,
@@ -684,7 +710,9 @@
                   mines[m.mineId] = {
                     mineConfigId: m.mineConfigId,
                     mineType,
-                    resourceAmount: m.resourceAmount
+                    resourceAmount: m.resourceAmount,
+                    coordinates: m.coordinates, mapId: call.args?.mapId, gatheringUserId: m.gatheringUser?.userId ?? null,
+                    observedAt: record.timestamp
                   };
                 }
               }
@@ -2177,6 +2205,9 @@
           delete next.rallyPowerStatus;
           delete next.marchStatus;
           delete next.gatheringStatus;
+          delete next.incomingMineAttacks;
+          delete next['getHealing:unit'];
+          delete next.buildingStatus;
           delete next.mineMap;
           delete next.experimentalMapContext;
           delete next.experimentalMineSearch;
@@ -2191,6 +2222,43 @@
           delete next.freeAlchemySpinReceipts;
           delete next['resource:refillable:53'];
           changed = true;
+        }
+        if (entry.key === 'incomingMineAction') {
+          const accountId = next.accountStatus?.data?.id, at = Date.parse(entry.updatedAt), data = entry.data;
+          if (accountId == null || !Number.isFinite(at) || Date.parse(next.accountStatus?.updatedAt) > at ||
+              data.accountId != null && String(data.accountId) !== String(accountId)) continue;
+          const prior = String(next.incomingMineAttacks?.data?.accountId) === String(accountId)
+            ? next.incomingMineAttacks.data : {};
+          const attacks = { ...prior.attacks }, ended = { ...prior.ended };
+          const terminal = (key) => { if (!ended[key] || ended[key] < at) ended[key] = at; };
+          if (data.action === 'ended') terminal('squad:' + data.enemySquadId);
+          if (data.action === 'routeEnded') terminal('route:' + data.routeId);
+          if (data.action === 'mineEnded') {
+            for (const attack of Object.values(attacks)) if (attack.mineId === data.mineId && attack.startedAt <= at && attack.observedAt <= at) terminal('route:' + attack.routeId);
+          }
+          let snapshotAt = prior.snapshotAt || 0;
+          if (data.action === 'snapshot') {
+            if (snapshotAt > at) continue;
+            snapshotAt = at;
+            const ids = new Set(data.attacks.map(a => a.routeId));
+            for (const [id, attack] of Object.entries(attacks)) if (attack.observedAt <= at && !ids.has(id)) delete attacks[id];
+          }
+          for (const attack of data.attacks || []) {
+            const old = attacks[attack.routeId];
+            if (attack.attackerId === String(accountId) || ended['route:' + attack.routeId] ||
+                attack.enemySquadIds.some(id => ended['squad:' + id]) || snapshotAt > at ||
+                old && (old.observedAt > at || old.version > attack.version)) continue;
+            attacks[attack.routeId] = { ...attack, observedAt: at };
+          }
+          for (const [id, attack] of Object.entries(attacks)) if (ended['route:' + id] ||
+              attack.enemySquadIds.some(s => ended['squad:' + s])) delete attacks[id];
+          const tombstones = Object.fromEntries(Object.entries(ended).sort((a, b) => b[1] - a[1]).slice(0, 200));
+          next.incomingMineAttacks = { key: 'incomingMineAttacks', method: entry.method, group: 'internal',
+            updatedAt: next.incomingMineAttacks?.updatedAt > entry.updatedAt ? next.incomingMineAttacks.updatedAt : entry.updatedAt,
+            data: { accountId: String(accountId), snapshotAt, ended: tombstones,
+              attacks: Object.fromEntries(Object.entries(attacks).sort((a, b) => b[1].observedAt - a[1].observedAt).slice(0, 30)) } };
+          changed = true;
+          continue;
         }
         if (entry.key === 'guildRosterAction') {
           const accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id;

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.81 — 2026-11-14
+
+### Added
+
+- Detect incoming mine attacks from RPC snapshots and MQTT events; recall threatened gathering squads in the final 10 seconds only when hospital space is insufficient.
+- Schedule deadline-checked defensive recalls, retain independent confirmations for simultaneous attacks, and avoid resuming mines with hostile or unknown occupancy.
+- Document both supplied attack captures, exact impact timing and verified cumulative Infirmary capacity.
+
+
 ## 0.10.80 — 2026-11-14
 
 ### Added

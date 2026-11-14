@@ -44,7 +44,7 @@ Chỉ ghi mine gián đoạn sau recall thành công. Trước quay lại dùng 
 
 Hospital trống = **max(0, tổng sức chứa các Infirmary − tổng troops bị thương)**, theo xác nhận của người dùng. Nếu một dữ liệu đầu vào thiếu thì capacity còn trống là chưa biết.
 
-Khi có dữ liệu xác thực về đội địch tấn công đúng mine đang gather và số troops lớn hơn hospital trống, recall đúng squad một lần trong **0 < ETA va chạm ≤10 giây**. Sau khi về base thì gather tiếp theo các ưu tiên trên. Tạm chưa triển khai trigger này: người dùng sẽ bổ sung capture bị tấn công; không suy đoán từ `routeCreated` chỉ có ID và tọa độ.
+Khi có dữ liệu xác thực về đội địch tấn công đúng mine đang gather và số troops lớn hơn hospital trống, recall đúng squad một lần trong **0 < ETA va chạm ≤10 giây**. Sau khi về base thì gather tiếp theo các ưu tiên trên. Đã xác minh trigger bằng hai capture `hwa-game-record-202611141920_firstattack.json` và `hwa-game-record-202611141923_under_attack2.json`: RPC `getIncomingMarches` hỗ trợ load giữa attack; MQTT `marchAttackDetected` hỗ trợ nhận từ đầu. Impact = startedAt + durationMs; lịch recall tại impact−10s, hết hạn tại impact. Giữ RPC mode chung; Piggyback cần có RPC game trong cửa sổ này.
 
 ## Bằng chứng và thông tin cần bổ sung
 
@@ -55,8 +55,8 @@ Khi có dữ liệu xác thực về đội địch tấn công đúng mine đan
 | E3 | Full chain daily | Remote quest + questChain, transferProgress=true; mốc cuối ×1,02 đã chốt | Không |
 | E4 | Thời lượng mine mới | Cấu hình globalMapMine + getMineById; cho phép ước tính | Không |
 | E5 | ETA return trước recall | Cấu hình route speed + tọa độ; cho phép ước tính | Không |
-| E6 | Nhận diện incoming attack: mine, owner, route, impactAt, cancel/update | **Thiếu capture**, routeCreated hiện không đủ | Capture RPC + MQTT từ trước khi bị đánh, lúc đến và sau khi hủy/đánh xong; ghi mine/squad đang giữ |
-| E7 | Hospital | Công thức đã chốt; cần dữ liệu building level/capacity và wounded đồng bộ | Khi E6 có, đối chiếu UI sức chứa từng Infirmary và wounded để kiểm chứng |
+| E6 | Incoming attack: mine, attacker, route/version, impactAt và terminal events | Đã xác minh RPC + MQTT từ hai capture 19:20/19:23; xem @doc/api/mine-incoming-attack-and-timed-withdrawal | Không còn thiếu capture |
+| E7 | Hospital | Metadata Infirmary 162/174/175 hash-verified; cộng dồn capacity từng level, trừ injuredUnits; không cộng trùng healing queue | Có thể đối chiếu UI khi thử live |
 
 ## Tiêu chí nghiệm thu và kịch bản
 
@@ -65,29 +65,31 @@ Khi có dữ liệu xác thực về đội địch tấn công đúng mine đan
 - AC-3: Queue chỉ start sau khi slot/heroes đã về thật; auto-gather dừng trong queue và quay lại mine sau terminal.
 - AC-4: Nearest chọn gần nhất trong ứng viên estimated >3600s; không nhận 3600s; mine cũ được miễn threshold.
 - AC-5: Auto-join không recall ở 29s hoặc ETA không biết; kiểm tra lại rally sau khi về, không recall/join trùng.
-- AC-6: Defense cần đủ owner/mine/ETA/capacity; chỉ fire ở 10s cuối; hiện chờ E6, không được đánh dấu done.
+- AC-6: Defense cần đủ owner/mine/ETA/capacity; chỉ recall trong [impact−10s, impact), đúng squad giữ mine và một lần cho mỗi attack; dữ liệu thiếu/stale phải refresh.
 
 Kịch bản kiểm thử: RPC tắt; smart tắt; account đổi; reset qua ngày; quest mới chỉ hoàn thành mốc đầu; hai đội cùng resource; amount/ETA thiếu; mine cạn sau search; recall bị từ chối; worker khởi động lại; queue cancel khi đội chưa về; rally full/start trong lúc recall; piggyback trễ; đúng 29s và 3600s.
 
 ## Kế hoạch và task
 
-Thực thi tuần tự theo yêu cầu người dùng, không dùng sub-agent. Thứ tự hiển thị không thay cho dependency: task tài liệu chặn các task code; daily tạo nền tảng runtime cho queue và nearest; auto-join dùng cơ chế recall/resume của queue. Defense độc lập sau tài liệu nhưng chờ E6.
+Thực thi tuần tự theo yêu cầu người dùng, không dùng sub-agent. Thứ tự hiển thị không thay cho dependency: task tài liệu chặn các task code; daily tạo nền tảng runtime cho queue và nearest; auto-join dùng cơ chế recall/resume của queue. Defense độc lập sau tài liệu; E6 đã được bổ sung và task 6 tiếp tục triển khai sau các task trước.
 
 | Thứ tự | Task | Kết quả cần đạt | Trạng thái |
 |---|---|---|---|
 | 1 | VHE-MA5SJK | Chuẩn hóa mô tả, bằng chứng, AC và missing inputs | Hoàn thành |
-àn thành |
-àn thành |
-àn thành |
-àn thành |
-| 6 | VHE-CB9VBW | Incoming attack và hospital guard | Chờ người dùng bổ sung E6 |
+| 2 | VHE-WBZH46 | Daily rotation, trạng thái quyết định, ngày/account | Hoàn thành |
+| 3 | VHE-XXCNGQ | Nhường queue, recall/return/resume lifecycle | Hoàn thành |
+| 4 | VHE-BCK7WZ | Nearest estimated >1h | Hoàn thành |
+| 5 | VHE-1M0CGC | Priority auto-join <29s, quay lại mine | Hoàn thành |
+| 6 | VHE-CB9VBW | Incoming attack và hospital guard | Hoàn thành với capture E6 mới |
 
 Sau mỗi task: test theo AC, review diff, cập nhật Knowns; cuối đợt chạy typecheck/test/build, tăng version/changelog và commit. Task chờ dữ liệu giữ AC chưa hoàn thành, nêu rõ trong kết quả.
 
 ## Kết quả đợt triển khai
 
-Bản 0.10.80: task 1–5 đã hoàn thành; task VHE-CB9VBW chờ E6 theo trao đổi với người dùng. Bật Smart gathering trong Gathering dialog để sử dụng phần đã triển khai. Chưa có trigger tự tránh tấn công.
+Bản 0.10.81: task 1–6 đã triển khai, bao gồm timed mine defense. Bật Auto-Gather Automation + Smart gathering để sử dụng. Chỉ rút khi tổng troops của squad bị đe dọa lớn hơn hospital trống; đủ chỗ thì giữ nguyên gather.
 
-Kiểm chứng: 762 tests, 750 pass, 12 tests tùy chọn skip; typecheck, WXT build và strict SDD validation đạt. Kiểm thử chạy planner, reducer và background/controller thực, bao gồm queue recall → confirmed return → start, interrupted-mine probe/resume, rally recall → recheck → join, các biên 3600s/29s, reset/account change và tọa độ outpost của route trở về. Chưa thử trực tiếp trong tài khoản game; defense AC-6 chưa có test chứng minh do thiếu capture.
+Hai capture mới được ghi nhận tại @doc/api/mine-incoming-attack-and-timed-withdrawal, cùng SHA256, RPC/MQTT fields, giờ impact và fixture rút gọn trong tests/fixtures/mine-attacks-20261114.json. Ví dụ log đầu: Infirmary 11900+11200=23100; wounded11188; free11912, đủ cho squad4194 nên không rút theo rule.
 
-Rà soát bổ sung đã sửa: không dùng tọa độ mine làm outpost; không dùng cache account cũ; không reset baseline gather khi quest progress chưa thay đổi; không tạo pending action khi RPC chung chặn dispatch.
+Kiểm thử gồm late-load, MQTT từ đầu, terminal/version/replay/account guards, biên 10s/impact, hospital thiếu/đủ/unknown, recall đồng thời các mine, xác nhận return/resume và Piggyback deadline. Chưa thử trực tiếp trong tài khoản game. Piggyback cần RPC game trước impact; không cam kết gửi đúng hạn nếu không có RPC tự nhiên.
+
+Sau defensive recall, mine cũ chỉ được ưu tiên khi đã qua impact và getChunks mới xác nhận không có người chiếm. Nếu còn enemy hoặc chưa rõ owner, helper chọn mine gather khác; không tự chuyển sang đánh PvP.

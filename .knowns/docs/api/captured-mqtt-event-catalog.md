@@ -3,7 +3,7 @@ id: doc-0d0028b9e4a3bb19e742de8b5ea769ed
 title: Captured MQTT Event Catalog
 description: Captured MQTT event schemas and provenance, including rally membership/departure evidence.
 createdAt: '2026-11-06T04:06:02.037Z'
-updatedAt: '2026-11-14T08:03:14.634Z'
+updatedAt: '2026-11-14T12:38:23.076Z'
 tags:
   - mqtt
   - api
@@ -162,3 +162,12 @@ Additional source: `temp/tracking-data/hwa-game-record-202611141452_expedition_c
 ## rallyStarted
 
 Same source/hash as rallyMembersUpdated above.2occurrences,07:52:15.773Z and07:52:24.455Z, same transport/topic/envelope with type `rallyStarted`, body `{rallyId:string,rallyVersion:13}`. Correlated getRallyById replies supply the actual outbound route, which starts earlier than plannedStartTime. Notification alone is neither a victory nor base-return confirmation. See @doc/api/world-map-rpc-contracts. Added by @task-VHE-GN1AQ2.
+
+## Mine attack lifecycle (2026-11-14)
+
+Verified from `hwa-game-record-202611141920_firstattack.json` and `hwa-game-record-202611141923_under_attack2.json`; hashes, timing examples and minimal fixtures are documented in @doc/api/mine-incoming-attack-and-timed-withdrawal.
+
+- `marchAttackDetected`: mapId, mine target identity/config/coordinates, toTargetPvp route (id/version/leader/from/to/startedAt/durationMs), enemy squads and pushUserId. This supplies hostility and impact ETA; routeCreated alone still does not.
+- `marchAttackEnded`: enemy squadId, mapId, pushUserId. It does not identify the defending gatherer.
+- `gatheringMineCompleted`: own mineId/config/squadId, remainingResourceAmount, actual routeToOutpost, battleResult/losses and pushUserId.
+- `returnFromMineCompleted`: own squadId, resource reward and pushUserId; use refreshes to confirm march/unit availability.

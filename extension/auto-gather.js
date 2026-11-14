@@ -175,11 +175,12 @@
 
     // Check if matching mine search results exist with full mines
     const mineSearch = cache?.experimentalMineSearch?.data;
-    const activeMineIds = new Set(
-      marches
+    const activeMineIds = new Set([
+      ...(smart ? globalThis.hwaHelperMineDefense?.unsafeMineIds(cache, stored.smartGatherState, now) || [] : []),
+      ...marches
         .map((m) => m?.mineId || m?.target?.objectId || m?.targetId)
         .filter(Boolean)
-    );
+    ]);
     const matchingMines = resume ? [resume.mine] : nearest ? [nearest.mine] : (mineSearch?.mineConfigId === configId)
       ? safeList(mineSearch?.mines).filter((m) => m?.mineId && !activeMineIds.has(m.mineId))
       : [];

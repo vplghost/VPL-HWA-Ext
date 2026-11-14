@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-14T12:15:47.621Z'
+updatedAt: '2026-11-14T12:41:05.708Z'
 tags:
   - api
   - rpc
@@ -301,4 +301,4 @@ See @doc/specs/smart-auto-gathering and source `docs/Smart-auto-gathering.md`. T
 - Priority rally preemption requires estimated return strictly under29000ms and enough rally start window, expires queued recall before the eligibility window closes, then rechecks details after confirmed return before join. A confirmed joined squad must return before interrupted gathering resumes.
 - getMarches return routes must contribute the outpost endpoint (usually route.to), not the mine/boss origin, to experimentalMapContext.outposts. Smart ETA never substitutes generic search center for an unknown own outpost.
 - Account switch clears gathering-sensitive cache inputs and runtime sync discards the old account state. Late recall acknowledgements are still recorded while automation is paused.
-- @task-VHE-CB9VBW remains blocked on hostile incoming-attack owner/target/impact timing capture, which the user will supply. Hospital formula is sum Infirmary capacities minus wounded troops; no automatic attack-avoidance trigger has been shipped.
+- @task-VHE-CB9VBW is implemented in0.10.81 after the user supplied late-load/full-attack captures. Contracts, source hashes, Infirmary capacity and timed recall behavior: @doc/api/mine-incoming-attack-and-timed-withdrawal.

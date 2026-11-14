@@ -455,7 +455,7 @@ async function recallMarch(march: any) {
         <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-600 dark:text-slate-400" role="status">
           {{ smartStatus || 'Waiting for current game data' }}
         </p>
-        <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-500">Attack avoidance is awaiting attack detection data.</p>
+        <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-500">Mine defense recalls in the final 10 seconds when hospital space is insufficient. Piggyback requires a game RPC before impact.</p>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <label class="block font-medium text-slate-700 dark:text-slate-300">
             Mine Target Type

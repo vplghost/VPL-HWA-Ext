@@ -64,7 +64,8 @@
       call: data.buildMineSearchCall(map.mapId, map.center, type, level), pending: { purpose: 'nearestSearch', level, configId: data.mineConfigId(type, level) } };
     if (nearest.selected && now - nearest.selected.checkedAt < 30000) return { action: 'target', mine: nearest.selected,
       type, level: globalThis.hwaHelperSmartGatherData.mines[nearest.selected.configId].level };
-    const active = new Set(list(cache.marchStatus?.data?.marches).map(m => m.mineId).filter(Boolean));
+    const active = new Set([...list(cache.marchStatus?.data?.marches).map(m => m.mineId).filter(Boolean),
+      ...(globalThis.hwaHelperMineDefense?.unsafeMineIds(cache, state, now) || [])]);
     const candidate = nearest.candidates.filter(m => !active.has(m.mineId)).sort((a, b) =>
       Math.hypot(a.coordinates.x - map.center.x, a.coordinates.y - map.center.y) -
       Math.hypot(b.coordinates.x - map.center.x, b.coordinates.y - map.center.y))[0];
@@ -75,7 +76,8 @@
   }
   function resumePlan(cache, state, now = Date.now()) {
     const mapId = context(cache).mapId;
-    const mine = list(state?.interrupted).find(row => row.mapId === mapId);
+    const unsafe = globalThis.hwaHelperMineDefense?.unsafeMineIds(cache, state, now) || new Set();
+    const mine = list(state?.interrupted).find(row => row.mapId === mapId && !unsafe.has(row.mineId));
     if (!mine) return null;
     if (list(cache.marchStatus?.data?.marches).some(m => m.mineId === mine.mineId && m.stage !== 'returnToOutpost' && m.kind !== 'return'))
       return { action: 'wait', reason: 'Interrupted mine already has a gathering squad' };

@@ -53,7 +53,7 @@ test('active queues suppress gather; terminal queue checks interrupted mine befo
   local.rpcCache.marchStatus.data.marches = [];
   local.raidQueue = { id: 'q', phase: 'waiting' };
   await ctx.runSmart(null, local.rpcCache, local, 1, at);
-  assert.equal(sent.length, 0);
+  assert.equal(sent.some(msg => msg.calls?.some(call => ['attackMine', 'searchMine'].includes(call.name))), false);
   local.raidQueue.phase = 'stopped';
   local.smartGatherState.interrupted = [{ mineId: 'mine', mapId: 'map', configId: 68 }];
   await ctx.runSmart(null, local.rpcCache, local, 1, at + 6000);

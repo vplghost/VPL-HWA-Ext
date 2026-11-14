@@ -3,7 +3,7 @@ id: doc-0387b165a8c4de930cfa0bf94b5311ad
 title: Smart auto gathering
 description: Execution scope, verified evidence, scenarios and missing information for smart auto-gathering
 createdAt: '2026-11-14T11:50:18.441Z'
-updatedAt: '2026-11-14T12:17:19.613Z'
+updatedAt: '2026-11-14T12:44:33.853Z'
 tags:
   - spec
   - gathering
@@ -11,7 +11,7 @@ tags:
 
 # Smart auto gathering
 
-Canonical task/spec tracking for `docs/Smart-auto-gathering.md`. AC-1 through AC-5 are implemented and verified in version0.10.80. AC-6 is explicitly deferred until the user supplies incoming-attack capture. User authorized planning, task creation, sequential implementation and final commit on 2026-11-14.
+Canonical task/spec tracking for `docs/Smart-auto-gathering.md`. AC-1 through AC-6 are implemented in version0.10.81. The user supplied the missing incoming-attack captures on 2026-11-14; see @doc/api/mine-incoming-attack-and-timed-withdrawal. User authorized planning, task creation, sequential implementation and final commit on 2026-11-14.
 
 ## Locked Decisions
 
@@ -28,7 +28,7 @@ Canonical task/spec tracking for `docs/Smart-auto-gathering.md`. AC-1 through AC
 - @task-VHE-XXCNGQ — queue recall and resume, done.
 - @task-VHE-BCK7WZ — nearest estimated >1h, done.
 - @task-VHE-1M0CGC — priority rally preemption, done.
-- @task-VHE-CB9VBW — defense, blocked on incoming-attack capture (user will supply).
+- @task-VHE-CB9VBW — timed mine defense, implemented with the supplied late-load and full-attack captures.
 
 ## Requirements, acceptance criteria and scenarios
 
@@ -77,7 +77,7 @@ Chỉ ghi mine gián đoạn sau recall thành công. Trước quay lại dùng 
 
 Hospital trống = **max(0, tổng sức chứa các Infirmary − tổng troops bị thương)**, theo xác nhận của người dùng. Nếu một dữ liệu đầu vào thiếu thì capacity còn trống là chưa biết.
 
-Khi có dữ liệu xác thực về đội địch tấn công đúng mine đang gather và số troops lớn hơn hospital trống, recall đúng squad một lần trong **0 < ETA va chạm ≤10 giây**. Sau khi về base thì gather tiếp theo các ưu tiên trên. Tạm chưa triển khai trigger này: người dùng sẽ bổ sung capture bị tấn công; không suy đoán từ `routeCreated` chỉ có ID và tọa độ.
+Khi có dữ liệu xác thực về đội địch tấn công đúng mine đang gather và số troops lớn hơn hospital trống, recall đúng squad một lần trong **0 < ETA va chạm ≤10 giây**. Sau khi về base thì gather tiếp theo các ưu tiên trên. Đã xác minh RPC getIncomingMarches và MQTT marchAttackDetected/Ended từ hai capture mới. Chi tiết, SHA256 và timing ở @doc/api/mine-incoming-attack-and-timed-withdrawal. Recall tại impact−10s, hết hạn tại impact; Piggyback cần game RPC trước deadline.
 
 ## Bằng chứng và thông tin cần bổ sung
 
@@ -88,8 +88,8 @@ Khi có dữ liệu xác thực về đội địch tấn công đúng mine đan
 | E3 | Full chain daily | Remote quest + questChain, transferProgress=true; mốc cuối ×1,02 đã chốt | Không |
 | E4 | Thời lượng mine mới | Cấu hình globalMapMine + getMineById; cho phép ước tính | Không |
 | E5 | ETA return trước recall | Cấu hình route speed + tọa độ; cho phép ước tính | Không |
-| E6 | Nhận diện incoming attack: mine, owner, route, impactAt, cancel/update | **Thiếu capture**, routeCreated hiện không đủ | Capture RPC + MQTT từ trước khi bị đánh, lúc đến và sau khi hủy/đánh xong; ghi mine/squad đang giữ |
-| E7 | Hospital | Công thức đã chốt; cần dữ liệu building level/capacity và wounded đồng bộ | Khi E6 có, đối chiếu UI sức chứa từng Infirmary và wounded để kiểm chứng |
+| E6 | Incoming attack owner/mine/route/version/impact and terminal events | Verified from 19:20/19:23 captures | No missing capture |
+| E7 | Hospital | Verified cumulative Infirmary metadata + getHealing injuredUnits | Optional live UI cross-check |
 
 ## Tiêu chí nghiệm thu và kịch bản
 
@@ -98,13 +98,13 @@ Khi có dữ liệu xác thực về đội địch tấn công đúng mine đan
 - AC-3: Queue chỉ start sau khi slot/heroes đã về thật; auto-gather dừng trong queue và quay lại mine sau terminal.
 - AC-4: Nearest chọn gần nhất trong ứng viên estimated >3600s; không nhận 3600s; mine cũ được miễn threshold.
 - AC-5: Auto-join không recall ở 29s hoặc ETA không biết; kiểm tra lại rally sau khi về, không recall/join trùng.
-- AC-6: Defense cần đủ owner/mine/ETA/capacity; chỉ fire ở 10s cuối; hiện chờ E6, không được đánh dấu done.
+- AC-6: Defense cần đủ owner/mine/ETA/capacity; recall đúng squad, một lần mỗi attack, trong [impact−10s, impact).
 
 Kịch bản kiểm thử: RPC tắt; smart tắt; account đổi; reset qua ngày; quest mới chỉ hoàn thành mốc đầu; hai đội cùng resource; amount/ETA thiếu; mine cạn sau search; recall bị từ chối; worker khởi động lại; queue cancel khi đội chưa về; rally full/start trong lúc recall; piggyback trễ; đúng 29s và 3600s.
 
 ## Kế hoạch và task
 
-Thực thi tuần tự theo yêu cầu người dùng, không dùng sub-agent. Thứ tự hiển thị không thay cho dependency: task tài liệu chặn các task code; daily tạo nền tảng runtime cho queue và nearest; auto-join dùng cơ chế recall/resume của queue. Defense độc lập sau tài liệu nhưng chờ E6.
+Thực thi tuần tự theo yêu cầu người dùng, không dùng sub-agent. Thứ tự hiển thị không thay cho dependency: task tài liệu chặn các task code; daily tạo nền tảng runtime cho queue và nearest; auto-join dùng cơ chế recall/resume của queue. Defense tiếp tục sau khi E6 được người dùng bổ sung.
 
 | Thứ tự | Task | Kết quả cần đạt | Trạng thái |
 |---|---|---|---|
@@ -113,7 +113,7 @@ Thực thi tuần tự theo yêu cầu người dùng, không dùng sub-agent. T
 | 3 | VHE-XXCNGQ | Nhường queue, recall/return/resume lifecycle | Hoàn thành |
 | 4 | VHE-BCK7WZ | Nearest estimated >1h | Hoàn thành |
 | 5 | VHE-1M0CGC | Priority auto-join <29s, quay lại mine | Hoàn thành |
-| 6 | VHE-CB9VBW | Incoming attack và hospital guard | Chờ người dùng bổ sung E6 |
+| 6 | VHE-CB9VBW | Incoming attack và hospital guard | Implemented in0.10.81 |
 
 Sau mỗi task: test theo AC, review diff, cập nhật Knowns; cuối đợt chạy typecheck/test/build, tăng version/changelog và commit. Task chờ dữ liệu giữ AC chưa hoàn thành, nêu rõ trong kết quả.
 
@@ -124,7 +124,7 @@ Sau mỗi task: test theo AC, review diff, cập nhật Knowns; cuối đợt ch
 - [x] AC-3: Raid/monster queues wait for gathering recall and confirmed return, suppress gather while active, then validate and resume interrupted mines.
 - [x] AC-4: Nearest mine mode orders candidates across levels, probes remaining resources and requires estimated >3600s; validated interrupted mines bypass threshold.
 - [x] AC-5: Priority rally preemption requires estimated return <29s plus start window, then rechecks rally and joins once after confirmed return.
-- [ ] AC-6: Incoming-attack defense requires captured hostile owner/target/impact ETA; pending user capture, no defense trigger shipped.
+- [x] AC-6: Verified hostile incoming routes target an own gathering mine; insufficient hospital space triggers a single deadline-checked recall in final10s. Missing/stale inputs refresh without guessing.
 
 ## Scenarios
 
@@ -143,8 +143,11 @@ Sau mỗi task: test theo AC, review diff, cập nhật Knowns; cuối đợt ch
 
 ## Verification mapping
 
-AC-1: source document and Knowns validation. AC-2/4: tests/smart-gather.test.mjs plus existing auto-gather tests. AC-3/5: tests/smart-gather-background.test.mjs runs real background controllers and RPC transitions, with boundary and account-reset cases in smart-gather.test.mjs. AC-6 has no proving test because required incoming-attack evidence is missing; it remains unchecked and blocked rather than covered by a guessed payload.
+AC-1: source document and Knowns validation. AC-2/4: tests/smart-gather.test.mjs plus existing auto-gather tests. AC-3/5: tests/smart-gather-background.test.mjs runs real background controllers and RPC transitions, with boundary and account-reset cases in smart-gather.test.mjs. AC-6: tests/mine-defense.test.mjs replays minimal real captures and exercises the reducer, planner and background; bridge.test.mjs verifies exact wake scheduling without a storage-triggered heartbeat loop.
 
-## Delivery verification
+## Delivery verification for0.10.80
 
-Release0.10.80: 762 tests,750 passed,12 optional skipped; typecheck and validated WXT build pass. Review PASS after fixes for return-outpost endpoints, stale account inputs, unchanged daily baselines and resetting during pending mine probes. No live in-game account test was performed. AC-6 remains blocked on user-supplied capture; the ready scope is not a claim that attack avoidance is implemented.
+Release0.10.80 completed AC-1…AC-5 with762 tests,750 passed,12 optional skipped; typecheck and WXT build passed. AC-6 was deferred at that release until incoming-attack capture was available. That deferred scope is now implemented in0.10.81; see the current delivery section and @doc/api/mine-incoming-attack-and-timed-withdrawal.
+## Delivery verification for0.10.81
+
+All six task scopes implemented. Incoming contracts/hashes: @doc/api/mine-incoming-attack-and-timed-withdrawal. Verification:775 tests,763 passed,12 optional skipped; typecheck, validated WXT build and strict SDD validation pass. AC-6 covers insufficient/sufficient/unknown hospital, exact10s/impact bounds, full/late-load attacks, snapshot/version/terminal/account guards, overlapping recalls, confirmed return, safe mine resume, Piggyback expiry and queue cleanup on account/Smart disable. Bridge test proves absolute wake scheduling without a storage-update loop. Direct sends at wake; Piggyback requires natural game traffic before impact. No live in-game validation is claimed.

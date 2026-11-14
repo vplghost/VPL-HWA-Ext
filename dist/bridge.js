@@ -244,7 +244,9 @@ try {
     }
     if (area !== 'local') return;
     if ('raidEnergyAuto' in changes) scheduleRaidEnergy(changes.raidEnergyAuto.newValue?.enabled === true);
-    if ('autoGatherSettings' in changes) scheduleSmartGather(changes.autoGatherSettings.newValue);
+    if ('autoGatherSettings' in changes || 'smartGatherState' in changes) {
+      chrome.storage.local.get(['autoGatherSettings', 'smartGatherState']).then(stored => scheduleSmartGather(stored.autoGatherSettings, stored.smartGatherState)).catch(error => handleContextInvalidated(error, false));
+    }
     if ('raidQueue' in changes) scheduleRaidWake(changes.raidQueue.newValue);
     if ('monsterQueue' in changes) scheduleMonsterWake(changes.monsterQueue.newValue);
     if ('towerRun' in changes) scheduleTowerWake(changes.towerRun.newValue);
@@ -348,15 +350,18 @@ chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
 let raidEnergyTimer;
 const raidEnergySession = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 let smartGatherTimer;
-function scheduleSmartGather(settings) {
+function scheduleSmartGather(settings, state) {
   if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') return;
   clearBridgeTimeout(smartGatherTimer);
   if (!settings?.enabled || !settings?.smartEnabled) return;
-  sendBridgeMessage({ kind: 'smart-gather-tick' }).catch(error => handleContextInvalidated(error, false));
-  smartGatherTimer = bridgeTimeout(() => scheduleSmartGather(settings), 5000);
+  const delay = Number.isFinite(state?.wakeAt) && state.wakeAt > Date.now() ? Math.min(5000, Math.max(50, state.wakeAt - Date.now())) : 5000;
+  smartGatherTimer = bridgeTimeout(() => {
+    sendBridgeMessage({ kind: 'smart-gather-tick' }).catch(error => handleContextInvalidated(error, false));
+    scheduleSmartGather(settings);
+  }, delay);
 }
 try {
-  chrome.storage?.local?.get?.('autoGatherSettings')?.then?.(stored => scheduleSmartGather(stored.autoGatherSettings)).catch?.(() => {});
+  chrome.storage?.local?.get?.(['autoGatherSettings', 'smartGatherState'])?.then?.(stored => scheduleSmartGather(stored.autoGatherSettings, stored.smartGatherState)).catch?.(() => {});
 } catch (_) {}
 function scheduleRaidEnergy(enabled) {
   if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') return;

@@ -5,6 +5,24 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/bridge.js', import.meta.url), 'utf8');
 
+test('mine defense wake uses an absolute near deadline without a storage-update heartbeat loop', async () => {
+  const timers = new Map(), sent = [], now = Date.now(); let id = 0, onChanged;
+  const settings = { enabled: true, smartEnabled: true }, state = { wakeAt: now + 1000 };
+  const chrome = { runtime: { sendMessage: async message => { sent.push(message); return {}; }, onMessage: { addListener() {} } },
+    storage: { local: { get: async () => ({ autoGatherSettings: settings, smartGatherState: state }) }, onChanged: { addListener: fn => { onChanged = fn; } } } };
+  runInNewContext(source, { chrome, Date, window: { addEventListener() {}, postMessage() {} }, location: { origin: 'https://www.hero-wars-alliance.com' },
+    setTimeout: (callback, delay) => { timers.set(++id, { callback, delay }); return id; }, clearTimeout: key => timers.delete(key) });
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(sent.filter(m => m.kind === 'smart-gather-tick').length, 0);
+  assert.ok([...timers.values()].some(t => t.delay <= 1000));
+  onChanged({ smartGatherState: { newValue: state } }, 'local');
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(sent.filter(m => m.kind === 'smart-gather-tick').length, 0, 'saving runtime state must only reschedule');
+  const timer = [...timers.values()].find(t => t.delay <= 1000); timers.clear(); timer.callback();
+  await Promise.resolve();
+  assert.equal(sent.filter(m => m.kind === 'smart-gather-tick').length, 1);
+});
+
 test('energy auto heartbeat runs with popup closed, stops on disable and resets document identity on reload', async () => {
   const run = async () => {
     const timers = new Map(), sent = []; let timerId = 0; const listeners = [];
