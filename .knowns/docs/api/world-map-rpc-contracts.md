@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-14T08:03:13.787Z'
+updatedAt: '2026-11-14T11:15:51.431Z'
 tags:
   - api
   - rpc
@@ -277,3 +277,15 @@ The Gathering dialog and Dashboard Active Marches share `GatheringProgress.vue`;
 
 
 Popup/Header initialization also requests `getMineSummary:mine` once alongside the existing march snapshot refresh, so Dashboard estimates can populate without first opening the Gathering dialog. This remains a normal shared-policy read, not polling.
+
+## Raid tooltip power comparison (2026-11-14)
+
+Implemented in `rallyPowerTooltip` and shared by Header and Dashboard via `formatMarchTooltip` (@task-VHE-G173WD).
+
+- Boss heroes power comes from `predefinedSquadHeroes.heroesPower`; troop power is sum of preset unit count × `unit.power`. The packaged tables cover levels 1–30. `generate-rally-power-data.mjs` verifies remote-config MD5 filenames and the captured asset manifest size/MD5 before generating `rallyPowerData.ts`. Source URLs/hashes are embedded in that file; no runtime CDN request is needed.
+- Level 19: heroes 639800, troops 459500, count 16250. Level 20: heroes 735875, troops 511000, count 17500. Level 22: heroes 1042375, troops 678000, count 19750.
+- Full `getRallyById:rally` membership is retained in bounded, account-scoped `rallyPowerStatus`; account switches clear it. Lower-version or older detail snapshots cannot replace newer observations. March refreshes preserve this separate snapshot.
+- Rally troop power sums observed participants' unit counts × packaged unit power. This is base/display power, not a victory prediction or combat damage formula.
+- Participant hero payloads contain no power. Only the current player's matching hero profiles in `heroGetAll` contribute to known heroes power; foreign hero IDs never resolve against the local roster. Supplied level/color/star must match.
+- Missing participants/components produce a lower-bound subtotal suffixed `+` (for example `114k+`); no known values produce `—`. Without full details, the current march team is shown as a partial subtotal. Partial compact numbers round down; exact compact numbers round to nearest tenth.
+- Tooltip compares Rally / Boss for heroes, troops and combined power. A complete observed troop subtotal may coexist with an incomplete hero subtotal.

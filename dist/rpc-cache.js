@@ -2171,6 +2171,7 @@
           delete next.guildStatus;
           delete next.guildOutposts;
           delete next.heroGetAll;
+          delete next.rallyPowerStatus;
           delete next.expeditionStatus;
           delete next.expeditionCollectStatus;
           delete next.expeditionCollectReceipts;
@@ -2503,7 +2504,22 @@
           if (entry.data.action === 'details') {
             const accountId = next.accountStatus?.data?.id;
             const member = [entry.data.leader, ...(entry.data.members || [])].find((member) => accountId && String(member?.userId) === String(accountId));
-            if (member?.squad) changed = observeSquad(next, rallyTeam(member.squad), entry.method, entry.updatedAt) || changed;
+            if (member?.squad) {
+              changed = observeSquad(next, rallyTeam(member.squad), entry.method, entry.updatedAt) || changed;
+              const previous = next.rallyPowerStatus;
+              const rows = String(previous?.data?.accountId) === String(accountId) ? normalizeArrayData(previous.data.rallies) : [];
+              const old = rows.find(row => row.rallyId === entry.data.rallyId);
+              if ((!old || old.observedAt <= entry.updatedAt) &&
+                  !(Number.isFinite(old?.version) && Number.isFinite(entry.data.rallyVersion) && old.version > entry.data.rallyVersion)) {
+                next.rallyPowerStatus = { key: 'rallyPowerStatus', group: 'internal', method: entry.method, updatedAt: entry.updatedAt,
+                  data: { accountId: String(accountId), rallies: [{ rallyId: entry.data.rallyId,
+                    mobConfigId: entry.data.mobConfigId, version: entry.data.rallyVersion ?? old?.version, observedAt: entry.updatedAt,
+                    participants: [entry.data.leader, ...(entry.data.members || [])].filter(Boolean).map(person => ({
+                      userId: person.userId, squad: person.squad
+                    })) }, ...rows.filter(row => row.rallyId !== entry.data.rallyId)].slice(0, 30) } };
+                changed = true;
+              }
+            }
           }
           if (entry.data.action === 'socketReturnCompleted') {
             next.experimentalRallyReturns = { key: 'experimentalRallyReturns', group: 'internal',

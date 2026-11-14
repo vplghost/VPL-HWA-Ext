@@ -1,4 +1,5 @@
 import { formatNumber } from './formatters.ts';
+import { rallyPowerTooltip } from './rallyPower.ts';
 import { normalizeArray } from './troops.ts';
 import { gatheringProgress } from './gatheringProgress.ts';
 import {
@@ -165,6 +166,7 @@ export function formatMarchTooltip(march: any, now = Date.now(), cache: any = {}
     if (troopsText) {
       lines.push(`Troops: ${troopsText}`);
     }
+    lines.push(...rallyPowerTooltip(march, cache));
     lines.push('(Click to view Raid dialog)');
     return lines.join('\n');
   }

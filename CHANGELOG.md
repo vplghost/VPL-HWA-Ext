@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.79 — 2026-11-14
+
+### Added
+
+- Compare Rally / Boss heroes, troops and total power in raid tooltips, using verified boss presets and observed rally troops. Show known hero subtotals with `+` when other participants' power is unavailable.
+
 ## 0.10.78 — 2026-11-14
 
 ### Added
