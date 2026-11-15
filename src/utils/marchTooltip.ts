@@ -23,12 +23,14 @@ export function formatMarchDuration(ms: number): string {
   return `${m}m ${String(s).padStart(2, '0')}s`;
 }
 
+import { getHeroName } from '../data/heroMetadata.ts';
+
 /**
  * Resolve readable name for a hero ID
  */
 export function resolveHeroName(id: number | string): string {
-  const metaMap = (globalThis as any).hwaHelperHeroMetadata;
-  if (metaMap?.[String(id)]?.name) return metaMap[String(id)].name;
+  const metaName = (globalThis as any).hwaHelperHeroMetadata?.[String(id)]?.name || getHeroName(id);
+  if (metaName && !metaName.startsWith('Hero #')) return metaName;
   const nameMap = (globalThis as any).hwaHelperNameMap;
   if (typeof nameMap?.hero === 'function') {
     const mapped = nameMap.hero(Number(id));
@@ -37,7 +39,7 @@ export function resolveHeroName(id: number | string): string {
   if (nameMap?.heroNames?.[String(id)]) {
     return nameMap.heroNames[String(id)];
   }
-  return `Hero #${id}`;
+  return metaName || `Hero #${id}`;
 }
 
 export interface MarchSquadDetails {

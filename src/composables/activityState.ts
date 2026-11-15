@@ -1,5 +1,6 @@
 import { TOWER_FLOOR_COUNT } from '../utils/towerRules.ts';
 import { normalizeArray } from '../utils/troops.ts';
+import { titanMetadata } from '../data/titanMetadata.ts';
 
 export function observedToday(entry: any, now = Date.now(), nextReset?: number): boolean {
   const time = new Date(entry?.updatedAt).getTime();
@@ -49,7 +50,7 @@ export function arenaActivityState(cache: Record<string, any>, grand = false, no
 }
 
 export function dungeonActivityState(cache: Record<string, any>, now = Date.now(),
-  metadata: Record<string, any> = (globalThis as any).hwaHelperTitanMetadata || {}) {
+  metadata: Record<string, any> = (globalThis as any).hwaHelperTitanMetadata || titanMetadata) {
   const entry = cache.dungeonStatus;
   if (!observedToday(entry, now, cache.questResetStatus?.data?.nextDayAt)) return { state: 'unknown' as const, detail: 'Waiting for game data' };
   const dungeon = entry.data || {};

@@ -57,3 +57,5 @@ export type ThemeMode = 'dark' | 'light' | 'system';
 
 export * from './game/building';
 export * from './game/research';
+export * from './game/hero';
+export * from './game/titan';

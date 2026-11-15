@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.100 — 2026-11-15
+
+### Added
+
+- Typed hero and titan metadata modules `src/data/heroMetadata.ts` and `src/data/titanMetadata.ts` with strict TypeScript interfaces (`HeroRole`, `HeroClass`, `HeroFaction`, `HeroMetadataItem`, `TitanRole`, `TitanElement`, `TitanMetadataItem`, artifact evolve and level costs).
+- Comprehensive unit test suite `tests/hero-titan-typed-data.test.mjs` verifying hero name resolution, titan data, artifact costs, and march tooltip integrations across 83 heroes and 29 titans.
+
+### Changed
+
+- Refactor `src/utils/metadata.ts`, `src/utils/marchTooltip.ts`, and `src/composables/activityState.ts` to consume typed hero and titan data directly while maintaining runtime backward compatibility.
+
 ## 0.10.99 — 2026-11-15
 
 ### Added

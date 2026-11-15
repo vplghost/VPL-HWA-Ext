@@ -16,6 +16,9 @@ import '~/extension/tower-rules.js';
 import '~/extension/tower-automation.js';
 import '~/extension/clan-versus-rules.js';
 
+import { heroMetadata, getHeroMetadata as getTypedHeroMetadata } from '../data/heroMetadata.ts';
+import { titanMetadata, getTitanMetadata as getTypedTitanMetadata } from '../data/titanMetadata.ts';
+
 export interface HeroMeta {
   name: string;
   role?: string;
@@ -37,21 +40,23 @@ export interface TitanMeta {
 }
 
 export function getHeroMetadata(heroId: number | string): HeroMeta | undefined {
-  const metaMap = (globalThis as any).hwaHelperHeroMetadata;
-  return metaMap?.[String(heroId)];
+  const meta = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperHeroMetadata?.[String(heroId)])
+    ?? getTypedHeroMetadata(heroId);
+  return (meta as HeroMeta) || undefined;
 }
 
 export function getAllHeroMetadata(): Record<string, HeroMeta> {
-  return (globalThis as any).hwaHelperHeroMetadata || {};
+  return (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperHeroMetadata) || (heroMetadata as any);
 }
 
 export function getTitanMetadata(titanId: number | string): TitanMeta | undefined {
-  const metaMap = (globalThis as any).hwaHelperTitanMetadata;
-  return metaMap?.[String(titanId)];
+  const meta = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanMetadata?.[String(titanId)])
+    ?? getTypedTitanMetadata(titanId);
+  return (meta as TitanMeta) || undefined;
 }
 
 export function getAllTitanMetadata(): Record<string, TitanMeta> {
-  return (globalThis as any).hwaHelperTitanMetadata || {};
+  return (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanMetadata) || (titanMetadata as any);
 }
 
 export function getHeroEquipmentRank(color: number | string) {
