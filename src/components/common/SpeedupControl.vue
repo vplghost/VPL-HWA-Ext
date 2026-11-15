@@ -77,7 +77,7 @@ async function confirm() {
     <div class="flex flex-wrap items-center gap-2">
       <select v-model.number="itemId" :disabled="waiting" aria-label="Speedup item" class="min-w-0 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1">
         <option v-if="!items.length" :value="0">No verified items · Refresh</option>
-        <option v-for="item in items" :key="item.id" :value="item.id">{{ formatDuration(speedup.duration(item.type, item.id) / 1000) }} · {{ item.quantity }} available</option>
+        <option v-for="item in items" :key="item.id" :value="item.id">{{ formatDuration((speedup.duration(item.type, item.id) || 0) / 1000) }} · {{ item.quantity }} available</option>
       </select>
       <input v-model.number="amount" type="number" min="1" :max="maxAmount" :disabled="waiting" aria-label="Speedup quantity" class="w-16 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1" />
       <button type="button" :disabled="!quote || waiting" class="cursor-pointer rounded bg-blue-600 px-2 py-1 text-white disabled:opacity-50 disabled:cursor-not-allowed" @click="review">Review speedup</button>

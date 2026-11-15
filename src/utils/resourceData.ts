@@ -149,16 +149,9 @@ export function resourceLabel(entry: ResourceEntry | undefined): string {
     return worldMaterialNames[itemId];
   }
 
-  // Lookup in typed nameData or fallback nameMap
-  const resolved = (typeof getItemName === 'function' ? getItemName(type, itemIdStr || itemId) : null)
-    || (globalThis as any).hwaHelperNameMap?.item?.(type, itemIdStr || itemId);
+  // Lookup in typed nameData (which already checks local names and fallbacks)
+  const resolved = typeof getItemName === 'function' ? getItemName(type, itemIdStr || itemId) : null;
   if (resolved) return resolved;
-
-  // Lookup in nameData dictionary fallback
-  const nameData = (globalThis as any).hwaHelperNameData?.names;
-  if (nameData?.[type]?.[itemIdStr]) {
-    return nameData[type][itemIdStr];
-  }
 
   if (entry?.data?.label) {
     return entry.data.label;

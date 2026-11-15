@@ -218,9 +218,7 @@ export function planNextStep(
       nextItem.currentLevel !== undefined ? Number(nextItem.currentLevel) : nextLvl > 1 ? nextLvl - 1 : 0;
     const durationMs =
       Number(nextItem.durationMs) ||
-      ((globalThis as any).hwaHelperResearchData?.calculateEffectiveDurationMs
-        ? (globalThis as any).hwaHelperResearchData.calculateEffectiveDurationMs(rId, nextLvl)
-        : calculateEffectiveDurationMs(rId, nextLvl)) ||
+      calculateEffectiveDurationMs(rId, nextLvl) ||
       1000;
 
     calls.push({

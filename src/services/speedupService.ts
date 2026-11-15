@@ -56,10 +56,7 @@ export function suggestedAmount(
 }
 
 export function duration(type: string, id: number | string): number | undefined {
-  return (
-    getSpeedupDuration(type as SpeedupType, id) ??
-    (globalThis as any).hwaHelperSpeedupData?.durations?.[type]?.[id]
-  );
+  return getSpeedupDuration(type as SpeedupType, id) ?? undefined;
 }
 
 export function kindFor(call: any): SpeedupKind | undefined {

@@ -29,7 +29,7 @@ import { getHeroName } from '../data/heroMetadata.ts';
  * Resolve readable name for a hero ID
  */
 export function resolveHeroName(id: number | string): string {
-  const metaName = (globalThis as any).hwaHelperHeroMetadata?.[String(id)]?.name || getHeroName(id);
+  const metaName = getHeroName(id);
   if (metaName && !metaName.startsWith('Hero #')) return metaName;
   const nameMap = (globalThis as any).hwaHelperNameMap;
   if (typeof nameMap?.hero === 'function') {

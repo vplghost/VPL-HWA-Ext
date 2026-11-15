@@ -147,11 +147,7 @@ export function getQueueEnd(q: any, now = Date.now()): number {
 }
 
 export function normalizeQueuedItem<T extends Partial<BuildingQueueItem>>(item: T): T {
-  return (
-    normalizeQueuedDuration(item) ??
-    (globalThis as any).hwaHelperBuildingData?.normalizeQueuedDuration?.(item) ??
-    item
-  );
+  return normalizeQueuedDuration(item) ?? item;
 }
 
 export function calculateQueueTimeline(
@@ -294,7 +290,6 @@ export function planNextStep(
     const durationMs =
       Number(nextItem.durationMs) ||
       calculateEffectiveDurationMs(bId, nextLvl) ||
-      (globalThis as any).hwaHelperBuildingData?.calculateEffectiveDurationMs?.(bId, nextLvl) ||
       60000;
 
     calls.push({

@@ -41,23 +41,19 @@ export interface TitanMeta {
 }
 
 export function getHeroMetadata(heroId: number | string): HeroMeta | undefined {
-  const meta = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperHeroMetadata?.[String(heroId)])
-    ?? getTypedHeroMetadata(heroId);
-  return (meta as HeroMeta) || undefined;
+  return getTypedHeroMetadata(heroId) as HeroMeta | undefined;
 }
 
 export function getAllHeroMetadata(): Record<string, HeroMeta> {
-  return (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperHeroMetadata) || (heroMetadata as any);
+  return heroMetadata as any;
 }
 
 export function getTitanMetadata(titanId: number | string): TitanMeta | undefined {
-  const meta = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanMetadata?.[String(titanId)])
-    ?? getTypedTitanMetadata(titanId);
-  return (meta as TitanMeta) || undefined;
+  return getTypedTitanMetadata(titanId) as TitanMeta | undefined;
 }
 
 export function getAllTitanMetadata(): Record<string, TitanMeta> {
-  return (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanMetadata) || (titanMetadata as any);
+  return titanMetadata as any;
 }
 
 export function getHeroEquipmentRank(color: number | string) {
@@ -112,8 +108,7 @@ export function getItemName(category: string, id: number | string): string {
   const typedItem = typeof typedGetItemName === 'function' ? typedGetItemName(category, strId) : null;
   if (typedItem) return typedItem;
   const nameMap = (globalThis as any).hwaHelperNameMap;
-  const nameData = (globalThis as any).hwaHelperNameData?.names;
-  return nameData?.[category]?.[strId] || nameMap?.item?.(category, strId) || `${category} #${strId}`;
+  return nameMap?.item?.(category, strId) || `${category} #${strId}`;
 }
 
 export function downloadJson(filename: string, data: any) {
@@ -132,8 +127,7 @@ export function downloadJson(filename: string, data: any) {
 export function getHeroName(heroId: number | string): string {
   const meta = getHeroMetadata(heroId);
   if (meta?.name) return meta.name;
-  const nameMap = (globalThis as any).hwaHelperNameMap;
-  return nameMap?.hero?.(heroId) || `Hero #${heroId}`;
+  return `Hero #${heroId}`;
 }
 
 export function getGearCraftData(gearId: number | string) {
@@ -141,17 +135,11 @@ export function getGearCraftData(gearId: number | string) {
 }
 
 export function getBuildingName(id: number | string): string {
-  const typedBuilding = typeof typedGetBuildingName === 'function' ? typedGetBuildingName(id) : null;
-  if (typedBuilding) return typedBuilding;
-  const nameMap = (globalThis as any).hwaHelperNameMap;
-  return nameMap?.building?.(id) || (id ? `Building #${id}` : 'Building');
+  return typedGetBuildingName(id) || (id ? `Building #${id}` : 'Building');
 }
 
 export function getResearchName(id: number | string): string {
-  const typedResearch = typeof typedGetResearchName === 'function' ? typedGetResearchName(id) : null;
-  if (typedResearch) return typedResearch;
-  const nameMap = (globalThis as any).hwaHelperNameMap;
-  return nameMap?.research?.(id) || (id ? `Research #${id}` : 'Research');
+  return typedGetResearchName(id) || (id ? `Research #${id}` : 'Research');
 }
 
 export { buildGearRecipeTree, findFirstUnfulfilledNode } from './recipeTree.ts';

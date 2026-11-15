@@ -91,17 +91,17 @@ export const routeSpeeds: RouteSpeedsMap = {
 
 export function getMineResourceType(configId: number | string | null | undefined): BasicResourceType | undefined {
   if (configId == null) return undefined;
-  return mineTypes[String(configId)] || (globalThis as any).hwaHelperMineTypes?.[String(configId)];
+  return mineTypes[String(configId)];
 }
 
 export function getRallyTargetName(configId: number | string | null | undefined): string | undefined {
   if (configId == null) return undefined;
-  return rallyTargets[String(configId)] || (globalThis as any).hwaHelperRallyTargets?.[String(configId)];
+  return rallyTargets[String(configId)];
 }
 
 export function getRouteSpeed(routeType: string | null | undefined): number | undefined {
   if (!routeType) return undefined;
-  return routeSpeeds[routeType] ?? (globalThis as any).hwaHelperRouteSpeeds?.[routeType];
+  return routeSpeeds[routeType];
 }
 
 // Preserve backward compatibility for background service worker scripts and VM tests

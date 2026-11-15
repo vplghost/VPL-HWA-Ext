@@ -19,6 +19,15 @@
   - Updated `refreshTroops` in `useSquadTeams.ts` to include `getMarches` alongside `getUnitSummary` and `heroGetAll`.
   - Added unit test suite `tests/status-alert-banner.test.mjs` verifying banner states and RPC dispatches.
 
+### Refactored
+
+- **Unified Single Source of Truth & Cleaned Redundant Fallback Chains**:
+  - Removed duplicate `(globalThis as any).hwaHelperSpeedupData?.durations` check in `speedupService.duration()` since `getSpeedupDuration()` already encapsulates data and fallback resolution.
+  - Streamlined `freeAlchemyAvailability` in `src/utils/freeAlchemySpin.ts` to re-export the typed implementation directly.
+  - Simplified `speedup`, `mail`, and `towerRules` utilities to reference primary typed services directly without redundant global fallbacks.
+  - Cleaned redundant global map/name fallbacks in `src/utils/marchRules.ts`, `src/utils/marchTooltip.ts`, `src/utils/metadata.ts`, and `src/utils/resourceData.ts`.
+  - Replaced duplicate duration calculations in `buildingQueue.ts` and `researchQueue.ts` to rely solely on primary `calculateEffectiveDurationMs` and `normalizeQueuedDuration`.
+
 ## 0.11.0 — 2026-11-15
 
 ### Added
