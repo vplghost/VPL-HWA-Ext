@@ -427,7 +427,10 @@
       if (!Array.isArray(request.calls)) return [];
       // Some RPC failures are top-level, with the rejected call attached.
       const failedCall = response.error?.call;
-      const failureMatches = ['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(failedCall?.name) &&
+      const speedupFailure = globalThis.hwaHelperSpeedup?.validate(failedCall) && request.calls.some(call =>
+        call.ident && call.ident === failedCall.ident && call.name === failedCall.name && call.feature === failedCall.feature &&
+        JSON.stringify(call.args) === JSON.stringify(failedCall.args));
+      const failureMatches = speedupFailure || ['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(failedCall?.name) &&
         request.calls.some(call => call.ident && call.ident === failedCall.ident &&
           call.name === failedCall.name && !call.feature && !failedCall.feature &&
           (call.name === 'refillable_alchemyUseVideo'
@@ -446,6 +449,16 @@
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
         const result = results.get(call.ident);
+        const speedup = globalThis.hwaHelperSpeedup?.validate(call);
+        if (speedup && call.ident && result) {
+          const code = result.errorCode ?? result.response?.errorCode;
+          const error = result.error || result.response?.error || (code != null && code !== 0 && code !== '0' ? code : null);
+          const success = !error && result.response != null && typeof result.response === 'object' && !Array.isArray(result.response) && Object.keys(result.response).length === 0;
+          if (!success && !error) return []; // Missing/unknown acknowledgement is not a rejection and cannot release a spend lock.
+          return [{ key: 'speedupAction', method: call.name, feature: call.feature, group: 'internal',
+            data: { token: call.ident, call, kind: speedup.kind, item: speedup.item, totalMs: speedup.totalMs, success,
+              error: success ? null : String(error?.description || error?.message || error?.name || error || 'No confirmed speedup response').slice(0, 200) }, updatedAt: record.timestamp }];
+        }
         if (result?.error && ['createRally:mob', 'attackMine:mine', 'getRallyById:rally'].includes(key)) return [];
         if (key === 'searchMob:mob' && call.args?.mobType === 'rally' &&
             (Array.isArray(result?.response?.mobs) || (result?.response?.mobs && typeof result.response.mobs === 'object'))) {
@@ -1771,7 +1784,10 @@
           });
         }
         if (key === 'getInventory:inventory' && Array.isArray(result?.response?.inventory?.items)) {
-          return inventoryResources(result.response.inventory.items, record, call.name);
+          return [...(globalThis.hwaHelperSpeedupData ? [{ key: 'speedupInventoryAction', method: call.name, feature: call.feature, group: 'internal',
+            data: result.response.inventory.items.filter(item => globalThis.hwaHelperSpeedupData?.durations[item?.type] &&
+              Number.isSafeInteger(item.id) && Number.isSafeInteger(item.quantity) && item.quantity >= 0), updatedAt: record.timestamp }] : []),
+            ...inventoryResources(result.response.inventory.items, record, call.name)];
         }
         if (call.name === 'inventoryGet' && result?.response) {
           const entries = [];
@@ -2226,6 +2242,10 @@
           delete next.expeditionGet;
           delete next.freeAlchemySpinStatus;
           delete next.freeAlchemySpinReceipts;
+          delete next.speedupInventory;
+          delete next.speedupStatus;
+          delete next.speedupReceipts;
+          next.speedupAccountEpoch = { key: 'speedupAccountEpoch', data: { accountId: String(entry.data.id) }, updatedAt: entry.updatedAt };
           delete next['resource:refillable:53'];
           changed = true;
         }
@@ -2361,6 +2381,63 @@
           }
           next.expeditionStatus = { key: 'expeditionStatus', method: entry.method, group: 'header',
             data: { rows, accountId: String(accountId) }, updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'speedupInventoryAction') {
+          const accountId = next.accountStatus?.data?.id;
+          if (accountId == null || next.speedupAccountEpoch?.updatedAt > entry.updatedAt || next.speedupInventory?.updatedAt > entry.updatedAt) continue;
+          next.speedupInventory = { key: 'speedupInventory', method: entry.method, feature: entry.feature, group: 'internal',
+            data: { accountId: String(accountId), items: entry.data, observedAt: entry.updatedAt }, updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'speedupAction') {
+          const helper = globalThis.hwaHelperSpeedup, accountId = next.accountStatus?.data?.id;
+          const seen = normalizeArrayData(next.speedupReceipts?.data);
+          if (!helper || accountId == null || next.speedupAccountEpoch?.updatedAt > entry.updatedAt || seen.some(row => row.token === entry.data.token)) continue;
+          next.speedupReceipts = { key: 'speedupReceipts', group: 'internal', data: [...seen, { token: entry.data.token, at: entry.updatedAt,
+            accountId: String(accountId), success: entry.data.success, error: entry.data.error }].slice(-200), updatedAt: entry.updatedAt };
+          const data = entry.data, def = helper.kinds[data.kind], args = data.call.args;
+          let appliedTimer = false;
+          if (data.success) {
+            const statusKey = data.kind === 'healing' ? (next['getHealing:unit'] ? 'getHealing:unit' : 'getHealing') : def.status;
+            const previous = next[statusKey];
+            const snapshotInBatch = entries.some(item => item !== entry && item.key === statusKey && !item.data?.action && item.updatedAt >= entry.updatedAt);
+            if (previous && previous.updatedAt <= entry.updatedAt && !snapshotInBatch) {
+              const eligible = row => Number.isFinite(row?.startDate) && row.startDate <= Date.parse(entry.updatedAt) &&
+                Number.isFinite(row.durationMs ?? row.duration) && (data.kind === 'healing' || row[def.id] === args[def.id] && (row.level ?? row.nextLevel) === args.nextLevel);
+              const shorten = row => {
+                if (!eligible(row)) return row;
+                appliedTimer = true;
+                const ms = Math.max(0, (row.durationMs ?? row.duration) - data.totalMs);
+                return { ...row, ...(data.kind === 'healing' ? { duration: ms } : { durationMs: ms, ...(row.duration != null ? { duration: ms } : {}) }) };
+              };
+              const updated = data.kind === 'healing' ? { ...previous.data, healing: shorten(previous.data.healing) }
+                : { ...previous.data, queues: normalizeArrayData(previous.data.queues).map(shorten) };
+              if (appliedTimer) next[statusKey] = { ...previous, data: updated, updatedAt: entry.updatedAt };
+            }
+            const inventorySnapshot = entries.some(item => item.key === 'speedupInventoryAction' && item.updatedAt >= entry.updatedAt);
+            const inventory = next.speedupInventory;
+            if (!inventorySnapshot && String(inventory?.data?.accountId) === String(accountId) && inventory.updatedAt <= entry.updatedAt) {
+              next.speedupInventory = { ...inventory, data: { ...inventory.data, items: inventory.data.items.map(item => item.type === data.item.type && item.id === data.item.id
+                ? { ...item, quantity: Math.max(0, item.quantity - data.item.amount) } : item) }, updatedAt: entry.updatedAt };
+            }
+            const resourceKey = `resource:${data.item.type}:${data.item.id}`;
+            const resourceSnapshot = entries.some(item => item.key === resourceKey && item.updatedAt >= entry.updatedAt);
+            if (!resourceSnapshot && !inventorySnapshot) {
+              const actions = resourceAction(record, data.call, `${data.item.type}:${data.item.id}`, -data.item.amount);
+              actions.forEach(action => { action.data.requireSnapshot = true; });
+              entries.push(...actions);
+            }
+            const raw = next['getInventory:inventory'];
+            if (!inventorySnapshot && raw?.data?.inventory?.items && raw.updatedAt <= entry.updatedAt) {
+              next['getInventory:inventory'] = { ...raw, data: { ...raw.data, inventory: { ...raw.data.inventory,
+                items: raw.data.inventory.items.map(item => item.type === data.item.type && item.id === data.item.id ? { ...item, quantity: Math.max(0, item.quantity - data.item.amount) } : item) } }, updatedAt: entry.updatedAt };
+            }
+          }
+          if (!next.speedupStatus || next.speedupStatus.updatedAt <= entry.updatedAt) next.speedupStatus = { key: 'speedupStatus', method: entry.method, group: 'internal',
+            data: { ...data, accountId: String(accountId), appliedTimer }, updatedAt: entry.updatedAt };
           changed = true;
           continue;
         }

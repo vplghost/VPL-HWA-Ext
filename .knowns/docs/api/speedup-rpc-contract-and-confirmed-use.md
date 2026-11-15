@@ -1,0 +1,51 @@
+---
+id: doc-d282129eb826b265d46f9db02558b4c6
+title: Speedup RPC contract and confirmed use
+description: Captured dedicated speedup payloads, timer/item reconciliation, mandatory confirmation and missing training/exchange evidence.
+createdAt: '2026-11-15T03:59:28.988Z'
+updatedAt: '2026-11-15T05:50:10.085Z'
+tags: []
+---
+
+# Speedup RPC contract and confirmed use
+
+Implemented by @task-VHE-HHPR1K in0.10.93.
+
+## Evidence and units
+
+Source: temp/tracking-data/hwa-game-record-202611151039_user_speedup.json, extension0.10.91/client1.293.1010, SHA2567b1bf945ec5e8d4ad2c9e747b9853d9e3b6405f14360895709a3825877222826. Sanitized exact action records and building/research queue baselines are packaged in tests/fixtures/speedup-20261115.json; initial healing/inventory baselines in tests are explicitly synthetic because this capture does not supply them.
+
+Timeline9 at03:38:51.911Z: speedUpHealingWithResources:unit sends speedUpDuration600000, resourcesToSpend[{type:speedUpUnitHealing,id:2,amount:2}], resourcesToReward[]. Timeline26 at03:39:06.542Z: speedUpConstructionWithResources:building sends buildingId20,nextLevel21,speedUpDate1794713945573 and one speedUpConstruction1. Timeline67 at03:39:32.755Z: speedUpResearchWithResources:personalResearch sends researchId122,nextLevel4,speedUpDate1794713971852 and three speedUpResearch1. Each response is exactly result.response:{}; errors or unknown response shapes cannot prove success.
+
+speedUpDuration and queue durations are milliseconds. speedUpDate is the client action epoch timestamp, not the new finish time. Before construction speedup, startDate1794690792715 and durationMs223381200 are observed; research has startDate1794708775871,durationMs25689600. For a matching confirmed action, subtract sum(item durationMs × count) from the existing duration, clamped at zero; preserve startDate. The resulting finish is old startDate + shortened duration. Healing uses the same reduction on healing.duration and retains healing/units/injuries until existing completeHealing collects it. Speedup never itself advances a building/research level or releases troops.
+
+scripts/generate-speedup-data.mjs validates MD5 filenames from the captured remote index for cached speedUpConstruction/speedUpResearch/speedUpUnitHealing configs and packages extension/speedup-data.js. All three tables give IDs1/2/3/4/5 durations1m/5m/1h/3h/8h. Runtime uses only packaged data. No CDN fetch or inferred exchange rate is used.
+
+## Passive reconciliation
+
+rpc-cache extracts only the observed dedicated-item, single-resource, empty-reward payloads with exact method/feature/fields and valid quantities. Native calls are observed without requiring helper confirmation, because their own game UI is outside this extension. Matching correlated top-level errors settle rejection; absent/unknown acknowledgements do not manufacture a receipt. Account-scoped receipts are bounded200, timer mutation is idempotent, and existing resourceAction history protects item deltas. Unknown item counts are not fabricated.
+
+A newer or same-batch authoritative queue/healing/inventory snapshot takes precedence over a derived delta. Target ID/nextLevel and run start time prevent an old speedup from shortening a replacement run. Account changes clear speedup inventory/status/receipts and retain an epoch guard against old-account replay. Known canonical resource amounts and raw world inventory follow the exact spend; full getInventory snapshots populate account-scoped speedupInventory. Successful native/helper observations trigger shared-policy getInventory plus the affected summary/healing reads; city queues reconcile from their canonical timer model.
+
+## Mandatory confirmation and pending ownership
+
+SpeedupControl appears in active Building and Research queue rows and the Dashboard Hospital area. Review opens a separate Confirm speedup use dialog naming the target, item duration, quantity, total reduction, estimated finish and irreversible consumption. Review, Cancel and closing never send a spend. Every new spend requires another explicit confirmation. Changed target/run, stock, account or time invalidates the quote.
+
+The background is the single owner of speedupSpendState. It rechecks the quote, stock, timer, account observed by the game bridge and current shared RPC settings immediately before dispatch. Generic refresh-rpc cannot issue speedups. A persisted mutation token is retained through MAIN Direct/Piggyback and matched against the exact receipt, so a native or unrelated result cannot unlock it. Across popups, worker restart, queued acknowledgement, transport error or timeout, an uncertain pending spend is not retried or silently released. Cold worker startup reconciles an already-cached matching receipt. An account switch drops the old queued group. No automation runs speedups.
+
+Stock and target must have observations within two minutes; Refresh items & timer requests current data explicitly. The UI permits only quantities within current stock and remaining time, because overrun/refund semantics have not been captured. Training, universal/mixed items and nonempty resourcesToReward remain unimplemented pending @task-VHE-4MAJ4H. No paid currency, purchase or reward/refund payload is guessed.
+
+## Verification
+
+Tests/speedup.test.mjs replays all three action captures, verifies units, exact stock, duplicate/stale/account/same-batch precedence and missing acknowledgements, and executes actual control confirmation/cancellation/invalidation. Tests/speedup-background.test.mjs proves shared serialized pending, persisted restart, transport uncertainty, settings/account/stock/target validation and generic-refresh rejection. Tests/intercept.test.mjs proves exact payload/token preservation and single use in Direct/Piggyback.
+
+Real Chrome acceptance uses local HTTP fixtures only: docs/acceptance/speedup-2026-11-15.json, extension0.10.93. Both Direct and Piggyback prove Review/Cancel spends0, Confirm sends1, stock3→2, timer reduced60000ms and pending cleared. No runtime errors and no live-account completion claim. Full834 tests:822 passed,12 optional private-log skips; typecheck and production build passed.
+
+
+## Compact controls and suggested quantities (0.10.94)
+
+@task-VHE-YX63BV replaces the default expanded controls with borderless fast-forward SVG buttons. Building/Research buttons sit immediately after the progress percentage; Hospital buttons follow each active healing timer. Clicking opens a form at stackLevel70 above the parent dialog. Review still opens mandatory confirmation at stackLevel80. Escape closes only the current speedup layer through a capture-phase handler; the parent remains open. Cancelling confirmation returns to the form, without spending.
+
+User confirmed on2026-11-15 that minus one means the number of items sufficient to finish minus one item, rather than reserving one second. Suggested amount = min(owned stock, max(0, ceil(remainingMs / itemDurationMs) - 1)). Recompute when opening the form or selecting an item; manual quantity remains adjustable under existing stock/time/revalidation guards. Ten minutes remaining with five-minute items suggests1; eleven minutes suggests2; if only1 is owned, use1. Zero/unknown/invalid choices cannot send a mutation. Merely opening, changing an option or accepting the suggestion never spends; explicit Review and Confirm are still required.
+
+Chrome local-fixture evidence: docs/acceptance/speedup-compact-2026-11-15.json, extension0.10.94, Direct and Piggyback. Default forms are absent; borderless Building/Research icons align with progress and Hospital icon with timer; the form overlays its parent and Escape preserves that parent. Insufficient stock auto-fills3 items; cancellation spends0, final confirmation sends1request for3items, stock3→0 and timer−180000ms. Existing unknown-acknowledgement/persisted pending safeguards are unchanged.

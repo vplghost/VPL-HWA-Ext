@@ -1,6 +1,7 @@
 importScripts('tracking-filter.js');
 importScripts('refillable-rules.js');
 importScripts('free-alchemy.js');
+importScripts('speedup-data.js', 'speedup.js');
 importScripts('clan-versus-rules.js');
 importScripts('mission-costs.js');
 importScripts('march-rules.js');
@@ -807,7 +808,10 @@ try {
   setupQueueAlarms();
 } catch (_) {}
 
-pending = pending.then(() => runFreeSpin()).catch(() => {});
+pending = pending.then(async () => {
+  await reconcileSpeedup((await chrome.storage.local.get('rpcCache')).rpcCache);
+  return runFreeSpin();
+}).catch(() => {});
 
 chrome.storage.onChanged?.addListener?.((changes, area) => {
   if (area === 'local' && ['autoFreeSpinEnabled', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some(key => key in changes)) {
@@ -991,6 +995,55 @@ async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType = null;
 let lastAutoGatherPendingLevel = null;
+
+async function reconcileSpeedup(cache) {
+  const stored = await chrome.storage.local.get('speedupSpendState');
+  const state = stored.speedupSpendState;
+  if (!state?.pending || cache?.accountStatus?.data?.id == null) return;
+  const receipt = globalThis.hwaHelperSpeedup.list(cache.speedupReceipts?.data).find(row => row.token === state.pending.token);
+  if (String(cache?.accountStatus?.data?.id) !== String(state.accountId)) {
+    if (state.tabId) await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: 'manual-speedup' }).catch(() => {});
+    await chrome.storage.local.set({ speedupSpendState: { accountId: cache?.accountStatus?.data?.id, pending: null, message: 'Account changed. Refresh speedup inventory.' } });
+  } else if (receipt && String(receipt.accountId) === String(state.accountId) && Date.parse(receipt.at) >= state.pending.sentAt) {
+    await chrome.storage.local.set({ speedupSpendState: { ...state, pending: null,
+      message: receipt.success ? 'Speedup confirmed by game.' : receipt.error || 'Speedup rejected by game.' } });
+  }
+}
+
+async function useConfirmedSpeedup(message) {
+  const stored = await chrome.storage.local.get(['rpcCache', 'speedupSpendState', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  const cache = stored.rpcCache || {}, helper = globalThis.hwaHelperSpeedup;
+  await reconcileSpeedup(cache);
+  const state = (await chrome.storage.local.get('speedupSpendState')).speedupSpendState;
+  if (message.confirmed !== true) return { ok: false, error: 'Confirm the item spend before using speedup.' };
+  if (state?.pending) return { ok: false, error: 'A speedup is awaiting game confirmation. Do not resend it.' };
+  if (!rpcMessageForSettings(stored, [])) return { ok: false, error: 'Speedup paused by shared RPC settings.' };
+  const request = message.quote, now = Date.now();
+  const current = helper.quote(cache, request?.kind, request?.targetId, request?.itemId, request?.amount, now);
+  if (!current || helper.signature(current) !== helper.signature(request)) return { ok: false, error: 'Target, inventory or remaining time changed. Refresh and confirm again.' };
+  const tab = await findActiveGameTab();
+  if (!tab?.id) return { ok: false, error: 'Open the game before using speedup.' };
+  const context = await chrome.tabs.sendMessage(tab.id, { kind: 'game-account-context' }).catch(() => null);
+  if (!context?.ok || String(context.accountId) !== current.accountId) return { ok: false, error: 'Refresh the game to verify the current account.' };
+  const latest = await chrome.storage.local.get(['rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  const sentAt = Date.now(), finalQuote = helper.quote(latest.rpcCache || {}, request.kind, request.targetId, request.itemId, request.amount, sentAt);
+  if (!finalQuote || helper.signature(finalQuote) !== helper.signature(request) || !rpcMessageForSettings(latest, [])) {
+    return { ok: false, error: 'Target, inventory, remaining time or RPC settings changed. Review and confirm again.' };
+  }
+  const call = helper.buildCall(finalQuote, sentAt);
+  if (!call) return { ok: false, error: 'Unsupported speedup request.' };
+  const token = crypto.randomUUID().replaceAll('-', '');
+  call.ident = token;
+  const dispatch = rpcMessageForSettings(latest, [call]);
+  const next = { accountId: current.accountId, tabId: tab.id, pending: { token, call, sentAt },
+    message: 'Speedup requested. Waiting for game confirmation; do not resend.' };
+  await chrome.storage.local.set({ speedupSpendState: next });
+  try { await chrome.tabs.sendMessage(tab.id, { ...dispatch, group: 'manual-speedup', expiresAt: sentAt + 30000 }); }
+  catch (_) {
+    return { ok: false, error: 'Speedup transport uncertain. Pending request retained; refresh game data before continuing.' };
+  }
+  return { ok: true, queued: dispatch.kind === 'queue-rpc' };
+}
 
 async function runFreeSpin(manual = false, record = null, sourceTabId = null) {
   const stored = await chrome.storage.local.get(['autoFreeSpinEnabled', 'autoFreeSpinState', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
@@ -1424,6 +1477,16 @@ async function handleControl(kind) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.kind === 'speedup-use' && sender.url?.startsWith('chrome-extension://' + chrome.runtime.id + '/')) {
+    pending = pending.then(() => useConfirmedSpeedup(message));
+    pending.then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
+  if (message?.kind === 'refresh-rpc' && message.calls?.some(call => /^speedUp.*WithResources$/.test(call?.name))) {
+    sendResponse({ ok: false, error: 'Use the speedup confirmation dialog for item spending.' });
+    return false;
+  }
   const freeManual = message?.kind === 'free-alchemy-spin' || message?.kind === 'refresh-rpc' &&
     message.calls?.length === 1 && message.calls[0]?.name === 'refillable_alchemyUseVideo' &&
     !message.calls[0].feature && message.calls[0].args?.type === 'alchemy' && Object.keys(message.calls[0].args).length === 1;
@@ -2108,6 +2171,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id);
     if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id);
     if (sender.tab?.id) await runFreeSpin(false, record, sender.tab.id);
+    await reconcileSpeedup(cacheResult.cache);
+    if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
+        cacheResult.cache.speedupStatus?.updatedAt === record.timestamp && cacheResult.cache.speedupStatus.data?.success) {
+      const calls = globalThis.hwaHelperSpeedup.refreshCalls(cacheResult.cache.speedupStatus.data.kind);
+      const dispatch = rpcMessageForSettings(stored, calls);
+      if (dispatch) chrome.tabs.sendMessage(sender.tab.id, { ...dispatch, group: 'speedup-refresh' }).catch(() => {});
+    }
     if (stored.popupRpcEnabled === true && sender.tab?.id) {
       const calls = socketRefreshCalls(record, cacheResult.cache);
       const dispatch = rpcMessageForSettings(stored, calls);

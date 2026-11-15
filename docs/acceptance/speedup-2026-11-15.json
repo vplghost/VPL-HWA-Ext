@@ -1,0 +1,26 @@
+{
+  "localFixtureOnly": true,
+  "modes": [
+    {
+      "mode": "direct",
+      "confirmationBeforeSpend": true,
+      "cancelSpent": 0,
+      "speedupRequests": 1,
+      "remainingItems": 2,
+      "reducedByMs": 60000,
+      "pendingCleared": true
+    },
+    {
+      "mode": "piggyback",
+      "confirmationBeforeSpend": true,
+      "cancelSpent": 0,
+      "speedupRequests": 1,
+      "remainingItems": 2,
+      "reducedByMs": 60000,
+      "pendingCleared": true
+    }
+  ],
+  "errors": [],
+  "extension": "0.10.93",
+  "passed": true
+}

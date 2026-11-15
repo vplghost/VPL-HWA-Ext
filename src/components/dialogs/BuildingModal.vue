@@ -5,6 +5,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getBuildingName } from '@/src/utils/metadata';
 import { formatDuration, formatFinishTime } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
+import SpeedupControl from '@/src/components/common/SpeedupControl.vue';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -627,8 +628,9 @@ async function refreshBuildings() {
 
               <div class="mt-3">
                 <div class="flex justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
-                  <span>
+                  <span class="inline-flex items-center gap-1">
                     Progress: {{ Math.min(100, Math.max(0, ((now - q.startDate) / q.durationMs) * 100)).toFixed(1) }}%
+                    <SpeedupControl kind="building" :target-id="q.buildingId" :target-label="getBuildingName(q.buildingId)" />
                   </span>
                   <span>
                     Est. finish: {{ formatFinishTime(q.startDate + q.durationMs, now) }}

@@ -1,0 +1,38 @@
+{
+  "localFixtureOnly": true,
+  "modes": [
+    {
+      "mode": "direct",
+      "confirmationBeforeSpend": true,
+      "cancelSpent": 0,
+      "speedupRequests": 1,
+      "formHiddenByDefault": true,
+      "borderlessProgressIcon": true,
+      "escapePreservesParent": true,
+      "suggestedQuantity": 3,
+      "researchIconBesideProgress": true,
+      "healingIconBesideTimer": true,
+      "remainingItems": 0,
+      "reducedByMs": 180000,
+      "pendingCleared": true
+    },
+    {
+      "mode": "piggyback",
+      "confirmationBeforeSpend": true,
+      "cancelSpent": 0,
+      "speedupRequests": 1,
+      "formHiddenByDefault": true,
+      "borderlessProgressIcon": true,
+      "escapePreservesParent": true,
+      "suggestedQuantity": 3,
+      "researchIconBesideProgress": true,
+      "healingIconBesideTimer": true,
+      "remainingItems": 0,
+      "reducedByMs": 180000,
+      "pendingCleared": true
+    }
+  ],
+  "errors": [],
+  "extension": "0.10.94",
+  "passed": true
+}

@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../extension/intercept.js', import.meta.url), 'utf8');
 const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
+const speedupSource = await readFile(new URL('../extension/speedup-data.js', import.meta.url), 'utf8') + '\n' + await readFile(new URL('../extension/speedup.js', import.meta.url), 'utf8');
 
 function setup(fetchImplementation, enable = true, extraContext = {}) {
   const messages = [];
@@ -55,7 +56,7 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
     ...extraContext
   };
   context.window = window;
-  runInNewContext(`${filterSource}\n${source}`, context);
+  runInNewContext(`${filterSource}\n${speedupSource}\n${source}`, context);
   if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true,
     popupRpcEnabled: true },
     'https://www.hero-wars-alliance.com');
@@ -675,6 +676,31 @@ test('expedition collection accepts only the exact ID payload and piggybacks onc
   }
 });
 
+for (const mode of ['direct', 'piggyback']) test(`confirmed speedup payload crosses ${mode} once with its correlation token intact`, async () => {
+  const batches = [], origin = 'https://www.hero-wars-alliance.com';
+  const { window } = setup(async (_url, options) => {
+    const calls = JSON.parse(options.body).calls; batches.push(calls);
+    return new Response(JSON.stringify({ results: calls.map(call => ({ ident: call.ident, result: { response: {} } })) }), { status: 200 });
+  }, true, { Response, Headers });
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', popupRpcEnabled: true, socketRefreshMode: mode }, origin);
+  const call = { name: 'speedUpHealingWithResources', feature: 'unit', ident: '0123456789abcdef0123456789abcdef',
+    args: { speedUpDuration: 600000, resourcesToSpend: [{ type: 'speedUpUnitHealing', id: 2, amount: 2 }], resourcesToReward: [] } };
+  const post = calls => window.postMessage({ source: 'hwa-helper-control', kind: mode === 'direct' ? 'refresh-rpc' : 'queue-rpc', calls }, origin);
+  for (const mutate of [call => { delete call.ident; }, call => { call.args.speedUpDuration = 600; },
+    call => { call.feature = 'building'; }, call => { call.args.resourcesToSpend[0].type = 'speedUpUniversal'; }]) {
+    const bad = structuredClone(call); mutate(bad); post([bad]);
+  }
+  assert.equal(batches.length, 0);
+  post([call]);
+  const carrier = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', { method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] }) });
+  if (mode !== 'direct') await carrier();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const sent = batches.flat().filter(row => row.name === call.name);
+  assert.equal(sent.length, 1); assert.equal(sent[0].ident, call.ident);
+  assert.deepEqual(sent[0].args, call.args);
+  await carrier(); assert.equal(batches.flat().filter(row => row.name === call.name).length, 1);
+});
+
 test('Direct expedition start accepts only the observed bounded hero payload', async () => {
   const sent = [];
   const { window } = setup(async (_url, options) => {
@@ -686,7 +712,8 @@ test('Direct expedition start accepts only the observed bounded hero payload', a
   const post = calls => window.postMessage({ source: 'hwa-helper-control', kind: 'refresh-rpc', calls }, origin);
   post(['artifact_expeditionStart']);
   for (const args of [{ expeditionId: 1, heroes: [1, 1] }, { expeditionId: 1, heroes: [1], buy: true },
-    { expeditionId: -1, heroes: [] }, { expeditionId: 1, heroes: [1, 2, 3, 4, 5, 6] }]) {
+    { expeditionId: -1, heroes: [] }, { expeditionId: 1, heroes: [1] }, { expeditionId: 1, heroes: [1, 2] },
+    { expeditionId: 1, heroes: [1, 2, 3] }, { expeditionId: 0, heroes: [16, 54, 79, 501] }, { expeditionId: 1, heroes: [1, 2, 3, 4, 5, 6] }]) {
     post([{ name: 'artifact_expeditionStart', args }]);
   }
   assert.equal(sent.length, 0);
@@ -706,6 +733,7 @@ test('expedition start piggybacks once with isolated result and expeditionGet is
   const post = calls => window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls }, 'https://www.hero-wars-alliance.com');
   post([{ name: 'expeditionGet', feature: 'other' }]);
   post([{ name: 'artifact_expeditionStart', args: { expeditionId: 4, heroes: [1, 1] } }]);
+  post([{ name: 'artifact_expeditionStart', args: { expeditionId: 0, heroes: [16, 54, 79, 501] } }]);
   const call = { name: 'artifact_expeditionStart', args: { expeditionId: 4, heroes: [15, 16, 72, 2, 56] } };
   post([call]); post([call]);
   const send = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {

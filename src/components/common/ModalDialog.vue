@@ -6,6 +6,7 @@ const props = defineProps<{
   title: string;
   icon?: string;
   maxWidth?: string;
+  stackLevel?: number;
 }>();
 
 const emit = defineEmits<{
@@ -18,6 +19,7 @@ function close() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    if (props.stackLevel != null) { e.stopPropagation(); e.stopImmediatePropagation(); }
     close();
   }
 }
@@ -26,15 +28,15 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      document.addEventListener('keydown', handleKeydown);
+      document.addEventListener('keydown', handleKeydown, props.stackLevel != null);
     } else {
-      document.removeEventListener('keydown', handleKeydown);
+      document.removeEventListener('keydown', handleKeydown, props.stackLevel != null);
     }
   }
 );
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown);
+  document.removeEventListener('keydown', handleKeydown, props.stackLevel != null);
 });
 </script>
 
@@ -45,6 +47,7 @@ onUnmounted(() => {
       role="dialog"
       aria-modal="true"
       :aria-label="title"
+      :style="stackLevel != null ? { zIndex: stackLevel } : undefined"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
 
     >

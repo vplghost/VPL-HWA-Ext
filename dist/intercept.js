@@ -44,6 +44,7 @@
   // Migrated refreshes are bounded by both method and feature. Do not turn
   // a method shared by multiple game features into an unrestricted RPC.
   const migratedReadFeatures = new Map([
+    ['getInventory', 'inventory'],
     ['getInfo', 'clanVersus'],
     ['getCampSummary', 'camp'],
     ['getMineSummary', 'mine'],
@@ -76,6 +77,9 @@
     'missionRaid', 'mission_raid', 'heroUpgradeSkill',
     'heroInsertItem', 'inventoryCraftFragments', 'inventoryCraftRecipe']);
   function isHelperAction(call) {
+    if (globalThis.hwaHelperSpeedup?.kindFor(call)) {
+      return Boolean(globalThis.hwaHelperSpeedup.validate(call) && /^[a-f0-9]{32}$/.test(call.ident || ''));
+    }
     if (call?.name === 'expeditionFarm') {
       return !call.feature && Object.keys(call.args || {}).length === 1 &&
         Number.isInteger(call.args?.expeditionId) && call.args.expeditionId >= 0;
@@ -83,7 +87,7 @@
     if (call?.name === 'artifact_expeditionStart') {
       return !call.feature && Object.keys(call.args || {}).length === 2 &&
         Number.isInteger(call.args?.expeditionId) && call.args.expeditionId >= 0 &&
-        Array.isArray(call.args.heroes) && call.args.heroes.length <= 5 &&
+        Array.isArray(call.args.heroes) && [0, 5].includes(call.args.heroes.length) &&
         call.args.heroes.every(id => Number.isInteger(id) && id > 0) &&
         new Set(call.args.heroes).size === call.args.heroes.length;
     }
@@ -283,6 +287,7 @@
         if (!(isClaim ? claimQueueMethods.has(call?.name) :
             isPiggybackRead(call) || isHelperAction(call))) continue;
         const safe = { name: call.name, args: call.args || {},
+          ...(globalThis.hwaHelperSpeedup?.kindFor(call) ? { ident: call.ident } : {}),
           ...(call.feature ? { feature: call.feature } : {}) };
         const key = JSON.stringify(safe);
         if (event.data.calls.some((item) => isHelperAction(item) || claimActionMethods.has(item?.name)) &&
@@ -361,7 +366,8 @@
       const calls = event.data.calls;
       const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null) || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
-      if (calls.some(call => ['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) && !isHelperAction(call))) return;
+      if (calls.some(call => (['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) ||
+          /^speedUp.*WithResources$/.test(call?.name)) && !isHelperAction(call))) return;
       let headersToUse = lastRpcHeaders;
       if (!headersToUse && typeof sessionStorage !== 'undefined') {
         try {
@@ -374,7 +380,7 @@
         calls: calls.map((c) => ({
           name: typeof c === 'string' ? c : c.name,
           args: (typeof c === 'object' && c.args) ? c.args : {},
-          ident: randHex() + randHex(),
+          ident: globalThis.hwaHelperSpeedup?.kindFor(c) ? c.ident : randHex() + randHex(),
           ...(typeof c === 'object' && c.feature ? { feature: c.feature } : {})
         }))
       };
@@ -1123,8 +1129,8 @@
         isHelperAction(call) || claimActionMethods.has(call.name));
       for (const [key, call] of queuedRpcCalls) {
         if (!existing.has(key) || (hasActions && isPiggybackRead(call))) {
-          const ident = Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16) +
-            Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16);
+          const ident = globalThis.hwaHelperSpeedup?.kindFor(call) ? call.ident :
+            Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16) + Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16);
           appended.push({ ...call, ident });
           if (queuedClaimKeys.has(key) && claimActionMethods.has(call.name)) claimIds.push(ident);
         } else if (queuedClaimKeys.has(key) && claimActionMethods.has(call.name)) {

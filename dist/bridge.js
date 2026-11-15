@@ -300,7 +300,7 @@ try {
 
 chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
   if (bridgeContextInvalidated) return;
-  if (message?.kind === 'free-spin-context') {
+  if (message?.kind === 'free-spin-context' || message?.kind === 'game-account-context') {
     sendResponse?.({ ok: true, accountId: freeSpinAccountId });
     return true;
   }

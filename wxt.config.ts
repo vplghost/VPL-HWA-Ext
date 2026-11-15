@@ -55,7 +55,7 @@ export default defineConfig({
           'https://www.hero-wars-alliance.com/*',
           'https://hero-wars-alliance.com/*',
         ],
-        js: ['tracking-filter.js', 'intercept.js', 'mqtt-capture.js'],
+        js: ['tracking-filter.js', 'speedup-data.js', 'speedup.js', 'intercept.js', 'mqtt-capture.js'],
         run_at: 'document_start',
         world: 'MAIN',
       },

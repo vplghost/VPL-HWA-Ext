@@ -3,7 +3,7 @@ id: doc-54006de1999a5f5836fbb35dc67d4d62
 title: Building and Research Queue Reconciliation
 description: Background ownership, queue acknowledgement, idle wake-up, correct wait timing, bounded RPC verification and visible failure logging.
 createdAt: '2026-11-13T08:50:14.091Z'
-updatedAt: '2026-11-13T16:49:09.548Z'
+updatedAt: '2026-11-15T04:00:05.944Z'
 tags:
   - building
   - research
@@ -70,3 +70,8 @@ A delayed successful start acknowledgement stores the request issue time as `las
 ## Multi-day metadata and saved queue estimates (2026-11-13)
 
 The Building metadata generator now parses server `[days.]hours:minutes:seconds` durations without losing day components. Exact legacy default estimates for affected saved automation targets are normalized in timeline/planner helpers and persisted by `runCityQueue` with a `repair` log. In-flight request payloads and authoritative server queue times are never rewritten. Research's898current duration values were audited and already correct. Both dialogs display days and include the date in finish estimates when it differs from today. Source hashes, Hall20→21 evidence, migration rules and regeneration: @doc/architecture/building-and-research-duration-units-and-day-components.
+
+
+## Confirmed manual speedups (0.10.93)
+
+@task-VHE-HHPR1K adds SpeedupControl to active Building/Research rows. Native or manually confirmed speedups shorten canonical queue duration without moving startDate or advancing levels; existing completion/reconciliation still owns finalization. Shared-policy inventory/summary reads follow a confirmed action. The exact payloads, units, snapshot precedence, persisted spend lock and mandatory confirmation are defined in @doc/api/speedup-rpc-contract-and-confirmed-use.

@@ -1,0 +1,56 @@
+{
+  "source": "hwa-game-record-202611151039_user_speedup.json",
+  "sha256": "7b1bf945ec5e8d4ad2c9e747b9853d9e3b6405f14360895709a3825877222826",
+  "baselines": {
+    "building": {
+      "updatedAt": "2026-11-15T03:39:06.011Z",
+      "queues": [
+        {
+          "buildingId": 20,
+          "nextLevel": 21,
+          "startDate": 1794690792715,
+          "durationMs": 223381200,
+          "duration": 223381200
+        }
+      ]
+    },
+    "research": {
+      "updatedAt": "2026-11-15T03:39:06.064Z",
+      "queues": [
+        {
+          "researchId": 122,
+          "level": 4,
+          "durationMs": 25689600,
+          "startDate": 1794708775871,
+          "queueNumber": 0
+        }
+      ]
+    }
+  },
+  "records": [
+    {
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-15T03:38:51.911Z",
+      "requestBody": "{\"calls\":[{\"name\":\"speedUpHealingWithResources\",\"args\":{\"speedUpDuration\":600000,\"resourcesToSpend\":[{\"type\":\"speedUpUnitHealing\",\"id\":2,\"amount\":2}],\"resourcesToReward\":[]},\"ident\":\"26836ff0df2b4f769df170a46eb63d86\",\"feature\":\"unit\"}]}",
+      "responseBody": "{\"results\":[{\"ident\":\"26836ff0df2b4f769df170a46eb63d86\",\"result\":{\"response\":{}}}],\"date\":1794713932.8263257}"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-15T03:39:06.542Z",
+      "requestBody": "{\"calls\":[{\"name\":\"speedUpConstructionWithResources\",\"args\":{\"buildingId\":20,\"resourcesToSpend\":[{\"type\":\"speedUpConstruction\",\"id\":1,\"amount\":1}],\"resourcesToReward\":[],\"speedUpDate\":1794713945573,\"nextLevel\":21},\"ident\":\"c866c2141da3466f8519e607e09fba24\",\"feature\":\"building\"}]}",
+      "responseBody": "{\"results\":[{\"ident\":\"c866c2141da3466f8519e607e09fba24\",\"result\":{\"response\":{}}}],\"date\":1794713947.4629896}"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "endpoint": "https://api.hero-wars-alliance.com/api/rpc",
+      "timestamp": "2026-11-15T03:39:32.755Z",
+      "requestBody": "{\"calls\":[{\"name\":\"speedUpResearchWithResources\",\"args\":{\"researchId\":122,\"resourcesToSpend\":[{\"type\":\"speedUpResearch\",\"id\":1,\"amount\":3}],\"resourcesToReward\":[],\"speedUpDate\":1794713971852,\"nextLevel\":4},\"ident\":\"95cf1947f5c340009682fa2aed00d287\",\"feature\":\"personalResearch\"}]}",
+      "responseBody": "{\"results\":[{\"ident\":\"95cf1947f5c340009682fa2aed00d287\",\"result\":{\"response\":{}}}],\"date\":1794713973.6820965}"
+    }
+  ]
+}

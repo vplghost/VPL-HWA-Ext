@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.10.94 — 2026-11-15
+
+### Changed
+
+- Replace expanded speedup forms with borderless fast-forward icons beside queue progress and healing timers. Open stacked forms on demand; Escape preserves the parent dialog and explicit confirmation remains mandatory.
+- Auto-select speedup quantities as min(stock, ceil(remaining time / item duration) - 1), clamped to zero, when opening the form or changing item type.
+
+## 0.10.93 — 2026-11-15
+
+### Added
+
+- Manual construction, research and hospital speedups with item/quantity preview and mandatory confirmation before spending. Pending spends are shared and persisted to prevent duplicate requests.
+- Confirmed native/helper speedups reduce matching timers and known item inventory once; stale or newer authoritative snapshots retain precedence. Training, universal-item exchange and overrun/refund payloads remain gated on capture evidence.
+
+## 0.10.92 — 2026-11-15
+
+### Changed
+
+- Dashboard Refresh All prioritizes Energy and World Energy snapshots, reports queued or failed requests, and prevents overlapping refresh clicks.
+
+## 0.10.91 — 2026-11-15
+
+### Fixed
+
+- Require five distinct heroes for hero-based expeditions even when fewer heroes already meet the power target. Reject incomplete helper start requests in Direct and Piggyback modes; preserve the hero-free Video Expedition exception.
+
+## 0.10.90 — 2026-11-15
+
+### Fixed
+
+- Smart gathering skips mines rejected with MineNotFound and continues with another target. Exhausted nearest searches retry after a minute, and the specific missing-mine stop saved by older versions recovers automatically.
+
 ## 0.10.89 — 2026-11-15
 
 ### Added

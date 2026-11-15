@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { troopStockProgress } from '@/src/utils/troops';
 import { useTroopTraining, getTroopType, normalizeArray } from '@/src/composables/useTroopTraining';
 import { formatDuration, formatNumber } from '@/src/utils/formatters';
+import SpeedupControl from '@/src/components/common/SpeedupControl.vue';
 
 const {
   troopStats,
@@ -181,8 +182,9 @@ const troopCards = computed(() => {
               <div class="font-bold text-rose-600 dark:text-rose-400 tabular-nums">
                 {{ formatNumber(t.hospitalCount) }}
               </div>
-              <div v-if="st.healingTimerText" class="text-[9px] text-rose-500 font-mono">
+              <div v-if="st.healingTimerText" class="inline-flex items-center gap-1 text-[9px] text-rose-500 font-mono">
                 {{ st.healingTimerText }}
+                <SpeedupControl v-if="isHealingActive" kind="healing" target-label="Hospital healing" />
               </div>
             </div>
             <div>
