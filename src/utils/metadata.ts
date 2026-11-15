@@ -18,6 +18,7 @@ import '~/extension/clan-versus-rules.js';
 
 import { heroMetadata, getHeroMetadata as getTypedHeroMetadata } from '../data/heroMetadata.ts';
 import { titanMetadata, getTitanMetadata as getTypedTitanMetadata } from '../data/titanMetadata.ts';
+import { getItemName as typedGetItemName, getBuildingName as typedGetBuildingName, getResearchName as typedGetResearchName } from '../data/nameData.ts';
 
 export interface HeroMeta {
   name: string;
@@ -108,6 +109,8 @@ export function getItemName(category: string, id: number | string): string {
     return `${sName} Fragment`;
   }
 
+  const typedItem = typeof typedGetItemName === 'function' ? typedGetItemName(category, strId) : null;
+  if (typedItem) return typedItem;
   const nameMap = (globalThis as any).hwaHelperNameMap;
   const nameData = (globalThis as any).hwaHelperNameData?.names;
   return nameData?.[category]?.[strId] || nameMap?.item?.(category, strId) || `${category} #${strId}`;
@@ -138,11 +141,15 @@ export function getGearCraftData(gearId: number | string) {
 }
 
 export function getBuildingName(id: number | string): string {
+  const typedBuilding = typeof typedGetBuildingName === 'function' ? typedGetBuildingName(id) : null;
+  if (typedBuilding) return typedBuilding;
   const nameMap = (globalThis as any).hwaHelperNameMap;
   return nameMap?.building?.(id) || (id ? `Building #${id}` : 'Building');
 }
 
 export function getResearchName(id: number | string): string {
+  const typedResearch = typeof typedGetResearchName === 'function' ? typedGetResearchName(id) : null;
+  if (typedResearch) return typedResearch;
   const nameMap = (globalThis as any).hwaHelperNameMap;
   return nameMap?.research?.(id) || (id ? `Research #${id}` : 'Research');
 }

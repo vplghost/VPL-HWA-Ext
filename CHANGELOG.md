@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.101 — 2026-11-15
+
+### Added
+
+- Typed game metadata modules `src/data/nameData.ts`, `src/data/itemData.ts`, and `src/data/campaignData.ts` with strict TypeScript interfaces (`ItemCategory`, `ItemResourceMetadata`, `ItemResourcesData`, `CampaignMission`, `CampaignMissionDrops`, `MissionProgress`, `MissionTriesInfo`).
+- Comprehensive unit test suite `tests/item-campaign-typed-data.test.mjs` verifying hero/item/category name resolution, item resource icons and expiry checks, campaign missions drops, heroic tries calculations, and raidable mission discovery.
+
+### Changed
+
+- Refactor `src/utils/itemResources.ts`, `src/utils/resourceData.ts`, `src/utils/recipeTree.ts`, and `src/utils/metadata.ts` to consume typed name, item, and campaign data with seamless fallback for VM test harnesses and backward compatibility.
+
 ## 0.10.100 — 2026-11-15
 
 ### Added

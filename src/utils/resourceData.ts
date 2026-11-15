@@ -1,4 +1,5 @@
 import { isInactiveResource } from './itemResources.ts';
+import { getItemName } from '../data/nameData.ts';
 
 export interface ResourceEntry {
   key?: string;
@@ -148,14 +149,12 @@ export function resourceLabel(entry: ResourceEntry | undefined): string {
     return worldMaterialNames[itemId];
   }
 
-  // Lookup in nameMap
-  const nameMap = (globalThis as any).hwaHelperNameMap;
-  if (nameMap && typeof nameMap.item === 'function') {
-    const found = nameMap.item(type, itemIdStr || itemId);
-    if (found) return found;
-  }
+  // Lookup in typed nameData or fallback nameMap
+  const resolved = (typeof getItemName === 'function' ? getItemName(type, itemIdStr || itemId) : null)
+    || (globalThis as any).hwaHelperNameMap?.item?.(type, itemIdStr || itemId);
+  if (resolved) return resolved;
 
-  // Lookup in nameData dictionary
+  // Lookup in nameData dictionary fallback
   const nameData = (globalThis as any).hwaHelperNameData?.names;
   if (nameData?.[type]?.[itemIdStr]) {
     return nameData[type][itemIdStr];
