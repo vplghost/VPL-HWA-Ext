@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.105 — 2026-11-15
+
+### Added
+
+- Typed march rules utility `src/utils/marchRules.ts` with mine resource types, rally targets, route speeds, and safe typed accessors (`getMineResourceType`, `getRallyTargetName`, `getRouteSpeed`).
+- Typed tracking filter utility `src/utils/trackingFilter.ts` with `isTrackingUrl` and `TRACKING_HOSTS` set.
+- Typed mission costs module `src/data/missionCostData.ts` with campaign mission start and win costs and accessors (`getMissionCosts`, `getMissionStartCost`, `getMissionWinCost`).
+- Strict TypeScript interfaces in `src/types/game/march.ts` (`BasicResourceType`, `RouteType`, `MineTypesMap`, `RallyTargetsMap`, `RouteSpeedsMap`) and `src/types/game/tracking.ts` (`TrackingUrlChecker`).
+- Comprehensive unit test suite `tests/march-rules-tracking-filter.test.mjs` verifying mine types, rally targets, route speeds, tracking URL detection, and mission costs.
+
+### Changed
+
+- Updated `src/components/dialogs/CampaignRaidModal.vue` to consume `getMissionCosts` from `src/data/missionCostData.ts`.
+- Re-exported march and tracking types from `src/types/index.ts`.
+
 ## 0.10.104 — 2026-11-15
 
 ### Added

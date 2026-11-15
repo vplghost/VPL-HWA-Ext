@@ -69,3 +69,6 @@ export * from './game/tower';
 export * from './game/refillable';
 export * from './game/speedup';
 export * from './game/clanVersus';
+export * from './game/march';
+export * from './game/tracking';
+

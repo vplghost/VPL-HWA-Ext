@@ -38,3 +38,8 @@ export interface MissionRaidOptions {
   maxCost?: number;
   [key: string]: any;
 }
+
+export type MissionCostPair = [startCost: number, totalWinCost: number];
+
+export type MissionCostsMap = Record<string, MissionCostPair>;
+

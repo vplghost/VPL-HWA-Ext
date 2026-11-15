@@ -15,6 +15,7 @@ import {
   getItemName,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import { getMissionCosts } from '@/src/data/missionCostData';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -196,8 +197,7 @@ const maxEnergy = computed(() => {
 });
 
 const missionCost = computed(() => {
-  const cMissions = (globalThis as any).hwaHelperMissionCosts;
-  const pair = cMissions?.[missionId.value];
+  const pair = getMissionCosts(missionId.value);
   return pair ? (Number(pair[0]) + Number(pair[1])) : 6;
 });
 
