@@ -71,4 +71,7 @@ export * from './game/speedup';
 export * from './game/clanVersus';
 export * from './game/march';
 export * from './game/tracking';
+export * from './game/freeAlchemy';
+export * from './game/mineDefense';
+export * from './game/mail';
 

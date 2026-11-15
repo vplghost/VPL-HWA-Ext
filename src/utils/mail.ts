@@ -1,2 +1,5 @@
-import '../../extension/mail-data.js';
-export const mail = (globalThis as any).hwaHelperMailData;
+import { mailService } from '../services/mailService.ts';
+
+export const mail = (globalThis as any).hwaHelperMailData || mailService;
+export { mailService };
+export * from '../services/mailService.ts';

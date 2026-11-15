@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.106 — 2026-11-15
+
+### Added
+
+- Typed Free Alchemy service `src/services/freeAlchemy.ts` providing `freeAlchemyDay`, `freeAlchemyAvailability`, `freeAlchemyCycle`, and `freeAlchemyPolicy`.
+- Typed Mine Defense data and service in `src/data/mineDefenseData.ts` and `src/services/mineDefense.ts` providing hospital capacities, unsafe mine detection, defense planning, and sync helpers.
+- Typed Mail service `src/services/mailService.ts` providing letter/report row extraction, unclaimed reward calculation, prune, compactReports, and claim validation.
+- Strict TypeScript interfaces in `src/types/game/`: `freeAlchemy.ts`, `mineDefense.ts`, and `mail.ts`.
+- Unit test suite `tests/services-typed-migration.test.mjs` verifying Free Alchemy, Mine Defense, and Mail Service functionality.
+
+### Changed
+
+- Updated `src/utils/freeAlchemySpin.ts` to consume `src/services/freeAlchemy.ts`.
+- Updated `src/utils/mail.ts` to re-export `mailService` from `src/services/mailService.ts`.
+- Preserved 100% backward compatibility globals for background service workers and VM tests.
+
 ## 0.10.105 — 2026-11-15
 
 ### Added
