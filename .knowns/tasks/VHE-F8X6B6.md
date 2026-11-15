@@ -5,7 +5,7 @@ status: done
 priority: medium
 labels: []
 createdAt: '2026-11-15T07:37:53.842Z'
-updatedAt: '2026-11-15T07:47:33.563Z'
+updatedAt: '2026-11-15T07:54:43.783Z'
 completedAt: '2026-11-15T07:47:33.563Z'
 timeSpent: 511
 ---
@@ -34,5 +34,7 @@ Reduce automatic getIncomingMarches:march and getRallyById:rally frequency after
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented world-read.plan with bounded serialized account-scoped leases, persisted version-aware trailing reads and worker-startup alarm recovery. Idle incoming fallback60s, active threats15s, reuse full native snapshot plus passive deltas; mine return no longer requests incoming. Native rallyReadStatus satisfies matching versions/maps; explicit refresh, reservation join rechecks and Raid auto-cancel reads bypass debounce. Review: checked stale/failed/native results, partial hydration, account switches, shared policy, serialization and cancellation/recall deadlines; no outstanding findings. Full861 tests:849 pass,12 optional skips; typecheck/build0.10.96 passed and runtime asset hashes match dist. Actual Chrome Direct/Piggyback: ten incoming checks=0 extra reads; ten rally versions=2 reads, trailing alarm confirmed. Evidence docs/acceptance/world-read-2026-11-15.json. Pre-source-update checkpoint committed as4247c37 per user request; this followup remains uncommitted. Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass. System Decision Impact: candidate @decision/20261115-1445-coalesce-optional-incoming-and-rally-reads-without-delaying-decisions (added) — bounded optional reads retain decision-critical freshness.
+
+kn-extract after commit4e40db7: canonical reusable lessons added to @doc/architecture/passive-first-gathering-march-observations; updated @memory/6jiqu0 and created proposed @memory/48uyvl for version-aware trailing invalidations. Added code/test/Chrome evidence to existing draft @decision/20261115-1445-coalesce-optional-incoming-and-rally-reads-without-delaying-decisions; ready_for_review, not accepted. Clarified fixture versus live-game evidence; task status/AC unchanged.
 <!-- SECTION:NOTES:END -->
 

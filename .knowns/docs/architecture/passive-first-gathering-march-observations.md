@@ -3,7 +3,7 @@ id: doc-7bfff44bddbe6dc90ec7c66abc88f367
 title: Passive first gathering march observations
 description: Selective march reads, native MQTT routes, snapshot completeness and confirmed return recovery
 createdAt: '2026-11-15T07:12:06.750Z'
-updatedAt: '2026-11-15T07:47:32.248Z'
+updatedAt: '2026-11-15T07:54:19.599Z'
 tags: []
 ---
 
@@ -16,3 +16,11 @@ world-read.plan coordinates optional automatic incoming/rally reads per account 
 
 The explicit Smart reservation recheck after troop return and existing Raid Queue reads for member counts before auto-cancel are deliberately preserved. They consume current server results for join/cancel decisions, so optional push coalescing does not delay their deadlines. Explicit user refresh also bypasses coordination. Regression proofs: tests/world-read.test.mjs, tests/gather-passive.test.mjs, tests/mine-defense.test.mjs, tests/raid-queue.test.mjs and tests/smart-gather-background.test.mjs.
 Verification for0.10.96: full suite861 tests,849 pass and12 optional private-capture skips; typecheck and WXT build pass. Actual Chrome local fixtures in scripts/browser-world-read-acceptance.mjs verify Direct and Piggyback: ten optional incoming checks issue zero extra reads, ten rally versions issue two detail reads, the actual trailing Chrome alarm fires and version10 is cached. Evidence: docs/acceptance/world-read-2026-11-15.json. Worker restart, policy/account changes, stale/missing replies and active defense/raid deadlines are covered by regression tests. Pre-change checkpoint commit: 4247c37.
+## Reusable lessons extracted from commit4e40db7
+
+- Freshness belongs to the required observation and scope: full initial snapshot, account, map and rally version. A recent unrelated push or a newer timestamp on an older rally version does not fulfill the requirement. Proof: hwaHelperWorldRead.fresh, rallyReadStatus and tests/world-read.test.mjs.
+- Coalescing must retain invalidations that arrive during an outstanding read. Preserve the highest required version (or latest unversioned event time), schedule one trailing read, and cancel that read when a native response already satisfies the requirement. Persist bounded state and serialize its writes so service-worker restarts or overlapping callers do not lose pending updates. Proof: hwaHelperWorldRead.plan, passiveWorldReads, flushWorldReads and the restart/native-response tests in tests/gather-passive.test.mjs.
+- Classify reads by purpose before applying a TTL. Optional display/monitoring reads can coalesce; join eligibility and predeparture cancellation checks retain their own freshness and deadlines. Read optimization must not treat a transport acknowledgement as mutation completion or create repeated uncertain mutations. Proof: evaluateSmartGather reservation recheck, hwaHelperRaidQueue.advance and tests/raid-queue.test.mjs.
+- Verify both request count and the final observed version. Reducing ten notifications to one request can silently lose the last update; the accepted fixture proves two reads AND cached version10. docs/acceptance/world-read-2026-11-15.json is a synthetic local Chrome transport/alarm fixture in Direct and Piggyback; it is not a live-game traffic benchmark or an end-to-end MQTT network capture. MQTT routing/ownership and deadline behavior are covered separately by reducer/background regression tests.
+
+Provenance: @task-VHE-F8X6B6, commit4e40db7, extension/world-read.js, tests/world-read.test.mjs, tests/gather-passive.test.mjs and scripts/browser-world-read-acceptance.mjs. Existing draft @decision/20261115-1445-coalesce-optional-incoming-and-rally-reads-without-delaying-decisions remains the guidance candidate; extraction does not accept or duplicate it.

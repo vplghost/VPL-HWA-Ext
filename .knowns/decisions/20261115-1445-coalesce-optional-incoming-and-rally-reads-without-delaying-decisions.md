@@ -8,20 +8,24 @@ tags: []
 sources:
   - '@task-VHE-F8X6B6'
   - '@doc/architecture/passive-first-gathering-march-observations'
+  - extension/world-read.js
+  - tests/world-read.test.mjs
+  - docs/acceptance/world-read-2026-11-15.json
 relatedDocs:
   - architecture/passive-first-gathering-march-observations
 relatedTasks:
   - VHE-F8X6B6
 verification: []
-reviewState: needs_evidence
-reviewBlockers:
-  - 'linked task "VHE-F8X6B6" is "in-progress"; all linked tasks must be done before accepting candidate'
+reviewState: ready_for_review
+reviewBlockers: []
 reviewMatches: []
-reviewAllowedResolutions: []
-reviewEvaluatedHash: '2501a74ee798454295699891f355eb28f321053bf273d0b710e25688724203c1'
-reviewEvaluatedAt: '2026-11-15T07:45:32.366Z'
+reviewAllowedResolutions:
+  - accept_new
+  - reject_new
+reviewEvaluatedHash: '68b6e26070b4868387956a0bd783e8a729e35be8ff30e9225ca3a52632a6611a'
+reviewEvaluatedAt: '2026-11-15T07:54:20.281Z'
 createdAt: '2026-11-15T07:45:32.366Z'
-updatedAt: '2026-11-15T07:45:32.366Z'
+updatedAt: '2026-11-15T07:54:20.281Z'
 ---
 
 ## Context
