@@ -115,25 +115,35 @@
 
     const smart = settings.smartEnabled ? globalThis.hwaHelperSmartGather : null;
     let daily = null;
-    if (smart && (!cache.marchStatus?.data?.marches || !cache['getUnitSummary:unit']?.data?.squads ||
-        !smart.fresh(cache.marchStatus, now) || !smart.fresh(cache['getUnitSummary:unit'], now))) return {
+    const incompleteMarches = cache.marchStatus?.method && cache.marchStatus.method !== 'getMarches' &&
+      String(cache.marchSnapshotStatus?.data?.accountId) !== String(cache.accountStatus?.data?.id);
+    const snapshotRefresh = smart && (incompleteMarches || !cache.marchStatus?.data?.marches || !cache['getUnitSummary:unit']?.data?.squads ||
+        !smart.fresh(cache.marchStatus, now) || !smart.fresh(cache['getUnitSummary:unit'], now)) ? {
       action: 'refresh', reason: 'Refreshing current marches, troops and gathering plans',
-      calls: [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' },
-        { name: 'getMineSummary', feature: 'mine' }, { name: 'heroGetAll' }] };
+      calls: [
+        ...(incompleteMarches || !cache.marchStatus?.data?.marches || !smart.fresh(cache.marchStatus, now) ? [{ name: 'getMarches', feature: 'march' }] : []),
+        ...(!cache['getUnitSummary:unit']?.data?.squads || !smart.fresh(cache['getUnitSummary:unit'], now) ? [{ name: 'getUnitSummary', feature: 'unit' }] : []),
+        ...(!smart.fresh(cache.gatheringStatus, now) ? [{ name: 'getMineSummary', feature: 'mine' }] : []),
+        ...(!cache.heroGetAll?.data ? [{ name: 'heroGetAll' }] : [])] } : null;
+    if (smart && incompleteMarches) return snapshotRefresh;
     if (smart && smart.activeQueue(stored)) return { action: 'wait', reason: 'Gathering paused while raid/monster queue is active' };
     const resume = smart?.resumePlan(cache, stored.smartGatherState, now);
-    if (resume && resume.action !== 'target') return resume;
+    if (resume && resume.action !== 'target') return snapshotRefresh || resume;
     if (smart && !resume && settings.mineType === 'rotate') {
       daily = smart.dailyPlan(cache, { ...settings, lastAutoMineType: stored.smartGatherState?.lastAutoMineType || settings.lastAutoMineType }, now, stored.smartGatherState);
       if (daily.action === 'refresh') return { action: 'refresh', reason: daily.reason,
         calls: [{ name: 'getDailyQuests', feature: 'quest', args: {} }, { name: 'user_getNextDayTime' }] };
       if (daily.action === 'wait') return daily;
-      if (daily.action === 'recall') return { action: 'recall', reason: daily.reason,
+      if (daily.action === 'recall') return snapshotRefresh || { action: 'recall', reason: daily.reason,
         call: { name: 'stopMineGathering', feature: 'mine', args: { squadId: daily.march.squadId } } };
     }
     const marches = safeList(cache?.marchStatus?.data?.marches);
     const activeCount = smart ? marches.length : countActiveMarches(marches, now);
     if (activeCount >= settings.maxMarches) {
+      // Stable deployed teams need no polling until an expected transition.
+      // Missing pushes recover once a route/gathering ETA is due (unknown ETA
+      // falls back to ordinary bounded snapshot freshness).
+      if (snapshotRefresh && marches.some(m => !Number.isFinite(m.endsAt) || now >= m.endsAt)) return snapshotRefresh;
       return {
         action: 'wait',
         reason: `Current marches limit reached (${activeCount}/${settings.maxMarches})`,
@@ -141,6 +151,7 @@
         maxMarches: settings.maxMarches
       };
     }
+    if (snapshotRefresh) return snapshotRefresh;
 
     const context = {
       ...cache?.experimentalMineSearch?.data,

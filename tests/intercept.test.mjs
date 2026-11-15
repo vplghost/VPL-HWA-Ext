@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm';
 const source = await readFile(new URL('../extension/intercept.js', import.meta.url), 'utf8');
 const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
 const speedupSource = await readFile(new URL('../extension/speedup-data.js', import.meta.url), 'utf8') + '\n' + await readFile(new URL('../extension/speedup.js', import.meta.url), 'utf8');
+const mailSource = await readFile(new URL('../extension/mail-data.js', import.meta.url), 'utf8');
 
 function setup(fetchImplementation, enable = true, extraContext = {}) {
   const messages = [];
@@ -56,7 +57,7 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
     ...extraContext
   };
   context.window = window;
-  runInNewContext(`${filterSource}\n${speedupSource}\n${source}`, context);
+  runInNewContext(`${filterSource}\n${speedupSource}\n${mailSource}\n${source}`, context);
   if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true,
     popupRpcEnabled: true },
     'https://www.hero-wars-alliance.com');
@@ -699,6 +700,19 @@ for (const mode of ['direct', 'piggyback']) test(`confirmed speedup payload cros
   assert.equal(sent.length, 1); assert.equal(sent[0].ident, call.ident);
   assert.deepEqual(sent[0].args, call.args);
   await carrier(); assert.equal(batches.flat().filter(row => row.name === call.name).length, 1);
+});
+
+for (const mode of ['direct', 'piggyback']) test(`mail claim retains its receipt token in ${mode}`, async () => {
+  const batches = [], origin = 'https://www.hero-wars-alliance.com';
+  const { window } = setup(async (_url, options) => {
+    const calls = JSON.parse(options.body).calls; batches.push(calls);
+    return new Response(JSON.stringify({ results: calls.map(call => ({ ident: call.ident, result: { response: call.name === 'mailFarm' ? { 101: { gold: 50 } } : {} } })) }), { status: 200 });
+  }, true, { Response, Headers });
+  window.postMessage({ source: 'hwa-helper-config', kind: 'control', popupRpcEnabled: true, socketRefreshMode: mode }, origin);
+  const token = '0123456789abcdef0123456789abcdef';
+  window.postMessage({ source: 'hwa-helper-control', kind: mode === 'direct' ? 'refresh-rpc' : 'queue-claim', calls: [{ name: 'mailFarm', ident: token, args: { letterIds: ['101'] } }] }, origin);
+  if (mode !== 'direct') await window.fetch('https://api.hero-wars-alliance.com/api/rpc', { method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] }) });
+  assert.equal(batches.flat().find(call => call.name === 'mailFarm').ident, token);
 });
 
 test('Direct expedition start accepts only the observed bounded hero payload', async () => {

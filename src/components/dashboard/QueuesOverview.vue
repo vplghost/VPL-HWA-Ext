@@ -81,23 +81,23 @@ function handleMarchClick(category: string) {
       <div v-if="marches.length === 0" class="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/40 text-center text-xs text-slate-400">
         {{ marchesKnown ? 'No active squad marches outside city' : 'Waiting for game data' }}
       </div>
-      <div v-else class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-        <BaseTooltip v-for="m in marches" :key="m.id" class="w-full" :content="formatMarchTooltip(m.march, now, cache)" placement="bottom">
+      <div v-else data-march-grid class="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
+        <BaseTooltip v-for="m in marches" :key="m.id" class="w-full min-w-0" :content="formatMarchTooltip(m.march, now, cache)" placement="bottom">
           <button
             type="button"
-            class="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-between gap-2 text-left text-xs"
+            class="w-full h-full min-w-0 p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex flex-col items-stretch gap-1 text-left text-xs"
             :class="{ 'cursor-pointer': m.category !== 'other' }"
             @click="handleMarchClick(m.category)"
           >
             <div class="flex items-center gap-2 min-w-0">
               <span>{{ m.icon }}</span>
               <div class="min-w-0">
-                <div class="font-semibold text-slate-800 dark:text-slate-200">{{ m.title }} · {{ m.stage }}</div>
+                <div class="font-semibold text-slate-800 dark:text-slate-200 break-words">{{ m.title }} · {{ m.stage }}</div>
                 <div class="text-[10px] text-slate-400 truncate max-w-40">{{ m.target }}</div>
-                <GatheringProgress v-if="m.gathering" :progress="m.gathering" />
               </div>
             </div>
-            <span class="shrink-0 px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-mono font-semibold text-[11px]">{{ m.timerText }}</span>
+            <GatheringProgress v-if="m.gathering" :progress="m.gathering" compact />
+            <span class="self-end px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-mono font-semibold text-[10px]">{{ m.timerText }}</span>
           </button>
         </BaseTooltip>
       </div>

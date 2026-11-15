@@ -276,9 +276,11 @@
     }
     const wait = state.pending;
     if (wait?.phase === 'returning' || wait?.phase === 'refresh') {
-      const marchFresh = Date.parse(cache.marchStatus?.updatedAt) >= wait.confirmedAt;
-      const unitsFresh = Date.parse(cache['getUnitSummary:unit']?.updatedAt) >= wait.confirmedAt;
       const squadId = wait.squadId ?? wait.call.args.squadId;
+      const requiredAt = wait.phase === 'returning' ? Math.max(wait.confirmedAt || 0, wait.returnAt || 0,
+        cache.marchReturnStatus?.data?.completions?.[squadId] || 0) : wait.confirmedAt;
+      const marchFresh = Date.parse(cache.marchStatus?.updatedAt) >= requiredAt;
+      const unitsFresh = Date.parse(cache['getUnitSummary:unit']?.updatedAt) >= requiredAt;
       const exists = list(cache.marchStatus?.data?.marches).some(m => m.squadId === squadId);
       const deployed = list(cache['getUnitSummary:unit']?.data?.squads).some(s => (s.squadId ?? s.id) === squadId);
       if (marchFresh && unitsFresh && (wait.phase === 'returning' ? !exists && !deployed : exists)) state.pending = null;

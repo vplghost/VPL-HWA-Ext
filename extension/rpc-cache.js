@@ -358,8 +358,19 @@
         return [entry('incomingMineAction', 'internal', { action: 'ended', accountId: body.pushUserId, enemySquadId: body.squadId, mapId: body.mapId })];
       if (type === 'routeCompleted' && typeof body.routeId === 'string')
         return [entry('incomingMineAction', 'internal', { action: 'routeEnded', routeId: body.routeId })];
-      if (type === 'gatheringMineCompleted' && typeof body.mineId === 'string')
-        return [entry('incomingMineAction', 'internal', { action: 'mineEnded', accountId: body.pushUserId, mineId: body.mineId })];
+      if (type === 'gatheringMineCompleted' && typeof body.mineId === 'string') {
+        const actions = [entry('incomingMineAction', 'internal', { action: 'mineEnded', accountId: body.pushUserId, mineId: body.mineId })];
+        const route = body.routeToOutpost, duration = route?.durationMs ?? route?.duration;
+        if (typeof body.squadId === 'string' && typeof route?.routeId === 'string' &&
+            route.from?.object?.objectId === body.mineId && route.to?.object?.objectType === 'outpost' &&
+            Number.isFinite(route.startedAt) && Number.isFinite(duration) && duration >= 0)
+          actions.push(entry('mineMarchAction', 'internal', { accountId: body.pushUserId, action: 'returning',
+            mineId: body.mineId, squadId: body.squadId, routeId: route.routeId,
+            startedAt: route.startedAt, returnAt: route.startedAt + duration }));
+        return actions;
+      }
+      if (type === 'returnFromMineCompleted' && typeof body.squadId === 'string')
+        return [entry('mineMarchAction', 'internal', { accountId: body.pushUserId, action: 'returned', squadId: body.squadId })];
       if (type === 'specialQuestEvents' && Array.isArray(body.events)) {
         return [entry('specialQuestStatus', 'events', {
           events: body.events, accountId: body.pushUserId ?? null
@@ -430,7 +441,9 @@
       const speedupFailure = globalThis.hwaHelperSpeedup?.validate(failedCall) && request.calls.some(call =>
         call.ident && call.ident === failedCall.ident && call.name === failedCall.name && call.feature === failedCall.feature &&
         JSON.stringify(call.args) === JSON.stringify(failedCall.args));
-      const failureMatches = speedupFailure || ['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(failedCall?.name) &&
+      const mailFailure = globalThis.hwaHelperMailData?.validateClaim(failedCall) && request.calls.some(call =>
+        call.ident && call.ident === failedCall.ident && call.name === failedCall.name && (call.feature || '') === (failedCall.feature || '') && JSON.stringify(call.args) === JSON.stringify(failedCall.args));
+      const failureMatches = speedupFailure || mailFailure || ['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(failedCall?.name) &&
         request.calls.some(call => call.ident && call.ident === failedCall.ident &&
           call.name === failedCall.name && !call.feature && !failedCall.feature &&
           (call.name === 'refillable_alchemyUseVideo'
@@ -449,6 +462,19 @@
         const key = `${call.name}${call.feature ? `:${call.feature}` : ''}`;
         const group = definitions[key];
         const result = results.get(call.ident);
+        const mailClaim = globalThis.hwaHelperMailData?.validateClaim(call);
+        if (mailClaim && call.ident && result) {
+          const code = result.errorCode ?? result.response?.errorCode;
+          const error = result.error || result.response?.error || (code != null && code !== 0 && code !== '0' ? code : null);
+          const response = result.response;
+          const confirmedIds = mailClaim.kind === 'letters' && response && typeof response === 'object' && !Array.isArray(response)
+            ? mailClaim.ids.filter(id => Object.hasOwn(response, id) && response[id] && typeof response[id] === 'object' && !Array.isArray(response[id])) : [];
+          const success = !error && response != null && typeof response === 'object' && !Array.isArray(response) && (mailClaim.kind === 'reports' || confirmedIds.length > 0);
+          if (!success && !error) return [];
+          return [{ key: 'mailClaimAction', method: call.name, feature: call.feature || null, group: 'internal',
+            data: { token: call.ident, call, ...mailClaim, confirmedIds, success, reward: success ? response : {},
+              error: success ? null : String(error?.description || error?.message || error?.name || error).slice(0, 200) }, updatedAt: record.timestamp }];
+        }
         const speedup = globalThis.hwaHelperSpeedup?.validate(call);
         if (speedup && call.ident && result) {
           const code = result.errorCode ?? result.response?.errorCode;
@@ -655,7 +681,8 @@
                 type: r.type,
                 read: r.read,
                 claimedReward: r.claimedReward,
-                createdAt: r.createdAt
+                createdAt: r.createdAt,
+                expiresAt: r.expiresAt, reward: r.reward ?? r.payload?.reward
               }))
             },
             updatedAt: record.timestamp
@@ -1638,8 +1665,9 @@
             updatedAt: record.timestamp
           }];
         }
-        if (call.name === 'mailGetAll' && result?.response) {
-          const letters = Array.isArray(result.response.letters) ? result.response.letters : [];
+        if (call.name === 'mailGetAll' && !result?.error && result?.response && !result.response.error &&
+            (Array.isArray(result.response.letters) || result.response.letters && typeof result.response.letters === 'object')) {
+          const letters = normalizeArrayData(result.response.letters);
           const unclaimedLetters = letters.filter((l) =>
             l && !l.deleted && (l.reward || l.q_reward || l.items) &&
             !l.claimed && !l.rewardReceived && !l.rewardClaimed
@@ -2210,6 +2238,10 @@
   function merge(cache, records, maxBytes = 5 * 1024 * 1024) {
     let next = { ...(cache && typeof cache === 'object' ? cache : {}) };
     let changed = false;
+    // Preserve proof of a complete native snapshot when later pushes patch one
+    // squad. A lone push must not imply knowledge of every deployed team.
+    if (!next.marchSnapshotStatus && next.marchStatus?.method === 'getMarches' && next.accountStatus?.data?.id != null)
+      next.marchSnapshotStatus = { updatedAt: next.marchStatus.updatedAt, data: { accountId: String(next.accountStatus.data.id) } };
     for (const record of records) {
       const entries = record && record.key ? [record] : extract(record);
       for (const entry of entries) {
@@ -2226,6 +2258,8 @@
           delete next.heroGetAll;
           delete next.rallyPowerStatus;
           delete next.marchStatus;
+          delete next.marchReturnStatus;
+          delete next.marchSnapshotStatus;
           delete next.gatheringStatus;
           delete next.incomingMineAttacks;
           delete next['getHealing:unit'];
@@ -2242,6 +2276,12 @@
           delete next.expeditionGet;
           delete next.freeAlchemySpinStatus;
           delete next.freeAlchemySpinReceipts;
+          delete next.mailStatus;
+          delete next.mailGetAll;
+          delete next['getPage:report'];
+          delete next.mailClaimReceipts;
+          delete next.mailClaimStatus;
+          next.mailAccountEpoch = { key: 'mailAccountEpoch', data: { accountId: String(entry.data.id) }, updatedAt: entry.updatedAt };
           delete next.speedupInventory;
           delete next.speedupStatus;
           delete next.speedupReceipts;
@@ -2910,6 +2950,29 @@
             for (const k of keys.slice(0, keys.length - 500)) delete merged[k];
           }
           next.mineMap = merged;
+          continue;
+        }
+        if (entry.key === 'mineMarchAction') {
+          const current = next.marchStatus, accountId = next.accountStatus?.data?.id;
+          if (accountId == null || entry.data.accountId == null || String(accountId) !== String(entry.data.accountId) || current?.updatedAt > entry.updatedAt) continue;
+          const marches = normalizeArrayData(current?.data?.marches);
+          const index = marches.findIndex(m => m.squadId === entry.data.squadId && m.mineId && (!entry.data.mineId || m.mineId === entry.data.mineId));
+          if (index < 0) continue;
+          const prior = marches[index];
+          if (entry.data.action === 'returned') {
+            if (prior.stage !== 'returnToOutpost' || Number.isFinite(prior.returnAt ?? prior.endsAt) && Date.parse(entry.updatedAt) < (prior.returnAt ?? prior.endsAt) - 1000) continue;
+            marches.splice(index, 1);
+            const completions = { ...next.marchReturnStatus?.data?.completions, [entry.data.squadId]: Date.parse(entry.updatedAt) };
+            for (const id of Object.keys(completions).slice(0, Math.max(0, Object.keys(completions).length - 100))) delete completions[id];
+            next.marchReturnStatus = { updatedAt: entry.updatedAt, data: { completions } };
+          } else {
+            if (Number.isFinite(prior.startedAt) && entry.data.startedAt < prior.startedAt) continue;
+            marches[index] = { ...prior, kind: 'return', previousKind: prior.kind === 'return' ? prior.previousKind : prior.kind,
+              stage: 'returnToOutpost', routeId: entry.data.routeId, gatheringStoppedAt: entry.data.startedAt,
+              returnAt: entry.data.returnAt, endsAt: entry.data.returnAt };
+          }
+          next.marchStatus = { ...current, method: entry.method, data: { ...current.data, marches }, updatedAt: entry.updatedAt };
+          changed = true;
           continue;
         }
         if (entry.key === 'gatherAction') {
@@ -4424,8 +4487,43 @@
           changed = true;
           continue;
         }
+        if (['mailGetAll', 'getPage:report'].includes(entry.key) && next.mailAccountEpoch?.updatedAt > entry.updatedAt) continue;
+        if (entry.key === 'mailClaimAction') {
+          const helper = globalThis.hwaHelperMailData, accountId = next.accountStatus?.data?.id;
+          const seen = normalizeArrayData(next.mailClaimReceipts?.data), data = entry.data;
+          if (!helper || accountId == null || next.mailAccountEpoch?.updatedAt > entry.updatedAt || seen.some(row => row.token === data.token)) continue;
+          const receipt = { ...data, accountId: String(accountId), at: entry.updatedAt };
+          next.mailClaimReceipts = { key: 'mailClaimReceipts', group: 'internal', data: [...seen, receipt].slice(-200), updatedAt: entry.updatedAt };
+          if (!next.mailClaimStatus || next.mailClaimStatus.updatedAt <= entry.updatedAt) next.mailClaimStatus = { key: 'mailClaimStatus', method: entry.method, group: 'internal', data: receipt, updatedAt: entry.updatedAt };
+          if (data.success) {
+            const ids = new Set(data.confirmedIds), status = next.mailStatus;
+            const mark = letters => normalizeArrayData(letters).map(row => ids.has(String(row.id ?? row.letterId)) ? { ...row, claimed: true, rewardReceived: true, rewardClaimed: true } : row);
+            const observed = data.kind === 'letters' ? status?.data?.lettersObservedAt : status?.data?.reportsObservedAt;
+            if (status && (!observed || observed <= entry.updatedAt)) {
+              const updated = { ...status.data };
+              if (data.kind === 'letters') updated.letters = mark(updated.letters);
+              else updated.reports = normalizeArrayData(updated.reports).map(row => data.types.includes(row.type) ? { ...row, claimedReward: true } : row);
+              next.mailStatus = { ...status, method: entry.method, data: { ...updated, accountId: String(accountId), ...helper.counts(updated) }, updatedAt: status.updatedAt > entry.updatedAt ? status.updatedAt : entry.updatedAt };
+            }
+            if (data.kind === 'letters' && next.mailGetAll?.data?.letters && next.mailGetAll.updatedAt <= entry.updatedAt) next.mailGetAll = {
+              ...next.mailGetAll, data: { ...next.mailGetAll.data, letters: mark(next.mailGetAll.data.letters) }, updatedAt: entry.updatedAt };
+            const rewards = data.kind === 'letters' ? data.confirmedIds.map(id => [id, data.reward[id]]) : [['reports', data.reward]];
+            for (const [id, reward] of rewards) {
+              const actions = extractRewardActions({ timestamp: entry.updatedAt }, data.call, reward, `mail:${id}`);
+              entries.push(...actions.filter(action => !entries.some(snapshot => snapshot.key === action.data.resourceKey && snapshot.updatedAt >= entry.updatedAt))
+                .map(action => ({ ...action, data: { ...action.data, requireSnapshot: true } })));
+            }
+          }
+          changed = true;
+          continue;
+        }
         if (entry.key === 'mailStatus') {
-          if (next.mailStatus && next.mailStatus.updatedAt === entry.updatedAt) continue;
+          const collectionAt = entry.method === 'mailGetAll' ? next.mailStatus?.data?.lettersObservedAt :
+            entry.data?.reports != null ? next.mailStatus?.data?.reportsObservedAt : next.mailStatus?.updatedAt;
+          if (next.mailAccountEpoch?.updatedAt > entry.updatedAt || collectionAt > entry.updatedAt) continue;
+          if (next.mailStatus && next.mailStatus.updatedAt === entry.updatedAt && entry.data?.action) continue;
+          const beforeMail = next.mailStatus;
+          const newerClaims = normalizeArrayData(next.mailClaimReceipts?.data).filter(row => row.success && row.at >= entry.updatedAt);
           const existing = next.mailStatus?.data || {};
           const existingReports = normalizeArrayData(existing.reports);
           const existingLetters = normalizeArrayData(existing.letters);
@@ -4503,7 +4601,8 @@
               const repMap = new Map(reports.map((r) => [String(r.id), r]));
               for (const rep of incomingReports) {
                 const prev = repMap.get(String(rep.id));
-                repMap.set(String(rep.id), prev ? { ...prev, ...rep } : rep);
+                const claimed = newerClaims.some(row => row.kind === 'reports' && row.types.includes(rep.type));
+                repMap.set(String(rep.id), { ...(prev || {}), ...rep, ...(claimed ? { claimedReward: true } : {}) });
               }
               reports = Array.from(repMap.values());
               unclaimedReportsCount = reports.filter((r) => r && r.claimedReward === false).length;
@@ -4515,11 +4614,12 @@
             let unclaimedLettersCount = existing.unclaimedLettersCount || 0;
             const incomingLetters = normalizeArrayData(entry.data?.letters);
             if (incomingLetters.length > 0 || Array.isArray(entry.data?.letters)) {
-              const letterMap = new Map(letters.map((l) => [String(l.id || l.letterId), l]));
+              const letterMap = new Map((entry.method === 'mailGetAll' ? [] : letters).map((l) => [String(l.id ?? l.letterId), l]));
               for (const l of incomingLetters) {
-                const lId = String(l.id || l.letterId);
+                const lId = String(l.id ?? l.letterId);
                 const prev = letterMap.get(lId);
-                letterMap.set(lId, prev ? { ...prev, ...l } : l);
+                const claimed = newerClaims.some(row => row.kind === 'letters' && row.confirmedIds.includes(lId));
+                letterMap.set(lId, { ...(prev || {}), ...l, ...(claimed ? { claimed: true, rewardReceived: true, rewardClaimed: true } : {}) });
               }
               letters = Array.from(letterMap.values());
               unclaimedLettersCount = letters.filter((l) =>
@@ -4536,6 +4636,9 @@
               data: {
                 ...existing,
                 ...entry.data,
+                accountId: next.accountStatus?.data?.id == null ? undefined : String(next.accountStatus.data.id),
+                ...(entry.method === 'mailGetAll' ? { lettersObservedAt: entry.updatedAt } : {}),
+                ...(entry.method === 'getPage' ? { reportsObservedAt: entry.updatedAt } : {}),
                 reports,
                 letters,
                 unclaimedReportsCount,
@@ -4545,7 +4648,8 @@
               }
             };
           }
-          changed = true;
+          if (beforeMail?.updatedAt > entry.updatedAt) next.mailStatus.updatedAt = beforeMail.updatedAt;
+          if (JSON.stringify(beforeMail) !== JSON.stringify(next.mailStatus)) changed = true;
           continue;
         }
 
@@ -4794,6 +4898,8 @@
           }
         }
         if (entry.key === 'marchStatus') {
+          if (entry.method === 'getMarches' && (!next.marchStatus?.updatedAt || next.marchStatus.updatedAt <= entry.updatedAt) && next.accountStatus?.data?.id != null)
+            next.marchSnapshotStatus = { updatedAt: entry.updatedAt, data: { accountId: String(next.accountStatus.data.id) } };
           const previous = normalizeArrayData(next.marchStatus?.data?.marches);
           const incoming = normalizeArrayData(entry.data?.marches);
           entry.data.marches = incoming.map((march) => {
@@ -4957,8 +5063,9 @@
 
     function pruneCache(cache, now = Date.now()) {
     if (!cache || typeof cache !== 'object') return { cache: {}, changed: false };
-    const next = { ...cache };
-    let changed = false;
+    const mailPruned = globalThis.hwaHelperMailData?.prune(cache, now);
+    const next = { ...(mailPruned?.cache || cache) };
+    let changed = mailPruned?.changed || false;
 
     // 1. Prune guildChat (drop messages older than 7 days relative to last chat update and orphaned users)
     if (next.guildChat?.data) {

@@ -3,7 +3,7 @@ id: doc-0387b165a8c4de930cfa0bf94b5311ad
 title: Smart auto gathering
 description: Execution scope, verified evidence, scenarios and missing information for smart auto-gathering
 createdAt: '2026-11-14T11:50:18.441Z'
-updatedAt: '2026-11-14T18:26:40.597Z'
+updatedAt: '2026-11-15T07:12:39.612Z'
 tags:
   - spec
   - gathering
@@ -185,3 +185,6 @@ Actual Chrome157 fixture acceptance: scripts/browser-gather-acceptance.mjs runs 
 Resume/nearest probes now require no gathering object, valid matching mineId/resources and the existing duration rules. Occupied or explicitly race-rejected targets are removed from interrupted/resume/nearest selection and temporarily excluded from ordinary Smart cached searches for60s (bounded50 records). BattleTypeMismatch selects a different free target; other mutation errors stop with the actual code. No automatic PvP and no retries of unconfirmed mutations.
 
 Verification: tests/gather-reload.test.mjs uses sanitized captured occupied/errorCode replies. Real Chrome157 Direct fixture acceptance with occupied-resume-and-target-race ends with3 squads, zero pending and status3/3; only distinct PvE targets are requested and the occupied interrupted mine is not attacked. Checked-in evidence docs/acceptance/gather-occupied-2026-11-15.json. Full suite796 tests:784 passed,12 optional private-capture skips; typecheck, validated build and diff whitespace checks PASS. Game responses in the Chrome acceptance are controlled fixtures, not a live-game outcome.
+## Passive-first march reads — 0.10.95
+
+@task-VHE-ZRSTK3 reduces automatic getMarches calls without changing Locked Decisions D1-D5. Header bootstrap and smart/defense followups reuse fresh native snapshots; repeated energy userGetInfo does not trigger login bootstrap. Known full deployed marches wait until a route/gather ETA, with stale-data recovery for due or unknown ETA. Captured gatheringMineCompleted and returnFromMineCompleted update known own squads directly; released troops/heroes still require fresh unit evidence after return. Complete initial hydration, account isolation and explicit manual refresh remain required. See @doc/architecture/passive-first-gathering-march-observations for request sources, capture provenance, bounded recovery and regression scenarios.

@@ -15,6 +15,7 @@ import GoalsTab from '@/src/components/tabs/GoalsTab.vue';
 import QuestsTab from '@/src/components/tabs/QuestsTab.vue';
 import SettingsTab from '@/src/components/tabs/SettingsTab.vue';
 import ExpeditionsModal from '@/src/components/dialogs/ExpeditionsModal.vue';
+import MailModal from '@/src/components/dialogs/MailModal.vue';
 import LogModal from '@/src/components/dialogs/LogModal.vue';
 
 import { useModals } from '@/src/composables/useModals';
@@ -82,6 +83,7 @@ const { modalState, modalContext } = useModals();
       <TowerModal v-model="modalState.tower" />
       <DungeonModal v-model="modalState.dungeon" />
       <ExpeditionsModal v-model="modalState.expeditions" />
+      <MailModal v-model="modalState.mail" />
       <QuestDetailModal v-model="modalState.questDetail" :initial-filter="modalContext.selectedQuestFilter" />
       <DraftModal v-model="modalState.draft" />
       <GuildVersusModal v-model="modalState.guildVersus" />

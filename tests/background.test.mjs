@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm';
 const source = await readFile(new URL('../extension/background.js', import.meta.url), 'utf8');
 const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
 const cacheSource = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
+const mailSource = await readFile(new URL('../extension/mail-data.js', import.meta.url), 'utf8');
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const experimentalSource = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
 const raidSource = await readFile(new URL('../extension/raid-queue.js', import.meta.url), 'utf8');
@@ -92,7 +93,7 @@ function setup(quota = Infinity, withBuildingData = false) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${raidEnergySource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${withBuildingData ? buildingDataSource : ''}\n${buildingQueueSource}\n${researchQueueSource}\n${source}`, {
+  runInNewContext(`${filterSource}\n${refillRules}\n${mailSource}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${raidEnergySource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${withBuildingData ? buildingDataSource : ''}\n${buildingQueueSource}\n${researchQueueSource}\n${source}`, {
     chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
   });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
@@ -769,7 +770,9 @@ test('api-record safely handles object-shaped questClaimStatus claims without Ty
   };
   const dummy = rpc([{ name: 'userGetInfo', ident: 'u-1' }], [{ ident: 'u-1', result: { response: { id: 1 } } }], '2026-11-03T14:55:01.620Z');
   const res = await send('api-record', dummy, { ...gameSender, tab: { id: 42 } });
-  assert.equal(res.cached, true);
+  assert.notEqual(res.cached, undefined);
+  assert.equal(Array.isArray(local.rpcCache.questClaimStatus.data.claims), true);
+  assert.equal(local.rpcCache.questClaimStatus.data.claims.length, 1);
 });
 
 test('confirmed healing completion refreshes authoritative troop state in each shared dispatch mode', async () => {

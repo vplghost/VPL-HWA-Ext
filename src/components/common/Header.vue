@@ -27,6 +27,7 @@ import { formatDuration } from '@/src/utils/formatters';
 import { useGameConnection } from '@/src/composables/useGameConnection';
 import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 import { getResourceIcon } from '@/src/utils/itemResources';
+import { mail } from '@/src/utils/mail';
 
 const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
 const { theme, applyTheme } = useTheme();
@@ -76,7 +77,7 @@ onMounted(async () => {
       { name: 'getSummary', feature: 'personalResearch' },
       { name: 'getMarches', feature: 'march' },
       { name: 'getMineSummary', feature: 'mine' },
-    ]).catch(() => {});
+    ], { passiveFirst: true }).catch(() => {});
   }
 
   // Check if opened as standalone tab
@@ -386,60 +387,13 @@ const draftTooltip = computed(() => {
 
 // Mail / Battle Reports Status
 const mailStatus = computed(() => {
-  const mail = cache.value.mailStatus?.data;
-
-  // 1. Check letters with unclaimed rewards
-  const letters = normalizeArray(
-    mail?.letters ?? cache.value.mailGetAll?.data?.letters ?? cache.value.mailGetAll?.letters
-  );
-
-  const unclaimedLetters = letters.filter((l: any) =>
-    l && !l.deleted && (l.reward || l.q_reward || l.items) &&
-    !l.claimed && !l.rewardReceived && !l.rewardClaimed
-  );
-
-  // 2. Check battle reports with unclaimed rewards
-  const reports = normalizeArray(mail?.reports);
-  const unclaimedReports = reports.filter((r: any) => r && r.claimedReward === false);
-
-  let letterCount = unclaimedLetters.length;
-  if (letters.length === 0 && typeof mail?.unclaimedLettersCount === 'number') {
-    letterCount = mail.unclaimedLettersCount;
-  }
-
-  let reportCount = 0;
-  if (reports.length > 0) {
-    reportCount = unclaimedReports.length;
-  } else if (typeof mail?.unclaimedReportsCount === 'number') {
-    reportCount = mail.unclaimedReportsCount;
-  } else if (mail?.hasUnclaimed) {
-    reportCount = Number(mail.totalUnclaimed) || 1;
-  }
-
-  const totalCount = letterCount + reportCount;
-  const hasUnclaimed = totalCount > 0 && Boolean(
-    mail?.hasUnclaimed ||
-    (mail?.totalUnclaimed && mail.totalUnclaimed > 0) ||
-    (mail?.unclaimedReportsCount && mail.unclaimedReportsCount > 0) ||
-    (mail?.unclaimedLettersCount && mail.unclaimedLettersCount > 0) ||
-    unclaimedLetters.length > 0 ||
-    unclaimedReports.length > 0
-  );
-
-  return {
-    hasUnclaimed,
-    count: totalCount || (mail?.totalUnclaimed ?? mail?.unclaimedReportsCount ?? 0),
-  };
+  const rows = mail.rows(cache.value, now.value);
+  const unclaimedLetters = rows.letters.filter((row: any) => row.unclaimed);
+  const unclaimedReports = rows.reports.filter((row: any) => row.unclaimed);
+  const count = unclaimedLetters.length + unclaimedReports.length;
+  return { hasUnclaimed: count > 0, count };
 });
-
-async function refreshMail() {
-  if (dispatchRpc) {
-    await dispatchRpc([
-      { name: 'getPage', feature: 'report', args: { limit: 10, cursor: null } },
-      { name: 'mailGetAll' },
-    ]);
-  }
-}
+function openMail() { openModal('mail'); }
 
 // Energy
 const energyEntry = computed(() => cache.value['resource:energy']);
@@ -666,23 +620,22 @@ function toggleTheme() {
 
         <!-- Mail / Reports Badge -->
         <BaseTooltip
-          v-if="mailStatus.hasUnclaimed"
-          :content="`New mail / battle report with reward${mailStatus.count > 1 ? `s (${mailStatus.count})` : ''} · Click to refresh mail`"
+          :content="mailStatus.hasUnclaimed ? `Mail / battle report rewards (${mailStatus.count}) · Open inbox` : 'Mail · Open inbox'"
         >
-          <span
+          <button
             id="mail-badge"
-            tabindex="0"
-            :aria-label="`New mail / battle report with reward${mailStatus.count > 1 ? `s (${mailStatus.count})` : ''} · Click to refresh mail`"
+            type="button"
+            aria-label="Open mail"
             class="relative cursor-pointer inline-flex items-center justify-center size-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            @click="refreshMail"
+            @click="openMail"
           >
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect width="20" height="16" x="2" y="4" rx="2" />
               <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
             </svg>
-            <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 animate-ping"></span>
-            <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-600"></span>
-          </span>
+            <span v-if="mailStatus.hasUnclaimed" class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 animate-ping"></span>
+            <span v-if="mailStatus.hasUnclaimed" class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-600"></span>
+          </button>
         </BaseTooltip>
 
         <!-- Energy Badge -->

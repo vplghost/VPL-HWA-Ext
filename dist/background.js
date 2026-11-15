@@ -2,6 +2,7 @@ importScripts('tracking-filter.js');
 importScripts('refillable-rules.js');
 importScripts('free-alchemy.js');
 importScripts('speedup-data.js', 'speedup.js');
+importScripts('mail-data.js');
 importScripts('clan-versus-rules.js');
 importScripts('mission-costs.js');
 importScripts('march-rules.js');
@@ -41,12 +42,14 @@ let pending = Promise.resolve();
 
 // Routine storage optimization on worker startup
 try {
-  chrome.storage.local.get('rpcCache').then((stored) => {
+  pending = pending.then(async () => {
+    const stored = await chrome.storage.local.get('rpcCache');
     if (stored?.rpcCache && globalThis.hwaHelperRpcCache?.pruneCache) {
       const pruned = globalThis.hwaHelperRpcCache.pruneCache(stored.rpcCache);
       if (pruned.changed) {
-        chrome.storage.local.set({ rpcCache: pruned.cache }).catch(() => {});
+        await chrome.storage.local.set({ rpcCache: pruned.cache });
       }
+      scheduleMailExpiry(pruned.cache);
     }
   }).catch(() => {});
 } catch (_) {}
@@ -147,6 +150,40 @@ function rpcMessageForSettings(stored, calls, claim = false, extra = {}) {
   const queued = stored.socketRefreshMode !== 'direct';
   if (queued && stored.captureSettings?.interceptEnabled === false) return null;
   return { kind: queued ? (claim ? 'queue-claim' : 'queue-rpc') : 'refresh-rpc', calls, ...extra };
+}
+
+// Native observations satisfy automatic reads; explicit refresh bypasses this.
+const marchReadLeases = new Map();
+function passiveMarchReads(cache, calls, now = Date.now(), after = now - 60000) {
+  const account = String(cache?.accountStatus?.data?.id ?? 'unknown');
+  for (const [key, value] of marchReadLeases) if (now >= value.until) marchReadLeases.delete(key);
+  return calls.filter(call => {
+    const name = call.name === 'getMarches' && call.feature === 'march' ? 'marchStatus' :
+      call.name === 'getUnitSummary' && call.feature === 'unit' ? 'getUnitSummary:unit' : null;
+    if (!name) return true;
+    const entry = cache?.[name], at = Date.parse(entry?.updatedAt);
+    const rows = name === 'marchStatus' ? entry?.data?.marches : entry?.data?.squads;
+    const complete = name !== 'marchStatus' || entry?.method === 'getMarches' ||
+      String(cache?.marchSnapshotStatus?.data?.accountId) === account;
+    if (complete && rows && typeof rows === 'object' && at >= after && at <= now) return false;
+    const key = account + ':' + name, lease = marchReadLeases.get(key);
+    if (lease && lease.at >= after) return false;
+    if (marchReadLeases.size >= 100) marchReadLeases.delete(marchReadLeases.keys().next().value);
+    marchReadLeases.set(key, { at: now, until: now + 30000 });
+    return true;
+  });
+}
+function observeMarchReads(record, cache) {
+  if (record?.status !== 200 || record.method !== 'POST' || record.endpoint !== 'https://api.hero-wars-alliance.com/api/rpc' ||
+      record.requestBodyTruncated || record.responseBodyTruncated) return;
+  try {
+    const calls = JSON.parse(record.requestBody).calls || [], results = JSON.parse(record.responseBody).results || [];
+    for (const call of calls) if (results.some(result => result.ident === call.ident)) {
+      const key = call.name === 'getMarches' && call.feature === 'march' ? 'marchStatus' :
+        call.name === 'getUnitSummary' && call.feature === 'unit' ? 'getUnitSummary:unit' : null;
+      if (key) marchReadLeases.delete(String(cache?.accountStatus?.data?.id ?? 'unknown') + ':' + key);
+    }
+  } catch (_) {}
 }
 
 async function saveRaidTransition(transition, stored) {
@@ -767,6 +804,10 @@ function setupQueueAlarms() {
 }
 
 chrome.alarms?.onAlarm?.addListener?.(async (alarm) => {
+  if (alarm.name === 'hwa-mail-expiry') {
+    pending = pending.then(pruneExpiredMail).catch(() => {});
+    await pending;
+  }
   if (alarm.name === 'hwa-building-queue-recovery' || alarm.name === 'hwa-research-queue-recovery') {
     await advanceCityQueue(alarm.name === 'hwa-building-queue-recovery' ? 'building' : 'research');
   }
@@ -809,6 +850,7 @@ try {
 } catch (_) {}
 
 pending = pending.then(async () => {
+  await pruneExpiredMail();
   await reconcileSpeedup((await chrome.storage.local.get('rpcCache')).rpcCache);
   return runFreeSpin();
 }).catch(() => {});
@@ -995,6 +1037,76 @@ async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType = null;
 let lastAutoGatherPendingLevel = null;
+
+function scheduleMailExpiry(cache = {}) {
+  const helper = globalThis.hwaHelperMailData;
+  const deadlines = [
+    ...helper.list(cache.mailStatus?.data?.letters), ...helper.list(cache.mailGetAll?.data?.letters ?? cache.mailGetAll?.letters),
+    ...helper.list(cache.mailStatus?.data?.reports).map(row => ({ availableUntil: helper.expiry(row, 'report') / 1000 })),
+    ...helper.list(cache['getPage:report']?.data?.reports).map(row => ({ availableUntil: helper.expiry(row, 'report') / 1000 }))
+  ].map(row => helper.expiry(row)).filter(at => Number.isFinite(at) && at > Date.now());
+  if (deadlines.length) chrome.alarms?.create?.('hwa-mail-expiry', { when: Math.min(...deadlines) });
+  else chrome.alarms?.clear?.('hwa-mail-expiry');
+}
+async function pruneExpiredMail() {
+  const stored = await chrome.storage.local.get('rpcCache');
+  const result = globalThis.hwaHelperMailData.prune(stored.rpcCache || {}, Date.now());
+  if (result.changed) await chrome.storage.local.set({ rpcCache: result.cache });
+  scheduleMailExpiry(result.cache);
+  await reconcileMailClaim(result.cache);
+  return { ok: true, removedExpired: result.changed };
+}
+async function reconcileMailClaim(cache) {
+  const state = (await chrome.storage.local.get('mailClaimState')).mailClaimState;
+  if (!state?.pending || cache.accountStatus?.data?.id == null) return;
+  const helper = globalThis.hwaHelperMailData, request = state.pending;
+  const receipt = helper.list(cache.mailClaimReceipts?.data).find(row => row.token === request.token && String(row.accountId) === String(state.accountId));
+  const changedAccount = String(cache.accountStatus.data.id) !== String(state.accountId);
+  const status = cache.mailStatus?.data || {}, collection = request.kind === 'letters' ? helper.list(status.letters) : helper.list(status.reports);
+  const observedAt = request.kind === 'letters' ? status.lettersObservedAt : status.reportsObservedAt;
+  const snapshotSettled = String(status.accountId) === String(state.accountId) && Date.parse(observedAt) >= request.sentAt && request.ids.every(id => !collection.some(row => String(row.id ?? row.letterId) === id &&
+    (request.kind === 'letters' ? helper.unclaimed(row) : row.claimedReward === false)));
+  const expiredAll = request.deadline && Date.now() >= request.deadline;
+  if (receipt || changedAccount || snapshotSettled || expiredAll) {
+    if (state.tabId && (changedAccount || expiredAll)) await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: 'mail-claim' }).catch(() => {});
+    await chrome.storage.local.set({ mailClaimState: { accountId: cache.accountStatus.data.id, pending: null,
+      message: changedAccount ? 'Account changed. Refresh mail.' : receipt ? receipt.success ? 'Rewards claimed by game.' : receipt.error || 'Claim rejected by game.'
+        : expiredAll ? 'Mail expired while awaiting confirmation. Refresh to check the outcome.' : 'Mail list updated by game. Check the returned rewards.' } });
+  }
+}
+async function claimMail(message) {
+  await pruneExpiredMail();
+  const stored = await chrome.storage.local.get(['rpcCache', 'mailClaimState', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  if (stored.mailClaimState?.pending) return { ok: false, error: 'A mail claim is awaiting game confirmation.' };
+  if (!rpcMessageForSettings(stored, [])) return { ok: false, error: 'Mail claims are paused by shared RPC settings.' };
+  const helper = globalThis.hwaHelperMailData, cache = stored.rpcCache || {}, accountId = cache.accountStatus?.data?.id;
+  if (accountId == null || String(message.accountId) !== String(accountId)) return { ok: false, error: 'Current mail account changed. Refresh mail.' };
+  const rows = helper.rows(cache), kind = message.reports === true ? 'reports' : 'letters';
+  const ids = kind === 'letters' ? Array.isArray(message.ids) ? [...new Set(message.ids.map(String))] : [] : rows.reports.filter(row => row.canClaim).map(row => String(row.id));
+  const candidates = kind === 'letters' ? rows.letters : rows.reports;
+  if (!rows.scoped || !ids.length || kind === 'letters' && ids.length > 100 || ids.some(id => !candidates.some(row => String(row.id) === id && row.canClaim))) return { ok: false, error: 'No matching unclaimed, unexpired mail. Refresh first.' };
+  const tab = await findActiveGameTab();
+  if (!tab?.id) return { ok: false, error: 'Open the game to claim mail.' };
+  const context = await chrome.tabs.sendMessage(tab.id, { kind: 'game-account-context' }).catch(() => null);
+  if (!context?.ok || String(context.accountId) !== String(accountId)) return { ok: false, error: 'Refresh the game to verify the mail account.' };
+  const token = crypto.randomUUID().replaceAll('-', '');
+  const call = kind === 'letters' ? { name: 'mailFarm', args: { letterIds: ids }, ident: token }
+    : { name: 'readAndClaimAll', feature: 'report', args: { types: helper.reportTypes }, ident: token };
+  if (!helper.validateClaim(call)) return { ok: false, error: 'Invalid mail claim.' };
+  const latest = await chrome.storage.local.get(['rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  const latestRows = helper.rows(latest.rpcCache || {}), selected = kind === 'letters' ? latestRows.letters : latestRows.reports;
+  if (String(latest.rpcCache?.accountStatus?.data?.id) !== String(accountId) || !rpcMessageForSettings(latest, []) ||
+      ids.some(id => !selected.some(row => String(row.id) === id && row.canClaim))) return { ok: false, error: 'Mail or RPC settings changed. Refresh before claiming.' };
+  const now = Date.now(), deadlines = selected.filter(row => ids.includes(String(row.id))).map(row => row.expiresAtMs ?? Infinity);
+  const queueDeadline = Math.min(...deadlines), deadline = Math.max(...deadlines);
+  if (queueDeadline <= now) return { ok: false, error: 'Mail has expired. Refresh mail.' };
+  const dispatch = rpcMessageForSettings(latest, [call, { name: 'mailGetAll' }], true);
+  const state = { accountId, tabId: tab.id, pending: { token, kind, ids, sentAt: now, deadline: Number.isFinite(deadline) ? deadline : null }, message: 'Waiting for mail claim confirmation.' };
+  await chrome.storage.local.set({ mailClaimState: state });
+  try { await chrome.tabs.sendMessage(tab.id, { ...dispatch, group: 'mail-claim', expiresAt: Math.min(now + 30000, queueDeadline) }); }
+  catch (_) { return { ok: false, error: 'Claim transport uncertain. Pending retained; refresh game data before retrying.' }; }
+  return { ok: true, queued: dispatch.kind !== 'refresh-rpc' };
+}
 
 async function reconcileSpeedup(cache) {
   const stored = await chrome.storage.local.get('speedupSpendState');
@@ -1212,6 +1324,11 @@ async function evaluateMineDefense(record, cache, stored, state, tabId, now) {
     defense.refreshAt = now;
   }
   if (calls.length) {
+    const returningUntil = defense.pending?.phase === 'returning' ? defense.pending.returnAt : null;
+    calls = Number.isFinite(returningUntil) && now < returningUntil ? calls.filter(call => !['getMarches', 'getUnitSummary'].includes(call.name)) :
+      passiveMarchReads(cache, calls, now, Math.max(now - 10000, defense.pending?.sentAt || 0, returningUntil || 0));
+  }
+  if (calls.length) {
     const dispatch = rpcMessageForSettings(stored, calls);
     if (dispatch) {
       await chrome.storage.local.set({ smartGatherState: state });
@@ -1255,7 +1372,11 @@ async function evaluateSmartGather(record, cache, stored, tabId, now = Date.now(
       state.pending.phase === 'refresh' ? `Confirming ${method} with current march/unit snapshots` :
       `Waiting for ${method} response · ${stored.socketRefreshMode === 'direct' ? 'Direct' : 'queued; requires a game RPC carrier'}`;
     if (['returning', 'refresh'].includes(state.pending.phase) && now - (state.lastRefreshAt || 0) >= 5000) {
-      calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
+      const returnAt = state.pending.phase === 'returning' ? Math.max(state.pending.returnAt || 0,
+        cache.marchReturnStatus?.data?.completions?.[state.pending.squadId ?? state.pending.call.args?.squadId] || 0) : 0;
+      if (now >= returnAt) calls = passiveMarchReads(cache,
+        [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }], now,
+        Math.max(state.pending.confirmedAt || 0, returnAt, now - 10000));
       state.lastRefreshAt = now;
     }
   } else if (!state.error && state.reservation?.type === 'rally' && now < state.reservation.expiresAt) {
@@ -1273,7 +1394,8 @@ async function evaluateSmartGather(record, cache, stored, tabId, now = Date.now(
     if (Date.parse(cache.marchStatus?.updatedAt) >= reservation.confirmedAt &&
         Date.parse(cache['getUnitSummary:unit']?.updatedAt) >= reservation.confirmedAt && !exists && !deployed) state.reservation = null;
     else if (now - (state.lastRefreshAt || 0) >= 5000) {
-      calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
+      calls = passiveMarchReads(cache, [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }], now,
+        Math.max(reservation.confirmedAt || 0, now - 10000));
       state.lastRefreshAt = now;
     }
     reason = 'Waiting for rally team to return before resuming gathering';
@@ -1283,6 +1405,7 @@ async function evaluateSmartGather(record, cache, stored, tabId, now = Date.now(
     reason = plan.reason || (plan.action === 'gather' ? 'Dispatching gathering squad' : 'Searching for resource mine');
     calls = plan.calls || (plan.call ? [plan.call] : []);
     if (calls.length && now - (state.lastPlanAt || 0) < 5000) calls = [];
+    if (calls.length) calls = passiveMarchReads(cache, calls, now);
     if (calls.length) {
       state.lastPlanAt = now;
       if (plan.nearest) state.nearest = plan.nearest;
@@ -1373,7 +1496,9 @@ function socketRefreshCalls(record, cache) {
     body = event?.body;
   } catch (_) { return []; }
   if (type === 'randomDraft_statusChanged') return [{ name: 'randomDraft_getInfo' }];
-  if (['marchAttackDetected', 'marchAttackEnded', 'gatheringMineCompleted', 'returnFromMineCompleted'].includes(type))
+  if (['marchAttackDetected', 'marchAttackEnded'].includes(type))
+    return [{ name: 'getHealing', feature: 'unit' }];
+  if (['gatheringMineCompleted', 'returnFromMineCompleted'].includes(type))
     return [{ name: 'getIncomingMarches', feature: 'march', args: {} }, { name: 'getMarches', feature: 'march' },
       { name: 'getUnitSummary', feature: 'unit' }, { name: 'getHealing', feature: 'unit' }];
   if (type === 'newReport') return [{ name: 'getPage', feature: 'report',
@@ -1477,6 +1602,12 @@ async function handleControl(kind) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (['mail-claim', 'mail-prune'].includes(message?.kind) && sender.url?.startsWith('chrome-extension://' + chrome.runtime.id + '/')) {
+    pending = pending.then(() => message.kind === 'mail-prune' ? pruneExpiredMail() : claimMail(message));
+    pending.then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
   if (message?.kind === 'speedup-use' && sender.url?.startsWith('chrome-extension://' + chrome.runtime.id + '/')) {
     pending = pending.then(() => useConfirmedSpeedup(message));
     pending.then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
@@ -1970,7 +2101,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     if (message.kind === 'engine-ping') forward();
     else chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode',
-      'captureSettings', 'claimRpcStatus']).then((stored) => {
+      'captureSettings', 'claimRpcStatus', 'rpcCache']).then((stored) => {
       if (stored.popupRpcEnabled === true) {
         if (message.kind === 'claim-rewards') {
           const allowed = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm',
@@ -2002,6 +2133,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           } else forward();
         } else {
           let calls = message.calls;
+          if (message.kind === 'refresh-rpc' && message.passiveFirst && Array.isArray(calls) && rpcMessageForSettings(stored, [])) {
+            calls = passiveMarchReads(stored.rpcCache, calls);
+            if (!calls.length) { sendResponse({ ok: true, skipped: true }); return; }
+          }
           if (message.kind === 'draft-action') {
             if (!['saveDefence', 'saveAttack'].includes(message.action) ||
                 !Array.isArray(message.heroes) || message.heroes.length !== 5 ||
@@ -2150,6 +2285,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       await chrome.storage.session.remove('raidEnergyWatch');
     }
     const cacheResult = globalThis.hwaHelperRpcCache.merge(stored.rpcCache, [record]);
+    observeMarchReads(record, cacheResult.cache);
     if (cacheResult.changed) {
       await chrome.storage.local.set({ rpcCache: cacheResult.cache });
       const heroSnap = cacheResult.cache.heroGetAll;
@@ -2172,27 +2308,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id);
     if (sender.tab?.id) await runFreeSpin(false, record, sender.tab.id);
     await reconcileSpeedup(cacheResult.cache);
+    await reconcileMailClaim(cacheResult.cache);
+    scheduleMailExpiry(cacheResult.cache);
+    if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
+        cacheResult.cache.mailClaimStatus?.updatedAt === record.timestamp && cacheResult.cache.mailClaimStatus.data?.success) {
+      const calls = [{ name: 'userGetInfo' }, { name: 'inventoryGet' }, { name: 'getInventory', feature: 'inventory' }];
+      if (cacheResult.cache.mailClaimStatus.data.kind === 'reports') calls.push({ name: 'getPage', feature: 'report', args: { limit: 50, cursor: null } });
+      const dispatch = rpcMessageForSettings(stored, calls);
+      if (dispatch) chrome.tabs.sendMessage(sender.tab.id, { ...dispatch, group: 'mail-refresh' }).catch(() => {});
+    }
     if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
         cacheResult.cache.speedupStatus?.updatedAt === record.timestamp && cacheResult.cache.speedupStatus.data?.success) {
       const calls = globalThis.hwaHelperSpeedup.refreshCalls(cacheResult.cache.speedupStatus.data.kind);
       const dispatch = rpcMessageForSettings(stored, calls);
       if (dispatch) chrome.tabs.sendMessage(sender.tab.id, { ...dispatch, group: 'speedup-refresh' }).catch(() => {});
     }
-    if (stored.popupRpcEnabled === true && sender.tab?.id) {
-      const calls = socketRefreshCalls(record, cacheResult.cache);
+    if (rpcMessageForSettings(stored, []) && sender.tab?.id) {
+      const calls = passiveMarchReads(cacheResult.cache, socketRefreshCalls(record, cacheResult.cache), Date.now(), Date.parse(record.timestamp));
       const dispatch = rpcMessageForSettings(stored, calls);
       if (calls.length && dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
-    if (stored.popupRpcEnabled === true && sender.tab?.id && record.requestBody &&
-        (record.requestBody.includes('"userGetInfo"') || record.requestBody.includes('"mobileLogin"'))) {
-      const dispatch = rpcMessageForSettings(stored, [
+    const accountLoaded = cacheResult.cache.accountStatus?.updatedAt === record.timestamp &&
+      (String(stored.rpcCache?.accountStatus?.data?.id ?? '') !== String(cacheResult.cache.accountStatus?.data?.id ?? '') ||
+       /"name"\s*:\s*"mobileLogin"/.test(record.requestBody || ''));
+    if (rpcMessageForSettings(stored, []) && sender.tab?.id && accountLoaded) {
+      const calls = passiveMarchReads(cacheResult.cache, [
         { name: 'getSummary', feature: 'building' },
         { name: 'getSummary', feature: 'personalResearch' },
         { name: 'getMarches', feature: 'march' },
         { name: 'getUnitSummary', feature: 'unit' },
         { name: 'getIncomingMarches', feature: 'march', args: {} }
       ]);
-      if (dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+      const dispatch = rpcMessageForSettings(stored, calls);
+      if (calls.length && dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
     if (stored.popupRpcEnabled === true && cacheResult.changed && sender.tab?.id &&
         cacheResult.cache.brigandCampStatus?.updatedAt === record.timestamp &&

@@ -1390,6 +1390,7 @@
 
     const unclaimedLetters = letters.filter((l) =>
       l && !l.deleted && (l.reward || l.q_reward || l.items) &&
+        !(Number(l.availableUntil) > 0 && Number(l.availableUntil) * 1000 <= Date.now()) &&
       !l.claimed && !l.rewardReceived && !l.rewardClaimed
     );
     const letterIds = unclaimedLetters.map((l) => l.id ?? l.letterId).filter((id) => id != null);

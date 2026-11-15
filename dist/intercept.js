@@ -96,6 +96,7 @@
     }
     return helperActionMethods.has(call?.name);
   }
+  const trackedMail = call => globalThis.hwaHelperMailData?.validateClaim(call) && /^[a-f0-9]{32}$/.test(call.ident || '');
   const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok, error = null) => window.postMessage({
@@ -287,7 +288,7 @@
         if (!(isClaim ? claimQueueMethods.has(call?.name) :
             isPiggybackRead(call) || isHelperAction(call))) continue;
         const safe = { name: call.name, args: call.args || {},
-          ...(globalThis.hwaHelperSpeedup?.kindFor(call) ? { ident: call.ident } : {}),
+          ...(globalThis.hwaHelperSpeedup?.kindFor(call) || trackedMail(call) ? { ident: call.ident } : {}),
           ...(call.feature ? { feature: call.feature } : {}) };
         const key = JSON.stringify(safe);
         if (event.data.calls.some((item) => isHelperAction(item) || claimActionMethods.has(item?.name)) &&
@@ -380,7 +381,7 @@
         calls: calls.map((c) => ({
           name: typeof c === 'string' ? c : c.name,
           args: (typeof c === 'object' && c.args) ? c.args : {},
-          ident: globalThis.hwaHelperSpeedup?.kindFor(c) ? c.ident : randHex() + randHex(),
+          ident: globalThis.hwaHelperSpeedup?.kindFor(c) || trackedMail(c) ? c.ident : randHex() + randHex(),
           ...(typeof c === 'object' && c.feature ? { feature: c.feature } : {})
         }))
       };
@@ -1129,7 +1130,7 @@
         isHelperAction(call) || claimActionMethods.has(call.name));
       for (const [key, call] of queuedRpcCalls) {
         if (!existing.has(key) || (hasActions && isPiggybackRead(call))) {
-          const ident = globalThis.hwaHelperSpeedup?.kindFor(call) ? call.ident :
+          const ident = globalThis.hwaHelperSpeedup?.kindFor(call) || trackedMail(call) ? call.ident :
             Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16) + Math.random().toString(16).slice(2).padEnd(16, '0').slice(0, 16);
           appended.push({ ...call, ident });
           if (queuedClaimKeys.has(key) && claimActionMethods.has(call.name)) claimIds.push(ident);

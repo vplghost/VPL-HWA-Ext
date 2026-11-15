@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.95 — 2026-11-15
+
+### Added
+
+- Header Mail opens a reward-first inbox dialog with deadlines, single/bulk mail claims and report rewards. Claims retain account-scoped pending state until game confirmation.
+- Automatically remove mail/report entries with explicit expired deadlines from canonical/raw caches and badge counts; preserve unknown expiry and replace full inbox snapshots without retaining absent mail.
+
+### Changed
+
+- Show Dashboard marches in two compact columns with k/M gathering amounts and no repeated resource labels.
+- Prefer passive RPC/MQTT march observations, coalesce automatic march/troop reads and request only missing snapshots. Energy refresh no longer triggers march bootstrap; stable deployed gatherers wait until their next route transition before polling.
+- Apply captured mine return routes/completion pushes directly to marches while requiring fresh troop evidence before releasing recalled teams.
+
 ## 0.10.94 — 2026-11-15
 
 ### Changed

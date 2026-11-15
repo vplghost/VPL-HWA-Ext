@@ -88,13 +88,13 @@ export function useRpcCache() {
     cache.value = next;
   }
 
-  async function dispatchRpc(calls: Array<{ name: string; args?: any; feature?: string }>) {
+  async function dispatchRpc(calls: Array<{ name: string; args?: any; feature?: string }>, options: { passiveFirst?: boolean } = {}) {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
       return { ok: false, error: 'Extension runtime is unavailable.' };
     }
     return new Promise<any>((resolve) => {
       try {
-        chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+        chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls, ...options }, (response) => {
           const error = chrome.runtime.lastError;
           resolve(error ? { ok: false, error: error.message || 'RPC transport failed.' } :
             response || { ok: false, error: 'No response from extension background.' });

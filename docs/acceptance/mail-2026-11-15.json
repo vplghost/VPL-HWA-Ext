@@ -1,0 +1,28 @@
+{
+  "localFixtureOnly": true,
+  "modes": [
+    {
+      "mode": "direct",
+      "claims": 1,
+      "openDoesNotRefresh": true,
+      "expiredHidden": true,
+      "unknownExpiryPreserved": true,
+      "receiptSettled": true,
+      "marchTwoColumns": true,
+      "compactGatherAmounts": true,
+      "extraMarchReadsForTwoEnergyRefreshes": 0
+    },
+    {
+      "mode": "piggyback",
+      "claims": 1,
+      "openDoesNotRefresh": true,
+      "expiredHidden": true,
+      "unknownExpiryPreserved": true,
+      "receiptSettled": true,
+      "marchTwoColumns": true,
+      "compactGatherAmounts": true,
+      "extraMarchReadsForTwoEnergyRefreshes": 0
+    }
+  ],
+  "errors": []
+}

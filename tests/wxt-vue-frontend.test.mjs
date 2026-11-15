@@ -615,7 +615,7 @@ test('SettingsTab supports popupRpcEnabled toggle, socketRefreshMode direct, and
   assert.match(settings, /id="socket-refresh-mode"/, 'SettingsTab must feature #socket-refresh-mode');
 });
 
-test('Header.vue accurately evaluates legend draft and mail indicator states and dispatches mail refresh', async () => {
+test('Header.vue evaluates live mail rewards and opens the inbox instead of refreshing', async () => {
   const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
 
   // Legend Draft checks
@@ -627,10 +627,10 @@ test('Header.vue accurately evaluates legend draft and mail indicator states and
   // Mail checks
   assert.match(header, /unclaimedLetters/, 'Header must compute actual unclaimed letters');
   assert.match(header, /unclaimedReports/, 'Header must compute actual unclaimed reports');
-  assert.match(header, /refreshMail/, 'Header must implement refreshMail');
-  assert.match(header, /@click="refreshMail"/, 'Header must bind @click="refreshMail" on #mail-badge');
-  assert.match(header, /name:\s*'getPage',\s*feature:\s*'report'/, 'refreshMail must request getPage:report');
-  assert.match(header, /name:\s*'mailGetAll'/, 'refreshMail must request mailGetAll');
+  assert.match(header, /openModal\('mail'\)/);
+  assert.match(header, /@click="openMail"/);
+  assert.match(header, /mail\.rows\(cache.value, now.value\)/, 'Badge must exclude expired mail as time advances');
+  assert.doesNotMatch(header, /refreshMail|@click="refreshMail"/);
 });
 
 test('App.vue and tab toolbars use responsive container widths and balanced toolbar layouts', async () => {
