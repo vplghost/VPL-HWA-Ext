@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.96 — 2026-11-15
+
+### Changed
+
+- Reduce idle incoming-march monitoring to a 60-second fallback while active attacks retain 15-second freshness and immediate MQTT defense handling. Reuse native snapshots and omit incoming reads from mine-return notifications.
+- Coalesce rally-detail push bursts with a five-second read window and one persisted trailing refresh for newer versions. Native details can satisfy the refresh; explicit join and raid cancellation checks remain immediate.
+
 ## 0.10.95 — 2026-11-15
 
 ### Added

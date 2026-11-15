@@ -1,0 +1,20 @@
+{
+  "localFixtureOnly": true,
+  "modes": [
+    {
+      "mode": "direct",
+      "incomingExtraReadsForTenChecks": 0,
+      "rallyRequestsForTenVersions": 2,
+      "trailingAlarmConfirmed": true,
+      "latestVersion": 10
+    },
+    {
+      "mode": "piggyback",
+      "incomingExtraReadsForTenChecks": 0,
+      "rallyRequestsForTenVersions": 2,
+      "trailingAlarmConfirmed": true,
+      "latestVersion": 10
+    }
+  ],
+  "errors": []
+}

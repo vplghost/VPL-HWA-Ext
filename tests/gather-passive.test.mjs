@@ -13,17 +13,17 @@ const rpc = (calls, replies, at) => ({ transport: 'fetch', method: 'POST', statu
 const mqtt = (type, body, at) => ({ transport: 'websocket', method: 'PUBLISH', status: null, durationMs: 0, outcome: 'completed', direction: 'received', encoding: 'utf8', timestamp: stamp(at),
   topic: 'hwm/user/test', qos: 0, payloadTruncated: false, payloadBytes: 100,
   endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt', payload: JSON.stringify({ result: { type, body } }) });
-async function environment(mode = 'direct') {
-  const clock = { now: start }, local = { popupRpcEnabled: true, socketRefreshMode: mode, rpcCache: {
+async function environment(mode = 'direct', existing) {
+  const clock = { now: start }, local = existing ? structuredClone(existing) : { popupRpcEnabled: true, socketRefreshMode: mode, rpcCache: {
     accountStatus: { data: { id: 1 } }, marchStatus: { method: 'getMarches', updatedAt: stamp(start), data: { marches: [] } },
     'getUnitSummary:unit': { updatedAt: stamp(start), data: { squads: [], available: [] } } } };
-  const sent = []; let listener;
+  const sent = [], alarms = new Map(); let listener, onAlarm;
   class Clock extends Date { static now() { return clock.now; } }
   const area = { get: async keys => structuredClone(Object.fromEntries((keys == null ? Object.keys(local) : Array.isArray(keys) ? keys : [keys]).filter(k => k in local).map(k => [k, local[k]]))),
     set: async values => Object.assign(local, structuredClone(values)), remove: async keys => (Array.isArray(keys) ? keys : [keys]).forEach(k => delete local[k]) };
   const chrome = { runtime: { id: 'test', onMessage: { addListener: fn => { listener = fn; } }, onInstalled: { addListener() {} } },
     storage: { local: area, session: area, onChanged: { addListener() {} } },
-    alarms: { get: (_, cb) => cb({}), create() {}, clear() {}, onAlarm: { addListener() {} } },
+    alarms: { get: (_, cb) => cb({}), create: (name, options) => alarms.set(name, options), clear: name => alarms.delete(name), onAlarm: { addListener: fn => { onAlarm = fn; } } },
     tabs: { query: (_, cb) => cb([{ id: 1, url: 'https://www.hero-wars-alliance.com/' }]), sendMessage: async (_, msg) => { sent.push(structuredClone(msg)); return { ok: true }; } } };
   const ctx = vm.createContext({ chrome, console, Date: Clock, URL, TextEncoder, crypto: webcrypto, structuredClone });
   ctx.importScripts = (...files) => files.forEach(file => vm.runInContext(readFileSync(new URL(file, root), 'utf8'), ctx));
@@ -31,7 +31,7 @@ async function environment(mode = 'direct') {
   await ctx.drain();
   const send = (message, game = false) => new Promise(resolve => listener(message, game ? { url: 'https://www.hero-wars-alliance.com/', tab: { id: 1 } } : { url: 'chrome-extension://test/popup.html' }, resolve));
   const merge = record => { local.rpcCache = structuredClone(ctx.hwaHelperRpcCache.merge(local.rpcCache, [record]).cache); };
-  return { ctx, clock, local, sent, send, merge };
+  return { ctx, clock, local, sent, send, merge, alarms, fireAlarm: name => onAlarm({ name }) };
 }
 
 test('passive-first popup reads reuse native snapshots, deduplicate missing reads and retain explicit refresh', async () => {
@@ -121,4 +121,82 @@ test('a single rally push does not substitute for the first complete march snaps
     rallyId: 'r2', squad: { squadId: 's2', heroes: [], units: [] }, route: { startedAt: start + 1, durationMs: 20000 }
   }, start + 1) }, true);
   assert.ok(e.sent.flatMap(msg => msg.calls || []).every(c => c.name !== 'getMarches'));
+});
+
+test('idle incoming monitoring reuses snapshots for a minute and native refresh restores the window', async () => {
+  for (const mode of ['direct', 'piggyback']) {
+    const e = await environment(mode), incoming = { name: 'getIncomingMarches', feature: 'march', args: {} };
+    e.local.autoGatherSettings = { enabled: true, smartEnabled: true, mineType: 'food', maxMarches: 1 };
+    e.local.rpcCache.marchStatus.data.marches = [{ squadId: 'g', kind: 'food', mineId: 'mine', stage: 'gathering', endsAt: start + 3600000 }];
+    await e.send({ kind: 'api-record', record: rpc([incoming], [{ attacks: [] }], start) }, true);
+    e.sent.length = 0;
+    for (let seconds = 5; seconds <= 60; seconds += 5) {
+      e.clock.now = start + seconds * 1000;
+      await e.ctx.runGather(null, e.local.rpcCache, e.local, 1, e.clock.now);
+    }
+    assert.equal(e.sent.flatMap(msg => msg.calls || []).filter(c => c.name === 'getIncomingMarches').length, 0);
+    e.clock.now = start + 65000;
+    await e.ctx.runGather(null, e.local.rpcCache, e.local, 1, e.clock.now);
+    assert.equal(e.sent.flatMap(msg => msg.calls || []).filter(c => c.name === 'getIncomingMarches').length, 1);
+    await e.send({ kind: 'api-record', record: rpc([incoming], [{ attacks: [] }], e.clock.now) }, true);
+    e.clock.now += 20000;
+    await e.ctx.runGather(null, e.local.rpcCache, e.local, 1, e.clock.now);
+    assert.equal(e.sent.flatMap(msg => msg.calls || []).filter(c => c.name === 'getIncomingMarches').length, 1);
+  }
+});
+
+test('rally push bursts coalesce and defer only unsatisfied newer versions', async () => {
+  for (const mode of ['direct', 'piggyback']) {
+    const e = await environment(mode), own = { squadId: 's', kind: 'raid', rally: { id: 'r' } };
+    e.local.rpcCache.marchStatus.data.marches = [own];
+    await e.send({ kind: 'api-record', record: mqtt('rallyMembersUpdated', { rallyId: 'r', rallyVersion: 1 }, start) }, true);
+    for (let version = 2; version <= 10; version++) {
+      e.clock.now++;
+      await e.send({ kind: 'api-record', record: mqtt('rallyMembersUpdated', { rallyId: 'r', rallyVersion: version }, e.clock.now) }, true);
+    }
+    const count = () => e.sent.flatMap(msg => msg.calls || []).filter(c => c.name === 'getRallyById').length;
+    assert.equal(count(), 1); assert.ok(e.alarms.has('hwa-world-read'));
+    e.clock.now = start + 5001;
+    await e.fireAlarm('hwa-world-read');
+    assert.equal(count(), 2, 'one trailing read covers all newer versions');
+    const call = { name: 'getRallyById', feature: 'rally', args: { rallyId: 'r' } };
+    await e.send({ kind: 'api-record', record: rpc([call], [{ rally: { rallyId: 'r', mapId: 'map', rallyVersion: 10, leader: { userId: 2 }, members: [] } }], e.clock.now) }, true);
+    e.clock.now++;
+    await e.send({ kind: 'api-record', record: mqtt('rallyMembersUpdated', { rallyId: 'r', rallyVersion: 10 }, e.clock.now) }, true);
+    assert.equal(count(), 2, 'same version native details satisfy repeated pushes');
+    await e.send({ kind: 'refresh-rpc', calls: [call] }); assert.equal(count(), 3, 'manual refresh bypasses debounce');
+  }
+});
+
+test('a native latest-version response satisfies a deferred rally request without sending the trailing RPC', async () => {
+  const e = await environment(); e.local.rpcCache.marchStatus.data.marches = [{ squadId: 's', rally: { id: 'r' } }];
+  for (const version of [1, 2]) {
+    e.clock.now++;
+    await e.send({ kind: 'api-record', record: mqtt('rallyMembersUpdated', { rallyId: 'r', rallyVersion: version }, e.clock.now) }, true);
+  }
+  e.clock.now++;
+  await e.send({ kind: 'api-record', record: rpc([{ name: 'getRallyById', feature: 'rally', args: { rallyId: 'r' } }],
+    [{ rally: { rallyId: 'r', rallyVersion: 2, mapId: 'map', members: [] } }], e.clock.now) }, true);
+  e.clock.now = start + 6000; await e.fireAlarm('hwa-world-read');
+  assert.equal(e.sent.flatMap(msg => msg.calls || []).filter(c => c.name === 'getRallyById').length, 1);
+  assert.equal(e.alarms.has('hwa-world-read'), false);
+});
+
+test('deferred rally refresh survives worker restart and is dropped if the account or RPC policy changes', async () => {
+  const e = await environment(); e.local.rpcCache.marchStatus.data.marches = [{ squadId: 's', rally: { id: 'r' } }];
+  for (const version of [1, 2]) {
+    e.clock.now++;
+    await e.send({ kind: 'api-record', record: mqtt('rallyMembersUpdated', { rallyId: 'r', rallyVersion: version }, e.clock.now) }, true);
+  }
+  const restart = await environment('direct', e.local);
+  assert.ok(restart.alarms.has('hwa-world-read'));
+  restart.clock.now = start + 6000; await restart.fireAlarm('hwa-world-read');
+  assert.equal(restart.sent.flatMap(msg => msg.calls || []).filter(c => c.name === 'getRallyById').length, 1);
+  for (const change of ['account', 'settings']) {
+    const stopped = await environment('direct', e.local);
+    if (change === 'account') stopped.local.rpcCache.accountStatus.data.id = 2;
+    else stopped.local.popupRpcEnabled = false;
+    stopped.clock.now = start + 6000; await stopped.fireAlarm('hwa-world-read');
+    assert.equal(stopped.sent.length, 0); assert.equal(stopped.local.worldReadState, undefined);
+  }
 });

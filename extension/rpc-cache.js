@@ -2257,6 +2257,7 @@
           delete next.guildOutposts;
           delete next.heroGetAll;
           delete next.rallyPowerStatus;
+          delete next.rallyReadStatus;
           delete next.marchStatus;
           delete next.marchReturnStatus;
           delete next.marchSnapshotStatus;
@@ -2713,6 +2714,19 @@
           if (entry.data.action === 'details' && (knownRally?.observedAt > entry.updatedAt ||
               Number.isFinite(knownRally?.rallyVersion) && Number.isFinite(entry.data.rallyVersion) &&
               entry.data.rallyVersion < knownRally.rallyVersion)) continue;
+          if (entry.data.action === 'details' && next.accountStatus?.data?.id != null) {
+            const accountId = String(next.accountStatus.data.id);
+            const previous = next.rallyReadStatus?.data;
+            const rallies = String(previous?.accountId) === accountId ? { ...previous.rallies } : {};
+            const old = rallies[entry.data.rallyId], at = Date.parse(entry.updatedAt);
+            if (Number.isFinite(at) && !(Date.parse(next.accountStatus.updatedAt) > at) && (!old || old.at <= at) &&
+                !(Number.isFinite(old?.version) && Number.isFinite(entry.data.rallyVersion) && old.version > entry.data.rallyVersion)) {
+              rallies[entry.data.rallyId] = { at, version: entry.data.rallyVersion, mapId: entry.data.mapId };
+              for (const id of Object.keys(rallies).slice(0, Math.max(0, Object.keys(rallies).length - 200))) delete rallies[id];
+              next.rallyReadStatus = { updatedAt: entry.updatedAt, data: { accountId, rallies } };
+              changed = true;
+            }
+          }
           if (['create', 'socketAutojoined', 'join'].includes(entry.data.action)) changed = observeSquad(next, entry.data.team, entry.method, entry.updatedAt) || changed;
           if (entry.data.action === 'details') {
             const accountId = next.accountStatus?.data?.id;

@@ -26,6 +26,7 @@ importScripts('smart-gather.js');
 importScripts('mine-defense-data.js');
 importScripts('mine-defense.js');
 importScripts('auto-gather.js');
+importScripts('world-read.js');
 
 const RECORD_STATE_KEY = 'recordingState';
 const RECORD_PREFIX = 'record:';
@@ -184,6 +185,44 @@ function observeMarchReads(record, cache) {
       if (key) marchReadLeases.delete(String(cache?.accountStatus?.data?.id ?? 'unknown') + ':' + key);
     }
   } catch (_) {}
+}
+
+function scheduleWorldRead(state) {
+  const wakeAt = globalThis.hwaHelperWorldRead?.wakeAt(state);
+  if (wakeAt != null) chrome.alarms?.create?.('hwa-world-read', { when: Math.max(Date.now() + 1, wakeAt) });
+  else chrome.alarms?.clear?.('hwa-world-read');
+}
+let worldReadsPending = Promise.resolve();
+function passiveWorldReads(cache, calls, tabId, now = Date.now(), options = {}) {
+  const helper = globalThis.hwaHelperWorldRead;
+  if (!helper || !calls.some(call => helper.key(call))) return Promise.resolve(calls);
+  const work = worldReadsPending.then(async () => {
+    const stored = await chrome.storage.local.get('worldReadState');
+    const result = helper.plan(stored.worldReadState, cache, calls, now, { ...options, tabId });
+    await chrome.storage.local.set({ worldReadState: result.state });
+    scheduleWorldRead(result.state);
+    return result.calls;
+  });
+  worldReadsPending = work.catch(() => {});
+  return work;
+}
+pending = pending.then(async () => {
+  const stored = await chrome.storage.local.get('worldReadState');
+  if (stored.worldReadState) scheduleWorldRead(stored.worldReadState);
+}).catch(() => {});
+async function flushWorldReads() {
+  const stored = await chrome.storage.local.get(['worldReadState', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  const accountId = stored.rpcCache?.accountStatus?.data?.id;
+  if (accountId == null || String(stored.worldReadState?.accountId) !== String(accountId) || !rpcMessageForSettings(stored, [])) {
+    await chrome.storage.local.remove('worldReadState'); scheduleWorldRead(null); return;
+  }
+  const now = Date.now(), tab = await findActiveGameTab();
+  if (!tab?.id) { await chrome.storage.local.remove('worldReadState'); scheduleWorldRead(null); return; }
+  for (const row of Object.values(stored.worldReadState?.entries || {})) {
+    if (!row.pending || now < row.until) continue;
+    const calls = await passiveWorldReads(stored.rpcCache, [row.call], tab.id, now, { after: row.after, version: row.version });
+    if (calls.length) await chrome.tabs.sendMessage(tab.id, { ...rpcMessageForSettings(stored, calls), group: 'world-read', expiresAt: now + 10000 }).catch(() => {});
+  }
 }
 
 async function saveRaidTransition(transition, stored) {
@@ -804,6 +843,10 @@ function setupQueueAlarms() {
 }
 
 chrome.alarms?.onAlarm?.addListener?.(async (alarm) => {
+  if (alarm.name === 'hwa-world-read') {
+    pending = pending.then(flushWorldReads).catch(() => {});
+    await pending;
+  }
   if (alarm.name === 'hwa-mail-expiry') {
     pending = pending.then(pruneExpiredMail).catch(() => {});
     await pending;
@@ -1318,7 +1361,9 @@ async function evaluateMineDefense(record, cache, stored, state, tabId, now) {
     calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
     defense.refreshAt = now;
   }
-  if (!calls.length && !defense.pending && now - (cache.incomingMineAttacks?.data?.snapshotAt || 0) > 15000 &&
+  const incomingTtl = globalThis.hwaHelperWorldRead?.incomingTtl(cache, now) || 15000;
+  if (!calls.length && !defense.pending && (!cache.incomingMineAttacks?.data?.snapshotAt ||
+      now - (Date.parse(cache.incomingMineAttacks?.updatedAt) || 0) > incomingTtl) &&
       now - (defense.refreshAt || 0) >= 5000) {
     calls = [{ name: 'getIncomingMarches', feature: 'march', args: {} }];
     defense.refreshAt = now;
@@ -1327,6 +1372,9 @@ async function evaluateMineDefense(record, cache, stored, state, tabId, now) {
     const returningUntil = defense.pending?.phase === 'returning' ? defense.pending.returnAt : null;
     calls = Number.isFinite(returningUntil) && now < returningUntil ? calls.filter(call => !['getMarches', 'getUnitSummary'].includes(call.name)) :
       passiveMarchReads(cache, calls, now, Math.max(now - 10000, defense.pending?.sentAt || 0, returningUntil || 0));
+  }
+  if (calls.length) {
+    calls = await passiveWorldReads(cache, calls, tabId, now);
   }
   if (calls.length) {
     const dispatch = rpcMessageForSettings(stored, calls);
@@ -1499,7 +1547,7 @@ function socketRefreshCalls(record, cache) {
   if (['marchAttackDetected', 'marchAttackEnded'].includes(type))
     return [{ name: 'getHealing', feature: 'unit' }];
   if (['gatheringMineCompleted', 'returnFromMineCompleted'].includes(type))
-    return [{ name: 'getIncomingMarches', feature: 'march', args: {} }, { name: 'getMarches', feature: 'march' },
+    return [{ name: 'getMarches', feature: 'march' },
       { name: 'getUnitSummary', feature: 'unit' }, { name: 'getHealing', feature: 'unit' }];
   if (type === 'newReport') return [{ name: 'getPage', feature: 'report',
     args: { limit: 10, cursor: null } }];
@@ -2324,7 +2372,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (dispatch) chrome.tabs.sendMessage(sender.tab.id, { ...dispatch, group: 'speedup-refresh' }).catch(() => {});
     }
     if (rpcMessageForSettings(stored, []) && sender.tab?.id) {
-      const calls = passiveMarchReads(cacheResult.cache, socketRefreshCalls(record, cacheResult.cache), Date.now(), Date.parse(record.timestamp));
+      let calls = passiveMarchReads(cacheResult.cache, socketRefreshCalls(record, cacheResult.cache), Date.now(), Date.parse(record.timestamp));
+      let version;
+      try { version = JSON.parse(record.payload)?.result?.body?.rallyVersion; } catch (_) {}
+      calls = await passiveWorldReads(cacheResult.cache, calls, sender.tab.id, Date.now(), { after: Date.parse(record.timestamp), version });
       const dispatch = rpcMessageForSettings(stored, calls);
       if (calls.length && dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
@@ -2332,13 +2383,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       (String(stored.rpcCache?.accountStatus?.data?.id ?? '') !== String(cacheResult.cache.accountStatus?.data?.id ?? '') ||
        /"name"\s*:\s*"mobileLogin"/.test(record.requestBody || ''));
     if (rpcMessageForSettings(stored, []) && sender.tab?.id && accountLoaded) {
-      const calls = passiveMarchReads(cacheResult.cache, [
+      let calls = passiveMarchReads(cacheResult.cache, [
         { name: 'getSummary', feature: 'building' },
         { name: 'getSummary', feature: 'personalResearch' },
         { name: 'getMarches', feature: 'march' },
         { name: 'getUnitSummary', feature: 'unit' },
         { name: 'getIncomingMarches', feature: 'march', args: {} }
       ]);
+      calls = await passiveWorldReads(cacheResult.cache, calls, sender.tab.id);
       const dispatch = rpcMessageForSettings(stored, calls);
       if (calls.length && dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
     }
