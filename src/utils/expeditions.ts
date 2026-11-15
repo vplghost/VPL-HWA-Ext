@@ -52,17 +52,17 @@ export function expeditionRows(cache: Record<string, any>, now = Date.now()) {
   });
 }
 
-/** Fit up to five owned heroes, then replace excess power with weaker available heroes. */
+/** Hero-based expeditions require five owned heroes, even if fewer meet the power target. */
 export function expeditionTeam(heroes: any[], required: number): number[] | null {
   if (!Number.isFinite(required) || required < 0) return null;
-  const sorted = [...heroes].sort((a, b) => b.power - a.power || a.id - b.id);
-  const team: any[] = [];
-  let power = 0;
-  for (const hero of sorted.slice(0, 5)) {
-    team.push(hero); power += hero.power;
-    if (power >= required) break;
+  const unique = new Map<number, any>();
+  for (const hero of heroes) {
+    if (Number.isInteger(hero?.id) && hero.id > 0 && Number.isFinite(hero.power) && hero.power > 0) unique.set(hero.id, hero);
   }
-  if (!team.length || power < required) return null;
+  const sorted = [...unique.values()].sort((a, b) => b.power - a.power || a.id - b.id);
+  const team = sorted.slice(0, 5);
+  let power = team.reduce((sum, hero) => sum + hero.power, 0);
+  if (team.length !== 5 || power < required) return null;
   for (let index = 0; index < team.length; index++) {
     const replacement = [...sorted].reverse().find(hero => !team.some(used => used.id === hero.id) &&
       hero.power < team[index].power && power - team[index].power + hero.power >= required);

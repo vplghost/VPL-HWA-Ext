@@ -121,7 +121,7 @@ onUnmounted(() => clearTimeout(timer));
   <ModalDialog :model-value="modelValue" title="Expeditions" icon="⛵" max-width="max-w-4xl" @update:model-value="emit('update:modelValue', $event)">
     <div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="text-xs text-slate-500">Choose available heroes automatically. Locked expeditions remain visible.</p>
+        <p class="text-xs text-slate-500">Hero expeditions require 5 available heroes and enough power. Video Expedition requires no heroes.</p>
         <div class="flex gap-2">
           <button type="button" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50" :disabled="refreshing || !hasGameTab" @click="refresh">Refresh</button>
           <button v-if="autoRunning" type="button" class="rounded-lg border border-amber-400 px-3 py-1.5 text-xs cursor-pointer" @click="autoRunning = false">Stop after current</button>
@@ -143,7 +143,7 @@ onUnmounted(() => clearTimeout(timer));
           <p v-if="row.heroes.length" class="text-xs text-slate-500">{{ names(row.heroes) }}</p>
           <div v-if="row.state === 'idle'" class="space-y-2">
             <p class="text-xs text-slate-500">{{ row.needsHeroes ? `Required power: ${Number.isFinite(row.power) ? row.power.toLocaleString('en-US') : 'Unknown'}` : 'No heroes required' }} · {{ row.durationMs ? formatDuration(row.durationMs / 1000) : 'Duration unknown' }}</p>
-            <p class="text-xs text-slate-500">{{ teamFor(row.slotId) ? (row.needsHeroes ? `Selected: ${names(teamFor(row.slotId)!.heroes)}` : 'Video expedition available') : 'Not enough available hero power · Free heroes reserved for stronger expeditions first' }}</p>
+            <p class="text-xs text-slate-500">{{ teamFor(row.slotId) ? (row.needsHeroes ? `Selected (5/5): ${names(teamFor(row.slotId)!.heroes)}` : 'Video expedition available') : 'Need 5 available heroes with enough power · Free heroes reserved for stronger expeditions first' }}</p>
             <button type="button" class="rounded-lg border border-violet-300 dark:border-violet-800 px-3 py-1 text-xs text-violet-600 dark:text-violet-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="!!pending || autoRunning || !hasGameTab || !teamFor(row.slotId)" @click="startNext(row.slotId)">{{ pending?.expeditionId === row.id ? 'Awaiting confirmation…' : 'Auto select & start' }}</button>
           </div>
         </article>

@@ -3,7 +3,7 @@ id: doc-06859327864c4c2a63be47e4bebd0d43
 title: Expedition RPC contract and Dashboard automation
 description: Captured expedition snapshots/start results, verified slot locks, hero selection and confirmation-driven Dashboard automation.
 createdAt: '2026-11-14T07:48:08.339Z'
-updatedAt: '2026-11-14T08:03:13.697Z'
+updatedAt: '2026-11-15T03:11:57.871Z'
 tags:
   - expeditions
   - rpc
@@ -23,17 +23,23 @@ Implemented by @task-VHE-03VDQ4.
 
 ## Observed wire contract
 
+## Observed wire contract
+
 `expeditionGet` has no feature and empty arguments. Its array response includes `id,slotId,status,heroes,endTime,duration,day,reward,power,rarity,storyId,attemptsLeft`. Expedition IDs are server-provided: the observed ID7 corresponds to slot8. Never substitute slotId for expeditionId.
 
 Observed statuses:0locked,1available,2dispatched,3completed/collected. Status2 remains occupied after its timer reaches zero: display Ready to collect until the game supplies a release/collected snapshot. End time and duration are seconds; normalize endTime to epoch milliseconds for timers. Progress is clamped elapsed/duration; do not infer completion/collection from time alone.
 
-`artifact_expeditionStart` has no feature and exactly `{expeditionId,heroes}`, with0..5distinct positive integer hero IDs. Examples: ID4 with heroes15/16/72/2/56 returns endTime1794641843; ID7 with an empty heroes array returns1794663090. An accepted response has `response.endTime`; optional `result.quests` describes quest progression, not claimed rewards. No gold/items are credited by a start. Shared-policy post-confirmation reads refresh expeditionGet and questGetAll. Correlated RPC errors settle rejection without inventing a timer.
+`artifact_expeditionStart` has no feature and exactly `{expeditionId,heroes}`, with exactly5distinct positive integer hero IDs for hero-based expeditions; the captured slot8 Video Expedition uses an empty heroes array. Examples: ID4 with heroes15/16/72/2/56 returns endTime1794641843; ID7 with an empty heroes array returns1794663090. An accepted response has `response.endTime`; optional `result.quests` describes quest progression, not claimed rewards. No gold/items are credited by a start. Shared-policy post-confirmation reads refresh expeditionGet and questGetAll. Correlated RPC errors settle rejection without inventing a timer.
+
+
+## Eligibility and hero selection
 
 ## Eligibility and hero selection
 
 Slots1/2/3require teamlevel20, slot4level25, slot5level30. Slot6requires active expedition subscription; slot7requires VIP8(5000VIPpoints); slot8is video and requires no heroes. Display all eight slots, including locked or unknown entries. Subscription status1is authoritative unlock evidence; no purchase/renewal action is issued. VIP points are resolved through the packaged official thresholds when account identity matches.
 
-A current-day account-scoped server snapshot must show status1 and positive attemptsLeft before starting. Unknown/stale entries need refresh. Running/ready entries retain all occupied heroes, including overnight runs. Candidate heroes come only from heroGetAll, with finite positive recorded power. The planner orders eligible expeditions by descending server-required power, fits at most five heroes and substitutes weaker available heroes when they still satisfy that requirement. Teams are distinct across the batch. This deterministic heuristic does not promise a globally optimal assignment.
+A current-day account-scoped server snapshot must show status1 and positive attemptsLeft before starting. Unknown/stale entries need refresh. Running/ready entries retain all occupied heroes, including overnight runs. Candidate heroes come only from heroGetAll, with finite positive recorded power. The planner orders eligible expeditions by descending server-required power, selects exactly five distinct available heroes and substitutes weaker available heroes when they still satisfy that requirement. Teams are distinct across the batch. This deterministic heuristic does not promise a globally optimal assignment.
+
 
 ## UI and lifecycle
 
@@ -59,3 +65,14 @@ An accepted reward object with explicit `newExpedition:null` immediately sets th
 The capture does not show a non-null replacement. Only a complete server-shaped replacement matching the slot is accepted as a new row; unfamiliar replacement shapes become Unknown and require expeditionGet. No replacement/attempt count is invented. Per-row observation dates prevent collecting one overnight run from refreshing unrelated prior-day idle slots. Same-time/stale snapshots cannot restore already-collected state.
 
 The dialog shows Collect only on Ready rows and serializes collection with starts. It sends the exact captured ID payload, waits through queued acknowledgements and keeps uncertain operations pending without automatic retry. A matching receipt or newer collected snapshot settles the UI. RPC failures preserve the run and its hero reservations. Account switching clears collection state/receipts. Tests: `tests/expeditions.test.mjs`, `tests/intercept.test.mjs`.
+
+
+## Five-hero requirement correction (0.10.91)
+
+@task-VHE-89H8FM analyzes temp/tracking-data/hwa-game-record-202611151008_expedition.json (extension0.10.90, client1.293.1010, SHA2568f00149e386c5ba72a5771b0e06941089782271c5747d6ec889c19722df04db7). Timeline0 at2026-11-15T03:07:46.115Z sends artifact_expeditionStart for expeditionId0 with heroes16/54/79/501. The top-level correlated error is NotEnough with description hero count. This disproves the earlier at-most-five team selection assumption. Hero-based expeditions require exactly five distinct owned available heroes and enough total power; meeting power with fewer heroes is insufficient.
+
+expeditionTeam now forms a full five before reducing excess power, rejects rosters with fewer than five distinct valid heroes, and preserves five during substitution. expeditionPlan reserves those full teams across the batch, including existing running/ready reservations. The dialog explains the count and power requirements and shows Selected (5/5). Direct and Piggyback helper validation allow only five distinct positive IDs or the existing empty Video Expedition shape; no1-4hero request passes. Slot8 Video Expedition remains the captured hero-free exception from the Nov14 successful ID7 start. No paid unlock behavior changes.
+
+Passive rpc-cache extraction deliberately continues observing old bounded 1-4hero requests so historical/native failures such as this capture still settle as rejections without inventing a start. Outgoing helper validation is stricter than this historical observation boundary. No automatic retry is added; confirmed starts/collection and account isolation retain their existing guards.
+
+Verification: tests/expeditions.test.mjs replays the new top-level error, requires five even when one hero meets power, rejects insufficient/duplicate rosters, verifies batch reservations and the existing video/collect paths. tests/intercept.test.mjs blocks incomplete Direct and Piggyback requests. Focused66/66 passed; full818 tests:806 passed,12 optional private-log skips; typecheck and production build passed.

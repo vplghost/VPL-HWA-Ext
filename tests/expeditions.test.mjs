@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { computed, ref, shallowRef, watch, nextTick } from 'vue';
-import { expeditionRows, expeditionPlan, expeditionActivity, expeditionRefreshCalls } from '../src/utils/expeditions.ts';
+import { expeditionRows, expeditionTeam, expeditionPlan, expeditionActivity, expeditionRefreshCalls } from '../src/utils/expeditions.ts';
 import { towerActivityState } from '../src/composables/activityState.ts';
 
 const context = { TextEncoder };
@@ -27,6 +27,36 @@ function rpc(name, response, args = {}, time = at, ident = name, error) {
 function state(extraRows = rows, time = at) { return reducer.merge(account, [rpc('expeditionGet', extraRows, {}, time)]).cache; }
 const owned = Object.fromEntries(Array.from({ length: 25 }, (_, index) => [index + 1, { id: index + 1, power: 40000 - index * 1000 }]));
 
+test('hero expeditions require five unique heroes even when one hero meets the power target', () => {
+  const heroes = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, power: 100000 - index * 1000 }));
+  const team = expeditionTeam(heroes, 1);
+  assert.equal(team.length, 5); assert.equal(new Set(team).size, 5);
+  assert.equal(expeditionTeam(heroes.slice(0, 4), 1), null);
+  assert.equal(expeditionTeam([...heroes.slice(0, 4), heroes[0]], 1), null);
+  assert.equal(expeditionTeam(heroes, 1e9), null);
+  assert.equal(expeditionTeam(heroes, 0).length, 5);
+});
+
+test('a roster with fewer than ten heroes cannot create two hero teams; video stays hero-free', () => {
+  const cache = state(rows.map(row => ({ ...row, power: 1 })));
+  cache.heroGetAll = entry(Object.fromEntries(Array.from({ length: 8 }, (_, index) => [index + 1, { id: index + 1, power: 100 }])));
+  const plan = expeditionPlan(cache, at);
+  assert.equal(plan.filter(item => item.slotId !== 8).length, 1);
+  assert.equal(plan.find(item => item.slotId !== 8).heroes.length, 5);
+  assert.deepEqual(plan.find(item => item.slotId === 8).heroes, []);
+});
+
+test('Nov15 captured four-hero NotEnough error remains observable without inventing a start', () => {
+  // hwa-game-record-202611151008_expedition.json SHA256 8f00149e386c5ba72a5771b0e06941089782271c5747d6ec889c19722df04db7.
+  const call = { name: 'artifact_expeditionStart', args: { expeditionId: 0, heroes: [16, 54, 79, 501] }, ident: '00b089a82fad6b180000389583b3d543' };
+  const record = { ...rpc(call.name, {}, call.args), timestamp: '2026-11-15T03:07:46.115Z',
+    requestBody: JSON.stringify({ calls: [call] }), responseBody: JSON.stringify({ error: { name: 'NotEnough',
+      description: 'hero count in /app/classes/RPCRequest.php (1324); rpc=`artifact_expeditionStart`', call } }) };
+  const cache = reducer.merge(state(), [record]).cache;
+  assert.equal(cache.expeditionStartStatus.data.success, false); assert.match(cache.expeditionStartStatus.data.error, /hero count/);
+  assert.equal(cache.expeditionStatus.data.rows[0].status, 1); assert.equal(cache.expeditionStatus.data.rows[0].endTime, 0);
+});
+
 test('snapshot keeps every slot and distinguishes VIP8, subscription, unknown and no-hero video expeditions', () => {
   const cache = state(), model = expeditionRows(cache, at);
   assert.equal(model.length, 8);
@@ -45,7 +75,7 @@ test('automatic teams are owned, distinct, fit server power and preserve running
   const plan = expeditionPlan(cache, at), ids = plan.flatMap(item => item.heroes);
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(ids.every(id => owned[id] && id > 5));
-  assert.ok(plan.every(item => item.heroes.length <= 5 && (item.slotId === 8 ? !item.heroes.length : item.power >= rows[item.expeditionId].power)));
+  assert.ok(plan.every(item => item.slotId === 8 ? !item.heroes.length : item.heroes.length === 5 && item.power >= rows[item.expeditionId].power));
   assert.ok(plan.every(item => ![0, 5, 6].includes(item.expeditionId)));
   assert.deepEqual(expeditionPlan(cache, at + 10000).flatMap(item => item.heroes), ids, 'Expired timers do not release heroes before collection');
   const model = expeditionRows(cache, at + 10000);
@@ -133,6 +163,7 @@ test('real dialog waits through queued ack and confirms each auto start before s
   v.callbacks.shift()({ ok: true, queued: true }); await flush();
   assert.equal(v.calls.length, 1);
   const first = v.calls[0][0];
+  assert.equal(first.args.heroes.length, 5);
   v.clock.value = at + 1001;
   v.cache.value = reducer.merge(v.cache.value, [rpc(first.name, { endTime: (at + 361000) / 1000 }, first.args, at + 1001, 'accepted')]).cache;
   await flush();
