@@ -205,3 +205,34 @@ test('return route records the outpost destination and account change clears gat
   assert.equal(switched.marchStatus, undefined);
   assert.equal(switched.experimentalMapContext, undefined);
 });
+
+test('daily quest read timeout falls back to standard rotation without fatal error', () => {
+  const call = { name: 'getDailyQuests', feature: 'quest', args: {} };
+  const state = {
+    accountId: 1,
+    pending: { call, sentAt: now - 35000, expiresAt: now - 5000, phase: 'sent' },
+    readTimeout: { key: 'getDailyQuests:quest', attempts: 2 }
+  };
+  const synced = smart.sync(state, null, cache(), now);
+  assert.equal(synced.error, undefined, 'Must not set fatal error for daily quest read timeout');
+  assert.equal(synced.pending, null);
+  assert.match(synced.notice?.message || '', /falling back to standard gathering rotation/);
+});
+
+test('game load record automatically releases persisted read timeout error on reconnect', () => {
+  const state = {
+    accountId: 1,
+    error: 'Read getDailyQuests:quest timed out after 3 attempts; press F5 in the game tab and restart Smart gathering',
+    readTimeout: { key: 'getDailyQuests:quest', attempts: 3 }
+  };
+  const reloadRecord = {
+    method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: new Date(now).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ name: 'getMarches', feature: 'march', ident: '1' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: '1', result: { response: { marches: [] } } }] })
+  };
+  const synced = smart.sync(state, reloadRecord, cache(), now);
+  assert.equal(synced.error, undefined, 'Game reload must automatically clear read timeout error');
+  assert.equal(synced.readTimeout, undefined);
+  assert.match(synced.notice?.message || '', /Resuming Smart gathering/);
+});

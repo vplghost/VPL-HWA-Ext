@@ -152,13 +152,15 @@ export default defineContentScript({
             sendResponse?.({ ok: true, accountId: freeSpinAccountId });
             return true;
           }
-          chrome.storage?.local?.get?.(['rpcCache'])?.then?.((stored: any) => {
-            const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
-            if (cachedAccountId) freeSpinAccountId = String(cachedAccountId);
-            sendResponse?.({ ok: true, accountId: freeSpinAccountId });
-          })?.catch?.(() => {
+          try {
+            chrome.storage?.local?.get(['rpcCache'], (stored: any) => {
+              const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
+              if (cachedAccountId) freeSpinAccountId = String(cachedAccountId);
+              sendResponse?.({ ok: true, accountId: freeSpinAccountId || null });
+            });
+          } catch (_) {
             sendResponse?.({ ok: true, accountId: null });
-          });
+          }
           return true;
         }
       });

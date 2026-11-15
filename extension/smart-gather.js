@@ -178,9 +178,26 @@
     return pending?.phase === 'sent' && readFeatures.has(pending.call?.name) &&
       readFeatures.get(pending.call.name) === (pending.call.feature || '');
   }
+  function isLoadRecord(record) {
+    if (!record || record.method !== 'POST' || !record.requestBody) return false;
+    try {
+      const parsed = typeof record.requestBody === 'string' ? JSON.parse(record.requestBody) : record.requestBody;
+      return (parsed?.calls || []).some(c =>
+        ['userGetInfo', 'mobileLogin', 'getLeaderboardPowerSummary', 'getUnitSummary', 'getMarches'].includes(c.name)
+      );
+    } catch { return false; }
+  }
   function sync(raw, record, cache, now) {
     const accountId = cache.accountStatus?.data?.id;
     const state = raw && accountId != null && String(raw.accountId) === String(accountId) ? structuredClone(raw) : { accountId, interrupted: [] };
+    if (!state.pending && state.error &&
+        (/^Read .* timed out after 3 attempts/.test(state.error) ||
+         /^Smart gathering .* confirmation timed out/.test(state.error)) &&
+        isLoadRecord(record)) {
+      delete state.error;
+      delete state.readTimeout;
+      state.notice = { at: now, expiresAt: now + 5000, message: 'Resuming Smart gathering after game reconnect' };
+    }
     // Older versions persisted a fatal stop for this explicit target rejection.
     // Release only that known stop; uncertain mutations and other errors stay held.
     if (!state.pending && /^(getMineById|attackMine) rejected by game: MineNotFound; restart Smart gathering to retry$/.test(state.error)) {
@@ -291,7 +308,14 @@
       state.pending = null;
       state.readTimeout = { key, attempts };
       state.notice = { at: now, message: `Retrying expired read ${key} (${attempts}/3)` };
-      if (attempts >= 3) state.error = `Read ${key} timed out after 3 attempts; press F5 in the game tab and restart Smart gathering`;
+      if (attempts >= 3) {
+        if (key === 'getDailyQuests:quest' || key === 'user_getNextDayTime:') {
+          delete state.readTimeout;
+          state.notice = { at: now, expiresAt: now + 60000, message: 'Daily quest read timed out; falling back to standard gathering rotation' };
+        } else {
+          state.error = `Read ${key} timed out after 3 attempts; press F5 in the game tab and restart Smart gathering`;
+        }
+      }
     } else if (state.pending && now - (state.pending.returnAt || state.pending.sentAt) > 120000) {
       const name = state.pending.call.name;
       state.pending = null; state.error = `Smart gathering ${name} confirmation timed out; refresh game and restart Smart gathering`;

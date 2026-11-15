@@ -122,3 +122,38 @@ test('uninitialized bridge account triggers proactive userGetInfo query and reco
   await e.ctx.run();
   assert.equal(e.spins().length, 1);
 });
+
+test('stale state.tabId falls back to active game tab and clears dead tab reference', async () => {
+  const e = await environment();
+  // Simulate stale tab ID 9999 left in persisted state
+  e.local.autoFreeSpinState = { enabled: true, tabId: 9999 };
+  let deadTabPings = 0;
+  const originalSendMessage = e.ctx.chrome.tabs.sendMessage;
+  e.ctx.chrome.tabs.sendMessage = async (tabId, message) => {
+    if (tabId === 9999) {
+      deadTabPings++;
+      throw new Error('No tab with id: 9999');
+    }
+    return originalSendMessage(tabId, message);
+  };
+  await e.ctx.run();
+  e.quota(1);
+  await e.ctx.run();
+  assert.equal(deadTabPings >= 1, true, 'Should have tried dead tab first');
+  assert.equal(e.spins().length, 1, 'Should have spun on fallback tab');
+  assert.equal(e.local.autoFreeSpinState.tabId, 1, 'Should have updated tabId to active game tab');
+});
+
+test('multiple game tabs prioritize the active tab for free spin context', async () => {
+  const e = await environment();
+  const tabsList = [
+    { id: 10, url: 'https://www.hero-wars-alliance.com/', active: false },
+    { id: 20, url: 'https://www.hero-wars-alliance.com/', active: true },
+  ];
+  e.ctx.chrome.tabs.query = (args, cb) => { setTimeout(() => cb(tabsList), 0); };
+  await e.ctx.run();
+  e.quota(1);
+  await e.ctx.run();
+  assert.equal(e.spins().length, 1);
+  assert.equal(e.spins()[0].tabId, 20, 'Should target active tab 20 instead of background tab 10');
+});

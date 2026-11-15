@@ -131,8 +131,12 @@
     if (resume && resume.action !== 'target') return snapshotRefresh || resume;
     if (smart && !resume && settings.mineType === 'rotate') {
       daily = smart.dailyPlan(cache, { ...settings, lastAutoMineType: stored.smartGatherState?.lastAutoMineType || settings.lastAutoMineType }, now, stored.smartGatherState);
-      if (daily.action === 'refresh') return { action: 'refresh', reason: daily.reason,
-        calls: [{ name: 'getDailyQuests', feature: 'quest', args: {} }, { name: 'user_getNextDayTime' }] };
+      if (daily.action === 'refresh') {
+        if (!stored.smartGatherState?.notice?.message?.includes('falling back to standard gathering rotation')) {
+          return { action: 'refresh', reason: daily.reason,
+            calls: [{ name: 'getDailyQuests', feature: 'quest', args: {} }, { name: 'user_getNextDayTime' }] };
+        }
+      }
       if (daily.action === 'wait') return daily;
       if (daily.action === 'recall') return snapshotRefresh || { action: 'recall', reason: daily.reason,
         call: { name: 'stopMineGathering', feature: 'mine', args: { squadId: daily.march.squadId } } };

@@ -232,11 +232,13 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
       stored?.smartGatherState
     );
     if (daily.action === 'refresh') {
-      return {
-        action: 'refresh',
-        reason: daily.reason,
-        calls: [{ name: 'getDailyQuests', feature: 'quest', args: {} }, { name: 'user_getNextDayTime' }],
-      };
+      if (!stored?.smartGatherState?.notice?.message?.includes('falling back to standard gathering rotation')) {
+        return {
+          action: 'refresh',
+          reason: daily.reason,
+          calls: [{ name: 'getDailyQuests', feature: 'quest', args: {} }, { name: 'user_getNextDayTime' }],
+        };
+      }
     }
     if (daily.action === 'wait') return daily;
     if (daily.action === 'recall') {

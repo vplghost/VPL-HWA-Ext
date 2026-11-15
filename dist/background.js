@@ -441,19 +441,26 @@ async function updateDungeonRun(record, tabId) {
     record, stored.rpcCache, Date.now()), stored);
 }
 
-async function findActiveGameTab() {
+async function findAllGameTabs() {
   const queryPatterns = GAME_ORIGINS.map((o) => `${o}/*`);
   const tabs = await new Promise((resolve) => {
     if (!chrome.tabs?.query) return resolve([]);
     chrome.tabs.query({ url: queryPatterns }, resolve);
   });
-  const tab = (tabs || []).find((t) => t.id && isGameUrl(t.url));
-  if (tab) return tab;
+  const validTabs = (tabs || []).filter((t) => t.id && isGameUrl(t.url));
+  if (validTabs.length) {
+    return validTabs.sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0) || (b.id - a.id));
+  }
   const allTabs = await new Promise((resolve) => {
     if (!chrome.tabs?.query) return resolve([]);
     chrome.tabs.query({}, resolve);
   });
-  return (allTabs || []).find((t) => t.id && isGameUrl(t.url)) || null;
+  return (allTabs || []).filter((t) => t.id && isGameUrl(t.url)).sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0) || (b.id - a.id));
+}
+
+async function findActiveGameTab() {
+  const tabs = await findAllGameTabs();
+  return tabs[0] || null;
 }
 
 async function appendQueueLog(type, logEntry) {
@@ -1257,11 +1264,47 @@ async function runFreeSpin(manual = false, record = null, sourceTabId = null) {
     await save('Waiting for free spin cooldown', available.readyAt);
     return { ok: false, error: 'Free spin cooldown has not expired.' };
   }
-  const tabId = sourceTabId || state.tabId || (await findActiveGameTab())?.id;
+  let tabId = sourceTabId;
+  let context = null;
+  if (tabId) {
+    try {
+      const ping = await chrome.tabs.sendMessage(tabId, { kind: 'free-spin-context' });
+      if (ping?.ok) context = ping;
+    } catch (_) {}
+  }
+  if (!context && state.tabId) {
+    try {
+      const ping = await chrome.tabs.sendMessage(state.tabId, { kind: 'free-spin-context' });
+      if (ping?.ok) {
+        tabId = state.tabId;
+        context = ping;
+      } else {
+        state.tabId = null;
+      }
+    } catch (_) {
+      state.tabId = null;
+    }
+  }
+  if (!context) {
+    const candidateTabs = await findAllGameTabs();
+    for (const cand of candidateTabs) {
+      if (cand.id === tabId || cand.id === state.tabId) continue;
+      try {
+        const ping = await chrome.tabs.sendMessage(cand.id, { kind: 'free-spin-context' });
+        if (ping?.ok) {
+          tabId = cand.id;
+          context = ping;
+          break;
+        }
+      } catch (_) {}
+    }
+    if (!tabId && candidateTabs.length > 0) {
+      tabId = candidateTabs[0].id;
+    }
+  }
   if (!tabId) { await save('Open the game to use free spin', now + 30000); return { ok: false, error: state.status }; }
-  let context;
-  try { context = await chrome.tabs.sendMessage(tabId, { kind: 'free-spin-context' }); } catch (_) {}
   if (!context?.ok) {
+    state.tabId = null;
     await save('Free spin bridge unavailable; press F5 in the game tab', now + 30000);
     return { ok: false, error: state.status };
   }
@@ -1275,6 +1318,7 @@ async function runFreeSpin(manual = false, record = null, sourceTabId = null) {
         return { ok: true, pending: true };
       } catch (_) {
         state.pending = null;
+        state.tabId = null;
         await save('Free spin bridge unavailable; press F5 in the game tab', now + 30000);
         return { ok: false, error: state.status };
       }
@@ -1302,7 +1346,7 @@ async function runFreeSpin(manual = false, record = null, sourceTabId = null) {
       state.pending = { phase: 'refresh', sentAt: now, expiresAt: now + 30000 };
       await save('Refreshing free spin quota', now + 30000);
       try { await chrome.tabs.sendMessage(tabId, { ...rpcMessageForSettings(stored, [{ name: 'userGetInfo' }, { name: 'user_getNextDayTime' }]), group: 'free-alchemy-refresh', expiresAt: now + 30000 }); }
-      catch (_) { state.pending = null; await save('Free spin bridge unavailable; press F5 in the game tab', now + 30000); }
+      catch (_) { state.pending = null; state.tabId = null; await save('Free spin bridge unavailable; press F5 in the game tab', now + 30000); }
       return { ok: true, pending: true };
     }
   }
@@ -1481,7 +1525,8 @@ async function evaluateSmartGather(record, cache, stored, tabId, now = Date.now(
       state.pending = { ...plan.pending, call: calls[0], sentAt: now, expiresAt: now + 30000, phase: 'sent' };
     }
   }
-  const dispatch = calls.length ? rpcMessageForSettings(stored, calls) : null;
+  const retriedRead = state.readTimeout && calls.some(c => (c.name + ':' + (c.feature || '')) === state.readTimeout.key);
+  const dispatch = calls.length ? (retriedRead ? { kind: 'refresh-rpc', calls } : rpcMessageForSettings(stored, calls)) : null;
   if (dispatch) {
     await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'smart-gather', expiresAt: now + 30000 }).catch(() => {
       state.pending = null; state.error = 'Game tab RPC bridge unavailable; press F5 in the game tab and restart Smart gathering';
