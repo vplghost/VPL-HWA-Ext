@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.102 — 2026-11-15
+
+### Fixed
+
+- Fix `lastRpcUrl` endpoint poisoning in `extension/intercept.js` where `/oauth/refresh` requests contaminated dispatch targeting, strictly validating all RPC URLs against `/api/rpc`.
+- Fix priority auto-join rally stall by including `{ name: 'getUnitSummary', feature: 'unit' }` in `socketRefreshCalls` for `rallyCreated` and `rallyUserAutojoined`, ensuring fresh troop capacity and squad state are loaded immediately upon rally discovery.
+
+### Changed
+
+- Optimize `rallyCreated` dispatch in `extension/background.js` and `extension/world-read.js` to immediately send `getRallyById` under `priority-rally` group without stale read suppression.
+- Add unit test suite `tests/rally-created-auto-join.test.mjs` verifying RPC endpoint purity, complete refresh calls, and immediate `rallyCreated` dispatch permissions.
+
 ## 0.10.101 — 2026-11-15
 
 ### Added

@@ -1558,11 +1558,13 @@ function socketRefreshCalls(record, cache) {
   ];
   if (type === 'rallyCreated' && typeof body?.rallyId === 'string') {
     return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } },
-      { name: 'getMarches', feature: 'march' }];
+      { name: 'getMarches', feature: 'march' },
+      { name: 'getUnitSummary', feature: 'unit' }];
   }
   if (type === 'rallyUserAutojoined' && typeof body?.rallyId === 'string') {
     return [{ name: 'getRallyById', feature: 'rally', args: { rallyId: body.rallyId } },
-      { name: 'getMarches', feature: 'march' }];
+      { name: 'getMarches', feature: 'march' },
+      { name: 'getUnitSummary', feature: 'unit' }];
   }
   if (type === 'rallyStarted' && typeof body?.rallyId === 'string' &&
       cache?.marchStatus?.data?.marches?.some((march) => march.rally?.id === body.rallyId)) {
@@ -2375,9 +2377,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       let calls = passiveMarchReads(cacheResult.cache, socketRefreshCalls(record, cacheResult.cache), Date.now(), Date.parse(record.timestamp));
       let version;
       try { version = JSON.parse(record.payload)?.result?.body?.rallyVersion; } catch (_) {}
-      calls = await passiveWorldReads(cacheResult.cache, calls, sender.tab.id, Date.now(), { after: Date.parse(record.timestamp), version });
+      const isRallyCreated = record.eventType === 'rallyCreated';
+      calls = await passiveWorldReads(cacheResult.cache, calls, sender.tab.id, Date.now(), {
+        after: Date.parse(record.timestamp),
+        version,
+        isRallyCreated
+      });
       const dispatch = rpcMessageForSettings(stored, calls);
-      if (calls.length && dispatch) chrome.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+      if (calls.length && dispatch) {
+        chrome.tabs?.sendMessage?.(sender.tab.id, {
+          ...dispatch,
+          ...(isRallyCreated ? { group: 'priority-rally' } : {})
+        })?.catch?.(() => {});
+      }
     }
     const accountLoaded = cacheResult.cache.accountStatus?.updatedAt === record.timestamp &&
       (String(stored.rpcCache?.accountStatus?.data?.id ?? '') !== String(cacheResult.cache.accountStatus?.data?.id ?? '') ||

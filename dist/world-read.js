@@ -38,8 +38,11 @@
       const after = Math.max(options.after ?? now - 5000, old?.after || 0);
       const versions = [options.version, old?.version].filter(Number.isFinite);
       const version = versions.length ? Math.max(...versions) : null;
-      if (fresh(cache, call, now, after, version)) { delete state.entries[id]; continue; }
-      if (old && old.until > now) {
+      if (options.isRallyCreated && old) {
+        delete state.entries[id];
+      }
+      if (!options.isRallyCreated && fresh(cache, call, now, after, version)) { delete state.entries[id]; continue; }
+      if (!options.isRallyCreated && old && old.until > now) {
         old.pending ||= id !== 'incoming' && (Number.isFinite(version) && (!Number.isFinite(old.sentVersion) || version > old.sentVersion) ||
           !Number.isFinite(options.version) && after > old.sentAt);
         old.after = after; old.version = version;

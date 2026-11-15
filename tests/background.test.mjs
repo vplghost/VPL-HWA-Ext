@@ -1073,7 +1073,7 @@ test('auto-join push starts a rally march and refreshes its details', async () =
   assert.equal(march.endsAt, 4000);
   assert.equal(march.rally.team.heroIds[0], 16);
   assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, (call) => call.name),
-    ['getRallyById', 'getMarches']);
+    ['getRallyById', 'getMarches', 'getUnitSummary']);
   await send('api-record', socket('rallyMembersUpdated', { rallyId: 'rally-3' },
     '2026-11-05T14:56:25.000Z'), sender);
   assert.deepEqual(Array.from(forwardedMessages[1].msg.calls, (call) => call.name),
@@ -1109,7 +1109,7 @@ test('priority auto-join joins guild rally when boss level meets or exceeds thre
   // 1. rallyCreated MQTT triggers getRallyById and getMarches
   await send('api-record', socket('rallyCreated', { rallyId: 'rally-high' }), sender);
   assert.equal(forwardedMessages.length, 1);
-  assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, (c) => c.name), ['getRallyById', 'getMarches']);
+  assert.deepEqual(Array.from(forwardedMessages[0].msg.calls, (c) => c.name), ['getRallyById', 'getMarches', 'getUnitSummary']);
 
   // 2. getRallyById response with boss level 15 (mobConfigId 74 >= 74) triggers joinRally
   const rallyHighRecord = rpc(

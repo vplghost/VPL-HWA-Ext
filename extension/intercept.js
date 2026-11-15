@@ -110,6 +110,9 @@
     }, location.origin);
   };
   let lastRpcUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null;
+  if (lastRpcUrl && !lastRpcUrl.includes('/api/rpc')) {
+    lastRpcUrl = null;
+  }
   let lastRpcHeaders = null;
   try {
     if (typeof sessionStorage !== 'undefined') {
@@ -365,7 +368,9 @@
         return;
       }
       const calls = event.data.calls;
-      const url = lastRpcUrl || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null) || 'https://api.hero-wars-alliance.com/api/rpc';
+      const storedUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_last_rpc_url') : null;
+      const rawUrl = (lastRpcUrl && lastRpcUrl.includes('/api/rpc')) ? lastRpcUrl : ((storedUrl && storedUrl.includes('/api/rpc')) ? storedUrl : null);
+      const url = rawUrl || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
       if (calls.some(call => (['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) ||
           /^speedUp.*WithResources$/.test(call?.name)) && !isHelperAction(call))) return;
@@ -1233,7 +1238,7 @@
       const options = args[1];
       const url = typeof input === 'string' || input instanceof URL ? input : input?.url;
       const urlStr = String(url || '');
-      if (urlStr.includes('/api/rpc') || urlStr.includes('api.hero-wars-alliance.com')) {
+      if (urlStr.includes('/api/rpc')) {
         lastRpcUrl = urlStr;
         try {
           if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('hwa_last_rpc_url', urlStr);
@@ -1535,7 +1540,7 @@
     xhr.open = function (method, url, ...rest) {
       const urlStr = String(url || '');
       xhrUrls.set(this, urlStr);
-      if (urlStr.includes('/api/rpc') || urlStr.includes('api.hero-wars-alliance.com')) {
+      if (urlStr.includes('/api/rpc')) {
         lastRpcUrl = urlStr;
         try {
           if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('hwa_last_rpc_url', urlStr);
@@ -1550,7 +1555,7 @@
     xhr.send = function (...args) {
       try {
         const urlStr = xhrUrls.get(this) || '';
-        if (urlStr.includes('/api/rpc') || urlStr.includes('api.hero-wars-alliance.com')) {
+        if (urlStr.includes('/api/rpc')) {
           const headers = xhrHeaders.get(this);
           if (headers && Object.keys(headers).length > 0) {
             lastRpcHeaders = { ...headers };
