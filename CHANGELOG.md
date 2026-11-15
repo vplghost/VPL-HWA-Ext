@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.111 — 2026-11-15
+
+### Added
+
+- Typed Tower Automation controller `src/services/queues/towerAutomation.ts` providing buff prioritization, buff room selection, battle room candidate scoring, and floor automation plan execution.
+- Typed Tower Runner service `src/services/queues/towerRunner.ts` managing tower run lifecycle (phases, room transitions, battle completion, floor progression, runner state persistence).
+- Typed Dungeon Automation controller `src/services/queues/dungeonAutomation.ts` providing titan vitality evaluation, elemental pool lineup selection, door candidate scoring, casualty tracking, and dungeon automation plan execution.
+- Typed Dungeon Runner service `src/services/queues/dungeonRunner.ts` managing dungeon run lifecycle (phases, door selections, gate coordinates, battle calls, casualty checks, runner state persistence).
+- Strict TypeScript interfaces in `src/types/game/towerAutomation.ts` (`TowerBuffPriority`, `TowerAutomationPlanResult`, `TowerRunnerPhase`, `TowerRunnerState`, `TowerRunnerStepResult`) and `src/types/game/dungeonAutomation.ts` (`DungeonDoorEvaluation`, `DungeonDoorSelectionResult`, `DungeonPlanResult`, `DungeonRunnerPhase`, `DungeonRunnerState`, `DungeonRunnerStepResult`).
+- Comprehensive unit test suite `tests/tower-dungeon-runners-typed.test.mjs` verifying tower buff selection, battle room planning, dungeon titan survival, and door prioritization.
+
+### Changed
+
+- Re-exported `towerAutomation` and `dungeonAutomation` types through `src/types/index.ts`.
+- Preserved global backward compatibility on `globalThis.hwaHelperTowerAutomation`, `globalThis.hwaHelperTowerRunner`, `globalThis.hwaHelperDungeonAutomation`, and `globalThis.hwaHelperDungeonRunner`.
+
 ## 0.10.110 — 2026-11-15
 
 ### Added
