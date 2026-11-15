@@ -5,7 +5,7 @@ import { join, relative, resolve } from 'node:path';
 
 // Keep the established classic worker/MAIN-world contracts as WXT public assets.
 // The popup is always compiled from entrypoints/popup; never ship its legacy renderer.
-const excluded = new Set(['manifest.json', 'popup.html', 'popup.js', 'popup.css', 'theme.css', 'export-name.js']);
+const excluded = new Set(['manifest.json', 'popup.html', 'popup.js', 'popup.css', 'theme.css']);
 async function runtimeAssets(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const groups = await Promise.all(entries.map(async (entry) => {

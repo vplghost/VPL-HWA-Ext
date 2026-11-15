@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.11.0 — 2026-11-15
+
+### Added
+
+- Complete migration to WXT / TypeScript modern extension architecture:
+  - Phase 1: Static Metadata & Type Schemas (`src/data/`, `src/types/game/`).
+  - Phase 2: Pure Utilities, Rules & Isolated Automation Units (`src/utils/`, `src/services/`).
+  - Phase 3: Complex Queue Runners & Modular RPC Cache Store (`src/services/queues/`, `src/core/cache/`).
+  - Phase 4: WXT Extension Entrypoints (`entrypoints/background.ts`, `entrypoints/bridge.content.ts`, `entrypoints/interceptor.content.ts`).
+
+### Removed
+
+- Removed obsolete dead JavaScript artifacts (`extension/export-name.js` and superseded test suite).
+- Cleaned up unreferenced legacy assets and build exclusions.
+
+### Changed
+
+- Minor version release marking full modernization, code cleanup, and zero-regression verification across 939 automated unit tests.
+
 ## 0.10.115 — 2026-11-15
 
 ### Added
