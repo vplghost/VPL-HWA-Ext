@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.115 — 2026-11-15
+
+### Added
+
+- Typed WXT network interceptor content script entrypoint [entrypoints/interceptor.content.ts](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/entrypoints/interceptor.content.ts) utilizing `defineContentScript()` configured for `world: 'MAIN'`:
+  - Implements `isTargetRpcUrl` for matching API RPC endpoints (`/api/rpc` and `api.hero-wars-alliance.com`).
+  - Implements `isMqttUrl` for matching MQTT WebSocket endpoints (`emqx-hwmb-wss.nextersglobal.com/mqtt`).
+  - Implements `createApiRecordMessage` and `createQueueStatusMessage` with bounds clamping (0–64) for standardized window messaging.
+  - Listens to control configuration messages (`hwa-helper-config`) from the isolated-world bridge and broadcasts ready state on initialization.
+- Unit test suite [tests/interceptor-entrypoint.test.mjs](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/tests/interceptor-entrypoint.test.mjs) testing URL evaluation, message formatting, queue clamping, and WXT MAIN-world configuration.
+
+### Changed
+
+- Preserved 100% backward compatibility for legacy MAIN-world network interception and MQTT capture across all 940 tests.
+
 ## 0.10.114 — 2026-11-15
 
 ### Added
