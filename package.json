@@ -1,6 +1,6 @@
 {
   "name": "hwa-helper",
-  "version": "0.10.108",
+  "version": "0.10.109",
   "private": true,
   "description": "Personal Chrome extension for Hero Wars: Alliance",
   "scripts": {

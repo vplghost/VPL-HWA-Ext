@@ -77,4 +77,7 @@ export * from './game/mail';
 export * from './game/worldRead';
 export * from './game/buildingQueue';
 export * from './game/researchQueue';
+export * from './game/raidQueue';
+export * from './game/monsterQueue';
+export * from './game/raidEnergyAuto';
 

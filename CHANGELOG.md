@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.109 — 2026-11-15
+
+### Added
+
+- Typed Raid Queue controller `src/services/queues/raidQueue.ts` providing rally creation, active rally tracking, member countdown check, battle result processing, active march detection, and step planning.
+- Typed Monster Queue controller `src/services/queues/monsterQueue.ts` providing solo monster attack sequence, mob target selection, attack battle result processing, and step planning.
+- Typed Raid Energy Auto controller `src/services/queues/raidEnergyAuto.ts` providing energy refill calculation clamped at cap, continuous observation state tracking, natural threshold crossing detection, and configuration validation.
+- Strict TypeScript interfaces in `src/types/game/raidQueue.ts` (`RaidQueueOptions`, `RaidQueueState`, `RaidBossQueue`, `RaidCurrentTarget`, `RaidQueueStepResult`), `src/types/game/monsterQueue.ts` (`MonsterQueueOptions`, `MonsterQueueState`, `MonsterCurrentTarget`, `MonsterQueueStepResult`), and `src/types/game/raidEnergyAuto.ts` (`RaidEnergyRefillSource`, `RaidEnergyAutoConfig`, `RaidEnergyAutoObservationState`, `RaidEnergyAutoObservationResult`).
+- Comprehensive unit test suite `tests/raid-monster-queue-typed.test.mjs` verifying raid queue lifecycle, monster attack planning, natural energy crossing, and configuration validation.
+
+### Changed
+
+- Re-exported `raidQueue`, `monsterQueue`, and `raidEnergyAuto` types through `src/types/index.ts`.
+- Preserved global backward compatibility on `globalThis.hwaHelperRaidQueue`, `globalThis.hwaHelperMonsterQueue`, and `globalThis.hwaHelperRaidEnergyAuto`.
+
 ## 0.10.108 — 2026-11-15
 
 ### Added
