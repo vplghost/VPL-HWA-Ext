@@ -64,8 +64,20 @@ onUnmounted(() => {
   }
 });
 
+const dashboardRefreshing = ref(false);
+const dashboardRefreshMessage = ref('');
 async function refreshAllDashboard() {
-  await dispatchRpc([
+  if (dashboardRefreshing.value || !hasGameTab.value) return;
+  dashboardRefreshing.value = true;
+  dashboardRefreshMessage.value = 'Requesting Energy and World Energy…';
+  try {
+    // Refresh resource snapshots before the unrelated dashboard reads.
+    const energy = await dispatchRpc([{ name: 'userGetInfo' }, { name: 'refillableGetAll', feature: 'refillable' }]);
+    if (!energy?.ok) {
+      dashboardRefreshMessage.value = energy?.error || 'Energy refresh could not be sent.';
+      return;
+    }
+    const result = await dispatchRpc([
     { name: 'getUnitSummary', feature: 'unit' },
     { name: 'getTrainings', feature: 'unit' },
     { name: 'getHealing', feature: 'unit' },
@@ -78,8 +90,6 @@ async function refreshAllDashboard() {
     { name: 'magicTower_briefInfo' },
     { name: 'magicTower_getAll' },
     { name: 'arenaGetAll' },
-    { name: 'userGetInfo' },
-    { name: 'refillableGetAll', feature: 'refillable' },
     { name: 'clanBoss_getAll' },
     { name: 'questGetAll' },
     { name: 'getDailyQuests', feature: 'quest', args: {} },
@@ -88,7 +98,17 @@ async function refreshAllDashboard() {
     { name: 'titanGetAll' },
     { name: 'expeditionGet' },
     { name: 'heroGetAll' },
-  ]);
+    ]);
+    dashboardRefreshMessage.value = !result?.ok
+      ? `Energy refresh requested. Other dashboard refresh failed: ${result?.error || 'RPC error'}`
+      : energy.queued || result.queued
+        ? 'Refresh queued. Energy and World Energy update after the next game RPC.'
+        : 'Refresh requested. Waiting for Energy, World Energy and dashboard snapshots from the game.';
+  } catch (error) {
+    dashboardRefreshMessage.value = `Refresh failed: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    dashboardRefreshing.value = false;
+  }
 }
 </script>
 
@@ -231,14 +251,17 @@ async function refreshAllDashboard() {
         <!-- Refresh All -->
         <button
           type="button"
-          class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 ml-1"
-          title="Refresh dashboard snapshots"
+          class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 ml-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Refresh Energy, World Energy and dashboard snapshots"
+          :disabled="dashboardRefreshing || !hasGameTab"
           @click="refreshAllDashboard"
         >
-          ↻ Refresh All
+          {{ dashboardRefreshing ? '↻ Requesting…' : '↻ Refresh All' }}
         </button>
       </div>
     </div>
+
+    <p v-if="dashboardRefreshMessage" role="status" class="text-xs text-slate-500 dark:text-slate-400">{{ dashboardRefreshMessage }}</p>
 
     <!-- Top Resource Summary -->
     <ResourceSummary />

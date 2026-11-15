@@ -3,7 +3,7 @@ id: doc-d229300ad19a499cc8f6e79fc5ea4df4
 title: Dashboard Live Status Model
 description: Vue Dashboard queue/march sources, countdown lifecycle, and evidence-based daily activity completion and reset rules.
 createdAt: '2026-11-13T05:20:28.286Z'
-updatedAt: '2026-11-14T07:48:08.447Z'
+updatedAt: '2026-11-15T03:32:25.481Z'
 tags:
   - dashboard
   - queues
@@ -52,3 +52,12 @@ The Tower progress denominator comes from shared generated `hwaHelperTowerRules.
 @task-VHE-03VDQ4 adds the Expeditions card to Activities, with aggregate progress and a timer/auto-start dialog. Canonical contract and verified VIP/subscription/hero rules: @doc/api/expedition-rpc-contract-and-dashboard-automation.
 
 Tower `magicTower_getAll` can represent completion without any top-level `state`: the observed `floorData.floorNumber=23` contains a `boss_battle` room with `state=room_completed`. Earlier reduction converted that snapshot into `inProgress/isCleared=false`, overwriting a successful brief snapshot or session. Extraction now treats an explicitly completed boss room on the configured final floor as completion. The Activity view also recognizes that evidence in existing cached floorData/session rooms, so replay is not required. Standing on the final floor, an initial boss room or a completed ordinary room is insufficient. Freshness and a newer reset/new-run snapshot retain precedence. Tests in `tests/expeditions.test.mjs` cover getAll alone, both brief/getAll orders, legacy caches and negative/reset/day cases.
+
+
+## Explicit Energy and World Energy refresh (0.10.92)
+
+@task-VHE-WZJWZX keeps the existing verified resource sources but prioritizes them in Dashboard Refresh All: its first dispatch is userGetInfo plus refillableGetAll with feature refillable. These calls were already present in the broad batch; they now have a dedicated first request and are removed from the remaining snapshot list. Piggyback may still coalesce queued reads onto a native carrier under the existing shared RPC policy; no dispatch mode is bypassed.
+
+The button disables during dispatch and without a game tab, ignores overlapping clicks and reports queued/transport failures. Acknowledgement means requested, not refreshed. Canonical Energy from userGetInfo refillable1 and World Energy from refillableGetAll refillableId2 update ResourceSummary and Header only through actual RPC cache reduction. No balance or refill timestamp is synthesized by the click.
+
+Verification: tests/dashboard-energy-refresh.test.mjs executes the actual Dashboard and ResourceSummary setup, proves both reads are requested first, queued ack leaves old values untouched, authoritative replies update Energy120 and World Energy90, and disabled RPC/overlapping clicks do not dispatch extra reads. Full820 tests:808 passed,12 optional private-log skips; typecheck/build passed.
