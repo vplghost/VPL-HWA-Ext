@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.108 — 2026-11-15
+
+### Added
+
+- Typed Building Queue controller `src/services/queues/buildingQueue.ts` providing simulated levels, queue timeline calculation, eligible candidate selection (excluding landmarks), step planning, and queue state mutations.
+- Typed Research Queue controller `src/services/queues/researchQueue.ts` providing simulated levels, queue timeline calculation, research level extraction, step planning, and queue state mutations.
+- Strict TypeScript interfaces in `src/types/game/buildingQueue.ts` (`BuildingQueueState`, `BuildingQueueCandidate`, `BuildingQueueTimeline`, `BuildingQueuePlanResult`) and `src/types/game/researchQueue.ts` (`ResearchQueueState`, `ResearchQueueTimeline`, `ResearchQueuePlanResult`).
+- Comprehensive unit test suite `tests/queues-typed-migration.test.mjs` verifying building and research queue simulation, candidate eligibility, queue mutations, timeline calculations, and RPC planning.
+
+### Changed
+
+- Updated `BuildingModal.vue` and `ResearchModal.vue` to import and consume typed queue services directly while preserving test harness fallbacks.
+- Re-exported queue types through `src/types/index.ts`.
+- Preserved global backward compatibility on `globalThis.hwaHelperBuildingQueue` and `globalThis.hwaHelperResearchQueue`.
+
 ## 0.10.107 — 2026-11-15
 
 ### Added

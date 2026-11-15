@@ -16,10 +16,14 @@ import {
   researchData as researchDataTyped,
   researchDataHelper,
 } from '@/src/data/researchData';
+import { researchQueueService } from '@/src/services/queues/researchQueue';
 
 // Resolve helper with fallback to typed module for runtime, and globalThis for test harness
 const rHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchData)
   || (typeof researchDataHelper !== 'undefined' ? researchDataHelper : null);
+
+const rQueueHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchQueue)
+  || (typeof researchQueueService !== 'undefined' ? researchQueueService : null);
 
 const getMaxLevel = (id: any) =>
   rHelper?.getMaxLevel?.(id)
@@ -224,7 +228,6 @@ async function finishResearch(f: any) {
 
 // Timeline
 const queueTimeline = computed(() => {
-  const rQueueHelper = (globalThis as any).hwaHelperResearchQueue;
   if (rQueueHelper?.calculateQueueTimeline) {
     return rQueueHelper.calculateQueueTimeline(rawQueues.value, researchQueue.value.items, now.value);
   }
@@ -417,7 +420,6 @@ const researchCenterLevel = computed(() => {
 
 // Calculate simulated levels including active queue and queued automation items
 const simulatedResearchLevels = computed(() => {
-  const rQueueHelper = (globalThis as any).hwaHelperResearchQueue;
   const researchMap = new Map<number, number>();
   for (const r of allResearchesList.value) {
     researchMap.set(Number(r.id), Number(r.level) || 0);

@@ -75,4 +75,6 @@ export * from './game/freeAlchemy';
 export * from './game/mineDefense';
 export * from './game/mail';
 export * from './game/worldRead';
+export * from './game/buildingQueue';
+export * from './game/researchQueue';
 

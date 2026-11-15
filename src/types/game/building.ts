@@ -23,6 +23,8 @@ export interface BuildingQueueItem {
   currentLevel: number;
   nextLevel: number;
   durationMs: number;
+  addedAt?: number;
   estStart?: number;
   estFinish?: number;
+  [key: string]: any;
 }

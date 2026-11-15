@@ -31,6 +31,8 @@ export interface ResearchQueueItem {
   currentLevel: number;
   nextLevel: number;
   durationMs: number;
+  addedAt?: number;
   estStart?: number;
   estFinish?: number;
+  [key: string]: any;
 }

@@ -14,10 +14,14 @@ import {
   buildingLevelsData as buildingLevelsDataTyped,
   buildingDataHelper,
 } from '@/src/data/buildingData';
+import { buildingQueueService } from '@/src/services/queues/buildingQueue';
 
 // Resolve helper with fallback to typed module for runtime, and globalThis for test harness
 const bHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingData)
   || (typeof buildingDataHelper !== 'undefined' ? buildingDataHelper : null);
+
+const bQueueHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingQueue)
+  || (typeof buildingQueueService !== 'undefined' ? buildingQueueService : null);
 
 const getBuildingLevelData = (id: any, lvl: any) =>
   bHelper?.getBuildingLevelData?.(id, lvl)
@@ -210,7 +214,6 @@ async function finishConstruction(f: any) {
 
 // Timeline
 const queueTimeline = computed(() => {
-  const bQueueHelper = (globalThis as any).hwaHelperBuildingQueue;
   if (bQueueHelper?.calculateQueueTimeline) {
     return bQueueHelper.calculateQueueTimeline(rawQueues.value, buildingQueue.value.items, now.value);
   }
@@ -330,7 +333,6 @@ const allBuildingsList = computed(() => {
 
 // Calculate simulated levels including active queue and queued automation items
 const simulatedBuildingLevels = computed(() => {
-  const bQueueHelper = (globalThis as any).hwaHelperBuildingQueue;
   const buildingMap = new Map<number, number>();
   for (const b of allBuildingsList.value) {
     buildingMap.set(Number(b.id), Number(b.level) || 0);
