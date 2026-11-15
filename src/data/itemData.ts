@@ -2627,14 +2627,14 @@ const aliases: Record<string, string> = {
 
 export function getItemIcon(category: string, id: string | number): string | null {
   const kind = aliases[category] || category;
-  const path = itemResources.icons?.[kind]?.[String(id)] || (globalThis as any).hwaHelperItemResources?.icons?.[kind]?.[String(id)];
+  const path = itemResources.icons?.[kind]?.[String(id)];
   return typeof path === 'string' && /^assets\/(?:items\/[\w-]+|heroes|titans)\/\d+\.png$/.test(path) ? path : null;
 }
 
 export function isInactiveResource(entry: { key?: string } | undefined, now = Date.now()): boolean {
   const [namespace, category, id = '0'] = entry?.key?.split(':') || [];
   if (namespace !== 'resource') return false;
-  const metadata = itemResources.items?.[category || '']?.[id] || (globalThis as any).hwaHelperItemResources?.items?.[category || '']?.[id];
+  const metadata = itemResources.items?.[category || '']?.[id];
   return metadata?.internal === true || (Number.isFinite(metadata?.expiresAt) && (metadata!.expiresAt as number) <= now);
 }
 

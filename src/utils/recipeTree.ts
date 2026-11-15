@@ -39,13 +39,15 @@ export function buildGearRecipeTree(gearId: number | string | null, cache: any):
     const cycle = ancestors.has(identity);
     const owned = allocate(category, id, required);
     const missing = Math.max(0, required - owned);
-    const craftInfo = (category === 'gear'
+    const craftMap = category === 'gear'
       ? (globals.hwaHelperGearCraftData || (typeof gearCraftData !== 'undefined' ? gearCraftData : null))
-      : (globals.hwaHelperScrollCraftData || (typeof scrollCraftData !== 'undefined' ? scrollCraftData : null))
-    )?.[id] || null;
-    const resolvedName = globals.hwaHelperNameData?.names?.[category]?.[id]
+      : (globals.hwaHelperScrollCraftData || (typeof scrollCraftData !== 'undefined' ? scrollCraftData : null));
+    const craftInfo = craftMap?.[id] || (category === 'gear'
+      ? (typeof gearCraftData !== 'undefined' ? gearCraftData?.[id] : null)
+      : (typeof scrollCraftData !== 'undefined' ? scrollCraftData?.[id] : null)) || null;
+    const resolvedName = (typeof getItemName === 'function' ? getItemName(category, id) : null)
       || globals.hwaHelperNameMap?.item?.(category, id)
-      || (typeof getItemName === 'function' ? getItemName(category, id) : null)
+      || globals.hwaHelperNameData?.names?.[category]?.[id]
       || `${category} #${id}`;
     const node: RecipeNode = {
       id, key, category, isScroll: category === 'scroll',
@@ -101,8 +103,9 @@ export function recipeFarmCategory(node: RecipeNode): string {
 
 export function recipeMissions(node: RecipeNode | null): any[] {
   if (!node || node.cycle) return [];
-  const missions = (globalThis as any).hwaHelperCampaignMissions?.getMissionsForItem?.(node.id)
-    || (typeof typedGetMissionsForItem === 'function' ? typedGetMissionsForItem(node.id) : []);
+  const missions = (typeof typedGetMissionsForItem === 'function' ? typedGetMissionsForItem(node.id) : null)
+    || (globalThis as any).hwaHelperCampaignMissions?.getMissionsForItem?.(node.id)
+    || [];
   const category = recipeFarmCategory(node);
   return missions.filter((mission: any) => mission.drops?.[category]?.some((id: any) => String(id) === node.id));
 }

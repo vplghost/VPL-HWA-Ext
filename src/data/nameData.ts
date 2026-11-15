@@ -1,4 +1,5 @@
 import type { NameDataGroup } from '../types/game/item.ts';
+import { itemResources } from './itemData.ts';
 
 export const nameData: NameDataGroup = {
   "assetUrl": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0054/d973530195826f1575a002f97a3f30e9/locale/en.json.gz",
@@ -2665,11 +2666,7 @@ export function lookupName(group: string, id: string | number): string | null {
   if (localNames && Object.hasOwn(localNames, strId)) {
     return localNames[strId] ?? null;
   }
-  const globalNames = (globalThis as any).hwaHelperNameData?.names?.[group];
-  if (globalNames && Object.hasOwn(globalNames, strId)) {
-    return globalNames[strId] ?? null;
-  }
-  const extra = (globalThis as any).hwaHelperItemResources?.items;
+  const extra = (typeof itemResources !== 'undefined' ? itemResources?.items : undefined) ?? (globalThis as any).hwaHelperItemResources?.items;
   const rows = extra && Object.hasOwn(extra, group) ? extra[group] : null;
   return rows && Object.hasOwn(rows, strId) && typeof rows[strId]?.name === 'string' ? (rows[strId].name as string) : null;
 }

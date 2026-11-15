@@ -2,6 +2,7 @@
 import UnitStars from '@/src/components/common/UnitStars.vue';
 import { computed } from 'vue';
 import { getHeroMetadata, getHeroEquipmentRank, getHeroSoulProgress, starGlowClass } from '@/src/utils/metadata';
+import { skinStats, getHeroGlyphs } from '@/src/data/heroMetadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { useHoverCardPosition } from '@/src/composables/useHoverCardPosition';
 
@@ -73,9 +74,9 @@ const skinsList = computed(() => {
   const skins = props.hero?.skins;
   if (!skins || typeof skins !== 'object') return [];
   const entries = Object.entries(skins).sort(([a], [b]) => Number(a) - Number(b));
-  const skinStats = (globalThis as any).hwaHelperSkinStats || {};
+  const statsMap = (typeof skinStats !== 'undefined' ? skinStats : undefined) || (globalThis as any).hwaHelperSkinStats || {};
   return entries.map(([skinId, level]) => {
-    let stat = skinStats[skinId];
+    let stat = statsMap[skinId];
     if (!stat || stat === 'MAIN' || Number(skinId) === Number(props.hero?.baseSkinId) || (Number(skinId) <= 100 && !skinStats[skinId])) {
       const mainStat = meta.value?.class === 'Marksman' ? 'Agi' : meta.value?.role === 'Tank' || meta.value?.class === 'Warrior' ? 'Str' : 'Int';
       stat = mainStat;
@@ -97,7 +98,7 @@ const glyphsList = computed(() => {
   if (!Array.isArray(runes) || runes.length === 0 || !runes.some((r: any) => Number(r) > 0)) {
     return [];
   }
-  const glyphStats = (globalThis as any).hwaHelperHeroGlyphs?.[String(props.heroId)] || ['PA', 'Arm', 'HP', 'MD', 'Str'];
+  const glyphStats = (typeof getHeroGlyphs === 'function' ? getHeroGlyphs(props.heroId) : null) || (globalThis as any).hwaHelperHeroGlyphs?.[String(props.heroId)] || ['PA', 'Arm', 'HP', 'MD', 'Str'];
   return runes.map((lvl: any, idx: number) => {
     let stat = glyphStats[idx] || `G${idx + 1}`;
     if (stat === 'Dodge') stat = 'Ddg';

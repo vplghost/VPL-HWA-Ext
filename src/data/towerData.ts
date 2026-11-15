@@ -67,7 +67,7 @@ export const towerRules: TowerRulesData = {
 
 export function getTowerBuff(id: number | string): TowerBuffMeta | undefined {
   const strId = String(id);
-  return towerBuffs[strId] || (globalThis as any).hwaHelperTowerBuffs?.[strId];
+  return towerBuffs[strId];
 }
 
 // Preserve backward compatibility for background worker scripts and VM tests

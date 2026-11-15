@@ -1,4 +1,5 @@
 import type { TowerAutomationPlanResult } from '../../types/game/towerAutomation.ts';
+import { towerRules } from '../../data/towerData.ts';
 
 export const DEFAULT_BUFF_PRIORITY: number[] = [
   6, 3, 29, 2, 7, 13, 28, 11, 16, 26, 30, 1, 4, 5, 8, 9, 14, 27, 33, 40, 41, 45,
@@ -106,7 +107,7 @@ export function plan(
         room: Number(choice.roomNumber),
       };
     }
-    const finalFloor = (globalThis as any).hwaHelperTowerRules?.finalFloor ?? 50;
+    const finalFloor = (globalThis as any).hwaHelperTowerRules?.finalFloor ?? towerRules.finalFloor ?? 50;
     const wonFinalBoss =
       session.floorNumber === finalFloor &&
       history.some(

@@ -42,7 +42,7 @@ const personalBattlePoints = computed(() => view.value.personalBattlePoints);
 const personalSeasonPoints = computed(() => view.value.personalSeasonPoints);
 const clanRank = computed(() => rewards.value.userClanRank != null ? '#' + rewards.value.userClanRank : '—');
 const seasonRank = computed(() => rewards.value.seasonClanRank != null ? '#' + rewards.value.seasonClanRank : '—');
-const thresholds = computed<Record<number, number>>(() => (globalThis as any).hwaHelperClanVersusChestThresholds || {});
+const thresholds = computed<Record<number, number>>(() => clanVersusChestThresholds || (globalThis as any).hwaHelperClanVersusChestThresholds || {});
 
 const chestRewardsMap = computed(() => clanVersusRewards || (globalThis as any).hwaHelperClanVersusRewards || {});
 

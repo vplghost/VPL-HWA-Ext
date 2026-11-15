@@ -108,10 +108,7 @@ export function getInfirmaryCapacity(
   buildingId: number | string,
   level: number | string
 ): number | undefined {
-  return (
-    mineDefenseData.capacities[String(buildingId)]?.[String(level)] ??
-    (globalThis as any).hwaHelperMineDefenseData?.capacities?.[String(buildingId)]?.[String(level)]
-  );
+  return mineDefenseData.capacities[String(buildingId)]?.[String(level)];
 }
 
 // Preserve backward compatibility for background service worker scripts and VM tests

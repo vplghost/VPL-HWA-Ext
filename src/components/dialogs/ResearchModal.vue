@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useCityQueueActions } from '@/src/composables/useCityQueueActions';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getResearchName } from '@/src/utils/metadata';
+import { nameData } from '@/src/data/nameData';
 import { formatDuration, formatFinishTime } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import SpeedupControl from '@/src/components/common/SpeedupControl.vue';
@@ -342,7 +343,9 @@ const allResearchesList = computed(() => {
     }
   }
 
-  const allDict = (globalThis as any).hwaHelperNameData?.names?.research || {};
+  const allDict = (typeof nameData !== 'undefined' ? nameData?.names?.research : undefined)
+    || (globalThis as any).hwaHelperNameData?.names?.research
+    || {};
   for (const key of Object.keys(allDict)) {
     const rId = Number(key);
     if (!researchMap.has(rId)) {

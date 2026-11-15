@@ -2,6 +2,7 @@
 import UnitStars from '@/src/components/common/UnitStars.vue';
 import { computed } from 'vue';
 import { getTitanMetadata, getTitanSoulProgress, starGlowClass } from '@/src/utils/metadata';
+import { skinStats } from '@/src/data/heroMetadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { useHoverCardPosition } from '@/src/composables/useHoverCardPosition';
 
@@ -69,9 +70,9 @@ const skinsList = computed(() => {
   const skins = props.titan?.skins;
   if (!skins || typeof skins !== 'object') return [];
   const entries = Object.entries(skins).sort(([a], [b]) => Number(a) - Number(b));
-  const skinStats = (globalThis as any).hwaHelperSkinStats || {};
+  const statsMap = (typeof skinStats !== 'undefined' ? skinStats : undefined) || (globalThis as any).hwaHelperSkinStats || {};
   return entries.map(([skinId, level]) => {
-    let stat = skinStats[skinId];
+    let stat = statsMap[skinId];
     if (!stat || stat === 'MAIN') stat = 'HP';
     return {
       stat,

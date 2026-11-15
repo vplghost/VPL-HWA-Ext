@@ -24,7 +24,7 @@ for (const id of [64, 66, 67, 69, 70, 71, 72, 75, 76, 77, 79, 80, 81, 82,
 
 export function getRefillableRule(id: number | string): RefillableRule | undefined {
   const num = typeof id === 'string' ? parseInt(id, 10) : id;
-  return refillableRules[num] || (globalThis as any).hwaHelperRefillableRules?.[num];
+  return refillableRules[num];
 }
 
 // Preserve backward compatibility for background worker scripts and VM tests

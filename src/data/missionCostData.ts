@@ -237,7 +237,7 @@ export const missionCosts: MissionCostsMap = {
 
 export function getMissionCosts(missionId: number | string | null | undefined): MissionCostPair | undefined {
   if (missionId == null) return undefined;
-  return missionCosts[String(missionId)] || (globalThis as any).hwaHelperMissionCosts?.[String(missionId)];
+  return missionCosts[String(missionId)];
 }
 
 export function getMissionStartCost(missionId: number | string | null | undefined): number {

@@ -16,7 +16,7 @@ import '~/extension/tower-rules.js';
 import '~/extension/tower-automation.js';
 import '~/extension/clan-versus-rules.js';
 
-import { heroMetadata, getHeroMetadata as getTypedHeroMetadata } from '../data/heroMetadata.ts';
+import { heroMetadata, getHeroMetadata as getTypedHeroMetadata, gearCraftData } from '../data/heroMetadata.ts';
 import { titanMetadata, getTitanMetadata as getTypedTitanMetadata } from '../data/titanMetadata.ts';
 import { getItemName as typedGetItemName, getBuildingName as typedGetBuildingName, getResearchName as typedGetResearchName } from '../data/nameData.ts';
 
@@ -93,15 +93,15 @@ export function getItemName(category: string, id: number | string): string {
     return `${tMeta?.name || `Titan #${strId}`} Titan Soul Stone`;
   }
   if (category === 'fragmentGear') {
-    const gName = (globalThis as any).hwaHelperNameData?.names?.gear?.[strId] || `Gear #${strId}`;
+    const gName = (typeof typedGetItemName === 'function' ? typedGetItemName('gear', strId) : null) || (globalThis as any).hwaHelperNameData?.names?.gear?.[strId] || `Gear #${strId}`;
     return `${gName} Fragment`;
   }
   if (category === 'fragmentArtifact') {
-    const aName = (globalThis as any).hwaHelperNameData?.names?.artifact?.[strId] || `Artifact #${strId}`;
+    const aName = (typeof typedGetItemName === 'function' ? typedGetItemName('artifact', strId) : null) || (globalThis as any).hwaHelperNameData?.names?.artifact?.[strId] || `Artifact #${strId}`;
     return `${aName} Fragment`;
   }
   if (category === 'fragmentScroll') {
-    const sName = (globalThis as any).hwaHelperNameData?.names?.scroll?.[strId] || `Scroll #${strId}`;
+    const sName = (typeof typedGetItemName === 'function' ? typedGetItemName('scroll', strId) : null) || (globalThis as any).hwaHelperNameData?.names?.scroll?.[strId] || `Scroll #${strId}`;
     return `${sName} Fragment`;
   }
 
@@ -131,7 +131,8 @@ export function getHeroName(heroId: number | string): string {
 }
 
 export function getGearCraftData(gearId: number | string) {
-  return (globalThis as any).hwaHelperGearCraftData?.[String(gearId)];
+  const local = typeof gearCraftData !== 'undefined' ? gearCraftData?.[String(gearId)] : undefined;
+  return local ?? (globalThis as any).hwaHelperGearCraftData?.[String(gearId)];
 }
 
 export function getBuildingName(id: number | string): string {

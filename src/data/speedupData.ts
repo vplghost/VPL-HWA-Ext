@@ -42,9 +42,7 @@ export const speedupData: SpeedupDataStructure = {
 
 export function getSpeedupDuration(type: SpeedupType, itemLevel: number | string): number | null {
   const duration = speedupData.durations[type]?.[String(itemLevel)];
-  if (typeof duration === 'number') return duration;
-  const fallback = (globalThis as any).hwaHelperSpeedupData?.durations?.[type]?.[String(itemLevel)];
-  return typeof fallback === 'number' ? fallback : null;
+  return typeof duration === 'number' ? duration : null;
 }
 
 // Preserve backward compatibility for background worker scripts and VM tests
