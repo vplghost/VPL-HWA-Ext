@@ -75,7 +75,8 @@
     'startResearch', 'completeResearch',
     'startHealing', 'startTraining', 'completeTraining',
     'missionRaid', 'mission_raid', 'heroUpgradeSkill',
-    'heroInsertItem', 'inventoryCraftFragments', 'inventoryCraftRecipe']);
+    'heroInsertItem', 'inventoryCraftFragments', 'inventoryCraftRecipe',
+    'cinemaGiveReward', 'cinemaGetCounters']);
   function isHelperAction(call) {
     if (globalThis.hwaHelperSpeedup?.kindFor(call)) {
       return Boolean(globalThis.hwaHelperSpeedup.validate(call) && /^[a-f0-9]{32}$/.test(call.ident || ''));

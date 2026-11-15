@@ -27,6 +27,7 @@
     startHealing: 'teams',
     completeHealing: 'teams',
     questGetAll: 'other',
+    cinemaGetCounters: 'other',
     user_getClanInfo: 'other',
     'getUserClanMembersOutposts:globalMap': 'other',
     arenaGetAll: 'other',
@@ -1633,6 +1634,26 @@
               gold: error ? 0 : gold, cooldownUntil, results: rows, quests: Array.isArray(result.quests) ? result.quests : [] },
             updatedAt: record.timestamp }];
         }
+        if (call.name === 'cinemaGiveReward') {
+          const response = result?.response;
+          const error = result?.error || response?.error;
+          return [{
+            key: 'cinemaGiveRewardAction',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: {
+              token: call.ident,
+              success: !error && Boolean(response),
+              error: error ? String(typeof error === 'object' ? error.message || error.description || JSON.stringify(error) : error).slice(0, 200) : null,
+              boxNum: call.args?.boxNum,
+              type: call.args?.type,
+              reward: response && typeof response === 'object' && !Array.isArray(response) ? response : null,
+              quests: Array.isArray(result?.quests) ? result.quests : []
+            },
+            updatedAt: record.timestamp
+          }];
+        }
         if (call.name === 'clanClash_claimReward') {
           const response = result?.response;
           if (!call.ident || result?.error || !response || typeof response !== 'object' ||
@@ -2278,6 +2299,9 @@
           delete next.expeditionGet;
           delete next.freeAlchemySpinStatus;
           delete next.freeAlchemySpinReceipts;
+          delete next.cinemaGiveRewardStatus;
+          delete next.cinemaGiveRewardReceipts;
+          delete next.cinemaGetCounters;
           delete next.mailStatus;
           delete next.mailGetAll;
           delete next['getPage:report'];
@@ -2574,6 +2598,44 @@
               }
               next.questGetAll = { key: 'questGetAll', method: entry.method, group: 'other', data: quests, updatedAt: entry.updatedAt };
             }
+          }
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'cinemaGiveRewardAction') {
+          const receipts = normalizeArrayData(next.cinemaGiveRewardReceipts?.data);
+          if (receipts.some(receipt => receipt?.token === entry.data.token)) continue;
+          next.cinemaGiveRewardReceipts = {
+            key: 'cinemaGiveRewardReceipts',
+            method: entry.method,
+            group: 'internal',
+            data: [...receipts, { token: entry.data.token, at: entry.updatedAt }].slice(-100),
+            updatedAt: entry.updatedAt
+          };
+          if (!next.cinemaGiveRewardStatus || next.cinemaGiveRewardStatus.updatedAt <= entry.updatedAt) {
+            next.cinemaGiveRewardStatus = {
+              key: 'cinemaGiveRewardStatus',
+              method: entry.method,
+              group: 'internal',
+              data: { ...entry.data },
+              updatedAt: entry.updatedAt
+            };
+          }
+          if (entry.data.success && next.cinemaGetCounters?.data) {
+            const counters = { ...next.cinemaGetCounters.data };
+            counters.placementViewed = Math.min(5, (counters.placementViewed ?? 0) + 1);
+            if (Number.isFinite(counters.placementAvailable) && counters.placementAvailable > 0) {
+              counters.placementAvailable -= 1;
+            }
+            next.cinemaGetCounters = {
+              ...next.cinemaGetCounters,
+              data: counters,
+              updatedAt: entry.updatedAt
+            };
+          }
+          if (entry.data.success && entry.data.reward) {
+            const actions = extractRewardActions(record, { name: entry.method, ident: entry.data.token }, entry.data.reward, 'cinemaBox');
+            entries.push(...actions.filter(action => !entries.some(snapshot => snapshot.key === action.data.resourceKey && snapshot.updatedAt >= entry.updatedAt)));
           }
           changed = true;
           continue;

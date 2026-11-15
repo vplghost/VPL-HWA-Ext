@@ -35,6 +35,8 @@ export interface RpcCache {
   quest_getAll?: { data?: any };
   building_getQueue?: { data?: any };
   research_getQueue?: { data?: any };
+  cinemaGetCounters?: { data?: import('./game/cinema').CinemaCountersData; updatedAt?: string };
+  cinemaGiveRewardStatus?: { data?: import('./game/cinema').CinemaGiveRewardResult; updatedAt?: string };
   registrationTime?: number;
   [key: string]: any;
 }
@@ -61,3 +63,4 @@ export * from './game/hero';
 export * from './game/titan';
 export * from './game/campaign';
 export * from './game/item';
+export * from './game/cinema';

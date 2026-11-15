@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.103 — 2026-11-15
+
+### Added
+
+- Add Free Video Box rewards feature with `src/components/dashboard/FreeBoxButton.vue` mounted on Dashboard adjacent to `FreeAlchemySpinButton`.
+- Add Cinema type definitions in `src/types/game/cinema.ts` (`CinemaPlacementReward`, `CinemaCountersData`, `CinemaGiveRewardResult`).
+- Add RPC cache reducer handling for `cinemaGetCounters` and `cinemaGiveRewardAction` in `extension/rpc-cache.js`, tracking remaining box counts and updating reward balances.
+- Add unit test suite `tests/free-boxes.test.mjs` verifying counter reduction, sequential reward updates, account switch cache clearing, and SFC button element contract.
+
+### Changed
+
+- Add `cinemaGiveReward` and `cinemaGetCounters` to permitted helper action methods in `extension/intercept.js`.
+
 ## 0.10.102 — 2026-11-15
 
 ### Fixed
