@@ -4,20 +4,22 @@ import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useNow } from '@/src/composables/useNow';
 import { freeAlchemyAvailability, freeAlchemyTimer } from '@/src/utils/freeAlchemySpin';
+import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 
 const props = defineProps<{ hasGameTab: boolean }>();
 const { cache, dispatchRpc } = useRpcCache();
+const { pending: sharedPending, status: autoStatus } = useFreeSpinAutomation();
 const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const result = computed(() => cache.value.freeAlchemySpinStatus);
 const now = useNow();
 const availability = computed(() => freeAlchemyAvailability(cache.value, now.value));
-const disabled = computed(() => !!pending.value || !props.hasGameTab || !availability.value.ready);
+const disabled = computed(() => !!pending.value || sharedPending.value || !props.hasGameTab || !availability.value.ready);
 const pending = shallowRef<{ startedAt: number; previous?: string } | null>(null);
 const message = ref('');
 let timer: ReturnType<typeof setTimeout> | undefined;
 const tooltip = computed(() => !props.hasGameTab ? 'Open the game to use Free Spin'
   : !availability.value.ready ? `Free Spin available in ${freeAlchemyTimer(availability.value.remainingSeconds)}`
-  : message.value || 'Free Spin · Emerald Exchange');
+  : message.value || autoStatus.value || 'Free Spin · Emerald Exchange');
 watch(result, entry => {
   const request = pending.value;
   if (!request || !entry || entry.data?.token === request.previous || Date.parse(entry.updatedAt) < request.startedAt) return;
@@ -33,7 +35,7 @@ watch(() => availability.value.ready, (ready, wasReady) => {
 watch(accountId, () => { pending.value = null; message.value = ''; clearTimeout(timer); });
 onUnmounted(() => clearTimeout(timer));
 async function spin() {
-  if (pending.value || !props.hasGameTab || !freeAlchemyAvailability(cache.value, Date.now()).ready) return;
+  if (pending.value || sharedPending.value || !props.hasGameTab || !freeAlchemyAvailability(cache.value, Date.now()).ready) return;
   const request = { startedAt: Date.now(), previous: result.value?.data?.token };
   pending.value = request;
   message.value = 'Free Spin requested…';

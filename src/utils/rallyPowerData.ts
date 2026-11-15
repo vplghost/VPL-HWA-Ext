@@ -201,3 +201,485 @@ export const BOSS_POWER: Record<number, { heroes: number; troops: number; count:
     "predefinedSquadId": 94
   }
 };
+export const MONSTER_POWER: Record<number, { level: number; variant: "normal" | "pvp"; heroes: number; troops: number; count: number; predefinedSquadId: number }> = {
+  "3": {
+    "level": 1,
+    "variant": "normal",
+    "heroes": 3500,
+    "troops": 1200,
+    "count": 400,
+    "predefinedSquadId": 3
+  },
+  "4": {
+    "level": 2,
+    "variant": "normal",
+    "heroes": 8700,
+    "troops": 2145,
+    "count": 715,
+    "predefinedSquadId": 4
+  },
+  "5": {
+    "level": 3,
+    "variant": "normal",
+    "heroes": 12350,
+    "troops": 4530,
+    "count": 1510,
+    "predefinedSquadId": 5
+  },
+  "6": {
+    "level": 4,
+    "variant": "normal",
+    "heroes": 19870,
+    "troops": 6815,
+    "count": 2115,
+    "predefinedSquadId": 6
+  },
+  "7": {
+    "level": 5,
+    "variant": "normal",
+    "heroes": 23290,
+    "troops": 8890,
+    "count": 2730,
+    "predefinedSquadId": 7
+  },
+  "8": {
+    "level": 6,
+    "variant": "normal",
+    "heroes": 32940,
+    "troops": 21200,
+    "count": 4240,
+    "predefinedSquadId": 8
+  },
+  "9": {
+    "level": 7,
+    "variant": "normal",
+    "heroes": 55000,
+    "troops": 25625,
+    "count": 4685,
+    "predefinedSquadId": 9
+  },
+  "10": {
+    "level": 8,
+    "variant": "normal",
+    "heroes": 78430,
+    "troops": 28185,
+    "count": 5085,
+    "predefinedSquadId": 10
+  },
+  "11": {
+    "level": 9,
+    "variant": "normal",
+    "heroes": 89140,
+    "troops": 39480,
+    "count": 4070,
+    "predefinedSquadId": 11
+  },
+  "12": {
+    "level": 10,
+    "variant": "normal",
+    "heroes": 98623,
+    "troops": 49920,
+    "count": 4900,
+    "predefinedSquadId": 12
+  },
+  "13": {
+    "level": 11,
+    "variant": "normal",
+    "heroes": 172000,
+    "troops": 100625,
+    "count": 9955,
+    "predefinedSquadId": 13
+  },
+  "14": {
+    "level": 12,
+    "variant": "normal",
+    "heroes": 187000,
+    "troops": 116040,
+    "count": 8470,
+    "predefinedSquadId": 14
+  },
+  "15": {
+    "level": 13,
+    "variant": "normal",
+    "heroes": 198000,
+    "troops": 116430,
+    "count": 7470,
+    "predefinedSquadId": 15
+  },
+  "16": {
+    "level": 14,
+    "variant": "normal",
+    "heroes": 216000,
+    "troops": 148395,
+    "count": 9385,
+    "predefinedSquadId": 16
+  },
+  "17": {
+    "level": 15,
+    "variant": "normal",
+    "heroes": 244000,
+    "troops": 164255,
+    "count": 8645,
+    "predefinedSquadId": 17
+  },
+  "18": {
+    "level": 16,
+    "variant": "normal",
+    "heroes": 265000,
+    "troops": 220255,
+    "count": 10885,
+    "predefinedSquadId": 18
+  },
+  "19": {
+    "level": 17,
+    "variant": "normal",
+    "heroes": 278000,
+    "troops": 211630,
+    "count": 10300,
+    "predefinedSquadId": 19
+  },
+  "20": {
+    "level": 18,
+    "variant": "normal",
+    "heroes": 365000,
+    "troops": 405250,
+    "count": 16210,
+    "predefinedSquadId": 20
+  },
+  "21": {
+    "level": 19,
+    "variant": "normal",
+    "heroes": 390000,
+    "troops": 477710,
+    "count": 18450,
+    "predefinedSquadId": 21
+  },
+  "22": {
+    "level": 20,
+    "variant": "normal",
+    "heroes": 578000,
+    "troops": 846365,
+    "count": 31313,
+    "predefinedSquadId": 22
+  },
+  "23": {
+    "level": 21,
+    "variant": "normal",
+    "heroes": 599000,
+    "troops": 621445,
+    "count": 19210,
+    "predefinedSquadId": 23
+  },
+  "24": {
+    "level": 22,
+    "variant": "normal",
+    "heroes": 628000,
+    "troops": 836507,
+    "count": 25185,
+    "predefinedSquadId": 24
+  },
+  "25": {
+    "level": 23,
+    "variant": "normal",
+    "heroes": 680000,
+    "troops": 1124692,
+    "count": 32185,
+    "predefinedSquadId": 25
+  },
+  "26": {
+    "level": 24,
+    "variant": "normal",
+    "heroes": 1000000,
+    "troops": 1652300,
+    "count": 40300,
+    "predefinedSquadId": 26
+  },
+  "27": {
+    "level": 25,
+    "variant": "normal",
+    "heroes": 1250000,
+    "troops": 2555196,
+    "count": 59767,
+    "predefinedSquadId": 27
+  },
+  "28": {
+    "level": 26,
+    "variant": "normal",
+    "heroes": 245810,
+    "troops": 1892613,
+    "count": 44265,
+    "predefinedSquadId": 28
+  },
+  "29": {
+    "level": 27,
+    "variant": "normal",
+    "heroes": 250840,
+    "troops": 2505947,
+    "count": 55500,
+    "predefinedSquadId": 29
+  },
+  "30": {
+    "level": 28,
+    "variant": "normal",
+    "heroes": 280270,
+    "troops": 4046380,
+    "count": 78800,
+    "predefinedSquadId": 30
+  },
+  "31": {
+    "level": 29,
+    "variant": "normal",
+    "heroes": 300250,
+    "troops": 4721375,
+    "count": 91945,
+    "predefinedSquadId": 31
+  },
+  "32": {
+    "level": 30,
+    "variant": "normal",
+    "heroes": 350428,
+    "troops": 4379002,
+    "count": 81710,
+    "predefinedSquadId": 32
+  },
+  "95": {
+    "level": 1,
+    "variant": "pvp",
+    "heroes": 945,
+    "troops": 945,
+    "count": 315,
+    "predefinedSquadId": 95
+  },
+  "96": {
+    "level": 2,
+    "variant": "pvp",
+    "heroes": 1650,
+    "troops": 1650,
+    "count": 550,
+    "predefinedSquadId": 96
+  },
+  "97": {
+    "level": 3,
+    "variant": "pvp",
+    "heroes": 2145,
+    "troops": 2145,
+    "count": 715,
+    "predefinedSquadId": 97
+  },
+  "98": {
+    "level": 4,
+    "variant": "pvp",
+    "heroes": 3520,
+    "troops": 3520,
+    "count": 990,
+    "predefinedSquadId": 98
+  },
+  "99": {
+    "level": 5,
+    "variant": "pvp",
+    "heroes": 5395,
+    "troops": 5300,
+    "count": 1400,
+    "predefinedSquadId": 99
+  },
+  "100": {
+    "level": 6,
+    "variant": "pvp",
+    "heroes": 7710,
+    "troops": 7500,
+    "count": 1500,
+    "predefinedSquadId": 100
+  },
+  "101": {
+    "level": 7,
+    "variant": "pvp",
+    "heroes": 9360,
+    "troops": 9200,
+    "count": 1600,
+    "predefinedSquadId": 101
+  },
+  "102": {
+    "level": 8,
+    "variant": "pvp",
+    "heroes": 10108,
+    "troops": 9900,
+    "count": 1600,
+    "predefinedSquadId": 102
+  },
+  "103": {
+    "level": 9,
+    "variant": "pvp",
+    "heroes": 17765,
+    "troops": 17950,
+    "count": 1850,
+    "predefinedSquadId": 103
+  },
+  "104": {
+    "level": 10,
+    "variant": "pvp",
+    "heroes": 26528,
+    "troops": 26170,
+    "count": 2450,
+    "predefinedSquadId": 104
+  },
+  "105": {
+    "level": 11,
+    "variant": "pvp",
+    "heroes": 27905,
+    "troops": 26770,
+    "count": 2450,
+    "predefinedSquadId": 105
+  },
+  "106": {
+    "level": 12,
+    "variant": "pvp",
+    "heroes": 39485,
+    "troops": 36375,
+    "count": 2655,
+    "predefinedSquadId": 106
+  },
+  "107": {
+    "level": 13,
+    "variant": "pvp",
+    "heroes": 45978,
+    "troops": 40500,
+    "count": 2800,
+    "predefinedSquadId": 107
+  },
+  "108": {
+    "level": 14,
+    "variant": "pvp",
+    "heroes": 51690,
+    "troops": 44000,
+    "count": 3000,
+    "predefinedSquadId": 108
+  },
+  "109": {
+    "level": 15,
+    "variant": "pvp",
+    "heroes": 70903,
+    "troops": 56050,
+    "count": 2950,
+    "predefinedSquadId": 109
+  },
+  "110": {
+    "level": 16,
+    "variant": "pvp",
+    "heroes": 86272,
+    "troops": 67400,
+    "count": 3200,
+    "predefinedSquadId": 110
+  },
+  "111": {
+    "level": 17,
+    "variant": "pvp",
+    "heroes": 91585,
+    "troops": 70450,
+    "count": 3250,
+    "predefinedSquadId": 111
+  },
+  "112": {
+    "level": 18,
+    "variant": "pvp",
+    "heroes": 109687,
+    "troops": 81250,
+    "count": 3250,
+    "predefinedSquadId": 112
+  },
+  "113": {
+    "level": 19,
+    "variant": "pvp",
+    "heroes": 127960,
+    "troops": 91900,
+    "count": 3250,
+    "predefinedSquadId": 113
+  },
+  "114": {
+    "level": 20,
+    "variant": "pvp",
+    "heroes": 147175,
+    "troops": 102200,
+    "count": 3500,
+    "predefinedSquadId": 114
+  },
+  "115": {
+    "level": 21,
+    "variant": "pvp",
+    "heroes": 168000,
+    "troops": 113250,
+    "count": 3500,
+    "predefinedSquadId": 115
+  },
+  "116": {
+    "level": 22,
+    "variant": "pvp",
+    "heroes": 208475,
+    "troops": 135600,
+    "count": 3950,
+    "predefinedSquadId": 116
+  },
+  "117": {
+    "level": 23,
+    "variant": "pvp",
+    "heroes": 219520,
+    "troops": 138200,
+    "count": 3950,
+    "predefinedSquadId": 117
+  },
+  "118": {
+    "level": 24,
+    "variant": "pvp",
+    "heroes": 273982,
+    "troops": 166050,
+    "count": 4050,
+    "predefinedSquadId": 118
+  },
+  "119": {
+    "level": 25,
+    "variant": "pvp",
+    "heroes": 301070,
+    "troops": 177450,
+    "count": 4100,
+    "predefinedSquadId": 119
+  },
+  "120": {
+    "level": 26,
+    "variant": "pvp",
+    "heroes": 368190,
+    "troops": 205200,
+    "count": 4550,
+    "predefinedSquadId": 120
+  },
+  "121": {
+    "level": 27,
+    "variant": "pvp",
+    "heroes": 413630,
+    "troops": 218600,
+    "count": 4700,
+    "predefinedSquadId": 121
+  },
+  "122": {
+    "level": 28,
+    "variant": "pvp",
+    "heroes": 441400,
+    "troops": 221700,
+    "count": 4700,
+    "predefinedSquadId": 122
+  },
+  "123": {
+    "level": 29,
+    "variant": "pvp",
+    "heroes": 499800,
+    "troops": 239150,
+    "count": 5000,
+    "predefinedSquadId": 123
+  },
+  "124": {
+    "level": 30,
+    "variant": "pvp",
+    "heroes": 546040,
+    "troops": 249400,
+    "count": 5200,
+    "predefinedSquadId": 124
+  }
+};

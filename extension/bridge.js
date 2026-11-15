@@ -34,6 +34,7 @@ let popupRpcEnabled = false;
 let socketRefreshMode = 'piggyback';
 let recordingActive = false;
 let recordingStateObserved = false;
+let freeSpinAccountId = null;
 
 function sendControl() {
   if (!currentSettings) return;
@@ -147,6 +148,15 @@ window.addEventListener('message', (event) => {
     return;
   }
   if (event.data.kind !== 'api-record') return;
+  try {
+    const calls = JSON.parse(event.data.record?.requestBody || '{}').calls || [];
+    const results = JSON.parse(event.data.record?.responseBody || '{}').results || [];
+    for (const call of calls) if (call.name === 'userGetInfo') {
+      const result = results.find(row => row.ident === call.ident)?.result;
+      const id = result?.response?.id;
+      if (!result?.error && Number.isFinite(Number(id)) && Number(id) > 0) freeSpinAccountId = String(id);
+    }
+  } catch (_) {}
   if (!chrome.runtime?.id) return;
   try {
     const p = chrome.runtime?.sendMessage?.({ kind: 'api-record', record: event.data.record });
@@ -243,6 +253,9 @@ try {
       }
     }
     if (area !== 'local') return;
+    if ('autoFreeSpinEnabled' in changes || 'autoFreeSpinState' in changes) {
+      chrome.storage.local.get(['autoFreeSpinEnabled', 'autoFreeSpinState']).then(stored => scheduleFreeSpin(stored.autoFreeSpinEnabled, stored.autoFreeSpinState)).catch(error => handleContextInvalidated(error, false));
+    }
     if ('raidEnergyAuto' in changes) scheduleRaidEnergy(changes.raidEnergyAuto.newValue?.enabled === true);
     if ('autoGatherSettings' in changes || 'smartGatherState' in changes) {
       chrome.storage.local.get(['autoGatherSettings', 'smartGatherState']).then(stored => scheduleSmartGather(stored.autoGatherSettings, stored.smartGatherState)).catch(error => handleContextInvalidated(error, false));
@@ -287,6 +300,10 @@ try {
 
 chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
   if (bridgeContextInvalidated) return;
+  if (message?.kind === 'free-spin-context') {
+    sendResponse?.({ ok: true, accountId: freeSpinAccountId });
+    return true;
+  }
   if (message?.kind === 'drop-rpc-group') {
     window.postMessage({ source: 'hwa-helper-control', kind: message.kind, group: message.group }, location.origin);
     sendResponse?.({ ok: true });
@@ -350,6 +367,19 @@ chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
 let raidEnergyTimer;
 const raidEnergySession = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 let smartGatherTimer;
+let freeSpinTimer;
+function scheduleFreeSpin(enabled, state) {
+  if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') return;
+  clearBridgeTimeout(freeSpinTimer);
+  if (!enabled && !state?.pending) return;
+  const wakeAt = Number.isFinite(state?.wakeAt) ? state.wakeAt : Date.now() + 1000;
+  freeSpinTimer = bridgeTimeout(() => {
+    sendBridgeMessage({ kind: 'free-spin-tick' }).catch(error => handleContextInvalidated(error, false));
+  }, Math.max(100, Math.min(2147483647, wakeAt - Date.now())));
+}
+try {
+  chrome.storage?.local?.get?.(['autoFreeSpinEnabled', 'autoFreeSpinState'])?.then?.(stored => scheduleFreeSpin(stored.autoFreeSpinEnabled, stored.autoFreeSpinState)).catch?.(() => {});
+} catch (_) {}
 function scheduleSmartGather(settings, state) {
   if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') return;
   clearBridgeTimeout(smartGatherTimer);

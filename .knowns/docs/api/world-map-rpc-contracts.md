@@ -3,7 +3,7 @@ id: doc-bb1fd34008777a31286701b6684b03ff
 title: World Map RPC Contracts
 description: Verified rally, mine search, gathering and recall payloads, config mappings, timing and lifecycle workflows
 createdAt: '2026-11-06T04:07:06.575Z'
-updatedAt: '2026-11-14T18:26:40.365Z'
+updatedAt: '2026-11-14T23:34:24.785Z'
 tags:
   - api
   - rpc
@@ -318,3 +318,16 @@ Vacant getMineById samples in hwa-game-record-202611061040_gathering.json timeli
 Smart rpcFailure recognizes result.error, response.error and nonzero/nonempty errorCode (result or response). Confirmed BattleTypeMismatch on attackMine releases the rejected pending request, removes interrupted/resume/nearest references, and excludes that mine for60s (bounded50 entries). Other mutation failures stop with the actual code. This is recovery from a server-confirmed rejection toward a different target; unconfirmed mutations are not retried. Automatic requests retain battleType=pve and never escalate to PvP. Resume, nearest candidates and cached ordinary Smart searches all honor exclusions.
 
 Sanitized real responses: tests/fixtures/gather-occupied-20261115.json; tests/gather-reload.test.mjs verifies occupied resume/nearest skips, free target selection and immediate errorCode recognition. Actual Chrome background→bridge→MAIN Direct fixture test scripts/browser-gather-acceptance.mjs <new-temp-profile> occupied-race proves an occupied interrupted mine is never attacked, one race-rejected mine is not resent, two distinct successful free targets fill1→3 squads and pending clears at3/3. Evidence docs/acceptance/gather-occupied-2026-11-15.json. The backend in this browser test is local simulation; no live-account completion is claimed.
+
+
+## Solo monster power warning (0.10.89)
+
+@task-VHE-ZP1CW2 applies the rally base/display formula to the Monster dialog: selected own hero power plus sum of the actual allocated troop counts multiplied by packaged unit.power. It compares against predefinedSquadHeroes.heroesPower plus preset troop power. generate-rally-power-data.mjs verifies existing config/preset source MD5/size and emits MONSTER_POWER with 60 explicitly named normal/PvP solo presets for levels 1-30. Solo labels are matched exactly; elite monsters and rally bosses are excluded. No runtime CDN request or guessed config-to-preset ID relationship is used.
+
+The capture hwa-game-record-202611051201_attack_monster.json proves searchMob returns only mobId and coordinates for the solo level search. A later getSoloAttackDefenders request supplies PredefinedSquadId109/EnemyLevel15 for that target. Therefore search results alone cannot identify the actual variant: the dialog compares both level presets and explains this limitation. An explicit target predefinedSquadId is used only when it belongs to the selected level. No target detail RPC is invented. The solo config CDN was unreachable during this work; a complete config-to-preset mapping was not assumed.
+
+The comparison appears after a matching level search and team/target selection. Team, target, allocated units and hero cache updates recompute it; changing level immediately hides stale search results. Complete squad totals below a preset warn about defeat/wounded troops. Partial totals retain + or unknown, show a missing-data warning, and never become a definite lower-total judgment. These are advisory base/preset power comparisons; buffs, matchups and combat mechanics can change the outcome. Queue dispatch behavior is unchanged.
+
+Example verified level15: normal preset17 has heroes244000, troops164255, count8645; PvP preset109 has heroes70903, troops56050, count2950. These are preset/display values, not the sum of buffed battle defenders returned by getSoloAttackDefenders.
+
+Verification: tests/monster-power.test.mjs proves all 60 preset identities, allocated-only math, missing data, exact/equal thresholds, level guards and actual compiled dialog rendering. docs/acceptance/monster-power-2026-11-15.json records real Chrome/unpacked0.10.89 with local storage fixtures: selected weak team warns, changing to strong team removes the weak warning, changing level hides stale comparison, missing hero power shows a partial subtotal. No runtime exceptions; no live game calls. Full suite811 tests:799 passed,12 optional private-log skips. Typecheck and production build passed.

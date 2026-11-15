@@ -5,6 +5,7 @@ import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
+import { monsterSquadPower, monsterPowerComparison, formatMonsterPower } from '@/src/utils/monsterPower';
 import {
   soloMonsterConfigIds,
   soloMonsterLevel,
@@ -25,6 +26,7 @@ const {
   selectedTeam,
   teams,
   squadCapacity,
+  allocatedTroops,
   totalAllocatedTroops,
   troopTypeSummaries,
   isRefreshingTroops,
@@ -60,6 +62,15 @@ const matchingMonsterConfigs = computed(() => {
 const foundMonsters = computed(() => {
   if (!matchingMonsterConfigs.value || !Array.isArray(searchData.value?.mobs)) return [];
   return searchData.value.mobs;
+});
+
+const powerComparison = computed(() => {
+  if (!selectedTeam.value || !matchingMonsterConfigs.value || !foundMonsters.value.length) return null;
+  const target = foundMonsters.value.find((mob: any) => mob.mobId === selectedMobId.value);
+  if (!target) return null;
+  const unitsKnown = Boolean(cache.value['getUnitSummary:unit']?.data || cache.value.inventoryGet?.data?.unit);
+  const squad = monsterSquadPower(selectedTeam.value.heroIds, cache.value.heroGetAll?.data, allocatedTroops.value, unitsKnown);
+  return monsterPowerComparison(mobLevel.value, squad, target);
 });
 
 watch(mobLevel, () => {
@@ -611,6 +622,28 @@ async function stopMonsterQueue() {
                 class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
               />
             </div>
+          </div>
+
+          <div
+            v-if="powerComparison"
+            id="monster-power-comparison"
+            class="rounded-lg border p-3 text-xs space-y-2"
+            :class="powerComparison.warning ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200' : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200'"
+          >
+            <div class="font-semibold">Power comparison · Level {{ mobLevel }}</div>
+            <table class="w-full text-right tabular-nums">
+              <thead><tr><th class="text-left">Squad</th><th>Heroes</th><th>Troops</th><th>Total</th></tr></thead>
+              <tbody>
+                <tr><th class="text-left font-medium">Selected team</th><td>{{ powerComparison.squad.heroes }}</td><td>{{ powerComparison.squad.troops }}</td><td>{{ powerComparison.squad.total }}</td></tr>
+                <tr v-for="row in powerComparison.rows" :key="row.predefinedSquadId">
+                  <th class="text-left font-medium">{{ row.variant === 'pvp' ? 'PvP monster' : 'Normal monster' }}</th>
+                  <td>{{ formatMonsterPower(row.heroes) }}</td><td>{{ formatMonsterPower(row.troops) }}</td><td>{{ formatMonsterPower(row.total) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-if="!powerComparison.variantKnown" class="text-2xs">Search does not identify the target variant. Both level presets are shown.</p>
+            <p id="monster-power-warning" role="status" aria-live="polite" class="font-medium">{{ powerComparison.warning ? '⚠️ ' : '' }}{{ powerComparison.message }}</p>
+            <p class="text-2xs">Base power uses the selected heroes and allocated troops. Preset power is a guide; combat bonuses and matchups can change the outcome.</p>
           </div>
 
           <p class="text-2xs text-slate-400 dark:text-slate-500 italic">

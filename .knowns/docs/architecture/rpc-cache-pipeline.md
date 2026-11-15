@@ -3,7 +3,7 @@ id: doc-5977b0645ae33e48fc00a5b8f7c90347
 title: RPC Cache Pipeline
 description: Passive RPC interception, delta reduction, resource keys, and action deduplication in HWA Helper
 createdAt: '2026-11-02T06:43:06.566Z'
-updatedAt: '2026-11-14T06:56:34.124Z'
+updatedAt: '2026-11-14T18:59:45.089Z'
 tags:
   - architecture,cache,rpc
 ---
@@ -85,3 +85,18 @@ Cooldown support is implemented by @task-VHE-8GZG4Z. Capture `temp/tracking-data
 `freeAlchemyAvailability` considers the latest same-day receipt and authoritative quota snapshot; a newer positive quota is ready, while zero quota with a known last-refill timestamp waits for that interval. A zero quota without timing waits until daily reset instead of inventing a start time. The user's2026-11-14 requirement restores default free availability on a new game day: cooldown ends at the earlier of natural refill and the next observed `questResetStatus.nextDayAt`. This boundary is advanced across stale/missed days; before any observed reset exists, the existing project convention uses local midnight. Prior-day exhaustion does not block a fresh day. Account changes clear spin receipt/status/quota associations.
 
 The Dashboard button uses lifecycle-managed `useNow` ticks; while unavailable its tooltip displays `Free Spin available in HH:MM:SS` and both the disabled button and dispatch guard reject another attempt. Expiration/reset re-enables it and clears stale feedback. No timer polls or sends RPC. Tests: `tests/free-alchemy-timer.test.mjs` covers the captured failure, exact correlation, successful cooldown, quota precedence, daily reset/local fallback, account transition and the actual Vue button script; `tests/free-alchemy-spin.test.mjs` retains reward/queue protections.
+
+## Automatic free spin (0.10.87)
+
+@task-VHE-Q5STB2 adds opt-in Settings → Auto Free Spin → Use free spin when its timer expires (default off). Auto applies only to refillable53 via exact refillable_alchemyUseVideo({type:alchemy}), not paid alchemy19 or archived62. Shared RPC enable/mode remains authoritative. extension/free-alchemy.js is the shared availability/day/cycle policy used by the UI and classic worker, preserving the existing8h-or-game-reset rule and local-midnight fallback.
+
+runFreeSpin serializes manual Dashboard calls and automatic wake-ups through the background pending lane and persisted autoFreeSpinState. The worker refreshes userGetInfo/user_getNextDayTime at readiness, then requires a quota observation after that refresh before sending automatically. The content bridge confirms the observed userGetInfo account before sending to that tab. Different-account bridge responses block sending; account switches drop the previous queued group and replace its scoped runtime. Manual sends use the same persisted mutation lock even while auto is disabled.
+
+MV3 alarm hwa-auto-free-spin and a content-script absolute wake timer run with popup closed. Existing pending state survives worker restarts. Confirmed receipt or a fresh consumed quota with advanced lastRefill settles pending; reward/quest reduction remains server-driven and idempotent. Missing/late acknowledgement never unlocks/resends a mutation. Read-only quota refresh may reconcile an uncertain request. Unknown rejection blocks additional automatic attempts in the same eligibility cycle. Disabling auto/shared RPC or changing mode requests cancellation of its queued group while retaining uncertainty for requests already sent. Settling a queued spin also drops any remaining queued duplicate. No paid fallback or ad telemetry is synthesized.
+
+UI Settings and Dashboard share useFreeSpinAutomation state; the manual icon is disabled during an automatic mutation, and timer/result state stays synchronized across popups. Browser acceptance docs/acceptance/free-spin-2026-11-15.json: real Chrome157/unpacked0.10.87, local HTTP fixture only, enabled via actual Settings checkbox then closed popup, refreshed quota at deadline, exactly one free RPC, confirmed73800gold credited once (balance74800), pending cleared and next wake scheduled. Eight HTTP batches, no feedback loop. It is integration evidence, not a live-game result.
+
+Tests/auto-free-spin.test.mjs covers expiry, refresh-before-send, reset, shared manual/auto serialization, disabled/mismatched-account guards, queued cancellation, unknown rejection and account changes. Mock Chrome storage now structured-clones get/set values: real browser acceptance exposed a loop when state was mutated in the same object used as the stored comparison snapshot. Clone state before mutation and compare against the untouched snapshot; reference-sharing mocks must not hide missing writes.
+
+
+Final combined verification (0.10.88): browser free-spin acceptance was rerun after the Teams repair; docs/acceptance/free-spin-2026-11-15.json now records extension0.10.88 with popup closed, local fixture only and no errors. Full suite:806 tests,794 passed,12 optional private-log skips; typecheck and build passed.

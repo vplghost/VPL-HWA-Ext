@@ -6,6 +6,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useGameConnection } from '@/src/composables/useGameConnection';
 import '@/src/utils/metadata';
 import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
+import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 import type { ThemeMode } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
@@ -15,6 +16,7 @@ const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab, gameEn
 const engine = computed(() => engineDiagnostics(gameEngineStatus.value));
 const enginePingMessage = ref('');
 const enginePingPending = ref(false);
+const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 async function pingEngine() {
   enginePingPending.value = true;
   try {
@@ -380,6 +382,13 @@ async function toggleRecording() {
         </button>
       </div>
     </div>
+
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <h3 class="text-sm font-bold">Auto Free Spin</h3>
+      <label class="flex items-center gap-2"><input id="setting-auto-free-spin" v-model="autoFreeSpinEnabled" type="checkbox" @change="saveAutoFreeSpin" />Use free spin when its timer expires</label>
+      <p class="text-xs text-slate-500">Runs while the game is open, including when this popup is closed. Uses shared RPC settings and free spins only.</p>
+      <p role="status" class="text-xs text-slate-500">{{ autoFreeSpinStatus }}</p>
+    </section>
 
     <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
       <h3 class="text-sm font-bold">Reward Claims · {{ pendingClaims.totalCount }} ready</h3>

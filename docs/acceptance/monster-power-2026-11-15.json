@@ -1,0 +1,10 @@
+{
+  "localFixtureOnly": true,
+  "errors": [],
+  "weak": "Power comparison · Level 1\nSquad\tHeroes\tTroops\tTotal\nSelected team\t500\t300\t800\nNormal monster\t3.5k\t1.2k\t4.7k\nPvP monster\t945\t945\t1.9k\n\nSearch does not identify the target variant. Both level presets are shown.\n\n⚠️ Squad power is lower than Normal monster and PvP monster at this level. Risk of defeat and wounded troops.\n\nBase power uses the selected heroes and allocated troops. Preset power is a guide; combat bonuses and matchups can change the outcome.",
+  "strong": "Power comparison · Level 1\nSquad\tHeroes\tTroops\tTotal\nSelected team\t500k\t300\t500.3k\nNormal monster\t3.5k\t1.2k\t4.7k\nPvP monster\t945\t945\t1.9k\n\nSearch does not identify the target variant. Both level presets are shown.\n\nSquad power meets these preset totals. Power alone does not guarantee victory.\n\nBase power uses the selected heroes and allocated troops. Preset power is a guide; combat bonuses and matchups can change the outcome.",
+  "staleLevelHidden": true,
+  "partial": "Power comparison · Level 2\nSquad\tHeroes\tTroops\tTotal\nSelected team\t400k+\t300\t400.3k+\nNormal monster\t8.7k\t2.1k\t10.8k\nPvP monster\t1.7k\t1.7k\t3.3k\n\nSearch does not identify the target variant. Both level presets are shown.\n\n⚠️ Incomplete squad power data. Refresh heroes and troops before comparing; + marks a known subtotal.\n\nBase power uses the selected heroes and allocated troops. Preset power is a guide; combat bonuses and matchups can change the outcome.",
+  "extension": "0.10.89",
+  "passed": true
+}

@@ -1,0 +1,86 @@
+{
+  "localFixtureOnly": true,
+  "popupClosed": true,
+  "calls": [
+    [],
+    [
+      "userGetInfo"
+    ],
+    [
+      "getSummary",
+      "getSummary",
+      "getMarches",
+      "getUnitSummary",
+      "getIncomingMarches"
+    ],
+    [
+      "userGetInfo",
+      "user_getNextDayTime"
+    ],
+    [
+      "refillable_alchemyUseVideo"
+    ],
+    [
+      "getSummary",
+      "getSummary",
+      "getMarches",
+      "getUnitSummary",
+      "getIncomingMarches"
+    ],
+    [
+      "userGetInfo",
+      "questGetAll"
+    ],
+    [
+      "getSummary",
+      "getSummary",
+      "getMarches",
+      "getUnitSummary",
+      "getIncomingMarches"
+    ]
+  ],
+  "errors": [],
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/157.0.8103.52",
+    "revision": "@0985600c06a688b9c669e74afde7dacd5aaed047",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "jsVersion": "15.7.112.23"
+  },
+  "extension": "0.10.88",
+  "state": {
+    "automation": {
+      "accountId": 1,
+      "attemptedCycle": "1:1794675600000:1794653878000:0",
+      "lastResult": "Free spin confirmed",
+      "pending": null,
+      "status": "Waiting for free spin cooldown",
+      "tabId": 1309339569,
+      "wakeAt": 1794711478000
+    },
+    "receipt": {
+      "data": {
+        "cooldownUntil": 1794711478057,
+        "error": null,
+        "gold": 73800,
+        "quests": [],
+        "results": [
+          {
+            "crit": 2,
+            "reward": {
+              "gold": 73800
+            }
+          }
+        ],
+        "success": true,
+        "token": "0041e8ea88cc2db800029fa92c426197"
+      },
+      "group": "internal",
+      "key": "freeAlchemySpinStatus",
+      "method": "refillable_alchemyUseVideo",
+      "updatedAt": "2026-11-14T18:57:58.057Z"
+    },
+    "gold": 74800
+  },
+  "passed": true
+}

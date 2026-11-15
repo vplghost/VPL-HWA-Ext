@@ -69,6 +69,7 @@ test('actual dashboard button sends only free RPC, waits through queued ack/time
   const calls = [], callbacks = [], timers = [], stops = [];
   const boundary = { computed, ref, shallowRef, Date, defineProps: () => props,
     useNow: () => ref(Date.now()), freeAlchemyAvailability, freeAlchemyTimer,
+    useFreeSpinAutomation: () => ({ pending: ref(false), status: ref('') }),
     watch: (...args) => { const stop = watch(...args); stops.push(stop); return stop; }, onUnmounted() {},
     useRpcCache: () => ({ cache, dispatchRpc: batch => { calls.push(batch); return new Promise(resolve => callbacks.push(resolve)); } }),
     setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {},

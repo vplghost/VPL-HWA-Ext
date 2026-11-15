@@ -91,6 +91,7 @@ test('actual button ticks tooltip, blocks dispatch, unlocks at reset and cleans 
   const clock = ref(at), cache = ref({ ...reducer.merge({}, [record()]).cache, questResetStatus: entry({ nextDayAt: at + 60000 }) });
   const stops = [], calls = [], props = { hasGameTab: true };
   const boundary = { computed, ref, shallowRef, Date: class extends Date { static now() { return clock.value; } },
+    useFreeSpinAutomation: () => ({ pending: ref(false), status: ref('') }),
     defineProps: () => props, useNow: () => clock, freeAlchemyAvailability, freeAlchemyTimer,
     watch: (...args) => { const stop = watch(...args); stops.push(stop); return stop; }, onUnmounted() {},
     useRpcCache: () => ({ cache, dispatchRpc: async batch => { calls.push(batch); return { ok: false, error: 'RPC disabled' }; } }),

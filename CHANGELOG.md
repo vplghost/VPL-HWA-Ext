@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.10.89 — 2026-11-15
+
+### Added
+
+- Monster dialog compares selected heroes and allocated troop power with both verified solo monster variants at the searched level, warning about weaker squads or missing data before attack. Unidentified target variants remain explicit; power is advisory.
+
+## 0.10.88 — 2026-11-15
+
+### Fixed
+
+- Normalize object-shaped custom/server team members before rendering, editing and calculating power, preventing the Teams tab reduce crash after hero cache updates.
+
+## 0.10.87 — 2026-11-15
+
+### Added
+
+- Opt-in Auto Free Spin in Settings: background scheduling after cooldown or daily reset, quota refresh before sending, and a shared manual/automatic confirmation lock that works with the popup closed.
+
 ## 0.10.86 — 2026-11-15
 
 ### Fixed

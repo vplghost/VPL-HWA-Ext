@@ -1,6 +1,12 @@
 import { onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
+import { normalizeArray } from '../utils/troops.ts';
+import { teamMemberIds } from '../utils/teamMembers.ts';
 
 export interface AccountTeam { id: string; name: string; heroIds: number[]; maxTroops?: number }
+export function normalizeAccountTeams(raw: unknown): AccountTeam[] {
+  return normalizeArray(raw).filter(team => team && typeof team === 'object' && team.id != null)
+    .map(team => ({ ...team, heroIds: teamMemberIds(team.heroIds) }));
+}
 
 export function useAccountTeams(accountId: Ref<string | number | undefined>) {
   const customTeams = ref<AccountTeam[]>([]);
@@ -14,7 +20,7 @@ export function useAccountTeams(accountId: Ref<string | number | undefined>) {
     const stored = await chrome.storage.local.get('customTeams');
     if (request !== revision || account !== accountId.value) return;
     const accounts = (stored.customTeams || {}) as Record<string, AccountTeam[]>;
-    customTeams.value = Array.isArray(accounts[String(account)]) ? accounts[String(account)]! : [];
+    customTeams.value = normalizeAccountTeams(accounts[String(account)]);
   }
   async function saveTeams(next: AccountTeam[]) {
     const account = accountId.value;
@@ -22,8 +28,9 @@ export function useAccountTeams(accountId: Ref<string | number | undefined>) {
     const stored = await chrome.storage.local.get('customTeams');
     if (account !== accountId.value) throw new Error('Game account changed. Reopen the team editor.');
     const accounts = (stored.customTeams || {}) as Record<string, AccountTeam[]>;
-    await chrome.storage.local.set({ customTeams: { ...accounts, [String(account)]: next } });
-    if (account === accountId.value) customTeams.value = next;
+    const normalized = normalizeAccountTeams(next);
+    await chrome.storage.local.set({ customTeams: { ...accounts, [String(account)]: normalized } });
+    if (account === accountId.value) customTeams.value = normalized;
   }
   function onChanged(changes: Record<string, chrome.storage.StorageChange>, area: string) {
     if (area === 'local' && 'customTeams' in changes) void loadTeams().catch((cause) => { storageError.value = String(cause); });

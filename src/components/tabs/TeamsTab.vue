@@ -7,6 +7,7 @@ import TitanHoverCard from '@/src/components/common/TitanHoverCard.vue';
 import { getHeroMetadata, getTitanMetadata, starGlowClass } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
+import { teamMemberIds, serverTeamGroups } from '@/src/utils/teamMembers';
 
 interface CustomTeam {
   id: string;
@@ -76,17 +77,10 @@ const serverTeams = computed(() => {
 
   for (const [mode, rawMembers] of Object.entries(data)) {
     if (!rawMembers) continue;
-    const groups: any[] = Array.isArray(rawMembers)
-      ? (rawMembers.some(Array.isArray) ? rawMembers : [rawMembers])
-      : (typeof rawMembers === 'object' ? Object.values(rawMembers) : []);
+    const groups = serverTeamGroups(rawMembers);
 
     groups.forEach((group: any, idx: number) => {
-      let ids: number[] = [];
-      if (Array.isArray(group)) {
-        ids = group.map(Number).filter((n) => Number.isInteger(n) && n > 0);
-      } else if (typeof group === 'object' && group !== null) {
-        ids = Object.values(group).map(Number).filter((n) => Number.isInteger(n) && n > 0);
-      }
+      const ids = teamMemberIds(group);
 
       if (ids.length > 0) {
         let label = modeLabels[mode];
@@ -150,7 +144,7 @@ function openEditTeam(team: CustomTeam) {
   editingTeamId.value = team.id;
   formName.value = team.name;
   formMaxTroops.value = team.maxTroops !== undefined ? String(team.maxTroops) : '';
-  selectedHeroIds.value = [...team.heroIds];
+  selectedHeroIds.value = teamMemberIds(team.heroIds);
   heroSearch.value = '';
   formError.value = '';
   isEditing.value = true;
@@ -268,8 +262,8 @@ function getMemberPower(id: number | string): number {
   return Number(snap?.power) || 0;
 }
 
-function getTeamPower(memberIds: number[]): number {
-  return memberIds.reduce((sum, id) => {
+function getTeamPower(memberIds: unknown): number {
+  return teamMemberIds(memberIds).reduce((sum, id) => {
     return sum + getMemberPower(id);
   }, 0);
 }

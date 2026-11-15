@@ -1,5 +1,6 @@
 importScripts('tracking-filter.js');
 importScripts('refillable-rules.js');
+importScripts('free-alchemy.js');
 importScripts('clan-versus-rules.js');
 importScripts('mission-costs.js');
 importScripts('march-rules.js');
@@ -768,6 +769,10 @@ chrome.alarms?.onAlarm?.addListener?.(async (alarm) => {
   if (alarm.name === 'hwa-building-queue-recovery' || alarm.name === 'hwa-research-queue-recovery') {
     await advanceCityQueue(alarm.name === 'hwa-building-queue-recovery' ? 'building' : 'research');
   }
+  if (alarm.name === 'hwa-auto-free-spin') {
+    pending = pending.then(() => runFreeSpin()).catch(() => {});
+    await pending;
+  }
   if (alarm.name === 'hwa-mine-defense') await tickAutoGather();
   if (alarm.name === 'hwa-queue-watch') {
     const tab = await findActiveGameTab();
@@ -802,7 +807,12 @@ try {
   setupQueueAlarms();
 } catch (_) {}
 
+pending = pending.then(() => runFreeSpin()).catch(() => {});
+
 chrome.storage.onChanged?.addListener?.((changes, area) => {
+  if (area === 'local' && ['autoFreeSpinEnabled', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some(key => key in changes)) {
+    pending = pending.then(() => runFreeSpin()).catch(() => {});
+  }
   if (area !== 'local' || !['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) return;
   pending = pending.then(async () => {
     const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'towerRun', 'dungeonRun', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
@@ -981,6 +991,100 @@ async function evaluatePriorityAutoJoin(record, cache, stored, tabId) {
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType = null;
 let lastAutoGatherPendingLevel = null;
+
+async function runFreeSpin(manual = false, record = null, sourceTabId = null) {
+  const stored = await chrome.storage.local.get(['autoFreeSpinEnabled', 'autoFreeSpinState', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
+  const cache = stored.rpcCache || {}, policy = globalThis.hwaHelperFreeAlchemy;
+  const accountId = cache.accountStatus?.data?.id, now = Date.now();
+  let state = stored.autoFreeSpinState ? structuredClone(stored.autoFreeSpinState) : null;
+  if (!manual && !stored.autoFreeSpinEnabled && !state?.pending) return { ok: false, error: 'Auto free spin is disabled.' };
+  if (!policy || accountId == null) return { ok: false, error: 'Waiting for current game account.' };
+  if (state && String(state.accountId) !== String(accountId)) {
+    if (state.tabId) await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: 'free-alchemy-spin' }).catch(() => {});
+    state = null;
+  }
+  state = state || { accountId, pending: null };
+  if (state.pending?.automatic && (!stored.autoFreeSpinEnabled || !rpcMessageForSettings(stored, []) || state.pending.mode !== stored.socketRefreshMode) && !state.pending.cancelRequested) {
+    if (state.tabId) await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: 'free-alchemy-spin' }).catch(() => {});
+    state.pending.cancelRequested = true;
+  }
+  const save = async (status, wakeAt = null) => {
+    state.status = status; state.wakeAt = wakeAt;
+    if (JSON.stringify(state) !== JSON.stringify(stored.autoFreeSpinState)) await chrome.storage.local.set({ autoFreeSpinState: state });
+    if (Number.isFinite(wakeAt)) chrome.alarms?.create?.('hwa-auto-free-spin', { when: Math.max(now + 1000, wakeAt) });
+  };
+  const receipt = cache.freeAlchemySpinStatus, quota = cache['resource:refillable:53'];
+  if (state.pending?.phase === 'sent') {
+    const request = state.pending;
+    const confirmed = receipt?.data?.token && receipt.data.token !== request.previous && Date.parse(receipt.updatedAt) >= request.sentAt;
+    const consumed = Date.parse(quota?.updatedAt) > request.sentAt && quota?.data?.amount === 0 && quota.data.lastRefillAt >= request.sentAt - 1000;
+    if (confirmed || consumed) {
+      if (request.queued && state.tabId) await chrome.tabs.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: 'free-alchemy-spin' }).catch(() => {});
+      state.pending = null;
+      state.lastResult = confirmed ? receipt.data.success ? 'Free spin confirmed' : receipt.data.error : 'Free spin quota updated by game';
+    } else {
+      const refreshQuota = rpcMessageForSettings(stored, [{ name: 'userGetInfo' }]);
+      if (refreshQuota && state.tabId && now - request.sentAt >= 30000 && now - (request.refreshAt || 0) >= 30000) {
+        request.refreshAt = now;
+        try {
+          const context = await chrome.tabs.sendMessage(state.tabId, { kind: 'free-spin-context' });
+          if (context?.ok && String(context.accountId) === String(accountId)) await chrome.tabs.sendMessage(state.tabId, { ...refreshQuota, group: 'free-alchemy-refresh', expiresAt: now + 30000 });
+        } catch (_) {}
+      }
+      await save('Free spin awaiting server confirmation; no automatic retry', now + 30000);
+      return { ok: true, pending: true, queued: request.queued };
+    }
+  }
+  if (!manual && !stored.autoFreeSpinEnabled) {
+    await save('Auto free spin is disabled');
+    return { ok: false, error: state.status };
+  }
+  if (!rpcMessageForSettings(stored, [])) {
+    await save('Free spin paused by shared RPC settings');
+    return { ok: false, error: state.status };
+  }
+  const available = policy.availability(cache, now);
+  if (!available.ready) {
+    state.pending = null;
+    await save('Waiting for free spin cooldown', available.readyAt);
+    return { ok: false, error: 'Free spin cooldown has not expired.' };
+  }
+  const tabId = sourceTabId || state.tabId || (await findActiveGameTab())?.id;
+  if (!tabId) { await save('Open the game to use free spin', now + 30000); return { ok: false, error: state.status }; }
+  let context;
+  try { context = await chrome.tabs.sendMessage(tabId, { kind: 'free-spin-context' }); } catch (_) {}
+  if (!context?.ok || String(context.accountId) !== String(accountId)) {
+    await save('Free spin needs current account data; press F5 in the game tab', now + 30000);
+    return { ok: false, error: state.status };
+  }
+  state.tabId = tabId;
+  const cycle = policy.cycle(cache, now);
+  if (!manual && state.attemptedCycle === cycle) {
+    await save(state.lastResult || 'Free spin already attempted; waiting for a new cooldown or game day', policy.day(cache, now).next);
+    return { ok: false, error: state.status };
+  }
+  if (!manual) {
+    const refreshed = state.pending?.phase === 'refresh' && Date.parse(quota?.updatedAt) >= state.pending.sentAt;
+    if (!refreshed) {
+      if (state.pending?.phase === 'refresh' && now < state.pending.expiresAt) {
+        await save('Refreshing free spin quota', state.pending.expiresAt);
+        return { ok: true, pending: true };
+      }
+      state.pending = { phase: 'refresh', sentAt: now, expiresAt: now + 30000 };
+      await save('Refreshing free spin quota', now + 30000);
+      try { await chrome.tabs.sendMessage(tabId, { ...rpcMessageForSettings(stored, [{ name: 'userGetInfo' }, { name: 'user_getNextDayTime' }]), group: 'free-alchemy-refresh', expiresAt: now + 30000 }); }
+      catch (_) { state.pending = null; await save('Free spin bridge unavailable; press F5 in the game tab', now + 30000); }
+      return { ok: true, pending: true };
+    }
+  }
+  const dispatch = rpcMessageForSettings(stored, [{ name: 'refillable_alchemyUseVideo', args: { type: 'alchemy' } }]);
+  state.attemptedCycle = cycle;
+  state.pending = { phase: 'sent', sentAt: now, previous: receipt?.data?.token, automatic: !manual, mode: stored.socketRefreshMode, queued: dispatch.kind === 'queue-rpc' };
+  await save(state.pending.queued ? 'Free spin queued for game traffic' : 'Free spin awaiting server confirmation', now + 30000);
+  try { await chrome.tabs.sendMessage(tabId, { ...dispatch, group: 'free-alchemy-spin', expiresAt: now + 30000 }); }
+  catch (_) { await save('Free spin transport unavailable; press F5 and sync game data before retrying', now + 30000); return { ok: false, error: state.status }; }
+  return { ok: true, queued: state.pending.queued };
+}
 
 async function tickAutoGather(reset = false) {
   const stored = await chrome.storage.local.get(['rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings',
@@ -1320,6 +1424,16 @@ async function handleControl(kind) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const freeManual = message?.kind === 'free-alchemy-spin' || message?.kind === 'refresh-rpc' &&
+    message.calls?.length === 1 && message.calls[0]?.name === 'refillable_alchemyUseVideo' &&
+    !message.calls[0].feature && message.calls[0].args?.type === 'alchemy' && Object.keys(message.calls[0].args).length === 1;
+  if ((freeManual || message?.kind === 'free-spin-tick') &&
+      (sender.url?.startsWith('chrome-extension://' + chrome.runtime.id + '/') || !freeManual && isGameUrl(sender.url) && sender.tab?.id)) {
+    pending = pending.then(() => runFreeSpin(freeManual, null, sender.tab?.id));
+    pending.then(sendResponse, error => sendResponse({ ok: false, error: String(error) }));
+    pending = pending.catch(() => {});
+    return true;
+  }
   if (['auto-gather-start', 'auto-gather-stop', 'smart-gather-tick'].includes(message?.kind) &&
       (sender.url?.startsWith('chrome-extension://' + chrome.runtime.id + '/') ||
        message.kind === 'smart-gather-tick' && isGameUrl(sender.url) && sender.tab?.id)) {
@@ -1993,6 +2107,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     Object.assign(stored, await chrome.storage.local.get(['smartGatherState', 'raidQueue', 'monsterQueue']));
     if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id);
     if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id);
+    if (sender.tab?.id) await runFreeSpin(false, record, sender.tab.id);
     if (stored.popupRpcEnabled === true && sender.tab?.id) {
       const calls = socketRefreshCalls(record, cacheResult.cache);
       const dispatch = rpcMessageForSettings(stored, calls);

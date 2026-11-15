@@ -3,7 +3,7 @@ id: doc-d4f1f3ade11beab1a38873ea0a61f4d8
 title: WXT Vue Tailwind Conventions
 description: Durable migration conventions for WXT-only packaging, Vue state, Tailwind v4, RPC ownership, lifecycle, strict typecheck and acceptance.
 createdAt: '2026-11-13T03:59:20.802Z'
-updatedAt: '2026-11-14T14:52:07.002Z'
+updatedAt: '2026-11-14T18:57:59.386Z'
 tags:
   - architecture
   - wxt
@@ -95,3 +95,11 @@ Bổ sung từ review tích hợp: quest_multiFarm phải đi qua runtime messag
 Proof boundaries matter: a compiled v-model callback opening a dialog proves rendering; it does not prove every user entry point or focus trap. A queued read and a successful mocked carrier do not establish successful game mutations, Unity actions or broker packets. Attach a per-feature limitation table and leave a precise follow-up rather than claiming live parity.
 
 @task-VHE-VT9095 provides guildVersusView, metric/displayMetric and challengeConvertedPoints as an unknown-aware view pattern: normalize finite nonnegative reported metrics to number|null and reported booleans to boolean|null, preserve 0/false, and keep rule metadata separate from observed account state. Require known claims, eligibility and a positive verified threshold before Ready; static rules alone do not establish eligibility. Detailed evidence: @doc/architecture/goals-tracking and tests/guild-versus-unknown.test.mjs.
+
+## Teams nested member normalization (0.10.88)
+
+@task-VHE-40Y50X addresses a blank Teams tab with reduce-is-not-a-function after a hero-cache update. TeamsTab's getTeamPower reduced memberIds directly; server-team paths constructed arrays, but customTeams loaded raw stored heroIds, which can be an indexed object. Normalizing only the outer teams list does not normalize nested members. The diagnostic CACHE_HEROES_UPDATED is informational and does not itself establish a failure in hero caching.
+
+src/utils/teamMembers.ts provides teamMemberIds and serverTeamGroups. useAccountTeams normalizes account preset collections and nested heroIds on load/save without rewriting data merely on read. The power/edit boundaries also normalize defensively. IDs accept numeric/string scalars and id/heroId members, reject invalid/nonpositive IDs, deduplicate and preserve order. Server groups distinguish flat indexed members from nested multi-team dictionaries/arrays, avoiding silently dropping a valid flat-object team. Hero/Titan power lookup remains unchanged.
+
+Tests/teams-members.test.mjs renders the actual compiled Teams SFC with raw indexed custom members, object server groups and mixed Hero/Titan snapshots, then changes hero power and rerenders. Real Chrome0.10.88 evidence docs/acceptance/teams-2026-11-15.json uses real storage/account-team loading and reactive cache refresh, preserves the rendered tab and changes custom power3000→9000 without runtime exceptions. The user's actual customTeams storage was not supplied; this is a reproduced code-path/input-shape regression, not a claim to have inspected their private browser storage.
