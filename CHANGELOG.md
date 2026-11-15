@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.113 — 2026-11-15
+
+### Added
+
+- Typed WXT background entrypoint [entrypoints/background.ts](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/entrypoints/background.ts) utilizing `defineBackground()` with service integration:
+  - Registers typed RPC cache (`rpcCacheService`) and queue controllers (`buildingQueueService`, `researchQueueService`, `raidQueueService`, `monsterQueueService`, `raidEnergyAutoService`, `autoGatherService`, `smartGatherService`, `towerAutomationService`, `towerRunnerService`, `dungeonAutomationService`, `dungeonRunnerService`).
+  - Registers typed support services (`speedupService`, `freeAlchemyPolicy`, `mailService`, `mineDefenseService`, `worldReadService`).
+  - Implements routine startup storage optimization (pruning RPC cache).
+  - Handles recording controls (`record-start`, `record-stop`, `record-clear`, `start-recording`, `stop-recording`) with session/local synchronization.
+- Unit test suite [tests/background-entrypoint.test.mjs](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/tests/background-entrypoint.test.mjs) testing `isGameUrl` verification and typed service registration.
+
+### Changed
+
+- Preserved 100% backward compatibility for classic service worker and VM tests across all 934 tests.
+
 ## 0.10.112 — 2026-11-15
 
 ### Added
