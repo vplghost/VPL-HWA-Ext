@@ -50,7 +50,10 @@
     const response = result?.response;
     const code = response?.errorCode ?? result?.errorCode;
     const error = result?.error || response?.error || (code != null && code !== 0 && code !== '0' && code !== '' ? code : null);
-    return error ? typeof error === 'object' ? error.message || JSON.stringify(error) : String(error) : null;
+    if (!error) return null;
+    if (typeof error !== 'object') return String(error);
+    const kind = error.code || error.name;
+    return ['MineNotFound', 'BattleTypeMismatch'].includes(kind) ? kind : error.message || kind || JSON.stringify(error);
   }
   function recallForRally(cache, stored, rally, now) {
     const marches = list(cache.marchStatus?.data?.marches);
@@ -78,7 +81,8 @@
     const map = context(cache), data = globalThis.hwaHelperExperimentalData;
     if (!map.mapId || !finite(map.center?.x) || !finite(map.center?.y)) return { action: 'wait', reason: 'Own outpost coordinates unavailable; open the world map to refresh' };
     const sameCenter = state?.nearest?.center?.x === map.center?.x && state?.nearest?.center?.y === map.center?.y;
-    const nearest = state?.nearest?.type === type && state.nearest.mapId === map.mapId && sameCenter
+    const exhausted = finite(state?.nearest?.exhaustedAt) && now >= state.nearest.exhaustedAt + 60000;
+    const nearest = !exhausted && state?.nearest?.type === type && state.nearest.mapId === map.mapId && sameCenter
       ? state.nearest : { mapId: map.mapId, center: map.center, type, levels: [], candidates: [], startedAt: now };
     if (nearest.selected && blockedMineIds(state, now).has(nearest.selected.mineId)) nearest.selected = null;
     const level = Array.from({ length: 10 }, (_, i) => i + 1).find(level => !nearest.levels.includes(level));
@@ -92,7 +96,10 @@
     const candidate = nearest.candidates.filter(m => !active.has(m.mineId)).sort((a, b) =>
       Math.hypot(a.coordinates.x - map.center.x, a.coordinates.y - map.center.y) -
       Math.hypot(b.coordinates.x - map.center.x, b.coordinates.y - map.center.y))[0];
-    if (!candidate) return { action: 'wait', reason: 'No eligible nearest mine; restart Smart gathering to search again' };
+    if (!candidate) {
+      if (!finite(nearest.exhaustedAt)) nearest.exhaustedAt = now;
+      return { action: 'wait', reason: 'No eligible nearest mine; searching again in ' + Math.ceil((nearest.exhaustedAt + 60000 - now) / 1000) + 's', nearest };
+    }
     return { action: 'probe', reason: 'Checking nearest mine · estimated duration must exceed 1h', nearest,
       call: { name: 'getMineById', feature: 'mine', args: { mineId: candidate.mineId } },
       pending: { purpose: 'nearestProbe', mine: candidate } };
@@ -174,6 +181,12 @@
   function sync(raw, record, cache, now) {
     const accountId = cache.accountStatus?.data?.id;
     const state = raw && accountId != null && String(raw.accountId) === String(accountId) ? structuredClone(raw) : { accountId, interrupted: [] };
+    // Older versions persisted a fatal stop for this explicit target rejection.
+    // Release only that known stop; uncertain mutations and other errors stay held.
+    if (!state.pending && /^(getMineById|attackMine) rejected by game: MineNotFound; restart Smart gathering to retry$/.test(state.error)) {
+      delete state.error;
+      state.notice = { at: now, expiresAt: now + 5000, message: 'Resuming gathering after a missing mine; checking available targets' };
+    }
     const pending = state.pending;
     if (!pending) return state;
     const reply = Date.parse(record?.timestamp) >= pending.sentAt ? replies(record).find(row => matches(row.call, pending.call)) : null;
@@ -181,7 +194,9 @@
     const failure = rpcFailure(reply?.result);
     if (reply && failure && pending.call.name !== 'joinRally') {
       state.pending = null;
-      if (pending.call.name === 'attackMine' && failure === 'BattleTypeMismatch') {
+      if (pending.call.feature === 'mine' &&
+          (['getMineById', 'attackMine'].includes(pending.call.name) && failure === 'MineNotFound' ||
+           pending.call.name === 'attackMine' && failure === 'BattleTypeMismatch')) {
         skipMine(state, pending.call.args.mineId, now, failure);
       } else state.error = `${pending.call.name} rejected by game: ${failure}; restart Smart gathering to retry`;
       return state;

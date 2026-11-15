@@ -32,6 +32,31 @@ function fixture() {
 function rpc(call, response, time) { return { method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc', timestamp: new Date(time).toISOString(),
   requestBody: JSON.stringify({ calls: [{ ...call, ident: '1' }] }), responseBody: JSON.stringify({ results: [{ ident: '1', result: { response } }] }) }; }
 
+test('actual background continues to a different free mine after MineNotFound without restarting', async () => {
+  const { local, ctx, sent } = environment(); Object.assign(local, fixture());
+  local.autoGatherSettings.mineLevel = 10;
+  local.rpcCache.marchStatus.data.marches = [];
+  local.rpcCache['getUnitSummary:unit'].data.squads = [];
+  local.rpcCache.experimentalMineSearch = { data: { mapId: 'map', mineConfigId: 68,
+    mines: [{ mineId: 'gone' }, { mineId: 'free' }] } };
+  const call = { name: 'getMineById', feature: 'mine', args: { mineId: 'gone' } };
+  local.smartGatherState = { accountId: 1, interrupted: [{ mineId: 'gone', mapId: 'map', configId: 68 }],
+    pending: { call, purpose: 'resume', mine: { mineId: 'gone', configId: 68 }, phase: 'sent', sentAt: at } };
+  await ctx.runSmart(rpc(call, { errorCode: 'MineNotFound' }, at + 1), local.rpcCache, local, 1, at + 6000);
+  assert.equal(local.smartGatherState.error, undefined);
+  assert.equal(local.smartGatherState.interrupted.length, 0);
+  const attack = sent.at(-1).calls[0];
+  assert.equal(attack.name, 'attackMine'); assert.equal(attack.args.mineId, 'free'); assert.equal(attack.args.battleType, 'pve');
+  assert.equal(sent.some(message => message.calls?.some(call => call.name === 'attackMine' && call.args.mineId === 'gone')), false);
+  assert.equal(local.smartGatherState.pending.phase, 'sent', 'a dispatch acknowledgement does not confirm gathering');
+  await ctx.runSmart(rpc(attack, { squadId: 'new-squad', route: { startedAt: at + 6001, durationMs: 1000 } }, at + 6001), local.rpcCache, local, 1, at + 6001);
+  assert.equal(local.smartGatherState.pending.phase, 'refresh');
+  local.rpcCache.marchStatus = { updatedAt: new Date(at + 7000).toISOString(), data: { marches: [{ squadId: 'new-squad', mineId: 'free' }] } };
+  local.rpcCache['getUnitSummary:unit'].updatedAt = new Date(at + 7000).toISOString();
+  await ctx.runSmart(null, local.rpcCache, local, 1, at + 7000);
+  assert.equal(local.smartGatherState.pending, null);
+});
+
 test('queue recall is wired: waits for confirmed return and then starts existing raid controller', async () => {
   const { local, ctx } = environment(); Object.assign(local, fixture());
   const options = { mapId: 'map', center: { x: 0, y: 0 }, level: 19, firstMobId: 'boss', waitSeconds: 60, count: 1, minMembers: 1, heroIds: [1,2,3,4,5] };

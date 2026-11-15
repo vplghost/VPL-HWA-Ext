@@ -10,6 +10,56 @@ import '../extension/auto-gather.js';
 const smart = globalThis.hwaHelperSmartGather;
 const now = Date.parse('2026-11-14T10:00:00Z');
 const at = new Date(now - 60000).toISOString();
+function failureRecord(call, result, time = now + 1) {
+  return { method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc', timestamp: new Date(time).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ ...call, ident: 'missing-mine' }] }),
+    responseBody: JSON.stringify({ results: [{ ident: 'missing-mine', result }] }) };
+}
+
+test('missing mine probes and explicitly rejected attacks skip the target rather than stopping', () => {
+  for (const name of ['getMineById', 'attackMine']) for (const result of [
+    { response: { errorCode: 'MineNotFound' } }, { error: 'MineNotFound' }, { error: { name: 'MineNotFound', message: 'The mine no longer exists' } },
+    { response: { error: 'MineNotFound' } }, { errorCode: 'MineNotFound' }
+  ]) {
+    const mine = { mineId: 'gone', mapId: 'map', configId: 68, coordinates: { x: 1, y: 0 } };
+    const call = { name, feature: 'mine', args: { mineId: mine.mineId } };
+    const state = { accountId: 1, interrupted: [mine], resumeCandidate: mine,
+      nearest: { mapId: 'map', center: { x: 0, y: 0 }, type: 'food', levels: [1,2,3,4,5,6,7,8,9,10],
+        selected: mine, candidates: [mine, { ...mine, mineId: 'free' }] },
+      pending: { purpose: 'resume', mine, call, phase: 'sent', sentAt: now } };
+    const next = smart.sync(state, failureRecord(call, result), cache(), now + 1);
+    assert.equal(next.error, undefined); assert.equal(next.pending, null);
+    assert.equal(next.interrupted.length, 0); assert.equal(next.resumeCandidate, null);
+    assert.equal(next.nearest.selected, null); assert.equal(next.nearest.candidates.length, 1);
+    assert.equal(smart.nearestPlan(cache(), next, 'food', now + 2).call.args.mineId, 'free');
+    assert.ok(smart.blockedMineIds(next, now + 2).has('gone'));
+    assert.equal(state.interrupted.length, 1, 'sync must not mutate its persisted input');
+  }
+});
+
+test('an exhausted nearest scan waits one minute then searches again without restart', () => {
+  const state = { accountId: 1, nearest: { mapId: 'map', center: { x: 0, y: 0 }, type: 'food',
+    levels: [1,2,3,4,5,6,7,8,9,10], candidates: [] } };
+  const first = smart.nearestPlan(cache(), state, 'food', now);
+  assert.equal(first.action, 'wait'); assert.doesNotMatch(first.reason, /restart/);
+  assert.equal(smart.nearestPlan(cache(), state, 'food', now + 59999).action, 'wait');
+  const next = smart.nearestPlan(cache(), state, 'food', now + 60000);
+  assert.equal(next.action, 'search'); assert.equal(next.pending.level, 1);
+});
+
+test('only a persisted confirmed missing-mine error is released automatically', () => {
+  for (const name of ['getMineById', 'attackMine']) {
+    const next = smart.sync({ accountId: 1, error: `${name} rejected by game: MineNotFound; restart Smart gathering to retry` }, null, cache(), now);
+    assert.equal(next.error, undefined);
+  }
+  for (const error of ['attackMine rejected by game: InsufficientUnits; restart Smart gathering to retry', 'Smart gathering attackMine confirmation timed out; refresh game and restart Smart gathering']) {
+    assert.equal(smart.sync({ accountId: 1, error }, null, cache(), now).error, error);
+  }
+  const call = { name: 'getMineById', feature: 'mine', args: { mineId: 'old' } };
+  const state = { accountId: 1, pending: { call, phase: 'sent', sentAt: now + 2 } };
+  assert.ok(smart.sync(state, failureRecord(call, { error: 'MineNotFound' }), cache(), now + 3).pending, 'older replies cannot release a current request');
+});
+
 function cache() {
   return { accountStatus: { data: { id: 1 } }, questResetStatus: { data: { nextDayAt: now + 3600000 } },
     'getDailyQuests:quest': { updatedAt: at, data: { quests: [354, 357, 356, 355].map(id => ({ id, progress: 0, state: 'inProgress' })) } },
