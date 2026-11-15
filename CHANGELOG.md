@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.112 — 2026-11-15
+
+### Added
+
+- Typed RPC Cache core architecture under `src/core/cache/`:
+  - `src/core/cache/definitions.ts`: complete 80+ method definitions, resource sets, material names, type names, gold skill upgrade calculation, and resource label resolution.
+  - `src/core/cache/extractors/baseExtractor.ts`: typed resource creation, inventory item extraction, resourceAction generation, reward/cost action delta extractions, and route distance/duration estimation.
+  - `src/core/cache/extractors/socketExtractor.ts`: typed MQTT socket packet parsing for incoming attacks, attack terminations, route completions, gathering completions, chat messages, reports, and rally battle results.
+  - `src/core/cache/reducers/accountReducer.ts`: account epoch handling and clean purge of account-scoped caches on user switch.
+  - `src/core/cache/reducers/pruneReducer.ts`: cache pruning logic for mail receipts, 7-day guild chat cutoff, expired special quest events, and object claim normalization.
+  - `src/core/cache/cacheStore.ts`: unified cache store providing atomic `merge`, `extract`, `pruneCache`, and global fallback `globalThis.hwaHelperRpcCache`.
+- Strict TypeScript interfaces in `src/types/game/rpcCache.ts` (`RpcCall`, `RpcResult`, `RpcRecord`, `CacheEntry`, `RpcCacheState`, `MergeResult`, `PruneResult`, `RpcExtractor`, `DomainReducer`, `RpcCacheModule`).
+- Comprehensive unit test suite `tests/cache-store-typed.test.mjs` verifying definitions, skill gold calculations, base extractions, socket extractions, account reset reducer, cache pruning, and atomic merge.
+
+### Changed
+
+- Re-exported `rpcCache` types through `src/types/index.ts`.
+- Preserved 100% backward compatibility on `globalThis.hwaHelperRpcCache` across all 932 test cases and extension background service workers.
+
 ## 0.10.111 — 2026-11-15
 
 ### Added
