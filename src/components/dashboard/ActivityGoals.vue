@@ -6,6 +6,7 @@ import '@/src/utils/metadata';
 import { towerActivityState, arenaActivityState, dungeonActivityState, observedToday, readyQuestCount } from '@/src/composables/activityState';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
+import { dailyQuests } from '@/src/data/questData';
 
 const { cache } = useRpcCache();
 const now = useNow();
@@ -62,13 +63,13 @@ const activities = computed<ActivityRow[]>(() => {
   const questEntry = cache.value.questGetAll ?? cache.value.quest_getAll;
   const questsKnown = observedToday(questEntry, now.value, cache.value.questResetStatus?.data?.nextDayAt);
   const pendingQuests = questsKnown ? readyQuestCount(cache.value) : 0;
-  const dailies = (globalThis as any).hwaHelperQuestData?.dailyQuests(cache.value, now.value);
-  const remainingDailies = dailies?.filter((quest: any) => quest.state === 'inProgress').length;
+  const dailies = typeof dailyQuests !== 'undefined' ? dailyQuests(cache.value, now.value) : (globalThis as any).hwaHelperQuestData?.dailyQuests?.(cache.value, now.value);
+  const remainingDailies = dailies ? dailies.filter((quest: any) => quest.state === 'inProgress').length : undefined;
   rows.push({
     id: 'quests',
     title: 'Daily Quests',
     icon: '📜',
-    state: pendingQuests > 0 || remainingDailies > 0 ? 'pending' : questsKnown ? 'info' : 'unknown',
+    state: pendingQuests > 0 || (remainingDailies ?? 0) > 0 ? 'pending' : questsKnown ? 'info' : 'unknown',
     detail: !questsKnown && !dailies ? unknown : `${remainingDailies != null ? `${remainingDailies} daily quests remaining · ` : ''}${questsKnown ? pendingQuests : '—'} quest rewards ready to claim`,
     isInteractive: true,
   });

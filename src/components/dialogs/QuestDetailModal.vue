@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { questRefreshCalls, sendQuestClaim } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { normalizeArray } from '@/src/utils/troops';
+import { questData } from '@/src/data/questData';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -106,7 +107,6 @@ function parseRewardText(reward: any): string {
 
 const allItems = computed<QuestCardItem[]>(() => {
   const c = cache.value;
-  const questData = (globalThis as any).hwaHelperQuestData;
   const items: QuestCardItem[] = [];
   const seenIds = new Set<string>();
 
@@ -302,7 +302,6 @@ async function refreshQuests() {
 
 function exportCatalog() {
   try {
-    const questData = (globalThis as any).hwaHelperQuestData;
     const json = questData?.exportCatalogJson?.() || JSON.stringify(allItems.value, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

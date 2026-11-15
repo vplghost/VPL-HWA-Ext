@@ -4,6 +4,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
+import { questData } from '@/src/data/questData';
 
 const { cache, dispatchRpc } = useRpcCache();
 const { openModal } = useModals();
@@ -157,9 +158,9 @@ const eventCards = computed<EventCard[]>(() => {
   }
 
   // 6. Special Quest Events
-  const questData = (globalThis as any).hwaHelperQuestData;
-  if (questData?.visibleMetadata) {
-    const questEvents = questData.visibleMetadata(cache.value);
+  const qData = questData || (globalThis as any).hwaHelperQuestData;
+  if (qData?.visibleMetadata) {
+    const questEvents = qData.visibleMetadata(cache.value);
     if (Array.isArray(questEvents)) {
       for (const qe of questEvents) {
         const titleMap: Record<string, string> = {

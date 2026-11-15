@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.10.104 — 2026-11-15
+
+### Added
+
+- Typed game metadata modules in `src/data/`: `questData.ts`, `towerData.ts`, `refillableData.ts`, `speedupData.ts`, and `clanVersusData.ts`.
+- Strict TypeScript interfaces in `src/types/game/`: `quest.ts`, `tower.ts`, `refillable.ts`, `speedup.ts`, and `clanVersus.ts`.
+- Unit test suite `tests/quest-tower-refillable-typed-data.test.mjs` verifying quest definitions/titles/resets, tower buff metadata and floor rules, refillable intervals/caps, speedup durations, and clan versus milestone thresholds/rewards.
+
+### Changed
+
+- Refactored `src/utils/towerRules.ts` and `src/utils/speedup.ts` to consume typed metadata with relative module imports compatible with Node ESM test runners.
+- Updated `ActivityGoals.vue`, `QuestDetailModal.vue`, `TowerModal.vue`, `EventsTab.vue`, and `GuildVersusModal.vue` to integrate typed modules while maintaining backwards-compatible global fallbacks.
+- Updated `tests/daily-quest-config.test.mjs` and `tests/guild-versus-unknown.test.mjs` SFC transpile mocks for typed metadata resolution.
+
 ## 0.10.103 — 2026-11-15
 
 ### Added

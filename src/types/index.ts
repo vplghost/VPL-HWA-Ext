@@ -64,3 +64,8 @@ export * from './game/titan';
 export * from './game/campaign';
 export * from './game/item';
 export * from './game/cinema';
+export * from './game/quest';
+export * from './game/tower';
+export * from './game/refillable';
+export * from './game/speedup';
+export * from './game/clanVersus';

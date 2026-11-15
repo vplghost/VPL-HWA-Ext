@@ -6,6 +6,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { towerSettingsForAccount } from '@/src/utils/dialogRpc';
 import { getHeroMetadata } from '@/src/utils/metadata';
 import { TOWER_FLOOR_COUNT } from '@/src/utils/towerRules';
+import { towerBuffs } from '@/src/data/towerData';
 import { formatNumber } from '@/src/utils/formatters';
 
 const props = defineProps<{
@@ -80,7 +81,7 @@ const effectIcons: Record<number, string> = {
 const buffOrder = ref<number[]>([]);
 
 function getCatalog() {
-  return (globalThis as any).hwaHelperTowerBuffs || {};
+  return towerBuffs || (globalThis as any).hwaHelperTowerBuffs || {};
 }
 
 function getBuffGroup(id: number) {

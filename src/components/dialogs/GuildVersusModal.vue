@@ -3,6 +3,14 @@ import { ref, computed, watch, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { normalizeArray } from '@/src/utils/troops';
 import { guildVersusView, displayMetric, metric, metricPercent, challengeConvertedPoints } from '@/src/utils/guildVersusView';
+import {
+  clanVersusChestThresholds,
+  clanVersusRewards,
+  clanVersusRoundQuests,
+  clanVersusChallengeNames,
+  clanVersusChallengePoints,
+  clanVersusChallengeSteps
+} from '@/src/data/clanVersusData';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -36,7 +44,7 @@ const clanRank = computed(() => rewards.value.userClanRank != null ? '#' + rewar
 const seasonRank = computed(() => rewards.value.seasonClanRank != null ? '#' + rewards.value.seasonClanRank : '—');
 const thresholds = computed<Record<number, number>>(() => (globalThis as any).hwaHelperClanVersusChestThresholds || {});
 
-const chestRewardsMap = computed(() => (globalThis as any).hwaHelperClanVersusRewards || {});
+const chestRewardsMap = computed(() => clanVersusRewards || (globalThis as any).hwaHelperClanVersusRewards || {});
 
 function formatRewardItem(key: string, amount: number) {
   if (key === 'energy') return `+${amount.toLocaleString()} Energy`;
@@ -82,7 +90,7 @@ watch(
 
 // --- Sections 4, 5, 6 Data ---
 const roundQuestsMap = computed(() => {
-  return (globalThis as any).hwaHelperClanVersusRoundQuests || {};
+  return clanVersusRoundQuests || (globalThis as any).hwaHelperClanVersusRoundQuests || {};
 });
 
 const currentRound = computed(() => view.value.rounds.find((r: any) => r.status === 'inProgress') ||
@@ -109,9 +117,9 @@ const personalSat = computed(() => view.value.personalEligible);
 const guildSat = computed(() => view.value.guildEligible);
 
 // Section 6: Daily Challenges
-const challengeNames = computed(() => (globalThis as any).hwaHelperClanVersusChallengeNames || {});
-const challengePoints = computed(() => (globalThis as any).hwaHelperClanVersusChallengePoints || {});
-const challengeSteps = computed(() => (globalThis as any).hwaHelperClanVersusChallengeSteps || {});
+const challengeNames = computed(() => clanVersusChallengeNames || (globalThis as any).hwaHelperClanVersusChallengeNames || {});
+const challengePoints = computed(() => clanVersusChallengePoints || (globalThis as any).hwaHelperClanVersusChallengePoints || {});
+const challengeSteps = computed(() => clanVersusChallengeSteps || (globalThis as any).hwaHelperClanVersusChallengeSteps || {});
 
 const challenges = computed(() => view.value.challenges || []);
 const totalChallengePts = computed(() => {
@@ -676,10 +684,10 @@ onUnmounted(() => {
                     {{ getChallengeDisplayName(ch) }}
                   </span>
                   <span
-                    v-if="challengePoints[ch.id] != null && challengeSteps[ch.id] > 0"
+                    v-if="challengePoints[ch.id] != null && (challengeSteps[ch.id] ?? 0) > 0"
                     class="text-[10px] text-slate-500 dark:text-slate-400 font-mono"
                   >
-                    +{{ displayMetric(challengePoints[ch.id]) }} pts / {{ displayMetric(challengeSteps[ch.id]) }} {{ challengeSteps[ch.id] > 1 ? 'units' : 'action' }}
+                    +{{ displayMetric(challengePoints[ch.id]) }} pts / {{ displayMetric(challengeSteps[ch.id]) }} {{ (challengeSteps[ch.id] ?? 0) > 1 ? 'units' : 'action' }}
                   </span>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
@@ -696,7 +704,7 @@ onUnmounted(() => {
                         ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60'
                         : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700'
                     "
-                    :title="challengePoints[ch.id] > 0 ? `${Number(challengePoints[ch.id]).toLocaleString()} pts per ${Number(challengeSteps[ch.id]) === 1 ? 'completion' : `${Number(challengeSteps[ch.id]).toLocaleString()} units`}` : ''"
+                    :title="(challengePoints[ch.id] ?? 0) > 0 ? `${Number(challengePoints[ch.id]).toLocaleString()} pts per ${Number(challengeSteps[ch.id]) === 1 ? 'completion' : `${Number(challengeSteps[ch.id] ?? 0).toLocaleString()} units`}` : ''"
                   >
                     {{ displayMetric(getChallengeConvertedPts(ch)) }} pts
                   </span>

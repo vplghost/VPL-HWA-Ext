@@ -8,14 +8,19 @@ import { parse, compileScript } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import * as viewHelpers from '../src/utils/guildVersusView.ts';
 import { normalizeArray } from '../src/utils/troops.ts';
+import * as clanVersusDataModule from '../src/data/clanVersusData.ts';
 const require = createRequire(import.meta.url);
 const current = Vue.ref({});
 const { descriptor } = parse(await readFile(new URL('../src/components/dialogs/GuildVersusModal.vue', import.meta.url), 'utf8'));
 const compiled = compileScript(descriptor, { id: 'guild-versus-fixture', inlineTemplate: true });
 const js = ts.transpileModule(compiled.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 const module = { exports: {} };
-const imports = { '@/src/composables/useRpcCache': { useRpcCache: () => ({ cache: current }) },
-  '@/src/utils/guildVersusView': viewHelpers, '@/src/utils/troops': { normalizeArray } };
+const imports = {
+  '@/src/composables/useRpcCache': { useRpcCache: () => ({ cache: current }) },
+  '@/src/utils/guildVersusView': viewHelpers,
+  '@/src/utils/troops': { normalizeArray },
+  '@/src/data/clanVersusData': clanVersusDataModule
+};
 new Function('require', 'module', 'exports', js)(name => imports[name] || require(name), module, module.exports);
 const Component = module.exports.default;
 async function render(cache) {
