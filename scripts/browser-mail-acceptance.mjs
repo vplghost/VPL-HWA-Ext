@@ -16,9 +16,17 @@ try {
     await pause(); await pause();
     await c.evaluate(p, `chrome.storage.local.set(${JSON.stringify({ popupRpcEnabled: true, socketRefreshMode: mode, captureSettings: { interceptEnabled: true } })})`);
     const game = await c.page('about:blank');
-    let claims = 0, reads = 0, helperMarchReads = 0;
+    let claims = 0, reads = 0, helperMarchReads = 0, reportClaims = 0;
     const observedCalls = [];
     const until = Math.floor(Date.now() / 1000) + 3600;
+    const reportAt = Date.now() - 1000;
+    const reports = [
+      { id: 'done-1', type: 'rallyMobAttackResult', claimedReward: true, payload: { result: 'win', redundant: 'x'.repeat(500) } },
+      { id: 'done-2', type: 'rallyMobAttackResult', claimedReward: true, payload: { result: 'lose' } },
+      { id: 'pending-1', type: 'rallyMobAttackResult', claimedReward: false, payload: { result: 'win' } },
+      { id: 'pending-2', type: 'rallyMobAttackResult', claimedReward: false, payload: { result: 'win' } },
+      { id: 'pending-3', type: 'mineGatheringResult', claimedReward: false, payload: {} },
+    ].map(row => ({ ...row, createdAt: reportAt, expiresAt: reportAt + 3600000 }));
     const remove = c.onEvent(event => {
       if ([p, game.sessionId].includes(event.sessionId) && event.method === 'Runtime.exceptionThrown') report.errors.push(event.params.exceptionDetails.text);
       if (event.sessionId !== game.sessionId || event.method !== 'Fetch.requestPaused') return;
@@ -29,10 +37,13 @@ try {
         body = JSON.stringify({ results: (JSON.parse(request.postData || '{}').calls || []).map(call => {
           observedCalls.push({ name: call.name, ident: call.ident });
           let response = {};
-          if (call.name === 'userGetInfo') response = { id: 1, name: 'Mail fixture', level: 80, gold: 100 + 50 * claims, refillable: [] };
+          if (call.name === 'userGetInfo') response = { id: 1, name: 'Mail fixture', level: 80, gold: 100 + 50 * claims + 25 * reportClaims, refillable: [] };
           if (call.name === 'mailGetAll') { reads++; response = { letters: claims ? [] : [{ id: 101, reward: { gold: 50 }, availableUntil: until }, { id: 102, reward: { gold: 999 }, availableUntil: 1 }, { id: 103, availableUntil: 0 }] }; }
           if (call.name === 'mailFarm') { assert.deepEqual(call.args.letterIds.map(String), ['101']); assert.match(call.ident, /^[a-f0-9]{32}$/); claims++; response = { 101: { gold: 50 } }; }
-          if (call.name === 'getPage') response = { reports: [] };
+          if (call.name === 'getPage') response = { reports: reports.map(row => ({ ...row, claimedReward: row.claimedReward || reportClaims > 0 })) };
+          if (call.name === 'readAndClaimAll' && call.feature === 'report') {
+            reportClaims++; response = { gold: 25, claimedRewards: [{ type: 'material', id: 2, amount: 7 }] };
+          }
           if (call.name === 'getMarches') { if (call.ident !== 'native') helperMarchReads++; response = { marches: [] }; }
           if (call.name === 'getUnitSummary') response = { squads: [], available: [] };
           return { ident: call.ident, result: { response } };
@@ -45,7 +56,7 @@ try {
     await pause(); await pause();
     const rpc = calls => c.evaluate(game.sessionId, `fetch('https://api.hero-wars-alliance.com/api/rpc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({calls:${JSON.stringify(calls)}})}).then(r=>r.json())`);
     const carrier = () => rpc([{ name: 'getMarches', feature: 'march', args: {}, ident: 'native' }]);
-    await rpc([{ name: 'userGetInfo', args: {}, ident: 'account' }, { name: 'mailGetAll', args: {}, ident: 'mail' }]);
+    await rpc([{ name: 'userGetInfo', args: {}, ident: 'account' }, { name: 'mailGetAll', args: {}, ident: 'mail' }, { name: 'getPage', feature: 'report', args: { limit: 50, cursor: null }, ident: 'reports' }]);
     await pause(); await carrier(); await pause();
     const beforeEnergyRefresh = helperMarchReads;
     await rpc([{ name: 'userGetInfo', args: {}, ident: 'energy-refresh-1' }]);
@@ -58,12 +69,32 @@ try {
     assert.ok(await c.evaluate(p, `!!document.querySelector('[data-mail-id="101"]')`));
     assert.equal(await c.evaluate(p, `!!document.querySelector('[data-mail-id="102"]')`), false);
     assert.match(await c.evaluate(p, `document.querySelector('[data-mail-id="103"]').innerText`), /Expiry not provided/);
+    assert.equal(await c.evaluate(p, `document.querySelectorAll('[data-pending-reports] .border-t').length`), 2);
+    assert.ok(await c.evaluate(p, `!!document.querySelector('[data-report-history]')`));
     await c.evaluate(p, `document.querySelector('[data-mail-id="101"] button').click()`);
     for (let i = 0; i < 10; i++) { await pause(); await carrier(); if (claims) break; }
     await pause(); await carrier(); await pause();
-    const stored = await c.evaluate(p, `chrome.storage.local.get(['rpcCache','mailClaimState'])`);
+    let stored = await c.evaluate(p, `chrome.storage.local.get(['rpcCache','mailClaimState'])`);
     assert.equal(claims, 1); assert.equal(stored.mailClaimState.pending, null);
     assert.equal(stored.rpcCache.mailStatus.data.letters.length, 0);
+    const reportDay = new Date(reportAt).toISOString().slice(0, 10);
+    assert.equal(stored.rpcCache.battleReportSummary.data.days[reportDay].total, 2);
+    assert.equal(stored.rpcCache.mailStatus.data.reports.length, 3);
+    await c.evaluate(p, `document.querySelector('[data-pending-reports] button').click()`);
+    for (let step = 0; step < 10; step++) { await pause(); await carrier(); if (reportClaims) break; }
+    await pause(); await carrier(); await pause();
+    await rpc([{ name: 'getPage', feature: 'report', args: { limit: 50, cursor: null }, ident: 'repeat-page' }]); await pause();
+    stored = await c.evaluate(p, `chrome.storage.local.get(['rpcCache','mailClaimState'])`);
+    assert.equal(reportClaims, 1); assert.equal(stored.mailClaimState.pending, null);
+    assert.equal(stored.rpcCache.mailStatus.data.reports.length, 0);
+    const summary = stored.rpcCache.battleReportSummary.data.days[reportDay];
+    assert.equal(summary.total, 5); assert.equal(summary.wins, 3); assert.equal(summary.losses, 1);
+    const claimDay = new Date().toISOString().slice(0, 10);
+    assert.equal(stored.rpcCache.battleReportSummary.data.days[claimDay].rewards['resource:gold'], 25);
+    assert.equal(stored.rpcCache.battleReportSummary.data.days[claimDay].rewards['resource:material:2'], 7);
+    assert.equal(await c.evaluate(p, `!!document.querySelector('[data-pending-reports]')`), false);
+    await c.evaluate(p, `document.querySelector('[data-report-history]').open=true`);
+    assert.match(await c.evaluate(p, `document.querySelector('[data-report-history]').innerText`), /5 reports/);
     await c.evaluate(p, `document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
     const marchAt = Date.now();
     stored.rpcCache.marchStatus = { updatedAt: new Date(marchAt).toISOString(), data: { marches: [1, 2, 3].map(i => ({ squadId: 'gather-' + i, kind: 'food', stage: 'gathering', mineId: 'mine-' + i, startedAt: marchAt - 1800000, durationMs: 3600000, endsAt: marchAt + 1800000, gatheringTotalAmount: 2000000 })) } };
@@ -71,7 +102,8 @@ try {
     const layout = await c.evaluate(p, `(()=>{const grid=document.querySelector('[data-march-grid]');const cards=[...grid.children].map(el=>el.getBoundingClientRect().toJSON());return {columns:getComputedStyle(grid).gridTemplateColumns,cards,text:grid.innerText,overflow:grid.scrollWidth>grid.clientWidth+1}})()`);
     assert.equal(layout.cards.length, 3); assert.equal(layout.cards[0].y, layout.cards[1].y); assert.ok(layout.cards[1].x > layout.cards[0].x); assert.ok(layout.cards[2].y > layout.cards[0].y); assert.equal(layout.overflow, false);
     assert.match(layout.text, /Est\. [\d.]+[kM] \/ 2M/); assert.doesNotMatch(layout.text, /Est\. [\d.]+[kM] Food/);
-    report.modes.push({ mode, claims, openDoesNotRefresh: true, expiredHidden: true, unknownExpiryPreserved: true, receiptSettled: true, marchTwoColumns: true, compactGatherAmounts: true, extraMarchReadsForTwoEnergyRefreshes: helperMarchReads - beforeEnergyRefresh });
+    report.modes.push({ mode, claims, openDoesNotRefresh: true, expiredHidden: true, unknownExpiryPreserved: true, receiptSettled: true, marchTwoColumns: true, compactGatherAmounts: true, extraMarchReadsForTwoEnergyRefreshes: helperMarchReads - beforeEnergyRefresh,
+      reportGroupsBeforeClaim: 2, dailyArchivedReports: summary.total, dailyWins: summary.wins, dailyLosses: summary.losses, reportClaims, replayDoesNotDoubleCount: true, claimedDetailRows: 0 });
     remove(); await c.send('Target.closeTarget', { targetId: game.targetId }); await c.send('Target.closeTarget', { targetId: popup.targetId });
   }
   assert.deepEqual(report.errors, []);

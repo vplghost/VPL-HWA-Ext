@@ -14,6 +14,8 @@ const { cache, dispatchRpc } = useRpcCache(), { hasGameTab } = useGameConnection
 const rows = computed(() => mail.rows(cache.value, now.value));
 const claimable = computed<any[]>(() => rows.value.letters.filter((row: any) => row.canClaim));
 const reportCount = computed(() => rows.value.reports.filter((row: any) => row.canClaim).length);
+const reportGroups = computed(() => mail.reportGroups(rows.value.reports));
+const reportDays = computed(() => mail.dailyReports(cache.value, now.value));
 const known = computed(() => Boolean(cache.value.mailStatus?.data?.lettersObservedAt) || cache.value.mailGetAll?.data?.letters != null);
 const refreshing = ref(false), submitting = ref(false), message = ref('');
 const claimState = shallowRef<any>(null);
@@ -95,14 +97,29 @@ const plainMessage = (row: any) => typeof row.message === 'string' ? row.message
         <button v-if="row.unclaimed" type="button" :disabled="pending || !hasGameTab || !row.canClaim" class="cursor-pointer rounded bg-emerald-600 px-3 py-1.5 text-white disabled:opacity-50" @click="claim([row.id])">Claim</button>
       </div>
     </article>
-    <details v-if="rows.reports.length" class="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-2">
-      <summary class="cursor-pointer font-semibold">Battle reports · {{ reportCount }} rewards available</summary>
+    <section v-if="reportGroups.length" data-pending-reports class="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-2">
+      <h4 class="font-semibold">Battle reports · {{ reportCount }} rewards available</h4>
       <button type="button" :disabled="pending || !hasGameTab || !reportCount" class="cursor-pointer rounded bg-emerald-600 px-3 py-1.5 text-white disabled:opacity-50" @click="claim(undefined, true)">Claim report rewards</button>
-      <div v-for="row in rows.reports" :key="row.id" class="border-t border-slate-200 dark:border-slate-700 pt-2 space-y-1">
-        <p class="font-medium">{{ String(row.type || 'Battle report').replace(/([a-z])([A-Z])/g, '$1 $2') }} · {{ row.unclaimed ? 'Reward available' : 'Claimed' }}</p>
-        <p v-if="row.rewards.length">{{ row.rewards.map((reward: any) => `${formatNumber(reward.amount)} ${resourceLabel(reward)}`).join(' · ') }}</p>
-        <p v-else class="text-slate-500">Reward details not included in this report.</p>
-        <p class="text-xs text-slate-500">{{ row.expiresAtMs ? `Expires ${formatFinishTime(row.expiresAtMs, now)}` : 'Expiry not provided' }}</p>
+      <div v-for="group in reportGroups" :key="group.type" class="flex flex-wrap justify-between gap-2 border-t border-slate-200 dark:border-slate-700 pt-2 text-xs">
+        <span>{{ group.label }} · {{ formatNumber(group.count) }}<span v-if="!group.canClaim" class="text-slate-500"> · Collect in game</span></span>
+        <span class="text-slate-500">{{ group.expiresAtMs ? `Earliest expiry ${formatFinishTime(group.expiresAtMs, now)}` : 'Expiry not provided' }}</span>
+        <span v-if="group.rewards.length" class="basis-full text-slate-500">Known rewards: {{ group.rewards.map((reward: any) => `${formatNumber(reward.amount)} ${resourceLabel(reward)}`).join(' · ') }}</span>
+      </div>
+      <p class="text-xs text-slate-500">Rewards are recorded when the game confirms collection.</p>
+    </section>
+    <details v-if="reportDays.length" data-report-history class="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-2">
+      <summary class="cursor-pointer font-semibold">Battle report history · daily totals</summary>
+      <p class="text-xs text-slate-500">Last 30 days · UTC · observed claimed reports. Counts use report dates (or first observation when unavailable); collected rewards use claim dates.</p>
+      <div v-for="day in reportDays" :key="day.day" :data-report-day="day.day" class="border-t border-slate-200 dark:border-slate-700 pt-2 space-y-1">
+        <div class="flex flex-wrap justify-between gap-2"><span class="font-medium">{{ day.day }}</span><span class="text-xs">{{ formatNumber(day.total) }} reports<span v-if="day.wins || day.losses"> · {{ formatNumber(day.wins) }} wins / {{ formatNumber(day.losses) }} losses</span></span></div>
+        <p v-if="day.types.length" class="text-xs text-slate-500">{{ day.types.map((type: any) => `${type.label}: ${formatNumber(type.count)}`).join(' · ') }}</p>
+        <div v-if="day.rewards.length" class="flex flex-wrap gap-2 text-xs">
+          <span v-for="reward in day.rewards" :key="reward.key" class="inline-flex items-center gap-1">
+            <img v-if="getResourceIcon(reward)" :src="getResourceIcon(reward)!" alt="" class="size-5 object-contain" />
+            {{ formatNumber(reward.amount) }} {{ resourceLabel(reward) }}
+          </span>
+        </div>
+        <p v-else class="text-xs text-slate-500">No collected reward totals observed.</p>
       </div>
     </details>
   </ModalDialog>

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.97 — 2026-11-15
+
+### Changed
+
+- Replace claimed battle-report details with account-scoped daily totals for the last 30 UTC days. Keep compact replay guards and aggregate confirmed claim rewards once; discard duplicate canonical/raw report payloads and full report-claim receipts.
+- Group pending report rewards by type in Mail and show daily counts, known wins/losses and observed collected rewards. Preserve operational battle-result processing and claim confirmation; late report pages can enrich unknown outcomes without recounting reports.
+
 ## 0.10.96 — 2026-11-15
 
 ### Changed

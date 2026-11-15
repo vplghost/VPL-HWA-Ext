@@ -473,6 +473,7 @@
           if (!success && !error) return [];
           return [{ key: 'mailClaimAction', method: call.name, feature: call.feature || null, group: 'internal',
             data: { token: call.ident, call, ...mailClaim, confirmedIds, success, reward: success ? response : {},
+              ...(mailClaim.kind === 'reports' && success ? { observedRewards: extractRewardActions(record, call, response).map(action => ({ key: action.data.resourceKey, amount: action.data.delta })) } : {}),
               error: success ? null : String(error?.description || error?.message || error?.name || error).slice(0, 200) }, updatedAt: record.timestamp }];
         }
         const speedup = globalThis.hwaHelperSpeedup?.validate(call);
@@ -681,7 +682,7 @@
                 type: r.type,
                 read: r.read,
                 claimedReward: r.claimedReward,
-                createdAt: r.createdAt,
+                createdAt: r.createdAt, result: r.payload?.result,
                 expiresAt: r.expiresAt, reward: r.reward ?? r.payload?.reward
               }))
             },
@@ -2282,6 +2283,7 @@
           delete next['getPage:report'];
           delete next.mailClaimReceipts;
           delete next.mailClaimStatus;
+          delete next.battleReportSummary;
           next.mailAccountEpoch = { key: 'mailAccountEpoch', data: { accountId: String(entry.data.id) }, updatedAt: entry.updatedAt };
           delete next.speedupInventory;
           delete next.speedupStatus;
@@ -4516,7 +4518,7 @@
             if (status && (!observed || observed <= entry.updatedAt)) {
               const updated = { ...status.data };
               if (data.kind === 'letters') updated.letters = mark(updated.letters);
-              else updated.reports = normalizeArrayData(updated.reports).map(row => data.types.includes(row.type) ? { ...row, claimedReward: true } : row);
+              else updated.reports = normalizeArrayData(updated.reports).map(row => (data.ids ? data.ids.includes(String(row.id)) : data.types.includes(row.type)) ? { ...row, claimedReward: true } : row);
               next.mailStatus = { ...status, method: entry.method, data: { ...updated, accountId: String(accountId), ...helper.counts(updated) }, updatedAt: status.updatedAt > entry.updatedAt ? status.updatedAt : entry.updatedAt };
             }
             if (data.kind === 'letters' && next.mailGetAll?.data?.letters && next.mailGetAll.updatedAt <= entry.updatedAt) next.mailGetAll = {
@@ -4615,7 +4617,7 @@
               const repMap = new Map(reports.map((r) => [String(r.id), r]));
               for (const rep of incomingReports) {
                 const prev = repMap.get(String(rep.id));
-                const claimed = newerClaims.some(row => row.kind === 'reports' && row.types.includes(rep.type));
+                const claimed = newerClaims.some(row => row.kind === 'reports' && (row.ids ? row.ids.includes(String(rep.id)) : row.types.includes(rep.type)));
                 repMap.set(String(rep.id), { ...(prev || {}), ...rep, ...(claimed ? { claimedReward: true } : {}) });
               }
               reports = Array.from(repMap.values());
@@ -5077,7 +5079,9 @@
 
     function pruneCache(cache, now = Date.now()) {
     if (!cache || typeof cache !== 'object') return { cache: {}, changed: false };
-    const mailPruned = globalThis.hwaHelperMailData?.prune(cache, now);
+    const mailPruned = globalThis.hwaHelperMailData?.prune(cache, now, receipt =>
+      extractRewardActions({ timestamp: receipt.at }, receipt.call || { ident: receipt.token }, receipt.reward)
+        .map(action => ({ key: action.data.resourceKey, amount: action.data.delta })));
     const next = { ...(mailPruned?.cache || cache) };
     let changed = mailPruned?.changed || false;
 
