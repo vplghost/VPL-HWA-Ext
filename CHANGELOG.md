@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.110 — 2026-11-15
+
+### Added
+
+- Typed Auto Gather controller `src/services/queues/autoGather.ts` providing settings normalization, resource type rotation, active march counting, game load / march return detection, and automated gathering dispatch planning.
+- Typed Smart Gather controller `src/services/queues/smartGather.ts` providing return time calculation, daily quest chain baseline evaluation, nearest mine probing (> 1h requirement), interrupted mine resuming, skip mine tracking, rally/queue march recalling, and state synchronization.
+- Combined queue service export `src/services/queues/gatherQueue.ts` re-exporting both autoGather and smartGather services.
+- Typed Smart Gather metadata module `src/data/smartGatherData.ts` with remote config sources, daily quest targets, and 40 mine level configurations.
+- Strict TypeScript interfaces in `src/types/game/gatherQueue.ts` (`AutoGatherSettings`, `AutoGatherPlanResult`, `SmartGatherNearestCandidate`, `SmartGatherNearestState`, `SmartGatherInterruptedMine`, `SmartGatherDailyRow`, `SmartGatherState`).
+- Comprehensive unit test suite `tests/gather-queue-typed.test.mjs` verifying settings normalization, resource rotation, march counting, nearest probe sync, and skip mine tracking.
+
+### Changed
+
+- Re-exported `gatherQueue` types through `src/types/index.ts`.
+- Preserved global backward compatibility on `globalThis.hwaHelperAutoGather`, `globalThis.hwaHelperSmartGather`, and `globalThis.hwaHelperSmartGatherData`.
+
 ## 0.10.109 — 2026-11-15
 
 ### Added

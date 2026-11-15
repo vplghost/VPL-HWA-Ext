@@ -80,4 +80,5 @@ export * from './game/researchQueue';
 export * from './game/raidQueue';
 export * from './game/monsterQueue';
 export * from './game/raidEnergyAuto';
+export * from './game/gatherQueue';
 
