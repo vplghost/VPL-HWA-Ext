@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.107 — 2026-11-15
+
+### Added
+
+- Typed Speedup service `src/services/speedupService.ts` providing definition lookup, suggested amounts, call validation, target extraction, stock filtering, and quote calculation.
+- Typed World Read service `src/services/worldReadService.ts` providing `incomingTtl`, cache key derivation, freshness checks, wake calculation, and throttled RPC planning.
+- Strict TypeScript interfaces in `src/types/game/speedup.ts` (`SpeedupKind`, `SpeedupKindDef`, `SpeedupTargetInfo`, `SpeedupQuote`, `SpeedupValidationResult`) and `src/types/game/worldRead.ts` (`WorldReadEntry`, `WorldReadState`, `WorldReadPlanOptions`, `WorldReadPlanResult`).
+- Comprehensive unit test suite `tests/speedup-world-read-typed.test.mjs` verifying speedup durations, suggested amounts, validation, and world-read TTL/key/planning logic.
+
+### Changed
+
+- Updated `src/utils/speedup.ts` to export directly from `src/services/speedupService.ts`.
+- Re-exported `worldRead` types from `src/types/index.ts`.
+- Preserved global backward compatibility for legacy worker contexts.
+
 ## 0.10.106 — 2026-11-15
 
 ### Added

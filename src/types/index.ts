@@ -74,4 +74,5 @@ export * from './game/tracking';
 export * from './game/freeAlchemy';
 export * from './game/mineDefense';
 export * from './game/mail';
+export * from './game/worldRead';
 
