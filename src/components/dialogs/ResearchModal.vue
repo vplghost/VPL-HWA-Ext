@@ -6,6 +6,47 @@ import { getResearchName } from '@/src/utils/metadata';
 import { formatDuration, formatFinishTime } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import SpeedupControl from '@/src/components/common/SpeedupControl.vue';
+import {
+  getMaxLevel as getMaxLevelTyped,
+  getResearchLevelData as getResearchLevelDataTyped,
+  isAvailable as isAvailableTyped,
+  calculateEffectiveDurationMs as calculateEffectiveDurationMsTyped,
+  getMissingCosts as getMissingCostsTyped,
+  requiresSpecialResource as checkRequiresSpecialResourceTyped,
+  researchData as researchDataTyped,
+  researchDataHelper,
+} from '@/src/data/researchData';
+
+// Resolve helper with fallback to typed module for runtime, and globalThis for test harness
+const rHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchData)
+  || (typeof researchDataHelper !== 'undefined' ? researchDataHelper : null);
+
+const getMaxLevel = (id: any) =>
+  rHelper?.getMaxLevel?.(id)
+  ?? (typeof getMaxLevelTyped !== 'undefined' ? getMaxLevelTyped(id) : 0);
+
+const getResearchLevelData = (id: any, lvl: any) =>
+  rHelper?.getResearchLevelData?.(id, lvl)
+  ?? (typeof getResearchLevelDataTyped !== 'undefined' ? getResearchLevelDataTyped(id, lvl) : null);
+
+const isAvailable = (id: any, lvl: any, cur: any, rc: any) =>
+  rHelper?.isAvailable?.(id, lvl, cur, rc)
+  ?? (typeof isAvailableTyped !== 'undefined' ? isAvailableTyped(id, lvl, cur, rc) : false);
+
+const calculateEffectiveDurationMs = (id: any, lvl: any, mult?: any) =>
+  rHelper?.calculateEffectiveDurationMs?.(id, lvl, mult)
+  ?? (typeof calculateEffectiveDurationMsTyped !== 'undefined' ? calculateEffectiveDurationMsTyped(id, lvl, mult) : 60000);
+
+const getMissingCosts = (id: any, lvl: any, mats: any) =>
+  rHelper?.getMissingCosts?.(id, lvl, mats)
+  ?? (typeof getMissingCostsTyped !== 'undefined' ? getMissingCostsTyped(id, lvl, mats) : []);
+
+const checkRequiresSpecialResource = (id: any, lvl?: any) =>
+  rHelper?.requiresSpecialResource?.(id, lvl)
+  ?? (typeof checkRequiresSpecialResourceTyped !== 'undefined' ? checkRequiresSpecialResourceTyped(id, lvl) : false);
+
+const researchData = rHelper?.data
+  ?? (typeof researchDataTyped !== 'undefined' ? researchDataTyped : {});
 
 const props = defineProps<{
   modelValue: boolean;
@@ -260,12 +301,11 @@ const rawResearches = computed(() => {
 // All researches directory data
 const allResearchesList = computed(() => {
   const researchMap = new Map<number, any>();
-  const rHelper = (globalThis as any).hwaHelperResearchData;
   const raw = rawResearches.value;
   for (const r of raw) {
     const rId = Number(r.id);
     if (Number.isFinite(rId)) {
-      const maxLvl = rHelper?.getMaxLevel ? rHelper.getMaxLevel(rId) : 0;
+      const maxLvl = getMaxLevel(rId);
       const lvl = r.level ?? 1;
       researchMap.set(rId, {
         id: rId,
@@ -281,7 +321,7 @@ const allResearchesList = computed(() => {
 
   for (const q of activeQueues.value) {
     const rId = Number(q.researchId);
-    const maxLvl = rHelper?.getMaxLevel ? rHelper.getMaxLevel(rId) : 0;
+    const maxLvl = getMaxLevel(rId);
     if (researchMap.has(rId)) {
       const item = researchMap.get(rId)!;
       item.isResearching = true;
@@ -303,7 +343,7 @@ const allResearchesList = computed(() => {
   for (const key of Object.keys(allDict)) {
     const rId = Number(key);
     if (!researchMap.has(rId)) {
-      const maxLvl = rHelper?.getMaxLevel ? rHelper.getMaxLevel(rId) : 0;
+      const maxLvl = getMaxLevel(rId);
       researchMap.set(rId, {
         id: rId,
         level: 0,
@@ -316,11 +356,10 @@ const allResearchesList = computed(() => {
     }
   }
 
-  const rDataDict = rHelper?.data || {};
-  for (const key of Object.keys(rDataDict)) {
+  for (const key of Object.keys(researchData)) {
     const rId = Number(key);
     if (!researchMap.has(rId)) {
-      const maxLvl = rHelper?.getMaxLevel ? rHelper.getMaxLevel(rId) : 0;
+      const maxLvl = getMaxLevel(rId);
       researchMap.set(rId, {
         id: rId,
         level: 0,
@@ -403,7 +442,6 @@ const simulatedResearchLevels = computed(() => {
 
 // Section 2: Candidate upgrades
 const upgradeCandidates = computed(() => {
-  const researchDataHelper = (globalThis as any).hwaHelperResearchData;
   const simulatedLevels = simulatedResearchLevels.value;
   const centerLevel = researchCenterLevel.value;
 
@@ -411,10 +449,8 @@ const upgradeCandidates = computed(() => {
     .map((r: any) => {
       const curLvl = simulatedLevels.get(r.id) ?? (r.isCompleted ? r.level : 0);
       const nextLvl = (curLvl > 0 || r.isCompleted) ? (curLvl + 1) : 1;
-      const durationMs = researchDataHelper?.calculateEffectiveDurationMs
-        ? researchDataHelper.calculateEffectiveDurationMs(r.id, nextLvl)
-        : 60000;
-      const maxLvl = researchDataHelper?.getMaxLevel ? researchDataHelper.getMaxLevel(r.id) : 0;
+      const durationMs = calculateEffectiveDurationMs(r.id, nextLvl);
+      const maxLvl = getMaxLevel(r.id);
       return {
         ...r,
         name: getResearchName(r.id),
@@ -430,15 +466,13 @@ const upgradeCandidates = computed(() => {
       if (r.maxLevel > 0 && (r.currentLevel >= r.maxLevel || r.nextLevel > r.maxLevel)) {
         return false;
       }
-      if (researchDataHelper?.getMaxLevel) {
-        const maxLevel = researchDataHelper.getMaxLevel(r.id);
-        if (maxLevel > 0) {
-          if (r.nextLevel > maxLevel || r.currentLevel >= maxLevel) return false;
-          if (researchDataHelper.isAvailable && !researchDataHelper.isAvailable(r.id, r.nextLevel, simulatedLevels, centerLevel)) {
-            return false;
-          }
-          return true;
+      const maxLevel = getMaxLevel(r.id);
+      if (maxLevel > 0) {
+        if (r.nextLevel > maxLevel || r.currentLevel >= maxLevel) return false;
+        if (!isAvailable(r.id, r.nextLevel, simulatedLevels, centerLevel)) {
+          return false;
         }
+        return true;
       }
       return (r.currentLevel > 0 || r.isCompleted) && r.nextLevel <= centerLevel;
     })
@@ -497,8 +531,6 @@ async function addToQueue(candidate: any) {
 const isStarting = ref<Record<string, boolean>>({});
 
 function hasEnoughResearchResources(candidate: any) {
-  const rHelper = (globalThis as any).hwaHelperResearchData;
-  if (!rHelper?.getMissingCosts) return true;
   const resourcesMap = new Map([
     [1, cache.value?.['resource:material:1']?.data?.amount ?? 0],
     [2, cache.value?.['resource:material:2']?.data?.amount ?? 0],
@@ -507,19 +539,12 @@ function hasEnoughResearchResources(candidate: any) {
     [5, cache.value?.['resource:material:5']?.data?.amount ?? 0],
     [12, cache.value?.['resource:material:12']?.data?.amount ?? 0],
   ]);
-  const missing = rHelper.getMissingCosts(candidate.id, candidate.nextLevel, resourcesMap);
+  const missing = getMissingCosts(candidate.id, candidate.nextLevel, resourcesMap);
   return !missing || missing.length === 0;
 }
 
 function requiresSpecialResource(researchId: number | string, level: number = 1): boolean {
-  const rHelper = (globalThis as any).hwaHelperResearchData;
-  if (typeof rHelper?.requiresSpecialResource === 'function') {
-    return rHelper.requiresSpecialResource(Number(researchId), Number(level));
-  }
-  if (!rHelper) return false;
-  const meta = rHelper.getResearchLevelData?.(Number(researchId), Number(level)) || rHelper.data?.[Number(researchId)]?.['1'];
-  if (!meta || !meta.c) return false;
-  return Object.keys(meta.c).some((m: string) => Number(m) === 12 || Number(m) > 5);
+  return checkRequiresSpecialResource(researchId, level);
 }
 
 async function startResearchUpgrade(candidate: any) {

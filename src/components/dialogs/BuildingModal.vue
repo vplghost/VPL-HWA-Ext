@@ -6,6 +6,37 @@ import { getBuildingName } from '@/src/utils/metadata';
 import { formatDuration, formatFinishTime } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import SpeedupControl from '@/src/components/common/SpeedupControl.vue';
+import {
+  getBuildingLevelData as getBuildingLevelDataTyped,
+  getMissingRequirements as getMissingRequirementsTyped,
+  getMissingCosts as getMissingCostsTyped,
+  calculateEffectiveDurationMs as calculateEffectiveDurationMsTyped,
+  buildingLevelsData as buildingLevelsDataTyped,
+  buildingDataHelper,
+} from '@/src/data/buildingData';
+
+// Resolve helper with fallback to typed module for runtime, and globalThis for test harness
+const bHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingData)
+  || (typeof buildingDataHelper !== 'undefined' ? buildingDataHelper : null);
+
+const getBuildingLevelData = (id: any, lvl: any) =>
+  bHelper?.getBuildingLevelData?.(id, lvl)
+  ?? (typeof getBuildingLevelDataTyped !== 'undefined' ? getBuildingLevelDataTyped(id, lvl) : null);
+
+const getMissingRequirements = (id: any, lvl: any, map: any) =>
+  bHelper?.getMissingRequirements?.(id, lvl, map)
+  ?? (typeof getMissingRequirementsTyped !== 'undefined' ? getMissingRequirementsTyped(id, lvl, map) : []);
+
+const getMissingCosts = (id: any, lvl: any, map: any) =>
+  bHelper?.getMissingCosts?.(id, lvl, map)
+  ?? (typeof getMissingCostsTyped !== 'undefined' ? getMissingCostsTyped(id, lvl, map) : []);
+
+const calculateEffectiveDurationMs = (id: any, lvl: any, mult?: any) =>
+  bHelper?.calculateEffectiveDurationMs?.(id, lvl, mult)
+  ?? (typeof calculateEffectiveDurationMsTyped !== 'undefined' ? calculateEffectiveDurationMsTyped(id, lvl, mult) : 1000);
+
+const buildingLevelsData = bHelper?.data
+  ?? (typeof buildingLevelsDataTyped !== 'undefined' ? buildingLevelsDataTyped : {});
 
 const props = defineProps<{
   modelValue: boolean;
@@ -328,7 +359,6 @@ const SYSTEM_LANDMARK_BUILDING_IDS = new Set([44, 160, 161, 166, 167, 168, 169, 
 
 // Section 2: Candidate upgrades
 const upgradeCandidates = computed(() => {
-  const bHelper = (globalThis as any).hwaHelperBuildingData;
   const simulatedLevels = simulatedBuildingLevels.value;
   const hallLevel = simulatedLevels.get(20) ?? Infinity;
 
@@ -336,9 +366,7 @@ const upgradeCandidates = computed(() => {
     .map((b: any) => {
       const curLvl = simulatedLevels.get(b.id) ?? (b.isBuilt ? b.level : 0);
       const nextLvl = (curLvl > 0 || b.isBuilt) ? (curLvl + 1) : 1;
-      const durationMs = bHelper?.calculateEffectiveDurationMs
-        ? bHelper.calculateEffectiveDurationMs(b.id, nextLvl)
-        : 1000;
+      const durationMs = calculateEffectiveDurationMs(b.id, nextLvl);
       return {
         ...b,
         name: getBuildingName(b.id),
@@ -352,13 +380,11 @@ const upgradeCandidates = computed(() => {
       if (SYSTEM_LANDMARK_BUILDING_IDS.has(Number(b.id))) return false;
       if (!b.isBuilt && (b.currentLevel ?? b.level ?? 0) <= 0) return false;
       if (b.id !== 20 && b.nextLevel > hallLevel) return false;
-      if (bHelper?.getBuildingLevelData && bHelper.data?.[b.id] && !bHelper.getBuildingLevelData(b.id, b.nextLevel)) {
+      if (buildingLevelsData[b.id] && !getBuildingLevelData(b.id, b.nextLevel)) {
         return false;
       }
-      if (bHelper?.getMissingRequirements) {
-        const missingReqs = bHelper.getMissingRequirements(b.id, b.nextLevel, simulatedLevels);
-        if (missingReqs && missingReqs.length > 0) return false;
-      }
+      const missingReqs = getMissingRequirements(b.id, b.nextLevel, simulatedLevels);
+      if (missingReqs && missingReqs.length > 0) return false;
       return true;
     })
     .sort((a: any, b: any) => (b.level - a.level) || (a.id - b.id));
@@ -416,15 +442,13 @@ async function addToQueue(candidate: any) {
 const isStarting = ref<Record<string, boolean>>({});
 
 function hasEnoughBuildingResources(candidate: any) {
-  const bHelper = (globalThis as any).hwaHelperBuildingData;
-  if (!bHelper?.getMissingCosts) return true;
   const resourcesMap = new Map([
     [2, cache.value?.['resource:material:2']?.data?.amount ?? 0],
     [3, cache.value?.['resource:material:3']?.data?.amount ?? 0],
     [4, cache.value?.['resource:material:4']?.data?.amount ?? 0],
     [5, cache.value?.['resource:material:5']?.data?.amount ?? 0],
   ]);
-  const missing = bHelper.getMissingCosts(candidate.id, candidate.nextLevel, resourcesMap);
+  const missing = getMissingCosts(candidate.id, candidate.nextLevel, resourcesMap);
   return !missing || missing.length === 0;
 }
 

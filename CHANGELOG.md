@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.99 — 2026-11-15
+
+### Added
+
+- Typed game metadata modules `src/data/buildingData.ts` and `src/data/researchData.ts` with TypeScript interfaces `BuildingLevelMeta`, `ResearchLevelMeta`, `ResearchTechMeta`, and cost/requirement interfaces.
+- Unit test suite `tests/building-research-typed-data.test.mjs` verifying parity and calculations across 154 building types and 229 research technologies.
+
+### Changed
+
+- Refactor `BuildingModal.vue` and `ResearchModal.vue` to use direct typed imports for building and research metadata, requirement checks, and cost calculations while preserving test harness compatibility.
+
 ## 0.10.98 — 2026-11-15
 
 ### Added
