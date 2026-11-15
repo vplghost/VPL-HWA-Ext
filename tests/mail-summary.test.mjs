@@ -18,6 +18,19 @@ const rpc = (call, response, time = now, error) => ({ method: 'POST', status: 20
 const bulk = { name: 'readAndClaimAll', feature: 'report', args: { types: ['rallyMobAttackResult'] }, ident: 'bulk-receipt' };
 const day = cache => cache.battleReportSummary.data.days['2026-11-15'];
 
+test('mail.rows handles empty cache without accountStatus or battleReportSummary without throwing', () => {
+  assert.doesNotThrow(() => {
+    const result = mail.rows({});
+    assert.equal(result.letters.length, 0);
+    assert.equal(result.reports.length, 0);
+    assert.equal(result.scoped, false);
+  });
+  assert.doesNotThrow(() => {
+    const result = mail.rows({ mailStatus: { data: { reports: [] } } });
+    assert.equal(result.reports.length, 0);
+  });
+});
+
 test('migration replaces duplicate claimed payloads with daily aggregates and minimal ID guards without mutating input', () => {
   const reports = Array.from({ length: 25 }, (_, i) => report('claimed-' + i, { claimedReward: true,
     payload: { result: i % 2 ? 'lose' : 'win', redundant: 'x'.repeat(1000) } }));

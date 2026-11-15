@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import ResourceSummary from './ResourceSummary.vue';
+import IncomeOverview from './IncomeOverview.vue';
 import TroopsOverview from './TroopsOverview.vue';
 import QueuesOverview from './QueuesOverview.vue';
 import ActivityGoals from './ActivityGoals.vue';
@@ -265,6 +266,9 @@ async function refreshAllDashboard() {
 
     <!-- Top Resource Summary -->
     <ResourceSummary />
+
+    <!-- Resource Income Analytics & 7-Day Chart -->
+    <IncomeOverview />
 
     <!-- Troop Forces, Hospital & Training Section -->
     <TroopsOverview />

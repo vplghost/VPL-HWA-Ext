@@ -35,7 +35,9 @@
       .filter(row => row && !flag(row.deleted) && !expired(row, 'letter', now)).map(row => ({ ...row,
         id: row.id ?? row.letterId, expiresAtMs: expiry(row), rewards: rewards(letterReward(row)),
         unclaimed: unclaimed(row), canClaim: scoped && id(row.id ?? row.letterId) && unclaimed(row) }));
-    const settled = String(cache.battleReportSummary?.data?.accountId) === String(account) ? cache.battleReportSummary.data.seen || {} : {};
+    const settled = account != null && cache.battleReportSummary?.data?.accountId != null && String(cache.battleReportSummary.data.accountId) === String(account)
+      ? cache.battleReportSummary.data.seen || {}
+      : {};
     const reports = list(status.reports).filter(row => row && !flag(row.claimedReward) && !settled[String(row.id)] && !expired(row, 'report', now)).map(row => ({ ...row,
       expiresAtMs: expiry(row, 'report'), rewards: rewards(row.reward ?? row.payload?.reward),
       unclaimed: row.claimedReward === false, canClaim: scoped && row.claimedReward === false && reportTypes.includes(row.type) }));

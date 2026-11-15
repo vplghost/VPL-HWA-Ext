@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.98 — 2026-11-15
+
+### Added
+
+- Add Gold and Emerald Income Analytics to Dashboard with Today's earnings breakdown by source (Emerald Exchange/alchemy, combat reports, mail, tower, campaign, dungeon, brigands, quests).
+- Add interactive SVG Daily Income Trend Chart with date-range filters, defaulting to previous 7 days (excluding current day), with 14-day/30-day presets, custom date inputs and hover tooltips.
+
+### Fixed
+
+- Prevent TypeError accessing `battleReportSummary.data` in `mail.rows` when account is undefined on popup startup.
+
 ## 0.10.97 — 2026-11-15
 
 ### Changed
