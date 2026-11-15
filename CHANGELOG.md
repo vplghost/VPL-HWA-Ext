@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.114 — 2026-11-15
+
+### Added
+
+- Typed WXT bridge content script entrypoint [entrypoints/bridge.content.ts](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/entrypoints/bridge.content.ts) utilizing `defineContentScript()` for isolated-world messaging:
+  - Implements `createControlPayload` to construct standardized `hwa-helper-config` control messages.
+  - Implements `createBridgeTimeoutManager` for safe lifecycle timer management with context invalidation protection.
+  - Forwards `api-record` and `rpc-queue-status` between web page and background service worker.
+  - Listens to chrome storage changes (`captureSettings`, `popupRpcEnabled`, `socketRefreshMode`, `recordingState`) and pushes live control messages to the game window.
+- Unit test suite [tests/bridge-entrypoint.test.mjs](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/tests/bridge-entrypoint.test.mjs) testing control message serialization, timer management, and WXT content script configuration.
+
+### Changed
+
+- Preserved 100% backward compatibility for legacy isolated world bridge and VM tests across all 937 tests.
+
 ## 0.10.113 — 2026-11-15
 
 ### Added
