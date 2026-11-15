@@ -98,7 +98,8 @@ test('actual Monster template displays power and warning before attack and updat
     '@/src/composables/useSquadTeams': { useSquadTeams: () => h.squad }, '@/src/utils/monsterPower': power,
     '@/src/utils/troops': { normalizeArray }, '@/src/utils/formatters': { formatNumber },
     '@/src/utils/experimentalData': { soloMonsterConfigIds, soloMonsterLevel },
-    '@/src/components/common/HeroHoverCard.vue': { render: () => null } };
+    '@/src/components/common/HeroHoverCard.vue': { render: () => null },
+    '@/src/components/common/StatusAlertBanner.vue': { render: () => null } };
   new Function('require', 'module', 'exports', js)(name => imports[name] || require(name), module, module.exports);
   const render = () => renderToString(Vue.createSSRApp(module.exports.default, { modelValue: true }));
   const first = await render();

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
+import StatusAlertBanner from '@/src/components/common/StatusAlertBanner.vue';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import { monsterSquadPower, monsterPowerComparison, formatMonsterPower } from '@/src/utils/monsterPower';
@@ -221,6 +222,15 @@ async function refreshMapCoordinates() {
   } finally {
     isLocatingMap.value = false;
   }
+}
+
+async function handleBannerRefresh() {
+  await dispatchRpc([
+    { name: 'getMarches', feature: 'march' },
+    { name: 'getUnitSummary', feature: 'unit' },
+    { name: 'heroGetAll' }
+  ]);
+  statusMessage.value = '✓ Marches and troops refreshed successfully.';
 }
 
 async function findMonsters() {
@@ -671,9 +681,12 @@ async function stopMonsterQueue() {
         </div>
 
         <!-- Status Message Banner -->
-        <div v-if="statusMessage" class="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200">
-          {{ statusMessage }}
-        </div>
+        <StatusAlertBanner
+          v-if="statusMessage"
+          :message="statusMessage"
+          :on-refresh="handleBannerRefresh"
+          refresh-title="Refresh marches and troops"
+        />
 
         <!-- Section 3: Actions & Queue Controls -->
         <div class="flex items-center justify-end gap-2 pt-2">

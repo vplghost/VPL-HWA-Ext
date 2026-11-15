@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.11.1 — 2026-11-15
+
+### Fixed
+
+- **Free Spin Account Context Deadlock**:
+  - Resolved "Free spin needs current account data; press F5 in the game tab" deadlock where uninitialized bridge account ID blocked sending and F5 reload could not recover.
+  - Initialized and synced `freeSpinAccountId` in `extension/bridge.js` and `entrypoints/bridge.content.ts` from `chrome.storage.local` (`rpcCache.accountStatus` and `userGetInfo`), and captured account ID on login/clan RPCs (`userGetInfo`, `mobileLogin`, `user_getInfo`, `user_getClanInfo`).
+  - Updated `runFreeSpin` in background to proactively dispatch `userGetInfo` and `user_getNextDayTime` to the game tab when bridge account context is unobserved rather than failing with an F5 reload prompt.
+  - Added unit test in `tests/auto-free-spin.test.mjs` verifying proactive account resolution and seamless spin execution.
+
+### Added
+
+- **Interactive Refresh Action on Modal Error Banners**:
+  - Created reusable `StatusAlertBanner.vue` component with inline refresh action button directly on the right side of error/status banners (`role="alert"`).
+  - Button state transitions: idle refresh icon (🔄), loading spinner with disabled click and `aria-busy` during execution, green checkmark tick (✓) on success with confirmation message, and error icon (✕ / ⚠️) on failure with retry support.
+  - Integrated `StatusAlertBanner` into `RaidModal.vue` and `MonsterModal.vue` to allow immediate in-dialog refresh of marches, troops, and hero roster without closing modal or navigating away.
+  - Updated `refreshTroops` in `useSquadTeams.ts` to include `getMarches` alongside `getUnitSummary` and `heroGetAll`.
+  - Added unit test suite `tests/status-alert-banner.test.mjs` verifying banner states and RPC dispatches.
+
 ## 0.11.0 — 2026-11-15
 
 ### Added

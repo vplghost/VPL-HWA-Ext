@@ -101,6 +101,7 @@ export default defineContentScript({
     let popupRpcEnabled = false;
     let socketRefreshMode = 'piggyback';
     let recordingActive = false;
+    let freeSpinAccountId: string | null = null;
 
     function sendControl() {
       const payload = createControlPayload(currentSettings, popupRpcEnabled, socketRefreshMode, recordingActive);
@@ -123,20 +124,57 @@ export default defineContentScript({
       }
 
       if (event.data.kind === 'api-record' && event.data.record) {
+        try {
+          const calls = JSON.parse(event.data.record.requestBody || '{}').calls || [];
+          const results = JSON.parse(event.data.record.responseBody || '{}').results || [];
+          for (const call of calls) {
+            if (['userGetInfo', 'mobileLogin', 'user_getInfo', 'user_getClanInfo'].includes(call.name)) {
+              const result = results.find((row: any) => row.ident === call.ident)?.result;
+              const id = result?.response?.id ?? result?.response?.userId ?? result?.response?.user?.id;
+              if (!result?.error && Number.isFinite(Number(id)) && Number(id) > 0) {
+                freeSpinAccountId = String(id);
+              }
+            }
+          }
+        } catch (_) {}
+
         sendBridgeMessage({ kind: 'api-record', record: event.data.record });
         return;
       }
     });
 
+    // Listen to background runtime queries
+    try {
+      chrome.runtime?.onMessage?.addListener?.((message: any, _sender: any, sendResponse: (resp: any) => void) => {
+        if (bridgeContextInvalidated) return;
+        if (message?.kind === 'free-spin-context' || message?.kind === 'game-account-context') {
+          if (freeSpinAccountId) {
+            sendResponse?.({ ok: true, accountId: freeSpinAccountId });
+            return true;
+          }
+          chrome.storage?.local?.get?.(['rpcCache'])?.then?.((stored: any) => {
+            const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
+            if (cachedAccountId) freeSpinAccountId = String(cachedAccountId);
+            sendResponse?.({ ok: true, accountId: freeSpinAccountId });
+          })?.catch?.(() => {
+            sendResponse?.({ ok: true, accountId: null });
+          });
+          return true;
+        }
+      });
+    } catch (_) {}
+
     // Listen to storage changes to update control configs
     try {
       chrome.storage?.local?.get?.(
-        ['captureSettings', 'popupRpcEnabled', 'socketRefreshMode', 'recordingState'],
+        ['captureSettings', 'popupRpcEnabled', 'socketRefreshMode', 'recordingState', 'rpcCache'],
         (res: any) => {
           if (res?.captureSettings) currentSettings = res.captureSettings;
           if (res?.popupRpcEnabled !== undefined) popupRpcEnabled = Boolean(res.popupRpcEnabled);
           if (res?.socketRefreshMode) socketRefreshMode = res.socketRefreshMode;
           if (res?.recordingState?.active !== undefined) recordingActive = Boolean(res.recordingState.active);
+          const cachedAccountId = res?.rpcCache?.accountStatus?.data?.id ?? res?.rpcCache?.userGetInfo?.data?.id;
+          if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
           sendControl();
         }
       );
@@ -159,6 +197,10 @@ export default defineContentScript({
         if (changes.recordingState) {
           recordingActive = Boolean(changes.recordingState.newValue?.active);
           changed = true;
+        }
+        if (changes.rpcCache) {
+          const cachedAccountId = changes.rpcCache.newValue?.accountStatus?.data?.id ?? changes.rpcCache.newValue?.userGetInfo?.data?.id;
+          if (cachedAccountId) freeSpinAccountId = String(cachedAccountId);
         }
         if (changed) sendControl();
       });

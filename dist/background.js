@@ -1203,7 +1203,7 @@ async function useConfirmedSpeedup(message) {
 async function runFreeSpin(manual = false, record = null, sourceTabId = null) {
   const stored = await chrome.storage.local.get(['autoFreeSpinEnabled', 'autoFreeSpinState', 'rpcCache', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
   const cache = stored.rpcCache || {}, policy = globalThis.hwaHelperFreeAlchemy;
-  const accountId = cache.accountStatus?.data?.id, now = Date.now();
+  const accountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id, now = Date.now();
   let state = stored.autoFreeSpinState ? structuredClone(stored.autoFreeSpinState) : null;
   if (!manual && !stored.autoFreeSpinEnabled && !state?.pending) return { ok: false, error: 'Auto free spin is disabled.' };
   if (!policy || accountId == null) return { ok: false, error: 'Waiting for current game account.' };
@@ -1261,7 +1261,28 @@ async function runFreeSpin(manual = false, record = null, sourceTabId = null) {
   if (!tabId) { await save('Open the game to use free spin', now + 30000); return { ok: false, error: state.status }; }
   let context;
   try { context = await chrome.tabs.sendMessage(tabId, { kind: 'free-spin-context' }); } catch (_) {}
-  if (!context?.ok || String(context.accountId) !== String(accountId)) {
+  if (!context?.ok) {
+    await save('Free spin bridge unavailable; press F5 in the game tab', now + 30000);
+    return { ok: false, error: state.status };
+  }
+  if (!context.accountId) {
+    const refreshQuota = rpcMessageForSettings(stored, [{ name: 'userGetInfo' }, { name: 'user_getNextDayTime' }]);
+    if (refreshQuota) {
+      state.pending = { phase: 'refresh', sentAt: now, expiresAt: now + 30000 };
+      await save('Refreshing free spin quota', now + 30000);
+      try {
+        await chrome.tabs.sendMessage(tabId, { ...refreshQuota, group: 'free-alchemy-refresh', expiresAt: now + 30000 });
+        return { ok: true, pending: true };
+      } catch (_) {
+        state.pending = null;
+        await save('Free spin bridge unavailable; press F5 in the game tab', now + 30000);
+        return { ok: false, error: state.status };
+      }
+    }
+    await save('Free spin needs current account data; press F5 in the game tab', now + 30000);
+    return { ok: false, error: state.status };
+  }
+  if (String(context.accountId) !== String(accountId)) {
     await save('Free spin needs current account data; press F5 in the game tab', now + 30000);
     return { ok: false, error: state.status };
   }

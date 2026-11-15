@@ -151,10 +151,12 @@ window.addEventListener('message', (event) => {
   try {
     const calls = JSON.parse(event.data.record?.requestBody || '{}').calls || [];
     const results = JSON.parse(event.data.record?.responseBody || '{}').results || [];
-    for (const call of calls) if (call.name === 'userGetInfo') {
-      const result = results.find(row => row.ident === call.ident)?.result;
-      const id = result?.response?.id;
-      if (!result?.error && Number.isFinite(Number(id)) && Number(id) > 0) freeSpinAccountId = String(id);
+    for (const call of calls) {
+      if (call.name === 'userGetInfo' || call.name === 'mobileLogin' || call.name === 'user_getInfo' || call.name === 'user_getClanInfo') {
+        const result = results.find(row => row.ident === call.ident)?.result;
+        const id = result?.response?.id ?? result?.response?.userId ?? result?.response?.user?.id;
+        if (!result?.error && Number.isFinite(Number(id)) && Number(id) > 0) freeSpinAccountId = String(id);
+      }
     }
   } catch (_) {}
   if (!chrome.runtime?.id) return;
@@ -220,10 +222,12 @@ try {
 } catch (_) {}
 
 try {
-  chrome.storage?.local?.get?.(['captureSettings', 'popupRpcEnabled', 'socketRefreshMode'])?.then?.((stored) => {
+  chrome.storage?.local?.get?.(['captureSettings', 'popupRpcEnabled', 'socketRefreshMode', 'rpcCache'])?.then?.((stored) => {
     currentSettings = stored?.captureSettings || {};
     popupRpcEnabled = stored?.popupRpcEnabled === true;
     socketRefreshMode = ['direct', 'mqtt-piggyback'].includes(stored?.socketRefreshMode) ? stored?.socketRefreshMode : 'piggyback';
+    const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
+    if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
     sendControl();
     try {
       const gv = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hwa_game_version') : null) ||
@@ -253,6 +257,10 @@ try {
       }
     }
     if (area !== 'local') return;
+    if ('rpcCache' in changes) {
+      const cachedAccountId = changes.rpcCache.newValue?.accountStatus?.data?.id ?? changes.rpcCache.newValue?.userGetInfo?.data?.id;
+      if (cachedAccountId) freeSpinAccountId = String(cachedAccountId);
+    }
     if ('autoFreeSpinEnabled' in changes || 'autoFreeSpinState' in changes) {
       chrome.storage.local.get(['autoFreeSpinEnabled', 'autoFreeSpinState']).then(stored => scheduleFreeSpin(stored.autoFreeSpinEnabled, stored.autoFreeSpinState)).catch(error => handleContextInvalidated(error, false));
     }
@@ -301,7 +309,17 @@ try {
 chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
   if (bridgeContextInvalidated) return;
   if (message?.kind === 'free-spin-context' || message?.kind === 'game-account-context') {
-    sendResponse?.({ ok: true, accountId: freeSpinAccountId });
+    if (freeSpinAccountId) {
+      sendResponse?.({ ok: true, accountId: freeSpinAccountId });
+      return true;
+    }
+    chrome.storage?.local?.get?.(['rpcCache'])?.then?.((stored) => {
+      const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
+      if (cachedAccountId) freeSpinAccountId = String(cachedAccountId);
+      sendResponse?.({ ok: true, accountId: freeSpinAccountId });
+    })?.catch?.(() => {
+      sendResponse?.({ ok: true, accountId: null });
+    });
     return true;
   }
   if (message?.kind === 'drop-rpc-group') {

@@ -266,6 +266,7 @@ export function useSquadTeams(
     isRefreshingTroops.value = true;
     try {
       await dispatchRpc([
+        { name: 'getMarches', feature: 'march' },
         { name: 'heroGetAll' },
         { name: 'getUnitSummary', feature: 'unit' },
       ]);

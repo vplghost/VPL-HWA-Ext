@@ -108,3 +108,17 @@ test('account change cancels old queued work and does not transfer its pending s
   assert.ok(e.sent.some(m => m.kind === 'drop-rpc-group'));
   assert.equal(e.spins().length, 1);
 });
+
+test('uninitialized bridge account triggers proactive userGetInfo query and recovers without F5 loop', async () => {
+  const e = await environment();
+  e.bridge(null);
+  await e.ctx.run();
+  assert.equal(e.sent.length, 1);
+  assert.equal(e.sent[0].calls[0].name, 'userGetInfo');
+  assert.equal(e.local.autoFreeSpinState.pending?.phase, 'refresh');
+  // Bridge captures userGetInfo response and sets account ID to 1
+  e.bridge('1');
+  e.quota(1);
+  await e.ctx.run();
+  assert.equal(e.spins().length, 1);
+});
