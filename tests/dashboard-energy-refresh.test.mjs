@@ -27,9 +27,8 @@ test('Dashboard refresh requests both energy sources first and resource amounts 
   assert.equal(batches[1].some(call => ['userGetInfo', 'refillableGetAll'].includes(call.name)), false);
   assert.match(ui.dashboardRefreshMessage.value, /queued.*Energy and World Energy/);
   assert.equal(resources.energyVal.value, 1); assert.equal(resources.worldEnergyVal.value, 2);
-  const context = { TextEncoder };
-  vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
-  cache.value = context.hwaHelperRpcCache.merge(cache.value, [{ method: 'POST', status: 200,
+  const { rpcCacheService } = await import('../src/core/cache/index.ts');
+  cache.value = rpcCacheService.merge(cache.value, [{ method: 'POST', status: 200,
     endpoint: 'https://api.hero-wars-alliance.com/api/rpc', timestamp: new Date().toISOString(),
     requestBody: JSON.stringify({ calls: batches[0].map((call, index) => ({ ...call, ident: String(index) })) }),
     responseBody: JSON.stringify({ results: [

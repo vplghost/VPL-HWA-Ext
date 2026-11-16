@@ -40,9 +40,7 @@ test('own-team fallback remains partial; foreign and mismatched profiles are nev
 });
 
 test('rally snapshots survive march refresh, reject lower versions and clear on account switch', async () => {
-  const context = { TextEncoder };
-  vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
-  const reducer = context.hwaHelperRpcCache;
+  const { rpcCacheService: reducer } = await import('../src/core/cache/index.ts');
   const details = (version, time) => ({ key: 'rallyAction', method: 'getRallyById', updatedAt: time,
     data: { action: 'details', rallyId: 'r', rallyVersion: version, mobId: 'mob', mapId: 'map', mobConfigId: 78,
       leader: participants[0], members: [participants[1]] } });

@@ -35,7 +35,7 @@ test('GuildChatPanel implements 7-day retention, 50-item limit, scroll to bottom
 });
 
 test('rpc-cache applies 7-day message retention to guildChat merges and prunes', async () => {
-  const rpcCachePath = join(root, 'extension/rpc-cache.js');
+  const rpcCachePath = join(root, 'src/core/cache/rpcCache.ts');
   const code = await readFile(rpcCachePath, 'utf8');
 
   // Merge cutoff

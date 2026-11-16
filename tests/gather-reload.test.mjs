@@ -8,12 +8,7 @@ import { autoGatherService } from '../src/services/queues/autoGather.ts';
 
 const fixture = JSON.parse(readFileSync(new URL('fixtures/gather-reload-20261115.json', import.meta.url)));
 const occupiedFixture = JSON.parse(readFileSync(new URL('fixtures/gather-occupied-20261115.json', import.meta.url)));
-const root = new URL('../extension/', import.meta.url);
-
-const rpcCacheSandbox = { console, Date, URL, TextEncoder, structuredClone, globalThis: {} };
-rpcCacheSandbox.globalThis = rpcCacheSandbox;
-vm.runInNewContext(readFileSync(new URL('rpc-cache.js', root), 'utf8'), rpcCacheSandbox);
-const reducer = rpcCacheSandbox.globalThis.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 
 function environment() {
   const local = {}, sent = [], clock = { now: Date.parse(fixture.records.at(-1).timestamp) };

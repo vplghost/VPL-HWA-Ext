@@ -6,10 +6,7 @@ import { createRenderer, nextTick } from 'vue';
 import { useTroopTraining } from '../src/composables/useTroopTraining.ts';
 import { useRpcCache } from '../src/composables/useRpcCache.ts';
 
-const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
-const context = { Date, TextEncoder, globalThis: {} };
-vm.runInNewContext(source, context);
-const reducer = context.globalThis.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 // Sanitized contract from hwa-game-record-202611131344_sync_healed.json.
 const completeDate = 1794552240233;
 const units = [{ unitId: 27, count: 2 }, { unitId: 17, count: 2 }, { unitId: 7, count: 1 }];

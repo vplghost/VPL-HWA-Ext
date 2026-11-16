@@ -3,11 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
-const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
-const context = { TextEncoder };
-runInNewContext(await readFile(new URL('../extension/tower-rules.js', import.meta.url), 'utf8'), context);
-runInNewContext(source, context);
-const cache = context.hwaHelperRpcCache;
+import { rpcCacheService as cache } from '../src/core/cache/index.ts';
 
 function rpc(name, args, result, index) {
   const ident = `tower-${index}`;

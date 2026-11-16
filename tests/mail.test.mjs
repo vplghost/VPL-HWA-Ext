@@ -6,9 +6,9 @@ import ts from 'typescript';
 import * as Vue from 'vue';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import { mail } from '../src/utils/mail.ts';
-const context = { TextEncoder };
-for (const name of ['mail-data.js', 'rpc-cache.js']) vm.runInNewContext(await readFile(new URL('../extension/' + name, import.meta.url), 'utf8'), context);
-const reducer = context.hwaHelperRpcCache, now = Date.now(), stamp = time => new Date(time).toISOString();
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
+import { mailService as mailHelper } from '../src/services/mailService.ts';
+const now = Date.now(), stamp = time => new Date(time).toISOString();
 const entry = (data, time = now) => ({ data, updatedAt: stamp(time) });
 const letter = (id = '101', extra = {}) => ({ id, type: 'common', reward: { gold: '50', stamina: '20', consumable: { 105: '1' } },
   availableUntil: String(Math.floor(now / 1000) + 60), ...extra });

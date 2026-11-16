@@ -4,9 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { dashboardMarches } from '../src/utils/dashboardState.ts';
 
-const context = { TextEncoder };
-vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
-const reducer = context.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 const at = Date.parse('2026-11-14T07:52:16.845Z');
 const id = '705830d9-40d5-412b-94fe-a23932169fca';
 const mobId = '57f4f40f-test-boss';

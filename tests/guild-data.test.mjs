@@ -9,9 +9,7 @@ import { renderToString } from '@vue/server-renderer';
 import { currentGuild, guildMembers, guildRole } from '../src/utils/guildData.ts';
 import { formatNumber } from '../src/utils/formatters.ts';
 
-const context = { TextEncoder };
-vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
-const reducer = context.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 const at = '2026-11-14T01:00:00Z';
 function rpc(name, response, feature, timestamp = at) {
   return { method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc', timestamp,

@@ -79,10 +79,7 @@ class MockElement {
 }
 
 test('rpc-cache merges startTrainingAction, completeTrainingAction, and startHealingAction', async () => {
-  const rpcCacheCode = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
-  const context = vm.createContext({ globalThis: {}, TextEncoder });
-  vm.runInContext(rpcCacheCode, context);
-  const cacheHelper = context.globalThis.hwaHelperRpcCache;
+  const { rpcCacheService: cacheHelper } = await import('../src/core/cache/index.ts');
 
   const initialCache = {
     'getUnitSummary:unit': {

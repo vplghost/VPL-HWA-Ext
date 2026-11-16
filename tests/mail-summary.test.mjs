@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 const now = Date.parse('2026-11-15T12:00:00Z'), stamp = time => new Date(time).toISOString();
-class Clock extends Date { static now() { return now; } }
-const ctx = vm.createContext({ TextEncoder, Date: Clock });
-for (const file of ['mail-data.js', 'rpc-cache.js']) vm.runInContext(readFileSync(new URL('../extension/' + file, import.meta.url), 'utf8'), ctx);
-const mail = ctx.hwaHelperMailData, reducer = ctx.hwaHelperRpcCache;
+Date.now = () => now;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
+import { mailService as mail } from '../src/services/mailService.ts';
 const entry = data => ({ data, updatedAt: stamp(now - 10000) });
 const report = (id, extra = {}) => ({ id, type: 'rallyMobAttackResult', claimedReward: false, createdAt: now - 1000, expiresAt: now + 86400000, ...extra });
 const baseline = reports => ({ accountStatus: entry({ id: 1 }), mailStatus: entry({ accountId: '1', reports,

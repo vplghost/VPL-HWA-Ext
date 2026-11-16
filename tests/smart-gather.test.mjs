@@ -189,9 +189,7 @@ test('expired read requests recover with a bounded retry count while mutations n
 });
 
 test('return route records the outpost destination and account change clears gathering inputs', async () => {
-  const context = { TextEncoder };
-  vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
-  const reducer = context.hwaHelperRpcCache;
+  const { rpcCacheService: reducer } = await import('../src/core/cache/index.ts');
   const record = { method: 'POST', status: 200, timestamp: new Date(now).toISOString(), endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
     requestBody: JSON.stringify({ calls: [{ name: 'getMarches', feature: 'march', ident: 'm' }] }),
     responseBody: JSON.stringify({ results: [{ ident: 'm', result: { response: { marches: { returnToOutpost: [{ squadId: 's', mapId: 'map', route: {

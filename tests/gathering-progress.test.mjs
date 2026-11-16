@@ -7,8 +7,7 @@ import { formatMarchTooltip } from '../src/utils/marchTooltip.ts';
 import { dashboardMarches } from '../src/utils/dashboardState.ts';
 
 const context = { TextEncoder };
-for (const name of ['march-rules', 'rpc-cache']) vm.runInNewContext(await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
-const reducer = context.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 const start = 1794407868742, duration = 34829722, total = 375000;
 function rpc(name, feature, response, at = start + 1000) {
   return { method: 'POST', endpoint: 'https://api.hero-wars-alliance.com/api/rpc', status: 200,

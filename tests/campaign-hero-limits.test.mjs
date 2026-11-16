@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { rpcCacheService as cache } from '../src/core/cache/index.ts';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -104,8 +105,7 @@ test('getHighestRaidableMission skips exhausted hero missions and falls back to 
 });
 
 test('rpc-cache handles missionRaid failure by creating failed lastCampaignRaidResult', async () => {
-  const rpcCacheModule = await import('../extension/rpc-cache.js');
-  const cache = globalThis.hwaHelperRpcCache;
+  const rpcCacheModule = { rpcCacheService: cache };
 
   assert.ok(cache, 'hwaHelperRpcCache should exist');
 
@@ -137,7 +137,7 @@ test('rpc-cache handles missionRaid failure by creating failed lastCampaignRaidR
 });
 
 test('rpc-cache increments triesSpent in missionGetAll when missionRaid succeeds', async () => {
-  const cache = globalThis.hwaHelperRpcCache;
+  
 
   const initial = {
     missionGetAll: {

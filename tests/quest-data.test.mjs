@@ -5,14 +5,11 @@ import vm from 'node:vm';
 import { questData } from '../src/data/questData.ts';
 import { dashboardDataHelper } from '../src/data/dashboardData.ts';
 
-const context = { Date, Number, Array, TextEncoder, console, hwaHelperQuestData: questData, hwaHelperDashboardData: dashboardDataHelper };
-for (const file of ['refillable-rules.js', 'rpc-cache.js', 'popup-data.js']) {
-  vm.runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
-}
-const data = context.hwaHelperQuestData;
-const cacheReducer = context.hwaHelperRpcCache;
-const dashboard = context.hwaHelperDashboardData.dailyDashboard;
-const goals = context.hwaHelperPopupData.extractEventGoals;
+import { rpcCacheService as cacheReducer } from '../src/core/cache/index.ts';
+import { popupDataHelper } from '../src/utils/popupData.ts';
+const data = questData;
+const dashboard = dashboardDataHelper.dailyDashboard;
+const goals = popupDataHelper.extractEventGoals;
 let trace = null;
 try {
   trace = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-game-record-202611062259_start.json', import.meta.url)));

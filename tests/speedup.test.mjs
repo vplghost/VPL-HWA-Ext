@@ -7,8 +7,10 @@ import * as Vue from 'vue';
 import { speedup } from '../src/utils/speedup.ts';
 const fixture = JSON.parse(await readFile(new URL('./fixtures/speedup-20261115.json', import.meta.url), 'utf8'));
 const context = { TextEncoder };
-for (const name of ['speedup-data.js', 'speedup.js', 'rpc-cache.js']) vm.runInNewContext(await readFile(new URL('../extension/' + name, import.meta.url), 'utf8'), context);
-const reducer = context.hwaHelperRpcCache, now = Date.parse('2026-11-15T03:38:40Z');
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
+import { speedupService } from '../src/services/speedupService.ts';
+import { speedupData } from '../src/data/speedupData.ts';
+const now = Date.parse('2026-11-15T03:38:40Z');
 const stamp = time => new Date(time).toISOString();
 const entry = (data, time = now) => ({ data, updatedAt: stamp(time) });
 function baseline() {

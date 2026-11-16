@@ -6,12 +6,7 @@ import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
 import { mineDefenseService } from '../src/services/mineDefense.ts';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/mine-attacks-20261114.json', import.meta.url), 'utf8'));
-const root = new URL('../extension/', import.meta.url);
-
-const rpcCacheSandbox = { console, Date, URL, TextEncoder, structuredClone, globalThis: {} };
-rpcCacheSandbox.globalThis = rpcCacheSandbox;
-vm.runInNewContext(readFileSync(new URL('rpc-cache.js', root), 'utf8'), rpcCacheSandbox);
-const reducer = rpcCacheSandbox.globalThis.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 
 function environment() {
   const local = {}, sent = [], alarms = [], clock = { now: 0 };

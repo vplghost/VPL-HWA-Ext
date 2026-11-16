@@ -6,9 +6,7 @@ import ts from 'typescript';
 import { computed, ref, shallowRef, watch, nextTick } from 'vue';
 import { freeAlchemyAvailability, freeAlchemyTimer } from '../src/utils/freeAlchemySpin.ts';
 
-const context = { TextEncoder };
-vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
-const reducer = context.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 const timestamp = '2026-11-13T23:50:55.872Z';
 const rewards = [{ reward: { gold: 73800 }, crit: 2 }];
 const quests = [

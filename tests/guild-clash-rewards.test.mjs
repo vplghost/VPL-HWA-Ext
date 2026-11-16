@@ -5,10 +5,7 @@ import vm from 'node:vm';
 import { resourceDataHelper } from '../src/utils/resourceData.ts';
 
 const context = { TextEncoder, hwaHelperResourceData: resourceDataHelper };
-for (const name of ['rpc-cache']) {
-  vm.runInNewContext(await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
-}
-const reducer = context.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 const at = '2026-11-13T23:49:09.310Z';
 // Sanitized contract from hwa-game-record-202611140649._guild_rewardjson.json.
 // topGet/clan ranking data is unrelated to the claim and omitted.

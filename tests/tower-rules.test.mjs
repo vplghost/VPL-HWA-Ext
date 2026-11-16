@@ -74,7 +74,6 @@ test('extraction rejects truncated data, invalid row IDs and corrupt index offse
   assert.throws(() => indexedRows(corrupt), /index/);
 });
 
-const rpcSource = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
 
 test('planner requires a win in the configured final boss room, including future floor counts', () => {
   for (const finalFloor of [23, 27]) {
@@ -94,9 +93,10 @@ test('planner requires a win in the configured final boss room, including future
   }
 });
 
-test('RPC snapshots use the configured final floor and require actual completion evidence', () => {
-  const runtime = { TextEncoder, hwaHelperTowerRules: { ...rules } };
-  vm.runInNewContext(rpcSource, runtime);
+test('RPC snapshots use the configured final floor and require actual completion evidence', async () => {
+  const { rpcCacheService } = await import('../src/core/cache/index.ts');
+  const runtime = { TextEncoder, hwaHelperTowerRules: { ...rules }, hwaHelperRpcCache: rpcCacheService };
+  globalThis.hwaHelperTowerRules = runtime.hwaHelperTowerRules;
   const record = (name, response, args = {}) => ({
     method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
     timestamp: new Date().toISOString(),

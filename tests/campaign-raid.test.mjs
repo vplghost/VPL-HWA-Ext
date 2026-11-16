@@ -146,7 +146,7 @@ async function createCampaignContext() {
   const heroMetaSrc = await readFile('extension/hero-metadata.js', 'utf8');
   const popupDataSrc = await readFile('extension/popup-data.js', 'utf8');
   const popupSrc = await readFile('extension/popup.js', 'utf8');
-  const rpcCacheSrc = await readFile('extension/rpc-cache.js', 'utf8');
+  const { rpcCacheService } = await import('../src/core/cache/index.ts');
 
   context.hwaHelperResourceData = resourceDataHelper;
   context.hwaHelperDashboardData = dashboardDataHelper;
@@ -165,7 +165,7 @@ async function createCampaignContext() {
   vm.runInContext(heroMetaSrc, context);
   vm.runInContext(popupDataSrc, context);
   vm.runInContext(popupSrc, context);
-  vm.runInContext(rpcCacheSrc, context);
+  context.hwaHelperRpcCache = rpcCacheService;
 
   context.hwaHelperNameMap = {
     ...context.hwaHelperNameMap,

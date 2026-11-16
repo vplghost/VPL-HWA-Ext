@@ -5,12 +5,7 @@ import { readFileSync } from 'node:fs';
 import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
 import { autoGatherService } from '../src/services/queues/autoGather.ts';
 
-const root = new URL('../extension/', import.meta.url);
-const rpcCacheSandbox = { console, Date, URL, TextEncoder, structuredClone, globalThis: {} };
-rpcCacheSandbox.globalThis = rpcCacheSandbox;
-vm.runInNewContext(readFileSync(new URL('rpc-cache.js', root), 'utf8'), rpcCacheSandbox);
-const rpcCacheReducer = rpcCacheSandbox.globalThis.hwaHelperRpcCache;
-globalThis.hwaHelperRpcCache = rpcCacheReducer;
+import { rpcCacheService as rpcCacheReducer } from '../src/core/cache/index.ts';
 
 const start = Date.parse('2026-11-15T07:00:00Z');
 const stamp = at => new Date(at).toISOString();

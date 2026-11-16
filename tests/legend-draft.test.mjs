@@ -2,15 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// Load rpcCache and popupData scripts
-import '../extension/refillable-rules.js';
-import '../extension/mission-costs.js';
-import '../extension/march-rules.js';
-import '../extension/rpc-cache.js';
-import '../extension/popup-data.js';
-
-const rpcCache = globalThis.hwaHelperRpcCache;
-const popupData = globalThis.hwaHelperPopupData;
+import { rpcCacheService as rpcCache } from '../src/core/cache/index.ts';
+import { popupDataHelper as popupData } from '../src/utils/popupData.ts';
 
 // Load sample records from the draft trace log
 let rawLog;

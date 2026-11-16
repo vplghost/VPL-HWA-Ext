@@ -4,17 +4,11 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../src/data/titanMetadata.ts';
 
-const rpcCacheJs = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
+import { rpcCacheService as cacheModule } from '../src/core/cache/index.ts';
 import { dungeonAutomationService as dungeonAuto } from '../src/services/queues/dungeonAutomation.ts';
 import { dungeonRunnerService as dungeonRunner } from '../src/services/queues/dungeonRunner.ts';
 
-const rpcContext = {
-  Date,
-  TextEncoder,
-  globalThis: {}
-};
-vm.runInNewContext(rpcCacheJs, rpcContext);
-const cacheModule = rpcContext.globalThis.hwaHelperRpcCache;
+
 
 test('rpc-cache extracts dungeonStartBattle activeBattle state and dungeonEndBattle clears it', () => {
   const startRecord = {

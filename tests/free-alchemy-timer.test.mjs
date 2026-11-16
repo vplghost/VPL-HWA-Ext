@@ -6,9 +6,7 @@ import ts from 'typescript';
 import { computed, ref, shallowRef, watch, nextTick } from 'vue';
 import { freeAlchemyAvailability, freeAlchemyTimer } from '../src/utils/freeAlchemySpin.ts';
 
-const context = { TextEncoder };
-vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
-const reducer = context.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 // Captured wheel_timer.json, SHA256 a686d9295e81cd81eda2c634e14ac3561ef0704f1575017daef976878e7307d9.
 const timestamp = '2026-11-14T06:49:21.255Z';
 const at = Date.parse(timestamp);

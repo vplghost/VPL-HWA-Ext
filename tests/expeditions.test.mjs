@@ -7,10 +7,7 @@ import { computed, ref, shallowRef, watch, nextTick } from 'vue';
 import { expeditionRows, expeditionTeam, expeditionPlan, expeditionActivity, expeditionRefreshCalls } from '../src/utils/expeditions.ts';
 import { towerActivityState } from '../src/composables/activityState.ts';
 
-const context = { TextEncoder };
-vm.runInNewContext(await readFile(new URL('../extension/tower-rules.js', import.meta.url), 'utf8'), context);
-vm.runInNewContext(await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8'), context);
-const reducer = context.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 const at = Date.parse('2026-11-14T07:31:23.682Z');
 const entry = (data, time = at) => ({ data, updatedAt: new Date(time).toISOString() });
 // Shape/values from expeditionGet in the 20261110 dungeon capture; refreshed for this test day.

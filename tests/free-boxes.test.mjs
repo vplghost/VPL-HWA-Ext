@@ -3,27 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
-const cacheSource = readFileSync('extension/rpc-cache.js', 'utf8');
-
+import { rpcCacheService } from '../src/core/cache/index.ts';
 function setupCache() {
-  const sandbox = {
-    globalThis: {},
-    console,
-    Date,
-    Math,
-    JSON,
-    Set,
-    Map,
-    Array,
-    Object,
-    String,
-    Number,
-    Boolean,
-    TextEncoder
-  };
-  sandbox.globalThis = sandbox;
-  runInNewContext(cacheSource, sandbox);
-  return sandbox.globalThis.hwaHelperRpcCache;
+  return rpcCacheService;
 }
 
 test('cinemaGetCounters extracts and caches placementViewed and placementRewards', () => {

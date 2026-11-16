@@ -7,11 +7,7 @@ import { computed, ref, shallowRef, watch, nextTick } from 'vue';
 import { campAttackError, campAttackCalls, campHeroIds, BRIGAND_ENERGY_COST, campSearchCalls, availableCamps } from '../src/utils/brigandCamp.ts';
 import { getAmountAt, resourceDataHelper } from '../src/utils/resourceData.ts';
 
-const context = { TextEncoder, hwaHelperResourceData: resourceDataHelper };
-for (const file of ['refillable-rules', 'rpc-cache']) {
-  vm.runInNewContext(await readFile(new URL('../extension/' + file + '.js', import.meta.url), 'utf8'), context);
-}
-const reducer = context.hwaHelperRpcCache;
+import { rpcCacheService as reducer } from '../src/core/cache/index.ts';
 const at = '2026-11-13T09:02:02.924Z';
 const campId = '2eb37df6-e1f1-4d1d-8cf2-36822ec986e6';
 const heroes = [79, 72, 16, 54, 60];
