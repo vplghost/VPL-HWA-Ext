@@ -2,6 +2,8 @@ if (typeof (globalThis as any).defineContentScript === 'undefined') {
   (globalThis as any).defineContentScript = (config: any) => config;
 }
 
+import { installInterceptor } from '../src/content/interceptor.ts';
+
 export interface InterceptRecord {
   endpoint: string;
   method?: string;
@@ -61,22 +63,6 @@ export default defineContentScript({
   runAt: 'document_start',
   world: 'MAIN',
   main() {
-    let interceptEnabled = true;
-    let recordingActive = false;
-
-    // Listen to control message from isolated world bridge
-    window.addEventListener('message', (event) => {
-      if (event.source !== window || event.origin !== location.origin) return;
-      if (event.data?.source !== 'hwa-helper-config' || event.data.kind !== 'control') return;
-      if (event.data.interceptEnabled !== undefined) {
-        interceptEnabled = Boolean(event.data.interceptEnabled);
-      }
-      if (event.data.recordingActive !== undefined) {
-        recordingActive = Boolean(event.data.recordingActive);
-      }
-    });
-
-    // Notify bridge that MAIN world interceptor is ready
-    window.postMessage({ source: 'hwa-helper-api', kind: 'ready' }, location.origin);
+    installInterceptor();
   }
 });
