@@ -1534,6 +1534,7 @@
                 briefInfo: result.magicTower_briefInfo || null
               }, updatedAt: record.timestamp
             }];
+
           }
         }
         if ((call.name === 'magicTower_briefInfo' || call.name === 'magicTower_getAll') && result?.response) {
@@ -3260,6 +3261,54 @@
               };
             }
           }
+          if ((rawResKey === 'gold' || rawResKey === 'starMoney') && entry.data.delta > 0) {
+            const actionDate = new Date(actionAt);
+            const dayStr = Number.isFinite(actionDate.getTime()) ? actionDate.toISOString().slice(0, 10) : '';
+            if (dayStr) {
+              const resolveIncomeSource = (method, feature, token) => {
+                const m = String(method || '');
+                const t = String(token || '');
+                if (m === 'missionRaid' || m === 'missionEnd' || m === 'missionStart' || t.includes('campaign')) return 'campaign';
+                if (m.startsWith('quest') || m === 'completeQuest' || m === 'dailyQuestFarm' || t.includes('quest')) return 'quests';
+                if (m.startsWith('dungeon') || t.includes('dungeon')) return 'dungeon';
+                if (m.startsWith('magicTower') || t.includes('tower')) return 'tower';
+                if (m === 'refillable_alchemyUseVideo' || t.includes('freeAlchemy') || t.includes('alchemy')) return 'alchemy';
+                if (m.startsWith('mail') || t.includes('mail') || t.includes('readAndClaimAll')) return 'mail';
+                if (m.startsWith('clan_') || m === 'attackMob' || m === 'joinRally' || m === 'createRally' || t.includes('battle')) return 'battles';
+                if (m.startsWith('brigand') || t.includes('brigand')) return 'brigands';
+                return 'other';
+              };
+              const source = resolveIncomeSource(entry.method, entry.feature, entry.data.token);
+              const prevIncome = next.resourceIncomeHistory?.data || {};
+              const days = { ...(prevIncome.days || prevIncome) };
+              const day = days[dayStr] ? {
+                gold: days[dayStr].gold || 0,
+                emerald: days[dayStr].emerald || 0,
+                goldBySource: { ...(days[dayStr].goldBySource || {}) },
+                emeraldBySource: { ...(days[dayStr].emeraldBySource || {}) }
+              } : { gold: 0, emerald: 0, goldBySource: {}, emeraldBySource: {} };
+              if (rawResKey === 'gold') {
+                day.gold += entry.data.delta;
+                day.goldBySource[source] = (day.goldBySource[source] || 0) + entry.data.delta;
+              } else if (rawResKey === 'starMoney') {
+                day.emerald += entry.data.delta;
+                day.emeraldBySource[source] = (day.emeraldBySource[source] || 0) + entry.data.delta;
+              }
+              days[dayStr] = day;
+              const cutoffStr = new Date(actionAt - 30 * 86400000).toISOString().slice(0, 10);
+              for (const d of Object.keys(days)) {
+                if (d < cutoffStr) delete days[d];
+              }
+              next.resourceIncomeHistory = {
+                key: 'resourceIncomeHistory',
+                method: entry.method,
+                feature: null,
+                group: 'internal',
+                data: days,
+                updatedAt: entry.updatedAt
+              };
+            }
+          }
           const history = { ...seen, [entry.data.token]: entry.updatedAt };
           const tokens = Object.keys(history).sort((a, b) =>
             history[b].localeCompare(history[a]));
@@ -4029,6 +4078,20 @@
             }
           }
 
+          if (reward.gold || reward.starMoney) {
+            const dGold = Number(reward.gold) || 0;
+            const dEm = Number(reward.starMoney) || 0;
+            const dayStr = entry.updatedAt ? entry.updatedAt.slice(0, 10) : '';
+            if (dayStr && (dGold > 0 || dEm > 0)) {
+              const prev = next.resourceIncomeHistory?.data || {};
+              const days = { ...(prev.days || prev) };
+              const day = days[dayStr] ? { ...days[dayStr], goldBySource: { ...(days[dayStr].goldBySource || {}) }, emeraldBySource: { ...(days[dayStr].emeraldBySource || {}) } } : { gold: 0, emerald: 0, goldBySource: {}, emeraldBySource: {} };
+              if (dGold > 0) { day.gold += dGold; day.goldBySource.dungeon = (day.goldBySource.dungeon || 0) + dGold; }
+              if (dEm > 0) { day.emerald += dEm; day.emeraldBySource.dungeon = (day.emeraldBySource.dungeon || 0) + dEm; }
+              days[dayStr] = day;
+              next.resourceIncomeHistory = { key: 'resourceIncomeHistory', method: entry.method, feature: null, group: 'internal', data: days, updatedAt: entry.updatedAt };
+            }
+          }
           if (reward.gold) {
             const numAmt = Number(reward.gold) || 0;
             const resKey = 'resource:gold';

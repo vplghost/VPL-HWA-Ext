@@ -165,3 +165,106 @@ test('resourceIncome handles undefined, null, or empty cache gracefully without 
   assert.equal(emptyToday.gold, 0);
   assert.equal(emptyToday.emerald, 0);
 });
+
+test('aggregateIncomeByDate aggregates from all collectible sources: campaign, quests, dungeon, tower, and other', () => {
+  const fixedNow = Date.parse('2026-11-15T12:00:00.000Z');
+  const mockCache = {
+    lastCampaignRaidResult: {
+      updatedAt: '2026-11-15T09:00:00.000Z',
+      data: {
+        missionId: 101,
+        drops: { gold: 35000 },
+      },
+    },
+    questClaimStatus: {
+      data: {
+        claims: [
+          {
+            id: 201,
+            at: '2026-11-15T09:15:00.000Z',
+            reward: { gold: 20000, starMoney: 50 },
+          },
+          {
+            id: 202,
+            at: '2026-11-15T09:20:00.000Z',
+            reward: {
+              rewards: [{ type: 'gold', amount: 15000 }, { type: 'starMoney', amount: 25 }],
+            },
+          },
+        ],
+      },
+    },
+    dungeonRewardAction: {
+      updatedAt: '2026-11-15T09:30:00.000Z',
+      data: {
+        reward: { gold: 45000 },
+      },
+    },
+    towerAction: {
+      updatedAt: '2026-11-15T09:45:00.000Z',
+      data: {
+        action: 'openChest',
+        reward: { gold: 60000, starMoney: 10 },
+      },
+    },
+    freeBoxAction: {
+      updatedAt: '2026-11-15T10:00:00.000Z',
+      data: {
+        gold: 12000,
+      },
+    },
+  };
+
+  const today = getTodayIncome(mockCache, fixedNow);
+  assert.equal(today.date, '2026-11-15');
+  // Campaign: 35,000
+  assert.equal(today.goldBySource.campaign, 35000);
+  // Quests: 20,000 + 15,000 = 35,000 Gold, 50 + 25 = 75 Emeralds
+  assert.equal(today.goldBySource.quests, 35000);
+  assert.equal(today.emeraldBySource.quests, 75);
+  // Dungeon: 45,000
+  assert.equal(today.goldBySource.dungeon, 45000);
+  // Tower: 60,000 Gold, 10 Emeralds
+  assert.equal(today.goldBySource.tower, 60000);
+  assert.equal(today.emeraldBySource.tower, 10);
+  // Other: 12,000
+  assert.equal(today.goldBySource.other, 12000);
+
+  // Total Gold: 35000 + 35000 + 45000 + 60000 + 12000 = 187,000
+  assert.equal(today.gold, 187000);
+  // Total Emeralds: 75 + 10 = 85
+  assert.equal(today.emerald, 85);
+});
+
+test('aggregateIncomeByDate merges persistent resourceIncomeHistory without double counting snapshots', () => {
+  const fixedNow = Date.parse('2026-11-15T12:00:00.000Z');
+  const mockCache = {
+    resourceIncomeHistory: {
+      data: {
+        '2026-11-15': {
+          gold: 150000,
+          emerald: 100,
+          goldBySource: {
+            campaign: 150000, // Cumulative 5 raids
+          },
+          emeraldBySource: {
+            quests: 100,
+          },
+        },
+      },
+    },
+    // Snapshot of the 5th raid only (30,000 gold). Must not double count!
+    lastCampaignRaidResult: {
+      updatedAt: '2026-11-15T10:00:00.000Z',
+      data: {
+        drops: { gold: 30000 },
+      },
+    },
+  };
+
+  const today = getTodayIncome(mockCache, fixedNow);
+  assert.equal(today.gold, 150000);
+  assert.equal(today.goldBySource.campaign, 150000);
+  assert.equal(today.emerald, 100);
+  assert.equal(today.emeraldBySource.quests, 100);
+});

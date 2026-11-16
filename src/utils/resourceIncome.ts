@@ -229,20 +229,203 @@ export function aggregateIncomeByDate(cache: Record<string, any> = {}, now: numb
     }
   }
 
-  // 4. Stored custom daily income logs if persisted in storage
-  const customIncome = cache?.resourceIncomeHistory?.data ?? cache?.resourceIncomeHistory;
+  // 4. Stored persistent daily income logs (resourceIncomeHistory)
+  const customIncome = cache?.resourceIncomeHistory?.data?.days ?? cache?.resourceIncomeHistory?.data ?? cache?.resourceIncomeHistory;
   if (customIncome && typeof customIncome === 'object') {
     for (const [dayStr, summary] of Object.entries(customIncome as Record<string, any>)) {
       if (!summary || typeof summary !== 'object') continue;
-      if (summary.goldBySource) {
+      if (summary.goldBySource && typeof summary.goldBySource === 'object') {
         for (const [src, amt] of Object.entries(summary.goldBySource)) {
-          addIncome(dayStr, src, Number(amt) || 0, 0);
+          const num = Number(amt) || 0;
+          const existing = daysMap.get(dayStr)?.goldBySource?.[src] || 0;
+          if (num > existing) {
+            addIncome(dayStr, src, num - existing, 0);
+          }
         }
       }
-      if (summary.emeraldBySource) {
+      if (summary.emeraldBySource && typeof summary.emeraldBySource === 'object') {
         for (const [src, amt] of Object.entries(summary.emeraldBySource)) {
-          addIncome(dayStr, src, 0, Number(amt) || 0);
+          const num = Number(amt) || 0;
+          const existing = daysMap.get(dayStr)?.emeraldBySource?.[src] || 0;
+          if (num > existing) {
+            addIncome(dayStr, src, 0, num - existing);
+          }
         }
+      }
+    }
+  }
+
+  // 5. Campaign Raids (lastCampaignRaidResult and historical raid receipts)
+  const campaignEntries = [
+    cache?.lastCampaignRaidResult,
+    ...(Array.isArray(cache?.campaignRaidReceipts?.data) ? cache.campaignRaidReceipts.data : []),
+  ];
+  const campaignByDay = new Map<string, { gold: number; emerald: number }>();
+  for (const cEntry of campaignEntries) {
+    if (!cEntry) continue;
+    const timeVal = cEntry.updatedAt || cEntry.at;
+    const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+    const drops = cEntry.data?.drops ?? cEntry.drops;
+    if (!dateStr || !drops) continue;
+    const raidGold = Number(drops.gold ?? drops['resource:gold'] ?? 0);
+    const raidEmerald = Number(drops.starMoney ?? drops['resource:starMoney'] ?? drops.diamond ?? 0);
+    if (raidGold > 0 || raidEmerald > 0) {
+      const cur = campaignByDay.get(dateStr) || { gold: 0, emerald: 0 };
+      cur.gold += raidGold;
+      cur.emerald += raidEmerald;
+      campaignByDay.set(dateStr, cur);
+    }
+  }
+  for (const [dateStr, cData] of campaignByDay) {
+    const existingGold = daysMap.get(dateStr)?.goldBySource?.campaign || 0;
+    const existingEm = daysMap.get(dateStr)?.emeraldBySource?.campaign || 0;
+    if (cData.gold > existingGold || cData.emerald > existingEm) {
+      addIncome(dateStr, 'campaign', Math.max(0, cData.gold - existingGold), Math.max(0, cData.emerald - existingEm));
+    }
+  }
+
+  // 6. Quests (questClaimStatus claims and completed quests)
+  const questClaims = Array.isArray(cache?.questClaimStatus?.data?.claims)
+    ? cache.questClaimStatus.data.claims
+    : Array.isArray(cache?.questClaimStatus?.claims)
+      ? cache.questClaimStatus.claims
+      : [];
+
+  const allQuestItems = [
+    ...questClaims,
+    ...(cache?.questClaimAction ? [cache.questClaimAction] : []),
+  ];
+
+  const questByDay = new Map<string, { gold: number; emerald: number }>();
+  for (const claim of allQuestItems as any[]) {
+    if (!claim) continue;
+    const timeVal = claim.at || claim.updatedAt;
+    const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+    const reward = claim.data?.reward ?? claim.reward;
+    if (!dateStr || !reward || typeof reward !== 'object') continue;
+
+    let qGold = Number(reward.gold ?? reward['resource:gold'] ?? 0);
+    let qEmerald = Number(reward.starMoney ?? reward['resource:starMoney'] ?? reward.diamond ?? 0);
+
+    const arrayRewards = Array.isArray(reward.reward) ? reward.reward : (Array.isArray(reward.rewards) ? reward.rewards : []);
+    for (const item of arrayRewards) {
+      const amt = Number(item?.amount ?? item?.count ?? item?.quantity ?? 0);
+      if (item?.type === 'gold' || item?.key === 'resource:gold') qGold += amt;
+      if (item?.type === 'starMoney' || item?.type === 'diamond' || item?.key === 'resource:starMoney') qEmerald += amt;
+    }
+
+    if (qGold > 0 || qEmerald > 0) {
+      const cur = questByDay.get(dateStr) || { gold: 0, emerald: 0 };
+      cur.gold += qGold;
+      cur.emerald += qEmerald;
+      questByDay.set(dateStr, cur);
+    }
+  }
+
+  for (const [dateStr, qData] of questByDay) {
+    const existingGold = daysMap.get(dateStr)?.goldBySource?.quests || 0;
+    const existingEm = daysMap.get(dateStr)?.emeraldBySource?.quests || 0;
+    if (qData.gold > existingGold || qData.emerald > existingEm) {
+      addIncome(dateStr, 'quests', Math.max(0, qData.gold - existingGold), Math.max(0, qData.emerald - existingEm));
+    }
+  }
+
+  // 7. Dungeon Rewards (dungeonRewardAction and dungeon floor/battle rewards)
+  const dungeonEntries = [
+    cache?.dungeonRewardAction,
+    ...(Array.isArray(cache?.dungeonRewardHistory?.data) ? cache.dungeonRewardHistory.data : []),
+  ];
+  const dungeonByDay = new Map<string, { gold: number; emerald: number }>();
+  for (const dEntry of dungeonEntries) {
+    if (!dEntry) continue;
+    const timeVal = dEntry.updatedAt || dEntry.at;
+    const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+    const reward = dEntry.data?.reward ?? dEntry.reward;
+    if (!dateStr || !reward || typeof reward !== 'object') continue;
+
+    const dGold = Number(reward.gold ?? reward['resource:gold'] ?? 0);
+    const dEmerald = Number(reward.starMoney ?? reward['resource:starMoney'] ?? reward.diamond ?? 0);
+    if (dGold > 0 || dEmerald > 0) {
+      const cur = dungeonByDay.get(dateStr) || { gold: 0, emerald: 0 };
+      cur.gold += dGold;
+      cur.emerald += dEmerald;
+      dungeonByDay.set(dateStr, cur);
+    }
+  }
+  for (const [dateStr, dData] of dungeonByDay) {
+    const existingGold = daysMap.get(dateStr)?.goldBySource?.dungeon || 0;
+    const existingEm = daysMap.get(dateStr)?.emeraldBySource?.dungeon || 0;
+    if (dData.gold > existingGold || dData.emerald > existingEm) {
+      addIncome(dateStr, 'dungeon', Math.max(0, dData.gold - existingGold), Math.max(0, dData.emerald - existingEm));
+    }
+  }
+
+  // 8. Tower (magicTower_openChest and towerAction rewards)
+  const towerEntries = [
+    cache?.towerAction,
+    ...(Array.isArray(cache?.towerHistory?.data) ? cache.towerHistory.data : []),
+  ];
+  const towerByDay = new Map<string, { gold: number; emerald: number }>();
+  for (const tEntry of towerEntries) {
+    if (!tEntry) continue;
+    const timeVal = tEntry.updatedAt || tEntry.at;
+    const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+    const reward = tEntry.data?.reward ?? tEntry.reward;
+    if (!dateStr || !reward || typeof reward !== 'object') continue;
+
+    const tGold = Number(reward.gold ?? reward['resource:gold'] ?? 0);
+    const tEmerald = Number(reward.starMoney ?? reward['resource:starMoney'] ?? reward.diamond ?? 0);
+    if (tGold > 0 || tEmerald > 0) {
+      const cur = towerByDay.get(dateStr) || { gold: 0, emerald: 0 };
+      cur.gold += tGold;
+      cur.emerald += tEmerald;
+      towerByDay.set(dateStr, cur);
+    }
+  }
+  for (const [dateStr, tData] of towerByDay) {
+    const existingGold = daysMap.get(dateStr)?.goldBySource?.tower || 0;
+    const existingEm = daysMap.get(dateStr)?.emeraldBySource?.tower || 0;
+    if (tData.gold > existingGold || tData.emerald > existingEm) {
+      addIncome(dateStr, 'tower', Math.max(0, tData.gold - existingGold), Math.max(0, tData.emerald - existingEm));
+    }
+  }
+
+  // 9. Free Video Boxes, Brigands, & Misc Sources (other / brigands)
+  const miscBoxes = [
+    cache?.freeBoxAction,
+    cache?.cinemaBoxAction,
+    cache?.clanVersusChestAction,
+    cache?.expeditionCollectAction,
+    cache?.brigandCampAction,
+  ];
+  const miscByDay = new Map<string, Map<string, { gold: number; emerald: number }>>();
+  for (const mEntry of miscBoxes) {
+    if (!mEntry) continue;
+    const timeVal = mEntry.updatedAt || mEntry.at;
+    const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+    if (!dateStr) continue;
+
+    const data = mEntry.data ?? mEntry;
+    const reward = data?.reward ?? data;
+    const bGold = Number(data?.gold ?? reward?.gold ?? reward?.['resource:gold'] ?? 0);
+    const bEmerald = Number(data?.starMoney ?? reward?.starMoney ?? reward?.['resource:starMoney'] ?? reward?.diamond ?? 0);
+    const sourceKey = mEntry.key === 'brigandCampAction' ? 'brigands' : 'other';
+
+    if (bGold > 0 || bEmerald > 0) {
+      if (!miscByDay.has(dateStr)) miscByDay.set(dateStr, new Map());
+      const dayMap = miscByDay.get(dateStr)!;
+      const cur = dayMap.get(sourceKey) || { gold: 0, emerald: 0 };
+      cur.gold += bGold;
+      cur.emerald += bEmerald;
+      dayMap.set(sourceKey, cur);
+    }
+  }
+  for (const [dateStr, dayMap] of miscByDay) {
+    for (const [sourceKey, mData] of dayMap) {
+      const existingGold = daysMap.get(dateStr)?.goldBySource?.[sourceKey] || 0;
+      const existingEm = daysMap.get(dateStr)?.emeraldBySource?.[sourceKey] || 0;
+      if (mData.gold > existingGold || mData.emerald > existingEm) {
+        addIncome(dateStr, sourceKey, Math.max(0, mData.gold - existingGold), Math.max(0, mData.emerald - existingEm));
       }
     }
   }
