@@ -1,8 +1,8 @@
 {
   "source": {
     "staticVersion": "1.293.0",
-    "localeMd5": "def7ae37ac67df119f41eae76690c092",
-    "libraryMd5": "1357804ab5ab599e3522f8cbdeb75802",
+    "localeMd5": "f640f200f4d58044949d6f982978ff47",
+    "libraryMd5": "4bb8f25cd1550eeaefc0069bb9e71dd2",
     "chapterNameKey": "LIB_WORLD_<id>",
     "missionNameKey": "LIB_MISSION_NAME_<id>"
   },

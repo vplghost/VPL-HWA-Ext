@@ -1,12 +1,13 @@
+// Generated from https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0065/7a886a37bdee83b15b8997d89d028015/locale/en.json.gz
 import type { NameDataGroup } from '../types/game/item.ts';
 import { itemResources } from './itemData.ts';
 
 export const nameData: NameDataGroup = {
-  "assetUrl": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0054/d973530195826f1575a002f97a3f30e9/locale/en.json.gz",
-  "assetMd5": "def7ae37ac67df119f41eae76690c092",
-  "assetSize": 683124,
+  "assetUrl": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0065/7a886a37bdee83b15b8997d89d028015/locale/en.json.gz",
+  "assetMd5": "f640f200f4d58044949d6f982978ff47",
+  "assetSize": 683621,
   "clientVersion": "1.293.1010",
-  "indexCapturedAt": "2026-11-10T02:39:50.645Z",
+  "indexCapturedAt": "2026-11-14T17:55:08.620Z",
   "names": {
     "hero": {
       "0": "Not available",
@@ -2679,13 +2680,13 @@ export function getArtifactName(id: string | number): string | null {
   return lookupName('artifact', id);
 }
 
-export function getBuildingName(id: string | number): string {
+export function getBuildingName(id: string | number): string | null {
   const found = lookupName('building', id);
   if (found) return found;
   return id ? `Building #${id}` : '';
 }
 
-export function getResearchName(id: string | number): string {
+export function getResearchName(id: string | number): string | null {
   const found = lookupName('research', id);
   if (found) return found;
   return id ? `Research #${id}` : '';

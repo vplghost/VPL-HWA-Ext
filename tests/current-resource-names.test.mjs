@@ -53,9 +53,9 @@ test('strategic name extraction uses exact category/ID keys and rejects unresolv
 test('bundled names identify client1.293.1010 and the verified current locale revision', () => {
   const data = context.hwaHelperNameData;
   assert.equal(data.clientVersion, '1.293.1010');
-  assert.equal(data.assetMd5, 'def7ae37ac67df119f41eae76690c092');
-  assert.equal(data.assetSize, 683124);
-  assert.match(data.assetUrl, /\/1\.293\.0\/v0054\//);
+  assert.equal(data.assetMd5, 'f640f200f4d58044949d6f982978ff47');
+  assert.equal(data.assetSize, 683621);
+  assert.match(data.assetUrl, /\/1\.293\.0\/v0065\//);
   for (const [category, count] of Object.entries({ lootboxChanced: 30, lootboxChoiced: 3,
     material: 10, speedUpConstruction: 5, speedUpResearch: 5, speedUpUniversal: 5,
     speedUpUnitTraining: 5, speedUpUnitHealing: 5, teleporter: 2, talisman: 163 })) {

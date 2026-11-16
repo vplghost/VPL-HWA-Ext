@@ -109,9 +109,90 @@ const englishCorrections = {
 for (const [group, corrections] of Object.entries(englishCorrections)) {
   Object.assign(names[group], corrections);
 }
+const payload = {
+  assetUrl,
+  assetMd5: entry.md5,
+  assetSize: entry.size,
+  clientVersion: typeof exported.gameVersion === 'string' ? exported.gameVersion : null,
+  indexCapturedAt: index.timestamp,
+  names
+};
+
 const output = `// Generated from ${assetUrl}\n` +
-  `globalThis.hwaHelperNameData = ${JSON.stringify({ assetUrl, assetMd5: entry.md5, assetSize: entry.size,
-    clientVersion: typeof exported.gameVersion === 'string' ? exported.gameVersion : null,
-    indexCapturedAt: index.timestamp, names })};\n`;
+  `globalThis.hwaHelperNameData = ${JSON.stringify(payload)};\n`;
 await writeFile(join(root, 'extension/data-names.js'), output);
+
+const tsHelpers = `
+const itemGroups: Record<string, string> = {
+  consumable: 'consumable',
+  gear: 'gear',
+  scroll: 'scroll',
+  coin: 'coin',
+  fragmentHero: 'hero',
+  fragmentTitan: 'hero',
+  fragmentGear: 'gear',
+  fragmentScroll: 'scroll',
+  fragmentArtifact: 'artifact',
+  fragmentSkin: 'skin'
+};
+
+export function lookupName(group: string, id: string | number): string | null {
+  const strId = String(id);
+  const localNames = nameData.names?.[group];
+  if (localNames && Object.hasOwn(localNames, strId)) {
+    return localNames[strId] ?? null;
+  }
+  const extra = itemResources?.items;
+  const rows = extra && Object.hasOwn(extra, group) ? extra[group] : null;
+  return rows && Object.hasOwn(rows, strId) && typeof rows[strId]?.name === 'string' ? (rows[strId].name as string) : null;
+}
+
+export function getHeroName(id: string | number): string | null {
+  return lookupName('hero', id);
+}
+
+export function getArtifactName(id: string | number): string | null {
+  return lookupName('artifact', id);
+}
+
+export function getBuildingName(id: string | number): string | null {
+  const found = lookupName('building', id);
+  if (found) return found;
+  return id ? \`Building #\${id}\` : '';
+}
+
+export function getResearchName(id: string | number): string | null {
+  const found = lookupName('research', id);
+  if (found) return found;
+  return id ? \`Research #\${id}\` : '';
+}
+
+export function getItemName(category: string, id: string | number): string | null {
+  const group = itemGroups[category] || category;
+  const name = group ? lookupName(group, id) : null;
+  return name ? (category.startsWith('fragment') ? \`\${name} fragment\` : name) : null;
+}
+
+export const nameMap = {
+  hero: getHeroName,
+  item: getItemName,
+  building: getBuildingName,
+  research: getResearchName,
+  artifact: getArtifactName
+};
+
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).hwaHelperNameData = nameData;
+  (globalThis as any).hwaHelperNameMap = nameMap;
+}
+`;
+
+const tsContent = `// Generated from ${assetUrl}
+import type { NameDataGroup } from '../types/game/item.ts';
+import { itemResources } from './itemData.ts';
+
+export const nameData: NameDataGroup = ${JSON.stringify(payload, null, 2)};
+${tsHelpers}`;
+
+await writeFile(join(root, 'src/data/nameData.ts'), tsContent, 'utf8');
 console.log(`Generated name map from ${assetUrl}: ${Object.entries(names).map(([k, v]) => `${k}=${Object.keys(v).length}`).join(', ')}`);

@@ -85,8 +85,8 @@ export async function generateQuestData(configDir = join(root, 'temp'), indexPat
   const runtimePath = join(root, 'src/data/questData.ts');
   const runtime = await readFile(runtimePath, 'utf8');
   const block = '  // BEGIN GENERATED DAILY QUESTS — npm run quests:update\n' +
-    '  const dailyTitles = ' + JSON.stringify(catalog.dailyTitles, null, 2).replace(/\n/g, '\n  ') + ';\n' +
-    '  const dailyDefinitions = ' + JSON.stringify(definitions) + ';\n' +
+    '  const dailyTitles: Record<string, string> = ' + JSON.stringify(catalog.dailyTitles, null, 2).replace(/\n/g, '\n  ') + ';\n' +
+    '  const dailyDefinitions: Record<string, DailyQuestDefinition> = ' + JSON.stringify(definitions) + ';\n' +
     '  const dailySources = ' + JSON.stringify(sources) + ';\n' +
     '  // END GENERATED DAILY QUESTS';
   const pattern = /  \/\/ BEGIN GENERATED DAILY QUESTS[\s\S]*?  \/\/ END GENERATED DAILY QUESTS|  const dailyTitles = \{[\s\S]*?\n  \};/;
