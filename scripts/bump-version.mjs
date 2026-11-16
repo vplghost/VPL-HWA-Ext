@@ -54,9 +54,11 @@ export async function bumpVersion(targetType = 'patch') {
 
   const distManifestPath = join(root, 'dist', 'manifest.json');
   try {
-    const distManifest = JSON.parse(await readFile(distManifestPath, 'utf8'));
+    const distRaw = await readFile(distManifestPath, 'utf8');
+    const isMinified = !distRaw.includes('\n');
+    const distManifest = JSON.parse(distRaw);
     distManifest.version = nextVersion;
-    await writeFile(distManifestPath, JSON.stringify(distManifest, null, 2) + '\n', 'utf8');
+    await writeFile(distManifestPath, isMinified ? JSON.stringify(distManifest) : (JSON.stringify(distManifest, null, 2) + '\n'), 'utf8');
   } catch {}
 
   console.log(`✓ Bumped extension version: ${currentVersion} -> ${nextVersion}`);
