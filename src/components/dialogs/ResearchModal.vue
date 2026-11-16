@@ -20,11 +20,11 @@ import {
 import { researchQueueService } from '@/src/services/queues/researchQueue';
 
 // Resolve helper with fallback to typed module for runtime, and globalThis for test harness
-const rHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchData)
-  || (typeof researchDataHelper !== 'undefined' ? researchDataHelper : null);
+const rHelper = (typeof researchDataHelper !== 'undefined' ? researchDataHelper : null)
+  || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchData);
 
-const rQueueHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchQueue)
-  || (typeof researchQueueService !== 'undefined' ? researchQueueService : null);
+const rQueueHelper = (typeof researchQueueService !== 'undefined' ? researchQueueService : null)
+  || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchQueue);
 
 const getMaxLevel = (id: any) =>
   rHelper?.getMaxLevel?.(id)

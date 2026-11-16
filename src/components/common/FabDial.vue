@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import '@/src/utils/metadata';
+import { getUnreadChatCount } from '@/src/utils/popupData';
 import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import { useModals } from '@/src/composables/useModals';
 import { useRpcCache } from '@/src/composables/useRpcCache';
@@ -15,7 +16,7 @@ const chatMessages = computed<any[]>(() => {
 });
 const unreadCount = computed(() => {
   const reference = Math.floor(Date.parse(cache.value.guildChat?.updatedAt || '') / 1000);
-  return (globalThis as any).hwaHelperPopupData?.getUnreadChatCount?.(chatMessages.value, lastRead.value, reference) || 0;
+  return getUnreadChatCount(chatMessages.value, lastRead.value, reference) || 0;
 });
 const unreadLabel = computed(() => unreadCount.value > 99 ? '99+' : String(unreadCount.value));
 function updateLastRead(changes: Record<string, chrome.storage.StorageChange>, area: string) {

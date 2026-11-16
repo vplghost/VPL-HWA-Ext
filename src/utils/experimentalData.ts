@@ -444,6 +444,28 @@ export function buildGatherCall(mapId: string, mineId: string, squad: any) {
   };
 }
 
+export interface RallyPhaseInfo {
+  phase: 'Returning' | 'Battle complete' | 'Waiting' | 'Traveling to boss' | 'Battle / awaiting result';
+  until: number | null;
+  result: string | null;
+}
+
+export function rallyPhase(march: any, now: number = Date.now()): RallyPhaseInfo | null {
+  const rally = march?.rally;
+  if (!rally) return null;
+  if (march.stage === 'returnToOutpost') return { phase: 'Returning', until: rally.returnAt || march.endsAt, result: march.result || null };
+  if (march.result) return { phase: 'Battle complete', until: rally.returnAt, result: march.result };
+  if (Number.isFinite(rally.waitUntil) && now < rally.waitUntil) return {
+    phase: 'Waiting', until: rally.waitUntil, result: null };
+  const arrivalAt = rally.arrivalAt ||
+    (march.stage === 'moveToTargetInRally' && Number.isFinite(march.endsAt) ? march.endsAt : null) ||
+    (Number.isFinite(rally.waitUntil) && Number.isFinite(rally.outboundMs) ?
+      rally.waitUntil + rally.outboundMs : null);
+  if (Number.isFinite(arrivalAt) && now < arrivalAt) return {
+    phase: 'Traveling to boss', until: arrivalAt, result: null };
+  return { phase: 'Battle / awaiting result', until: null, result: null };
+}
+
 export function buildRallyCall(mapId: string, mobId: string, squad: any, waitSeconds: number) {
   if (
     !mapId ||
@@ -466,34 +488,76 @@ export function buildRallyCall(mapId: string, mobId: string, squad: any, waitSec
   };
 }
 
+export function rallyMembers(rally: any): { count: number; total: number } | null {
+  if (!rally?.leader || !Array.isArray(rally.members) || !Number.isInteger(rally.membersCapacityLeft)) return null;
+  const ids = new Set([rally.leader, ...rally.members].map((member: any) => member?.userId).filter((id: any) => id != null).map(String));
+  if (!ids.size) return null;
+  return { count: ids.size, total: ids.size + rally.membersCapacityLeft };
+}
+
+export function buildJoinRallyCall(mapId: string | null | undefined, rallyId: string, squad: any): any {
+  if (!rallyId || !squad) return null;
+  const args: any = { rallyId, squad };
+  if (mapId) args.mapId = mapId;
+  return { name: 'joinRally', feature: 'rally', args };
+}
+
+export function autoJoinTeamOptions(teams: any, heroes: any, customTeams: any[] = [], availableIds?: any[]): any[] {
+  const list: any[] = [
+    { id: 'highest', label: '⭐ Top 5 highest power heroes (Default)', heroIds: highestPowerHeroes(heroes, availableIds) }
+  ];
+  list.push(...asArray(customTeams).map((team) => normalizeCustomTeam(team, heroes)).filter(Boolean)
+    .map((team: any) => ({ id: `custom:${team.id}`, label: `Custom · ${team.name}`, heroIds: team.heroIds, maxTroops: team.maxTroops })));
+  for (const [mode, members] of Object.entries(teams || {})) {
+    if (!Array.isArray(members)) continue;
+    const groups = (members as any[]).some(Array.isArray) ? (members as any[]) : [members];
+    groups.forEach((group: any, index: number) => {
+      const heroIds = (Array.isArray(group) ? group : []).filter((id: any) =>
+        Number.isInteger(id) && heroes?.[id]).slice(0, 5);
+      if (heroIds.length) list.push({ id: `${mode}:${index}`,
+        label: `${mode}${groups.length > 1 ? ` #${index + 1}` : ''}`, heroIds });
+    });
+  }
+  list.push({ id: 'weakest', label: '5 lowest power heroes', heroIds: lowestPowerHeroes(heroes, availableIds) });
+  return list;
+}
+
+export const experimentalDataHelper = {
+  rallyWaitOptions,
+  capacitySignature,
+  heroCapacity,
+  estimateHeroTroopCapacity,
+  squadCapacity,
+  normalizeCapacitySettings,
+  capacityModel,
+  unitInfo,
+  allocateTroops,
+  bossConfigId,
+  bossLevel,
+  soloMonsterConfigIds,
+  soloMonsterLevel,
+  mineConfigs,
+  mineConfigId: getMineConfigId,
+  mineTypeLevel: getMineTypeLevel,
+  availableHeroIds,
+  normalizeCustomTeam,
+  lowestPowerHeroes,
+  highestPowerHeroes,
+  teamOptions,
+  autoJoinTeamOptions,
+  teamTroopCapacity,
+  buildSquad,
+  buildRallyCall,
+  buildJoinRallyCall,
+  buildGatherCall,
+  buildMineSearchCall,
+  rallyMembers,
+  rallyPhase,
+};
+
 // Global hookup for backwards compatibility
 if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperExperimentalData = {
-    rallyWaitOptions,
-    capacitySignature,
-    heroCapacity,
-    estimateHeroTroopCapacity,
-    squadCapacity,
-    normalizeCapacitySettings,
-    capacityModel,
-    unitInfo,
-    allocateTroops,
-    bossConfigId,
-    bossLevel,
-    soloMonsterConfigIds,
-    soloMonsterLevel,
-    mineConfigs,
-    mineConfigId: getMineConfigId,
-    mineTypeLevel: getMineTypeLevel,
-    availableHeroIds,
-    normalizeCustomTeam,
-    lowestPowerHeroes,
-    highestPowerHeroes,
-    teamOptions,
-    teamTroopCapacity,
-    buildSquad,
-    buildRallyCall,
-    buildGatherCall,
-    buildMineSearchCall,
-  };
+  (globalThis as any).hwaHelperExperimentalData = experimentalDataHelper;
 }
+
+export default experimentalDataHelper;

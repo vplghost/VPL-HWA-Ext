@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
-import '../extension/march-rules.js';
-import '../extension/experimental-data.js';
-import '../extension/smart-gather-data.js';
-import '../extension/smart-gather.js';
-import '../extension/auto-gather.js';
-const smart = globalThis.hwaHelperSmartGather;
+import '../src/utils/marchRules.ts';
+import '../src/utils/experimentalData.ts';
+import '../src/data/smartGatherData.ts';
+import smartGatherService from '../src/services/queues/smartGather.ts';
+import '../src/services/queues/autoGather.ts';
+const smart = smartGatherService;
 const now = Date.parse('2026-11-14T10:00:00Z');
 const at = new Date(now - 60000).toISOString();
 function failureRecord(call, result, time = now + 1) {

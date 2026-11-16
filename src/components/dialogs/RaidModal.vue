@@ -10,6 +10,7 @@ import {
   bossConfigId,
   bossLevel as getBossLevel,
   rallyWaitOptions,
+  rallyPhase,
 } from '@/src/utils/experimentalData';
 
 const props = defineProps<{
@@ -102,8 +103,7 @@ const activeRallies = computed(() => {
 const currentRaidPhase = computed(() => {
   if (activeRallies.value.length === 0) return null;
   const march = activeRallies.value[0];
-  const expData = (globalThis as any).hwaHelperExperimentalData;
-  return expData?.rallyPhase ? expData.rallyPhase(march, now.value) : null;
+  return rallyPhase(march, now.value);
 });
 
 const currentRaidCountdown = computed(() => {

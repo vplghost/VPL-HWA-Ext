@@ -4,7 +4,7 @@ import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import TitanHoverCard from '@/src/components/common/TitanHoverCard.vue';
-import { getHeroMetadata, getTitanMetadata, starGlowClass } from '@/src/utils/metadata';
+import { getHeroMetadata, getTitanMetadata, starGlowClass, getHeroName } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import { teamMemberIds, serverTeamGroups } from '@/src/utils/teamMembers';
@@ -231,7 +231,8 @@ function getMemberName(id: number | string): string {
   if (isTitanId(id)) {
     return getTitanMetadata(id)?.name || `Titan #${id}`;
   }
-  return getHeroMetadata(id)?.name || (globalThis as any).hwaHelperNameMap?.hero?.(id) || `Hero #${id}`;
+  const heroNameFn = typeof getHeroName === 'function' ? getHeroName : (id: any) => `Hero #${id}`;
+  return getHeroMetadata(id)?.name || heroNameFn(id);
 }
 
 function getMemberAvatarUrl(id: number | string): string {

@@ -56,7 +56,7 @@ export interface RaidQueueState {
   completed: number;
   phase: RaidQueuePhase;
   current: RaidCurrentTarget | null;
-  bossQueue: RaidBossQueue;
+  bossQueue: RaidBossQueue | null;
   failedBossIds: Array<string | number>;
   wonBossIds: Array<string | number>;
   sentAt?: number;

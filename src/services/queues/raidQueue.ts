@@ -30,7 +30,7 @@ export function safeList<T = any>(raw: any): T[] {
 }
 
 export function stop(state: RaidQueueState, reason: string): RaidQueueState {
-  return { ...state, bossQueue: { remain_raid_count: 0, queue: [] }, phase: 'stopped', reason, wakeAt: null };
+  return { ...state, bossQueue: null, phase: 'stopped', reason, wakeAt: null };
 }
 
 export function issue(
@@ -93,23 +93,26 @@ export function nextBoss(
   now: number
 ): RaidQueueStepResult {
   const data = getDataHelper();
-  if (state.bossQueue.remain_raid_count === 0) {
+  const bossQueue = state.bossQueue;
+  if (!bossQueue || bossQueue.remain_raid_count === 0) {
     return { state: { ...state, phase: 'complete', wakeAt: null } };
   }
+  let currentQueue = bossQueue.queue;
   if (
-    state.bossQueue.queue.length &&
+    currentQueue.length &&
     (!Number.isFinite(state.searchedAt) || now - (state.searchedAt as number) > 300000)
   ) {
-    state.bossQueue = { ...state.bossQueue, queue: [] };
+    currentQueue = [];
+    state.bossQueue = { ...bossQueue, queue: [] };
   }
-  if (!state.bossQueue.queue.length) return search(state, now);
+  if (!currentQueue.length) return search(state, now);
   const energy = energyAt(cache, now);
   if (Number.isFinite(energy) && (energy as number) < RALLY_ENERGY_COST) {
     return {
       state: stop(state, `Not enough World Energy for a rally (need ${RALLY_ENERGY_COST}).`),
     };
   }
-  const mobId = state.bossQueue.queue[0]?.mobId;
+  const mobId = currentQueue[0]?.mobId;
   const call = data.buildRallyCall(state.options.mapId, mobId, state.squad, state.options.waitSeconds);
   if (!call) return { state: stop(state, 'No available troops. Refresh the form.') };
   state.current = { mobId: mobId!, mapId: state.options.mapId };
@@ -118,11 +121,14 @@ export function nextBoss(
 
 export function consumeBoss(state: RaidQueueState, failed: boolean = false): void {
   const mobId = state.current?.mobId;
-  state.bossQueue = {
-    ...state.bossQueue,
-    queue: state.bossQueue.queue.filter((boss) => boss.mobId !== mobId),
-    remain_raid_count: state.bossQueue.remain_raid_count - (failed ? 0 : 1),
-  };
+  const bq = state.bossQueue;
+  if (bq) {
+    state.bossQueue = {
+      ...bq,
+      queue: bq.queue.filter((boss) => boss.mobId !== mobId),
+      remain_raid_count: bq.remain_raid_count - (failed ? 0 : 1),
+    };
+  }
   if (failed) {
     state.failedBossIds = [...new Set([...(state.failedBossIds || []), mobId!])];
   } else {
@@ -262,7 +268,7 @@ export function start(
       phase: 'waiting_rally',
       sentAt: now,
       wakeAt: now + 5000,
-      bossQueue: { ...state.bossQueue, queue: uniqueQueue },
+      bossQueue: state.bossQueue ? { ...state.bossQueue, queue: uniqueQueue } : { remain_raid_count: state.options?.count ?? 1, queue: uniqueQueue },
     };
     return {
       state: waitState,
@@ -288,7 +294,7 @@ export function start(
     {
       ...state,
       squad,
-      bossQueue: { ...state.bossQueue, queue: uniqueQueue },
+      bossQueue: state.bossQueue ? { ...state.bossQueue, queue: uniqueQueue } : { remain_raid_count: Number(state.options?.count || 1), queue: uniqueQueue },
     },
     cache,
     now

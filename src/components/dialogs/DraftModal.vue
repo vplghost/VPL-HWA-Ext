@@ -3,6 +3,7 @@ import UnitStars from '@/src/components/common/UnitStars.vue';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata } from '@/src/utils/metadata';
+import { observedDraftChoices } from '@/src/utils/popupData';
 import { formatNumber } from '@/src/utils/formatters';
 
 const props = defineProps<{
@@ -115,7 +116,7 @@ function getHeroStar(mode: 'defense' | 'attack' | 'enemyDefence' | 'enemyAttack'
 
 const observedChoices = computed(() => {
   if (!matchId.value) return null;
-  return (globalThis as any).hwaHelperPopupData?.observedDraftChoices?.(matchId.value) || null;
+  return observedDraftChoices(matchId.value);
 });
 
 const poolCandidates = computed<number[]>(() => {

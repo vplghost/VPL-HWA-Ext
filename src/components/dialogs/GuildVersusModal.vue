@@ -42,9 +42,9 @@ const personalBattlePoints = computed(() => view.value.personalBattlePoints);
 const personalSeasonPoints = computed(() => view.value.personalSeasonPoints);
 const clanRank = computed(() => rewards.value.userClanRank != null ? '#' + rewards.value.userClanRank : '—');
 const seasonRank = computed(() => rewards.value.seasonClanRank != null ? '#' + rewards.value.seasonClanRank : '—');
-const thresholds = computed<Record<number, number>>(() => clanVersusChestThresholds || (globalThis as any).hwaHelperClanVersusChestThresholds || {});
+const thresholds = computed<Record<number, number>>(() => clanVersusChestThresholds);
 
-const chestRewardsMap = computed(() => clanVersusRewards || (globalThis as any).hwaHelperClanVersusRewards || {});
+const chestRewardsMap = computed(() => clanVersusRewards);
 
 function formatRewardItem(key: string, amount: number) {
   if (key === 'energy') return `+${amount.toLocaleString()} Energy`;
@@ -90,7 +90,7 @@ watch(
 
 // --- Sections 4, 5, 6 Data ---
 const roundQuestsMap = computed(() => {
-  return clanVersusRoundQuests || (globalThis as any).hwaHelperClanVersusRoundQuests || {};
+  return clanVersusRoundQuests;
 });
 
 const currentRound = computed(() => view.value.rounds.find((r: any) => r.status === 'inProgress') ||
@@ -117,9 +117,9 @@ const personalSat = computed(() => view.value.personalEligible);
 const guildSat = computed(() => view.value.guildEligible);
 
 // Section 6: Daily Challenges
-const challengeNames = computed(() => clanVersusChallengeNames || (globalThis as any).hwaHelperClanVersusChallengeNames || {});
-const challengePoints = computed(() => clanVersusChallengePoints || (globalThis as any).hwaHelperClanVersusChallengePoints || {});
-const challengeSteps = computed(() => clanVersusChallengeSteps || (globalThis as any).hwaHelperClanVersusChallengeSteps || {});
+const challengeNames = computed(() => clanVersusChallengeNames);
+const challengePoints = computed(() => clanVersusChallengePoints);
+const challengeSteps = computed(() => clanVersusChallengeSteps);
 
 const challenges = computed(() => view.value.challenges || []);
 const totalChallengePts = computed(() => {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { countEvolvableHeroes, countEvolvableTitans } from '@/src/utils/popupData';
 
 export interface TabConfigItem {
   id: string;
@@ -84,21 +85,13 @@ const visibleTabs = computed(() => {
 
 // Badges
 const heroesBadge = computed(() => {
-  const popupData = (globalThis as any).hwaHelperPopupData;
-  if (popupData?.countEvolvableHeroes) {
-    const count = popupData.countEvolvableHeroes(cache.value.heroGetAll?.data, cache.value.inventoryGet?.data);
-    return count > 0 ? count : null;
-  }
-  return null;
+  const count = countEvolvableHeroes(cache.value.heroGetAll?.data, cache.value.inventoryGet?.data);
+  return count > 0 ? count : null;
 });
 
 const titansBadge = computed(() => {
-  const popupData = (globalThis as any).hwaHelperPopupData;
-  if (popupData?.countEvolvableTitans) {
-    const count = popupData.countEvolvableTitans(cache.value.titanGetAll?.data, cache.value.inventoryGet?.data);
-    return count > 0 ? count : null;
-  }
-  return null;
+  const count = countEvolvableTitans(cache.value.titanGetAll?.data, cache.value.inventoryGet?.data);
+  return count > 0 ? count : null;
 });
 
 const hasActiveEvents = computed(() => {

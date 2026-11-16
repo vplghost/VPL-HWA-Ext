@@ -1,11 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
-
-const context = {};
-runInNewContext(await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8'), context);
-const metadata = context.hwaHelperHeroMetadata;
+import { heroMetadata as metadata } from '../src/data/heroMetadata.ts';
 
 test('hero metadata includes all playable heroes with role, class, and faction', () => {
   assert.ok(metadata);

@@ -3,6 +3,7 @@ import UnitStars from '@/src/components/common/UnitStars.vue';
 import { computed } from 'vue';
 import { getTitanMetadata, getTitanSoulProgress, starGlowClass } from '@/src/utils/metadata';
 import { skinStats } from '@/src/data/heroMetadata';
+import { isTitanArtifactUpgradable } from '@/src/utils/popupData';
 import { formatNumber } from '@/src/utils/formatters';
 import { useHoverCardPosition } from '@/src/composables/useHoverCardPosition';
 
@@ -70,7 +71,7 @@ const skinsList = computed(() => {
   const skins = props.titan?.skins;
   if (!skins || typeof skins !== 'object') return [];
   const entries = Object.entries(skins).sort(([a], [b]) => Number(a) - Number(b));
-  const statsMap = (typeof skinStats !== 'undefined' ? skinStats : undefined) || (globalThis as any).hwaHelperSkinStats || {};
+  const statsMap = (typeof skinStats !== 'undefined' ? skinStats : undefined) || {};
   return entries.map(([skinId, level]) => {
     let stat = statsMap[skinId];
     if (!stat || stat === 'MAIN') stat = 'HP';
@@ -86,9 +87,8 @@ const artifactsList = computed(() => {
   const arts = props.titan?.artifacts;
   if (!Array.isArray(arts) || arts.length === 0) return [];
   const typeNames = ['Wpn', 'Crown', 'Seal'];
-  const popupData = (globalThis as any).hwaHelperPopupData;
   return arts.map((art, idx) => {
-    const isUpgradable = popupData?.isTitanArtifactUpgradable?.(props.titanId, idx, props.titan, {
+    const isUpgradable = isTitanArtifactUpgradable(props.titanId, idx, props.titan, {
       inventoryGet: { data: props.inventory },
       titanGetAll: { data: { [String(props.titanId)]: props.titan } },
     });

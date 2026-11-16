@@ -18,11 +18,11 @@ import {
 import { buildingQueueService } from '@/src/services/queues/buildingQueue';
 
 // Resolve helper with fallback to typed module for runtime, and globalThis for test harness
-const bHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingData)
-  || (typeof buildingDataHelper !== 'undefined' ? buildingDataHelper : null);
+const bHelper = (typeof buildingDataHelper !== 'undefined' ? buildingDataHelper : null)
+  || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingData);
 
-const bQueueHelper = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingQueue)
-  || (typeof buildingQueueService !== 'undefined' ? buildingQueueService : null);
+const bQueueHelper = (typeof buildingQueueService !== 'undefined' ? buildingQueueService : null)
+  || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingQueue);
 
 const getBuildingLevelData = (id: any, lvl: any) =>
   bHelper?.getBuildingLevelData?.(id, lvl)

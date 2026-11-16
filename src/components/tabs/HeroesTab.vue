@@ -9,6 +9,7 @@ import {
   getHeroSoulProgress,
   starGlowClass,
   downloadJson,
+  getHeroName,
   type HeroMeta,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
@@ -73,7 +74,7 @@ const heroEntries = computed(() => {
     return {
       id: Number(id),
       idStr,
-      name: meta?.name || (globalThis as any).hwaHelperNameMap?.hero?.(id) || `Hero #${id}`,
+      name: meta?.name || (typeof getHeroName === 'function' ? getHeroName(id) : null) || (globalThis as any).hwaHelperNameMap?.hero?.(id) || `Hero #${id}`,
       class: meta?.class || 'Other',
       role: meta?.role || '',
       faction: meta?.faction || '',

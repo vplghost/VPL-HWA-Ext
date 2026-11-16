@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
-const queueJs = await readFile(new URL('../extension/building-queue.js', import.meta.url), 'utf8');
-const buildingDataJs = await readFile(new URL('../extension/building-data.js', import.meta.url), 'utf8');
+import { buildingDataHelper } from '../src/data/buildingData.ts';
+import { buildingQueueService } from '../src/services/queues/buildingQueue.ts';
 
 function createContext() {
-  const context = vm.createContext({ globalThis: {} });
-  vm.runInContext(buildingDataJs, context);
-  vm.runInContext(queueJs, context);
-  return context.globalThis;
+  return {
+    hwaHelperBuildingQueue: buildingQueueService,
+    hwaHelperBuildingData: buildingDataHelper,
+  };
 }
 
 test('getSimulatedLevels calculates projected levels across current buildings, active queues, and queued items', () => {

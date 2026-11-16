@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import '../extension/march-rules.js';
-import '../extension/hero-metadata.js';
-import '../extension/experimental-data.js';
-import '../extension/auto-gather.js';
+import '../src/utils/marchRules.ts';
+import '../src/data/heroMetadata.ts';
+import '../src/utils/experimentalData.ts';
+import autoGatherService from '../src/services/queues/autoGather.ts';
 
 test('normalizeAutoGatherSettings defaults and clamps correctly', () => {
   const norm = globalThis.hwaHelperAutoGather.normalizeAutoGatherSettings;

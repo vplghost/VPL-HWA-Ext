@@ -1,12 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import vm from 'node:vm';
-
-const context = {};
-for (const file of ['experimental-data', 'raid-queue']) vm.runInNewContext(
-  await readFile(new URL(`../extension/${file}.js`, import.meta.url), 'utf8'), context);
-const queue = context.hwaHelperRaidQueue, data = context.hwaHelperExperimentalData;
+import { experimentalDataHelper as data } from '../src/utils/experimentalData.ts';
+import { raidQueueService as queue } from '../src/services/queues/raidQueue.ts';
 const heroes = Object.fromEntries([1, 2, 3, 4, 5].map((id) => [id, { level: 30, star: 2, power: id * 100 }]));
 const capacities = Object.fromEntries(Object.entries(heroes).map(([id, hero]) => [id, { signature: data.capacitySignature(hero), count: 600 }]));
 const options = { mapId: 'map', center: { x: 10, y: 20 }, level: 5, heroIds: [1, 2, 3, 4, 5],

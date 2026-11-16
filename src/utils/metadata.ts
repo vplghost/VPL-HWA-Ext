@@ -1,24 +1,24 @@
-import '~/extension/hero-metadata.js';
-import '~/extension/titan-metadata.js';
-import '~/extension/data-names.js';
-import '~/extension/item-resources.js';
-import '~/extension/name-map.js';
-import '~/extension/popup-data.js';
-import '~/extension/building-data.js';
-import '~/extension/building-queue.js';
-import '~/extension/research-data.js';
-import '~/extension/research-queue.js';
-import '~/extension/campaign-missions.js';
-import '~/extension/quest-data.js';
-import '~/extension/experimental-data.js';
-import '~/extension/tower-buffs.js';
-import '~/extension/tower-rules.js';
-import '~/extension/tower-automation.js';
-import '~/extension/clan-versus-rules.js';
+import '../data/heroMetadata.ts';
+import '../data/titanMetadata.ts';
+import '../data/nameData.ts';
+import '../data/itemData.ts';
+import './popupData.ts';
+import '../data/buildingData.ts';
+import '../services/queues/buildingQueue.ts';
+import '../data/researchData.ts';
+import '../services/queues/researchQueue.ts';
+import '../data/campaignData.ts';
+import '../data/questData.ts';
+import './experimentalData.ts';
+import '../data/towerData.ts';
+import './towerRules.ts';
+import '../services/queues/towerAutomation.ts';
+import '../data/clanVersusData.ts';
 
 import { heroMetadata, getHeroMetadata as getTypedHeroMetadata, gearCraftData } from '../data/heroMetadata.ts';
 import { titanMetadata, getTitanMetadata as getTypedTitanMetadata } from '../data/titanMetadata.ts';
 import { getItemName as typedGetItemName, getBuildingName as typedGetBuildingName, getResearchName as typedGetResearchName } from '../data/nameData.ts';
+import { heroEquipmentRank, heroSoulProgress, titanSoulProgress } from './popupData.ts';
 
 export interface HeroMeta {
   name: string;
@@ -57,15 +57,15 @@ export function getAllTitanMetadata(): Record<string, TitanMeta> {
 }
 
 export function getHeroEquipmentRank(color: number | string) {
-  return (globalThis as any).hwaHelperPopupData?.getHeroEquipmentRank?.(color);
+  return heroEquipmentRank(color) ?? (globalThis as any).hwaHelperPopupData?.getHeroEquipmentRank?.(color);
 }
 
 export function getHeroSoulProgress(heroId: string | number, hero: any, inventory: any) {
-  return (globalThis as any).hwaHelperPopupData?.heroSoulProgress?.(String(heroId), hero, inventory);
+  return heroSoulProgress(String(heroId), hero, inventory) ?? (globalThis as any).hwaHelperPopupData?.heroSoulProgress?.(String(heroId), hero, inventory);
 }
 
 export function getTitanSoulProgress(titanId: string | number, titan: any, inventory: any) {
-  return (globalThis as any).hwaHelperPopupData?.titanSoulProgress?.(String(titanId), titan, inventory);
+  return titanSoulProgress(String(titanId), titan, inventory) ?? (globalThis as any).hwaHelperPopupData?.titanSoulProgress?.(String(titanId), titan, inventory);
 }
 
 const worldMaterialNames: Record<number, string> = {

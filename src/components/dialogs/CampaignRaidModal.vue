@@ -16,7 +16,7 @@ import {
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { getMissionCosts } from '@/src/data/missionCostData';
-import { campaignMissions, getHighestRaidableMission } from '@/src/data/campaignData';
+import { campaignMissions, getHighestRaidableMission, getMissionTries } from '@/src/data/campaignData';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -103,7 +103,7 @@ function getTriesInfo(id: number | string) {
       isExhausted: disabled,
     };
   }
-  const tries = cMissions?.getMissionTries?.(numId, cache.value?.missionGetAll?.data) || {
+  const tries = (typeof getMissionTries === 'function' ? getMissionTries(numId, cache.value?.missionGetAll?.data) : null) || cMissions?.getMissionTries?.(numId, cache.value?.missionGetAll?.data) || {
     isHeroic: true,
     maxTries: 3,
     triesSpent: 0,

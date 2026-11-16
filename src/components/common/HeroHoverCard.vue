@@ -2,7 +2,8 @@
 import UnitStars from '@/src/components/common/UnitStars.vue';
 import { computed } from 'vue';
 import { getHeroMetadata, getHeroEquipmentRank, getHeroSoulProgress, starGlowClass } from '@/src/utils/metadata';
-import { skinStats, getHeroGlyphs } from '@/src/data/heroMetadata';
+import { skinStats, getHeroGlyphs, getHeroName } from '@/src/data/heroMetadata';
+import { getHeroArtifactTierStyle } from '@/src/utils/popupData';
 import { formatNumber } from '@/src/utils/formatters';
 import { useHoverCardPosition } from '@/src/composables/useHoverCardPosition';
 
@@ -17,7 +18,7 @@ const { isVisible, cardPositionStyle, anchorRef } = useHoverCardPosition();
 const meta = computed(() => getHeroMetadata(props.heroId));
 
 const heroName = computed(() => {
-  return meta.value?.name || (globalThis as any).hwaHelperNameMap?.hero?.(props.heroId) || `Hero #${props.heroId}`;
+  return meta.value?.name || getHeroName(props.heroId) || `Hero #${props.heroId}`;
 });
 
 const starCount = computed(() => Number(props.hero?.star) || 1);
@@ -74,7 +75,7 @@ const skinsList = computed(() => {
   const skins = props.hero?.skins;
   if (!skins || typeof skins !== 'object') return [];
   const entries = Object.entries(skins).sort(([a], [b]) => Number(a) - Number(b));
-  const statsMap = (typeof skinStats !== 'undefined' ? skinStats : undefined) || (globalThis as any).hwaHelperSkinStats || {};
+  const statsMap = (typeof skinStats !== 'undefined' ? skinStats : undefined) || {};
   return entries.map(([skinId, level]) => {
     let stat = statsMap[skinId];
     if (!stat || stat === 'MAIN' || Number(skinId) === Number(props.hero?.baseSkinId) || (Number(skinId) <= 100 && !skinStats[skinId])) {
@@ -98,7 +99,7 @@ const glyphsList = computed(() => {
   if (!Array.isArray(runes) || runes.length === 0 || !runes.some((r: any) => Number(r) > 0)) {
     return [];
   }
-  const glyphStats = (typeof getHeroGlyphs === 'function' ? getHeroGlyphs(props.heroId) : null) || (globalThis as any).hwaHelperHeroGlyphs?.[String(props.heroId)] || ['PA', 'Arm', 'HP', 'MD', 'Str'];
+  const glyphStats = getHeroGlyphs(props.heroId) || ['PA', 'Arm', 'HP', 'MD', 'Str'];
   return runes.map((lvl: any, idx: number) => {
     let stat = glyphStats[idx] || `G${idx + 1}`;
     if (stat === 'Dodge') stat = 'Ddg';
@@ -113,12 +114,9 @@ const artifactsList = computed(() => {
   const arts = props.hero?.artifacts;
   if (!Array.isArray(arts) || arts.length === 0) return [];
   const typeAbbr: Record<string, string> = { weapon: 'Wpn', book: 'Book', ring: 'Ring' };
-  const popupData = (globalThis as any).hwaHelperPopupData;
   return arts.map((art: any) => {
     const artLvl = Number(art.level) || 0;
-    const tierStyle = popupData?.getHeroArtifactTierStyle?.(artLvl) || {
-      badge: 'bg-slate-700/80 text-slate-300 ring-1 ring-slate-600/60',
-    };
+    const tierStyle = getHeroArtifactTierStyle(artLvl);
     const name = typeAbbr[art.artifactType] || art.artifactType || 'Art';
     return {
       name,

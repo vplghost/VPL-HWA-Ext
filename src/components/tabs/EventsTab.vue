@@ -158,7 +158,7 @@ const eventCards = computed<EventCard[]>(() => {
   }
 
   // 6. Special Quest Events
-  const qData = questData || (globalThis as any).hwaHelperQuestData;
+  const qData = questData;
   if (qData?.visibleMetadata) {
     const questEvents = qData.visibleMetadata(cache.value);
     if (Array.isArray(questEvents)) {

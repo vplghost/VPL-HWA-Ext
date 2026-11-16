@@ -7,6 +7,7 @@ import { towerSettingsForAccount } from '@/src/utils/dialogRpc';
 import { getHeroMetadata } from '@/src/utils/metadata';
 import { TOWER_FLOOR_COUNT } from '@/src/utils/towerRules';
 import { towerBuffs } from '@/src/data/towerData';
+import { DEFAULT_BUFF_PRIORITY } from '@/src/services/queues/towerAutomation';
 import { formatNumber } from '@/src/utils/formatters';
 
 const props = defineProps<{
@@ -81,7 +82,7 @@ const effectIcons: Record<number, string> = {
 const buffOrder = ref<number[]>([]);
 
 function getCatalog() {
-  return towerBuffs || (globalThis as any).hwaHelperTowerBuffs || {};
+  return towerBuffs || {};
 }
 
 function getBuffGroup(id: number) {
@@ -96,9 +97,10 @@ function getBuffInfo(id: number) {
 function initBuffOrder(saved?: number[]) {
   const cat = getCatalog();
   const allIds = Object.keys(cat).map(Number).sort((a, b) => a - b);
-  const defaultOrder = Array.isArray((globalThis as any).hwaHelperTowerAutomation?.DEFAULT_BUFF_PRIORITY)
-    ? (globalThis as any).hwaHelperTowerAutomation.DEFAULT_BUFF_PRIORITY
-    : allIds;
+  const defaultOrder = (Array.isArray(DEFAULT_BUFF_PRIORITY) ? DEFAULT_BUFF_PRIORITY : null) ||
+    (Array.isArray((globalThis as any).hwaHelperTowerAutomation?.DEFAULT_BUFF_PRIORITY)
+      ? (globalThis as any).hwaHelperTowerAutomation.DEFAULT_BUFF_PRIORITY
+      : allIds);
   const savedList = Array.isArray(saved) ? saved : [];
   const merged = [...new Set([...savedList, ...defaultOrder, ...allIds])].filter((id) => cat[id] != null);
   buffOrder.value = merged.length > 0 ? merged : defaultOrder;

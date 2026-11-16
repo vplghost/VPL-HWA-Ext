@@ -3,10 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
-const source = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
-const context = { globalThis: {} };
-vm.runInNewContext(source, context);
-const data = context.globalThis.hwaHelperExperimentalData;
+import { experimentalDataHelper as data } from '../src/utils/experimentalData.ts';
 
 test('object-form custom heroes render in both team option builders without mutation', () => {
   const heroes = Object.fromEntries([1, 2, 3, 4, 5].map(id => [id, { power: id }]));

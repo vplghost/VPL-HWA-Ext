@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
-
-const context = {};
-runInNewContext(await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8'), context);
-const metadata = context.hwaHelperTitanMetadata;
+import {
+  titanMetadata as metadata,
+  titanArtifactEvolveCost,
+  titanArtifactLevelCosts,
+} from '../src/data/titanMetadata.ts';
 
 test('titan metadata includes all 29 playable titans with role, element, and avatar', () => {
   assert.ok(metadata);
@@ -60,7 +60,7 @@ test('titan metadata includes 3 artifact IDs, evolution costs, and level costs',
   const araji = metadata['4013'];
   assert.deepEqual([...araji.artifacts], [11008, 12001, 13001]);
 
-  const evolveCost = context.hwaHelperTitanArtifactEvolveCost;
+  const evolveCost = titanArtifactEvolveCost;
   assert.ok(evolveCost);
   assert.equal(evolveCost[1], 15);
   assert.equal(evolveCost[2], 300);
@@ -69,7 +69,7 @@ test('titan metadata includes 3 artifact IDs, evolution costs, and level costs',
   assert.equal(evolveCost[5], 4500);
   assert.equal(evolveCost[6], 15000);
 
-  const levelCosts = context.hwaHelperTitanArtifactLevelCosts;
+  const levelCosts = titanArtifactLevelCosts;
   assert.ok(Array.isArray(levelCosts));
   assert.equal(levelCosts.length, 121);
   assert.deepEqual([...levelCosts[2]], [25, 20000]);

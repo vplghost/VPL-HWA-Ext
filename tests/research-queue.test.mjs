@@ -3,18 +3,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
-const researchDataJs = await readFile(new URL('../extension/research-data.js', import.meta.url), 'utf8');
-const researchQueueJs = await readFile(new URL('../extension/research-queue.js', import.meta.url), 'utf8');
-const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+import { researchDataHelper as researchData } from '../src/data/researchData.ts';
+import { researchQueueService as queueHelper } from '../src/services/queues/researchQueue.ts';
 
-const rContext = {
-  Date,
-  globalThis: {}
-};
-vm.runInNewContext(researchDataJs, rContext);
-vm.runInNewContext(researchQueueJs, rContext);
-const researchData = rContext.globalThis.hwaHelperResearchData;
-const queueHelper = rContext.globalThis.hwaHelperResearchQueue;
+const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 
 test('research-queue getSimulatedLevels calculates max level from completed, active queue and automation queue', () => {
   const researchMap = new Map([
