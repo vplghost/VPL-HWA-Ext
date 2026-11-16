@@ -10,22 +10,12 @@ const excluded = new Set([
   'popup.html',
   'popup.js',
   'popup.css',
-  'theme.css',
-  'background.js',
-  'bridge.js',
-  'intercept.js',
-  'mqtt-capture.js',
-  'auto-gather.js',
-  'free-alchemy.js',
-  'mine-defense.js',
-  'research-queue.js',
-  'smart-gather.js',
-  'tower-runner.js'
+  'theme.css'
 ]);
 async function runtimeAssets(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const groups = await Promise.all(entries.map(async (entry) => {
-    if (excluded.has(entry.name)) return [];
+    if (excluded.has(entry.name) || entry.name.endsWith('.js')) return [];
     const path = join(dir, entry.name);
     return entry.isDirectory() ? runtimeAssets(path) : [path];
   }));
