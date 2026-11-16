@@ -1,24 +1,8 @@
+import '../extension/rpc-cache.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
+import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
 
-const source = await readFile(new URL('../extension/background.js', import.meta.url), 'utf8');
-const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
-const cacheSource = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
-const mailSource = await readFile(new URL('../extension/mail-data.js', import.meta.url), 'utf8');
-const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
-const experimentalSource = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
-const raidSource = await readFile(new URL('../extension/raid-queue.js', import.meta.url), 'utf8');
-const raidEnergySource = await readFile(new URL('../extension/raid-energy-auto.js', import.meta.url), 'utf8');
-const monsterSource = await readFile(new URL('../extension/monster-queue.js', import.meta.url), 'utf8');
-const towerAutomationSource = await readFile(new URL('../extension/tower-automation.js', import.meta.url), 'utf8');
-const towerRunnerSource = await readFile(new URL('../extension/tower-runner.js', import.meta.url), 'utf8');
-const dungeonAutomationSource = await readFile(new URL('../extension/dungeon-automation.js', import.meta.url), 'utf8');
-const dungeonRunnerSource = await readFile(new URL('../extension/dungeon-runner.js', import.meta.url), 'utf8');
-const buildingDataSource = await readFile(new URL('../extension/building-data.js', import.meta.url), 'utf8');
-const buildingQueueSource = await readFile(new URL('../extension/building-queue.js', import.meta.url), 'utf8');
-const researchQueueSource = await readFile(new URL('../extension/research-queue.js', import.meta.url), 'utf8');
 const gameSender = { url: 'https://www.hero-wars-alliance.com/' };
 const popupSender = { url: 'chrome-extension://test-extension/popup.html' };
 
@@ -93,9 +77,7 @@ function setup(quota = Infinity, withBuildingData = false) {
       }
     }
   };
-  runInNewContext(`${filterSource}\n${refillRules}\n${mailSource}\n${cacheSource}\n${experimentalSource}\n${raidSource}\n${raidEnergySource}\n${monsterSource}\n${towerAutomationSource}\n${towerRunnerSource}\n${dungeonAutomationSource}\n${dungeonRunnerSource}\n${withBuildingData ? buildingDataSource : ''}\n${buildingQueueSource}\n${researchQueueSource}\n${source}`, {
-    chrome, URL, Date, console, Promise, Number, Array, TextEncoder, importScripts: () => {}
-  });
+  setupBackgroundRuntime({ chrome });
   const send = (kind, record, sender = kind === 'api-record' ? gameSender : popupSender) =>
     new Promise((resolve) => listener({ kind, record }, sender, resolve));
   return { local, session, send, installed, listener, tabsList, forwardedMessages, chrome, alarms, reloadedTabIds,
