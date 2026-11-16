@@ -558,9 +558,4 @@ export const experimentalDataHelper = {
   rallyPhase,
 };
 
-// Global hookup for backwards compatibility
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperExperimentalData = experimentalDataHelper;
-}
-
 export default experimentalDataHelper;

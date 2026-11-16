@@ -11443,9 +11443,4 @@ export const productionDataHelper = {
   ratePerMinute
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperProductionRules = (globalThis as any).hwaHelperProductionRules || productionRules;
-  (globalThis as any).hwaHelperProductionData = (globalThis as any).hwaHelperProductionData || productionDataHelper;
-}
-
 export default productionDataHelper;

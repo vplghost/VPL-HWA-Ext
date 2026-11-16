@@ -14356,12 +14356,4 @@ export const heroMetadataHelper = {
   getHeroEquipment,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperHeroMetadata = (globalThis as any).hwaHelperHeroMetadata || heroMetadata;
-  (globalThis as any).hwaHelperHeroGlyphs = (globalThis as any).hwaHelperHeroGlyphs || heroGlyphs;
-  (globalThis as any).hwaHelperSkinStats = (globalThis as any).hwaHelperSkinStats || skinStats;
-  (globalThis as any).hwaHelperGearCraftData = (globalThis as any).hwaHelperGearCraftData || gearCraftData;
-  (globalThis as any).hwaHelperScrollCraftData = (globalThis as any).hwaHelperScrollCraftData || scrollCraftData;
-}
-
 export default heroMetadataHelper;

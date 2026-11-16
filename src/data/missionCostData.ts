@@ -249,10 +249,3 @@ export function getMissionWinCost(missionId: number | string | null | undefined)
   const pair = getMissionCosts(missionId);
   return pair ? pair[1] : 0;
 }
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperMissionCosts) {
-    (globalThis as any).hwaHelperMissionCosts = missionCosts;
-  }
-}

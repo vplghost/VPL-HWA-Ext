@@ -44,8 +44,3 @@ export function getSpeedupDuration(type: SpeedupType, itemLevel: number | string
   const duration = speedupData.durations[type]?.[String(itemLevel)];
   return typeof duration === 'number' ? duration : null;
 }
-
-// Preserve backward compatibility for background worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperSpeedupData = speedupData;
-}

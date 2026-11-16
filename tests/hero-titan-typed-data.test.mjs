@@ -69,13 +69,13 @@ test('heroMetadata exports complete typed data and helpers with 100% parity', ()
   assert.deepEqual(getHeroGlyphs(99999), ['PA', 'Arm', 'HP', 'MD', 'Str']);
   assert.equal(getSkinStat(99999), null);
 
-  // Global backward compatibility
-  assert.ok(globalThis.hwaHelperHeroMetadata);
-  assert.equal(globalThis.hwaHelperHeroMetadata['1'].name, 'Aurora');
-  assert.ok(globalThis.hwaHelperHeroGlyphs);
-  assert.ok(globalThis.hwaHelperSkinStats);
-  assert.ok(globalThis.hwaHelperGearCraftData);
-  assert.ok(globalThis.hwaHelperScrollCraftData);
+  // Typed data objects
+  assert.ok(heroMetadata);
+  assert.equal(heroMetadata['1'].name, 'Aurora');
+  assert.ok(heroGlyphs);
+  assert.ok(skinStats);
+  assert.ok(gearCraftData);
+  assert.ok(scrollCraftData);
 });
 
 test('titanMetadata exports complete typed data and helpers with 100% parity', () => {
@@ -108,11 +108,11 @@ test('titanMetadata exports complete typed data and helpers with 100% parity', (
   assert.equal(getTitanArtifactEvolveCost(99), 0);
   assert.equal(getTitanArtifactLevelCost(999), null);
 
-  // Global backward compatibility
-  assert.ok(globalThis.hwaHelperTitanMetadata);
-  assert.equal(globalThis.hwaHelperTitanMetadata['4000'].name, 'Sigurd');
-  assert.ok(globalThis.hwaHelperTitanArtifactEvolveCost);
-  assert.ok(globalThis.hwaHelperTitanArtifactLevelCosts);
+  // Typed data objects
+  assert.ok(titanMetadata);
+  assert.equal(titanMetadata['4000'].name, 'Sigurd');
+  assert.ok(titanArtifactEvolveCost);
+  assert.ok(titanArtifactLevelCosts);
 });
 
 test('marchTooltip resolveHeroName resolves correctly using typed data', () => {

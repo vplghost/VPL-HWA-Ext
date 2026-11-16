@@ -71,8 +71,7 @@ export function plan(
   const data = cache.incomingMineAttacks?.data;
   if (account == null || String(data?.accountId) !== String(account)) return null;
 
-  const smart = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperSmartGather)
-    || smartGatherService;
+  const smart = smartGatherService;
   const rows = list(data.attacks)
     .filter((a: any) => a.attackerId !== String(account) && a.impactAt > now)
     .sort((a: any, b: any) => a.impactAt - b.impactAt);
@@ -171,8 +170,7 @@ export function sync(
   now: number
 ): Record<string, any> {
   const defense = state.defense || { attempted: [] };
-  const smart = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperSmartGather)
-    || smartGatherService;
+  const smart = smartGatherService;
   const process = (pending: any) => {
     if (!pending || !smart) return null;
     const child = smart.sync(
@@ -202,10 +200,3 @@ export const mineDefenseService = {
   plan,
   sync,
 };
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperMineDefense) {
-    (globalThis as any).hwaHelperMineDefense = mineDefenseService;
-  }
-}

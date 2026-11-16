@@ -17,7 +17,7 @@ import '../data/clanVersusData.ts';
 
 import { heroMetadata, getHeroMetadata as getTypedHeroMetadata, gearCraftData } from '../data/heroMetadata.ts';
 import { titanMetadata, getTitanMetadata as getTypedTitanMetadata } from '../data/titanMetadata.ts';
-import { getItemName as typedGetItemName, getBuildingName as typedGetBuildingName, getResearchName as typedGetResearchName, nameData } from '../data/nameData.ts';
+import { getItemName as typedGetItemName, getBuildingName as typedGetBuildingName, getResearchName as typedGetResearchName, nameData, nameMap } from '../data/nameData.ts';
 import { heroEquipmentRank, heroSoulProgress, titanSoulProgress } from './popupData.ts';
 
 export interface HeroMeta {
@@ -116,8 +116,9 @@ export function getItemName(category: string, id: number | string): string {
 
   const typedItem = typeof typedGetItemName === 'function' ? typedGetItemName(category, strId) : null;
   if (typedItem) return typedItem;
-  const nameMap = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperNameMap) || null;
-  return nameMap?.item?.(category, strId) || `${category} #${strId}`;
+  const mapHelper = (typeof nameMap !== 'undefined' ? nameMap : null)
+    || (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperNameMap : null);
+  return mapHelper?.item?.(category, strId) || `${category} #${strId}`;
 }
 
 export function downloadJson(filename: string, data: any) {

@@ -28,9 +28,7 @@ test('marchRules: mineTypes correctly categorizes all basic resource types', () 
   assert.equal(getMineResourceType(99999), undefined);
   assert.equal(getMineResourceType(null), undefined);
 
-  // Global backward compatibility
-  assert.ok(globalThis.hwaHelperMineTypes);
-  assert.equal(globalThis.hwaHelperMineTypes['12'], 'wood');
+  assert.equal(mineTypes['12'], 'wood');
 });
 
 test('marchRules: rallyTargets resolves known PvE and PvP targets', () => {
@@ -41,9 +39,7 @@ test('marchRules: rallyTargets resolves known PvE and PvP targets', () => {
   assert.equal(getRallyTargetName(99999), undefined);
   assert.equal(getRallyTargetName(undefined), undefined);
 
-  // Global backward compatibility
-  assert.ok(globalThis.hwaHelperRallyTargets);
-  assert.equal(globalThis.hwaHelperRallyTargets['26'], 'Blood Shaman');
+  assert.equal(rallyTargets['26'], 'Blood Shaman');
 });
 
 test('marchRules: routeSpeeds exports configured route speeds', () => {
@@ -51,9 +47,7 @@ test('marchRules: routeSpeeds exports configured route speeds', () => {
   assert.equal(getRouteSpeed('returnToOutpost'), 15);
   assert.equal(getRouteSpeed('unknownRoute'), undefined);
 
-  // Global backward compatibility
-  assert.ok(globalThis.hwaHelperRouteSpeeds);
-  assert.equal(globalThis.hwaHelperRouteSpeeds.toTargetRallyPve, 20);
+  assert.equal(routeSpeeds.toTargetRallyPve, 20);
 });
 
 test('trackingFilter: identifies tracking, analytics, and ads endpoints', () => {
@@ -74,9 +68,8 @@ test('trackingFilter: identifies tracking, analytics, and ads endpoints', () => 
   assert.equal(isTrackingUrl('invalid-url-string'), false);
   assert.equal(isTrackingUrl(null), false);
 
-  // Global backward compatibility
-  assert.equal(typeof globalThis.hwaHelperIsTrackingUrl, 'function');
-  assert.equal(globalThis.hwaHelperIsTrackingUrl('https://wa.appsflyersdk.com'), true);
+  assert.equal(typeof isTrackingUrl, 'function');
+  assert.equal(isTrackingUrl('https://wa.appsflyersdk.com'), true);
 });
 
 test('missionCostData: exports accurate mission start and win costs', () => {
@@ -100,7 +93,7 @@ test('missionCostData: exports accurate mission start and win costs', () => {
   assert.equal(getMissionStartCost(99999), 0);
   assert.equal(getMissionWinCost(99999), 0);
 
-  // Global backward compatibility
-  assert.ok(globalThis.hwaHelperMissionCosts);
-  assert.deepEqual(globalThis.hwaHelperMissionCosts['135'], [2, 6]);
+  // Typed mission costs
+  assert.ok(missionCosts);
+  assert.deepEqual(missionCosts['135'], [2, 6]);
 });

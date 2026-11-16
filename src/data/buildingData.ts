@@ -100,8 +100,4 @@ export const buildingDataHelper = {
   normalizeQueuedDuration,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperBuildingData = (globalThis as any).hwaHelperBuildingData || buildingDataHelper;
-}
-
 export default buildingDataHelper;

@@ -26,8 +26,3 @@ export function getRefillableRule(id: number | string): RefillableRule | undefin
   const num = typeof id === 'string' ? parseInt(id, 10) : id;
   return refillableRules[num];
 }
-
-// Preserve backward compatibility for background worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperRefillableRules = refillableRules;
-}

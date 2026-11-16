@@ -57,7 +57,7 @@ export function dailyDashboard(cache: Record<string, any> = {}, now: number | Da
   activities.push(row('hydra', 'Hydra', '🐉', !hydra ? 'unknown' : tries > 0 ? 'pending' : 'info',
     !hydra ? unknown : `${hydra.tries ?? 0} regular · ${hydra.superTries ?? 0} super tries left`));
 
-  const qData = questData || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperQuestData);
+  const qData = questData;
   const quests = data('questGetAll');
   const dailyList = qData?.dailyQuests(cache, nowMs) || null;
   const openDaily = dailyList?.filter((quest: any) => quest.state === 'inProgress') || [];
@@ -94,9 +94,5 @@ export function dailyDashboard(cache: Record<string, any> = {}, now: number | Da
 export const dashboardDataHelper = {
   dailyDashboard
 };
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperDashboardData = dashboardDataHelper;
-}
 
 export default dashboardDataHelper;

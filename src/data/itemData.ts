@@ -2643,7 +2643,3 @@ export function getResourceIcon(entry: { key?: string } | undefined): string | n
   if (namespace !== 'resource') return null;
   return category ? getItemIcon(category, id) : null;
 }
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperItemResources = itemResources;
-}

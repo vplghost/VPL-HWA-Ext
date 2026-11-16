@@ -4,9 +4,9 @@ import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import '../src/utils/marchRules.ts';
 import '../src/utils/experimentalData.ts';
-import '../src/data/smartGatherData.ts';
+import smartGatherData from '../src/data/smartGatherData.ts';
 import smartGatherService from '../src/services/queues/smartGather.ts';
-import '../src/services/queues/autoGather.ts';
+import autoGatherService from '../src/services/queues/autoGather.ts';
 const smart = smartGatherService;
 const now = Date.parse('2026-11-14T10:00:00Z');
 const at = new Date(now - 60000).toISOString();
@@ -108,8 +108,8 @@ test('recall confirmation and fresh roster gate return; account changes discard 
   assert.equal(smart.sync(confirmed, null, c, now + 21000).pending, undefined);
 });
 test('shared RPC and disabled smart mode preserve existing dispatch gates', () => {
-  assert.equal(globalThis.hwaHelperAutoGather.planAutoGather(cache(), { popupRpcEnabled: false, autoGatherSettings: { enabled: true, smartEnabled: true } }, now).action, 'idle');
-  assert.equal(globalThis.hwaHelperAutoGather.normalizeAutoGatherSettings({}).smartEnabled, false);
+  assert.equal(autoGatherService.planAutoGather(cache(), { popupRpcEnabled: false, autoGatherSettings: { enabled: true, smartEnabled: true } }, now).action, 'idle');
+  assert.equal(autoGatherService.normalizeAutoGatherSettings({}).smartEnabled, false);
 });
 
 test('nearest mode scans levels, orders candidates and rejects exactly one hour', () => {
@@ -126,7 +126,7 @@ test('nearest mode scans levels, orders candidates and rejects exactly one hour'
   const response = amount => ({ method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc', timestamp: new Date(now + 1).toISOString(),
     requestBody: JSON.stringify({ calls: [{ ...probe.call, ident: 'p' }] }), responseBody: JSON.stringify({ results: [{ ident: 'p', result: { response: { mineId: 'near', resourceAmount: amount } } }] }) });
   state.pending = { ...probe.pending, call: probe.call, phase: 'sent', sentAt: now };
-  const perMinute = globalThis.hwaHelperSmartGatherData.mines[68].speedPerMinute;
+  const perMinute = smartGatherData.mines[68].speedPerMinute;
   const rejected = smart.sync(state, response(perMinute * 60), c, now + 1);
   assert.equal(rejected.nearest.candidates.length, 1);
   assert.equal(smart.nearestPlan(c, rejected, 'food', now + 2).call.args.mineId, 'far');

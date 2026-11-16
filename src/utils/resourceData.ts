@@ -291,7 +291,3 @@ export const resourceDataHelper = {
   isMarchExpired,
   getMarchBadgeInfo,
 };
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperResourceData = (globalThis as any).hwaHelperResourceData || resourceDataHelper;
-}

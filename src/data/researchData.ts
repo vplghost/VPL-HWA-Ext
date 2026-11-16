@@ -179,8 +179,4 @@ export const researchDataHelper = {
   requiresSpecialResource,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperResearchData = (globalThis as any).hwaHelperResearchData || researchDataHelper;
-}
-
 export default researchDataHelper;

@@ -4174,15 +4174,3 @@ export function getHighestRaidableMission(
 
   return Number(sorted[0]);
 }
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperCampaignMissions = {
-    missions: campaignMissions,
-    itemDrops,
-    getMissionsForItem,
-    getHighestRaidableMission,
-    getMissionProgress,
-    getMissionTries,
-    isMissionRaidable
-  };
-}

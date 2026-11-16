@@ -103,16 +103,3 @@ export function getRouteSpeed(routeType: string | null | undefined): number | un
   if (!routeType) return undefined;
   return routeSpeeds[routeType];
 }
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperMineTypes) {
-    (globalThis as any).hwaHelperMineTypes = mineTypes;
-  }
-  if (!(globalThis as any).hwaHelperRallyTargets) {
-    (globalThis as any).hwaHelperRallyTargets = rallyTargets;
-  }
-  if (!(globalThis as any).hwaHelperRouteSpeeds) {
-    (globalThis as any).hwaHelperRouteSpeeds = routeSpeeds;
-  }
-}

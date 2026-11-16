@@ -505,10 +505,3 @@ export const mailService = {
   reportLabel,
   compactReports,
 };
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperMailData) {
-    (globalThis as any).hwaHelperMailData = mailService;
-  }
-}

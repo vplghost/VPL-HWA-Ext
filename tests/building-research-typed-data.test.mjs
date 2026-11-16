@@ -64,9 +64,9 @@ test('buildingData exports complete data and typed helpers with 100% parity', ()
   const normalized = normalizeQueuedDuration(item);
   assert.equal(normalized.durationMs, Math.round(109680 * 1000 * 0.58));
 
-  // Global backward compatibility
-  assert.ok(globalThis.hwaHelperBuildingData);
-  assert.equal(globalThis.hwaHelperBuildingData.getBuildingLevelData, getBuildingLevelData);
+  // Typed helper
+  assert.ok(buildingDataHelper);
+  assert.equal(buildingDataHelper.getBuildingLevelData, getBuildingLevelData);
 });
 
 test('researchData exports complete data and typed helpers with 100% parity', () => {
@@ -116,7 +116,7 @@ test('researchData exports complete data and typed helpers with 100% parity', ()
   assert.equal(requiresSpecialResource(1, 1), false);
   assert.equal(requiresSpecialResource(558, 1), true); // Tactical classes require material 12
 
-  // Global backward compatibility
-  assert.ok(globalThis.hwaHelperResearchData);
-  assert.equal(globalThis.hwaHelperResearchData.getMaxLevel, getMaxLevel);
+  // Typed helper
+  assert.ok(researchDataHelper);
+  assert.equal(researchDataHelper.getMaxLevel, getMaxLevel);
 });

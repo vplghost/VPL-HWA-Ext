@@ -136,10 +136,3 @@ export const worldReadService = {
   plan,
   wakeAt,
 };
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperWorldRead) {
-    (globalThis as any).hwaHelperWorldRead = worldReadService;
-  }
-}

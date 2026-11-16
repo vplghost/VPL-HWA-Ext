@@ -61,10 +61,3 @@ export const freeAlchemyPolicy: FreeAlchemyPolicy = {
   day: freeAlchemyDay,
   cycle: freeAlchemyCycle,
 };
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperFreeAlchemy) {
-    (globalThis as any).hwaHelperFreeAlchemy = freeAlchemyPolicy;
-  }
-}

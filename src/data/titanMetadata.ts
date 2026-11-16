@@ -414,10 +414,4 @@ export const titanMetadataHelper = {
   getTitanArtifactLevelCost,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperTitanMetadata = (globalThis as any).hwaHelperTitanMetadata || titanMetadata;
-  (globalThis as any).hwaHelperTitanArtifactEvolveCost = (globalThis as any).hwaHelperTitanArtifactEvolveCost || titanArtifactEvolveCost;
-  (globalThis as any).hwaHelperTitanArtifactLevelCosts = (globalThis as any).hwaHelperTitanArtifactLevelCosts || titanArtifactLevelCosts;
-}
-
 export default titanMetadataHelper;

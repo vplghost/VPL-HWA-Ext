@@ -510,13 +510,3 @@ export const clanVersusChallengeNames: Record<number, string> = challengeNames;
 export const clanVersusChallengePoints: Record<number, number> = challengePoints;
 export const clanVersusChallengeSteps: Record<number, number> = challengeSteps;
 export const clanVersusRoundQuests: Record<number, { theme: string; battlePoints: number; quests: Array<{ label: string; points: number }> }> = roundQuests;
-
-// Preserve backward compatibility
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperClanVersusRewards = chestRewards;
-  (globalThis as any).hwaHelperClanVersusChestThresholds = chestThresholds;
-  (globalThis as any).hwaHelperClanVersusChallengeNames = challengeNames;
-  (globalThis as any).hwaHelperClanVersusChallengePoints = challengePoints;
-  (globalThis as any).hwaHelperClanVersusChallengeSteps = challengeSteps;
-  (globalThis as any).hwaHelperClanVersusRoundQuests = roundQuests;
-}

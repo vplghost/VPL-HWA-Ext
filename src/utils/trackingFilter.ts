@@ -22,10 +22,3 @@ export function isTrackingUrl(input: string | URL | null | undefined, base?: str
     return false;
   }
 }
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperIsTrackingUrl) {
-    (globalThis as any).hwaHelperIsTrackingUrl = isTrackingUrl;
-  }
-}

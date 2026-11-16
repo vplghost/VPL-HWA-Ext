@@ -69,9 +69,3 @@ export function getTowerBuff(id: number | string): TowerBuffMeta | undefined {
   const strId = String(id);
   return towerBuffs[strId];
 }
-
-// Preserve backward compatibility for background worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperTowerBuffs = towerBuffs;
-  (globalThis as any).hwaHelperTowerRules = towerRules;
-}

@@ -124,9 +124,4 @@ export const smartGatherData: SmartGatherData = {
   }
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperSmartGatherData =
-    (globalThis as any).hwaHelperSmartGatherData || smartGatherData;
-}
-
 export default smartGatherData;

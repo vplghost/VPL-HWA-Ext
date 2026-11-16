@@ -110,10 +110,3 @@ export function getInfirmaryCapacity(
 ): number | undefined {
   return mineDefenseData.capacities[String(buildingId)]?.[String(level)];
 }
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperMineDefenseData) {
-    (globalThis as any).hwaHelperMineDefenseData = mineDefenseData;
-  }
-}

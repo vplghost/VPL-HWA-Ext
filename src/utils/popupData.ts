@@ -581,10 +581,10 @@ export function extractEventGoals(cache: any, now = Date.now()): {
   const goalsMap = new Map<string, any>();
   const towerCleared = isTowerCleared(cache);
 
-  const challengeNames = clanVersusChallengeNames || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusChallengeNames) || {};
-  const challengePoints = clanVersusChallengePoints || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusChallengePoints) || {};
-  const challengeSteps = clanVersusChallengeSteps || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusChallengeSteps) || {};
-  const roundQuestsMap = clanVersusRoundQuests || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusRoundQuests) || {};
+  const challengeNames = clanVersusChallengeNames || {};
+  const challengePoints = clanVersusChallengePoints || {};
+  const challengeSteps = clanVersusChallengeSteps || {};
+  const roundQuestsMap = clanVersusRoundQuests || {};
 
   function addOrMergeGoal({ key, title, category, eventName, amount = 1, unit = '', points = 0, stock = null, hint = '' }: any) {
     const isTowerChest = key === 'act:tower' ||
@@ -730,7 +730,7 @@ export function extractEventGoals(cache: any, now = Date.now()): {
   }
 
   // 4. Special Quest Events
-  const qData = questData || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperQuestData);
+  const qData = questData;
   const questEvents = qData?.visibleMetadata?.(cache, now);
   if (Array.isArray(questEvents)) {
     for (const qe of questEvents) {
@@ -1017,7 +1017,3 @@ export const popupDataHelper = {
   isTowerCleared,
   extractEventGoals,
 };
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperPopupData = (globalThis as any).hwaHelperPopupData || popupDataHelper;
-}

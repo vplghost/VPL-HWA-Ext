@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import '../src/utils/marchRules.ts';
 import '../src/data/heroMetadata.ts';
-import '../src/utils/experimentalData.ts';
+import experimentalDataHelper from '../src/utils/experimentalData.ts';
 import autoGatherService from '../src/services/queues/autoGather.ts';
 
 test('normalizeAutoGatherSettings defaults and clamps correctly', () => {
-  const norm = globalThis.hwaHelperAutoGather.normalizeAutoGatherSettings;
+  const norm = autoGatherService.normalizeAutoGatherSettings;
   const def = norm({});
   assert.equal(def.enabled, false);
   assert.equal(def.maxMarches, 3);
@@ -23,7 +23,7 @@ test('normalizeAutoGatherSettings defaults and clamps correctly', () => {
 });
 
 test('resolveNextMineType rotates through basic mine types and persists order', () => {
-  const resolve = globalThis.hwaHelperAutoGather.resolveNextMineType;
+  const resolve = autoGatherService.resolveNextMineType;
   // Specific types return as is
   assert.equal(resolve('stone', 'food'), 'stone');
   assert.equal(resolve('iron', null), 'iron');
@@ -37,7 +37,7 @@ test('resolveNextMineType rotates through basic mine types and persists order', 
 });
 
 test('countActiveMarches handles ongoing marches and expired returning marches', () => {
-  const count = globalThis.hwaHelperAutoGather.countActiveMarches;
+  const count = autoGatherService.countActiveMarches;
   const now = 1000000;
   const marches = [
     { id: 1, kind: 'gather', stage: 'harvest' },
@@ -49,7 +49,7 @@ test('countActiveMarches handles ongoing marches and expired returning marches',
 });
 
 test('planAutoGather plans search when no cached mines and gather when full mines exist', () => {
-  const plan = globalThis.hwaHelperAutoGather.planAutoGather;
+  const plan = autoGatherService.planAutoGather;
   const now = 1000000;
 
   const heroes = {
@@ -95,7 +95,7 @@ test('planAutoGather plans search when no cached mines and gather when full mine
   assert.equal(step1.call.args.mapId, 42);
 
   // Step 2: Full mines cached for wood level 5 (mineConfigId 56)
-  const woodLvl5Config = globalThis.hwaHelperExperimentalData.mineConfigId('wood', 5);
+  const woodLvl5Config = experimentalDataHelper.mineConfigId('wood', 5);
   cache.experimentalMineSearch = {
     data: {
       mapId: 42,
@@ -115,8 +115,8 @@ test('planAutoGather plans search when no cached mines and gather when full mine
 });
 
 test('auto-gather handles object-shaped marches and mine search without TypeError', () => {
-  const plan = globalThis.hwaHelperAutoGather.planAutoGather;
-  const count = globalThis.hwaHelperAutoGather.countActiveMarches;
+  const plan = autoGatherService.planAutoGather;
+  const count = autoGatherService.countActiveMarches;
   const now = 1000000;
 
   // Object-shaped marches
@@ -146,7 +146,7 @@ test('auto-gather handles object-shaped marches and mine search without TypeErro
     experimentalMineSearch: {
       data: {
         mapId: 42,
-        mineConfigId: globalThis.hwaHelperExperimentalData.mineConfigId('wood', 5),
+        mineConfigId: experimentalDataHelper.mineConfigId('wood', 5),
         mines: {
           '0': { mineId: 'mine_wood_obj', coordinates: { x: 105, y: 205 } }
         }
@@ -173,7 +173,7 @@ test('auto-gather handles object-shaped marches and mine search without TypeErro
 });
 
 test('isGameLoadRecord recognizes mobileLogin, userGetInfo, and getMarches', () => {
-  const isGameLoad = globalThis.hwaHelperAutoGather.isGameLoadRecord;
+  const isGameLoad = autoGatherService.isGameLoadRecord;
 
   assert.equal(isGameLoad({ requestBody: JSON.stringify({ calls: [{ name: 'mobileLogin' }] }) }), true);
   assert.equal(isGameLoad({ requestBody: JSON.stringify({ calls: [{ name: 'userGetInfo' }] }) }), true);
@@ -182,7 +182,7 @@ test('isGameLoadRecord recognizes mobileLogin, userGetInfo, and getMarches', () 
 });
 
 test('planAutoGather filters out mines currently being gathered by active squads', () => {
-  const plan = globalThis.hwaHelperAutoGather.planAutoGather;
+  const plan = autoGatherService.planAutoGather;
   const now = 1000000;
 
   const heroes = {
@@ -216,7 +216,7 @@ test('planAutoGather filters out mines currently being gathered by active squads
     }
   };
 
-  const woodLvl5Config = globalThis.hwaHelperExperimentalData.mineConfigId('wood', 5);
+  const woodLvl5Config = experimentalDataHelper.mineConfigId('wood', 5);
   const cache = {
     heroGetAll: { data: heroes },
     'getUnitSummary:unit': { data: unitSummary },

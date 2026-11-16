@@ -290,8 +290,3 @@ export {
   getCatalog,
   exportCatalogJson
 };
-
-// Preserve backward compatibility for background worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperQuestData = questData;
-}

@@ -259,10 +259,3 @@ export const speedupService = {
   buildCall,
   refreshCalls,
 };
-
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperSpeedup) {
-    (globalThis as any).hwaHelperSpeedup = speedupService;
-  }
-}

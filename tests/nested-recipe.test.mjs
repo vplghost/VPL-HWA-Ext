@@ -106,13 +106,13 @@ test('deep component select/craft events bubble to the root with the correct bra
 test('actual dialog targets nested fragments, computes progress and blocks unrelated composite raids', async () => {
   const text = await readFile(new URL('../src/components/dialogs/CampaignRaidModal.vue', import.meta.url), 'utf8');
   const source = text.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
-  const data = ref({ ...cache(), missionGetAll: { data: Object.fromEntries(Object.keys(globalThis.hwaHelperCampaignMissions.missions).map(id => [id, { stars: 3 }])) } });
+  const data = ref({ ...cache(), missionGetAll: { data: Object.fromEntries(Object.keys(campaignMissions).map(id => [id, { stars: 3 }])) } });
   const context = { ref, computed, watch() {}, onMounted() {}, onUnmounted() {},
     defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     useRpcCache: () => ({ cache: data, dispatchRpc: async () => ({ ok: false }) }), useModals: () => ({ modalContext: {} }),
     buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory,
     campaignMissions, getHighestRaidableMission, getMissionTries,
-    hwaHelperCampaignMissions: globalThis.hwaHelperCampaignMissions,
+    hwaHelperCampaignMissions: { missions: campaignMissions },
     testCache: data, raidCalls: 0,
     useCampaignMissionHistory: () => ({ recent: ref([]), record: async () => {} }),
   };
