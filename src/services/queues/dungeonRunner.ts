@@ -5,10 +5,7 @@ import type {
 import dungeonAutomationService, { planDungeon } from './dungeonAutomation.ts';
 
 function getPlanner(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperDungeonAutomation) ||
-    dungeonAutomationService
-  );
+  return dungeonAutomationService;
 }
 
 export function terminal(state?: DungeonRunnerState | null): boolean {

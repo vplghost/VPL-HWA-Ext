@@ -1,15 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
-
-const context = {};
-for (const file of ['data-names.js', 'item-resources.js', 'name-map.js']) {
-  runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
-}
+import { nameMap } from '../src/data/nameData.ts';
 
 test('verified locale maps hero, titan, and item categories', () => {
-  const { hero, item } = context.hwaHelperNameMap;
+  const { hero, item } = nameMap;
   assert.equal(hero(1), 'Aurora');
   assert.equal(hero(4000), 'Sigurd');
   assert.equal(item('fragmentTitan', 4000), 'Sigurd fragment');
@@ -21,7 +15,7 @@ test('verified locale maps hero, titan, and item categories', () => {
 });
 
 test('missing and unresolved locale entries retain the popup fallback', () => {
-  const { hero, item } = context.hwaHelperNameMap;
+  const { hero, item } = nameMap;
   assert.equal(hero(5041), null);
   assert.equal(hero(999999), null);
   assert.equal(item('border', 999999), null);

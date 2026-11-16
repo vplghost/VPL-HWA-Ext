@@ -24,6 +24,7 @@ export function formatMarchDuration(ms: number): string {
 }
 
 import { getHeroName } from '../data/heroMetadata.ts';
+import { nameMap } from '../data/nameData.ts';
 
 /**
  * Resolve readable name for a hero ID
@@ -31,13 +32,9 @@ import { getHeroName } from '../data/heroMetadata.ts';
 export function resolveHeroName(id: number | string): string {
   const metaName = getHeroName(id);
   if (metaName && !metaName.startsWith('Hero #')) return metaName;
-  const nameMap = (globalThis as any).hwaHelperNameMap;
   if (typeof nameMap?.hero === 'function') {
     const mapped = nameMap.hero(Number(id));
     if (mapped) return mapped;
-  }
-  if (nameMap?.heroNames?.[String(id)]) {
-    return nameMap.heroNames[String(id)];
   }
   return metaName || `Hero #${id}`;
 }

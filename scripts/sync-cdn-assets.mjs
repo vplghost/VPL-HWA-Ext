@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { inflateRawSync, gunzipSync, crc32 } from 'node:zlib';
+import { titanMetadata } from '../src/data/titanMetadata.ts';
 import vm from 'node:vm';
 import { convertImgBuffer } from './convert-img-asset.mjs';
 
@@ -224,7 +225,7 @@ export async function runSync({ version = DEFAULT_VERSION, indexPath, only, conc
     await atomicWrite(snapshotPath, JSON.stringify({ source, categories, manifest: selectedManifest }, null, 2) + '\n');
   }
   const heroes = await loadGlobal('hero-metadata.js', 'hwaHelperHeroMetadata');
-  const titans = await loadGlobal('titan-metadata.js', 'hwaHelperTitanMetadata');
+  const titans = titanMetadata;
   const catalogs = { heroes: metadata.heroes || heroes, titans: metadata.titans || titans,
     ...Object.fromEntries(['consumable', 'gear', 'scroll'].map((kind) => [`items/${kind}`, metadata[`items/${kind}`] || {}])) };
   const tasks = [];
@@ -244,8 +245,7 @@ export async function runSync({ version = DEFAULT_VERSION, indexPath, only, conc
   }));
   results.sort((a, b) => a.category.localeCompare(b.category) || Number(a.id) - Number(b.id));
   // Preserve roles/classes/factions; update only verified local avatar references.
-  for (const [category, catalog, filename, globalName] of [['heroes', heroes, 'hero-metadata.js', 'hwaHelperHeroMetadata'],
-    ['titans', titans, 'titan-metadata.js', 'hwaHelperTitanMetadata']]) {
+  for (const [category, catalog, filename, globalName] of [['heroes', heroes, 'hero-metadata.js', 'hwaHelperHeroMetadata']]) {
     if (only && !category.startsWith(only)) continue;
     for (const result of results.filter((item) => item.category === category)) {
       if (catalog[result.id] && await optionalRead(join(outputDir, category, `${result.id}.png`))) {

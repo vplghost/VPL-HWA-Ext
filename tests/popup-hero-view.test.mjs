@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { heroGlyphs, skinStats } from '../src/data/heroMetadata.ts';
+import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../src/data/titanMetadata.ts';
 
 class MockElement {
   constructor(tag) {
@@ -63,8 +65,6 @@ const mockDoc = {
 
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const heroMetaJs = await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8');
-const titanMetaJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
-const heroStatJs = await readFile(new URL('../extension/hero-stat-data.js', import.meta.url), 'utf8');
 const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
 
 // Extract helper functions and run in context
@@ -79,9 +79,12 @@ const context = {
   favoriteTitans: new Set()
 };
 vm.runInNewContext(heroMetaJs, context);
-vm.runInNewContext(titanMetaJs, context);
-vm.runInNewContext(heroStatJs, context);
+context.globalThis.hwaHelperTitanMetadata = titanMetadata;
+context.globalThis.hwaHelperTitanArtifactEvolveCost = titanArtifactEvolveCost;
+context.globalThis.hwaHelperTitanArtifactLevelCosts = titanArtifactLevelCosts;
 vm.runInNewContext(popupDataJs, context);
+context.globalThis.hwaHelperHeroGlyphs = heroGlyphs;
+context.globalThis.hwaHelperSkinStats = skinStats;
 
 // Extract helper functions including table(headings, rows)
 const codeToRun = popupJs.slice(

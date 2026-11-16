@@ -1,14 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import vm from 'node:vm';
-
-const source = await readFile(new URL('../extension/dashboard-data.js', import.meta.url), 'utf8');
-const questSource = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
-const context = { Date, Number, Array, globalThis: {} };
-vm.runInNewContext(questSource, context);
-vm.runInNewContext(source, context);
-const { dailyDashboard } = context.globalThis.hwaHelperDashboardData;
+import { dailyDashboard } from '../src/data/dashboardData.ts';
 const now = new Date('2026-11-06T12:00:00Z').getTime();
 const observed = (data, updatedAt = '2026-11-06T10:00:00Z') => ({ data, updatedAt });
 

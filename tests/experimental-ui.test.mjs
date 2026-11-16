@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { questData } from '../src/data/questData.ts';
+import { dashboardDataHelper } from '../src/data/dashboardData.ts';
 
 class Element {
   constructor(tag) { this.tagName = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.value = ''; this.textContent = ''; this.attributes = {}; this.hidden = false; }
@@ -366,8 +368,6 @@ test('Monster dialog searches by level, starts selected team attack and shows re
 });
 
 test('Dashboard tower and dungeon cards are interactive and open respective modals', async () => {
-  const questSource = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
-  const dashDataSrc = await readFile(new URL('../extension/dashboard-data.js', import.meta.url), 'utf8');
   const dashRenderer = popup.slice(popup.indexOf('function renderDashboard('), popup.indexOf('function renderEvents('));
 
   const dashboardContainer = new Element('div');
@@ -405,8 +405,10 @@ test('Dashboard tower and dungeon cards are interactive and open respective moda
     updateDashboardGameStatus: () => {}
   });
 
-  vm.runInContext(questSource, context);
-  vm.runInContext(dashDataSrc, context);
+  context.globalThis.hwaHelperQuestData = questData;
+  context.hwaHelperQuestData = questData;
+  context.globalThis.hwaHelperDashboardData = dashboardDataHelper;
+  context.hwaHelperDashboardData = dashboardDataHelper;
   vm.runInContext(dashRenderer, context);
 
   const cache = {

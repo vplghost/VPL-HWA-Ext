@@ -9,9 +9,10 @@ import { createSSRApp } from 'vue';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import ts from 'typescript';
 import { buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory } from '../src/utils/recipeTree.ts';
+import { campaignMissions, getHighestRaidableMission, getMissionTries } from '../src/data/campaignData.ts';
 
 const require = createRequire(import.meta.url);
-for (const file of ['data-names.js', 'hero-metadata.js', 'campaign-missions.js']) {
+for (const file of ['data-names.js', 'hero-metadata.js']) {
   vm.runInThisContext(await readFile(new URL('../extension/' + file, import.meta.url), 'utf8'));
 }
 const cache = (inventory = {}) => ({ inventoryGet: { data: inventory } });
@@ -110,6 +111,7 @@ test('actual dialog targets nested fragments, computes progress and blocks unrel
     defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     useRpcCache: () => ({ cache: data, dispatchRpc: async () => ({ ok: false }) }), useModals: () => ({ modalContext: {} }),
     buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory,
+    campaignMissions, getHighestRaidableMission, getMissionTries,
     hwaHelperCampaignMissions: globalThis.hwaHelperCampaignMissions,
     testCache: data, raidCalls: 0,
     useCampaignMissionHistory: () => ({ recent: ref([]), record: async () => {} }),

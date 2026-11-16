@@ -7,10 +7,7 @@ import type {
 import * as expData from '../../utils/experimentalData.ts';
 
 function getDataHelper(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperExperimentalData) ||
-    expData
-  );
+  return expData;
 }
 
 export function amountAt(

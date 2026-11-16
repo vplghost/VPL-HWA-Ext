@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../src/data/titanMetadata.ts';
 
 const rpcCacheJs = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
 const dungeonAutoJs = await readFile(new URL('../extension/dungeon-automation.js', import.meta.url), 'utf8');
 const dungeonRunnerJs = await readFile(new URL('../extension/dungeon-runner.js', import.meta.url), 'utf8');
-const titanMetaJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
 
 const rpcContext = {
   Date,
@@ -18,9 +18,14 @@ const cacheModule = rpcContext.globalThis.hwaHelperRpcCache;
 
 const autoContext = {
   Date,
-  globalThis: {}
+  globalThis: {},
+  hwaHelperTitanMetadata: titanMetadata,
+  hwaHelperTitanArtifactEvolveCost: titanArtifactEvolveCost,
+  hwaHelperTitanArtifactLevelCosts: titanArtifactLevelCosts,
 };
-vm.runInNewContext(titanMetaJs, autoContext);
+autoContext.globalThis.hwaHelperTitanMetadata = titanMetadata;
+autoContext.globalThis.hwaHelperTitanArtifactEvolveCost = titanArtifactEvolveCost;
+autoContext.globalThis.hwaHelperTitanArtifactLevelCosts = titanArtifactLevelCosts;
 vm.runInNewContext(dungeonAutoJs, autoContext);
 vm.runInNewContext(dungeonRunnerJs, autoContext);
 const dungeonAuto = autoContext.globalThis.hwaHelperDungeonAutomation;

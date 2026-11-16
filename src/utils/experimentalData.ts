@@ -315,6 +315,9 @@ export function getMineTypeLevel(configId: number): { type: string; level: numbe
   return null;
 }
 
+export const mineConfigId = getMineConfigId;
+export const mineTypeLevel = getMineTypeLevel;
+
 export function availableHeroIds(
   heroes: Record<string | number, any> = {},
   summary: any,

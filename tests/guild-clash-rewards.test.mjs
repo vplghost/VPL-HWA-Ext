@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { resourceDataHelper } from '../src/utils/resourceData.ts';
 
-const context = { TextEncoder };
-for (const name of ['resource-data', 'rpc-cache']) {
+const context = { TextEncoder, hwaHelperResourceData: resourceDataHelper };
+for (const name of ['rpc-cache']) {
   vm.runInNewContext(await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
 }
 const reducer = context.hwaHelperRpcCache;

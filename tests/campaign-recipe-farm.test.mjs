@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import {
+  campaignMissions,
+  itemDrops,
+  getMissionsForItem,
+  getHighestRaidableMission,
+  getMissionProgress,
+  getMissionTries,
+  isMissionRaidable,
+} from '../src/data/campaignData.ts';
+import { dashboardDataHelper } from '../src/data/dashboardData.ts';
+import { resourceDataHelper } from '../src/utils/resourceData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -132,20 +143,26 @@ async function createTestContext() {
 
   const dataNamesSrc = await readFile('extension/data-names.js', 'utf8');
   const nameMapSrc = await readFile('extension/name-map.js', 'utf8');
-  const resourceDataSrc = await readFile('extension/resource-data.js', 'utf8');
   const heroMetaSrc = await readFile('extension/hero-metadata.js', 'utf8');
-  const campaignMissionsSrc = await readFile('extension/campaign-missions.js', 'utf8');
   const popupDataSrc = await readFile('extension/popup-data.js', 'utf8');
-  const dashboardDataSrc = await readFile('extension/dashboard-data.js', 'utf8');
   const popupSrc = await readFile('extension/popup.js', 'utf8');
+
+  context.hwaHelperResourceData = resourceDataHelper;
+  context.hwaHelperDashboardData = dashboardDataHelper;
+  context.hwaHelperCampaignMissions = {
+    missions: campaignMissions,
+    itemDrops,
+    getMissionsForItem,
+    getHighestRaidableMission,
+    getMissionProgress,
+    getMissionTries,
+    isMissionRaidable,
+  };
 
   vm.runInContext(dataNamesSrc, context);
   vm.runInContext(nameMapSrc, context);
-  vm.runInContext(resourceDataSrc, context);
   vm.runInContext(heroMetaSrc, context);
-  vm.runInContext(campaignMissionsSrc, context);
   vm.runInContext(popupDataSrc, context);
-  vm.runInContext(dashboardDataSrc, context);
   vm.runInContext(popupSrc, context);
 
   context.hwaHelperNameMap = {

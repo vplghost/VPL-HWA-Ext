@@ -8,9 +8,10 @@ import { ref, computed } from 'vue';
 import { patronName, refillableMetadata, selectItemTexture } from '../scripts/lib/observed-item-metadata.mjs';
 import { getItemIcon, getResourceIcon, isInactiveResource } from '../src/utils/itemResources.ts';
 import { isSelectableForHeader } from '../src/utils/resourceData.ts';
+import { itemResources } from '../src/data/itemData.ts';
 
-const context = {};
-for (const name of ['data-names', 'item-resources', 'name-map']) {
+const context = { hwaHelperItemResources: itemResources };
+for (const name of ['data-names', 'name-map']) {
   vm.runInNewContext(await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
 }
 

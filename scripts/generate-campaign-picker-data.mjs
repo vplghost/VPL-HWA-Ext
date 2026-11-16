@@ -3,6 +3,8 @@ import { gunzipSync } from 'node:zlib';
 import { findIndex, readZip, verifyAsset, hash } from './sync-cdn-assets.mjs';
 import vm from 'node:vm';
 
+import { campaignMissions } from '../src/data/campaignData.ts';
+
 if (!process.argv[2]) throw Error('Pass a matching game capture containing indexGet');
 const capture = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const index = findIndex(capture, '1.293.0');
@@ -15,10 +17,8 @@ const missionBytes = files.get('mission.json');
 verifyAsset(missionBytes, index.lib['splitlib.json.zip'].content.find(row => row.path === 'mission.json'));
 const locale = JSON.parse(gunzipSync(localeBytes));
 const libraryMissions = JSON.parse(missionBytes);
-const context = {};
-vm.runInNewContext(await readFile('extension/campaign-missions.js', 'utf8'), context);
 const missions = {}, chapters = {};
-for (const known of Object.values(context.hwaHelperCampaignMissions.missions)) {
+for (const known of Object.values(campaignMissions)) {
   const row = libraryMissions[known.id];
   if (!row || row.world !== known.chapter || row.index !== known.index) throw Error('Mission layout changed: ' + known.id);
   chapters[row.world] = locale['LIB_WORLD_' + row.world] || `Chapter ${row.world}`;

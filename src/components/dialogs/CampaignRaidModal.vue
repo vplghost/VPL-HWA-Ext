@@ -39,7 +39,7 @@ const localRaidResult = ref<any>(null);
 const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const missionHistory = useCampaignMissionHistory(accountId);
 const recentMissions = computed(() => {
-  const dict = (typeof campaignMissions !== 'undefined' ? campaignMissions : undefined) || (globalThis as any).hwaHelperCampaignMissions?.missions;
+  const dict = (typeof campaignMissions !== 'undefined' ? campaignMissions : undefined) || (globalThis as any).campaignMissions || (globalThis as any).hwaHelperCampaignMissions?.missions;
   return missionHistory.recent.value.filter(id => Boolean(dict?.[id]));
 });
 function missionName(id: number) {
@@ -85,13 +85,12 @@ function disableMissionToday(id: number | string) {
 }
 
 function isHeroic(id: number | string): boolean {
-  const dict = (typeof campaignMissions !== 'undefined' ? campaignMissions : undefined) || (globalThis as any).hwaHelperCampaignMissions?.missions;
+  const dict = (typeof campaignMissions !== 'undefined' ? campaignMissions : undefined) || (globalThis as any).campaignMissions || (globalThis as any).hwaHelperCampaignMissions?.missions;
   return Boolean(dict?.[String(id)]?.isHeroic);
 }
 
 function getTriesInfo(id: number | string) {
   const numId = Number(id);
-  const cMissions = (globalThis as any).hwaHelperCampaignMissions;
   const isHero = isHeroic(numId);
   if (!isHero) {
     const disabled = disabledMissionsToday.value.has(numId);
@@ -103,7 +102,8 @@ function getTriesInfo(id: number | string) {
       isExhausted: disabled,
     };
   }
-  const tries = (typeof getMissionTries === 'function' ? getMissionTries(numId, cache.value?.missionGetAll?.data) : null) || cMissions?.getMissionTries?.(numId, cache.value?.missionGetAll?.data) || {
+  const getTriesFn = (typeof getMissionTries !== 'undefined' ? getMissionTries : undefined) || (globalThis as any).hwaHelperCampaignMissions?.getMissionTries;
+  const tries = getTriesFn?.(numId, cache.value?.missionGetAll?.data) || {
     isHeroic: true,
     maxTries: 3,
     triesSpent: 0,
@@ -175,9 +175,7 @@ watch(
 
       if (selectedRecipeNodeId.value) {
         const candidates = recipeMissions(findRecipeNode(tree, selectedRecipeNodeId.value));
-        const highestFn = typeof getHighestRaidableMission === 'function'
-          ? getHighestRaidableMission
-          : (globalThis as any).hwaHelperCampaignMissions?.getHighestRaidableMission;
+        const highestFn = (typeof getHighestRaidableMission !== 'undefined' ? getHighestRaidableMission : undefined) || (globalThis as any).hwaHelperCampaignMissions?.getHighestRaidableMission;
         const highest = highestFn?.(
           candidates.map((m: any) => m.id),
           cache.value?.missionGetAll?.data,
@@ -284,9 +282,7 @@ function selectRecipeNode(node: any) {
   if (isRaidRunning.value) return;
   selectedRecipeNodeId.value = node.key;
   const candidates = recipeMissions(node);
-  const highestFn = typeof getHighestRaidableMission === 'function'
-    ? getHighestRaidableMission
-    : (globalThis as any).hwaHelperCampaignMissions?.getHighestRaidableMission;
+  const highestFn = (typeof getHighestRaidableMission !== 'undefined' ? getHighestRaidableMission : undefined) || (globalThis as any).hwaHelperCampaignMissions?.getHighestRaidableMission;
   const highest = highestFn?.(
     candidates.map((m: any) => m.id),
     cache.value?.missionGetAll?.data,

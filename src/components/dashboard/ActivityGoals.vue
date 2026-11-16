@@ -63,9 +63,7 @@ const activities = computed<ActivityRow[]>(() => {
   const questEntry = cache.value.questGetAll ?? cache.value.quest_getAll;
   const questsKnown = observedToday(questEntry, now.value, cache.value.questResetStatus?.data?.nextDayAt);
   const pendingQuests = questsKnown ? readyQuestCount(cache.value) : 0;
-  const dailies = typeof dailyQuests === 'function'
-    ? dailyQuests(cache.value, now.value)
-    : (globalThis as any).hwaHelperQuestData?.dailyQuests?.(cache.value, now.value);
+  const dailies = (typeof dailyQuests === 'function' ? dailyQuests : (globalThis as any).hwaHelperQuestData?.dailyQuests)?.(cache.value, now.value);
   const remainingDailies = dailies ? dailies.filter((quest: any) => quest.state === 'inProgress').length : undefined;
   rows.push({
     id: 'quests',

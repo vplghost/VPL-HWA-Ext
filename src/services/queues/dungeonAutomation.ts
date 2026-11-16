@@ -3,6 +3,7 @@ import type {
   DungeonDoorSelectionResult,
   DungeonPlanResult,
 } from '../../types/game/dungeonAutomation.ts';
+import { titanMetadata } from '../../data/titanMetadata.ts';
 
 export const DEFAULT_DOOR_PRIORITY: string[] = ['prime', 'water', 'mixed', 'neutral', 'earth', 'fire'];
 export const DEFAULT_ATTACKER_PRIORITY: string[] = ['water', 'mixed', 'neutral', 'earth', 'fire'];
@@ -55,7 +56,7 @@ export function getPoolForType(type: string, cache: any, customPools: any = {}):
     return [...DEFAULT_TITAN_POOLS[norm]!];
   }
 
-  const meta = (globalThis as any).hwaHelperTitanMetadata || {};
+  const meta = (globalThis as any).hwaHelperTitanMetadata || titanMetadata;
   const elemental = Object.entries(meta)
     .filter(([_, data]: [string, any]) => data?.element?.toLowerCase() === norm)
     .map(([id]) => Number(id));

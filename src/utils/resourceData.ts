@@ -259,3 +259,39 @@ export function getMarchBadgeInfo(march: any, now = Date.now()): {
 
   return { category, icon, classes, isPulse };
 }
+
+export const amountAt = getAmountAt;
+export const nextRefillSeconds = getNextRefillSeconds;
+export const formatAmount = formatResourceAmount;
+
+export function refillDescription(entry: ResourceEntry | undefined, now = Date.now()): string | null {
+  const data = entry?.data;
+  if (!Number.isFinite(data?.refillEveryMs) || (data?.refillEveryMs || 0) <= 0 ||
+      !Number.isFinite(data?.refillAmount) || (data?.refillAmount || 0) <= 0) return null;
+  const perMinute = (data!.refillAmount! * 60000) / data!.refillEveryMs!;
+  if (perMinute >= 1) return `+${Number(perMinute.toFixed(2)).toLocaleString('en-US')}/min`;
+  const next = nextRefillSeconds(entry, now);
+  if (next != null) return `Next +${data!.refillAmount} in ${tooltipTime(next)}`;
+  return Number.isFinite(data?.cap) && (amountAt(entry, now) ?? 0) >= data!.cap! ?
+    'Full; refill resumes after spending' : 'Next refill time unavailable';
+}
+
+export const resourceDataHelper = {
+  amountAt,
+  nextRefillSeconds,
+  remainingMinutes,
+  hoursMinutes,
+  formatAmount,
+  refillDescription,
+  tooltipTime,
+  resourceAppearance,
+  resourceLabel,
+  isListedInventoryItem,
+  isSelectableForHeader,
+  isMarchExpired,
+  getMarchBadgeInfo,
+};
+
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).hwaHelperResourceData = (globalThis as any).hwaHelperResourceData || resourceDataHelper;
+}

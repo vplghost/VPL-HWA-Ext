@@ -1,4 +1,6 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
+import { getPendingClaims, buildAutoClaimCalls } from '../utils/popupData.ts';
+import { availableHeroIds, autoJoinTeamOptions } from '../utils/experimentalData.ts';
 
 export function normalizeAutoClaim(value: any = {}) {
   value = value || {};
@@ -25,8 +27,7 @@ export function usePopupAutomation(cache: Ref<any>, runOnOpen = false) {
   let didAutoClaim = false;
   const helpers = () => (globalThis as any).hwaHelperPopupData;
   const experimental = () => (globalThis as any).hwaHelperExperimentalData;
-  const pending = computed(() => helpers()?.getPendingClaims?.(cache.value) ||
-    { letterIds: [], hasReports: false, questIds: [], totalCount: 0 });
+  const pending = computed(() => helpers()?.getPendingClaims?.(cache.value) || getPendingClaims(cache.value));
   const selectedCount = computed(() => (autoClaimSettings.value.mail ? pending.value.letterIds.length : 0) +
     (autoClaimSettings.value.reports && pending.value.hasReports ? 1 : 0) +
     (autoClaimSettings.value.quests ? pending.value.questIds.length : 0));
@@ -35,9 +36,9 @@ export function usePopupAutomation(cache: Ref<any>, runOnOpen = false) {
     const heroes = c.heroGetAll?.data || {};
     const summary = c['getUnitSummary:unit']?.data;
     const array = (value: any): any[] => Array.isArray(value) ? value : Object.values(value || {});
-    const available = experimental()?.availableHeroIds?.(heroes, { ...summary, squads: array(summary?.squads) }, array(c.marchStatus?.data?.marches));
+    const available = (experimental()?.availableHeroIds || availableHeroIds)(heroes, { ...summary, squads: array(summary?.squads) }, array(c.marchStatus?.data?.marches));
     const accountTeams = customTeams.value[String(c.accountStatus?.data?.id)] || [];
-    return experimental()?.autoJoinTeamOptions?.(c.teamGetAll?.data, heroes, accountTeams, available) ||
+    return (experimental()?.autoJoinTeamOptions || autoJoinTeamOptions)(c.teamGetAll?.data, heroes, accountTeams, available) ||
       [{ id: 'highest', label: 'Top 5 highest power heroes' }];
   });
   function consume(stored: Record<string, any>) {
@@ -66,7 +67,7 @@ export function usePopupAutomation(cache: Ref<any>, runOnOpen = false) {
   async function claimRewards() {
     if (!enabled.value || busy.value) return;
     if (claimStatus.value?.state === 'queued' && Date.now() - Date.parse(claimStatus.value.updatedAt || '') < 120000) return;
-    const calls = helpers()?.buildAutoClaimCalls?.(cache.value, autoClaimSettings.value)?.calls || [];
+    const calls = (helpers()?.buildAutoClaimCalls || buildAutoClaimCalls)(cache.value, autoClaimSettings.value)?.calls || [];
     if (!calls.length) return;
     busy.value = true;
     message.value = 'Dispatching selected rewards…';

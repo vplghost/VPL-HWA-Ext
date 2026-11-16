@@ -1,19 +1,17 @@
 import type { PruneResult, RpcCacheState } from '../../../types';
 import { normalizeArrayData, extractRewardActions } from '../extractors/baseExtractor.ts';
+import { prune as pruneMail } from '../../../services/mailService.ts';
 
 export function pruneCache(cache: RpcCacheState, now = Date.now()): PruneResult {
   if (!cache || typeof cache !== 'object') return { cache: {}, changed: false };
 
-  const mailHelper = (globalThis as any).hwaHelperMailData;
-  const mailPruned = mailHelper?.prune
-    ? mailHelper.prune(cache, now, (receipt: any) =>
-        extractRewardActions(
-          { timestamp: receipt.at },
-          receipt.call || { ident: receipt.token, name: 'mailClaim' },
-          receipt.reward
-        ).map((action) => ({ key: action.data.resourceKey, amount: action.data.delta }))
-      )
-    : null;
+  const mailPruned = pruneMail(cache, now, (receipt: any) =>
+    extractRewardActions(
+      { timestamp: receipt.at },
+      receipt.call || { ident: receipt.token, name: 'mailClaim' },
+      receipt.reward
+    ).map((action) => ({ key: action.data.resourceKey, amount: action.data.delta }))
+  );
 
   const next: RpcCacheState = { ...(mailPruned?.cache || cache) };
   let changed = mailPruned?.changed || false;

@@ -82,7 +82,7 @@ export async function generateQuestData(configDir = join(root, 'temp'), indexPat
   for (let id = 346; id <= 370; id++) delete catalog.dailyTitles[id];
   Object.assign(catalog.dailyTitles, titles);
   catalog.dailyDefinitions = definitions; catalog.dailySources = sources;
-  const runtimePath = join(root, 'extension/quest-data.js');
+  const runtimePath = join(root, 'src/data/questData.ts');
   const runtime = await readFile(runtimePath, 'utf8');
   const block = '  // BEGIN GENERATED DAILY QUESTS — npm run quests:update\n' +
     '  const dailyTitles = ' + JSON.stringify(catalog.dailyTitles, null, 2).replace(/\n/g, '\n  ') + ';\n' +

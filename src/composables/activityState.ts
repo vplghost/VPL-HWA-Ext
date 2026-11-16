@@ -50,7 +50,7 @@ export function arenaActivityState(cache: Record<string, any>, grand = false, no
 }
 
 export function dungeonActivityState(cache: Record<string, any>, now = Date.now(),
-  metadata: Record<string, any> = (globalThis as any).hwaHelperTitanMetadata || titanMetadata) {
+  metadata: Record<string, any> = titanMetadata) {
   const entry = cache.dungeonStatus;
   if (!observedToday(entry, now, cache.questResetStatus?.data?.nextDayAt)) return { state: 'unknown' as const, detail: 'Waiting for game data' };
   const dungeon = entry.data || {};

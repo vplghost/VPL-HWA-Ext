@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { questData } from '../src/data/questData.ts';
+import { dashboardDataHelper } from '../src/data/dashboardData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -78,8 +80,6 @@ test('popup.html includes #quest-detail-dialog with title and body', async () =>
 
 test('renderDashboard presents activities, quests, and gifts in a 2-column grid and quest cards are interactive', async () => {
   const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-  const questCode = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
-  const dashCode = await readFile(new URL('../extension/dashboard-data.js', import.meta.url), 'utf8');
   const nameMapCode = await readFile(new URL('../extension/name-map.js', import.meta.url), 'utf8');
 
   const elements = new Map();
@@ -108,8 +108,10 @@ test('renderDashboard presents activities, quests, and gifts in a 2-column grid 
   };
 
   vm.runInNewContext(nameMapCode, context);
-  vm.runInNewContext(questCode, context);
-  vm.runInNewContext(dashCode, context);
+  context.globalThis.hwaHelperQuestData = questData;
+  context.hwaHelperQuestData = questData;
+  context.globalThis.hwaHelperDashboardData = dashboardDataHelper;
+  context.hwaHelperDashboardData = dashboardDataHelper;
 
   // Run popup up to end of renderDashboard
   const renderDashboardSrc = popupCode.slice(
@@ -164,8 +166,6 @@ test('renderDashboard presents activities, quests, and gifts in a 2-column grid 
 
 test('getDetailedQuests aggregates daily quests and event quests with correct states and rewards', async () => {
   const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-  const questCode = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
-  const dashCode = await readFile(new URL('../extension/dashboard-data.js', import.meta.url), 'utf8');
   const nameMapCode = await readFile(new URL('../extension/name-map.js', import.meta.url), 'utf8');
 
   const context = {
@@ -175,8 +175,10 @@ test('getDetailedQuests aggregates daily quests and event quests with correct st
   };
 
   vm.runInNewContext(nameMapCode, context);
-  vm.runInNewContext(questCode, context);
-  vm.runInNewContext(dashCode, context);
+  context.globalThis.hwaHelperQuestData = questData;
+  context.hwaHelperQuestData = questData;
+  context.globalThis.hwaHelperDashboardData = dashboardDataHelper;
+  context.hwaHelperDashboardData = dashboardDataHelper;
 
   // Extract towerRewardText, getDetailedQuests, openQuestDetailDialog, renderQuestDetailDialog
   const questDetailsSrc = popupCode.slice(
@@ -242,8 +244,6 @@ test('getDetailedQuests aggregates daily quests and event quests with correct st
 
 test('renderQuestDetailDialog renders filter tabs, search input, status badge, and cards', async () => {
   const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-  const questCode = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
-  const dashCode = await readFile(new URL('../extension/dashboard-data.js', import.meta.url), 'utf8');
   const nameMapCode = await readFile(new URL('../extension/name-map.js', import.meta.url), 'utf8');
 
   const elements = new Map();
@@ -273,8 +273,10 @@ test('renderQuestDetailDialog renders filter tabs, search input, status badge, a
   };
 
   vm.runInNewContext(nameMapCode, context);
-  vm.runInNewContext(questCode, context);
-  vm.runInNewContext(dashCode, context);
+  context.globalThis.hwaHelperQuestData = questData;
+  context.hwaHelperQuestData = questData;
+  context.globalThis.hwaHelperDashboardData = dashboardDataHelper;
+  context.hwaHelperDashboardData = dashboardDataHelper;
 
   const questDetailsSrc = popupCode.slice(
     popupCode.indexOf('function towerRewardText('),

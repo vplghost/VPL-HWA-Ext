@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { towerBuffs } from '../src/data/towerData.ts';
 
 class MockClassList {
   constructor(element) {
@@ -102,7 +103,7 @@ class MockElement {
 }
 
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-const towerBuffsJs = await readFile(new URL('../extension/tower-buffs.js', import.meta.url), 'utf8');
+const towerBuffsJs = `globalThis.hwaHelperTowerBuffs = ${JSON.stringify(towerBuffs)};`;
 
 const mockDoc = {
   elementsById: new Map(),

@@ -2666,7 +2666,7 @@ export function lookupName(group: string, id: string | number): string | null {
   if (localNames && Object.hasOwn(localNames, strId)) {
     return localNames[strId] ?? null;
   }
-  const extra = (typeof itemResources !== 'undefined' ? itemResources?.items : undefined) ?? (globalThis as any).hwaHelperItemResources?.items;
+  const extra = itemResources?.items;
   const rows = extra && Object.hasOwn(extra, group) ? extra[group] : null;
   return rows && Object.hasOwn(rows, strId) && typeof rows[strId]?.name === 'string' ? (rows[strId].name as string) : null;
 }

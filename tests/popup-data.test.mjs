@@ -2,9 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
+import { heroGlyphs, skinStats } from '../src/data/heroMetadata.ts';
+import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../src/data/titanMetadata.ts';
+import { questData } from '../src/data/questData.ts';
+import { resourceDataHelper } from '../src/utils/resourceData.ts';
 
-const context = {};
-for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'resource-data.js', 'hero-metadata.js', 'titan-metadata.js', 'hero-stat-data.js', 'quest-data.js', 'popup-data.js']) {
+const context = { hwaHelperHeroGlyphs: heroGlyphs, hwaHelperSkinStats: skinStats, hwaHelperTitanMetadata: titanMetadata, hwaHelperTitanArtifactEvolveCost: titanArtifactEvolveCost, hwaHelperTitanArtifactLevelCosts: titanArtifactLevelCosts, hwaHelperQuestData: questData, hwaHelperResourceData: resourceDataHelper };
+for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'hero-metadata.js', 'popup-data.js']) {
   runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 const { heroSoulProgress, formatTitanArtifactLevels, isTitanArtifactUpgradable, exportTableData, teamRows, sortRows, isNumericColumn,

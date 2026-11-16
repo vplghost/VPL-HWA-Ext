@@ -1,3 +1,5 @@
+import { nameMap } from '../../data/nameData.ts';
+
 export const RPC_CACHE_DEFINITIONS: Record<string, string> = {
   heroGetAll: 'heroes',
   artifact_getAll: 'heroes',
@@ -148,7 +150,6 @@ export function resolveResourceLabel(key: string): string {
   if (type === 'material' && WORLD_MATERIAL_NAMES[id]) return WORLD_MATERIAL_NAMES[id]!;
   if (type === 'speedUpResearch' && id === 2) return '5m Research Speedup';
   if (type === 'patron' && id === 1) return 'Relic Shard';
-  const nameMap = (globalThis as any).hwaHelperNameMap;
   if (nameMap && typeof nameMap.item === 'function') {
     const found = nameMap.item(type, id);
     if (found) return found;

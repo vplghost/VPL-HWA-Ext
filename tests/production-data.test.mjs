@@ -1,14 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
+import { productionDataHelper as production, productionRules as rules } from '../src/data/productionData.ts';
 
-const context = {};
-for (const file of ['production-rules.js', 'production-data.js']) {
-  runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
-}
-const production = context.hwaHelperProductionData;
-const rules = context.hwaHelperProductionRules;
 const snapshot = JSON.parse(await readFile(new URL('./fixtures/production-snapshot.json', import.meta.url)));
 
 test('production rates from the captured snapshot agree with the game screen', () => {

@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { questData } from '../src/data/questData.ts';
+import { dashboardDataHelper } from '../src/data/dashboardData.ts';
 
-const context = { Date, Number, Array, TextEncoder, console };
-for (const file of ['refillable-rules.js', 'rpc-cache.js', 'quest-data.js', 'dashboard-data.js', 'popup-data.js']) {
+const context = { Date, Number, Array, TextEncoder, console, hwaHelperQuestData: questData, hwaHelperDashboardData: dashboardDataHelper };
+for (const file of ['refillable-rules.js', 'rpc-cache.js', 'popup-data.js']) {
   vm.runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
 }
 const data = context.hwaHelperQuestData;

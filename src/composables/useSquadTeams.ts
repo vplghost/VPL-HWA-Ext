@@ -3,6 +3,7 @@ import { useDialogTeamSelection } from './useDialogTeamSelection';
 import { selectSquadStorage } from '../utils/squadStorage';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getHeroMetadata, starGlowClass } from '@/src/utils/metadata';
+import { getHeroName as lookupHeroName } from '@/src/data/heroMetadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import {
@@ -302,7 +303,7 @@ export function useSquadTeams(
 
   function getHeroName(heroId: number | string): string {
     const meta = getHeroMetadata(heroId);
-    return meta?.name || (globalThis as any).hwaHelperNameMap?.hero?.(heroId) || `Hero #${heroId}`;
+    return meta?.name || lookupHeroName(heroId) || `Hero #${heroId}`;
   }
 
   function getHeroAvatarUrl(heroId: number | string): string {

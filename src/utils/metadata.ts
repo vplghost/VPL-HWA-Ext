@@ -57,15 +57,15 @@ export function getAllTitanMetadata(): Record<string, TitanMeta> {
 }
 
 export function getHeroEquipmentRank(color: number | string) {
-  return heroEquipmentRank(color) ?? (globalThis as any).hwaHelperPopupData?.getHeroEquipmentRank?.(color);
+  return heroEquipmentRank(color);
 }
 
 export function getHeroSoulProgress(heroId: string | number, hero: any, inventory: any) {
-  return heroSoulProgress(String(heroId), hero, inventory) ?? (globalThis as any).hwaHelperPopupData?.heroSoulProgress?.(String(heroId), hero, inventory);
+  return heroSoulProgress(String(heroId), hero, inventory);
 }
 
 export function getTitanSoulProgress(titanId: string | number, titan: any, inventory: any) {
-  return titanSoulProgress(String(titanId), titan, inventory) ?? (globalThis as any).hwaHelperPopupData?.titanSoulProgress?.(String(titanId), titan, inventory);
+  return titanSoulProgress(String(titanId), titan, inventory);
 }
 
 const worldMaterialNames: Record<number, string> = {
@@ -131,8 +131,7 @@ export function getHeroName(heroId: number | string): string {
 }
 
 export function getGearCraftData(gearId: number | string) {
-  const local = typeof gearCraftData !== 'undefined' ? gearCraftData?.[String(gearId)] : undefined;
-  return local ?? (globalThis as any).hwaHelperGearCraftData?.[String(gearId)];
+  return gearCraftData?.[String(gearId)] ?? null;
 }
 
 export function getBuildingName(id: number | string): string {

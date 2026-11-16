@@ -2,21 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, access } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
+import { resourceDataHelper } from '../src/utils/resourceData.ts';
 
 const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
 const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
 const missionCosts = await readFile(new URL('../extension/mission-costs.js', import.meta.url), 'utf8');
 const marchRules = await readFile(new URL('../extension/march-rules.js', import.meta.url), 'utf8');
 const heroMetadata = await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8');
-const resourceDataSource = await readFile(new URL('../extension/resource-data.js', import.meta.url), 'utf8');
+
 const clanVersusRules = await readFile(new URL('../extension/clan-versus-rules.js', import.meta.url), 'utf8');
-const context = { TextEncoder };
+const context = { TextEncoder, hwaHelperResourceData: resourceDataHelper };
 runInNewContext(refillRules, context);
 runInNewContext(missionCosts, context);
 runInNewContext(marchRules, context);
 runInNewContext(heroMetadata, context);
 runInNewContext(clanVersusRules, context);
-runInNewContext(resourceDataSource, context);
+
 runInNewContext(await readFile(new URL('../extension/tower-rules.js', import.meta.url), 'utf8'), context);
 runInNewContext(source, context);
 const cache = context.hwaHelperRpcCache;

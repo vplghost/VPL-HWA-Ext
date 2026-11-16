@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
-
-const source = await readFile(new URL('../extension/resource-data.js', import.meta.url), 'utf8');
-const context = {};
-runInNewContext(source, context);
-const resources = context.hwaHelperResourceData;
+import * as resources from '../src/utils/resourceData.ts';
 
 test('World Energy refills at verified interval, caps, and accepts newer API baseline', () => {
   const entry = { data: { amount: 44, lastRefillAt: 1000000, refillEveryMs: 300000,

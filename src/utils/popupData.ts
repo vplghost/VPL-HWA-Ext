@@ -415,6 +415,108 @@ export function getChallengeResourceStock(cache: any, target: string | number): 
   return null;
 }
 
+export const BATTLE_REPORT_CLAIM_TYPES = [
+  'soloMobAttackResult',
+  'rallyMobAttackResult',
+  'rallyCancelled',
+  'mineGatheringResult',
+  'outpostScoutResult',
+  'outpostAttackResult',
+  'outpostScoutDenied',
+  'mineAttackResult',
+  'mineDefendResult',
+  'rallyMemberKicked',
+  'mineScoutResult',
+  'presidentAssign',
+  'outpostAttackDenied',
+] as const;
+
+export interface PendingClaimsResult {
+  letterIds: Array<string | number>;
+  hasReports: boolean;
+  questIds: Array<string | number>;
+  totalCount: number;
+}
+
+export function getPendingClaims(cache: any): PendingClaimsResult {
+  if (!cache || typeof cache !== 'object') {
+    return { letterIds: [], hasReports: false, questIds: [], totalCount: 0 };
+  }
+
+  const letters = Array.isArray(cache.mailStatus?.data?.letters)
+    ? cache.mailStatus.data.letters
+    : Array.isArray(cache.mailGetAll?.data?.letters)
+    ? cache.mailGetAll.data.letters
+    : Array.isArray(cache.mailGetAll?.letters)
+    ? cache.mailGetAll.letters
+    : [];
+
+  const unclaimedLetters = letters.filter(
+    (l: any) =>
+      l &&
+      !l.deleted &&
+      (l.reward || l.q_reward || l.items) &&
+      !(Number(l.availableUntil) > 0 && Number(l.availableUntil) * 1000 <= Date.now()) &&
+      !l.claimed &&
+      !l.rewardReceived &&
+      !l.rewardClaimed
+  );
+  const letterIds = unclaimedLetters.map((l: any) => l.id ?? l.letterId).filter((id: any) => id != null);
+
+  const mailData = cache.mailStatus?.data || {};
+  const hasReports = Boolean(
+    mailData.hasUnclaimed ||
+    Number(mailData.totalUnclaimed) > 0 ||
+    Number(mailData.unclaimedReportsCount) > 0
+  );
+
+  const quests = Array.isArray(cache.questGetAll?.data)
+    ? cache.questGetAll.data
+    : Array.isArray(cache.questGetAll)
+    ? cache.questGetAll
+    : [];
+  const readyQuests = quests.filter((q: any) => q && q.state === 2);
+  const questIds = readyQuests.map((q: any) => q.id).filter((id: any) => id != null);
+
+  const totalCount = letterIds.length + (hasReports ? 1 : 0) + questIds.length;
+
+  return { letterIds, hasReports, questIds, totalCount };
+}
+
+export function buildAutoClaimCalls(cache: any, options: any = {}) {
+  const opt = { mail: true, reports: true, quests: true, ...options };
+  const pending = getPendingClaims(cache);
+  const calls: any[] = [];
+
+  if (opt.mail && pending.letterIds.length > 0) {
+    calls.push({
+      name: 'mailFarm',
+      args: { letterIds: pending.letterIds },
+    });
+  }
+
+  if (opt.reports && pending.hasReports) {
+    calls.push({
+      name: 'readAndClaimAll',
+      args: { types: BATTLE_REPORT_CLAIM_TYPES },
+      feature: 'report',
+    });
+  }
+
+  if (opt.quests && pending.questIds.length > 0) {
+    calls.push({
+      name: 'quest_multiFarm',
+      args: { questIds: pending.questIds },
+    });
+  }
+
+  if (calls.length > 0) {
+    calls.push({ name: 'mailGetAll', args: {} }, { name: 'questGetAll', args: {} });
+  }
+
+  return { calls, pending };
+}
+
 export const popupDataHelper = {
   heroSoulProgress,
   titanSoulProgress,
@@ -438,6 +540,9 @@ export const popupDataHelper = {
   validateDraftPicks,
   getDraftActiveStep,
   questLocaleMap,
+  BATTLE_REPORT_CLAIM_TYPES,
+  getPendingClaims,
+  buildAutoClaimCalls,
 };
 
 if (typeof globalThis !== 'undefined') {

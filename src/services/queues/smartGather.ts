@@ -8,32 +8,21 @@ import * as expData from '../../utils/experimentalData.ts';
 import { unsafeMineIds as getUnsafeMineIds } from '../mineDefense.ts';
 
 function getSmartGatherData(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperSmartGatherData) ||
-    smartGatherData
-  );
+  return smartGatherData;
 }
 
 function getDataHelper(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperExperimentalData) ||
-    expData
-  );
+  return expData;
 }
 
 function getRouteSpeeds(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperRouteSpeeds) ||
-    routeSpeeds
-  );
+  return routeSpeeds;
 }
 
 function getMineDefenseHelper(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMineDefense) || {
-      unsafeMineIds: getUnsafeMineIds,
-    }
-  );
+  return {
+    unsafeMineIds: getUnsafeMineIds,
+  };
 }
 
 export function list<T = any>(raw: any): T[] {

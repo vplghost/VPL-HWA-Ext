@@ -9,9 +9,9 @@ import { parse, compileScript } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import { recentMissionIds, rememberMission } from '../src/utils/campaignMissionHistory.ts';
 import { getItemIcon } from '../src/utils/itemResources.ts';
+import { campaignMissions } from '../src/data/campaignData.ts';
 
 const data = JSON.parse(await readFile(new URL('../src/data/campaign-picker.json', import.meta.url)));
-vm.runInThisContext(await readFile(new URL('../extension/campaign-missions.js', import.meta.url), 'utf8'));
 const require = createRequire(import.meta.url);
 async function loadComponent(path, imports = {}) {
   const { descriptor } = parse(await readFile(new URL('../src/components/dialogs/' + path, import.meta.url), 'utf8'));
@@ -29,7 +29,9 @@ const MissionTooltip = await loadComponent('MissionDropTooltip.vue', {
   '@/src/utils/itemResources': { getItemIcon },
 });
 const Picker = await loadComponent('CampaignMissionPicker.vue', {
-  '@/src/data/campaign-picker.json': data, './MissionDropTooltip.vue': MissionTooltip,
+  '@/src/data/campaign-picker.json': data,
+  './MissionDropTooltip.vue': MissionTooltip,
+  '@/src/data/campaignData': { campaignMissions },
 });
 
 test('picker uses verified campaign world names and previews actual possible drops with bundled images', async () => {
@@ -60,7 +62,7 @@ test('chapter and mission actions select matching missions, retain exhausted res
   const js = ts.transpileModule(script, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
   const props = Vue.reactive({ modelValue: 135, disabled: false, isMissionDisabled: id => id === 1 });
   const updates = [], stops = [];
-  const context = { ...Vue, pickerData: data, hwaHelperCampaignMissions: globalThis.hwaHelperCampaignMissions,
+  const context = { ...Vue, pickerData: data, campaignMissions, hwaHelperCampaignMissions: globalThis.hwaHelperCampaignMissions,
     defineProps: () => props, defineEmits: () => (_, id) => updates.push(id),
     watch: (...args) => { const stop = Vue.watch(...args); stops.push(stop); return stop; },
   };
@@ -93,6 +95,7 @@ test('actual Campaign raid only records history after confirmed successful resul
     waitForCampaignRaidResult: async () => result,
     chrome: { storage: { local: { set: async () => {}, get: async () => ({}) } } },
     hwaHelperCampaignMissions: globalThis.hwaHelperCampaignMissions,
+    campaignMissions,
   };
   vm.runInNewContext(js + '\nglobalThis.api = { executeRaidCall };', context);
   await context.api.executeRaidCall(1); assert.equal(records.length, 0);

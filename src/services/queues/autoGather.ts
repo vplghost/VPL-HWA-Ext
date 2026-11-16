@@ -10,25 +10,17 @@ import { unsafeMineIds as getUnsafeMineIds } from '../mineDefense.ts';
 export const BASIC_MINE_TYPES: readonly BasicResourceType[] = ['food', 'wood', 'stone', 'iron'];
 
 function getDataHelper(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperExperimentalData) ||
-    expData
-  );
+  return expData;
 }
 
 function getSmartGatherHelper(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperSmartGather) ||
-    smartGatherService
-  );
+  return smartGatherService;
 }
 
 function getMineDefenseHelper(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMineDefense) || {
-      unsafeMineIds: getUnsafeMineIds,
-    }
-  );
+  return {
+    unsafeMineIds: getUnsafeMineIds,
+  };
 }
 
 

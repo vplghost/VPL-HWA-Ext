@@ -8,6 +8,7 @@ import { parse, compile } from '@vue/compiler-dom';
 import { renderToString } from '@vue/server-renderer';
 import { normalizeArray } from '../src/utils/troops.ts';
 import { formatNumber } from '../src/utils/formatters.ts';
+import { getTitanMetadata } from '../src/data/titanMetadata.ts';
 import UnitStars from './helpers/unit-stars.mjs';
 
 const source = await readFile(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
@@ -21,12 +22,10 @@ function findGrid(node) {
 }
 // Render the actual door template with the actual SFC computed state.
 const render = new Function('Vue', compile(findGrid(parse(template)).loc.source, { mode: 'function', prefixIdentifiers: true }).code)(Vue);
-const metadata = {};
-vm.runInNewContext(await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8'), metadata);
 function setup(data) {
   const cache = Vue.ref({ dungeonStatus: { data } });
   const context = { ref: Vue.ref, computed: Vue.computed, normalizeArray, formatNumber,
-    getTitanMetadata: id => metadata.hwaHelperTitanMetadata[id],
+    getTitanMetadata,
     useRpcCache: () => ({ cache, dispatchRpc() {}, updateCacheLocally() {} }),
     defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     onMounted() {}, onUnmounted() {}, watch() {} };

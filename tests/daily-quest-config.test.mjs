@@ -13,8 +13,7 @@ import * as questDataModule from '../src/data/questData.ts';
 
 // Reduced pinned remote config, plus sanitized getDailyQuests from firstattack timeline 11.
 const fixture = JSON.parse(await readFile(new URL('fixtures/daily-quest-config.json', import.meta.url)));
-const context = { Date, Number, Array, console };
-vm.runInNewContext(await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8'), context);
+const context = { Date, Number, Array, console, hwaHelperQuestData: questDataModule.questData || questDataModule.default || questDataModule };
 vm.runInNewContext(await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8'), context);
 const data = context.hwaHelperQuestData;
 const derived = deriveDailyDefinitions(fixture.quests, fixture.chains, fixture.conditions, fixture.packs, fixture.locale);

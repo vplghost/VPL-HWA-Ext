@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { towerBuffs } from '../src/data/towerData.ts';
+import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../src/data/titanMetadata.ts';
+import { questData } from '../src/data/questData.ts';
+import { resourceDataHelper } from '../src/utils/resourceData.ts';
 
 class MockClassList {
   constructor(element) {
@@ -348,12 +352,9 @@ const mockDoc = {
 };
 
 const clanVersusRulesJs = await readFile(new URL('../extension/clan-versus-rules.js', import.meta.url), 'utf8');
-const resourceDataJs = await readFile(new URL('../extension/resource-data.js', import.meta.url), 'utf8');
-const titanMetadataJs = await readFile(new URL('../extension/titan-metadata.js', import.meta.url), 'utf8');
 const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
-const questDataJs = await readFile(new URL('../extension/quest-data.js', import.meta.url), 'utf8');
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-const towerBuffsJs = await readFile(new URL('../extension/tower-buffs.js', import.meta.url), 'utf8');
+const towerBuffsJs = `globalThis.hwaHelperTowerBuffs = ${JSON.stringify(towerBuffs)};`;
 const popupCss = await readFile(new URL('../extension/popup.css', import.meta.url), 'utf8');
 
 const context = {
@@ -384,15 +385,17 @@ const context = {
   }
 };
 context.globalThis = context;
+context.hwaHelperTitanMetadata = titanMetadata;
+context.hwaHelperTitanArtifactEvolveCost = titanArtifactEvolveCost;
+context.hwaHelperTitanArtifactLevelCosts = titanArtifactLevelCosts;
+context.hwaHelperQuestData = questData;
+context.hwaHelperResourceData = resourceDataHelper;
+context.resourceData = resourceDataHelper;
 vm.createContext(context);
 vm.runInContext(towerBuffsJs, context);
 vm.runInContext(clanVersusRulesJs, context);
-vm.runInContext(resourceDataJs, context);
-vm.runInContext(titanMetadataJs, context);
-vm.runInContext(questDataJs, context);
 vm.runInContext(popupDataJs, context);
 context.Date = Date;
-context.resourceData = context.globalThis.hwaHelperResourceData;
 context.globalThis.hwaHelperNameMap = { building: () => '', research: () => '', item: () => null, hero: () => null };
 
 // Extract renderEvents, openGuildVersusModal, setupGuildVersusModal from popupJs

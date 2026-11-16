@@ -5,10 +5,7 @@ import type {
 import towerAutomationService, { plan as planTower } from './towerAutomation.ts';
 
 function getPlanner(): any {
-  return (
-    (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTowerAutomation) ||
-    towerAutomationService
-  );
+  return towerAutomationService;
 }
 
 export function terminal(state?: TowerRunnerState | null): boolean {

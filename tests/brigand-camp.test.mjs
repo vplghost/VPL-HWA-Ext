@@ -5,10 +5,10 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { computed, ref, shallowRef, watch, nextTick } from 'vue';
 import { campAttackError, campAttackCalls, campHeroIds, BRIGAND_ENERGY_COST, campSearchCalls, availableCamps } from '../src/utils/brigandCamp.ts';
-import { getAmountAt } from '../src/utils/resourceData.ts';
+import { getAmountAt, resourceDataHelper } from '../src/utils/resourceData.ts';
 
-const context = { TextEncoder };
-for (const file of ['refillable-rules', 'resource-data', 'rpc-cache']) {
+const context = { TextEncoder, hwaHelperResourceData: resourceDataHelper };
+for (const file of ['refillable-rules', 'rpc-cache']) {
   vm.runInNewContext(await readFile(new URL('../extension/' + file + '.js', import.meta.url), 'utf8'), context);
 }
 const reducer = context.hwaHelperRpcCache;

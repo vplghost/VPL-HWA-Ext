@@ -39,15 +39,11 @@ export function buildGearRecipeTree(gearId: number | string | null, cache: any):
     const cycle = ancestors.has(identity);
     const owned = allocate(category, id, required);
     const missing = Math.max(0, required - owned);
-    const craftMap = category === 'gear'
-      ? (globals.hwaHelperGearCraftData || (typeof gearCraftData !== 'undefined' ? gearCraftData : null))
-      : (globals.hwaHelperScrollCraftData || (typeof scrollCraftData !== 'undefined' ? scrollCraftData : null));
-    const craftInfo = craftMap?.[id] || (category === 'gear'
-      ? (typeof gearCraftData !== 'undefined' ? gearCraftData?.[id] : null)
-      : (typeof scrollCraftData !== 'undefined' ? scrollCraftData?.[id] : null)) || null;
-    const resolvedName = (typeof getItemName === 'function' ? getItemName(category, id) : null)
+    const craftMap = (category === 'gear' ? globals.hwaHelperGearCraftData : globals.hwaHelperScrollCraftData)
+      || (category === 'gear' ? gearCraftData : scrollCraftData);
+    const craftInfo = craftMap?.[id] || (category === 'gear' ? gearCraftData?.[id] : scrollCraftData?.[id]) || null;
+    const resolvedName = getItemName(category, id)
       || globals.hwaHelperNameMap?.item?.(category, id)
-      || globals.hwaHelperNameData?.names?.[category]?.[id]
       || `${category} #${id}`;
     const node: RecipeNode = {
       id, key, category, isScroll: category === 'scroll',
@@ -103,9 +99,7 @@ export function recipeFarmCategory(node: RecipeNode): string {
 
 export function recipeMissions(node: RecipeNode | null): any[] {
   if (!node || node.cycle) return [];
-  const missions = (typeof typedGetMissionsForItem === 'function' ? typedGetMissionsForItem(node.id) : null)
-    || (globalThis as any).hwaHelperCampaignMissions?.getMissionsForItem?.(node.id)
-    || [];
+  const missions = typedGetMissionsForItem(node.id) || [];
   const category = recipeFarmCategory(node);
   return missions.filter((mission: any) => mission.drops?.[category]?.some((id: any) => String(id) === node.id));
 }

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue';
 import pickerData from '@/src/data/campaign-picker.json';
+import { campaignMissions } from '@/src/data/campaignData';
 import MissionDropTooltip from './MissionDropTooltip.vue';
 
 const props = defineProps<{ modelValue: number; disabled?: boolean; isMissionDisabled: (id: number) => boolean; missionStatus: (id: number) => string }>();
 const emit = defineEmits<{ (e: 'update:modelValue', id: number): void }>();
 interface Mission { id: number; chapter: number; index: number; isHeroic: boolean }
-const missions = Object.values((globalThis as any).hwaHelperCampaignMissions?.missions || {}) as Mission[];
+const missions = Object.values(campaignMissions || (globalThis as any).hwaHelperCampaignMissions?.missions || {}) as Mission[];
 const names = pickerData.missions as Record<string, { name: string }>;
 const chapters = Object.entries(pickerData.chapters).map(([id, name]) => ({ id: Number(id), name }));
 const chapter = ref(missions.find(m => m.id === props.modelValue)?.chapter || chapters[0]?.id || 1);

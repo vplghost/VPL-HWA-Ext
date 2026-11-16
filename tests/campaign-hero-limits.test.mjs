@@ -2,19 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import vm from 'node:vm';
+import { campaignMissions, itemDrops, getMissionsForItem, getHighestRaidableMission, getMissionProgress, getMissionTries, isMissionRaidable } from '../src/data/campaignData.ts';
 
 const root = resolve(import.meta.dirname, '..');
 
+const campaignHelper = {
+  missions: campaignMissions,
+  itemDrops,
+  getMissionsForItem,
+  getHighestRaidableMission,
+  getMissionProgress,
+  getMissionTries,
+  isMissionRaidable,
+};
+
 async function createCampaignContext() {
-  const content = await readFile(join(root, 'extension/campaign-missions.js'), 'utf8');
-  const context = {
-    globalThis: {}
+  return {
+    globalThis: {
+      hwaHelperCampaignMissions: campaignHelper,
+    },
   };
-  context.globalThis = context;
-  vm.createContext(context);
-  vm.runInContext(content, context);
-  return context;
 }
 
 test('campaign-missions correctly distinguishes heroic missions from normal missions', async () => {
