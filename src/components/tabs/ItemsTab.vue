@@ -4,6 +4,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getItemName, downloadJson } from '@/src/utils/metadata';
 import { getItemIcon } from '@/src/utils/itemResources';
 import { formatNumber } from '@/src/utils/formatters';
+import { popupDataHelper } from '@/src/utils/popupData';
 
 const { cache, dispatchRpc } = useRpcCache();
 
@@ -184,8 +185,10 @@ async function refreshInventory() {
 }
 
 function exportItemsJson() {
-  const popupData = (globalThis as any).hwaHelperPopupData;
-  const exported = popupData?.exportTableData?.(
+  const pData = typeof popupDataHelper !== 'undefined'
+    ? popupDataHelper
+    : (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperPopupData : null);
+  const exported = pData?.exportTableData?.(
     'items',
     cache.value,
     search.value,

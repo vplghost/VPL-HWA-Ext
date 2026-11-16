@@ -12,6 +12,7 @@ import {
   getHeroName,
   type HeroMeta,
 } from '@/src/utils/metadata';
+import { popupDataHelper } from '@/src/utils/popupData';
 import { formatNumber } from '@/src/utils/formatters';
 import HeroDetailModal from '@/src/components/dialogs/HeroDetailModal.vue';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
@@ -74,7 +75,7 @@ const heroEntries = computed(() => {
     return {
       id: Number(id),
       idStr,
-      name: meta?.name || (typeof getHeroName === 'function' ? getHeroName(id) : null) || (globalThis as any).hwaHelperNameMap?.hero?.(id) || `Hero #${id}`,
+      name: meta?.name || (typeof getHeroName === 'function' ? getHeroName(id) : null) || (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperNameMap?.hero?.(id) : null) || `Hero #${id}`,
       class: meta?.class || 'Other',
       role: meta?.role || '',
       faction: meta?.faction || '',
@@ -182,8 +183,10 @@ async function refreshHeroes() {
 }
 
 function exportHeroesJson() {
-  const popupData = (globalThis as any).hwaHelperPopupData;
-  const exported = popupData?.exportTableData?.('heroes', cache.value, search.value);
+  const pData = typeof popupDataHelper !== 'undefined'
+    ? popupDataHelper
+    : (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperPopupData : null);
+  const exported = pData?.exportTableData?.('heroes', cache.value, search.value);
   if (Array.isArray(exported) && exported.length > 0) {
     downloadJson('hwa-heroes.json', exported);
   } else {

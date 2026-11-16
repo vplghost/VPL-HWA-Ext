@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { formatNumber } from '@/src/utils/formatters';
+import { extractEventGoals } from '@/src/utils/popupData';
 
 const { cache, dispatchRpc } = useRpcCache();
 
@@ -10,9 +11,11 @@ const activeFilter = ref<'all' | 'activities' | 'resources' | 'synergies' | 'rea
 const isRefreshing = ref(false);
 
 const goalsData = computed(() => {
-  const pData = (globalThis as any).hwaHelperPopupData;
-  if (pData?.extractEventGoals) {
-    return pData.extractEventGoals(cache.value);
+  const extractFn = typeof extractEventGoals === 'function'
+    ? extractEventGoals
+    : (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperPopupData?.extractEventGoals : null);
+  if (extractFn) {
+    return extractFn(cache.value);
   }
   return {
     all: [],

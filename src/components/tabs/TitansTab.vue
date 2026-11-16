@@ -12,6 +12,7 @@ import {
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 import TitanHoverCard from '@/src/components/common/TitanHoverCard.vue';
+import { isTitanArtifactUpgradable, popupDataHelper } from '@/src/utils/popupData';
 
 const { cache, dispatchRpc } = useRpcCache();
 
@@ -124,9 +125,11 @@ const titanEntries = computed(() => {
     const artifactsList: Array<{ type: string; star: number; level: number; isUpgradable: boolean }> = [];
     if (Array.isArray(arts) && arts.length > 0) {
       const typeNames = ['Wpn', 'Crown', 'Seal'];
-      const popupData = (globalThis as any).hwaHelperPopupData;
+      const isUpgradableFn = typeof isTitanArtifactUpgradable === 'function'
+        ? isTitanArtifactUpgradable
+        : (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperPopupData?.isTitanArtifactUpgradable : null);
       arts.forEach((art: any, idx: number) => {
-        const isUpgradable = popupData?.isTitanArtifactUpgradable?.(id, idx, titan, cache.value);
+        const isUpgradable = isUpgradableFn?.(id, idx, titan, cache.value);
         artifactsList.push({
           type: typeNames[idx] || `Art${idx + 1}`,
           star: art?.star ?? 0,
@@ -257,8 +260,10 @@ async function refreshTitans() {
 }
 
 function exportTitansJson() {
-  const popupData = (globalThis as any).hwaHelperPopupData;
-  const exported = popupData?.exportTableData?.('titans', cache.value, search.value);
+  const pData = typeof popupDataHelper !== 'undefined'
+    ? popupDataHelper
+    : (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperPopupData : null);
+  const exported = pData?.exportTableData?.('titans', cache.value, search.value);
   if (Array.isArray(exported) && exported.length > 0) {
     downloadJson('hwa-titans.json', exported);
   } else {

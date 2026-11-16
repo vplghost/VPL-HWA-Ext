@@ -25,9 +25,11 @@ export function usePopupAutomation(cache: Ref<any>, runOnOpen = false) {
   const message = ref('');
   const busy = ref(false);
   let didAutoClaim = false;
-  const helpers = () => (globalThis as any).hwaHelperPopupData;
-  const experimental = () => (globalThis as any).hwaHelperExperimentalData;
-  const pending = computed(() => helpers()?.getPendingClaims?.(cache.value) || getPendingClaims(cache.value));
+  const pending = computed(() => {
+    const claimsFn = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperPopupData?.getPendingClaims)
+      || (typeof getPendingClaims === 'function' ? getPendingClaims : null);
+    return claimsFn ? claimsFn(cache.value) : { letterIds: [], hasReports: false, questIds: [], totalCount: 0 };
+  });
   const selectedCount = computed(() => (autoClaimSettings.value.mail ? pending.value.letterIds.length : 0) +
     (autoClaimSettings.value.reports && pending.value.hasReports ? 1 : 0) +
     (autoClaimSettings.value.quests ? pending.value.questIds.length : 0));
@@ -36,9 +38,13 @@ export function usePopupAutomation(cache: Ref<any>, runOnOpen = false) {
     const heroes = c.heroGetAll?.data || {};
     const summary = c['getUnitSummary:unit']?.data;
     const array = (value: any): any[] => Array.isArray(value) ? value : Object.values(value || {});
-    const available = (experimental()?.availableHeroIds || availableHeroIds)(heroes, { ...summary, squads: array(summary?.squads) }, array(c.marchStatus?.data?.marches));
+    const availFn = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperExperimentalData?.availableHeroIds)
+      || (typeof availableHeroIds === 'function' ? availableHeroIds : null);
+    const available = availFn ? availFn(heroes, { ...summary, squads: array(summary?.squads) }, array(c.marchStatus?.data?.marches)) : [];
     const accountTeams = customTeams.value[String(c.accountStatus?.data?.id)] || [];
-    return (experimental()?.autoJoinTeamOptions || autoJoinTeamOptions)(c.teamGetAll?.data, heroes, accountTeams, available) ||
+    const joinFn = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperExperimentalData?.autoJoinTeamOptions)
+      || (typeof autoJoinTeamOptions === 'function' ? autoJoinTeamOptions : null);
+    return (joinFn ? joinFn(c.teamGetAll?.data, heroes, accountTeams, available) : null) ||
       [{ id: 'highest', label: 'Top 5 highest power heroes' }];
   });
   function consume(stored: Record<string, any>) {
@@ -67,7 +73,9 @@ export function usePopupAutomation(cache: Ref<any>, runOnOpen = false) {
   async function claimRewards() {
     if (!enabled.value || busy.value) return;
     if (claimStatus.value?.state === 'queued' && Date.now() - Date.parse(claimStatus.value.updatedAt || '') < 120000) return;
-    const calls = (helpers()?.buildAutoClaimCalls || buildAutoClaimCalls)(cache.value, autoClaimSettings.value)?.calls || [];
+    const buildCallsFn = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperPopupData?.buildAutoClaimCalls)
+      || (typeof buildAutoClaimCalls === 'function' ? buildAutoClaimCalls : null);
+    const calls = buildCallsFn ? buildCallsFn(cache.value, autoClaimSettings.value)?.calls || [] : [];
     if (!calls.length) return;
     busy.value = true;
     message.value = 'Dispatching selected rewards…';

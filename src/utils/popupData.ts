@@ -1,4 +1,11 @@
 import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../data/titanMetadata.ts';
+import {
+  clanVersusRoundQuests,
+  clanVersusChallengeNames,
+  clanVersusChallengePoints,
+  clanVersusChallengeSteps,
+} from '../data/clanVersusData.ts';
+import { questData } from '../data/questData.ts';
 
 // enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.293.0 (client 1.293.1010) splitlib asset.
 // Each value is the cost to evolve TO that star, not the current star.
@@ -415,6 +422,469 @@ export function getChallengeResourceStock(cache: any, target: string | number): 
   return null;
 }
 
+export function normalizeGoalKey(target: any): string {
+  const s = String(target || '').toLowerCase();
+  if (s.includes('titan skin stone')) return 'res:titan_skin_stones';
+  if (s.includes('hero skin stone')) return 'res:hero_skin_stones';
+  if (s.includes('titan potion')) return 'res:titan_potions';
+  if (s.includes('elemental sphere')) return 'res:elemental_spheres';
+  if (s.includes('summoning sphere')) return 'res:summon_titan';
+  if (s.includes('summon') || s.includes('circle')) return 'res:summon_titan';
+  if (s.includes('relic shard')) return 'res:relic_shards';
+  if (s.includes('chaos core')) return 'res:chaos_cores';
+  if (s.includes('artifact chest')) return 'res:artifact_chests';
+  if (s.includes('heroic chest')) return 'res:heroic_chests';
+  if (s.includes('rune sphere')) return 'res:rune_spheres';
+  if (s.includes('rune stone')) return 'res:rune_stones';
+  if (s.includes('mastery crystal')) return 'res:mastery_crystals';
+  if ((s.includes('spend') && s.includes('energy')) || s.includes('pseudo_stamina')) return 'res:energy';
+  if (s.includes('emerald') || s.includes('starmoney')) return 'res:emerald_spend';
+  if (s.includes('hero soul stone')) return 'res:hero_soul_stones';
+  if (s.includes('skill book')) return 'res:skill_books';
+  if (s.includes('honor mark')) return 'res:honor_marks';
+  if (s.includes('outland chest')) return 'res:outland_chests';
+  if (s.includes('building speedup')) return 'res:building_speedups';
+  if (s.includes('research speedup')) return 'res:research_speedups';
+  if (s.includes('training speedup') || s.includes('train_speedup')) return 'res:training_speedups';
+  if (s.includes('healing speedup')) return 'res:healing_speedups';
+
+  // Activities
+  if (s.includes('tower')) return 'act:tower';
+  if (s.includes('bandit camp')) return 'act:bandit_camp';
+  if (s.includes('boss') || s.includes('rally')) return 'act:map_boss';
+  if (s.includes('monster')) return 'act:map_monster';
+  if (s.includes('expedition')) return 'act:expedition';
+  if (s.includes('daily quest') || s.includes('claim completed')) return 'act:daily_quest';
+  if (s.includes('grand arena')) return 'act:grand_arena';
+  if (s.includes('arena')) return 'act:arena';
+  if (s.includes('login') || s.includes('sign in')) return 'act:login';
+  if (s.includes('vip')) return 'act:vip_points';
+  if (s.includes('artlevel') || s.includes('artifact level')) return 'act:artifact_level';
+  if (s.includes('artifact evolution') || s.includes('artifact_evolution')) return 'act:artifact_evolution';
+  if (s.includes('hero rank') || s.includes('hero_rank')) return 'act:hero_rank';
+  if (s.includes('hero level') || s.includes('hero_level')) return 'act:hero_level';
+  if (s.includes('altar')) return 'act:clan_altar';
+  if (s.includes('battle pass') || s.includes('bp_daily')) return 'act:battle_pass_daily';
+  if (s.includes('gather') || s.includes('food') || s.includes('wood') || s.includes('stone') || s.includes('iron')) return 'act:gathering';
+  if (s.includes('titan power')) return 'act:titan_power';
+  if (s.includes('hero power')) return 'act:hero_power';
+  if (s.includes('building power')) return 'act:building_power';
+  if (s.includes('research power')) return 'act:research_power';
+  if (s.includes('train') && s.includes('troop')) return 'act:train_troops';
+  if (s.includes('unit in pvp') || s.includes('loseunits') || s.includes('pvp unit')) return 'act:pvp_clash';
+  if (s.includes('equip') && s.includes('item')) return 'act:equip_items';
+  if (s.includes('dungeon')) return 'act:dungeon';
+  if (s.includes('guild war')) return 'act:guild_war';
+
+  return `misc:${s.replace(/[^a-z0-9]+/g, '_')}`;
+}
+
+export const goalIconMap: Record<string, string> = {
+  'res:titan_skin_stones': '💎',
+  'res:hero_skin_stones': '💎',
+  'res:titan_potions': '🧪',
+  'res:elemental_spheres': '🔮',
+  'res:summon_titan': '🌀',
+  'res:relic_shards': '💠',
+  'res:chaos_cores': '⚡',
+  'res:artifact_chests': '🗝️',
+  'res:heroic_chests': '📦',
+  'res:rune_spheres': '🟣',
+  'res:rune_stones': '🪨',
+  'res:mastery_crystals': '🔶',
+  'res:energy': '⚡',
+  'res:emerald_spend': '💎',
+  'res:hero_soul_stones': '✨',
+  'res:skill_books': '📖',
+  'res:honor_marks': '🎖️',
+  'res:outland_chests': '🎁',
+  'res:building_speedups': '⏩',
+  'res:research_speedups': '⏩',
+  'res:training_speedups': '⏩',
+  'res:healing_speedups': '⏩',
+  'act:tower': '🗼',
+  'act:bandit_camp': '⛺',
+  'act:map_boss': '👹',
+  'act:map_monster': '👾',
+  'act:expedition': '⛵',
+  'act:daily_quest': '📜',
+  'act:arena': '⚔️',
+  'act:grand_arena': '🛡️',
+  'act:gathering': '🌾',
+  'act:titan_power': '💪',
+  'act:hero_power': '⭐',
+  'act:building_power': '🏛️',
+  'act:research_power': '🔬',
+  'act:train_troops': '🛡️',
+  'act:pvp_clash': '⚔️',
+  'act:equip_items': '🗡️',
+  'act:dungeon': '🏰',
+  'act:guild_war': '🏆',
+  'act:login': '📅',
+  'act:vip_points': '⭐',
+  'act:artifact_level': '⚔️',
+  'act:artifact_evolution': '🌟',
+  'act:hero_rank': '🎖️',
+  'act:hero_level': '📈',
+  'act:clan_altar': '🙏',
+  'act:battle_pass_daily': '🎟️',
+  'act:battle_pass_milestone': '🏅',
+  'act:seasonal_faction_1': '🛡️',
+  'act:seasonal_faction_2': '⚔️',
+  'act:claim_completed_quests': '🎁',
+};
+
+export const dailyLimitedKeys = new Set([
+  'act:tower',
+  'act:expedition',
+  'act:daily_quest',
+  'act:arena',
+  'act:grand_arena',
+  'act:guild_war',
+  'act:dungeon',
+  'act:login',
+  'act:claim_completed_quests',
+  'act:clan_altar',
+]);
+
+export const knownEventNames: Record<string | number, string> = {
+  100273: 'Demon Skin Festival',
+  100292: 'Soleil Upgrade Event',
+  100309: 'Battle Pass Daily',
+  100344: 'Titan & Combat Event',
+  100347: 'Hero Advancement Festival',
+  100351: 'Faction Clash',
+  100353: 'Battle Pass Daily',
+  100356: 'Battle Pass Season',
+  90249: 'Soleil Upgrade Event',
+  97682: 'Demon Skin Festival',
+  ADVENTURE_HERO62_TITLE_EVENT_UPGRADE: 'Soleil Upgrade Event',
+  DAEMONSKIN22_UI_TITLE: 'Demon Skin Festival',
+};
+
+export function isTowerCleared(cache: any): boolean {
+  if (cache?.towerStatus?.data?.isCleared) return true;
+  if (cache?.towerStatus?.data?.state === 'win' || cache?.towerStatus?.data?.state === 'completed') return true;
+  if (cache?.magicTower_briefInfo?.data?.state === 'win') return true;
+  if (cache?.['magicTower_briefInfo']?.data?.state === 'win') return true;
+  if (cache?.['magicTower_briefInfo']?.state === 'win') return true;
+  if (cache?.towerSession?.data?.completed) return true;
+  return false;
+}
+
+export function extractEventGoals(cache: any, now = Date.now()): {
+  all: any[];
+  activities: any[];
+  resources: any[];
+  metrics: { totalGoals: number; synergiesCount: number; readyCount: number };
+} {
+  const goalsMap = new Map<string, any>();
+  const towerCleared = isTowerCleared(cache);
+
+  const challengeNames = clanVersusChallengeNames || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusChallengeNames) || {};
+  const challengePoints = clanVersusChallengePoints || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusChallengePoints) || {};
+  const challengeSteps = clanVersusChallengeSteps || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusChallengeSteps) || {};
+  const roundQuestsMap = clanVersusRoundQuests || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusRoundQuests) || {};
+
+  function addOrMergeGoal({ key, title, category, eventName, amount = 1, unit = '', points = 0, stock = null, hint = '' }: any) {
+    const isTowerChest = key === 'act:tower' ||
+      (typeof key === 'string' && key.startsWith('act:daily_quest_') && (
+        [10019, 10082, 10083, 10084, 10085, 10107].includes(Number(key.replace('act:daily_quest_', ''))) ||
+        (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title))
+      )) ||
+      (typeof title === 'string' && /tower/i.test(title) && /chest/i.test(title));
+
+    const isUnavailable = isTowerChest && towerCleared;
+    const finalHint = (isTowerChest && towerCleared)
+      ? 'Tower cleared today • No more chests available until daily reset'
+      : hint;
+    const isLimited = (isTowerChest && towerCleared) ? false :
+      dailyLimitedKeys.has(key) || key.startsWith('act:daily_quest_');
+
+    if (!goalsMap.has(key)) {
+      const icon = goalIconMap[key] || (category === 'Resources' ? '💎' : '🎯');
+      goalsMap.set(key, {
+        key,
+        title,
+        icon,
+        category,
+        needed: amount,
+        unit,
+        stock,
+        inStock: stock != null ? stock >= amount : null,
+        isLimited,
+        isUnavailable,
+        totalPoints: points,
+        overlapCount: 1,
+        events: [{ name: eventName, amount, points, unit }],
+        hint: finalHint
+      });
+    } else {
+      const existing = goalsMap.get(key);
+      existing.overlapCount += 1;
+      existing.totalPoints += points;
+      if (amount > existing.needed) existing.needed = amount;
+      if (existing.stock != null && existing.needed != null) {
+        existing.inStock = existing.stock >= existing.needed;
+      }
+      if (isTowerChest && towerCleared) {
+        existing.isLimited = false;
+        existing.isUnavailable = true;
+        existing.hint = finalHint;
+      }
+      existing.events.push({ name: eventName, amount, points, unit });
+    }
+  }
+
+  // 1. Guild Versus
+  const vsStatus = cache?.clanVersusStatus?.data;
+  if (vsStatus) {
+    const battle = vsStatus.battle || {};
+    const info = vsStatus.info || {};
+    const rounds = Array.isArray(battle.rounds)
+      ? battle.rounds
+      : (battle.rounds && typeof battle.rounds === 'object' ? Object.values(battle.rounds) : []);
+    const liveRound: any = rounds.find((r: any) => r && r.status === 'inProgress') || rounds[0] || { index: 1 };
+    const roundConfig: any = (roundQuestsMap as any)[liveRound.index] || (roundQuestsMap as any)[1] || {};
+    const roundName = `Guild Versus Round ${liveRound.index}`;
+
+    const rawChallenges = Array.isArray(info.challenges)
+      ? info.challenges
+      : (info.challenges && typeof info.challenges === 'object' ? Object.values(info.challenges) : []);
+    const activeChallenges = rawChallenges.length > 0 ? rawChallenges : null;
+
+    if (activeChallenges) {
+      for (const ch of activeChallenges) {
+        const name = challengeNames[ch.id] || `Daily Challenge #${ch.id}`;
+        const stock = getChallengeResourceStock(cache, ch.id);
+        const isRes = stock !== null;
+        const key = normalizeGoalKey(name);
+        const step = challengeSteps[ch.id] || 1;
+        const points = challengePoints[ch.id] || 0;
+
+        addOrMergeGoal({
+          key,
+          title: name.replace(/\s*\(\d+[\d,]*\)$/, ''),
+          category: isRes ? 'Resources' : 'Activities',
+          eventName: roundName,
+          amount: step,
+          points,
+          stock,
+          hint: `Guild Versus challenge for ${roundName}`
+        });
+      }
+    } else if (Array.isArray(roundConfig.quests)) {
+      for (const q of roundConfig.quests) {
+        const stock = getChallengeResourceStock(cache, q.label);
+        const isRes = stock !== null;
+        const key = normalizeGoalKey(q.label);
+        const matchNum = q.label.match(/\b(\d+[\d,]*)\b/);
+        const amount = matchNum ? Number.parseInt(matchNum[1].replace(/,/g, ''), 10) : 1;
+
+        addOrMergeGoal({
+          key,
+          title: q.label.replace(/\s*\(\d+[\d,]*\)$/, ''),
+          category: isRes ? 'Resources' : 'Activities',
+          eventName: roundName,
+          amount,
+          points: q.points || 0,
+          stock,
+          hint: `Guild Versus quest for ${roundName}`
+        });
+      }
+    }
+  }
+
+  // 2. Titan Dungeon
+  const dungeon = cache?.dungeonStatus?.data;
+  if (dungeon && (dungeon.floorNumber || dungeon.maxFloorPassed)) {
+    const floor = dungeon.floorNumber || (dungeon.maxFloorPassed + 1);
+    addOrMergeGoal({
+      key: 'act:dungeon',
+      title: 'Titan Dungeon Exploration',
+      category: 'Activities',
+      eventName: 'Titan Dungeon',
+      amount: 1,
+      unit: 'floor',
+      points: 0,
+      stock: null,
+      hint: `Floor ${floor} • Prime element: ${dungeon.elements?.prime ? dungeon.elements.prime.charAt(0).toUpperCase() + dungeon.elements.prime.slice(1) : 'Earth'}`
+    });
+  }
+
+  // 3. Guild War Championship
+  const gwStatus = cache?.clanWarChampStatus?.data;
+  if (gwStatus) {
+    const tries = gwStatus.tries ?? 2;
+    addOrMergeGoal({
+      key: 'act:guild_war',
+      title: 'Guild War Championship Attacks',
+      category: 'Activities',
+      eventName: 'Guild War',
+      amount: tries > 0 ? tries : 1,
+      unit: 'attack',
+      points: 0,
+      stock: null,
+      hint: `${tries} war attacks remaining today`
+    });
+  }
+
+  // 4. Special Quest Events
+  const qData = questData || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperQuestData);
+  const questEvents = qData?.visibleMetadata?.(cache, now);
+  if (Array.isArray(questEvents)) {
+    for (const qe of questEvents) {
+      const title = knownEventNames[qe.name_localeKey] || knownEventNames[qe.id] || qe.name_localeKey?.replace(/_/g, ' ') || `Special Event #${qe.id}`;
+      const hasDetailedGroups = Array.isArray(cache?.specialQuestStatus?.data?.events)
+        && cache.specialQuestStatus.data.events.some((e: any) => e.id === qe.id && Array.isArray(e.groups) && e.groups.length > 0);
+      if (hasDetailedGroups) continue;
+
+      addOrMergeGoal({
+        key: `act:special_event_${qe.id}`,
+        title: `Special Quest: ${title}`,
+        category: 'Activities',
+        eventName: title,
+        amount: 1,
+        unit: 'quest',
+        points: 0,
+        stock: null,
+        hint: 'Active special event quests and milestones'
+      });
+    }
+  }
+
+  // 5. Special Quest Status
+  const specialEvents = qData?.visibleEvents?.(cache, now);
+  if (Array.isArray(specialEvents)) {
+    for (const ev of specialEvents) {
+      const evTitle = qData.title(ev);
+      for (const group of ev.groups || []) {
+        if (group.hide) continue;
+        const questsList = Array.isArray(group.quests) ? group.quests : [];
+        const activeQ = questsList.find((q: any) => q.state === 'inProgress');
+        const completedCount = questsList.filter((q: any) => q.state === 'completed').length;
+        if (!activeQ) continue;
+
+        const mapping = group.localeKey ? questLocaleMap[group.localeKey] : undefined;
+        const repeatLabel = group.repeatType === 'daily' ? 'Daily' : 'Chain';
+        const subEventName = `${evTitle} (${repeatLabel})`;
+
+        if (mapping) {
+          const stock = mapping.category === 'Resources'
+            ? getChallengeResourceStock(cache, mapping.title)
+            : null;
+          const progress = activeQ?.progress || 0;
+          const hint = activeQ
+            ? `Tier progress: ${progress.toLocaleString()} (${completedCount}/${questsList.length} completed)`
+            : `${completedCount}/${questsList.length} completed`;
+
+          addOrMergeGoal({
+            key: mapping.key,
+            title: mapping.title,
+            category: mapping.category,
+            eventName: subEventName,
+            amount: mapping.amount || 1,
+            unit: mapping.unit || '',
+            points: 0,
+            stock,
+            hint: `${hint} · Ends ${new Date(ev.end).toLocaleString()}`
+          });
+        } else if (group.localeKey) {
+          const humanTitle = group.localeKey
+            .replace(/^(LIB_SPECIAL_QUEST_EVENT_|LIB_SEASONAL_EVENT_NAME_|QUEST_TAB_|UI_)/, '')
+            .replace(/_/g, ' ')
+            .toLowerCase()
+            .replace(/\b\w/g, (c: string) => c.toUpperCase());
+          const key = normalizeGoalKey(group.localeKey);
+          addOrMergeGoal({
+            key,
+            title: humanTitle,
+            category: 'Activities',
+            eventName: subEventName,
+            amount: 1,
+            unit: 'tier',
+            points: 0,
+            stock: null,
+            hint: `${activeQ ? `In progress (${completedCount}/${questsList.length})` :
+              `${completedCount} completed`} · Ends ${new Date(ev.end).toLocaleString()}`
+          });
+        }
+      }
+    }
+  }
+
+  for (const quest of qData?.dailyQuests?.(cache, now) || []) {
+    if ((quest as any).state !== 'inProgress' && (quest as any).state !== 1) continue;
+    const resetAt = qData?.nextReset?.(cache, now);
+    addOrMergeGoal({
+      key: `act:daily_quest_${quest.id}`,
+      title: qData?.dailyTitle ? qData.dailyTitle(quest) : `Daily Quest #${quest.id}`,
+      category: 'Activities',
+      eventName: 'Daily Quests',
+      amount: 1,
+      unit: 'quest',
+      hint: `Progress: ${quest.progress ?? 0} · ${resetAt ? `Resets at ${new Date(resetAt).toLocaleString()}` : 'Resets daily'}`
+    });
+  }
+
+  // 6. Game Quests (questGetAll)
+  const allQuests = Array.isArray(cache?.questGetAll?.data)
+    ? cache.questGetAll.data
+    : (Array.isArray(cache?.questGetAll) ? cache.questGetAll : []);
+  const readyQuests = allQuests.filter((q: any) => q.state === 2);
+  if (readyQuests.length > 0) {
+    addOrMergeGoal({
+      key: 'act:claim_completed_quests',
+      title: `Claim Completed Quests (${readyQuests.length} ready)`,
+      category: 'Activities',
+      eventName: 'Daily Quests',
+      amount: readyQuests.length,
+      unit: 'quests',
+      points: 0,
+      stock: null,
+      hint: `${readyQuests.length} completed quest${readyQuests.length > 1 ? 's' : ''} waiting to collect rewards in game`
+    });
+  }
+
+  function compareGoals(a: any, b: any) {
+    const aOverlap = a.overlapCount > 1 ? a.overlapCount : 0;
+    const bOverlap = b.overlapCount > 1 ? b.overlapCount : 0;
+    if (aOverlap !== bOverlap) return bOverlap - aOverlap;
+
+    const aUrgent = a.category === 'Resources'
+      ? Boolean(a.inStock)
+      : (Boolean(a.isLimited) && !a.isUnavailable && !a.isCompleted);
+    const bUrgent = b.category === 'Resources'
+      ? Boolean(b.inStock)
+      : (Boolean(b.isLimited) && !b.isUnavailable && !b.isCompleted);
+    if (aUrgent !== bUrgent) return aUrgent ? -1 : 1;
+
+    const aPts = a.totalPoints || 0;
+    const bPts = b.totalPoints || 0;
+    if (aPts !== bPts) return bPts - aPts;
+
+    return a.title.localeCompare(b.title);
+  }
+
+  const allGoals = Array.from(goalsMap.values());
+  const activities = allGoals.filter((g) => g.category === 'Activities').sort(compareGoals);
+  const resources = allGoals.filter((g) => g.category === 'Resources').sort(compareGoals);
+
+  return {
+    all: allGoals.sort(compareGoals),
+    activities,
+    resources,
+    metrics: {
+      totalGoals: allGoals.length,
+      synergiesCount: allGoals.filter((g) => g.overlapCount > 1).length,
+      readyCount: allGoals.filter((g) =>
+        (g.category === 'Resources' && g.inStock) ||
+        (g.category === 'Activities' && g.isLimited && !g.isUnavailable && !g.isCompleted)
+      ).length
+    }
+  };
+}
+
 export const BATTLE_REPORT_CLAIM_TYPES = [
   'soloMobAttackResult',
   'rallyMobAttackResult',
@@ -543,6 +1013,9 @@ export const popupDataHelper = {
   BATTLE_REPORT_CLAIM_TYPES,
   getPendingClaims,
   buildAutoClaimCalls,
+  normalizeGoalKey,
+  isTowerCleared,
+  extractEventGoals,
 };
 
 if (typeof globalThis !== 'undefined') {
