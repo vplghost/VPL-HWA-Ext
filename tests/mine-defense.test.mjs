@@ -2,25 +2,50 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
+import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
+import { mineDefenseService } from '../src/services/mineDefense.ts';
+
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/mine-attacks-20261114.json', import.meta.url), 'utf8'));
 const root = new URL('../extension/', import.meta.url);
+
+const rpcCacheSandbox = { console, Date, URL, TextEncoder, structuredClone, globalThis: {} };
+rpcCacheSandbox.globalThis = rpcCacheSandbox;
+vm.runInNewContext(readFileSync(new URL('rpc-cache.js', root), 'utf8'), rpcCacheSandbox);
+const reducer = rpcCacheSandbox.globalThis.hwaHelperRpcCache;
+
 function environment() {
   const local = {}, sent = [], alarms = [], clock = { now: 0 };
-  class Clock extends Date { static now() { return clock.now; } }
   const area = { get: async keys => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).filter(k => k in local).map(k => [k, local[k]])), set: async value => Object.assign(local, value), remove: async () => {} };
   const chrome = { storage: { local: area, session: area, onChanged: { addListener() {} } },
     runtime: { id: 'test', onMessage: { addListener() {} }, onInstalled: { addListener() {} } },
     alarms: { get: (name, cb) => cb({}), create: (name, args) => alarms.push({ name, ...args }), onAlarm: { addListener() {} } },
     tabs: { sendMessage: async (id, message) => sent.push(message), query: (args, cb) => cb([]) } };
-  const ctx = vm.createContext({ chrome, console, Date: Clock, TextEncoder, URL, structuredClone });
-  ctx.importScripts = (...files) => files.forEach(file => vm.runInContext(readFileSync(new URL(file, root), 'utf8'), ctx));
-  vm.runInContext(readFileSync(new URL('background.js', root), 'utf8') + '\nglobalThis.runDefense = evaluateSmartGather; globalThis.tickMine = tickAutoGather;', ctx);
+
+  const bg = setupBackgroundRuntime({ chrome });
+  const withClock = async fn => {
+    const orig = Date.now;
+    Date.now = () => clock.now;
+    try {
+      return await fn();
+    } finally {
+      Date.now = orig;
+    }
+  };
+
+  const ctx = {
+    chrome,
+    runDefense: (...args) => withClock(() => bg.evaluateSmartGather(...args)),
+    tickMine: (...args) => withClock(() => bg.tickAutoGather(...args)),
+    hwaHelperMineDefense: mineDefenseService,
+    hwaHelperRpcCache: reducer
+  };
+
   let cache = { accountStatus: { data: { id: fixture.accountId } } };
-  for (const key of ['getSummary', 'getMarches', 'getUnitSummary', 'getHealing', 'getIncomingMarches']) cache = ctx.hwaHelperRpcCache.merge(cache, [fixture.rpc[key]]).cache;
+  for (const key of ['getSummary', 'getMarches', 'getUnitSummary', 'getHealing', 'getIncomingMarches']) cache = reducer.merge(cache, [fixture.rpc[key]]).cache;
   Object.assign(local, { rpcCache: cache, popupRpcEnabled: true, socketRefreshMode: 'direct', autoGatherSettings: { enabled: true, smartEnabled: true } });
   const attack = Object.values(cache.incomingMineAttacks.data.attacks)[0];
   clock.now = attack.impactAt - 10000;
-  return { ctx, cache, local, sent, alarms, clock, attack, helper: ctx.hwaHelperMineDefense, reducer: ctx.hwaHelperRpcCache };
+  return { ctx, cache, local, sent, alarms, clock, attack, helper: mineDefenseService, reducer };
 }
 function crowdHospital(cache) { cache['getHealing:unit'].data.injuredUnits = [{ unitId: 7, count: 23000 }]; }
 function socket(type, body, time) { return { transport: 'websocket', direction: 'received', encoding: 'utf8', endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt', timestamp: new Date(time).toISOString(), payload: JSON.stringify({ result: { type, body } }) }; }

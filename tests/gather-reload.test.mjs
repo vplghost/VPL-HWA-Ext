@@ -2,21 +2,48 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
+import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
+import { smartGatherService } from '../src/services/queues/smartGather.ts';
+import { autoGatherService } from '../src/services/queues/autoGather.ts';
+
 const fixture = JSON.parse(readFileSync(new URL('fixtures/gather-reload-20261115.json', import.meta.url)));
 const occupiedFixture = JSON.parse(readFileSync(new URL('fixtures/gather-occupied-20261115.json', import.meta.url)));
 const root = new URL('../extension/', import.meta.url);
+
+const rpcCacheSandbox = { console, Date, URL, TextEncoder, structuredClone, globalThis: {} };
+rpcCacheSandbox.globalThis = rpcCacheSandbox;
+vm.runInNewContext(readFileSync(new URL('rpc-cache.js', root), 'utf8'), rpcCacheSandbox);
+const reducer = rpcCacheSandbox.globalThis.hwaHelperRpcCache;
+
 function environment() {
   const local = {}, sent = [], clock = { now: Date.parse(fixture.records.at(-1).timestamp) };
-  class Clock extends Date { static now() { return clock.now; } }
   const area = { get: async keys => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).filter(k => k in local).map(k => [k, local[k]])), set: async value => Object.assign(local, value) };
   const chrome = { storage: { local: area, session: area, onChanged: { addListener() {} } },
     runtime: { id: 'test', onMessage: { addListener() {} }, onInstalled: { addListener() {} } },
     alarms: { get: (name, cb) => cb({}), create() {}, onAlarm: { addListener() {} } },
     tabs: { sendMessage: async (id, message) => sent.push(message), query: (args, cb) => cb([]) } };
-  const ctx = vm.createContext({ chrome, console, Date: Clock, TextEncoder, URL, structuredClone });
-  ctx.importScripts = (...files) => files.forEach(file => vm.runInContext(readFileSync(new URL(file, root), 'utf8'), ctx));
-  vm.runInContext(readFileSync(new URL('background.js', root), 'utf8') + '\nglobalThis.runGather = evaluateAutoGather; globalThis.tickGather = tickAutoGather; globalThis.findGameTab = findActiveGameTab;', ctx);
-  const reducer = ctx.hwaHelperRpcCache;
+
+  const bg = setupBackgroundRuntime({ chrome });
+  const withClock = async fn => {
+    const orig = Date.now;
+    Date.now = () => clock.now;
+    try {
+      return await fn();
+    } finally {
+      Date.now = orig;
+    }
+  };
+
+  const ctx = {
+    chrome,
+    runGather: (...args) => withClock(() => bg.evaluateAutoGather(...args)),
+    tickGather: (...args) => withClock(() => bg.tickAutoGather(...args)),
+    findGameTab: () => bg.findActiveGameTab(),
+    hwaHelperSmartGather: smartGatherService,
+    hwaHelperAutoGather: autoGatherService,
+    hwaHelperRpcCache: reducer
+  };
+
   const cache = reducer.merge({}, fixture.records).cache;
   Object.assign(local, { rpcCache: cache, popupRpcEnabled: true, socketRefreshMode: 'direct', captureSettings: { interceptEnabled: true },
     autoGatherSettings: { enabled: true, smartEnabled: true, maxMarches: 3, mineType: 'rotate', mineLevel: 10 } });

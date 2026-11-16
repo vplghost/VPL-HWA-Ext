@@ -4,8 +4,8 @@ import { readdir } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 
 // Keep the established classic worker/MAIN-world contracts as WXT public assets.
-// The popup is always compiled from entrypoints/popup; never ship its legacy renderer.
-const excluded = new Set(['manifest.json', 'popup.html', 'popup.js', 'popup.css', 'theme.css']);
+// The popup and background are compiled from entrypoints; never ship legacy worker or popup renderer.
+const excluded = new Set(['manifest.json', 'popup.html', 'popup.js', 'popup.css', 'theme.css', 'background.js']);
 async function runtimeAssets(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const groups = await Promise.all(entries.map(async (entry) => {
@@ -37,27 +37,13 @@ export default defineConfig({
       'https://*.hero-wars-alliance.com/*',
       'https://hero-wars-alliance.com/*',
     ],
-    background: {
-      service_worker: 'background.js',
-    },
     content_scripts: [
       {
         matches: [
-          'https://www.hero-wars-alliance.com/*',
+          'https://*.hero-wars-alliance.com/*',
           'https://hero-wars-alliance.com/*',
         ],
         css: ['page.css'],
-        js: ['bridge.js'],
-        run_at: 'document_start',
-      },
-      {
-        matches: [
-          'https://www.hero-wars-alliance.com/*',
-          'https://hero-wars-alliance.com/*',
-        ],
-        js: ['tracking-filter.js', 'speedup-data.js', 'speedup.js', 'mail-data.js', 'intercept.js', 'mqtt-capture.js'],
-        run_at: 'document_start',
-        world: 'MAIN',
       },
     ],
   },

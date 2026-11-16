@@ -2,8 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { webcrypto } from 'node:crypto';
+import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
+import { autoGatherService } from '../src/services/queues/autoGather.ts';
+
 const root = new URL('../extension/', import.meta.url);
+const rpcCacheSandbox = { console, Date, URL, TextEncoder, structuredClone, globalThis: {} };
+rpcCacheSandbox.globalThis = rpcCacheSandbox;
+vm.runInNewContext(readFileSync(new URL('rpc-cache.js', root), 'utf8'), rpcCacheSandbox);
+const rpcCacheReducer = rpcCacheSandbox.globalThis.hwaHelperRpcCache;
+globalThis.hwaHelperRpcCache = rpcCacheReducer;
+
 const start = Date.parse('2026-11-15T07:00:00Z');
 const stamp = at => new Date(at).toISOString();
 const marchCall = { name: 'getMarches', feature: 'march' }, unitCall = { name: 'getUnitSummary', feature: 'unit' };
@@ -18,20 +26,34 @@ async function environment(mode = 'direct', existing) {
     accountStatus: { data: { id: 1 } }, marchStatus: { method: 'getMarches', updatedAt: stamp(start), data: { marches: [] } },
     'getUnitSummary:unit': { updatedAt: stamp(start), data: { squads: [], available: [] } } } };
   const sent = [], alarms = new Map(); let listener, onAlarm;
-  class Clock extends Date { static now() { return clock.now; } }
   const area = { get: async keys => structuredClone(Object.fromEntries((keys == null ? Object.keys(local) : Array.isArray(keys) ? keys : [keys]).filter(k => k in local).map(k => [k, local[k]]))),
     set: async values => Object.assign(local, structuredClone(values)), remove: async keys => (Array.isArray(keys) ? keys : [keys]).forEach(k => delete local[k]) };
   const chrome = { runtime: { id: 'test', onMessage: { addListener: fn => { listener = fn; } }, onInstalled: { addListener() {} } },
     storage: { local: area, session: area, onChanged: { addListener() {} } },
     alarms: { get: (_, cb) => cb({}), create: (name, options) => alarms.set(name, options), clear: name => alarms.delete(name), onAlarm: { addListener: fn => { onAlarm = fn; } } },
     tabs: { query: (_, cb) => cb([{ id: 1, url: 'https://www.hero-wars-alliance.com/' }]), sendMessage: async (_, msg) => { sent.push(structuredClone(msg)); return { ok: true }; } } };
-  const ctx = vm.createContext({ chrome, console, Date: Clock, URL, TextEncoder, crypto: webcrypto, structuredClone });
-  ctx.importScripts = (...files) => files.forEach(file => vm.runInContext(readFileSync(new URL(file, root), 'utf8'), ctx));
-  vm.runInContext(readFileSync(new URL('background.js', root), 'utf8') + '\nglobalThis.drain=()=>pending; globalThis.runGather=evaluateSmartGather;', ctx);
+
+  const withClock = async fn => {
+    const orig = Date.now;
+    Date.now = () => clock.now;
+    try {
+      return await fn();
+    } finally {
+      Date.now = orig;
+    }
+  };
+
+  const bg = await withClock(() => setupBackgroundRuntime({ chrome }));
+  const ctx = {
+    drain: () => bg.drain(),
+    runGather: (...args) => withClock(() => bg.evaluateSmartGather(...args)),
+    hwaHelperAutoGather: autoGatherService,
+    hwaHelperRpcCache: rpcCacheReducer
+  };
   await ctx.drain();
-  const send = (message, game = false) => new Promise(resolve => listener(message, game ? { url: 'https://www.hero-wars-alliance.com/', tab: { id: 1 } } : { url: 'chrome-extension://test/popup.html' }, resolve));
-  const merge = record => { local.rpcCache = structuredClone(ctx.hwaHelperRpcCache.merge(local.rpcCache, [record]).cache); };
-  return { ctx, clock, local, sent, send, merge, alarms, fireAlarm: name => onAlarm({ name }) };
+  const send = (message, game = false) => withClock(() => new Promise(resolve => listener(message, game ? { url: 'https://www.hero-wars-alliance.com/', tab: { id: 1 } } : { url: 'chrome-extension://test/popup.html' }, resolve)));
+  const merge = record => withClock(() => { local.rpcCache = structuredClone(rpcCacheReducer.merge(local.rpcCache, [record]).cache); });
+  return { ctx, clock, local, sent, send, merge, alarms, fireAlarm: name => withClock(() => onAlarm({ name })) };
 }
 
 test('passive-first popup reads reuse native snapshots, deduplicate missing reads and retain explicit refresh', async () => {
