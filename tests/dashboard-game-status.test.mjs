@@ -1,93 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import vm from 'node:vm';
 
-class MockElement {
-  constructor(tag) {
-    this.tagName = tag;
-    this.children = [];
-    this.listeners = {};
-    this.dataset = {};
-    this.value = '';
-    this._textContent = undefined;
-    this.attributes = {};
-    this.hidden = false;
-    this.disabled = false;
-    this.className = '';
-  }
-  get id() { return this.attributes.id || ''; }
-  set id(v) { this.attributes.id = v; }
-  get textContent() {
-    if (this._textContent !== undefined) return this._textContent;
-    if (this.children.length > 0) return this.children.map((c) => c.textContent).join(' ');
-    return '';
-  }
-  set textContent(val) {
-    this._textContent = val;
-    this.children = [];
-  }
-  get innerHTML() {
-    return this._innerHTML || this.children.map((c) => `<${c.tagName}>${c.textContent}</${c.tagName}>`).join('');
-  }
-  set innerHTML(val) {
-    this._innerHTML = val;
-    this._textContent = String(val).replace(/<[^>]*>/g, '');
-  }
-  append(...children) {
-    for (const c of children) {
-      if (c) this.children.push(c);
-    }
-  }
-  replaceChildren(...children) { this.children = [...children]; }
-  remove() {
-    if (this.parent) {
-      this.parent.children = this.parent.children.filter((c) => c !== this);
-    }
-  }
-  setAttribute(name, value) { this.attributes[name] = String(value); }
-  getAttribute(name) { return this.attributes[name]; }
-  removeAttribute(name) { delete this.attributes[name]; }
-  addEventListener(name, handler) { this.listeners[name] = handler; }
-  async fire(name, event = {}) {
-    await this.listeners[name]?.({
-      currentTarget: this,
-      target: this,
-      stopPropagation: () => {},
-      preventDefault: () => {},
-      ...event
-    });
-  }
-  querySelector(sel) {
-    if (sel.startsWith('#')) {
-      const id = sel.slice(1);
-      if (this.attributes?.id === id || this.id === id) return this;
-      for (const c of this.children) {
-        if (c.querySelector) {
-          const res = c.querySelector(sel);
-          if (res) return res;
-        }
-      }
-    }
-    if (sel.startsWith('.')) {
-      const cls = sel.slice(1);
-      if (this.className.includes(cls)) return this;
-      for (const c of this.children) {
-        if (c.querySelector) {
-          const res = c.querySelector(sel);
-          if (res) return res;
-        }
-      }
-    }
-    return null;
-  }
-}
-
-const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-
-function setupTestContext(initialStatus = null, onSendMessage = null) {
+function setupMockChrome(initialStatus = null, onSendMessage = null) {
   let lastMessage = null;
-  const mockChrome = {
+  globalThis.chrome = {
     runtime: {
       getManifest: () => ({ version: '0.9.169' }),
       sendMessage: (msg, callback) => {
@@ -107,114 +23,83 @@ function setupTestContext(initialStatus = null, onSendMessage = null) {
       }
     }
   };
-
-  const actionsEl = new MockElement('div');
-  actionsEl.id = 'dashboard-actions';
-  const raidBtn = new MockElement('button');
-  raidBtn.textContent = 'Raid';
-  const gatherBtn = new MockElement('button');
-  gatherBtn.textContent = 'Gathering';
-  const monsterBtn = new MockElement('button');
-  monsterBtn.textContent = 'Monster';
-  actionsEl.append(raidBtn, gatherBtn, monsterBtn);
-
-  const alertEl = new MockElement('div');
-  alertEl.id = 'dashboard-game-status-alert';
-  alertEl.hidden = true;
-
-  const mockDoc = {
-    createElement: (tag) => new MockElement(tag),
-    querySelector: (sel) => {
-      if (sel === '#dashboard-actions') return actionsEl;
-      if (sel === '#dashboard-game-status-alert') return alertEl;
-      return null;
-    }
-  };
-
-  const context = vm.createContext({
-    document: mockDoc,
-    chrome: mockChrome,
-    setTimeout,
-    clearTimeout,
-    globalThis: {}
-  });
-
-  // Extract updateDashboardGameStatus function from popup.js
-  const fnStart = popupCode.indexOf('function updateDashboardGameStatus(');
-  const fnEnd = popupCode.indexOf('\nfunction renderDashboard(', fnStart);
-  const fnCode = popupCode.slice(fnStart, fnEnd);
-  vm.runInContext(fnCode, context);
-
-  return { context, actionsEl, alertEl, getLastMessage: () => lastMessage };
+  return { getLastMessage: () => lastMessage };
 }
 
-test('updateDashboardGameStatus displays warning banner when no game window is open and omits Refresh browser button', () => {
-  const { context, actionsEl, alertEl } = setupTestContext({
+test('useGameConnection displays warning banner when no game window is open and needsRefresh is false', async () => {
+  setupMockChrome({
     ok: true,
     hasGameTab: false,
     gameEngineStatus: null
   });
 
-  context.updateDashboardGameStatus(actionsEl, alertEl);
+  const { useGameConnection } = await import('../src/composables/useGameConnection.ts');
+  const conn = useGameConnection();
+  await conn.checkStatus();
 
-  assert.equal(alertEl.hidden, false, 'Alert banner must be visible');
-  assert.ok(alertEl.textContent.includes('No Game Window Detected'), 'Must indicate no game window is detected');
-  assert.equal(actionsEl.querySelector('#btn-refresh-browser'), null, 'Refresh browser button must not be rendered when no game tab');
+  assert.equal(conn.hasGameTab.value, false, 'Must indicate no game tab is open');
+  assert.ok(conn.alertMessage.value, 'Alert banner must be present');
+  assert.equal(conn.alertMessage.value.type, 'no-tab');
+  assert.ok(conn.alertMessage.value.title.includes('No Game Window Detected'));
+  assert.equal(conn.needsRefresh.value, false, 'Needs refresh must be false when no game tab');
 });
 
-test('updateDashboardGameStatus displays Refresh browser button and recommendation when game window is open but not hooked', () => {
-  const { context, actionsEl, alertEl } = setupTestContext({
+test('useGameConnection displays refresh recommended when game window is open but not hooked', async () => {
+  setupMockChrome({
     ok: true,
     hasGameTab: true,
     gameEngineStatus: { ready: false, hasCanvas: false, hasRpcHeaders: false }
   });
 
-  context.updateDashboardGameStatus(actionsEl, alertEl);
+  const { useGameConnection } = await import('../src/composables/useGameConnection.ts');
+  const conn = useGameConnection();
+  await conn.checkStatus();
 
-  assert.equal(alertEl.hidden, false, 'Alert banner must be visible');
-  assert.ok(alertEl.textContent.includes('Refresh Recommended'), 'Must recommend refresh');
-  assert.ok(alertEl.textContent.includes('hooks are not yet connected'), 'Must indicate hooks not connected');
-
-  const refreshBtn = actionsEl.querySelector('#btn-refresh-browser');
-  assert.ok(refreshBtn, 'Refresh browser button must be added to actions');
-  assert.ok(refreshBtn.textContent.includes('Refresh browser'));
+  assert.equal(conn.hasGameTab.value, true);
+  assert.ok(conn.alertMessage.value);
+  assert.equal(conn.alertMessage.value.type, 'not-hooked');
+  assert.ok(conn.alertMessage.value.title.includes('Refresh Recommended'));
+  assert.ok(conn.alertMessage.value.body.includes('hooks are not yet connected'));
+  assert.equal(conn.needsRefresh.value, true);
 });
 
-test('updateDashboardGameStatus displays Refresh browser button when extension version changes', () => {
-  const { context, actionsEl, alertEl } = setupTestContext({
+test('useGameConnection displays refresh recommendation when extension version changes', async () => {
+  setupMockChrome({
     ok: true,
     hasGameTab: true,
     gameEngineStatus: { ready: true, extensionVersion: '0.9.168' }
   });
 
-  context.updateDashboardGameStatus(actionsEl, alertEl);
+  const { useGameConnection } = await import('../src/composables/useGameConnection.ts');
+  const conn = useGameConnection();
+  await conn.checkStatus();
 
-  assert.equal(alertEl.hidden, false);
-  assert.ok(alertEl.textContent.includes('Extension updated to v0.9.169'), 'Must mention new version');
-
-  const refreshBtn = actionsEl.querySelector('#btn-refresh-browser');
-  assert.ok(refreshBtn, 'Refresh browser button must be present');
+  assert.ok(conn.alertMessage.value);
+  assert.equal(conn.alertMessage.value.type, 'version-changed');
+  assert.ok(conn.alertMessage.value.body.includes('Extension updated to v0.9.169'));
+  assert.equal(conn.needsRefresh.value, true);
 });
 
-test('updateDashboardGameStatus displays Refresh browser button when engine requests refresh', () => {
-  const { context, actionsEl, alertEl } = setupTestContext({
+test('useGameConnection displays refresh recommendation when engine requests refresh', async () => {
+  setupMockChrome({
     ok: true,
     hasGameTab: true,
     gameEngineStatus: { ready: true, extensionVersion: '0.9.169', refreshRequired: true }
   });
 
-  context.updateDashboardGameStatus(actionsEl, alertEl);
+  const { useGameConnection } = await import('../src/composables/useGameConnection.ts');
+  const conn = useGameConnection();
+  await conn.checkStatus();
 
-  assert.equal(alertEl.hidden, false);
-  assert.ok(alertEl.textContent.includes('requested a refresh'), 'Must mention engine requested refresh');
-
-  const refreshBtn = actionsEl.querySelector('#btn-refresh-browser');
-  assert.ok(refreshBtn, 'Refresh browser button must be present');
+  assert.ok(conn.alertMessage.value);
+  assert.equal(conn.alertMessage.value.type, 'refresh-required');
+  assert.ok(conn.alertMessage.value.body.includes('requested a refresh'));
+  assert.equal(conn.needsRefresh.value, true);
 });
 
-test('clicking Refresh browser button dispatches reload-game-tab message', async () => {
+test('reloadGameTab dispatches reload-game-tab message to background', async () => {
   let dispatched = null;
-  const { context, actionsEl, alertEl } = setupTestContext(
+  setupMockChrome(
     { ok: true, hasGameTab: true, gameEngineStatus: { ready: false } },
     (msg, cb) => {
       if (msg.kind === 'reload-game-tab') {
@@ -226,24 +111,27 @@ test('clicking Refresh browser button dispatches reload-game-tab message', async
     }
   );
 
-  context.updateDashboardGameStatus(actionsEl, alertEl);
-  const refreshBtn = actionsEl.querySelector('#btn-refresh-browser');
-  assert.ok(refreshBtn);
+  const { useGameConnection } = await import('../src/composables/useGameConnection.ts');
+  const conn = useGameConnection();
+  await conn.reloadGameTab();
 
-  await refreshBtn.fire('click');
   assert.ok(dispatched, 'Must dispatch reload-game-tab message');
   assert.equal(dispatched.kind, 'reload-game-tab');
 });
 
-test('updateDashboardGameStatus hides warning and removes button when game window is healthy and hooked', () => {
-  const { context, actionsEl, alertEl } = setupTestContext({
+test('useGameConnection hides warning banner when game window is healthy and hooked', async () => {
+  setupMockChrome({
     ok: true,
     hasGameTab: true,
     gameEngineStatus: { ready: true, extensionVersion: '0.9.169' }
   });
 
-  context.updateDashboardGameStatus(actionsEl, alertEl);
+  const { useGameConnection } = await import('../src/composables/useGameConnection.ts');
+  const conn = useGameConnection();
+  await conn.checkStatus();
 
-  assert.equal(alertEl.hidden, true, 'Alert must be hidden for healthy connected game');
-  assert.equal(actionsEl.querySelector('#btn-refresh-browser'), null, 'Refresh browser button must be omitted when healthy');
+  assert.equal(conn.hasGameTab.value, true);
+  assert.equal(conn.isHealthy.value, true, 'Connection must be healthy');
+  assert.equal(conn.alertMessage.value, null, 'Alert message must be null when healthy');
+  assert.equal(conn.needsRefresh.value, false, 'Needs refresh must be false when healthy');
 });

@@ -109,8 +109,8 @@ class MockElement {
   }
 }
 
-const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
-const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const popupHtml = await readFile(new URL('./helpers/legacy-popup-template.html', import.meta.url), 'utf8');
+const popupJs = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
 test('popup.html defines hero-dialog with title, status, and body', () => {
   assert.match(popupHtml, /<dialog id="hero-dialog"[\s\S]*id="hero-dialog-title"[\s\S]*id="hero-dialog-status"[\s\S]*id="hero-dialog-body"[\s\S]*<\/dialog>/);

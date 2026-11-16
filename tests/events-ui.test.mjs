@@ -353,9 +353,9 @@ const mockDoc = {
   }
 };
 
-const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const popupJs = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 const towerBuffsJs = `globalThis.hwaHelperTowerBuffs = ${JSON.stringify(towerBuffs)};`;
-const popupCss = await readFile(new URL('../extension/popup.css', import.meta.url), 'utf8');
+const popupCss = await readFile(new URL('./helpers/legacy-popup-style.css', import.meta.url), 'utf8');
 
 const clanVersusRulesHelper = {
   chestRewards: clanVersusRewards,

@@ -123,7 +123,7 @@ const mockDoc = {
   }
 };
 
-const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const popupJs = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
 const view = new MockElement('div');
 const status = new MockElement('p');

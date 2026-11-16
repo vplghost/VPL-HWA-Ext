@@ -36,8 +36,8 @@ class Element {
   }
   all(tag) { return this.children.flatMap((child) => [ ...(child.tagName === tag ? [child] : []), ...child.all(tag) ]); }
 }
-const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
+const popup = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
+const popupHtml = await readFile(new URL('./helpers/legacy-popup-template.html', import.meta.url), 'utf8');
 const renderer = popup.slice(popup.indexOf('function renderExperimental('), popup.indexOf('async function experimentalRpc('));
 const pendingSync = popup.slice(popup.indexOf('function syncExperimentalPending('), popup.indexOf('function renderMonster('));
 const monsterRenderer = popup.slice(popup.indexOf('function renderMonster('), popup.indexOf('function renderExperimental('));

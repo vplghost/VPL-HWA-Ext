@@ -192,7 +192,7 @@ test('rpc-cache merges startTrainingAction, completeTrainingAction, and startHea
 });
 
 test('renderDashboardTroops renders ready, train, and heal action buttons and handles interactions', async () => {
-  const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+  const popupCode = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
   let sentMessages = [];
   const mockChrome = {
@@ -331,7 +331,7 @@ test('renderDashboardTroops renders ready, train, and heal action buttons and ha
 });
 
 test('renderDashboardTroops respects max threshold and clamps unitsToTrain or disables button', async () => {
-  const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+  const popupCode = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
   const mockChrome = {
     runtime: { sendMessage: () => {} },

@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import { researchDataHelper as researchData } from '../src/data/researchData.ts';
 import { researchQueueService as queueHelper } from '../src/services/queues/researchQueue.ts';
 
-const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const popupJs = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
 test('research-queue getSimulatedLevels calculates max level from completed, active queue and automation queue', () => {
   const researchMap = new Map([

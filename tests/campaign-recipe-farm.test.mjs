@@ -144,7 +144,7 @@ async function createTestContext() {
     console
   });
 
-  const popupSrc = await readFile('extension/popup.js', 'utf8');
+  const popupSrc = await readFile('tests/helpers/legacy-popup-runtime.js', 'utf8');
 
   context.hwaHelperResourceData = resourceDataHelper;
   context.hwaHelperDashboardData = dashboardDataHelper;

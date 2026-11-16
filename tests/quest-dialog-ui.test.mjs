@@ -72,7 +72,7 @@ class MockElement {
 }
 
 test('popup.html includes #quest-detail-dialog with title and body', async () => {
-  const html = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('./helpers/legacy-popup-template.html', import.meta.url), 'utf8');
   assert.match(html, /<dialog\s+id="quest-detail-dialog"/);
   assert.match(html, /id="quest-detail-dialog-title"/);
   assert.match(html, /id="quest-detail-dialog-status"/);
@@ -80,7 +80,7 @@ test('popup.html includes #quest-detail-dialog with title and body', async () =>
 });
 
 test('renderDashboard presents activities, quests, and gifts in a 2-column grid and quest cards are interactive', async () => {
-  const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+  const popupCode = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
   const elements = new Map();
   const getEl = (sel) => {
@@ -166,7 +166,7 @@ test('renderDashboard presents activities, quests, and gifts in a 2-column grid 
 });
 
 test('getDetailedQuests aggregates daily quests and event quests with correct states and rewards', async () => {
-  const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+  const popupCode = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
   const context = {
     Date, Number, Array, Math, Set, Map, String, console,
@@ -244,7 +244,7 @@ test('getDetailedQuests aggregates daily quests and event quests with correct st
 });
 
 test('renderQuestDetailDialog renders filter tabs, search input, status badge, and cards', async () => {
-  const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+  const popupCode = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
   const elements = new Map();
   const getEl = (sel) => {

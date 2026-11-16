@@ -42,9 +42,9 @@ test('coin assets exist and contain valid PNG files', async () => {
   }
 });
 
-test('popup.js maps coin category to assets/items/coin/${item.id}.png', async () => {
-  const popupSrc = await readFile(join(root, 'extension/popup.js'), 'utf8');
+import { getItemIcon } from '../src/data/itemData.ts';
 
-  assert.ok(popupSrc.includes("item.category === 'coin'"), "popup.js should check item.category === 'coin'");
-  assert.ok(popupSrc.includes("assets/items/coin/${item.id}.png"), 'popup.js should map coin to assets/items/coin/${item.id}.png');
+test('getItemIcon maps coin category to assets/items/coin/${item.id}.png', () => {
+  assert.equal(getItemIcon('coin', '1'), 'assets/items/coin/1.png');
+  assert.equal(getItemIcon('coin', '2'), 'assets/items/coin/2.png');
 });

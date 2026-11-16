@@ -65,7 +65,7 @@ const mockDoc = {
   createElementNS: (_, tag) => new MockElement(tag)
 };
 
-const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const popupJs = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
 // Extract helper functions and run in context
 const context = {

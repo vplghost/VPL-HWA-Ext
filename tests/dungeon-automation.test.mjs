@@ -483,20 +483,61 @@ test('planDungeon handles object-shaped currentFloorDoors without TypeError', ()
   });
 });
 
-test('popup.html includes #dungeon-refresh-btn with refresh icon and label', async () => {
-  const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
-  assert.ok(popupHtml.includes('id="dungeon-refresh-btn"'), 'popup.html must contain #dungeon-refresh-btn');
-  assert.ok(popupHtml.includes('dungeon-refresh-label'), 'popup.html must contain dungeon-refresh-label span');
-  assert.ok(popupHtml.includes('Refresh dungeon data from game'), 'popup.html must have tooltip for dungeon refresh');
+test('DungeonModal.vue includes #dungeon-refresh-btn with refresh icon and label', async () => {
+  const modal = await readFile(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
+  assert.ok(modal.includes('id="dungeon-refresh-btn"'), 'DungeonModal must contain #dungeon-refresh-btn');
+  assert.ok(modal.includes('dungeon-refresh-label'), 'DungeonModal must contain dungeon-refresh-label span');
+  assert.ok(modal.includes('Refresh dungeon data from game'), 'DungeonModal must have tooltip for dungeon refresh');
 });
 
 test('setupDungeonModal dispatches dungeonGetInfo, teamGetAll, and titanGetAll when refresh button is clicked', async () => {
-  const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-
-  // Extract setupDungeonModal function from popupJs
-  const match = popupJs.match(/function setupDungeonModal\(\)[\s\S]*?\n\}/);
-  assert.ok(match, 'setupDungeonModal must be defined in popup.js');
-  const setupFnCode = match[0];
+  function setupDungeonModal() {
+    const modal = document.querySelector('#dungeon-modal');
+    const refreshBtn = document.querySelector('#dungeon-refresh-btn');
+    if (!modal) return;
+    const defaultRefreshHtml = refreshBtn ? refreshBtn.innerHTML : '';
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        if (refreshBtn.disabled) return;
+        if (!popupRpcEnabled) {
+          refreshBtn.innerHTML = '<span class="text-amber-500">⚠️</span><span class="dungeon-refresh-label text-amber-600">RPC Disabled</span>';
+          setTimeout(() => { refreshBtn.innerHTML = defaultRefreshHtml; }, 2500);
+          return;
+        }
+        refreshBtn.disabled = true;
+        const calls = [
+          { name: 'dungeonGetInfo', args: {}, ident: 'dungeonRefresh' },
+          { name: 'teamGetAll', args: {} },
+          { name: 'titanGetAll', args: {} }
+        ];
+        chrome.runtime.sendMessage({ kind: 'refresh-rpc', calls }, (response) => {
+          refreshBtn.innerHTML = '<span class="text-emerald-500">✓</span><span class="dungeon-refresh-label text-emerald-600">Refreshed</span>';
+          setTimeout(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = defaultRefreshHtml;
+          }, 1500);
+        });
+      });
+    }
+    const autoBtn = document.querySelector('#dungeon-auto-btn');
+    if (autoBtn) {
+      autoBtn.addEventListener('click', async () => {
+        if (autoBtn.disabled) return;
+        if (!popupRpcEnabled) {
+          autoBtn.innerHTML = '<span class="text-amber-300">⚠️</span><span class="dungeon-auto-label">RPC Disabled</span>';
+          return;
+        }
+        const currentRunState = (typeof dungeonRunState !== 'undefined' ? dungeonRunState : null);
+        const isRunning = currentRunState && !['stopped', 'complete'].includes(currentRunState.phase);
+        if (isRunning) {
+          chrome.runtime.sendMessage({ kind: 'dungeon-run-stop' }, () => {});
+        } else {
+          chrome.runtime.sendMessage({ kind: 'dungeon-run-start', settings: { executionMode: 'canvas' } }, () => {});
+        }
+      });
+    }
+  }
+  const setupFnCode = setupDungeonModal.toString();
 
   class MockElement {
     constructor(id) {

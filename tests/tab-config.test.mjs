@@ -88,40 +88,35 @@ class MockElement {
   }
 }
 
+import { DEFAULT_TAB_CONFIG, normalizeTabConfig, applyTabConfig, createTabConfigManager } from '../src/utils/tabConfig.ts';
+
 async function loadTabConfigHelper(customDoc = null, customActiveTab = 'heroes') {
-  const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-
-  // Extract from DEFAULT_TAB_CONFIG to globalThis.hwaHelperTabConfig
-  const startIdx = popupJs.indexOf('const DEFAULT_TAB_CONFIG =');
-  const endMarker = 'globalThis.hwaHelperTabConfig = {';
-  const endIdx = popupJs.indexOf(endMarker);
-  const closingBraceIdx = popupJs.indexOf('};', endIdx) + 2;
-  const snippet = popupJs.slice(startIdx, closingBraceIdx);
-
-  const context = {
-    globalThis: {},
-    Set,
-    Array,
-    Object,
-    String,
-    document: customDoc || {
+  let saved = {};
+  const mockStorage = {
+    set: async (obj) => { Object.assign(saved, obj); },
+    get: async () => saved
+  };
+  const manager = createTabConfigManager({
+    doc: customDoc || {
       createElement: (tag) => new MockElement(tag),
       querySelector: () => null,
       querySelectorAll: () => []
     },
     activeTab: customActiveTab,
-    chrome: {
-      storage: {
-        local: {
-          set: async () => {},
-          get: async () => ({})
+    storage: mockStorage
+  });
+  return {
+    helper: manager,
+    context: {
+      get activeTab() { return manager.context.activeTab; },
+      set activeTab(val) { manager.context.activeTab = val; },
+      chrome: {
+        storage: {
+          local: mockStorage
         }
       }
     }
   };
-  context.globalThis = context;
-  vm.runInNewContext(snippet, context);
-  return { helper: context.globalThis.hwaHelperTabConfig, context };
 }
 
 test('normalizeTabConfig handles defaults, reordering, missing items, and visibility', async () => {

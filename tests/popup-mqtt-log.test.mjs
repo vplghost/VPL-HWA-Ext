@@ -1,36 +1,44 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
+import { recorderEntries, filterRecorderEntries } from '../src/composables/useRecorder.ts';
 
-const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+test('Log tab and recorderEntries handle MQTT direction, topic, and payload', async () => {
+  const stored = {
+    'record:1': {
+      transport: 'websocket',
+      method: 'PUBLISH',
+      endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt',
+      status: null,
+      durationMs: 0,
+      outcome: 'completed',
+      timestamp: '2026-11-05T12:00:00Z',
+      direction: 'received',
+      topic: 'hero/update',
+      qos: 1,
+      payload: '{"hero":1}',
+      encoding: 'utf8',
+      payloadBytes: 10,
+      eventMethod: 'msg',
+      eventType: 'rallyCreated',
+    }
+  };
 
-class Element {
-  constructor(tag) { this.tagName = tag.toUpperCase(); this.children = []; this._text = ''; }
-  set textContent(value) { this._text = String(value); this.children = []; }
-  get textContent() { return this._text || this.children.map((child) => child.textContent).join(''); }
-  append(...children) { this.children.push(...children); }
-}
+  const entries = recorderEntries(stored);
+  assert.equal(entries.length, 1);
+  const entry = entries[0];
+  assert.equal(entry.method, 'PUBLISH');
+  assert.equal(entry.topic, 'hero/update');
+  assert.equal(entry.eventType, 'rallyCreated');
+  assert.equal(entry.payload, '{"hero":1}');
 
-test('Log tab displays MQTT direction, topic, and payload', () => {
-  const view = new Element('main');
-  const status = new Element('p');
-  const context = { document: { createElement: (tag) => new Element(tag) },
-    view, status, logSort: { value: 'newest' }, matches: () => true,
-    formatTime: () => '12:00', showEmpty: () => {} };
-  const source = popup.slice(popup.indexOf('function renderLog('), popup.indexOf('async function recordedEntries('));
-  runInNewContext(source, context);
-  context.renderLog([{
-    transport: 'websocket', method: 'PUBLISH',
-    endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt',
-    status: null, durationMs: 0, outcome: 'completed', timestamp: '2026-11-05T12:00:00Z',
-    direction: 'received', topic: 'hero/update', qos: 1,
-    payload: '{"hero":1}', encoding: 'utf8', payloadBytes: 10,
-    eventMethod: 'msg', eventType: 'rallyCreated'
-  }], { active: true });
-  assert.match(status.textContent, /1 entries/);
-  assert.match(view.textContent, /PUBLISHreceivedMQTT/);
-  assert.match(view.textContent, /hero\/update/);
-  assert.match(view.textContent, /rallyCreated/);
-  assert.match(view.textContent, /\{"hero":1\}/);
+  const filteredTopic = filterRecorderEntries(entries, 'hero/update');
+  assert.equal(filteredTopic.length, 1);
+
+  const filteredEvent = filterRecorderEntries(entries, 'rallyCreated');
+  assert.equal(filteredEvent.length, 1);
+
+  const source = await readFile(new URL('../src/components/tabs/LogTab.vue', import.meta.url), 'utf8');
+  assert.ok(source.includes('log.topic || log.endpoint'));
+  assert.ok(source.includes('log.payload ?? log.requestBody'));
 });

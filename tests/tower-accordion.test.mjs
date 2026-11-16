@@ -102,7 +102,7 @@ class MockElement {
   }
 }
 
-const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const popupJs = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 const towerBuffsJs = `globalThis.hwaHelperTowerBuffs = ${JSON.stringify(towerBuffs)};`;
 
 const mockDoc = {

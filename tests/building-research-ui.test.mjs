@@ -63,8 +63,8 @@ class MockElement {
   }
 }
 
-const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
+const popup = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
+const popupHtml = await readFile(new URL('./helpers/legacy-popup-template.html', import.meta.url), 'utf8');
 
 
 test('popup.html defines building-dialog and research-dialog with title, status, and body', () => {

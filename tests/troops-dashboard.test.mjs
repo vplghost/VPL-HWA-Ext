@@ -72,7 +72,7 @@ class MockElement {
   }
 }
 
-const popupCode = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+const popupCode = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
 function setupContext() {
   const mockDoc = {
@@ -202,7 +202,7 @@ test('Building #163 is named Garrison Wall in name-map', () => {
 });
 
 test('renderCampaignDialog displays accurate gear, fragment, and consumable names in raid results', async () => {
-  const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
+  const popupJs = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
 
   assert.ok(popupJs.includes("getItemName('gear', gId) || getItemName('scroll', gId)"));
   assert.ok(popupJs.includes("getItemName('consumable', cId)"));

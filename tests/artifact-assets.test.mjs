@@ -36,11 +36,10 @@ test('artifact and fragmentArtifact assets exist and contain all 143 items', asy
   }
 });
 
-test('renderItemsTab maps fragmentArtifact and artifact to asset image paths', async () => {
-  const popupSrc = await readFile(join(root, 'extension/popup.js'), 'utf8');
+import { getItemIcon } from '../src/data/itemData.ts';
 
-  // Verify popup.js handles fragmentArtifact and artifact
-  assert.ok(popupSrc.includes("item.category === 'fragmentArtifact'"), 'popup.js should handle fragmentArtifact image path');
-  assert.ok(popupSrc.includes("assets/items/fragmentArtifact/${item.id}.png"), 'popup.js should point to fragmentArtifact asset path');
-  assert.ok(popupSrc.includes("assets/items/artifact/${item.id}.png"), 'popup.js should point to artifact asset path');
+test('getItemIcon maps fragmentArtifact and artifact to asset image paths', () => {
+  assert.equal(getItemIcon('artifact', '1001'), 'assets/items/artifact/1001.png');
+  assert.equal(getItemIcon('fragmentArtifact', '1001'), 'assets/items/artifact/1001.png');
+  assert.equal(getItemIcon('artifact', '13007'), 'assets/items/artifact/13007.png');
 });
