@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { webcrypto } from 'node:crypto';
-const root = new URL('../extension/', import.meta.url);
+import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
+import { rpcCacheService } from '../src/core/cache/index.ts';
+
 async function environment(existing) {
   const now = Date.now(), stamp = new Date(now - 1000).toISOString();
   const letter = { id: '101', reward: { gold: 50 }, availableUntil: String(Math.floor(now / 1000) + 60) };
@@ -11,7 +10,6 @@ async function environment(existing) {
     accountStatus: { data: { id: 1 } }, mailStatus: { updatedAt: stamp, data: { accountId: '1', letters: [letter], reports: [], lettersObservedAt: stamp } },
     mailGetAll: { updatedAt: stamp, data: { letters: [letter] } }, 'resource:gold': { updatedAt: stamp, data: { amount: 100 } } } };
   const sent = [], alarms = [], clock = { now }; let listener, account = '1', alarm;
-  class Clock extends Date { static now() { return clock.now; } }
   const area = { get: async keys => structuredClone(Object.fromEntries((Array.isArray(keys) ? keys : [keys]).filter(k => k in local).map(k => [k, local[k]]))),
     set: async value => Object.assign(local, structuredClone(value)), remove: async () => {} };
   const chrome = { runtime: { id: 'test', onMessage: { addListener: fn => { listener = fn; } }, onInstalled: { addListener() {} } },
@@ -19,12 +17,26 @@ async function environment(existing) {
     alarms: { get: (_, cb) => cb({}), create: (name, options) => alarms.push({ name, ...options }), clear() {}, onAlarm: { addListener: fn => { alarm = fn; } } },
     tabs: { query: (_, cb) => setTimeout(() => cb([{ id: 1, url: 'https://www.hero-wars-alliance.com/' }]), 0),
       sendMessage: async (_, message) => { if (message.kind === 'game-account-context') return { ok: true, accountId: account }; sent.push(structuredClone(message)); return { ok: true }; } } };
-  const ctx = vm.createContext({ chrome, console, Date: Clock, crypto: webcrypto, URL, TextEncoder, structuredClone });
-  ctx.importScripts = (...files) => files.forEach(file => vm.runInContext(readFileSync(new URL(file, root), 'utf8'), ctx));
-  vm.runInContext(readFileSync(new URL('background.js', root), 'utf8') + '\nglobalThis.drain = () => pending; globalThis.reconcile = reconcileMailClaim;', ctx);
+
+  const withClock = async fn => {
+    const orig = Date.now;
+    Date.now = () => clock.now;
+    try {
+      return await fn();
+    } finally {
+      Date.now = orig;
+    }
+  };
+
+  const bg = await withClock(() => setupBackgroundRuntime({ chrome }));
+  const ctx = {
+    drain: () => bg.drain(),
+    reconcile: cache => withClock(() => bg.reconcileMailClaim(cache)),
+    hwaHelperRpcCache: rpcCacheService
+  };
   await ctx.drain();
-  const send = message => new Promise(resolve => listener(message, { url: 'chrome-extension://test/popup.html' }, resolve));
-  return { local, sent, ctx, alarms, clock, send, setAccount: value => { account = value; }, fire: name => alarm({ name }) };
+  const send = message => withClock(() => new Promise(resolve => listener(message, { url: 'chrome-extension://test/popup.html' }, resolve)));
+  return { local, sent, ctx, alarms, clock, send, setAccount: value => { account = value; }, fire: name => withClock(() => alarm({ name })) };
 }
 
 test('mail claims serialize and retain pending across restart until their own server receipt', async () => {

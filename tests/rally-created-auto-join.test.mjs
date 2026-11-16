@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { runInNewContext } from 'node:vm';
+import { socketRefreshCalls } from '../src/background/backgroundRuntime.ts';
+import { worldReadService } from '../src/services/worldReadService.ts';
 
 test('intercept.js strictly limits lastRpcUrl and lastRpcHeaders to /api/rpc', () => {
   const content = readFileSync('extension/intercept.js', 'utf8');
@@ -15,34 +16,6 @@ test('intercept.js strictly limits lastRpcUrl and lastRpcHeaders to /api/rpc', (
 });
 
 test('socketRefreshCalls includes getUnitSummary alongside getRallyById and getMarches on rallyCreated', async () => {
-  const backgroundContent = readFileSync('extension/background.js', 'utf8');
-  const context = {
-    chrome: {
-      runtime: { getManifest: () => ({ version: '1.0.0' }), onMessage: { addListener: () => {} }, onInstalled: { addListener: () => {} } },
-      storage: { local: { get: async () => ({}), set: async () => ({}) }, session: { get: async () => ({}), set: async () => ({}) } },
-      tabs: { query: () => {}, reload: () => {}, sendMessage: async () => {} },
-      alarms: { get: () => {}, create: () => {}, onAlarm: { addListener: () => {} } }
-    },
-    importScripts: () => {},
-    console,
-    Date,
-    Math,
-    JSON,
-    Set,
-    Map,
-    Array,
-    Object,
-    String,
-    Number,
-    Boolean,
-    TextEncoder,
-    URL
-  };
-  context.globalThis = context;
-
-  runInNewContext(backgroundContent + '\nglobalThis.__socketRefreshCalls = socketRefreshCalls;', context);
-  const socketRefreshCalls = context.__socketRefreshCalls;
-
   const calls = socketRefreshCalls({
     transport: 'websocket',
     direction: 'received',
@@ -55,11 +28,7 @@ test('socketRefreshCalls includes getUnitSummary alongside getRallyById and getM
 });
 
 test('world-read plan allows getRallyById immediately when isRallyCreated is true even if recently queried', () => {
-  const worldReadContent = readFileSync('extension/world-read.js', 'utf8');
-  const sandbox = { globalThis: {} };
-  sandbox.globalThis = sandbox;
-  new Function('globalThis', worldReadContent)(sandbox);
-  const worldRead = sandbox.globalThis.hwaHelperWorldRead;
+  const worldRead = worldReadService;
 
   const now = 1700000000000;
   const cache = {

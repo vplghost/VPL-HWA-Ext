@@ -1,12 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-const root = new URL('../extension/', import.meta.url);
+import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
+
 function environment() {
   const local = {}, sent = [], session = {};
   const clock = { now: Date.now() };
-  class Clock extends Date { static now() { return clock.now; } }
   const area = state => ({ get: async keys => Object.fromEntries((Array.isArray(keys) ? keys : keys ? [keys] : Object.keys(state)).filter(k => k in state).map(k => [k, state[k]])),
     set: async data => Object.assign(state, data), remove: async keys => (Array.isArray(keys) ? keys : [keys]).forEach(k => delete state[k]) });
   const chrome = { runtime: { id: 'test', onMessage: { addListener() {} }, onInstalled: { addListener() {} } },
@@ -14,9 +12,22 @@ function environment() {
     alarms: { get: (name, cb) => cb({}), onAlarm: { addListener() {} } },
     tabs: { query: (filter, cb) => cb([{ id: 1, url: 'https://www.hero-wars-alliance.com/' }]),
       sendMessage: async (tabId, message) => sent.push(message) } };
-  const ctx = vm.createContext({ chrome, console, TextEncoder, URL, structuredClone, Date: Clock });
-  ctx.importScripts = (...names) => names.forEach(name => vm.runInContext(readFileSync(new URL(name, root), 'utf8'), ctx));
-  vm.runInContext(readFileSync(new URL('background.js', root), 'utf8') + '\nglobalThis.runSmart = evaluateSmartGather; globalThis.deferGather = deferQueueForGathering; globalThis.advanceGather = advanceGatherQueue; globalThis.runPriority = evaluatePriorityAutoJoin;', ctx);
+  const bg = setupBackgroundRuntime({ chrome });
+  const withClock = async fn => {
+    const orig = Date.now;
+    Date.now = () => clock.now;
+    try {
+      return await fn();
+    } finally {
+      Date.now = orig;
+    }
+  };
+  const ctx = {
+    runSmart: (...args) => withClock(() => bg.evaluateSmartGather(...args)),
+    deferGather: (...args) => withClock(() => bg.deferQueueForGathering(...args)),
+    advanceGather: (...args) => withClock(() => bg.advanceGatherQueue(...args)),
+    runPriority: (...args) => withClock(() => bg.evaluatePriorityAutoJoin(...args))
+  };
   return { local, sent, ctx, clock };
 }
 const at = Date.now();

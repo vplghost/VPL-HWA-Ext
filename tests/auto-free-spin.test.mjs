@@ -1,21 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-const root = new URL('../extension/', import.meta.url);
+import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
+
 async function environment() {
   const local = {}, sent = [], alarms = [], clock = { now: Date.parse('2026-11-15T10:00:00Z') };
   let listener, bridgeAccount = '1';
-  class Clock extends Date { static now() { return clock.now; } }
   const area = { get: async keys => structuredClone(Object.fromEntries((Array.isArray(keys) ? keys : [keys]).filter(k => k in local).map(k => [k, local[k]]))), set: async value => Object.assign(local, structuredClone(value)), remove: async () => {} };
   const chrome = { storage: { local: area, session: area, onChanged: { addListener() {} } },
     runtime: { id: 'test', onMessage: { addListener: fn => { listener = fn; } }, onInstalled: { addListener() {} } },
     alarms: { get: (name, cb) => cb({}), create: (name, args) => alarms.push({ name, ...args }), onAlarm: { addListener() {} } },
     tabs: { query: (args, cb) => { setTimeout(() => cb([{ id: 1, url: 'https://www.hero-wars-alliance.com/' }]), 0); },
       sendMessage: async (tabId, message) => { if (message.kind === 'free-spin-context') return { ok: true, accountId: bridgeAccount }; sent.push({ tabId, ...message }); return { ok: true }; } } };
-  const ctx = vm.createContext({ chrome, console, Date: Clock, TextEncoder, URL, structuredClone });
-  ctx.importScripts = (...files) => files.forEach(file => vm.runInContext(readFileSync(new URL(file, root), 'utf8'), ctx));
-  vm.runInContext(readFileSync(new URL('background.js', root), 'utf8') + '\nglobalThis.run = runFreeSpin; globalThis.drain = () => pending;', ctx);
+
+  const bg = setupBackgroundRuntime({ chrome });
+  const withClock = async fn => {
+    const orig = Date.now;
+    Date.now = () => clock.now;
+    try {
+      return await fn();
+    } finally {
+      Date.now = orig;
+    }
+  };
+  const ctx = {
+    chrome,
+    run: () => withClock(() => bg.runFreeSpin()),
+    drain: () => bg.drain()
+  };
   await ctx.drain();
   local.rpcCache = { accountStatus: { data: { id: 1 }, updatedAt: new Date(clock.now).toISOString() },
     questResetStatus: { data: { nextDayAt: clock.now + 3600000 } },
@@ -26,7 +37,7 @@ async function environment() {
     local.rpcCache['resource:refillable:53'] = { data: { amount }, updatedAt: new Date(clock.now).toISOString() };
   };
   const spins = () => sent.filter(m => m.calls?.[0]?.name === 'refillable_alchemyUseVideo');
-  const send = message => new Promise(resolve => listener(message, { url: 'chrome-extension://test/popup.html' }, resolve));
+  const send = message => withClock(() => new Promise(resolve => listener(message, { url: 'chrome-extension://test/popup.html' }, resolve)));
   return { ctx, local, sent, alarms, clock, quota, spins, send, bridge: id => { bridgeAccount = id; } };
 }
 

@@ -3504,6 +3504,11 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     evaluateAutoGather: (record: any, currentCache: any, stored: any, tabId: number) =>
       evaluateAutoGather(record, currentCache, stored, tabId, cr),
     tickAutoGather: (reset?: boolean) => tickAutoGather(reset, cr),
+    deferQueueForGathering: (queueType: string, options: any, tabId: number, accountId: any, stored: any, now: number = Date.now()) =>
+      deferQueueForGathering(queueType, options, tabId, accountId, stored, now, cr),
+    advanceGatherQueue: (queueType: string, record: any, stored: any, tabId: number) =>
+      advanceGatherQueue(queueType, record, stored, tabId, cr),
+    socketRefreshCalls: (record: any, cache: any) => socketRefreshCalls(record, cache),
     saveRaidTransition: (transition: any, stored: any) => saveRaidTransition(transition, stored, cr),
     updateRaidQueue: (record: any, tabId: number) => updateRaidQueue(record, tabId, cr),
     evaluateRaidEnergy: (tabId: number, sessionId: string, now?: number) => evaluateRaidEnergy(tabId, sessionId, now, cr),

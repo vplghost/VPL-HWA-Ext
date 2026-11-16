@@ -69,6 +69,39 @@ export function extract(record: RpcRecord): CacheEntry[] {
         updatedAt: timestamp
       });
 
+      // Mail farm extraction
+      if (call.name === 'mailFarm' && response && typeof response === 'object') {
+        const letterIds = Object.keys(response);
+        for (const letterId of letterIds) {
+          const letterReward = response[letterId];
+          if (letterReward && typeof letterReward === 'object') {
+            entries.push(...extractRewardActions(record, call, letterReward, `mail:${letterId}`));
+          }
+        }
+        entries.push({
+          key: 'mailStatus',
+          method: call.name,
+          feature: call.feature || null,
+          group: 'header',
+          data: {
+            letters: letterIds.map((id) => ({ id, claimed: true }))
+          },
+          updatedAt: timestamp
+        });
+        entries.push({
+          key: 'mailClaimReceipts',
+          group: 'internal',
+          data: {
+            token: call.ident,
+            at: timestamp,
+            accountId: null,
+            success: true,
+            letterIds
+          },
+          updatedAt: timestamp
+        });
+      }
+
       // Reward and Cost extractions
       if (response?.reward || response?.rewards || response?.claimedRewards) {
         entries.push(...extractRewardActions(record, call, response));
@@ -124,6 +157,53 @@ export function merge(
             mob && !won.some((item: any) => item?.mapId === entry.data?.mapId && item?.mobId === mob?.mobId)
           )
         };
+      }
+
+      if (entry.key === 'resourceAction') {
+        const data = entry.data;
+        const existingRes = next[data.resourceKey];
+        if (existingRes?.data && typeof existingRes.data.amount === 'number') {
+          existingRes.data.amount += data.delta;
+          existingRes.updatedAt = entry.updatedAt;
+          changed = true;
+        }
+        continue;
+      }
+
+      if (entry.key === 'mailClaimReceipts') {
+        const seen = normalizeArrayData(next.mailClaimReceipts?.data);
+        const data = entry.data;
+        const receipt = {
+          token: data.token,
+          at: data.at || entry.updatedAt,
+          accountId: data.accountId ?? next.accountStatus?.data?.id,
+          success: data.success !== false,
+          letterIds: normalizeArrayData(data.letterIds),
+          reportIds: normalizeArrayData(data.reportIds),
+          error: data.error
+        };
+        next.mailClaimReceipts = {
+          key: 'mailClaimReceipts',
+          group: 'internal',
+          data: [...seen, receipt].slice(-200),
+          updatedAt: entry.updatedAt
+        };
+        changed = true;
+        continue;
+      }
+
+      if (entry.key === 'mailStatus') {
+        const existingMail = next.mailStatus;
+        if (existingMail?.data?.letters && Array.isArray(entry.data?.letters)) {
+          const claimedMap = new Set(entry.data.letters.map((l: any) => String(l.id)));
+          for (const letter of existingMail.data.letters) {
+            if (claimedMap.has(String(letter.id))) {
+              letter.claimed = true;
+            }
+          }
+          existingMail.updatedAt = entry.updatedAt;
+          changed = true;
+        }
       }
 
       next[entry.key] = entry;

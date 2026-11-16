@@ -1,13 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { webcrypto } from 'node:crypto';
-const root = new URL('../extension/', import.meta.url);
+import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
+import { speedupService } from '../src/services/speedupService.ts';
+
 async function environment(existing = {}) {
   const local = structuredClone(existing), sent = [], clock = { now: Date.now() };
   let listener, account = '1', failTransport = false;
-  class Clock extends Date { static now() { return clock.now; } }
   const area = { get: async keys => structuredClone(Object.fromEntries((Array.isArray(keys) ? keys : [keys]).filter(k => k in local).map(k => [k, local[k]]))),
     set: async value => Object.assign(local, structuredClone(value)), remove: async () => {} };
   const chrome = { storage: { local: area, session: area, onChanged: { addListener() {} } },
@@ -18,9 +16,22 @@ async function environment(existing = {}) {
         if (message.kind === 'game-account-context') return { ok: true, accountId: account };
         sent.push(structuredClone(message)); if (failTransport) throw Error('Bridge unavailable'); return { ok: true };
       } } };
-  const ctx = vm.createContext({ chrome, console, Date: Clock, crypto: webcrypto, TextEncoder, URL, structuredClone });
-  ctx.importScripts = (...files) => files.forEach(file => vm.runInContext(readFileSync(new URL(file, root), 'utf8'), ctx));
-  vm.runInContext(readFileSync(new URL('background.js', root), 'utf8') + '\nglobalThis.reconcile = reconcileSpeedup; globalThis.drain = () => pending;', ctx);
+
+  const bg = setupBackgroundRuntime({ chrome });
+  const withClock = async fn => {
+    const orig = Date.now;
+    Date.now = () => clock.now;
+    try {
+      return await fn();
+    } finally {
+      Date.now = orig;
+    }
+  };
+  const ctx = {
+    reconcile: (...args) => withClock(() => bg.reconcileSpeedup(...args)),
+    drain: () => bg.drain(),
+    hwaHelperSpeedup: speedupService
+  };
   await ctx.drain();
   if (!local.rpcCache) {
     const at = new Date(clock.now).toISOString();
@@ -29,8 +40,8 @@ async function environment(existing = {}) {
       speedupInventory: { updatedAt: at, data: { accountId: '1', observedAt: at, items: [{ type: 'speedUpConstruction', id: 1, quantity: 10 }] } } };
     Object.assign(local, { popupRpcEnabled: true, socketRefreshMode: 'direct' });
   }
-  const quote = () => ctx.hwaHelperSpeedup.quote(local.rpcCache, 'building', 20, 1, 1, clock.now);
-  const send = message => new Promise(resolve => listener(message, { url: 'chrome-extension://test/popup.html' }, resolve));
+  const quote = () => speedupService.quote(local.rpcCache, 'building', 20, 1, 1, clock.now);
+  const send = message => withClock(() => new Promise(resolve => listener(message, { url: 'chrome-extension://test/popup.html' }, resolve)));
   return { local, sent, ctx, clock, quote, send, setAccount: value => { account = value; }, breakTransport: () => { failTransport = true; } };
 }
 
