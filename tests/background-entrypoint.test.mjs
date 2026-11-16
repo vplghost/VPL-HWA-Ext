@@ -14,16 +14,10 @@ test('isGameUrl correctly validates game origins and subpaths', () => {
   assert.equal(isGameUrl(''), false);
 });
 
-test('entrypoints/background.ts defines WXT defineBackground and registers typed services', async () => {
+test('entrypoints/background.ts defines WXT defineBackground and runs background orchestrator', async () => {
   const content = await readFile(new URL('../entrypoints/background.ts', import.meta.url), 'utf8');
   assert.ok(content.includes('defineBackground('), 'Must use WXT defineBackground entrypoint');
-  assert.ok(content.includes('hwaHelperRpcCache'), 'Must register typed RPC cache fallback');
-  assert.ok(content.includes('hwaHelperBuildingQueue'), 'Must register typed Building Queue fallback');
-  assert.ok(content.includes('hwaHelperResearchQueue'), 'Must register typed Research Queue fallback');
-  assert.ok(content.includes('hwaHelperRaidQueue'), 'Must register typed Raid Queue fallback');
-  assert.ok(content.includes('hwaHelperAutoGather'), 'Must register typed Auto Gather fallback');
-  assert.ok(content.includes('hwaHelperSmartGather'), 'Must register typed Smart Gather fallback');
-  assert.ok(content.includes('hwaHelperTowerAutomation'), 'Must register typed Tower Automation fallback');
-  assert.ok(content.includes('hwaHelperDungeonAutomation'), 'Must register typed Dungeon Automation fallback');
+  assert.ok(content.includes('setupBackgroundRuntime()'), 'Must run setupBackgroundRuntime orchestrator');
   assert.ok(content.includes('recordingState'), 'Must support recordingState');
+  assert.equal(content.includes('(globalThis as any).hwaHelper'), false, 'Must not rely on globalThis.hwaHelper registrations');
 });

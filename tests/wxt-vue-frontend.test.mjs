@@ -341,7 +341,7 @@ test('CampaignRaidModal has Recipe Tree hierarchy, loop controls, auto-stop, max
   assert.match(intercept, /'playable_getAvailable'/, 'intercept.js piggybackMethods must include playable_getAvailable');
   assert.match(intercept, /'worldStars_getAvailable'/, 'intercept.js piggybackMethods must include worldStars_getAvailable');
 
-  const rpcCache = await readFile(join(root, 'extension/rpc-cache.js'), 'utf8');
+  const rpcCache = await readFile(join(root, 'src/core/cache/rpcCache.ts'), 'utf8');
   assert.match(rpcCache, /entry\.key === 'lastCampaignRaidResult'[\s\S]*?next\.inventoryGet/, 'rpc-cache must synchronize lastCampaignRaidResult drops into next.inventoryGet');
 });
 
@@ -723,7 +723,7 @@ test('Experimental data helpers, mine configurations, and RPC payloads are robus
   assert.match(raid, /15 minutes \(900s\)/, 'RaidModal must offer valid 15m (900s) rally wait option');
   assert.doesNotMatch(raid, /10 minutes \(600s\)/, 'RaidModal must not offer invalid 600s option');
 
-  const bg = await readFile(join(root, 'extension/background.js'), 'utf8');
+  const bg = await readFile(join(root, 'src/background/backgroundRuntime.ts'), 'utf8');
   assert.match(
     bg,
     /stored\.rpcCache\?\.accountStatus\?\.data\?\.id\s*\?\?\s*stored\.rpcCache\?\.userGetInfo\?\.data\?\.id/,
@@ -1000,10 +1000,10 @@ test('BuildingModal and ResearchModal support queuing upgrades with projected pr
   assert.match(rContent, /special-resource-icon/, 'ResearchModal must render special-resource-icon');
   assert.match(rContent, /🎖️/, 'ResearchModal must render medal badge for special resource requirements');
 
-  // Verify requiresSpecialResource helper in extension/research-data.js
-  await import('../extension/research-data.js');
-  const rHelper = globalThis.hwaHelperResearchData;
-  assert.equal(typeof rHelper?.requiresSpecialResource, 'function', 'hwaHelperResearchData must export requiresSpecialResource');
+  // Verify requiresSpecialResource helper in src/data/researchData.ts
+  const { researchData, requiresSpecialResource } = await import('../src/data/researchData.ts');
+  const rHelper = { data: researchData, requiresSpecialResource };
+  assert.equal(typeof requiresSpecialResource, 'function', 'researchData must export requiresSpecialResource');
 
   // Find a research requiring honor marks or special material
   let specialFound = false;
@@ -1180,7 +1180,7 @@ test('Session recording, MQTT capture, and building/research controls operate se
   assert.match(header, /:content="researchTooltipText"/, 'Header must use dynamic researchTooltipText');
   assert.match(header, /return 'Ready'/, 'Header countdown must display Ready when completed queues exist');
 
-  const bg = await readFile(join(root, 'extension/background.js'), 'utf8');
+  const bg = await readFile(join(root, 'src/background/backgroundRuntime.ts'), 'utf8');
   assert.match(bg, /start-recording/, 'Background must support start-recording alias');
   assert.match(bg, /recordingState:\s*next/, 'Background must persist recordingState to local storage for reactive UI');
 

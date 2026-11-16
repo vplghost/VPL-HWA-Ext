@@ -1,26 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, access } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
+import { rpcCacheService as cache } from '../src/core/cache/index.ts';
+import { towerRules } from '../src/data/towerData.ts';
 import { resourceDataHelper } from '../src/utils/resourceData.ts';
-
-const source = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
-const refillRules = await readFile(new URL('../extension/refillable-rules.js', import.meta.url), 'utf8');
-const missionCosts = await readFile(new URL('../extension/mission-costs.js', import.meta.url), 'utf8');
-const marchRules = await readFile(new URL('../extension/march-rules.js', import.meta.url), 'utf8');
-const heroMetadata = await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8');
-
-const clanVersusRules = await readFile(new URL('../extension/clan-versus-rules.js', import.meta.url), 'utf8');
-const context = { TextEncoder, hwaHelperResourceData: resourceDataHelper };
-runInNewContext(refillRules, context);
-runInNewContext(missionCosts, context);
-runInNewContext(marchRules, context);
-runInNewContext(heroMetadata, context);
-runInNewContext(clanVersusRules, context);
-
-runInNewContext(await readFile(new URL('../extension/tower-rules.js', import.meta.url), 'utf8'), context);
-runInNewContext(source, context);
-const cache = context.hwaHelperRpcCache;
 
 function testWithTraces(name, files, run) {
   test(name, async (context) => {
@@ -383,9 +366,9 @@ test('successful empty skill results spend once and only refill below soft cap',
   assert.equal(after['resource:refillable:2'].data.lastRefillAt,
     Date.parse('2026-11-01T12:01:00.000Z'));
   assert.equal(cache.merge(after, [spend]).changed, false);
-  assert.equal(context.hwaHelperResourceData.amountAt(after['resource:refillable:2'],
+  assert.equal(resourceDataHelper.amountAt(after['resource:refillable:2'],
     Date.parse('2026-11-01T12:05:59.000Z')), 8);
-  assert.equal(context.hwaHelperResourceData.amountAt(after['resource:refillable:2'],
+  assert.equal(resourceDataHelper.amountAt(after['resource:refillable:2'],
     Date.parse('2026-11-01T12:06:00.000Z')), 9);
   const failed = record([{ name: 'heroUpgradeSkill', ident: 'failed' }],
     [{ ident: 'failed', result: { error: 'no skill point' } }]);
@@ -403,7 +386,7 @@ test('a paid Skill Point balance above the soft cap waits until it drops below 1
       `2026-11-01T12:0${index + 1}:00.000Z`));
   const afterTwo = cache.merge({}, [baseline, ...spends.slice(0, 2)]).cache;
   assert.equal(afterTwo['resource:refillable:2'].data.amount, 10);
-  assert.equal(context.hwaHelperResourceData.amountAt(afterTwo['resource:refillable:2'],
+  assert.equal(resourceDataHelper.amountAt(afterTwo['resource:refillable:2'],
     Date.parse('2026-11-01T12:12:00.000Z')), 10);
   const afterThree = cache.merge(afterTwo, [spends[2]]).cache;
   assert.equal(afterThree['resource:refillable:2'].data.amount, 9);
@@ -466,13 +449,16 @@ test('extracts material and speedups from World inventory, and queue timers', ()
   ]);
   const entries = cache.extract(input);
   assert.deepEqual([...entries.map((entry) => entry.key)], [
-    'resource:material:3', 'resource:speedUpResearch:1', 'resource:lootboxChanced:6',
+    'speedupInventoryAction', 'resource:material:3', 'resource:speedUpResearch:1', 'resource:lootboxChanced:6',
     'researchStatus', 'buildingStatus'
   ]);
-  assert.equal(entries[0].data.label, 'Stone');
-  assert.equal(entries[0].data.renewable, true);
-  assert.equal(entries[1].data.renewable, undefined);
-  assert.equal(entries[3].data.queues[0].durationMs, 8136000);
+  const matEntry = entries.find(e => e.key === 'resource:material:3');
+  const speedEntry = entries.find(e => e.key === 'resource:speedUpResearch:1');
+  const researchEntry = entries.find(e => e.key === 'researchStatus');
+  assert.equal(matEntry.data.label, 'Stone');
+  assert.equal(matEntry.data.renewable, true);
+  assert.equal(speedEntry.data.renewable, undefined);
+  assert.equal(researchEntry.data.queues[0].durationMs, 8136000);
 });
 
 test('newer World Energy API snapshot replaces older balance and refill clock', () => {
@@ -1525,7 +1511,7 @@ test('magicTower_briefInfo and magicTower_getAll extract towerStatus with isClea
   assert.ok(towerEntry);
   assert.equal(towerEntry.data.state, 'win');
   assert.equal(towerEntry.data.isCleared, true);
-  assert.equal(towerEntry.data.floorNumber, context.hwaHelperTowerRules.finalFloor);
+  assert.equal(towerEntry.data.floorNumber, towerRules.finalFloor);
 
   const merged = cache.merge({}, [briefRecord]);
   assert.equal(merged.cache.towerStatus.data.isCleared, true);
