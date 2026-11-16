@@ -4,8 +4,24 @@ import { readdir } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 
 // Keep the established classic worker/MAIN-world contracts as WXT public assets.
-// The popup and background are compiled from entrypoints; never ship legacy worker or popup renderer.
-const excluded = new Set(['manifest.json', 'popup.html', 'popup.js', 'popup.css', 'theme.css', 'background.js']);
+// The popup, background, and content scripts are compiled from entrypoints; never ship legacy scripts.
+const excluded = new Set([
+  'manifest.json',
+  'popup.html',
+  'popup.js',
+  'popup.css',
+  'theme.css',
+  'background.js',
+  'bridge.js',
+  'intercept.js',
+  'mqtt-capture.js',
+  'auto-gather.js',
+  'free-alchemy.js',
+  'mine-defense.js',
+  'research-queue.js',
+  'smart-gather.js',
+  'tower-runner.js'
+]);
 async function runtimeAssets(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const groups = await Promise.all(entries.map(async (entry) => {
