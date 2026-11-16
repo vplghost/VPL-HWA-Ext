@@ -20,9 +20,12 @@ export interface RecipeNode {
 }
 
 /** Reserve stock once across branches; descendants are needed only for missing parent copies. */
-export function buildGearRecipeTree(gearId: number | string | null, cache: any): RecipeNode | null {
+export function buildGearRecipeTree(
+  gearId: number | string | null,
+  cache: any,
+  customCraftMap?: Record<string, any>
+): RecipeNode | null {
   if (!gearId) return null;
-  const globals = globalThis as any;
   const inventory = cache?.inventoryGet?.data || {};
   const reserved = new Map<string, number>();
   const stock = (category: string, id: string) => Math.max(0, Number(inventory[category]?.[id]) || 0);
@@ -39,13 +42,9 @@ export function buildGearRecipeTree(gearId: number | string | null, cache: any):
     const cycle = ancestors.has(identity);
     const owned = allocate(category, id, required);
     const missing = Math.max(0, required - owned);
-    const globals = typeof globalThis !== 'undefined' ? (globalThis as any) : {};
-    const craftMap = (category === 'gear' ? globals.hwaHelperGearCraftData : globals.hwaHelperScrollCraftData)
-      || (category === 'gear' ? gearCraftData : scrollCraftData);
-    const craftInfo = craftMap?.[id] || (category === 'gear' ? gearCraftData?.[id] : scrollCraftData?.[id]) || null;
-    const resolvedName = getItemName(category, id)
-      || globals.hwaHelperNameMap?.item?.(category, id)
-      || `${category} #${id}`;
+    const craftMap = category === 'gear' ? (customCraftMap || gearCraftData) : scrollCraftData;
+    const craftInfo = craftMap?.[id] || null;
+    const resolvedName = getItemName(category, id) || `${category} #${id}`;
     const node: RecipeNode = {
       id, key, category, isScroll: category === 'scroll',
       name: resolvedName,

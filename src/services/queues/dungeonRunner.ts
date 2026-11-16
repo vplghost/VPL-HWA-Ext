@@ -2,7 +2,8 @@ import type {
   DungeonRunnerState,
   DungeonRunnerStepResult,
 } from '../../types/game/dungeonAutomation.ts';
-import dungeonAutomationService, { planDungeon } from './dungeonAutomation.ts';
+import dungeonAutomationService from './dungeonAutomation.ts';
+import { titanMetadata } from '../../data/titanMetadata.ts';
 
 function getPlanner(): any {
   return dungeonAutomationService;
@@ -92,13 +93,12 @@ export function checkCasualtiesInBattle(endCallArgs: any, endRep: any, deployedH
   return casualties;
 }
 
-export function getGateCoordinates(
-  doorCount: number,
-  teamNum: number
-): { ratioX: number; ratioY: number; label: string } {
+export function getGateCoordinates(doorCount: number, teamNum: number): { ratioX: number; ratioY: number; label: string } {
+  // Single door floor: Center gate
   if (doorCount <= 1) {
-    return { ratioX: 0.5, ratioY: 0.79, label: 'Center Gate' };
+    return { ratioX: 0.50, ratioY: 0.79, label: 'Center Gate' };
   }
+  // 2 doors floor: Door 0 is Left, Door 1 is Right
   if (teamNum === 0) {
     return { ratioX: 0.34, ratioY: 0.79, label: 'Door 1 (Left Gate)' };
   }
@@ -112,10 +112,7 @@ export function next(state: DungeonRunnerState, cache: any, now: number): Dungeo
   }
 
   const planner = getPlanner();
-  const decision = planner.planDungeon
-    ? planner.planDungeon(cache, state.options || {})
-    : planDungeon(cache, state.options || {});
-
+  const decision = planner.planDungeon(cache, state.options || {});
   if (decision.kind === 'complete') {
     return { state: { ...state, phase: 'complete', statusText: 'Dungeon cleared.', wakeAt: null } };
   }
@@ -123,23 +120,51 @@ export function next(state: DungeonRunnerState, cache: any, now: number): Dungeo
     return { state: stop(state, decision.reason || 'Dungeon snapshot is missing. Open Dungeon in game.') };
   }
   if (decision.kind === 'busy') {
-    return { state: { ...state, statusText: decision.reason, wakeAt: now + 5000 } };
+    return { state: stop(state, decision.reason) };
   }
 
   state.floorNumber = decision.floorNumber;
   state.teamNum = decision.teamNum;
+  state.currentHeroes = decision.heroes;
   state.heroes = decision.heroes;
   state.attackerType = decision.attackerType;
-  state.door = decision.door;
 
-  return issue(state, 'starting-battle', decision.call, now);
+  // Check execution mode: 'canvas' (In-game UI trigger) vs 'rpc' (legacy direct RPC)
+  const isCanvasMode = state.options?.executionMode === 'canvas';
+
+  if (!isCanvasMode) {
+    // Legacy RPC mode
+    return issue(state, 'starting-battle', decision.call, now);
+  }
+
+  // Canvas Automation
+  const doorCoords = getGateCoordinates(dungeon.currentFloorDoors.length, decision.teamNum);
+  state.gateCoords = doorCoords;
+  const updated: DungeonRunnerState = {
+    ...state,
+    phase: 'opening-gate',
+    statusText: `Selecting Door ${decision.teamNum + 1} (${decision.attackerType})...`,
+    sentAt: now,
+    wakeAt: now + 1500,
+  };
+
+  return {
+    state: updated,
+    canvasAction: {
+      action: 'click',
+      ratioX: doorCoords.ratioX,
+      ratioY: doorCoords.ratioY,
+      label: doorCoords.label,
+    },
+    expiresAt: now + 120000,
+  };
 }
 
 export function start(
   cache: any,
-  options: any,
+  settings: any,
   tabId: number,
-  now: number
+  now: number = Date.now()
 ): DungeonRunnerStepResult | null {
   const accountId = cache?.accountStatus?.data?.id ?? cache?.userGetInfo?.data?.id;
   if (!accountId || !Number.isInteger(tabId)) return null;
@@ -149,13 +174,13 @@ export function start(
   }
   return next(
     {
-      id: `dungeon:${now}:${tabId}`,
+      id: `${now}:${tabId}`,
       tabId,
       accountId,
       phase: 'planning',
-      options: options || {},
-      statusText: 'Starting Dungeon automation...',
+      options: settings || {},
       startedAt: now,
+      battlesCleared: 0,
     },
     cache,
     now
@@ -200,53 +225,248 @@ export function advance(
     return { state: stop(state, 'Game account changed.') };
   }
   if (!record && now >= (state.wakeAt || 0)) {
-    return {
-      state: stop(
-        state,
-        state.phase === 'waiting-battle' || state.phase === 'ending-battle'
-          ? 'Dungeon battle did not finish.'
-          : 'Dungeon RPC timed out. No automatic retry.'
-      ),
-    };
-  }
-  if (!record || Date.parse(record.timestamp) < (state.sentAt || 0)) return { state };
-  const replies = responses(record);
-
-  if (state.phase === 'waiting-battle' || state.phase === 'ending-battle') {
-    const ended = replies.find(({ call }) => call.name === 'dungeonEndBattle');
-    if (!ended) return { state };
-    if (ended.result?.error || ended.call.args?.result?.win !== true) {
-      return { state: stop(state, 'Dungeon battle was lost or rejected by server.') };
+    if (['opening-gate', 'skipping-battle', 'dismissing-victory', 'walking-animation'].includes(state.phase)) {
+      // Normal timer progression for canvas/animation phases - handled below
+    } else {
+      return { state: stop(state, 'Dungeon automation timed out.') };
     }
-    const casualties = checkCasualtiesInBattle(
-      ended.call.args,
-      ended.result?.response,
-      state.heroes || []
+  }
+  if (record && Date.parse(record.timestamp) < (state.sentAt || 0)) return { state };
+
+  const replies = record ? responses(record) : [];
+  const isCanvasMode = state.options?.executionMode === 'canvas';
+
+  // ==========================================
+  // IN-GAME CANVAS PHASES
+  // ==========================================
+  if (isCanvasMode) {
+    // 1. Gate clicked -> 1.5s elapsed -> Popup open -> Click "Fight" button (ratioX: 0.85, ratioY: 0.75)
+    if (state.phase === 'opening-gate') {
+      const updated: DungeonRunnerState = {
+        ...state,
+        phase: 'waiting-battle-start',
+        statusText: `Starting Battle on Floor ${state.floorNumber}...`,
+        sentAt: now,
+        wakeAt: now + 10000,
+      };
+      return {
+        state: updated,
+        canvasAction: {
+          action: 'click',
+          ratioX: 0.85,
+          ratioY: 0.75,
+          label: 'Fight Button',
+        },
+        expiresAt: now + 120000,
+      };
+    }
+
+    // 2. Waiting for battle to start (observed via dungeonStartBattle API record)
+    if (state.phase === 'waiting-battle-start') {
+      const startReply = replies.find(({ call }) => call.name === 'dungeonStartBattle');
+      if (!startReply) {
+        if (!record && now >= (state.wakeAt || 0)) {
+          return { state: stop(state, 'Battle did not start in game. Make sure Dungeon window is open.') };
+        }
+        return { state };
+      }
+      const startRes = startReply.result?.response;
+      if (startReply.result?.error || startRes == null || startRes.error) {
+        const errorReason = startRes?.error || startReply.result?.error || 'dungeonStartBattle failed.';
+        return { state: stop(state, String(errorReason)) };
+      }
+
+      const updated: DungeonRunnerState = {
+        ...state,
+        phase: 'skipping-battle',
+        statusText: `Combat loading on Floor ${state.floorNumber}...`,
+        battleStartedAt: now,
+        sentAt: now,
+        wakeAt: now + 1200,
+      };
+      return { state: updated };
+    }
+
+    // 3. Combat loaded -> Click "Skip" button (ratioX: 0.69, ratioY: 0.81)
+    if (state.phase === 'skipping-battle') {
+      const updated: DungeonRunnerState = {
+        ...state,
+        phase: 'waiting-battle-end',
+        statusText: `Fast-forwarding combat on Floor ${state.floorNumber}...`,
+        sentAt: now,
+        wakeAt: now + 15000,
+      };
+      return {
+        state: updated,
+        canvasAction: {
+          action: 'click',
+          ratioX: 0.69,
+          ratioY: 0.81,
+          label: 'Skip Button',
+        },
+        expiresAt: now + 120000,
+      };
+    }
+
+    // 4. Waiting for combat end (observed via genuine dungeonEndBattle sent by Unity)
+    if (state.phase === 'waiting-battle-end') {
+      const endReply = replies.find(({ call }) => call.name === 'dungeonEndBattle');
+      if (!endReply) {
+        if (!record && now >= (state.wakeAt || 0)) {
+          return { state: stop(state, 'Dungeon battle did not finish in time.') };
+        }
+        return { state };
+      }
+      const endRes = endReply.result?.response;
+      if (endReply.result?.error || endRes == null || endRes.error || endReply.call?.args?.result?.win !== true) {
+        const errorReason = endRes?.error || endReply.result?.error || 'Dungeon battle was lost or rejected.';
+        return { state: stop(state, String(errorReason)) };
+      }
+
+      // Safety Casualty Check
+      const casualties = checkCasualtiesInBattle(
+        endReply.call?.args,
+        endRes,
+        state.currentHeroes || []
+      );
+
+      if (casualties.length > 0) {
+        const meta = titanMetadata || {};
+        const fallenNames = casualties.map((id) => meta[id]?.name || `Titan #${id}`).join(', ');
+        return {
+          state: stop(
+            state,
+            `Titan casualty (${fallenNames}) at floor ${state.floorNumber}. Halting dungeon automation. Press Continue Auto to proceed with remaining titans.`,
+            { fallen: casualties, floor: state.floorNumber }
+          ),
+        };
+      }
+
+      state.battlesCleared = (state.battlesCleared || 0) + 1;
+
+      // Checkpoint save check
+      const nextFloor = endRes?.dungeon?.floorNumber;
+      const respawn = endRes?.dungeon?.respawnFloor;
+      const needsSave = nextFloor && respawn && (nextFloor - 1 === respawn);
+
+      const updated: DungeonRunnerState = {
+        ...state,
+        phase: 'dismissing-victory',
+        statusText: `Floor ${state.floorNumber} cleared! Claiming rewards...`,
+        needsSave,
+        nextFloor,
+        sentAt: now,
+        wakeAt: now + 1000,
+      };
+      return { state: updated };
+    }
+
+    // 5. Dismiss victory/reward dialog by clicking center (ratioX: 0.50, ratioY: 0.38)
+    if (state.phase === 'dismissing-victory') {
+      const updated: DungeonRunnerState = {
+        ...state,
+        phase: 'walking-animation',
+        statusText: `Titans moving to Floor ${state.nextFloor || (state.floorNumber || 0) + 1} (walking animation)...`,
+        sentAt: now,
+        wakeAt: now + 4500,
+      };
+      const result: DungeonRunnerStepResult = {
+        state: updated,
+        canvasAction: {
+          action: 'click',
+          ratioX: 0.50,
+          ratioY: 0.38,
+          label: 'Dismiss Victory',
+        },
+        expiresAt: now + 120000,
+      };
+      if (state.needsSave) {
+        result.calls = [{ name: 'dungeonSaveProgress', args: {} }];
+      }
+      return result;
+    }
+
+    // 6. Walking animation completed!
+    if (state.phase === 'walking-animation') {
+      const saveReply = replies.find(({ call }) => call.name === 'dungeonSaveProgress');
+      if (saveReply && (saveReply.result?.error || saveReply.result?.response?.error)) {
+        const errorReason =
+          saveReply.result?.response?.error || saveReply.result?.error || 'dungeonSaveProgress failed.';
+        return { state: stop(state, String(errorReason)) };
+      }
+      return next(state, cache, now);
+    }
+  }
+
+  // ==========================================
+  // LEGACY RPC MODE PHASES
+  // ==========================================
+  if (state.phase === 'starting-battle') {
+    const startReply = replies.find(({ call }) => call.name === 'dungeonStartBattle');
+    if (!startReply) return { state };
+    const startRes = startReply.result?.response;
+    if (startReply.result?.error || startRes == null || startRes.error) {
+      const errorReason = startRes?.error || startReply.result?.error || 'dungeonStartBattle failed. Queue stopped.';
+      return { state: stop(state, String(errorReason)) };
+    }
+    const endCall = makeEndBattleCall(
+      startRes,
+      state.currentHeroes,
+      startRes?.seed
     );
-    if (casualties.length > 0 && state.options?.requireIntactLineup) {
+    return issue(state, 'ending-battle', endCall, now);
+  }
+
+  if (state.phase === 'ending-battle') {
+    const endReply = replies.find(({ call }) => call.name === 'dungeonEndBattle');
+    if (!endReply) return { state };
+    const endRes = endReply.result?.response;
+    if (endReply.result?.error || endRes == null || endRes.error || endReply.call?.args?.result?.win !== true) {
+      const errorReason = endRes?.error || endReply.result?.error || 'Dungeon battle was lost or rejected.';
+      return { state: stop(state, String(errorReason)) };
+    }
+
+    const casualties = checkCasualtiesInBattle(
+      endReply.call?.args,
+      endRes,
+      state.currentHeroes || []
+    );
+
+    if (casualties.length > 0) {
+      const meta = titanMetadata || {};
+      const fallenNames = casualties.map((id) => meta[id]?.name || `Titan #${id}`).join(', ');
       return {
         state: stop(
           state,
-          `Titan casualties detected (${casualties.join(', ')}). Automation halted by safe setting.`,
-          casualties
+          `Titan casualty (${fallenNames}) at floor ${state.floorNumber}. Halting dungeon automation. Press Auto Attack to start next round.`,
+          { fallen: casualties, floor: state.floorNumber }
         ),
       };
+    }
+
+    state.battlesCleared = (state.battlesCleared || 0) + 1;
+
+    const rep = endRes;
+    const nextFloor = rep?.dungeon?.floorNumber;
+    const respawn = rep?.dungeon?.respawnFloor;
+    if (nextFloor && respawn && nextFloor - 1 === respawn) {
+      return issue(state, 'saving-progress', { name: 'dungeonSaveProgress', args: {} }, now);
+    }
+
+    return next(state, cache, now);
+  }
+
+  if (state.phase === 'saving-progress') {
+    const saveReply = replies.find(({ call }) => call.name === 'dungeonSaveProgress');
+    if (!saveReply) return { state };
+    const saveRes = saveReply.result?.response;
+    if (saveReply.result?.error || saveRes?.error) {
+      const errorReason = saveRes?.error || saveReply.result?.error || 'dungeonSaveProgress failed.';
+      return { state: stop(state, String(errorReason)) };
     }
     return next(state, cache, now);
   }
 
-  const reply = replies.find(({ call }) => sameCall(call, state.expected));
-  if (!reply) return { state };
-  if (reply.result?.error || reply.result?.response == null) {
-    return { state: stop(state, `${state.expected?.name} failed. Dungeon stopped.`) };
-  }
-  if (state.phase === 'starting-battle') {
-    const endBattleCall = makeEndBattleCall(
-      reply.result?.response,
-      state.heroes || state.expected?.args?.heroes
-    );
-    return issue(state, 'ending-battle', endBattleCall, now);
-  }
   return next(state, cache, now);
 }
 
@@ -259,10 +479,5 @@ export const dungeonRunnerService = {
   checkCasualtiesInBattle,
   getGateCoordinates,
 };
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperDungeonRunner =
-    (globalThis as any).hwaHelperDungeonRunner || dungeonRunnerService;
-}
 
 export default dungeonRunnerService;

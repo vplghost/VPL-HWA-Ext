@@ -6,9 +6,8 @@ import vm from 'node:vm';
 import { deriveTowerRules, indexedRows } from '../scripts/generate-tower-rules.mjs';
 import { towerActivityState } from '../src/composables/activityState.ts';
 
-const context = {};
-vm.runInNewContext(await readFile(new URL('../extension/tower-rules.js', import.meta.url), 'utf8'), context);
-const rules = context.hwaHelperTowerRules;
+import { towerRules as rules } from '../src/data/towerData.ts';
+import { towerAutomationService } from '../src/services/queues/towerAutomation.ts';
 const fixtures = await Promise.all(['magicTower.pb', 'magicTowerFloorTemplate.pb'].map(async name => {
   const bytes = await readFile(new URL(`./fixtures/tower/${name}`, import.meta.url));
   assert.equal(bytes.length, rules.source.files[name].size);
@@ -76,19 +75,16 @@ test('extraction rejects truncated data, invalid row IDs and corrupt index offse
 });
 
 const rpcSource = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
-const plannerSource = await readFile(new URL('../extension/tower-automation.js', import.meta.url), 'utf8');
 
 test('planner requires a win in the configured final boss room, including future floor counts', () => {
   for (const finalFloor of [23, 27]) {
-    const runtime = { hwaHelperTowerRules: { ...rules, finalFloor } };
-    vm.runInNewContext(plannerSource, runtime);
-    const plan = (floorNumber, type, win = true, historyRoom = 1) => runtime.hwaHelperTowerAutomation.plan({
+    const plan = (floorNumber, type, win = true, historyRoom = 1) => towerAutomationService.plan({
       towerSession: { updatedAt: new Date().toISOString(), data: {
         floorNumber, roomNumber: 0,
         rooms: { 1: { roomNumber: 1, type, state: 'finished' } },
         history: [{ action: 'endBattle', floor: floorNumber, room: historyRoom, win }],
       } },
-    });
+    }, [], Math.random, null, finalFloor);
     assert.equal(plan(finalFloor, 'boss_battle').kind, 'complete');
     assert.notEqual(plan(21, 'hero_battle').kind, 'complete');
     assert.notEqual(plan(finalFloor - 2, 'boss_battle').kind, 'complete');

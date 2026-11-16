@@ -1,14 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
-
-const dataSource = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
-const queueSource = await readFile(new URL('../extension/monster-queue.js', import.meta.url), 'utf8');
-const context = {};
-runInNewContext(`${dataSource}\n${queueSource}`, context);
-const queue = context.hwaHelperMonsterQueue;
-const data = context.hwaHelperExperimentalData;
+import { monsterQueueService as queue } from '../src/services/queues/monsterQueue.ts';
+import { experimentalDataHelper as data } from '../src/utils/experimentalData.ts';
 const at = (seconds) => Date.UTC(2026, 10, 7, 12, 9, 0) + seconds * 1000;
 const timestamp = (seconds) => new Date(at(seconds)).toISOString();
 const heroes = Object.fromEntries([7, 51, 54, 60, 71].map((id) => [id, {

@@ -19,37 +19,16 @@ import {
 } from '@/src/data/researchData';
 import { researchQueueService } from '@/src/services/queues/researchQueue';
 
-const rHelper = (typeof researchDataHelper !== 'undefined' ? researchDataHelper : null)
-  || (typeof globalThis !== 'undefined' ? ((globalThis as any).researchDataHelper || (globalThis as any).hwaHelperResearchData) : null);
-const rQueueHelper = (typeof researchQueueService !== 'undefined' ? researchQueueService : null)
-  || (typeof globalThis !== 'undefined' ? ((globalThis as any).researchQueueService || (globalThis as any).hwaHelperResearchQueue) : null);
+const rHelper = researchDataHelper;
+const rQueueHelper = researchQueueService;
 
-const getMaxLevel = (id: any) =>
-  rHelper?.getMaxLevel?.(id)
-  ?? (typeof getMaxLevelTyped !== 'undefined' ? getMaxLevelTyped(id) : 0);
-
-const getResearchLevelData = (id: any, lvl: any) =>
-  rHelper?.getResearchLevelData?.(id, lvl)
-  ?? (typeof getResearchLevelDataTyped !== 'undefined' ? getResearchLevelDataTyped(id, lvl) : null);
-
-const isAvailable = (id: any, lvl: any, cur: any, rc: any) =>
-  rHelper?.isAvailable?.(id, lvl, cur, rc)
-  ?? (typeof isAvailableTyped !== 'undefined' ? isAvailableTyped(id, lvl, cur, rc) : false);
-
-const calculateEffectiveDurationMs = (id: any, lvl: any, mult?: any) =>
-  rHelper?.calculateEffectiveDurationMs?.(id, lvl, mult)
-  ?? (typeof calculateEffectiveDurationMsTyped !== 'undefined' ? calculateEffectiveDurationMsTyped(id, lvl, mult) : 60000);
-
-const getMissingCosts = (id: any, lvl: any, mats: any) =>
-  rHelper?.getMissingCosts?.(id, lvl, mats)
-  ?? (typeof getMissingCostsTyped !== 'undefined' ? getMissingCostsTyped(id, lvl, mats) : []);
-
-const checkRequiresSpecialResource = (id: any, lvl?: any) =>
-  rHelper?.requiresSpecialResource?.(id, lvl)
-  ?? (typeof checkRequiresSpecialResourceTyped !== 'undefined' ? checkRequiresSpecialResourceTyped(id, lvl) : false);
-
-const researchData = rHelper?.data
-  ?? (typeof researchDataTyped !== 'undefined' ? researchDataTyped : {});
+const getMaxLevel = getMaxLevelTyped;
+const getResearchLevelData = getResearchLevelDataTyped;
+const isAvailable = isAvailableTyped;
+const calculateEffectiveDurationMs = calculateEffectiveDurationMsTyped;
+const getMissingCosts = getMissingCostsTyped;
+const checkRequiresSpecialResource = checkRequiresSpecialResourceTyped;
+const researchData = researchDataTyped;
 
 const props = defineProps<{
   modelValue: boolean;
@@ -341,9 +320,8 @@ const allResearchesList = computed(() => {
     }
   }
 
-  const names = (typeof nameData !== 'undefined' ? nameData : null)
-    || (typeof globalThis !== 'undefined' ? ((globalThis as any).nameData || (globalThis as any).hwaHelperNameMap) : null);
-  const allDict = names?.names?.research || names?.research || {};
+  const names = nameData;
+  const allDict = names?.names?.research || {};
   for (const key of Object.keys(allDict)) {
     const rId = Number(key);
     if (!researchMap.has(rId)) {

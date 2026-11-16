@@ -35,15 +35,11 @@ const abortCampaignRaidLoop = ref(false);
 const loopStatusMsg = ref('');
 
 const resolveMissionTries = (numId: any, missionData: any) => {
-  const fn = (typeof getMissionTries !== 'undefined' ? getMissionTries : null)
-    || (typeof globalThis !== 'undefined' ? ((globalThis as any).getMissionTries || (globalThis as any).campaignMissions?.getMissionTries || (globalThis as any).hwaHelperCampaignMissions?.getMissionTries) : null);
-  return fn?.(numId, missionData);
+  return getMissionTries(numId, missionData);
 };
 
 const resolveHighestRaidableMission = (ids: any, missionData: any, options?: any) => {
-  const fn = (typeof getHighestRaidableMission !== 'undefined' ? getHighestRaidableMission : null)
-    || (typeof globalThis !== 'undefined' ? ((globalThis as any).getHighestRaidableMission || (globalThis as any).campaignMissions?.getHighestRaidableMission || (globalThis as any).hwaHelperCampaignMissions?.getHighestRaidableMission) : null);
-  return fn?.(ids, missionData, options);
+  return getHighestRaidableMission(ids, missionData, options);
 };
 const campaignRaidSequential = ref(false);
 const localRaidResult = ref<any>(null);

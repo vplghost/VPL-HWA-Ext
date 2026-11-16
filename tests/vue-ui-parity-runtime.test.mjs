@@ -96,11 +96,13 @@ test('popup automation honors RPC gate, claims on open once and saves selected t
     set: async (value) => writes.push(value) }, onChanged: { addListener: (fn) => listeners.add(fn), removeListener: (fn) => listeners.delete(fn) } },
   runtime: { sendMessage: async (message) => { sent.push(message); return { ok: true }; } } };
   const calls = [{ name: 'quest_multiFarm', args: { questIds: [42] } }];
-  globalThis.hwaHelperPopupData = { getPendingClaims: () => ({ letterIds: [], hasReports: false, questIds: [42], totalCount: 1 }),
-    buildAutoClaimCalls: () => ({ calls }) };
-  globalThis.hwaHelperExperimentalData = { autoJoinTeamOptions: () => [{ id: 'highest', label: 'Top 5' }] };
-  t.after(() => { delete globalThis.chrome; delete globalThis.hwaHelperPopupData; delete globalThis.hwaHelperExperimentalData; });
-  const cache = ref({}); const { value, unmount } = mountComposable(() => usePopupAutomation(cache, true));
+  const deps = {
+    getPendingClaims: () => ({ letterIds: [], hasReports: false, questIds: [42], totalCount: 1 }),
+    buildAutoClaimCalls: () => ({ calls }),
+    autoJoinTeamOptions: () => [{ id: 'highest', label: 'Top 5' }],
+  };
+  t.after(() => { delete globalThis.chrome; });
+  const cache = ref({}); const { value, unmount } = mountComposable(() => usePopupAutomation(cache, true, deps));
   await flush();
   await value.claimRewards(); assert.equal(sent.length, 0);
   for (const fn of listeners) fn({ popupRpcEnabled: { newValue: true } }, 'local');

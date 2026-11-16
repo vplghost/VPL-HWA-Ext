@@ -5,8 +5,8 @@ import vm from 'node:vm';
 import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../src/data/titanMetadata.ts';
 
 const rpcCacheJs = await readFile(new URL('../extension/rpc-cache.js', import.meta.url), 'utf8');
-const dungeonAutoJs = await readFile(new URL('../extension/dungeon-automation.js', import.meta.url), 'utf8');
-const dungeonRunnerJs = await readFile(new URL('../extension/dungeon-runner.js', import.meta.url), 'utf8');
+import { dungeonAutomationService as dungeonAuto } from '../src/services/queues/dungeonAutomation.ts';
+import { dungeonRunnerService as dungeonRunner } from '../src/services/queues/dungeonRunner.ts';
 
 const rpcContext = {
   Date,
@@ -15,21 +15,6 @@ const rpcContext = {
 };
 vm.runInNewContext(rpcCacheJs, rpcContext);
 const cacheModule = rpcContext.globalThis.hwaHelperRpcCache;
-
-const autoContext = {
-  Date,
-  globalThis: {},
-  hwaHelperTitanMetadata: titanMetadata,
-  hwaHelperTitanArtifactEvolveCost: titanArtifactEvolveCost,
-  hwaHelperTitanArtifactLevelCosts: titanArtifactLevelCosts,
-};
-autoContext.globalThis.hwaHelperTitanMetadata = titanMetadata;
-autoContext.globalThis.hwaHelperTitanArtifactEvolveCost = titanArtifactEvolveCost;
-autoContext.globalThis.hwaHelperTitanArtifactLevelCosts = titanArtifactLevelCosts;
-vm.runInNewContext(dungeonAutoJs, autoContext);
-vm.runInNewContext(dungeonRunnerJs, autoContext);
-const dungeonAuto = autoContext.globalThis.hwaHelperDungeonAutomation;
-const dungeonRunner = autoContext.globalThis.hwaHelperDungeonRunner;
 
 test('rpc-cache extracts dungeonStartBattle activeBattle state and dungeonEndBattle clears it', () => {
   const startRecord = {

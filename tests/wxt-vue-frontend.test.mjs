@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { getTroopType } from '../src/utils/troops.ts';
 import { formatDuration, formatNumber, formatCompact } from '../src/utils/formatters.ts';
 import { formatResourceAmount, getAmountAt, getNextRefillSeconds } from '../src/utils/resourceData.ts';
+import { raidQueueService } from '../src/services/queues/raidQueue.ts';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -1043,10 +1044,8 @@ test('Raid queue allows creation during active guild raid and Dashboard displays
   assert.match(raidModal, /currentRaidStageIcon/, 'RaidModal must compute currentRaidStageIcon');
   assert.match(raidModal, /queueStatusLabel/, 'RaidModal must compute queueStatusLabel');
 
-  // 3. Test extension/raid-queue.js active raid handling
-  await import('../extension/experimental-data.js');
-  await import('../extension/raid-queue.js');
-  const controller = globalThis.hwaHelperRaidQueue;
+  // 3. Test raidQueueService active raid handling
+  const controller = raidQueueService;
   assert.equal(typeof controller.start, 'function');
   assert.equal(typeof controller.advance, 'function');
 

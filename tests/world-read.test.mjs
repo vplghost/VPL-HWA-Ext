@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import '../extension/world-read.js';
-const helper = globalThis.hwaHelperWorldRead;
+import { worldReadService as helper } from '../src/services/worldReadService.ts';
 const now = Date.parse('2026-11-15T08:00:00Z');
 const incoming = { name: 'getIncomingMarches', feature: 'march', args: {} };
 const rally = { name: 'getRallyById', feature: 'rally', args: { rallyId: 'r', mapId: 'map' } };

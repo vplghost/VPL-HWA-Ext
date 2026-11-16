@@ -92,8 +92,7 @@ export function getItemName(category: string, id: number | string): string {
     const tMeta = getTitanMetadata(strId);
     return `${tMeta?.name || `Titan #${strId}`} Titan Soul Stone`;
   }
-  const names = (typeof nameData !== 'undefined' ? nameData : null)
-    || (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperNameData : null);
+  const names = typeof nameData !== 'undefined' ? nameData : null;
 
   if (category === 'fragmentGear') {
     const gName = (typeof typedGetItemName === 'function' ? typedGetItemName('gear', strId) : null)
@@ -116,8 +115,7 @@ export function getItemName(category: string, id: number | string): string {
 
   const typedItem = typeof typedGetItemName === 'function' ? typedGetItemName(category, strId) : null;
   if (typedItem) return typedItem;
-  const mapHelper = (typeof nameMap !== 'undefined' ? nameMap : null)
-    || (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperNameMap : null);
+  const mapHelper = typeof nameMap !== 'undefined' ? nameMap : null;
   return mapHelper?.item?.(category, strId) || `${category} #${strId}`;
 }
 

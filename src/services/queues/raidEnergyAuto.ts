@@ -128,9 +128,4 @@ export const raidEnergyAutoService = {
   validConfig,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperRaidEnergyAuto =
-    (globalThis as any).hwaHelperRaidEnergyAuto || raidEnergyAutoService;
-}
-
 export default raidEnergyAutoService;

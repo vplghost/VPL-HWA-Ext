@@ -11,18 +11,7 @@ const activeFilter = ref<'all' | 'activities' | 'resources' | 'synergies' | 'rea
 const isRefreshing = ref(false);
 
 const goalsData = computed(() => {
-  const extractFn = typeof extractEventGoals === 'function'
-    ? extractEventGoals
-    : (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperPopupData?.extractEventGoals : null);
-  if (extractFn) {
-    return extractFn(cache.value);
-  }
-  return {
-    all: [],
-    activities: [],
-    resources: [],
-    metrics: { totalGoals: 0, synergiesCount: 0, readyCount: 0 },
-  };
+  return extractEventGoals(cache.value);
 });
 
 function matchGoal(g: any): boolean {

@@ -17,29 +17,14 @@ import {
 } from '@/src/data/buildingData';
 import { buildingQueueService } from '@/src/services/queues/buildingQueue';
 
-const bHelper = (typeof buildingDataHelper !== 'undefined' ? buildingDataHelper : null)
-  || (typeof globalThis !== 'undefined' ? ((globalThis as any).buildingDataHelper || (globalThis as any).hwaHelperBuildingData) : null);
-const bQueueHelper = (typeof buildingQueueService !== 'undefined' ? buildingQueueService : null)
-  || (typeof globalThis !== 'undefined' ? ((globalThis as any).buildingQueueService || (globalThis as any).hwaHelperBuildingQueue) : null);
+const bHelper = buildingDataHelper;
+const bQueueHelper = buildingQueueService;
 
-const getBuildingLevelData = (id: any, lvl: any) =>
-  bHelper?.getBuildingLevelData?.(id, lvl)
-  ?? (typeof getBuildingLevelDataTyped !== 'undefined' ? getBuildingLevelDataTyped(id, lvl) : null);
-
-const getMissingRequirements = (id: any, lvl: any, map: any) =>
-  bHelper?.getMissingRequirements?.(id, lvl, map)
-  ?? (typeof getMissingRequirementsTyped !== 'undefined' ? getMissingRequirementsTyped(id, lvl, map) : []);
-
-const getMissingCosts = (id: any, lvl: any, map: any) =>
-  bHelper?.getMissingCosts?.(id, lvl, map)
-  ?? (typeof getMissingCostsTyped !== 'undefined' ? getMissingCostsTyped(id, lvl, map) : []);
-
-const calculateEffectiveDurationMs = (id: any, lvl: any, mult?: any) =>
-  bHelper?.calculateEffectiveDurationMs?.(id, lvl, mult)
-  ?? (typeof calculateEffectiveDurationMsTyped !== 'undefined' ? calculateEffectiveDurationMsTyped(id, lvl, mult) : 1000);
-
-const buildingLevelsData = bHelper?.data
-  ?? (typeof buildingLevelsDataTyped !== 'undefined' ? buildingLevelsDataTyped : {});
+const getBuildingLevelData = getBuildingLevelDataTyped;
+const getMissingRequirements = getMissingRequirementsTyped;
+const getMissingCosts = getMissingCostsTyped;
+const calculateEffectiveDurationMs = calculateEffectiveDurationMsTyped;
+const buildingLevelsData = buildingLevelsDataTyped;
 
 const props = defineProps<{
   modelValue: boolean;
@@ -313,9 +298,8 @@ const allBuildingsList = computed(() => {
     }
   }
 
-  const names = (typeof nameData !== 'undefined' ? nameData : null)
-    || (typeof globalThis !== 'undefined' ? ((globalThis as any).nameData || (globalThis as any).hwaHelperNameMap) : null);
-  const allDict = names?.names?.building || names?.building || {};
+  const names = nameData;
+  const allDict = names?.names?.building || {};
   for (const key of Object.keys(allDict)) {
     const bId = Number(key);
     if (!buildingMap.has(bId)) {

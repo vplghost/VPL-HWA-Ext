@@ -3,11 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
-const context = { Date };
-for (const name of ['tower-rules', 'tower-automation', 'tower-runner']) vm.runInNewContext(
-  await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
-const planner = context.hwaHelperTowerAutomation;
-const runner = context.hwaHelperTowerRunner;
+import { towerAutomationService as planner } from '../src/services/queues/towerAutomation.ts';
+import { towerRunnerService as runner } from '../src/services/queues/towerRunner.ts';
 const time = Date.parse('2026-11-06T11:15:20Z');
 const team = [79, 72, 16, 54, 60];
 const rooms = {

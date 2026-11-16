@@ -8,14 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { extractStrategicResourceNames } from '../scripts/lib/strategic-resource-names.mjs';
 import { resourceLabel } from '../src/utils/resourceData.ts';
 import { itemResources } from '../src/data/itemData.ts';
-
-const context = { hwaHelperItemResources: itemResources };
-for (const name of ['data-names', 'name-map']) {
-  vm.runInNewContext(await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
-}
-const metadata = (await readFile(new URL('../src/utils/metadata.ts', import.meta.url), 'utf8'))
-  .replace(/^import .*;\r?$/gm, '').replace(/^export \{.*\} from .*;\r?$/gm, '').replace(/^export /gm, '');
-vm.runInNewContext(ts.transpileModule(metadata, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
+import { getItemName } from '../src/utils/metadata.ts';
+import { nameMap, nameData } from '../src/data/nameData.ts';
 
 test('generation refuses a stale default or mismatched cached bytes before replacing bundled data', async () => {
   const script = fileURLToPath(new URL('../scripts/generate-name-map.mjs', import.meta.url));
@@ -51,7 +45,7 @@ test('strategic name extraction uses exact category/ID keys and rejects unresolv
 });
 
 test('bundled names identify client1.293.1010 and the verified current locale revision', () => {
-  const data = context.hwaHelperNameData;
+  const data = nameData;
   assert.equal(data.clientVersion, '1.293.1010');
   assert.equal(data.assetMd5, 'f640f200f4d58044949d6f982978ff47');
   assert.equal(data.assetSize, 683621);
@@ -63,11 +57,7 @@ test('bundled names identify client1.293.1010 and the verified current locale re
   }
 });
 
-test('Items and Resources resolve the same current names instead of cached type#ID placeholders', t => {
-  const previousMap = globalThis.hwaHelperNameMap, previousData = globalThis.hwaHelperNameData;
-  globalThis.hwaHelperNameMap = context.hwaHelperNameMap;
-  globalThis.hwaHelperNameData = context.hwaHelperNameData;
-  t.after(() => { globalThis.hwaHelperNameMap = previousMap; globalThis.hwaHelperNameData = previousData; });
+test('Items and Resources resolve the same current names instead of cached type#ID placeholders', () => {
   for (const [category, id, expected] of [
     ['lootboxChanced', 27, 'Tomes Casket'], ['lootboxChoiced', 2, 'Materials Chest Lv.1'],
     ['material', 9, 'Blueprints'], ['speedUpConstruction', 3, '1h Construction Speedup'],
@@ -75,16 +65,16 @@ test('Items and Resources resolve the same current names instead of cached type#
     ['speedUpUnitTraining', 3, '1h Training Speedup'], ['speedUpUnitHealing', 3, '1h Healing Speedup'],
     ['teleporter', 1, 'Advanced Teleport'], ['talisman', 1, 'Talisman of Research'],
   ]) {
-    assert.equal(context.hwaHelperNameMap.item(category, id), expected);
-    assert.equal(context.getItemName(category, id), expected);
+    assert.equal(nameMap.item(category, id), expected);
+    assert.equal(getItemName(category, id), expected);
     assert.equal(resourceLabel({ key: `resource:${category}:${id}`, data: { label: `${category} #${id}` } }), expected);
   }
 });
 
 test('unknown or untranslated IDs retain fallbacks and fragment aliases keep their semantics', () => {
-  assert.equal(context.hwaHelperNameMap.item('lootboxChanced', 1), null);
-  assert.equal(context.hwaHelperNameMap.item('lootboxChanced', 999999), null);
-  assert.equal(context.getItemName('lootboxChanced', 999999), 'lootboxChanced #999999');
-  assert.equal(context.hwaHelperNameMap.item('fragmentHero', 1), 'Aurora fragment');
-  assert.equal(context.getItemName('fragmentGear', 1), context.hwaHelperNameData.names.gear[1] + ' Fragment');
+  assert.equal(nameMap.item('lootboxChanced', 1), null);
+  assert.equal(nameMap.item('lootboxChanced', 999999), null);
+  assert.equal(getItemName('lootboxChanced', 999999), 'lootboxChanced #999999');
+  assert.equal(nameMap.item('fragmentHero', 1), 'Aurora fragment');
+  assert.equal(getItemName('fragmentGear', 1), nameData.names.gear[1] + ' Fragment');
 });

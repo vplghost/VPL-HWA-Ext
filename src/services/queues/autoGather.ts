@@ -364,9 +364,4 @@ export const autoGatherService = {
   planAutoGather,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperAutoGather =
-    (globalThis as any).hwaHelperAutoGather || autoGatherService;
-}
-
 export default autoGatherService;

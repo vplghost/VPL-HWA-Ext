@@ -5,6 +5,27 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { ref, computed } from 'vue';
 import { useCityQueueActions } from '../src/composables/useCityQueueActions.ts';
+import {
+  getBuildingLevelData as getBuildingLevelDataTyped,
+  getMissingRequirements as getMissingRequirementsTyped,
+  getMissingCosts as getMissingCostsTyped,
+  calculateEffectiveDurationMs as calculateEffectiveDurationMsTyped,
+  buildingLevelsData as buildingLevelsDataTyped,
+  buildingDataHelper,
+} from '../src/data/buildingData.ts';
+import { nameData } from '../src/data/nameData.ts';
+import {
+  getMaxLevel as getMaxLevelTyped,
+  getResearchLevelData as getResearchLevelDataTyped,
+  isAvailable as isAvailableTyped,
+  calculateEffectiveDurationMs as calculateEffectiveDurationMsTypedResearch,
+  getMissingCosts as getMissingCostsTypedResearch,
+  requiresSpecialResource as checkRequiresSpecialResourceTyped,
+  researchData as researchDataTyped,
+  researchDataHelper,
+} from '../src/data/researchData.ts';
+import { buildingQueueService } from '../src/services/queues/buildingQueue.ts';
+import { researchQueueService } from '../src/services/queues/researchQueue.ts';
 
 test('Building dialog candidates and saved queue timeline preserve Hall multi-day duration', async () => {
   const source = await readFile(new URL('../src/components/dialogs/BuildingModal.vue', import.meta.url), 'utf8');
@@ -14,10 +35,16 @@ test('Building dialog candidates and saved queue timeline preserve Hall multi-da
       buildings: [{ buildingId: 20, level: 20 }, { buildingId: 40, level: 20 }, { buildingId: 182, level: 20 }] } } }),
       dispatchRpc: async () => ({ ok: false }) }),
     defineProps: () => ({ modelValue: false }), defineEmits: () => () => {}, onMounted() {}, onUnmounted() {}, watch() {},
-    getBuildingName: id => String(id), normalizeArray: value => Array.isArray(value) ? value : Object.values(value || {}) };
-  for (const name of ['building-data', 'building-queue']) {
-    vm.runInNewContext(await readFile(new URL('../extension/' + name + '.js', import.meta.url), 'utf8'), context);
-  }
+    getBuildingName: id => String(id), normalizeArray: value => Array.isArray(value) ? value : Object.values(value || {}),
+    nameData,
+    buildingDataHelper,
+    buildingQueueService,
+    getBuildingLevelDataTyped,
+    getMissingRequirementsTyped,
+    getMissingCostsTyped,
+    calculateEffectiveDurationMsTyped,
+    buildingLevelsDataTyped,
+  };
   const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
   vm.runInNewContext(js + '\nglobalThis.api = { upgradeCandidates, queueTimeline, buildingQueue };', context);
@@ -30,10 +57,7 @@ test('Building dialog candidates and saved queue timeline preserve Hall multi-da
 
 test('both queue helpers preserve millisecond duration and distinguish legacy seconds by start units', async () => {
   const now = Date.parse('2026-11-13T08:33:46Z');
-  for (const type of ['building', 'research']) {
-    const context = { globalThis: {} };
-    vm.runInNewContext(await readFile(new URL('../extension/' + type + '-queue.js', import.meta.url), 'utf8'), context);
-    const helper = context.globalThis[type === 'building' ? 'hwaHelperBuildingQueue' : 'hwaHelperResearchQueue'];
+  for (const [type, helper] of [['building', buildingQueueService], ['research', researchQueueService]]) {
     assert.equal(helper.getQueueEnd({ startDate: now, duration: 30000 }, now), now + 30000);
     assert.equal(helper.getQueueEnd({ startDate: now, durationMs: 30000 }, now), now + 30000);
     assert.equal(helper.getQueueEnd({ startDate: now - 1500000, duration: 30000 }, now), now - 1470000,
@@ -86,9 +110,26 @@ test('actual Building and Research Add Queue handlers send intent and retain UI 
     const messages = [], callbacks = [], writes = [];
     globalThis.chrome = { runtime: { sendMessage(message, callback) { messages.push(message); callbacks.push(callback); } },
       storage: { local: { get: async () => ({}), set: async value => writes.push(value) } } };
-    const context = { ref, computed, useCityQueueActions, useRpcCache: () => ({ cache: ref({}), dispatchRpc: async () => ({ ok: false }) }),
+    const context = {
+      ref, computed, useCityQueueActions, useRpcCache: () => ({ cache: ref({}), dispatchRpc: async () => ({ ok: false }) }),
       defineProps: () => ({ modelValue: false }), defineEmits: () => () => {}, onMounted() {}, onUnmounted() {}, watch() {},
-      normalizeArray: value => Array.isArray(value) ? value : Object.values(value || {}) };
+      normalizeArray: value => Array.isArray(value) ? value : Object.values(value || {}),
+      nameData,
+      buildingDataHelper,
+      buildingQueueService,
+      getBuildingLevelDataTyped,
+      getMissingRequirementsTyped,
+      getMissingCostsTyped,
+      calculateEffectiveDurationMsTyped,
+      buildingLevelsDataTyped,
+      researchDataHelper,
+      researchQueueService,
+      getMaxLevelTyped,
+      getResearchLevelDataTyped,
+      isAvailableTyped,
+      checkRequiresSpecialResourceTyped,
+      researchDataTyped,
+    };
     const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
     vm.runInNewContext(js + '\nglobalThis.api = { addToQueue, queue: ' + type + 'Queue, queueError, removeQueueItem };', context);
     const ui = context.api;

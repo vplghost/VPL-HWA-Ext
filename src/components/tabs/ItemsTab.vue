@@ -185,10 +185,7 @@ async function refreshInventory() {
 }
 
 function exportItemsJson() {
-  const pData = typeof popupDataHelper !== 'undefined'
-    ? popupDataHelper
-    : (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperPopupData : null);
-  const exported = pData?.exportTableData?.(
+  const exported = popupDataHelper.exportTableData(
     'items',
     cache.value,
     search.value,

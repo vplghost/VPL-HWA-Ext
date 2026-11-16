@@ -100,10 +100,7 @@ const currentTheme = computed(() => currentRound.value?.theme || (roundNumber.va
 const roundsList = computed(() => view.value.rounds);
 
 function getResourceStock(target: string | number): number | null {
-  const fn = typeof getChallengeResourceStock === 'function'
-    ? getChallengeResourceStock
-    : (typeof globalThis !== 'undefined' ? ((globalThis as any).getChallengeResourceStock || (globalThis as any).hwaHelperPopupData?.getChallengeResourceStock) : null);
-  return fn ? fn(cache.value, target) : null;
+  return getChallengeResourceStock(cache.value, target);
 }
 
 function getQuestDisplayName(q: { label: string }): string {

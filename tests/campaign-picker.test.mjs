@@ -9,7 +9,7 @@ import { parse, compileScript } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import { recentMissionIds, rememberMission } from '../src/utils/campaignMissionHistory.ts';
 import { getItemIcon } from '../src/utils/itemResources.ts';
-import { campaignMissions } from '../src/data/campaignData.ts';
+import { campaignMissions, getMissionTries, getHighestRaidableMission } from '../src/data/campaignData.ts';
 
 const data = JSON.parse(await readFile(new URL('../src/data/campaign-picker.json', import.meta.url)));
 const require = createRequire(import.meta.url);
@@ -94,8 +94,9 @@ test('actual Campaign raid only records history after confirmed successful resul
     useCampaignMissionHistory: () => ({ recent: Vue.ref([]), record: async (...args) => records.push(args) }),
     waitForCampaignRaidResult: async () => result,
     chrome: { storage: { local: { set: async () => {}, get: async () => ({}) } } },
-    hwaHelperCampaignMissions: globalThis.hwaHelperCampaignMissions,
     campaignMissions,
+    getMissionTries,
+    getHighestRaidableMission,
   };
   vm.runInNewContext(js + '\nglobalThis.api = { executeRaidCall };', context);
   await context.api.executeRaidCall(1); assert.equal(records.length, 0);

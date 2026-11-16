@@ -50,6 +50,13 @@ export type DungeonRunnerPhase =
   | 'starting-battle'
   | 'ending-battle'
   | 'waiting-battle'
+  | 'opening-gate'
+  | 'waiting-battle-start'
+  | 'skipping-battle'
+  | 'waiting-battle-end'
+  | 'dismissing-victory'
+  | 'walking-animation'
+  | 'saving-progress'
   | 'complete'
   | 'stopped';
 
@@ -69,6 +76,7 @@ export interface DungeonRunnerState {
   floorNumber?: number;
   teamNum?: number;
   heroes?: number[];
+  currentHeroes?: number[];
   attackerType?: string;
   door?: any;
   [key: string]: any;
@@ -77,5 +85,6 @@ export interface DungeonRunnerState {
 export interface DungeonRunnerStepResult {
   state: DungeonRunnerState;
   calls?: any[];
+  canvasAction?: any;
   expiresAt?: number;
 }

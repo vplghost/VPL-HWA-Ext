@@ -19,7 +19,7 @@ export function getSimulatedLevels(
   queueItems: any = []
 ): Map<number, number> {
   const simulated = new Map<number, number>();
-  if (buildingMap instanceof Map) {
+  if (buildingMap && typeof buildingMap.entries === 'function') {
     for (const [id, b] of buildingMap.entries()) {
       simulated.set(Number(id), typeof b === 'number' ? b : (b?.level ?? 0));
     }
@@ -65,7 +65,7 @@ export function getEligibleCandidates(
     // Hall of Heroes limitation: non-hall buildings cannot exceed simulated Hall of Heroes level
     if (b.id !== 20 && currentSimulated >= simulatedHall) continue;
 
-    const helper = bHelper || (globalThis as any).hwaHelperBuildingData || buildingDataHelper;
+    const helper = bHelper || buildingDataHelper;
     if (
       helper?.getBuildingLevelData &&
       helper.data?.[b.id] &&
@@ -425,9 +425,4 @@ export const buildingQueueService = {
   clearQueue,
 };
 
-// Preserve backward compatibility for background service worker scripts and VM tests
-if (typeof globalThis !== 'undefined') {
-  if (!(globalThis as any).hwaHelperBuildingQueue) {
-    (globalThis as any).hwaHelperBuildingQueue = buildingQueueService;
-  }
-}
+export default buildingQueueService;

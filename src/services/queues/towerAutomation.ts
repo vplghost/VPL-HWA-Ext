@@ -73,7 +73,8 @@ export function plan(
   cache: any,
   preferred: number[] = [],
   random: () => number = Math.random,
-  preferredTeam: number[] | null = null
+  preferredTeam: number[] | null = null,
+  finalFloorOverride?: number
 ): TowerAutomationPlanResult {
   const session = cache?.towerSession?.data;
   const status = cache?.towerStatus?.data;
@@ -107,7 +108,7 @@ export function plan(
         room: Number(choice.roomNumber),
       };
     }
-    const finalFloor = (globalThis as any).hwaHelperTowerRules?.finalFloor ?? towerRules.finalFloor ?? 50;
+    const finalFloor = finalFloorOverride ?? towerRules.finalFloor ?? 50;
     const wonFinalBoss =
       session.floorNumber === finalFloor &&
       history.some(
@@ -217,10 +218,5 @@ export const towerAutomationService = {
   chooseBattleRoom,
   DEFAULT_BUFF_PRIORITY,
 };
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperTowerAutomation =
-    (globalThis as any).hwaHelperTowerAutomation || towerAutomationService;
-}
 
 export default towerAutomationService;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { buildingQueueService } from '../src/services/queues/buildingQueue.ts';
 
 class MockElement {
   constructor(tag) {
@@ -64,7 +65,7 @@ class MockElement {
 const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
 const buildingDataJs = await readFile(new URL('../extension/building-data.js', import.meta.url), 'utf8');
-const buildingQueueJs = await readFile(new URL('../extension/building-queue.js', import.meta.url), 'utf8');
+
 
 test('popup.html defines building-dialog and research-dialog with title, status, and body', () => {
   assert.match(popupHtml, /<dialog id="building-dialog"[\s\S]*id="building-dialog-title"[\s\S]*id="building-dialog-status"[\s\S]*id="building-dialog-body"[\s\S]*<\/dialog>/);
@@ -799,7 +800,7 @@ test('Building Automation Queue auto-chains finish, supports virtual prerequisit
   });
 
   vm.runInContext(buildingDataJs, context);
-  vm.runInContext(buildingQueueJs, context);
+  context.hwaHelperBuildingQueue = buildingQueueService;
 
   const setupCode = popup.slice(
     popup.indexOf("let buildingSearchQuery = '';"),
@@ -929,7 +930,7 @@ test('Building dialog excludes system landmarks and displays card with #ID pill,
   );
   vm.runInContext(setupCode, context);
   vm.runInContext(buildingDataJs, context);
-  vm.runInContext(buildingQueueJs, context);
+  context.hwaHelperBuildingQueue = buildingQueueService;
 
   // 1. Render when builder is idle with sufficient resources
   context.renderBuildingDialog({

@@ -6,6 +6,7 @@ import smartGatherData from '../../data/smartGatherData.ts';
 import { routeSpeeds } from '../../utils/marchRules.ts';
 import * as expData from '../../utils/experimentalData.ts';
 import { unsafeMineIds as getUnsafeMineIds } from '../mineDefense.ts';
+import { normalizeAutoGatherSettings } from './autoGather.ts';
 
 function getSmartGatherData(): any {
   return smartGatherData;
@@ -124,10 +125,7 @@ export function rpcFailure(result: any): string | null {
 
 export function recallForRally(cache: any, stored: any, rally: any, now: number): any {
   const marches = list(cache?.marchStatus?.data?.marches);
-  const autoGatherHelper = (globalThis as any).hwaHelperAutoGather;
-  const maxMarches = autoGatherHelper?.normalizeAutoGatherSettings
-    ? autoGatherHelper.normalizeAutoGatherSettings(stored?.autoGatherSettings).maxMarches
-    : 3;
+  const maxMarches = normalizeAutoGatherSettings(stored?.autoGatherSettings).maxMarches ?? 3;
   if (marches.length < maxMarches) return null;
   if (!finite(rally?.plannedStartTime) || rally?.route) return null;
   return (
@@ -667,10 +665,5 @@ export const smartGatherService = {
   replies,
   sync,
 };
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperSmartGather =
-    (globalThis as any).hwaHelperSmartGather || smartGatherService;
-}
 
 export default smartGatherService;

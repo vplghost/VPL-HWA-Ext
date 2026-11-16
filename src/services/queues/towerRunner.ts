@@ -216,9 +216,4 @@ export const towerRunnerService = {
   terminal,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperTowerRunner =
-    (globalThis as any).hwaHelperTowerRunner || towerRunnerService;
-}
-
 export default towerRunnerService;

@@ -1,4 +1,6 @@
 import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../data/titanMetadata.ts';
+import { heroMetadata } from '../data/heroMetadata.ts';
+import { getItemName, getHeroName } from '../data/nameData.ts';
 import {
   clanVersusRoundQuests,
   clanVersusChallengeNames,
@@ -987,6 +989,123 @@ export function buildAutoClaimCalls(cache: any, options: any = {}) {
   return { calls, pending };
 }
 
+export function exportTableData(tab: string, cache: any, query = '', itemGroupFilter = ''): any[] {
+  if (!cache) return [];
+  const q = (query || '').trim().toLocaleLowerCase();
+  const matchesFilter = (vals: any[]) => !q || vals.some((v) => String(v ?? '').toLocaleLowerCase().includes(q));
+
+  if (tab === 'heroes') {
+    const data = cache.heroGetAll?.data || {};
+    const heroes = Object.entries(data).sort(([a], [b]) => Number(a) - Number(b));
+    const result: any[] = [];
+    for (const [id, hero] of heroes as [string, any][]) {
+      const meta = heroMetadata[Number(id)] || (heroMetadata as any)[id];
+      const name = meta?.name || getHeroName(id) || `#${id}`;
+      if (!matchesFilter([id, name, hero?.level, hero?.star, hero?.power, meta?.role, meta?.class, meta?.faction])) {
+        continue;
+      }
+      const { owned, needed } = heroSoulProgress(id, hero, cache.inventoryGet?.data);
+      const sparkLevel = Number.isInteger(hero?.titanGiftLevel) ? hero.titanGiftLevel : 0;
+      const skills = hero?.skills
+        ? Object.entries(hero.skills)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([k, lvl], idx) => ({ slot: idx + 1, skillId: Number(k), level: Number(lvl) }))
+        : [];
+      result.push({
+        id: Number(id),
+        name,
+        level: Number(hero?.level) || null,
+        star: Number(hero?.star) || 1,
+        power: Number(hero?.power) || 0,
+        role: meta?.role || null,
+        class: meta?.class || null,
+        faction: meta?.faction || null,
+        soulStones: { current: owned, needed },
+        sparksOfPower: { level: sparkLevel, max: 30 },
+        skills,
+      });
+    }
+    return result;
+  }
+
+  if (tab === 'titans') {
+    const data = cache.titanGetAll?.data || {};
+    const titans = Object.entries(data).sort(([a], [b]) => Number(a) - Number(b));
+    const result: any[] = [];
+    for (const [id, titan] of titans as [string, any][]) {
+      const meta = titanMetadata[Number(id)] || (titanMetadata as any)[id];
+      const name = meta?.name || `#${id}`;
+      if (!matchesFilter([id, name, titan?.level, titan?.star, titan?.power, meta?.role, meta?.element])) {
+        continue;
+      }
+      const { owned, needed } = titanSoulProgress(id, titan, cache.inventoryGet?.data);
+      const skills = titan?.skills
+        ? Object.entries(titan.skills)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([k, lvl], idx) => ({ slot: idx + 1, skillId: Number(k), level: Number(lvl) }))
+        : [];
+      result.push({
+        id: Number(id),
+        name,
+        level: Number(titan?.level) || null,
+        star: Number(titan?.star) || 1,
+        power: Number(titan?.power) || 0,
+        role: meta?.role || null,
+        element: meta?.element || null,
+        soulStones: { current: owned, needed },
+        skills,
+        artifacts: Array.isArray(titan?.artifacts)
+          ? titan.artifacts.map((art: any, idx: number) => ({
+              slot: idx + 1,
+              type: ['weapon', 'crown', 'seal'][idx] || `artifact${idx + 1}`,
+              star: Number(art?.star) || 0,
+              level: Number(art?.level) || 0,
+              isUpgradable: isTitanArtifactUpgradable(id, idx, titan, cache),
+            }))
+          : [],
+      });
+    }
+    return result;
+  }
+
+  if (tab === 'items') {
+    const data = cache.inventoryGet?.data || {};
+    const result: any[] = [];
+    for (const [category, items] of Object.entries(data)) {
+      if (itemGroupFilter && category !== itemGroupFilter) continue;
+      for (const [id, quantity] of Object.entries((items as any) ?? {})) {
+        const name = getItemName(category, id) || '—';
+        if (!matchesFilter([category, id, name, quantity])) continue;
+        result.push({
+          group: category,
+          id: Number(id) || id,
+          name,
+          amount: Number(quantity) || 0,
+        });
+      }
+    }
+    return result;
+  }
+
+  if (tab === 'resources') {
+    const result: any[] = [];
+    const resEntries = Object.entries(cache).filter(([k]) => k.startsWith('resource:'));
+    for (const [key, entry] of resEntries) {
+      const d = (entry as any)?.data || {};
+      const name = d.label || d.name || key.replace('resource:', '');
+      if (!matchesFilter([key, name, d.amount])) continue;
+      result.push({
+        key,
+        name,
+        amount: Number(d.amount) || 0,
+      });
+    }
+    return result;
+  }
+
+  return [];
+}
+
 export const popupDataHelper = {
   heroSoulProgress,
   titanSoulProgress,
@@ -1016,4 +1135,5 @@ export const popupDataHelper = {
   normalizeGoalKey,
   isTowerCleared,
   extractEventGoals,
+  exportTableData,
 };

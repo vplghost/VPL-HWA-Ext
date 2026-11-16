@@ -46,19 +46,16 @@ test('owned parents skip descendant farming and shared gear/fragments are reserv
 });
 
 test('required copies propagate through deeper recipes and cycles cannot become craftable', () => {
-  const prior = globalThis.hwaHelperGearCraftData;
-  try {
-    globalThis.hwaHelperGearCraftData = { 900: { recipe: { 901: 2 } }, 901: { recipe: { 902: 3 } },
-      902: { recipe: { 903: 2 } }, 903: { fragmentCount: 5 } };
-    const tree = buildGearRecipeTree(900, cache({ gear: { 901: 1 } }));
-    const leaf = tree.children[0].children[0].children[0];
-    assert.equal(leaf.requiredCount, 6);
-    assert.equal(leaf.fragment.required, 30);
-    globalThis.hwaHelperGearCraftData = { 900: { recipe: { 901: 1 } }, 901: { recipe: { 900: 1 } } };
-    const cycle = buildGearRecipeTree(900, cache());
-    assert.equal(cycle.children[0].children[0].cycle, true);
-    assert.equal(cycle.children[0].canCraft, false);
-  } finally { globalThis.hwaHelperGearCraftData = prior; }
+  const craftData = { 900: { recipe: { 901: 2 } }, 901: { recipe: { 902: 3 } },
+    902: { recipe: { 903: 2 } }, 903: { fragmentCount: 5 } };
+  const tree = buildGearRecipeTree(900, cache({ gear: { 901: 1 } }), craftData);
+  const leaf = tree.children[0].children[0].children[0];
+  assert.equal(leaf.requiredCount, 6);
+  assert.equal(leaf.fragment.required, 30);
+  const cycleCraftData = { 900: { recipe: { 901: 1 } }, 901: { recipe: { 900: 1 } } };
+  const cycle = buildGearRecipeTree(900, cache(), cycleCraftData);
+  assert.equal(cycle.children[0].children[0].cycle, true);
+  assert.equal(cycle.children[0].canCraft, false);
 });
 
 async function recipeComponent() {

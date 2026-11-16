@@ -75,7 +75,7 @@ const heroEntries = computed(() => {
     return {
       id: Number(id),
       idStr,
-      name: meta?.name || (typeof getHeroName === 'function' ? getHeroName(id) : null) || (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperNameMap?.hero?.(id) : null) || `Hero #${id}`,
+      name: meta?.name || getHeroName(id) || `Hero #${id}`,
       class: meta?.class || 'Other',
       role: meta?.role || '',
       faction: meta?.faction || '',
@@ -183,10 +183,7 @@ async function refreshHeroes() {
 }
 
 function exportHeroesJson() {
-  const pData = typeof popupDataHelper !== 'undefined'
-    ? popupDataHelper
-    : (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperPopupData : null);
-  const exported = pData?.exportTableData?.('heroes', cache.value, search.value);
+  const exported = popupDataHelper.exportTableData('heroes', cache.value, search.value);
   if (Array.isArray(exported) && exported.length > 0) {
     downloadJson('hwa-heroes.json', exported);
   } else {

@@ -351,8 +351,4 @@ export const researchQueueService = {
   clearQueue,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperResearchQueue = (globalThis as any).hwaHelperResearchQueue || researchQueueService;
-}
-
 export default researchQueueService;

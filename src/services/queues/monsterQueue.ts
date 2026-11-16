@@ -446,8 +446,4 @@ export const monsterQueueService = {
   confirmedWins,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperMonsterQueue = (globalThis as any).hwaHelperMonsterQueue || monsterQueueService;
-}
-
 export default monsterQueueService;

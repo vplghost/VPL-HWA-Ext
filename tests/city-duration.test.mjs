@@ -5,12 +5,10 @@ import vm from 'node:vm';
 import { parseRemoteDurationSeconds } from '../scripts/lib/remote-duration.mjs';
 import { formatDuration, formatFinishTime } from '../src/utils/formatters.ts';
 
-const runtime = {};
-for (const name of ['building-data', 'research-data', 'building-queue', 'research-queue']) {
-  vm.runInNewContext(await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), runtime);
-}
-const building = runtime.hwaHelperBuildingData, research = runtime.hwaHelperResearchData;
-const buildingQueue = runtime.hwaHelperBuildingQueue, researchQueue = runtime.hwaHelperResearchQueue;
+import { buildingDataHelper as building } from '../src/data/buildingData.ts';
+import { researchDataHelper as research } from '../src/data/researchData.ts';
+import { buildingQueueService as buildingQueue } from '../src/services/queues/buildingQueue.ts';
+import { researchQueueService as researchQueue } from '../src/services/queues/researchQueue.ts';
 
 test('remote duration parsing preserves days, zero padding, long hours and legacy short forms', () => {
   for (const [raw, seconds] of [

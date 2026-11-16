@@ -671,8 +671,4 @@ export const raidQueueService = {
   areHeroesDeployed,
 };
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperRaidQueue = (globalThis as any).hwaHelperRaidQueue || raidQueueService;
-}
-
 export default raidQueueService;

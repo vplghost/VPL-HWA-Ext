@@ -4,11 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { ref, computed, watch, nextTick } from 'vue';
-
-const context = {};
-vm.runInNewContext(await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8'), context);
-vm.runInNewContext(await readFile(new URL('../extension/raid-energy-auto.js', import.meta.url), 'utf8'), context);
-const auto = context.hwaHelperRaidEnergyAuto;
+import { raidEnergyAutoService as auto } from '../src/services/queues/raidEnergyAuto.ts';
 const config = { enabled: true, accountId: 10, threshold: 200, options: {
   mapId: 'map', center: { x: 1, y: 2 }, level: 5, count: 2, waitSeconds: 300,
   minMembers: 4, autoCancel: true, teamId: 'weakest', heroIds: [1, 2, 3, 4, 5]

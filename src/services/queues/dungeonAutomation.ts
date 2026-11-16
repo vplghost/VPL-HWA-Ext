@@ -56,7 +56,7 @@ export function getPoolForType(type: string, cache: any, customPools: any = {}):
     return [...DEFAULT_TITAN_POOLS[norm]!];
   }
 
-  const meta = (globalThis as any).hwaHelperTitanMetadata || titanMetadata;
+  const meta = titanMetadata;
   const elemental = Object.entries(meta)
     .filter(([_, data]: [string, any]) => data?.element?.toLowerCase() === norm)
     .map(([id]) => Number(id));
@@ -345,10 +345,5 @@ export const dungeonAutomationService = {
   planDungeon,
   resetTitanStates,
 };
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperDungeonAutomation =
-    (globalThis as any).hwaHelperDungeonAutomation || dungeonAutomationService;
-}
 
 export default dungeonAutomationService;
