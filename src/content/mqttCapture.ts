@@ -3,12 +3,16 @@
  * Operates in the game page MAIN world.
  */
 
-export function installMqttCapture(): void {
+export function installMqttCapture(customWindow?: any): void {
+  const win = customWindow || (typeof window !== 'undefined' ? window : null);
+  if (!win) return;
+  const loc = win.location || (typeof location !== 'undefined' ? location : { origin: 'https://www.hero-wars-alliance.com', href: 'https://www.hero-wars-alliance.com/' });
+  const getNow = () => (typeof win.Date?.now === 'function' ? win.Date.now() : Date.now());
   const flag = Symbol.for('hwa-helper-mqtt-capture-installed');
-  if ((window as any)[flag] || typeof window.WebSocket !== 'function') return;
-  (window as any)[flag] = true;
+  if ((win as any)[flag] || typeof win.WebSocket !== 'function') return;
+  (win as any)[flag] = true;
 
-  const NativeWebSocket = window.WebSocket;
+  const NativeWebSocket = win.WebSocket;
   const MQTT_ENDPOINT = 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt';
   const MAX_FRAME_BYTES = 1024 * 1024;
   const MAX_PAYLOAD_BYTES = 128 * 1024;
@@ -23,13 +27,13 @@ export function installMqttCapture(): void {
   const syntheticEvents = new WeakSet();
 
   const reportTrigger = (state: string, details: Record<string, any> = {}) =>
-    window.postMessage(
+    win.postMessage(
       { source: 'hwa-helper-api', kind: 'mqtt-rpc-nudge-status', state, ...details },
-      location.origin
+      loc.origin
     );
 
-  window.addEventListener('message', (event) => {
-    if (event.source !== window || event.origin !== location.origin) return;
+  win.addEventListener('message', (event: any) => {
+    if (event.source !== win || event.origin !== loc.origin) return;
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled !== false;
       popupRpcEnabled = event.data.popupRpcEnabled === true;
@@ -105,7 +109,7 @@ export function installMqttCapture(): void {
       if (coordinates.length)
         viewedChunks = {
           mapId: native.args.mapId,
-          observedAt: Date.now(),
+          observedAt: getNow(),
           coordinates
         };
     } catch (_) {}
@@ -123,7 +127,7 @@ export function installMqttCapture(): void {
           topic: packet.topic,
           type,
           rawJson: message,
-          observedAt: Date.now()
+          observedAt: getNow()
         };
       }
 
@@ -142,7 +146,7 @@ export function installMqttCapture(): void {
         )
       )
         return;
-      const observedAt = Date.now();
+      const observedAt = getNow();
       const previous =
         triggerTemplate?.state === state && triggerTemplate.topic === packet.topic
           ? triggerTemplate.chunks.filter((chunk: any) => observedAt - chunk.observedAt <= 60000)
@@ -200,33 +204,33 @@ export function installMqttCapture(): void {
       popupRpcEnabled,
       hasMapTemplate: Boolean(mapSample),
       hasUserTemplate: Boolean(userSample),
-      mapTemplateAgeMs: mapSample ? Date.now() - mapSample.observedAt : null,
-      userTemplateAgeMs: userSample ? Date.now() - userSample.observedAt : null,
+      mapTemplateAgeMs: mapSample ? getNow() - mapSample.observedAt : null,
+      userTemplateAgeMs: userSample ? getNow() - userSample.observedAt : null,
       viewedChunks: viewedChunks
         ? {
             mapId: viewedChunks.mapId,
             count: viewedChunks.coordinates.length,
-            ageMs: Date.now() - viewedChunks.observedAt
+            ageMs: getNow() - viewedChunks.observedAt
           }
         : null
     });
 
     if (!sample) return reportTrigger('waiting-template');
 
-    const mapFresh = Boolean(mapSample && Date.now() - mapSample.observedAt <= 60000);
-    const userFresh = Boolean(userSample && Date.now() - userSample.observedAt <= 120000);
+    const mapFresh = Boolean(mapSample && getNow() - mapSample.observedAt <= 60000);
+    const userFresh = Boolean(userSample && getNow() - userSample.observedAt <= 120000);
     if (!mapFresh && !userFresh) return reportTrigger('expired-template');
 
     const mapReady = Boolean(mapFresh && !mapSample.state.closed && mapSample.state.socket.readyState === 1);
     const userReady = Boolean(userFresh && !userSample.state.closed && userSample.state.socket.readyState === 1);
     if (!mapReady && !userReady) return reportTrigger('socket-closed');
 
-    if (Date.now() - lastTriggerAt < 5000) return reportTrigger('cooldown');
+    if (getNow() - lastTriggerAt < 5000) return reportTrigger('cooldown');
     if (typeof MessageEvent !== 'function') return reportTrigger('error');
 
     try {
       let nudgeType = 'none';
-      const isMapActive = viewedChunks && Date.now() - viewedChunks.observedAt <= 60000;
+      const isMapActive = viewedChunks && getNow() - viewedChunks.observedAt <= 60000;
       let mapEvent: MessageEvent | null = null;
       let userEvent: MessageEvent | null = null;
 
@@ -250,7 +254,7 @@ export function installMqttCapture(): void {
               chunks: [...chunks.values()].slice(-32).map(({ x, y, updatedAt }: any) => ({
                 x,
                 y,
-                updatedAt: Math.max(Date.now(), updatedAt + 1)
+                updatedAt: Math.max(getNow(), updatedAt + 1)
               }))
             }
           }
@@ -286,7 +290,7 @@ export function installMqttCapture(): void {
         nudgeType = mapReady ? 'multi' : 'user';
       }
 
-      lastTriggerAt = Date.now();
+      lastTriggerAt = getNow();
       reportTrigger('triggered', { nudgeType, trackId });
 
       if (mapEvent) mapSample.state.socket.dispatchEvent(mapEvent);
@@ -302,7 +306,7 @@ export function installMqttCapture(): void {
       });
 
       if (recordingActive)
-        window.postMessage(
+        win.postMessage(
           {
             source: 'hwa-helper-api',
             kind: 'interaction-record',
@@ -314,7 +318,7 @@ export function installMqttCapture(): void {
               timestamp: new Date().toISOString()
             }
           },
-          location.origin
+          loc.origin
         );
     } catch (_) {
       reportTrigger('error');
@@ -457,7 +461,7 @@ export function installMqttCapture(): void {
               bytes: packet.payload.length
             });
           }
-          window.postMessage(
+          win.postMessage(
             {
               source: 'hwa-helper-api',
               kind: 'api-record',
@@ -475,20 +479,20 @@ export function installMqttCapture(): void {
                 ...describePayload(packet.payload)
               }
             },
-            location.origin
+            loc.origin
           );
         }
       })
       .catch(() => {});
   }
 
-  (window as any).WebSocket = new Proxy(NativeWebSocket, {
+  (win as any).WebSocket = new Proxy(NativeWebSocket, {
     construct(target, args, newTarget) {
       const socket = Reflect.construct(target, args, newTarget);
       let endpoint: string;
       let url: URL;
       try {
-        url = new URL(String(args[0]), location.href);
+        url = new URL(String(args[0]), loc.href);
         endpoint = `${url.origin}${url.pathname}`;
       } catch (_) {
         return socket;
@@ -516,5 +520,5 @@ export function installMqttCapture(): void {
     }
   });
 
-  window.postMessage({ source: 'hwa-helper-api', kind: 'ready' }, location.origin);
+  win.postMessage({ source: 'hwa-helper-api', kind: 'ready' }, loc.origin);
 }

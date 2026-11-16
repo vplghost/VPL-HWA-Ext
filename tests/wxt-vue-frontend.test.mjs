@@ -335,7 +335,7 @@ test('CampaignRaidModal has Recipe Tree hierarchy, loop controls, auto-stop, max
   assert.match(camp, /worldStars_getAvailable/, 'Must dispatch worldStars_getAvailable');
 
   // Intercept & RPC cache verification
-  const intercept = await readFile(join(root, 'extension/intercept.js'), 'utf8');
+  const intercept = await readFile(join(root, 'src/content/interceptor.ts'), 'utf8');
   assert.match(intercept, /'missionRaid'/, 'intercept.js helperActionMethods must include missionRaid');
   assert.match(intercept, /'mission_raid'/, 'intercept.js helperActionMethods must include mission_raid');
   assert.match(intercept, /'playable_getAvailable'/, 'intercept.js piggybackMethods must include playable_getAvailable');
@@ -882,7 +882,7 @@ test('Hover cards teleport to body with viewport-aware positioning and next cand
 
 test('Resilient object-array handling and healing RPC dispatch permissions prevent TypeError regressions', async () => {
   // 1. Intercept methods for healing and training
-  const intercept = await readFile(join(root, 'extension/intercept.js'), 'utf8');
+  const intercept = await readFile(join(root, 'src/content/interceptor.ts'), 'utf8');
   assert.match(intercept, /'startHealing'/, 'intercept.js must register startHealing in helperActionMethods');
   assert.match(intercept, /'completeTraining'/, 'intercept.js must register completeTraining in helperActionMethods');
   assert.match(intercept, /'startTraining'/, 'intercept.js must register startTraining in helperActionMethods');
@@ -1137,7 +1137,7 @@ test('ResourceSummary and HeroDetailModal use accurate RPC keys and payload conv
   assert.match(heroDetailModalContent, /name:\s*['"]heroUpgradeSkill['"]/, 'Must dispatch heroUpgradeSkill');
   assert.doesNotMatch(heroDetailModalContent, /name:\s*['"]heroUpgradeSkill['"][\s\S]*?feature:\s*['"]hero['"]/, 'heroUpgradeSkill must not contain feature: hero');
 
-  const interceptContent = await readFile(join(root, 'extension/intercept.js'), 'utf8');
+  const interceptContent = await readFile(join(root, 'src/content/interceptor.ts'), 'utf8');
   assert.match(interceptContent, /'heroUpgradeSkill'/, 'intercept.js helperActionMethods must include heroUpgradeSkill');
   assert.match(interceptContent, /'heroInsertItem'/, 'intercept.js helperActionMethods must include heroInsertItem');
   assert.match(interceptContent, /'inventoryCraftFragments'/, 'intercept.js helperActionMethods must include inventoryCraftFragments');
@@ -1184,7 +1184,7 @@ test('Session recording, MQTT capture, and building/research controls operate se
   assert.match(bg, /start-recording/, 'Background must support start-recording alias');
   assert.match(bg, /recordingState:\s*next/, 'Background must persist recordingState to local storage for reactive UI');
 
-  const mqtt = await readFile(join(root, 'extension/mqtt-capture.js'), 'utf8');
+  const mqtt = await readFile(join(root, 'src/content/mqttCapture.ts'), 'utf8');
   assert.match(mqtt, /interceptEnabled\s*!==\s*false/, 'MQTT capture must activate when interceptEnabled is not false');
 });
 

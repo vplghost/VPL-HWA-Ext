@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import vm from 'node:vm';
+import { installBridge } from '../src/content/bridge.ts';
 
-const source = await readFile(new URL('../extension/bridge.js', import.meta.url), 'utf8');
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 
 async function setup() {
@@ -24,15 +22,21 @@ async function setup() {
     storage: { onChanged: { addListener: listener => { onChanged = listener; } },
       local: { get: async () => stored } },
   };
-  vm.runInNewContext(source, { chrome, Date, location: { origin: 'https://www.hero-wars-alliance.com' },
-    window: { addEventListener() {}, postMessage() {} }, alert: value => alerts.push(value),
+  const win = {
+    chrome,
+    Date,
+    location: { origin: 'https://www.hero-wars-alliance.com' },
+    addEventListener() {},
+    postMessage() {},
+    alert: value => alerts.push(value),
     setTimeout: (callback, delay) => {
       const id = ++nextId;
       timers.set(id, { callback: () => { timers.delete(id); callback(); }, delay });
       return id;
     },
-    clearTimeout: id => timers.delete(id),
-  });
+    clearTimeout: id => timers.delete(id)
+  };
+  installBridge(win);
   await flush();
   return { timers, sent, alerts, stored, chrome, setMode: value => { mode = value; },
     change: changes => onChanged(changes, 'local') };

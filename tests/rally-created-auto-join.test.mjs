@@ -5,7 +5,7 @@ import { socketRefreshCalls } from '../src/background/backgroundRuntime.ts';
 import { worldReadService } from '../src/services/worldReadService.ts';
 
 test('intercept.js strictly limits lastRpcUrl and lastRpcHeaders to /api/rpc', () => {
-  const content = readFileSync('extension/intercept.js', 'utf8');
+  const content = readFileSync('src/content/interceptor.ts', 'utf8');
   // Ensure /oauth/refresh or generic api.hero-wars-alliance.com does not match rpc capture
   assert.ok(!content.includes("urlStr.includes('/api/rpc') || urlStr.includes('api.hero-wars-alliance.com')"),
     'Must not capture all api.hero-wars-alliance.com endpoints as RPC');

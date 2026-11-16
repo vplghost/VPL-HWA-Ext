@@ -6,6 +6,7 @@ import { installMqttCapture } from '../src/content/mqttCapture.ts';
 
 export default defineContentScript({
   matches: [
+    'https://*.hero-wars-alliance.com/*',
     'https://www.hero-wars-alliance.com/*',
     'https://hero-wars-alliance.com/*'
   ],

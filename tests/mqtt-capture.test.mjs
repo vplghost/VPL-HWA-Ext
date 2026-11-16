@@ -1,11 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
+import { installMqttCapture } from '../src/content/mqttCapture.ts';
+import { installInterceptor } from '../src/content/interceptor.ts';
 
-const source = await readFile(new URL('../extension/mqtt-capture.js', import.meta.url), 'utf8');
-const interceptSource = await readFile(new URL('../extension/intercept.js', import.meta.url), 'utf8');
-const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
 const origin = 'https://www.hero-wars-alliance.com';
 const endpoint = 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt';
 
@@ -21,6 +18,12 @@ function setup(options = {}) {
     receive(data) { for (const listener of this.listeners.message || []) listener({ data }); }
     dispatchEvent(event) { for (const listener of this.listeners[event.type] || []) listener(event); return true; }
   }
+  const storage = {};
+  const sessionStorage = {
+    getItem: (k) => storage[k] ?? null,
+    setItem: (k, v) => { storage[k] = String(v); },
+    removeItem: (k) => { delete storage[k]; }
+  };
   const window = {
     WebSocket: FakeWebSocket,
     ...(options.fetch ? { fetch: options.fetch } : {}),
@@ -32,12 +35,16 @@ function setup(options = {}) {
         triggerEvents.push(data);
       }
       for (const listener of listeners) listener({ source: window, origin, data });
-    }
+    },
+    location: { origin, href: `${origin}/` },
+    sessionStorage,
+    performance: { now: () => 0 },
+    Date: options.Date || Date
   };
-  runInNewContext((options.intercept ? `${filterSource}\n${interceptSource}\n` : '') + source,
-    { window, URL, Symbol, Proxy, Reflect, ArrayBuffer, Blob, Response, Headers, MessageEvent,
-    performance: { now: () => 0 }, Promise, sessionStorage: { getItem: () => null, setItem: () => {} },
-    TextDecoder, TextEncoder, Uint8Array, btoa, Date: options.Date || Date, location: { origin, href: `${origin}/` } });
+  if (options.intercept) {
+    installInterceptor(window);
+  }
+  installMqttCapture(window);
   const control = (recordingActive, interceptEnabled = true, settings = {}) => window.postMessage({
     source: 'hwa-helper-config', kind: 'control', interceptEnabled, recordingActive, ...settings
   });

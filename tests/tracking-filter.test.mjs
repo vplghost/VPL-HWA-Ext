@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
-
-const source = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
-const context = { URL };
-runInNewContext(source, context);
-const isTracking = context.hwaHelperIsTrackingUrl;
+import { isTrackingUrl } from '../src/utils/trackingFilter.ts';
 
 test('filters sampled analytics and advertising endpoints', () => {
   for (const url of [
@@ -17,7 +11,7 @@ test('filters sampled analytics and advertising endpoints', () => {
     'https://www.google.com/rmkt/collect/123',
     'https://www.google-analytics.com/g/collect',
     'https://www.googleadservices.com/pagead/conversion/123'
-  ]) assert.equal(isTracking(url), true, url);
+  ]) assert.equal(isTrackingUrl(url), true, url);
 });
 
 test('retains game, authentication, and shop endpoints', () => {
@@ -26,5 +20,5 @@ test('retains game, authentication, and shop endpoints', () => {
     'https://api.hero-wars-alliance.com/oauth/refresh',
     'https://api.aghanim.com/sdk/v1/items',
     'https://www.google.com/search?q=game'
-  ]) assert.equal(isTracking(url), false, url);
+  ]) assert.equal(isTrackingUrl(url), false, url);
 });

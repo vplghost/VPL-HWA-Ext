@@ -37,13 +37,30 @@ export function createControlPayload(
   };
 }
 
-export function createBridgeTimeoutManager() {
+export function createBridgeTimeoutManager(customWin?: any) {
   const timers = new Set<any>();
   let invalidated = false;
 
+  const setTimer = (fn: (...args: any[]) => void, ms: number) => {
+    if (customWin && typeof customWin.setTimeout === 'function') {
+      return customWin.setTimeout(fn, ms);
+    }
+    const timer = setTimeout(fn, ms);
+    if (typeof (timer as any)?.unref === 'function') (timer as any).unref();
+    return timer;
+  };
+
+  const clearTimer = (id: any) => {
+    if (customWin && typeof customWin.clearTimeout === 'function') {
+      return customWin.clearTimeout(id);
+    }
+    clearTimeout(id);
+  };
+
   const bridgeTimeout = (callback: () => void, delay: number) => {
     if (invalidated) return null;
-    const id = setTimeout(() => {
+    let id: any = null;
+    id = setTimer(() => {
       timers.delete(id);
       if (!invalidated) callback();
     }, delay);
@@ -52,14 +69,14 @@ export function createBridgeTimeoutManager() {
   };
 
   const clearBridgeTimeout = (id: any) => {
-    clearTimeout(id);
+    clearTimer(id);
     timers.delete(id);
   };
 
   const invalidate = () => {
     invalidated = true;
-    for (const id of timers) {
-      clearTimeout(id);
+    for (const id of Array.from(timers)) {
+      clearTimer(id);
     }
     timers.clear();
   };
@@ -78,10 +95,11 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
 
   const win = customWindow;
   const doc = win.document;
-  const timeoutManager = createBridgeTimeoutManager();
+  const timeoutManager = createBridgeTimeoutManager(win);
   let bridgeContextInvalidated = false;
+  const getNow = () => (typeof win.Date?.now === 'function' ? win.Date.now() : Date.now());
 
-  function handleContextInvalidated(err: any, notifyUser = false) {
+  function handleContextInvalidated(err: any, notifyUser = true) {
     if (err?.message?.includes('Extension context invalidated') || String(err).includes('Extension context invalidated')) {
       bridgeContextInvalidated = true;
       timeoutManager.invalidate();
@@ -98,13 +116,26 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       if (p && typeof p.then === 'function') {
         return p.catch((error: any) => {
           handleContextInvalidated(error, false);
+          return Promise.reject(error);
         });
       }
-      return Promise.resolve();
+      return Promise.resolve(p);
     } catch (error) {
       handleContextInvalidated(error, false);
       return Promise.resolve();
     }
+  }
+
+  function readLocal(keys: string | string[]): Promise<any> {
+    try {
+      const p = win.chrome?.storage?.local?.get?.(keys);
+      if (p && typeof p.then === 'function') {
+        return p;
+      }
+    } catch (err) {
+      handleContextInvalidated(err, false);
+    }
+    return Promise.resolve({});
   }
 
   let currentSettings: BridgeSettings | null = null;
@@ -386,158 +417,216 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   let dungeonWakeTimer: any = null;
   let buildingWakeTimer: any = null;
   let researchWakeTimer: any = null;
-  const raidEnergySession = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  const raidEnergySession = getNow().toString(36) + '-' + Math.random().toString(36).slice(2);
 
   function scheduleFreeSpin(enabled: boolean, state: any) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(freeSpinTimer);
     if (!enabled && !state?.pending) return;
-    const wakeAt = Number.isFinite(state?.wakeAt) ? state.wakeAt : Date.now() + 1000;
+    const wakeAt = Number.isFinite(state?.wakeAt) ? state.wakeAt : getNow() + 1000;
     freeSpinTimer = timeoutManager.bridgeTimeout(() => {
-      sendBridgeMessage({ kind: 'free-spin-tick' });
-    }, Math.max(100, Math.min(2147483647, wakeAt - Date.now())));
+      sendBridgeMessage({ kind: 'free-spin-tick' }).catch((error: any) => handleContextInvalidated(error, false));
+    }, Math.max(100, Math.min(2147483647, wakeAt - getNow())));
   }
 
   function scheduleSmartGather(settings: any, state?: any) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(smartGatherTimer);
     if (!settings?.enabled || !settings?.smartEnabled) return;
-    const delay = Number.isFinite(state?.wakeAt) && state.wakeAt > Date.now() ? Math.min(5000, Math.max(50, state.wakeAt - Date.now())) : 5000;
+    const delay = Number.isFinite(state?.wakeAt) && state.wakeAt > getNow() ? Math.min(5000, Math.max(50, state.wakeAt - getNow())) : 5000;
     smartGatherTimer = timeoutManager.bridgeTimeout(() => {
-      sendBridgeMessage({ kind: 'smart-gather-tick' });
+      sendBridgeMessage({ kind: 'smart-gather-tick' }).catch((error: any) => handleContextInvalidated(error, false));
       scheduleSmartGather(settings);
     }, delay);
   }
 
   function scheduleRaidEnergy(enabled: boolean) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(raidEnergyTimer);
     if (!enabled) return;
-    sendBridgeMessage({ kind: 'raid-energy-tick', sessionId: raidEnergySession });
+    sendBridgeMessage({ kind: 'raid-energy-tick', sessionId: raidEnergySession }).catch((error: any) => handleContextInvalidated(error, false));
     raidEnergyTimer = timeoutManager.bridgeTimeout(() => scheduleRaidEnergy(true), 30000);
   }
 
   function scheduleRaidWake(state: any) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(raidWakeTimer);
     if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
     raidWakeTimer = timeoutManager.bridgeTimeout(() => {
-      sendBridgeMessage({ kind: 'raid-queue-tick' }).then((res: any) => {
-        if (res?.watch) {
-          win.chrome?.storage?.local?.get('raidQueue').then((stored: any) => scheduleRaidWake(stored.raidQueue));
-        }
-      });
-    }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+      sendBridgeMessage({ kind: 'raid-queue-tick' })
+        .then((res: any) => {
+          if (res?.watch) {
+            return readLocal(['raidQueue']).then((stored: any) => scheduleRaidWake(stored.raidQueue));
+          }
+        })
+        .catch((error: any) => handleContextInvalidated(error, false));
+    }, Math.max(100, Math.min(2147483647, state.wakeAt - getNow())));
   }
 
   function scheduleMonsterWake(state: any) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(monsterWakeTimer);
     if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
     monsterWakeTimer = timeoutManager.bridgeTimeout(() => {
-      sendBridgeMessage({ kind: 'monster-queue-tick' }).then((res: any) => {
-        if (res?.watch) {
-          win.chrome?.storage?.local?.get('monsterQueue').then((stored: any) => scheduleMonsterWake(stored.monsterQueue));
-        }
-      });
-    }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+      sendBridgeMessage({ kind: 'monster-queue-tick' })
+        .then((res: any) => {
+          if (res?.watch) {
+            return readLocal(['monsterQueue']).then((stored: any) => scheduleMonsterWake(stored.monsterQueue));
+          }
+        })
+        .catch((error: any) => handleContextInvalidated(error, false));
+    }, Math.max(100, Math.min(2147483647, state.wakeAt - getNow())));
   }
 
   function scheduleTowerWake(state: any) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(towerWakeTimer);
     if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
     towerWakeTimer = timeoutManager.bridgeTimeout(() => {
-      sendBridgeMessage({ kind: 'tower-run-tick' }).then((res: any) => {
-        if (res?.watch) {
-          win.chrome?.storage?.local?.get('towerRun').then((stored: any) => scheduleTowerWake(stored.towerRun));
-        }
-      });
-    }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+      sendBridgeMessage({ kind: 'tower-run-tick' })
+        .then((res: any) => {
+          if (res?.watch) {
+            return readLocal(['towerRun']).then((stored: any) => scheduleTowerWake(stored.towerRun));
+          }
+        })
+        .catch((error: any) => handleContextInvalidated(error, false));
+    }, Math.max(100, Math.min(2147483647, state.wakeAt - getNow())));
   }
 
   function scheduleDungeonWake(state: any) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(dungeonWakeTimer);
     if (!state || ['stopped', 'complete'].includes(state.phase) || !Number.isFinite(state.wakeAt)) return;
     dungeonWakeTimer = timeoutManager.bridgeTimeout(() => {
-      sendBridgeMessage({ kind: 'dungeon-run-tick' }).then((res: any) => {
-        if (res?.watch) {
-          win.chrome?.storage?.local?.get('dungeonRun').then((stored: any) => scheduleDungeonWake(stored.dungeonRun));
-        }
-      });
-    }, Math.max(100, Math.min(2147483647, state.wakeAt - Date.now())));
+      sendBridgeMessage({ kind: 'dungeon-run-tick' })
+        .then((res: any) => {
+          if (res?.watch) {
+            return readLocal(['dungeonRun']).then((stored: any) => scheduleDungeonWake(stored.dungeonRun));
+          }
+        })
+        .catch((error: any) => handleContextInvalidated(error, false));
+    }, Math.max(100, Math.min(2147483647, state.wakeAt - getNow())));
   }
 
   function scheduleBuildingWake(state: any) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(buildingWakeTimer);
     if (!state || state.enabled === false) return;
     const hasItems = Array.isArray(state.items) && state.items.length > 0;
     if (!Number.isFinite(state.wakeAt)) {
       if (hasItems) {
         buildingWakeTimer = timeoutManager.bridgeTimeout(() => {
-          sendBridgeMessage({ kind: 'building-queue-tick' }).then((res: any) => {
-            if (res?.watch) {
-              win.chrome?.storage?.local?.get('buildingQueue').then((stored: any) => scheduleBuildingWake(stored.buildingQueue));
-            }
-          });
+          sendBridgeMessage({ kind: 'building-queue-tick' })
+            .then((res: any) => {
+              if (res?.watch) {
+                return readLocal(['buildingQueue']).then((stored: any) => scheduleBuildingWake(stored.buildingQueue));
+              }
+            })
+            .catch((error: any) => handleContextInvalidated(error, false));
         }, 100);
       }
       return;
     }
-    const delay = Math.max(100, Math.min(2147483647, state.wakeAt - Date.now()));
+    const delay = Math.max(100, Math.min(2147483647, state.wakeAt - getNow()));
     buildingWakeTimer = timeoutManager.bridgeTimeout(() => {
-      sendBridgeMessage({ kind: 'building-queue-tick' }).then((res: any) => {
-        if (res?.watch) {
-          win.chrome?.storage?.local?.get('buildingQueue').then((stored: any) => scheduleBuildingWake(stored.buildingQueue));
-        }
-      });
+      sendBridgeMessage({ kind: 'building-queue-tick' })
+        .then((res: any) => {
+          if (res?.watch) {
+            return readLocal(['buildingQueue']).then((stored: any) => scheduleBuildingWake(stored.buildingQueue));
+          }
+        })
+        .catch((error: any) => handleContextInvalidated(error, false));
     }, delay);
   }
 
   function scheduleResearchWake(state: any) {
+    if (bridgeContextInvalidated) return;
     timeoutManager.clearBridgeTimeout(researchWakeTimer);
     if (!state || state.enabled === false) return;
     const hasItems = Array.isArray(state.items) && state.items.length > 0;
     if (!Number.isFinite(state.wakeAt)) {
       if (hasItems) {
         researchWakeTimer = timeoutManager.bridgeTimeout(() => {
-          sendBridgeMessage({ kind: 'research-queue-tick' }).then((res: any) => {
-            if (res?.watch) {
-              win.chrome?.storage?.local?.get('researchQueue').then((stored: any) => scheduleResearchWake(stored.researchQueue));
-            }
-          });
+          sendBridgeMessage({ kind: 'research-queue-tick' })
+            .then((res: any) => {
+              if (res?.watch) {
+                return readLocal(['researchQueue']).then((stored: any) => scheduleResearchWake(stored.researchQueue));
+              }
+            })
+            .catch((error: any) => handleContextInvalidated(error, false));
         }, 100);
       }
       return;
     }
-    const delay = Math.max(100, Math.min(2147483647, state.wakeAt - Date.now()));
+    const delay = Math.max(100, Math.min(2147483647, state.wakeAt - getNow()));
     researchWakeTimer = timeoutManager.bridgeTimeout(() => {
-      sendBridgeMessage({ kind: 'research-queue-tick' }).then((res: any) => {
-        if (res?.watch) {
-          win.chrome?.storage?.local?.get('researchQueue').then((stored: any) => scheduleResearchWake(stored.researchQueue));
-        }
-      });
+      sendBridgeMessage({ kind: 'research-queue-tick' })
+        .then((res: any) => {
+          if (res?.watch) {
+            return readLocal(['researchQueue']).then((stored: any) => scheduleResearchWake(stored.researchQueue));
+          }
+        })
+        .catch((error: any) => handleContextInvalidated(error, false));
     }, delay);
   }
 
   // Storage initialization and watcher
+  readLocal([
+    'captureSettings',
+    'popupRpcEnabled',
+    'socketRefreshMode',
+    'rpcCache',
+    'autoFreeSpinEnabled',
+    'autoFreeSpinState',
+    'autoGatherSettings',
+    'smartGatherState',
+    'raidEnergyAuto',
+    'raidQueue',
+    'monsterQueue',
+    'towerRun',
+    'dungeonRun',
+    'buildingQueue',
+    'researchQueue',
+    'gameEngineStatus'
+  ]).then((stored: any) => {
+    const currentExtVersion = win.chrome?.runtime?.getManifest?.()?.version;
+    const hasCanvas = typeof doc?.querySelector === 'function' && Boolean(doc.querySelector('canvas#unity-canvas, canvas#canvas, canvas'));
+    const existingStatus = stored?.gameEngineStatus || null;
+    if (!existingStatus || existingStatus.extensionVersion !== currentExtVersion || (hasCanvas && !existingStatus.hasCanvas)) {
+      win.chrome?.storage?.local?.set?.({
+        gameEngineStatus: {
+          ready: existingStatus?.ready || false,
+          hasSendMessage: existingStatus?.hasSendMessage || false,
+          hasCanvas: hasCanvas || existingStatus?.hasCanvas || false,
+          hasRpcHeaders: existingStatus?.hasRpcHeaders || false,
+          rpcUrlAvailable: existingStatus?.rpcUrlAvailable || false,
+          detectedGlobals: existingStatus?.detectedGlobals || [],
+          extensionVersion: currentExtVersion || existingStatus?.extensionVersion || null,
+          updatedAt: new Date().toISOString(),
+          reason: 'bridge-init'
+        }
+      });
+    }
+
+    if (stored?.captureSettings) currentSettings = stored.captureSettings;
+    if (stored?.popupRpcEnabled !== undefined) popupRpcEnabled = Boolean(stored.popupRpcEnabled);
+    if (stored?.socketRefreshMode) socketRefreshMode = ['direct', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'piggyback';
+    const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
+    if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
+    sendControl();
+
+    scheduleFreeSpin(stored?.autoFreeSpinEnabled, stored?.autoFreeSpinState);
+    scheduleSmartGather(stored?.autoGatherSettings, stored?.smartGatherState);
+    scheduleRaidEnergy(stored?.raidEnergyAuto?.enabled === true);
+    scheduleRaidWake(stored?.raidQueue);
+    scheduleMonsterWake(stored?.monsterQueue);
+    scheduleTowerWake(stored?.towerRun);
+    scheduleDungeonWake(stored?.dungeonRun);
+    scheduleBuildingWake(stored?.buildingQueue);
+    scheduleResearchWake(stored?.researchQueue);
+  }).catch((err: any) => handleContextInvalidated(err, false));
+
   try {
-    win.chrome?.storage?.local?.get?.(
-      ['captureSettings', 'popupRpcEnabled', 'socketRefreshMode', 'rpcCache', 'autoFreeSpinEnabled', 'autoFreeSpinState', 'autoGatherSettings', 'smartGatherState', 'raidEnergyAuto', 'raidQueue', 'monsterQueue', 'towerRun', 'dungeonRun', 'buildingQueue', 'researchQueue'],
-      (stored: any) => {
-        if (stored?.captureSettings) currentSettings = stored.captureSettings;
-        if (stored?.popupRpcEnabled !== undefined) popupRpcEnabled = Boolean(stored.popupRpcEnabled);
-        if (stored?.socketRefreshMode) socketRefreshMode = ['direct', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'piggyback';
-        const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
-        if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
-        sendControl();
-
-        scheduleFreeSpin(stored?.autoFreeSpinEnabled, stored?.autoFreeSpinState);
-        scheduleSmartGather(stored?.autoGatherSettings, stored?.smartGatherState);
-        scheduleRaidEnergy(stored?.raidEnergyAuto?.enabled === true);
-        scheduleRaidWake(stored?.raidQueue);
-        scheduleMonsterWake(stored?.monsterQueue);
-        scheduleTowerWake(stored?.towerRun);
-        scheduleDungeonWake(stored?.dungeonRun);
-        scheduleBuildingWake(stored?.buildingQueue);
-        scheduleResearchWake(stored?.researchQueue);
-      }
-    );
-
     win.chrome?.storage?.onChanged?.addListener?.((changes: any, area: string) => {
       if (bridgeContextInvalidated || area !== 'local') return;
       if ('gameRecordingActive' in changes) {
@@ -553,11 +642,11 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         if (cachedAccountId) freeSpinAccountId = String(cachedAccountId);
       }
       if ('autoFreeSpinEnabled' in changes || 'autoFreeSpinState' in changes) {
-        win.chrome.storage.local.get(['autoFreeSpinEnabled', 'autoFreeSpinState']).then((res: any) => scheduleFreeSpin(res.autoFreeSpinEnabled, res.autoFreeSpinState));
+        readLocal(['autoFreeSpinEnabled', 'autoFreeSpinState']).then((res: any) => scheduleFreeSpin(res.autoFreeSpinEnabled, res.autoFreeSpinState));
       }
       if ('raidEnergyAuto' in changes) scheduleRaidEnergy(changes.raidEnergyAuto.newValue?.enabled === true);
       if ('autoGatherSettings' in changes || 'smartGatherState' in changes) {
-        win.chrome.storage.local.get(['autoGatherSettings', 'smartGatherState']).then((res: any) => scheduleSmartGather(res.autoGatherSettings, res.smartGatherState));
+        readLocal(['autoGatherSettings', 'smartGatherState']).then((res: any) => scheduleSmartGather(res.autoGatherSettings, res.smartGatherState));
       }
       if ('raidQueue' in changes) scheduleRaidWake(changes.raidQueue.newValue);
       if ('monsterQueue' in changes) scheduleMonsterWake(changes.monsterQueue.newValue);
@@ -596,7 +685,14 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     btn.title = 'Open HWA Helper in new tab';
     btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6-9 9M20 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h6"/></svg><span>HWA Helper</span>';
     btn.addEventListener('click', () => {
-      sendBridgeMessage({ kind: 'open-tab' });
+      try {
+        const p = win.chrome?.runtime?.sendMessage?.({ kind: 'open-tab' });
+        if (p && typeof p.then === 'function') {
+          p.catch((err: any) => handleContextInvalidated(err, true));
+        }
+      } catch (err) {
+        handleContextInvalidated(err, true);
+      }
     });
 
     const recordBtn = doc.createElement('button');
@@ -654,6 +750,74 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     recordBtn.addEventListener('click', () => {
       const nextKind = isRecording ? 'record-stop' : 'record-start';
       sendBridgeMessage({ kind: nextKind }).then(syncRecordingState);
+    });
+
+    exportBtn.addEventListener('click', () => {
+      try {
+        const p = win.chrome?.runtime?.sendMessage?.({ kind: 'record-export' });
+        if (p && typeof p.then === 'function') {
+          p.then((res: any) => {
+            const records = res?.records || [];
+            const interactions = res?.interactions || [];
+            const BlobConstructor = win.Blob || (typeof Blob !== 'undefined' ? Blob : null);
+            const UrlConstructor = win.URL || (typeof URL !== 'undefined' ? URL : null);
+            if ((!records.length && !interactions.length) || !BlobConstructor || !UrlConstructor) return;
+            const timeline = [
+              ...records.map((record: any) => ({ kind: 'api', ...record })),
+              ...interactions.map((entry: any) => ({ kind: 'interaction', ...entry }))
+            ].sort((a: any, b: any) => String(a.timestamp || '').localeCompare(String(b.timestamp || '')));
+            const extensionVersion = win.chrome?.runtime?.getManifest?.()?.version || res?.extensionVersion || null;
+            let gameVersion = res?.gameVersion || null;
+            if (!gameVersion) {
+              try {
+                const storage = win.sessionStorage || (typeof sessionStorage !== 'undefined' ? sessionStorage : null);
+                if (storage) {
+                  gameVersion = storage.getItem('hwa_game_version');
+                  if (!gameVersion) {
+                    const stored = storage.getItem('hwa_last_rpc_headers');
+                    if (stored) {
+                      const h = JSON.parse(stored);
+                      const k = Object.keys(h).find((key) => key.toLowerCase() === 'x-application-version');
+                      if (k) gameVersion = h[k];
+                    }
+                  }
+                }
+              } catch (_) {}
+            }
+            if (!gameVersion) {
+              for (const item of records) {
+                if (item.responseBody && item.responseBody.includes('"version"')) {
+                  try {
+                    const parsed = JSON.parse(item.responseBody);
+                    const ver = parsed?.results?.find((r: any) => r.result?.response?.version)?.result?.response?.version;
+                    if (ver) { gameVersion = String(ver); break; }
+                  } catch (_) {}
+                }
+              }
+            }
+
+            const exportPayload = {
+              version: 1,
+              extensionVersion,
+              gameVersion: gameVersion || null,
+              exportedAt: new Date().toISOString(),
+              timeline
+            };
+            const blob = new BlobConstructor([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+            const url = UrlConstructor.createObjectURL(blob);
+            const a = doc.createElement('a');
+            a.href = url;
+            const now = new Date();
+            const pad = (n: number) => String(n).padStart(2, '0');
+            const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
+            a.download = `hwa-game-record-${ts}.json`;
+            a.click();
+            UrlConstructor.revokeObjectURL(url);
+          }).catch((err: any) => handleContextInvalidated(err));
+        }
+      } catch (err) {
+        handleContextInvalidated(err);
+      }
     });
 
     clearBtn.addEventListener('click', () => {

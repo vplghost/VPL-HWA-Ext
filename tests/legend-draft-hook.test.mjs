@@ -1,10 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import vm from 'node:vm';
-
-const interceptCode = await readFile(new URL('../extension/intercept.js', import.meta.url), 'utf8');
-const bridgeCode = await readFile(new URL('../extension/bridge.js', import.meta.url), 'utf8');
+import { installInterceptor } from '../src/content/interceptor.ts';
+import { installBridge } from '../src/content/bridge.ts';
 
 function setupInterceptContext() {
   const windowMessages = [];
@@ -12,28 +9,17 @@ function setupInterceptContext() {
     windowMessages.push(data);
   };
 
-  const context = vm.createContext({
-    window: {
-      postMessage,
-      addEventListener: () => {},
-      sessionStorage: { setItem: () => {}, getItem: () => null }
-    },
-    location: { origin: 'https://www.hero-wars-alliance.com' },
+    const win = {
+    postMessage,
+    addEventListener: () => {},
+    sessionStorage: { setItem: () => {}, getItem: () => null },
+    location: { origin: 'https://www.hero-wars-alliance.com', href: 'https://www.hero-wars-alliance.com/' },
     document: { addEventListener: () => {} },
-    atob: (str) => Buffer.from(str, 'base64').toString('binary'),
-    btoa: (str) => Buffer.from(str, 'binary').toString('base64'),
     setTimeout: (fn) => { fn(); return 1; },
-    clearTimeout: () => {},
-    console: { log: () => {}, warn: () => {}, error: () => {} },
-    Uint8Array,
-    Uint32Array,
-    Int32Array,
-    Date,
-    JSON,
-    performance: { now: () => 0 }
-  });
-
-  vm.runInContext(interceptCode, context);
+    clearTimeout: () => {}
+  };
+  installInterceptor(win, { setTimeout: (fn) => { fn(); return 1; }, clearTimeout: () => {} });
+  const context = { window: win };
   return { context, windowMessages };
 }
 
@@ -181,12 +167,10 @@ test('bridge handles legend-draft-hook-result and populates rpcCache.legendDraft
     }
   };
 
-  vm.runInNewContext(bridgeCode, {
-    window,
-    chrome,
-    document: { readyState: 'complete', getElementById: () => ({}) },
-    location: { origin: 'https://www.hero-wars-alliance.com' }
-  });
+  window.chrome = chrome;
+  window.document = { readyState: 'complete', getElementById: () => ({}) };
+  window.location = { origin: 'https://www.hero-wars-alliance.com' };
+  installBridge(window);
 
   const sampleCandidates = [78, 49, 44, 76, 20, 38, 75, 2, 25, 37, 73, 28, 5, 35, 69];
   window.postMessage({

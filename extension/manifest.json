@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HWA Helper",
-  "version": "0.11.20",
+  "version": "0.11.21",
   "description": "Personal page tweaks and API profiling for Hero Wars: Alliance",
   "permissions": [
     "storage",
@@ -23,29 +23,23 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.hero-wars-alliance.com/*",
+        "https://*.hero-wars-alliance.com/*",
         "https://hero-wars-alliance.com/*"
       ],
       "css": [
         "page.css"
       ],
-      "js": [
-        "bridge.js"
-      ],
       "run_at": "document_start"
     },
     {
       "matches": [
-        "https://www.hero-wars-alliance.com/*",
+        "https://*.hero-wars-alliance.com/*",
         "https://hero-wars-alliance.com/*"
       ],
       "js": [
-        "tracking-filter.js",
         "speedup-data.js",
         "speedup.js",
-        "mail-data.js",
-        "intercept.js",
-        "mqtt-capture.js"
+        "mail-data.js"
       ],
       "run_at": "document_start",
       "world": "MAIN"

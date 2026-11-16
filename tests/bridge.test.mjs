@@ -1,9 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
+import { installBridge } from '../src/content/bridge.ts';
 
-const source = await readFile(new URL('../extension/bridge.js', import.meta.url), 'utf8');
+const source = '';
+
+function runInNewContext(_, sandbox) {
+  const win = sandbox.window || {};
+  win.chrome = sandbox.chrome;
+  if (sandbox.document) win.document = sandbox.document;
+  if (sandbox.location) win.location = sandbox.location;
+  if (sandbox.Date) win.Date = sandbox.Date;
+  if (sandbox.Blob) win.Blob = sandbox.Blob;
+  if (sandbox.URL) win.URL = sandbox.URL;
+  if (sandbox.alert) win.alert = sandbox.alert;
+  if (sandbox.sessionStorage) win.sessionStorage = sandbox.sessionStorage;
+  if (sandbox.setTimeout) win.setTimeout = sandbox.setTimeout;
+  if (sandbox.clearTimeout) win.clearTimeout = sandbox.clearTimeout;
+  installBridge(win);
+}
 
 test('mine defense wake uses an absolute near deadline without a storage-update heartbeat loop', async () => {
   const timers = new Map(), sent = [], now = Date.now(); let id = 0, onChanged;

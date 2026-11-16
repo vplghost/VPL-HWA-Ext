@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { runInNewContext } from 'node:vm';
-
-const source = await readFile(new URL('../extension/intercept.js', import.meta.url), 'utf8');
-const filterSource = await readFile(new URL('../extension/tracking-filter.js', import.meta.url), 'utf8');
-const speedupSource = await readFile(new URL('../extension/speedup-data.js', import.meta.url), 'utf8') + '\n' + await readFile(new URL('../extension/speedup.js', import.meta.url), 'utf8');
-const mailSource = await readFile(new URL('../extension/mail-data.js', import.meta.url), 'utf8');
+import { installInterceptor } from '../src/content/interceptor.ts';
 
 function setup(fetchImplementation, enable = true, extraContext = {}) {
   const messages = [];
@@ -48,16 +42,15 @@ function setup(fetchImplementation, enable = true, extraContext = {}) {
       if (data.kind === 'rpc-queue-status') queueCounts.push(data.count);
       for (const handler of listeners) handler({ source: window, origin: targetOrigin, data });
     },
-    ...extraContext.window
-  };
-  const context = {
-    window, URL, Date, Promise, Symbol, WeakMap, TextDecoder, URLSearchParams, FormData, Blob, sessionStorage,
     location: { href: 'https://www.hero-wars-alliance.com/', origin: 'https://www.hero-wars-alliance.com' },
     performance: { now: () => ++now },
-    ...extraContext
+    document: extraContext.document || null,
+    Date: extraContext.Date || Date,
+    setTimeout: extraContext.setTimeout || setTimeout,
+    clearTimeout: extraContext.clearTimeout || clearTimeout,
+    ...extraContext.window
   };
-  context.window = window;
-  runInNewContext(`${filterSource}\n${speedupSource}\n${mailSource}\n${source}`, context);
+  installInterceptor(window);
   if (enable) window.postMessage({ source: 'hwa-helper-config', kind: 'control', interceptEnabled: true,
     popupRpcEnabled: true },
     'https://www.hero-wars-alliance.com');
