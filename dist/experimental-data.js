@@ -1,5 +1,5 @@
 (() => {
-  // Alliance 1.292.0 globalMapRallySettings f69b9fce.
+  // Alliance 1.293.0 (client 1.293.1010) globalMapRallySettings f69b9fce.
   const rallyWaitOptions = [60, 300, 900, 1800];
   const capacitySignature = (hero) => JSON.stringify([hero?.level, hero?.star, hero?.power]);
   const capacityExamples = { 16: [80, 3, 799], 67: [70, 4, 740],
@@ -134,7 +134,7 @@
     if (id >= 74 && id <= 88) return id - 58;
     return null;
   };
-  // Hero Wars: Alliance 1.292.0 globalMapMine remote config 8e714674: levels 1–10.
+  // Hero Wars: Alliance 1.293.0 (client 1.293.1010) globalMapMine remote config 8e714674: levels 1–10.
   const mineConfigs = {
     wood: [12, 20, 21, 22, 23, 24, 55, 56, 57, 58],
     food: [27, 28, 29, 30, 31, 32, 65, 66, 67, 68],

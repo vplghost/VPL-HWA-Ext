@@ -1,4 +1,4 @@
-// From Hero Wars: Alliance webgl 1.292.0 splitlib/refillable.json and level_teamDelta.json.
+// From Hero Wars: Alliance WebGL 1.293.0 (client 1.293.1010) splitlib/refillable.json and level_teamDelta.json.
 // Only counters with an identified automatic refill are eligible for the header.
 (() => {
   const rules = {

@@ -2,7 +2,7 @@
 
 Nguồn: `temp/tracking-data/hwa-api-2026-11-01_latest.json`. Đây là snapshot của một tài khoản, lấy từ response RPC; tên hiển thị lấy từ locale CDN đã đóng gói; nơi thiếu tên giữ ID. Không chép token, tên người chơi, chat hoặc mail.
 
-RPC: `heroGetAll` và `inventoryGet.fragmentHero`; cập nhật lúc `2026-11-01T09:18:28.248Z` và `2026-11-01T09:18:28.248Z`. Map được khóa bằng hero ID. Cột soul stone là số đang có / số cần để lên bậc sao kế tiếp; bậc 6 là tối đa. Giá nâng sao lấy từ `enum_evolutionStar.json` trong asset game 1.292.0.
+RPC: `heroGetAll` và `inventoryGet.fragmentHero`; cập nhật lúc `2026-11-01T09:18:28.248Z` và `2026-11-01T09:18:28.248Z`. Map được khóa bằng hero ID. Cột soul stone là số đang có / số cần để lên bậc sao kế tiếp; bậc 6 là tối đa. Giá nâng sao lấy từ `enum_evolutionStar.json` trong asset game 1.293.0.
 
 | Hero ID | Tên | Level | Star | Soul stone / cần | Power | Color | Current skin ID |
 | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |

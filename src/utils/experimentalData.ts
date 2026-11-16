@@ -292,7 +292,7 @@ export function soloMonsterLevel(configId: number): number | null {
   return null;
 }
 
-// Hero Wars: Alliance 1.292.0 globalMapMine remote config 8e714674: levels 1–10.
+// Hero Wars: Alliance 1.293.0 (client 1.293.1010) globalMapMine remote config 8e714674: levels 1–10.
 export const mineConfigs: Record<string, number[]> = {
   wood: [12, 20, 21, 22, 23, 24, 55, 56, 57, 58],
   food: [27, 28, 29, 30, 31, 32, 65, 66, 67, 68],

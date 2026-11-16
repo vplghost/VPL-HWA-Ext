@@ -1,5 +1,5 @@
 (() => {
-  // enum_evolutionStar.json from the verified 1.292.0 splitlib asset.
+  // enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.293.0 (client 1.293.1010) splitlib asset.
   // Each value is the cost to evolve TO that star, not the current star.
   const evolveFragmentCost = { 2: 20, 3: 50, 4: 100, 5: 150, 6: 300 };
   const evolveTitanFragmentCost = { 2: 50, 3: 150, 4: 500, 5: 900, 6: 1500 };
