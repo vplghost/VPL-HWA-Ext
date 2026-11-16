@@ -12,9 +12,11 @@ import { buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMi
 import { campaignMissions, getHighestRaidableMission, getMissionTries } from '../src/data/campaignData.ts';
 
 const require = createRequire(import.meta.url);
-for (const file of ['data-names.js', 'hero-metadata.js']) {
-  vm.runInThisContext(await readFile(new URL('../extension/' + file, import.meta.url), 'utf8'));
-}
+import { nameData } from '../src/data/nameData.ts';
+import { heroMetadata } from '../src/data/heroMetadata.ts';
+
+globalThis.hwaHelperNameData = nameData;
+globalThis.hwaHelperHeroMetadata = heroMetadata;
 const cache = (inventory = {}) => ({ inventoryGet: { data: inventory } });
 const trineKey = 'gear:131/gear:127';
 const headKey = trineKey + '/gear:94';

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import vm from 'node:vm';
+import { nameData } from '../src/data/nameData.ts';
 const root = resolve(import.meta.dirname, '..');
 
 /** Render only the verified English quest template/parameter forms used by this pack. */
@@ -68,9 +69,7 @@ export async function generateQuestData(configDir = join(root, 'temp'), indexPat
     if (!url?.endsWith(`/${md5}.json`)) throw Error(`Config hash mismatch: ${name}`);
     sources[name] = { url, md5 }; configs[name] = JSON.parse(bytes);
   }
-  const namesContext = {};
-  vm.runInNewContext(await readFile(join(root, 'extension/data-names.js'), 'utf8'), namesContext);
-  const metadata = namesContext.hwaHelperNameData;
+  const metadata = nameData;
   const compressed = await readFile(localePath);
   if (compressed.length !== metadata.assetSize || createHash('md5').update(compressed).digest('hex') !== metadata.assetMd5) throw Error('Locale size/hash mismatch');
   const locale = JSON.parse(gunzipSync(compressed));

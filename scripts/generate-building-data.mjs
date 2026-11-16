@@ -124,5 +124,5 @@ const helperMethods = `
 })();
 `;
 
-await writeFile(resolve(root, 'extension/building-data.js'), header + helperMethods);
-console.log(`Generated extension/building-data.js for ${Object.keys(buildingLevels).length} buildings.`);
+await writeFile(resolve(root, 'temp/building-data.js'), header + helperMethods);
+console.log(`Generated temp/building-data.js for ${Object.keys(buildingLevels).length} buildings.`);

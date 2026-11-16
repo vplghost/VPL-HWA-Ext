@@ -3,13 +3,13 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import vm from 'node:vm';
 
+import { nameData } from '../src/data/nameData.ts';
+
 const root = resolve(import.meta.dirname, '..');
 const assetsDir = join(root, 'extension/assets/heroes');
 await mkdir(assetsDir, { recursive: true });
 
-const namesContext = {};
-vm.runInNewContext(await readFile(join(root, 'extension/data-names.js'), 'utf8'), namesContext);
-const heroNames = namesContext.hwaHelperNameData.names.hero;
+const heroNames = nameData.names.hero;
 
 const splitlibHeroes = JSON.parse(await readFile(join(root, 'temp/splitlib/hero.json'), 'utf8'));
 const heroClassBuf = await readFile(join(root, 'temp/splitlib/hero_class.pb'));
@@ -252,5 +252,5 @@ const outputJs = `// Generated hero metadata\n` +
   `globalThis.hwaHelperGearCraftData = ${JSON.stringify(gearCraftData, null, 2)};\n\n` +
   `globalThis.hwaHelperScrollCraftData = ${JSON.stringify(scrollCraftData, null, 2)};\n`;
 
-await writeFile(join(root, 'extension/hero-metadata.js'), outputJs, 'utf8');
-console.log(`Wrote hero metadata to extension/hero-metadata.js (${Object.keys(metadata).length} heroes, ${Object.keys(gearCraftData).length} gear craft definitions, ${Object.keys(scrollCraftData).length} scroll craft definitions).`);
+await writeFile(join(root, 'temp/hero-metadata.js'), outputJs, 'utf8');
+console.log(`Wrote hero metadata to temp/hero-metadata.js (${Object.keys(metadata).length} heroes, ${Object.keys(gearCraftData).length} gear craft definitions, ${Object.keys(scrollCraftData).length} scroll craft definitions).`);

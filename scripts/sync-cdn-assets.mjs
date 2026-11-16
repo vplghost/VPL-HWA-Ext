@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { inflateRawSync, gunzipSync, crc32 } from 'node:zlib';
+import { heroMetadata } from '../src/data/heroMetadata.ts';
 import { titanMetadata } from '../src/data/titanMetadata.ts';
 import vm from 'node:vm';
 import { convertImgBuffer } from './convert-img-asset.mjs';
@@ -98,9 +99,6 @@ async function atomicWrite(path, bytes) {
 }
 async function optionalRead(path) {
   try { return await readFile(path); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
-}
-async function loadGlobal(filename, key) {
-  const context = {}; vm.runInNewContext(await readFile(join(root, 'extension', filename), 'utf8'), context); return context[key];
 }
 export function iconCandidates(base, category, id, metadata = {}) {
   const icons = `${base}v0001/extends/icons/`;
@@ -224,7 +222,7 @@ export async function runSync({ version = DEFAULT_VERSION, indexPath, only, conc
       key.startsWith('extends/') && names.has(key.split('/').at(-1))));
     await atomicWrite(snapshotPath, JSON.stringify({ source, categories, manifest: selectedManifest }, null, 2) + '\n');
   }
-  const heroes = await loadGlobal('hero-metadata.js', 'hwaHelperHeroMetadata');
+  const heroes = heroMetadata;
   const titans = titanMetadata;
   const catalogs = { heroes: metadata.heroes || heroes, titans: metadata.titans || titans,
     ...Object.fromEntries(['consumable', 'gear', 'scroll'].map((kind) => [`items/${kind}`, metadata[`items/${kind}`] || {}])) };
@@ -245,7 +243,7 @@ export async function runSync({ version = DEFAULT_VERSION, indexPath, only, conc
   }));
   results.sort((a, b) => a.category.localeCompare(b.category) || Number(a.id) - Number(b.id));
   // Preserve roles/classes/factions; update only verified local avatar references.
-  for (const [category, catalog, filename, globalName] of [['heroes', heroes, 'hero-metadata.js', 'hwaHelperHeroMetadata']]) {
+  for (const [category, catalog, filename, exportName] of [['heroes', heroes, 'heroMetadata.ts', 'heroMetadata']]) {
     if (only && !category.startsWith(only)) continue;
     for (const result of results.filter((item) => item.category === category)) {
       if (catalog[result.id] && await optionalRead(join(outputDir, category, `${result.id}.png`))) {
@@ -257,10 +255,12 @@ export async function runSync({ version = DEFAULT_VERSION, indexPath, only, conc
         catalog[result.id] = { ...catalog[result.id], hasAvatar: true, avatarFile: `assets/heroes/${result.id}.webp` };
       }
     }
-    const current = await readFile(join(root, 'extension', filename), 'utf8');
-    const start = current.indexOf(`globalThis.${globalName} = `), end = current.indexOf('\n};', start);
-    if (start < 0 || end < 0) throw Error(`Unknown metadata format: ${filename}`);
-    await atomicWrite(join(root, 'extension', filename), current.slice(0, start) + `globalThis.${globalName} = ${JSON.stringify(catalog, null, 2)};` + current.slice(end + 3));
+    const current = await readFile(join(root, 'src/data', filename), 'utf8');
+    const start = current.indexOf(`export const ${exportName}: HeroMetadataDict = `);
+    const end = current.indexOf('\n};\n', start);
+    if (start >= 0 && end >= 0) {
+      await atomicWrite(join(root, 'src/data', filename), current.slice(0, start) + `export const ${exportName}: HeroMetadataDict = ${JSON.stringify(catalog, null, 2)};` + current.slice(end + 3));
+    }
   }
   const counts = results.reduce((counts, item) => { counts[item.status] = (counts[item.status] || 0) + 1; return counts; }, {});
   const report = { ...source, scope: only || 'all bundled categories and current catalog IDs', counts,

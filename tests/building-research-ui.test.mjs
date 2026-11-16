@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { buildingQueueService } from '../src/services/queues/buildingQueue.ts';
+import { buildingDataHelper } from '../src/data/buildingData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -64,7 +65,6 @@ class MockElement {
 
 const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
-const buildingDataJs = await readFile(new URL('../extension/building-data.js', import.meta.url), 'utf8');
 
 
 test('popup.html defines building-dialog and research-dialog with title, status, and body', () => {
@@ -418,10 +418,7 @@ test('renderResearchDialog filters out uncompleted tech, active tech, and tech e
 });
 
 test('building-data.js provides metadata, validates prerequisites, costs, and calculates durations', () => {
-  const bContext = vm.createContext({ globalThis: {} });
-  vm.runInContext(buildingDataJs, bContext);
-
-  const helper = bContext.globalThis.hwaHelperBuildingData;
+  const helper = buildingDataHelper;
   assert.ok(helper, 'hwaHelperBuildingData must exist');
 
   // Building 40 Level 20: 12:20:30 (44,430s) -> effective duration: 25,769,400 ms
@@ -508,7 +505,8 @@ test('renderBuildingDialog excludes buildings with unsatisfied prerequisites and
     }
   });
 
-  vm.runInContext(buildingDataJs, context);
+  context.hwaHelperBuildingData = buildingDataHelper;
+  vm.runInContext('globalThis.hwaHelperBuildingData = hwaHelperBuildingData;', context);
 
   const setupCode = popup.slice(
     popup.indexOf("let buildingSearchQuery = '';"),
@@ -799,7 +797,8 @@ test('Building Automation Queue auto-chains finish, supports virtual prerequisit
     }
   });
 
-  vm.runInContext(buildingDataJs, context);
+  context.hwaHelperBuildingData = buildingDataHelper;
+  vm.runInContext('globalThis.hwaHelperBuildingData = hwaHelperBuildingData;', context);
   context.hwaHelperBuildingQueue = buildingQueueService;
 
   const setupCode = popup.slice(
@@ -929,7 +928,8 @@ test('Building dialog excludes system landmarks and displays card with #ID pill,
       'globalThis.setupBuildingAndResearchDialogs = setupBuildingAndResearchDialogs;'.length
   );
   vm.runInContext(setupCode, context);
-  vm.runInContext(buildingDataJs, context);
+  context.hwaHelperBuildingData = buildingDataHelper;
+  vm.runInContext('globalThis.hwaHelperBuildingData = hwaHelperBuildingData;', context);
   context.hwaHelperBuildingQueue = buildingQueueService;
 
   // 1. Render when builder is idle with sufficient resources

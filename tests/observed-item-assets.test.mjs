@@ -9,11 +9,9 @@ import { patronName, refillableMetadata, selectItemTexture } from '../scripts/li
 import { getItemIcon, getResourceIcon, isInactiveResource } from '../src/utils/itemResources.ts';
 import { isSelectableForHeader } from '../src/utils/resourceData.ts';
 import { itemResources } from '../src/data/itemData.ts';
+import { nameMap } from '../src/data/nameData.ts';
 
-const context = { hwaHelperItemResources: itemResources };
-for (const name of ['data-names', 'name-map']) {
-  vm.runInNewContext(await readFile(new URL(`../extension/${name}.js`, import.meta.url), 'utf8'), context);
-}
+const context = { hwaHelperItemResources: itemResources, hwaHelperNameMap: nameMap };
 
 test('metadata selects unique texture names and explicit typed manifest entries without numeric guesses', () => {
   const manifest = { 'extends/icons/inventory/gear_6_new.img': {},

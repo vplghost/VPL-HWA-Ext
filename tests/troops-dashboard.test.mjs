@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { nameMap } from '../src/data/nameData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -195,21 +196,13 @@ test('renderDashboardTroops renders 3 troop cards with accurate ready, hospital,
   assert.ok(text.includes('13,010'));
 });
 
-test('Building #163 is named Garrison Wall in name-map', async () => {
-  const dataNamesCode = await readFile(new URL('../extension/data-names.js', import.meta.url), 'utf8');
-  const nameMapCode = await readFile(new URL('../extension/name-map.js', import.meta.url), 'utf8');
-  const context = vm.createContext({ globalThis: {} });
-  vm.runInContext(dataNamesCode, context);
-  vm.runInContext(nameMapCode, context);
-
-  const buildingName = context.globalThis.hwaHelperNameMap.building(163);
+test('Building #163 is named Garrison Wall in name-map', () => {
+  const buildingName = nameMap.building(163);
   assert.equal(buildingName, 'Garrison Wall');
 });
 
 test('renderCampaignDialog displays accurate gear, fragment, and consumable names in raid results', async () => {
   const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-  const dataNamesJs = await readFile(new URL('../extension/data-names.js', import.meta.url), 'utf8');
-  const nameMapJs = await readFile(new URL('../extension/name-map.js', import.meta.url), 'utf8');
 
   assert.ok(popupJs.includes("getItemName('gear', gId) || getItemName('scroll', gId)"));
   assert.ok(popupJs.includes("getItemName('consumable', cId)"));

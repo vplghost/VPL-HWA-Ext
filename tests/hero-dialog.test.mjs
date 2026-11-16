@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { heroMetadata } from '../src/data/heroMetadata.ts';
+import { popupDataHelper } from '../src/utils/popupData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -109,8 +111,6 @@ class MockElement {
 
 const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-const heroMetaJs = await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8');
-const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
 
 test('popup.html defines hero-dialog with title, status, and body', () => {
   assert.match(popupHtml, /<dialog id="hero-dialog"[\s\S]*id="hero-dialog-title"[\s\S]*id="hero-dialog-status"[\s\S]*id="hero-dialog-body"[\s\S]*<\/dialog>/);
@@ -149,8 +149,10 @@ function createTestContext(elements = {}, sentMessages = []) {
     globalThis: {}
   };
 
-  vm.runInNewContext(heroMetaJs, context);
-  vm.runInNewContext(popupDataJs, context);
+  context.globalThis.hwaHelperHeroMetadata = heroMetadata;
+  context.hwaHelperHeroMetadata = heroMetadata;
+  context.globalThis.hwaHelperPopupData = popupDataHelper;
+  context.hwaHelperPopupData = popupDataHelper;
 
   // Extract renderHeroDialog and openHeroDialog functions from popupJs
   const heroDialogCode = popupJs.slice(

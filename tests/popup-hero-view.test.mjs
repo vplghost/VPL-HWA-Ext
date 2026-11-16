@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { heroGlyphs, skinStats } from '../src/data/heroMetadata.ts';
 import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../src/data/titanMetadata.ts';
+import { heroMetadata } from '../src/data/heroMetadata.ts';
+import { popupDataHelper } from '../src/utils/popupData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -64,8 +66,6 @@ const mockDoc = {
 };
 
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-const heroMetaJs = await readFile(new URL('../extension/hero-metadata.js', import.meta.url), 'utf8');
-const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
 
 // Extract helper functions and run in context
 const context = {
@@ -78,11 +78,13 @@ const context = {
   favoriteHeroes: new Set(),
   favoriteTitans: new Set()
 };
-vm.runInNewContext(heroMetaJs, context);
+context.globalThis.hwaHelperHeroMetadata = heroMetadata;
+context.hwaHelperHeroMetadata = heroMetadata;
 context.globalThis.hwaHelperTitanMetadata = titanMetadata;
 context.globalThis.hwaHelperTitanArtifactEvolveCost = titanArtifactEvolveCost;
 context.globalThis.hwaHelperTitanArtifactLevelCosts = titanArtifactLevelCosts;
-vm.runInNewContext(popupDataJs, context);
+context.globalThis.hwaHelperPopupData = popupDataHelper;
+context.hwaHelperPopupData = popupDataHelper;
 context.globalThis.hwaHelperHeroGlyphs = heroGlyphs;
 context.globalThis.hwaHelperSkinStats = skinStats;
 

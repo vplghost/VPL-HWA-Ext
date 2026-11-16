@@ -15,9 +15,7 @@ import * as popupDataModule from '../src/utils/popupData.ts';
 
 // Reduced pinned remote config, plus sanitized getDailyQuests from firstattack timeline 11.
 const fixture = JSON.parse(await readFile(new URL('fixtures/daily-quest-config.json', import.meta.url)));
-const context = { Date, Number, Array, console, hwaHelperQuestData: questDataModule.questData || questDataModule.default || questDataModule };
-vm.runInNewContext(await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8'), context);
-const data = context.hwaHelperQuestData;
+const data = questDataModule.questData || questDataModule.default || questDataModule;
 const derived = deriveDailyDefinitions(fixture.quests, fixture.chains, fixture.conditions, fixture.packs, fixture.locale);
 
 test('verified daily camp chain is cumulative 1 / 5 / 10, with phase 3 named correctly', () => {
@@ -88,7 +86,7 @@ test('map gathering quest #365 stays actionable when tower is already cleared', 
   assert.match(html, /Gather 1 time resources on the map/);
   assert.match(html, /Progress: 0.*\/ 1/);
   assert.doesNotMatch(html, /Tower cleared today|Cannot perform/);
-  const goals = context.hwaHelperPopupData.extractEventGoals(current.value, Date.now());
+  const goals = popupDataModule.extractEventGoals(current.value, Date.now());
   const goal = goals.all.find(goal => goal.key === 'act:daily_quest_365');
   assert.ok(goal);
   assert.equal(goal.title, 'Gather 1 time resources on the map');

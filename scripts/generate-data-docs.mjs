@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-import { runInNewContext } from 'node:vm';
+import { nameMap } from '../src/data/nameData.ts';
+import { popupDataHelper as popupData } from '../src/utils/popupData.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const input = resolve(process.argv[2] ?? join(root, 'temp/tracking-data/hwa-api-2026-11-01_latest.json'));
@@ -35,12 +36,6 @@ for (const key of ['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll']) {
 
 const number = (value) => typeof value === 'number' ? value.toLocaleString('en-US') : '—';
 const byId = ([a], [b]) => Number(a) - Number(b);
-const context = {};
-runInNewContext(await readFile(join(root, 'extension/data-names.js'), 'utf8'), context);
-runInNewContext(await readFile(join(root, 'extension/name-map.js'), 'utf8'), context);
-runInNewContext(await readFile(join(root, 'extension/popup-data.js'), 'utf8'), context);
-const nameMap = context.hwaHelperNameMap;
-const popupData = context.hwaHelperPopupData;
 const cell = (value) => String(value ?? '—').replaceAll('|', '\\|').replaceAll('\n', ' ');
 const source = `Source: \`${input.replace(`${root}\\`, '').replaceAll('\\', '/')}\`. This is a single-account snapshot extracted from RPC responses; display names are resolved using the bundled CDN locale; missing names retain the ID. Tokens, player names, chat, and mail are omitted.`;
 

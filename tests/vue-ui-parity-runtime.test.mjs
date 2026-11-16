@@ -64,14 +64,11 @@ test('automation normalization preserves opt-out defaults and clamps rally level
 });
 
 test('popup automation renders and saves object-form stored teams through the real runtime helper', async t => {
-  const { readFile } = await import('node:fs/promises');
-  const vm = await import('node:vm');
-  const runtime = {};
-  vm.runInNewContext(await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8'), runtime);
+  const { experimentalDataHelper } = await import('../src/utils/experimentalData.ts');
   const writes = [];
   const heroIds = { 0: 5, 1: 3, 2: 1, 3: 2, 4: 4 };
   const saved = { id: 'stored', name: 'Stored', heroIds };
-  globalThis.hwaHelperExperimentalData = runtime.hwaHelperExperimentalData;
+  globalThis.hwaHelperExperimentalData = experimentalDataHelper;
   globalThis.chrome = { storage: {
     local: { get: async () => ({ customTeams: { '7': [saved] }, popupRpcEnabled: true }),
       set: async value => writes.push(value) },

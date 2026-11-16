@@ -6,6 +6,8 @@ import { towerBuffs } from '../src/data/towerData.ts';
 import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../src/data/titanMetadata.ts';
 import { questData } from '../src/data/questData.ts';
 import { resourceDataHelper } from '../src/utils/resourceData.ts';
+import { clanVersusRewards, clanVersusChestThresholds, clanVersusChallengeNames, clanVersusChallengePoints, clanVersusChallengeSteps, clanVersusRoundQuests } from '../src/data/clanVersusData.ts';
+import { popupDataHelper } from '../src/utils/popupData.ts';
 
 class MockClassList {
   constructor(element) {
@@ -351,11 +353,18 @@ const mockDoc = {
   }
 };
 
-const clanVersusRulesJs = await readFile(new URL('../extension/clan-versus-rules.js', import.meta.url), 'utf8');
-const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const towerBuffsJs = `globalThis.hwaHelperTowerBuffs = ${JSON.stringify(towerBuffs)};`;
 const popupCss = await readFile(new URL('../extension/popup.css', import.meta.url), 'utf8');
+
+const clanVersusRulesHelper = {
+  chestRewards: clanVersusRewards,
+  chestThresholds: clanVersusChestThresholds,
+  challengeNames: clanVersusChallengeNames,
+  challengePoints: clanVersusChallengePoints,
+  challengeSteps: clanVersusChallengeSteps,
+  roundQuests: clanVersusRoundQuests,
+};
 
 const context = {
   document: mockDoc,
@@ -378,9 +387,9 @@ const context = {
   },
   setResourceTooltip: (node, val) => { if (node && node.dataset) { node.dataset.resourceTooltip = val; node.setAttribute('data-resource-tooltip', val); } },
   resourceTooltip: () => '',
-  isMarchExpired: (march, now) => context.hwaHelperPopupData.isMarchExpired(march, now),
+  isMarchExpired: (march, now) => popupDataHelper.isMarchExpired(march, now),
   marchTooltip: (march, now) => {
-    if (march?.rally) return context.hwaHelperPopupData.rallyTooltip(march, now, (id) => `Hero #${id}`);
+    if (march?.rally) return popupDataHelper.rallyTooltip(march, now, (id) => `Hero #${id}`);
     return '';
   }
 };
@@ -391,10 +400,24 @@ context.hwaHelperTitanArtifactLevelCosts = titanArtifactLevelCosts;
 context.hwaHelperQuestData = questData;
 context.hwaHelperResourceData = resourceDataHelper;
 context.resourceData = resourceDataHelper;
+context.hwaHelperClanVersusRewards = clanVersusRewards;
+context.hwaHelperClanVersusChestThresholds = clanVersusChestThresholds;
+context.hwaHelperClanVersusChallengeNames = clanVersusChallengeNames;
+context.hwaHelperClanVersusChallengePoints = clanVersusChallengePoints;
+context.hwaHelperClanVersusChallengeSteps = clanVersusChallengeSteps;
+context.hwaHelperClanVersusRoundQuests = clanVersusRoundQuests;
+context.hwaHelperPopupData = popupDataHelper;
 vm.createContext(context);
 vm.runInContext(towerBuffsJs, context);
-vm.runInContext(clanVersusRulesJs, context);
-vm.runInContext(popupDataJs, context);
+vm.runInContext(`
+  globalThis.hwaHelperClanVersusRewards = hwaHelperClanVersusRewards;
+  globalThis.hwaHelperClanVersusChestThresholds = hwaHelperClanVersusChestThresholds;
+  globalThis.hwaHelperClanVersusChallengeNames = hwaHelperClanVersusChallengeNames;
+  globalThis.hwaHelperClanVersusChallengePoints = hwaHelperClanVersusChallengePoints;
+  globalThis.hwaHelperClanVersusChallengeSteps = hwaHelperClanVersusChallengeSteps;
+  globalThis.hwaHelperClanVersusRoundQuests = hwaHelperClanVersusRoundQuests;
+  globalThis.hwaHelperPopupData = hwaHelperPopupData;
+`, context);
 context.Date = Date;
 context.globalThis.hwaHelperNameMap = { building: () => '', research: () => '', item: () => null, hero: () => null };
 

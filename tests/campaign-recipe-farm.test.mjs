@@ -13,6 +13,9 @@ import {
 } from '../src/data/campaignData.ts';
 import { dashboardDataHelper } from '../src/data/dashboardData.ts';
 import { resourceDataHelper } from '../src/utils/resourceData.ts';
+import { nameData, nameMap } from '../src/data/nameData.ts';
+import { heroMetadata, gearCraftData, scrollCraftData } from '../src/data/heroMetadata.ts';
+import { popupDataHelper } from '../src/utils/popupData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -141,14 +144,16 @@ async function createTestContext() {
     console
   });
 
-  const dataNamesSrc = await readFile('extension/data-names.js', 'utf8');
-  const nameMapSrc = await readFile('extension/name-map.js', 'utf8');
-  const heroMetaSrc = await readFile('extension/hero-metadata.js', 'utf8');
-  const popupDataSrc = await readFile('extension/popup-data.js', 'utf8');
   const popupSrc = await readFile('extension/popup.js', 'utf8');
 
   context.hwaHelperResourceData = resourceDataHelper;
   context.hwaHelperDashboardData = dashboardDataHelper;
+  context.hwaHelperNameData = nameData;
+  context.hwaHelperNameMap = nameMap;
+  context.hwaHelperHeroMetadata = heroMetadata;
+  context.hwaHelperGearCraftData = gearCraftData;
+  context.hwaHelperScrollCraftData = scrollCraftData;
+  context.hwaHelperPopupData = popupDataHelper;
   context.hwaHelperCampaignMissions = {
     missions: campaignMissions,
     itemDrops,
@@ -159,10 +164,14 @@ async function createTestContext() {
     isMissionRaidable,
   };
 
-  vm.runInContext(dataNamesSrc, context);
-  vm.runInContext(nameMapSrc, context);
-  vm.runInContext(heroMetaSrc, context);
-  vm.runInContext(popupDataSrc, context);
+  vm.runInContext(`
+    globalThis.hwaHelperNameData = hwaHelperNameData;
+    globalThis.hwaHelperNameMap = hwaHelperNameMap;
+    globalThis.hwaHelperHeroMetadata = hwaHelperHeroMetadata;
+    globalThis.hwaHelperGearCraftData = hwaHelperGearCraftData;
+    globalThis.hwaHelperScrollCraftData = hwaHelperScrollCraftData;
+    globalThis.hwaHelperPopupData = hwaHelperPopupData;
+  `, context);
   vm.runInContext(popupSrc, context);
 
   context.hwaHelperNameMap = {

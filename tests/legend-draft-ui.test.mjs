@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { dashboardDataHelper } from '../src/data/dashboardData.ts';
 import { resourceDataHelper } from '../src/utils/resourceData.ts';
+import { heroMetadata } from '../src/data/heroMetadata.ts';
+import { popupDataHelper } from '../src/utils/popupData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -124,13 +126,12 @@ async function createDraftContext(viewEl, statusEl, searchEl) {
     console
   });
 
-  const heroMetaSrc = await readFile('extension/hero-metadata.js', 'utf8');
-  const popupDataSrc = await readFile('extension/popup-data.js', 'utf8');
   const popupSrc = await readFile('extension/popup.js', 'utf8');
   context.hwaHelperResourceData = resourceDataHelper;
   context.hwaHelperDashboardData = dashboardDataHelper;
-  vm.runInContext(heroMetaSrc, context);
-  vm.runInContext(popupDataSrc, context);
+  context.hwaHelperHeroMetadata = heroMetadata;
+  context.hwaHelperPopupData = popupDataHelper;
+  vm.runInContext('globalThis.hwaHelperHeroMetadata = hwaHelperHeroMetadata; globalThis.hwaHelperPopupData = hwaHelperPopupData;', context);
   vm.runInContext(popupSrc, context);
 
   context.hwaHelperNameMap = {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { experimentalDataHelper } from '../src/utils/experimentalData.ts';
 import { questData } from '../src/data/questData.ts';
 import { dashboardDataHelper } from '../src/data/dashboardData.ts';
 
@@ -37,7 +38,6 @@ class Element {
 }
 const popup = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
 const popupHtml = await readFile(new URL('../extension/popup.html', import.meta.url), 'utf8');
-const dataSource = await readFile(new URL('../extension/experimental-data.js', import.meta.url), 'utf8');
 const renderer = popup.slice(popup.indexOf('function renderExperimental('), popup.indexOf('async function experimentalRpc('));
 const pendingSync = popup.slice(popup.indexOf('function syncExperimentalPending('), popup.indexOf('function renderMonster('));
 const monsterRenderer = popup.slice(popup.indexOf('function renderMonster('), popup.indexOf('function renderExperimental('));
@@ -56,7 +56,8 @@ test('Settings persists 600/950 defaults and serializes capacity changes without
   const context = vm.createContext({ document, settingsPending: Promise.resolve(), status: {},
     chrome: { storage: { local: { get: async () => stored,
       set: async (values) => Object.assign(stored, JSON.parse(JSON.stringify(values))) } } } });
-  vm.runInContext(dataSource, context);
+  context.hwaHelperExperimentalData = experimentalDataHelper;
+  vm.runInContext('globalThis.hwaHelperExperimentalData = hwaHelperExperimentalData;', context);
   const start = popup.indexOf("\nfor (const [id, key] of [['default-hero-troop-capacity'");
   vm.runInContext(popup.slice(popup.indexOf('async function renderSettings('), start) +
     popup.slice(start, popup.indexOf("document.querySelector('#socket-refresh-mode').addEventListener", start)), context);
@@ -91,7 +92,8 @@ test('rally form persists chosen team and last searched level, updates troop all
     experimentalRpc: async (calls) => sent.push({ calls }),
     experimentalSelection: { rallyTeam: 'weakest', gatherTeam: 'weakest', bossLevel: 1, searchedBossLevel: 1,
       waitSeconds: 300, minMembers: 4, autoCancel: true, raidCount: 2, baseTroops: 200, capacities: {}, units: '', mineType: 'food', mineLevel: 1 } });
-  vm.runInContext(dataSource, context);
+  context.hwaHelperExperimentalData = experimentalDataHelper;
+  vm.runInContext('globalThis.hwaHelperExperimentalData = hwaHelperExperimentalData;', context);
   context.render = () => context.renderExperimental(cache, true);
   vm.runInContext(save + '\n' + pendingSync + '\n' + renderer, context);
   context.render();
@@ -172,7 +174,8 @@ test('Dashboard groups Raid, Gathering and Monster buttons and Gathering keeps l
     experimentalSelection: { rallyTeam: 'weakest', gatherTeam: 'weakest', bossLevel: 1,
       waitSeconds: 300, minMembers: 4, autoCancel: true, raidCount: 2, units: '7:100',
       mineType: 'food', mineLevel: 1, mineId: 'mine-1' } });
-  vm.runInContext(dataSource, context);
+  context.hwaHelperExperimentalData = experimentalDataHelper;
+  vm.runInContext('globalThis.hwaHelperExperimentalData = hwaHelperExperimentalData;', context);
   context.render = () => context.renderExperimental(cache);
   vm.runInContext(pendingSync + '\n' + renderer, context);
   vm.runInContext(dashboardActions, context);
@@ -277,7 +280,8 @@ test('Monster dialog searches by level, starts selected team attack and shows re
     formatNumber: (value) => String(value), saveMonsterPreferences: () => Object.assign(saved, { saved: true }),
     chrome: { runtime: { sendMessage: async (message) => { sent.push(message); return { ok: true }; } } },
     experimentalRpc: async (calls) => sent.push({ calls }) });
-  vm.runInContext(dataSource, context);
+  context.hwaHelperExperimentalData = experimentalDataHelper;
+  vm.runInContext('globalThis.hwaHelperExperimentalData = hwaHelperExperimentalData;', context);
   context.render = () => context.renderMonster(cache);
   vm.runInContext(pendingSync + '\n' + monsterRenderer, context);
   context.render();
@@ -489,7 +493,8 @@ test('Raid rally shows Stop queue inline when queue is running, hides Start queu
     }
   });
 
-  vm.runInContext(dataSource, context);
+  context.hwaHelperExperimentalData = experimentalDataHelper;
+  vm.runInContext('globalThis.hwaHelperExperimentalData = hwaHelperExperimentalData;', context);
   context.render = () => context.renderExperimental(cache, true);
   vm.runInContext(save + '\n' + pendingSync + '\n' + renderer, context);
   context.render();
@@ -603,7 +608,8 @@ test('Gathering dialog groups inputs into rows and displays title status', async
     }
   });
 
-  vm.runInContext(dataSource, context);
+  context.hwaHelperExperimentalData = experimentalDataHelper;
+  vm.runInContext('globalThis.hwaHelperExperimentalData = hwaHelperExperimentalData;', context);
   context.render = () => context.renderExperimental(cache, false);
   vm.runInContext(save + '\n' + pendingSync + '\n' + renderer, context);
   context.render();

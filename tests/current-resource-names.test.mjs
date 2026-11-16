@@ -14,14 +14,14 @@ import { nameMap, nameData } from '../src/data/nameData.ts';
 test('generation refuses a stale default or mismatched cached bytes before replacing bundled data', async () => {
   const script = fileURLToPath(new URL('../scripts/generate-name-map.mjs', import.meta.url));
   const fixture = fileURLToPath(new URL('./fixtures/current-name-index.json', import.meta.url));
-  const before = await readFile(new URL('../extension/data-names.js', import.meta.url));
+  const before = await readFile(new URL('../src/data/nameData.ts', import.meta.url));
   const noCapture = spawnSync(process.execPath, [script], { encoding: 'utf8' });
   assert.notEqual(noCapture.status, 0);
   assert.match(noCapture.stderr, /current game export/);
   const badCache = spawnSync(process.execPath, [script, fixture, fixture], { encoding: 'utf8' });
   assert.notEqual(badCache.status, 0);
   assert.match(badCache.stderr, /does not match indexGet size\/hash/);
-  assert.deepEqual(await readFile(new URL('../extension/data-names.js', import.meta.url)), before);
+  assert.deepEqual(await readFile(new URL('../src/data/nameData.ts', import.meta.url)), before);
 });
 
 test('strategic name extraction uses exact category/ID keys and rejects unresolved keys', () => {

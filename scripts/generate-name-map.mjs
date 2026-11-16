@@ -118,9 +118,6 @@ const payload = {
   names
 };
 
-const output = `// Generated from ${assetUrl}\n` +
-  `globalThis.hwaHelperNameData = ${JSON.stringify(payload)};\n`;
-await writeFile(join(root, 'extension/data-names.js'), output);
 
 const tsHelpers = `
 const itemGroups: Record<string, string> = {

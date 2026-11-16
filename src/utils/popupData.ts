@@ -1,6 +1,6 @@
 import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from '../data/titanMetadata.ts';
-import { heroMetadata } from '../data/heroMetadata.ts';
-import { getItemName, getHeroName } from '../data/nameData.ts';
+import { heroMetadata, heroGlyphs, skinStats } from '../data/heroMetadata.ts';
+import { getItemName, getHeroName, nameMap } from '../data/nameData.ts';
 import {
   clanVersusRoundQuests,
   clanVersusChallengeNames,
@@ -989,6 +989,47 @@ export function buildAutoClaimCalls(cache: any, options: any = {}) {
   return { calls, pending };
 }
 
+export const ITEM_GROUP_META: Record<string, { order: number; label: string; icon: string }> = {
+  consumable: { order: 10, label: 'Consumables', icon: '🧪' },
+  lootboxChanced: { order: 15, label: 'Chests & Boxes', icon: '🎁' },
+  gear: { order: 20, label: 'Equipment', icon: '🛡️' },
+  fragmentGear: { order: 30, label: 'Gear Recipes', icon: '📜' },
+  scroll: { order: 32, label: 'Scrolls', icon: '📜' },
+  fragmentScroll: { order: 34, label: 'Scroll Recipes', icon: '📜' },
+  fragmentHero: { order: 40, label: 'Hero Soul Stones', icon: '👤' },
+  fragmentTitan: { order: 42, label: 'Titan Soul Stones', icon: '🗿' },
+  fragmentArtifact: { order: 44, label: 'Artifact Fragments', icon: '💍' },
+  fragmentSkin: { order: 46, label: 'Skin Fragments', icon: '✨' },
+  coin: { order: 50, label: 'Coins & Currency', icon: '🪙' },
+  material: { order: 52, label: 'Materials', icon: '⚙️' }
+};
+
+export function getItemCategoryMeta(category: string): { order: number; label: string; icon: string } {
+  if (!category || typeof category !== 'string') {
+    return { order: 100, label: 'Other Items', icon: '📦' };
+  }
+  return ITEM_GROUP_META[category] || {
+    order: 100,
+    label: category.charAt(0).toUpperCase() + category.slice(1).replace(/([A-Z])/g, ' $1'),
+    icon: '📦'
+  };
+}
+
+export function getItemAbbr(name: string, id?: number | string): string {
+  if (!name || name === '—') return id ? `#${id}` : '';
+  const clean = String(name).replace(/[^\w\s]/g, ' ').trim();
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return words.slice(0, 4).map((w) => w[0]).join('').toUpperCase();
+  }
+  if (words.length === 1 && words[0]) {
+    const w = words[0];
+    if (w.length <= 4) return w.toUpperCase();
+    return w.slice(0, 3).toUpperCase();
+  }
+  return String(id || '');
+}
+
 export function exportTableData(tab: string, cache: any, query = '', itemGroupFilter = ''): any[] {
   if (!cache) return [];
   const q = (query || '').trim().toLocaleLowerCase();
@@ -1006,11 +1047,49 @@ export function exportTableData(tab: string, cache: any, query = '', itemGroupFi
       }
       const { owned, needed } = heroSoulProgress(id, hero, cache.inventoryGet?.data);
       const sparkLevel = Number.isInteger(hero?.titanGiftLevel) ? hero.titanGiftLevel : 0;
+
       const skills = hero?.skills
         ? Object.entries(hero.skills)
             .sort(([a], [b]) => Number(a) - Number(b))
             .map(([k, lvl], idx) => ({ slot: idx + 1, skillId: Number(k), level: Number(lvl) }))
         : [];
+
+      const skins = hero?.skins
+        ? Object.entries(hero.skins)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([skinId, lvl]) => {
+              let stat = skinStats[Number(skinId)];
+              if (!stat || stat === 'MAIN' || Number(skinId) === Number(hero?.baseSkinId) || (Number(skinId) <= 100 && !skinStats[Number(skinId)])) {
+                const mainStat = meta?.mainStat || (meta?.role === 'Tank' || meta?.class === 'Warrior' ? 'strength' : meta?.class === 'Marksman' ? 'agility' : 'intelligence');
+                stat = mainStat === 'strength' ? 'Str' : mainStat === 'agility' ? 'Agi' : 'Int';
+              }
+              return {
+                skinId: Number(skinId),
+                stat: stat || 'Skin',
+                level: Number(lvl),
+                isCurrent: Number(skinId) === Number(hero?.currentSkin)
+              };
+            })
+        : [];
+
+      const rawRunes = hero?.hero_runes || hero?.runes;
+      const heroRunes = Array.isArray(rawRunes) ? rawRunes : (rawRunes && typeof rawRunes === 'object' ? Object.values(rawRunes) : []);
+      const glyphList = heroGlyphs[Number(id)] || ['PA', 'Arm', 'HP', 'MD', 'Str'];
+      const glyphs = heroRunes.map((lvl: any, idx: number) => ({
+        slot: idx + 1,
+        stat: glyphList[idx] || `G${idx + 1}`,
+        level: Number(lvl)
+      }));
+
+      const artifacts = Array.isArray(hero?.artifacts)
+        ? hero.artifacts.map((art: any, idx: number) => ({
+            slot: idx + 1,
+            id: art?.id ?? null,
+            star: art?.star ?? null,
+            level: art?.level ?? null
+          }))
+        : [];
+
       result.push({
         id: Number(id),
         name,
@@ -1023,6 +1102,9 @@ export function exportTableData(tab: string, cache: any, query = '', itemGroupFi
         soulStones: { current: owned, needed },
         sparksOfPower: { level: sparkLevel, max: 30 },
         skills,
+        skins,
+        glyphs,
+        artifacts,
       });
     }
     return result;
@@ -1044,6 +1126,22 @@ export function exportTableData(tab: string, cache: any, query = '', itemGroupFi
             .sort(([a], [b]) => Number(a) - Number(b))
             .map(([k, lvl], idx) => ({ slot: idx + 1, skillId: Number(k), level: Number(lvl) }))
         : [];
+
+      const skins = titan?.skins && typeof titan.skins === 'object'
+        ? Object.entries(titan.skins)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([skinId, lvl]) => {
+              let stat = skinStats[Number(skinId)];
+              if (!stat || stat === 'MAIN') stat = 'HP';
+              return {
+                skinId: Number(skinId),
+                stat: stat || 'Skin',
+                level: Number(lvl),
+                isCurrent: Number(skinId) === Number(titan?.currentSkin)
+              };
+            })
+        : (titan?.skins || titan?.skin || null);
+
       result.push({
         id: Number(id),
         name,
@@ -1063,6 +1161,7 @@ export function exportTableData(tab: string, cache: any, query = '', itemGroupFi
               isUpgradable: isTitanArtifactUpgradable(id, idx, titan, cache),
             }))
           : [],
+        skins,
       });
     }
     return result;
@@ -1098,12 +1197,244 @@ export function exportTableData(tab: string, cache: any, query = '', itemGroupFi
         key,
         name,
         amount: Number(d.amount) || 0,
+        cap: Number.isFinite(d.cap) ? d.cap : null,
+        renewable: Boolean(d.renewable),
+        refillEveryMs: Number.isFinite(d.refillEveryMs) ? d.refillEveryMs : null,
+        refillAmount: Number.isFinite(d.refillAmount) ? d.refillAmount : null,
       });
     }
     return result;
   }
 
+  if (tab === 'teams') {
+    const data = cache.teamGetAll?.data || {};
+    const rows = teamRows(data, { hero: (id: any) => getHeroName(id) });
+    return rows
+      .filter((row) => matchesFilter(row))
+      .map((row) => ({
+        mode: row[0],
+        teamNumber: row[1],
+        memberCount: row[2],
+        names: row[3],
+        members: Array.isArray(row[4]) ? row[4] : [],
+      }));
+  }
+
+  if (tab === 'other') {
+    const entries = Object.values(cache).filter((entry: any) =>
+      entry?.key && !['heroGetAll', 'inventoryGet', 'titanGetAll', 'teamGetAll', 'guildChat', 'energyStatus',
+        'worldEnergyStatus', 'worldEnergyRallies', 'resourceActionHistory',
+        'accountStatus', 'buildingStatus', 'marchStatus',
+        'researchStatus', 'productionConfigStatus', 'productionStatus',
+        'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents',
+        'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry.key)
+      && !entry.key.startsWith('resource:')
+      && matchesFilter([entry.method, entry.feature || entry.group]));
+    return entries.map((entry: any) => ({
+      key: entry.key,
+      method: entry.method,
+      feature: entry.feature || entry.group,
+      size: Array.isArray(entry.data) ? entry.data.length : Object.keys(entry.data ?? {}).length,
+      updatedAt: entry.updatedAt,
+      data: entry.data
+    }));
+  }
+
   return [];
+}
+
+export function formatTitanArtifactLevels(titanId: number | string, titan: any): string {
+  if (!titan || !Array.isArray(titan.artifacts) || !titan.artifacts.length) {
+    return '—';
+  }
+  return titan.artifacts.map((a: any) => (a && a.level != null ? a.level : 1)).join(' - ');
+}
+
+export function marchDuration(ms: number, precise = false): string {
+  if (!Number.isFinite(ms)) return '—';
+  if (ms <= 0) return 'Due now';
+  if (ms < 60000) return `${precise ? Math.ceil(ms / 1000) : Math.ceil(ms / 10000) * 10} sec`;
+  const minutes = Math.max(1, Math.floor(ms / 60000));
+  return minutes < 60 ? `${minutes} min` : `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+export function rallyTooltip(march: any, now: number, heroName: (id: number | string) => string): string {
+  const rally = march.rally || {};
+  const isAutoJoin = Boolean(rally.isAutoJoin);
+  const heroes = (rally.team?.heroIds || []).map((id: any) => heroName(id) || `Hero #${id}`);
+  const troops = (rally.team?.units || []).map((unit: any) => `#${unit.id} ×${Number(unit.count).toLocaleString('en-US')}`);
+  const isJoiningLeader = Number.isFinite(rally.memberEta) && rally.memberEta > now;
+  const wait = Number.isFinite(rally.waitUntil) && rally.waitUntil > now ? marchDuration(rally.waitUntil - now) : 'Complete';
+  const arrivalAt = Number.isFinite(rally.arrivalAt) ? rally.arrivalAt : Number.isFinite(rally.waitUntil) && Number.isFinite(rally.outboundMs) ? rally.waitUntil + rally.outboundMs : null;
+  const arrival = !Number.isFinite(arrivalAt) ? 'Route pending' : arrivalAt! > now ? `${Number.isFinite(rally.arrivalAt) ? '' : '~'}${marchDuration(arrivalAt! - now)} remaining` : Number.isFinite(rally.arrivalAt) ? 'Reached' : 'Due; awaiting route update';
+  const returning = Number.isFinite(rally.returnAt) ? `${rally.returnAt > now ? `${marchDuration(rally.returnAt - now)} remaining` : 'Due now'}` : Number.isFinite(rally.returnMs) ? `~${marchDuration(rally.returnMs, true)} travel after battle` : 'Route pending';
+  return [
+    `${isAutoJoin ? '⚡ Auto-Join Raid' : 'Raid'} · ${rally.target || 'Target pending'}`,
+    ...(rally.leaderName ? [`Leader: ${rally.leaderName}`] : []),
+    `Team: ${heroes.join(', ') || '—'}`,
+    ...(troops.length ? [`Troops: ${troops.join(', ')}`] : []),
+    ...(isJoiningLeader ? [`Joining leader camp: ~${marchDuration(rally.memberEta - now, true)} remaining`] : []),
+    `Wait: ${wait}`,
+    ...(Number.isFinite(rally.outboundMs) ? [`Travel to target: ~${marchDuration(rally.outboundMs, true)}`] : []),
+    `Arrival: ${arrival}`,
+    `Return to base: ${returning}`,
+  ].join('\n');
+}
+
+export function teamRows(data: any, nameMap: any): any[] {
+  return Object.entries(data || {}).flatMap(([mode, members]: [string, any]) => {
+    if (!Array.isArray(members)) return [[mode, '—', 0, '—', []]];
+    const groups = members.some(Array.isArray) ? members : [members];
+    return groups.map((group, index) => {
+      const ids = Array.isArray(group) ? group.filter(Number.isInteger) : [];
+      return [
+        mode,
+        groups.length > 1 ? index + 1 : '—',
+        ids.length,
+        ids.length ? ids.map((id) => (typeof nameMap?.hero === 'function' ? nameMap.hero(id) : null) || `#${id}`).join(', ') : '—',
+        ids,
+      ];
+    });
+  });
+}
+
+const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+const numericHeadings = new Set(['Level', 'Star', 'Soul stones / needed', 'Soul stone', 'Soul stones', 'Equipment rank', 'Power', 'Amount', 'Members', 'Size']);
+export const isNumericColumn = (heading: string): boolean => numericHeadings.has(heading);
+
+export function sortRows(rows: any[], column: number | string, direction: 'asc' | 'desc', isFavoriteFn?: (row: any) => boolean): any[] {
+  const numeric = (value: any) => {
+    if (typeof value === 'number') return value;
+    const text = String(value ?? '');
+    if (/^\d[\d,]*(?:\s*\/.*)?$/.test(text)) return Number((text.split('/')[0] || '').replaceAll(',', '').trim());
+    return null;
+  };
+  return [...rows].sort((left, right) => {
+    if (typeof isFavoriteFn === 'function') {
+      const favA = Boolean(isFavoriteFn(left));
+      const favB = Boolean(isFavoriteFn(right));
+      if (favA !== favB) return favA ? -1 : 1;
+    }
+    const a = left[column];
+    const b = right[column];
+    if (a == null || a === '—') return b == null || b === '—' ? 0 : 1;
+    if (b == null || b === '—') return -1;
+    const an = numeric(a);
+    const bn = numeric(b);
+    const result = an !== null && bn !== null ? an - bn : collator.compare(String(a), String(b));
+    return direction === 'desc' ? -result : result;
+  });
+}
+
+import { hoursMinutes } from './resourceData.ts';
+
+export function isMarchExpired(march: any, now = Date.now()): boolean {
+  if (!march) return true;
+  if (march.rally) {
+    const rally = march.rally;
+    const arrivalAt = Number.isFinite(rally.arrivalAt)
+      ? rally.arrivalAt
+      : Number.isFinite(rally.waitUntil) && Number.isFinite(rally.outboundMs)
+        ? rally.waitUntil + rally.outboundMs
+        : null;
+    const returnAt = Number.isFinite(rally.returnAt)
+      ? rally.returnAt
+      : Number.isFinite(march.endsAt) && march.stage === 'returnToOutpost'
+        ? march.endsAt
+        : Number.isFinite(arrivalAt) && Number.isFinite(rally.returnMs)
+          ? arrivalAt + rally.returnMs
+          : null;
+    if (Number.isFinite(returnAt)) return now >= returnAt;
+    if (march.stage === 'returnToOutpost' && Number.isFinite(march.endsAt)) return now >= march.endsAt;
+    return Number.isFinite(rally.waitUntil) && now > rally.waitUntil + 30 * 60000;
+  }
+  if (march.stage === 'returnToOutpost' || march.kind === 'return') {
+    const returnAt = Number.isFinite(march.returnAt) ? march.returnAt : march.endsAt;
+    return Number.isFinite(returnAt) && now >= returnAt;
+  }
+  if (march.kind === 'attack' && march.stage === 'moveToTargetInSolo') {
+    return Number.isFinite(march.targetArrivalAt) && Number.isFinite(march.durationMs) && now >= march.targetArrivalAt + march.durationMs + 5 * 60000;
+  }
+  const isMine = ['food', 'wood', 'stone', 'iron', 'mine'].includes(march.kind) || Boolean(march.mineId);
+  if (isMine) {
+    if (march.stage === 'moveToTargetInSolo' && Number.isFinite(march.targetArrivalAt)) {
+      return false;
+    }
+    if (march.stage === 'interactionWithTarget') {
+      if (Number.isFinite(march.endsAt) && (!march.targetArrivalAt || march.endsAt > march.targetArrivalAt + 60000)) {
+        return march.endsAt <= now;
+      }
+      return false;
+    }
+  }
+  return Number.isFinite(march.endsAt) && march.endsAt <= now;
+}
+
+export function buildingTooltip(status: any, now: number, buildingName?: (id: number | string) => string | null): string {
+  const queues = (status?.data?.queues || []).filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now);
+  if (!queues.length) return 'Construction: Idle';
+  const lines = ['Construction in progress:'];
+  for (const q of queues) {
+    const name = (buildingName && q.buildingId ? buildingName(q.buildingId) : null) || (q.buildingId ? `Building #${q.buildingId}` : 'Building');
+    const level = q.level ? ` (Lv. ${q.level})` : '';
+    const mins = Math.ceil((q.startDate + q.durationMs - now) / 60000);
+    const time = hoursMinutes(mins);
+    lines.push(`${name}${level} · ${time} remaining`);
+  }
+  return lines.join('\n');
+}
+
+export function researchTooltip(status: any, now: number, researchName?: (id: number | string) => string | null): string {
+  const queues = (status?.data?.queues || []).filter((q: any) => Number.isFinite(q.startDate) && Number.isFinite(q.durationMs) && q.startDate + q.durationMs > now);
+  if (!queues.length) return 'Research: Idle';
+  const lines = ['Research in progress:'];
+  for (const q of queues) {
+    const name = (researchName && q.researchId ? researchName(q.researchId) : null) || (q.researchId ? `Research #${q.researchId}` : 'Research');
+    const level = q.level ? ` (Lv. ${q.level})` : '';
+    const mins = Math.ceil((q.startDate + q.durationMs - now) / 60000);
+    const time = hoursMinutes(mins);
+    lines.push(`${name}${level} · ${time} remaining`);
+  }
+  return lines.join('\n');
+}
+
+export function tableExportFilename(tab: string, d = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`;
+  return `hwa-${tab}-${stamp}.json`;
+}
+
+export function isResourceSelectableForHeader(entry: any): boolean {
+  if (!entry || !entry.key) return false;
+  return !['resource:energy', 'resource:world-energy'].includes(entry.key);
+}
+
+export function isDebugOrEventResource(entry: any, nameMapInstance: any = nameMap, refillRules?: any): boolean {
+  if (!entry || !entry.key) return false;
+  const id = entry.key.slice('resource:'.length);
+  const [type, itemId] = id.split(':');
+  let label = entry.data?.label || '';
+  if (type === 'refillable') {
+    label = refillRules?.[itemId]?.label || label;
+  } else if (type && itemId && !id.startsWith('refillable:') && !id.startsWith('world-refillable:')) {
+    label = nameMapInstance?.item?.(type, itemId) || label;
+  }
+
+  if (/test|debug|dummy|placeholder|deprecated|beta|unreleased/i.test(label) || /test|debug/i.test(entry.key)) {
+    return true;
+  }
+
+  if (type === 'refillable' && itemId !== '2') {
+    if (/^Refillable #|^Event Energy #/i.test(label) || entry.data?.amount === 0) {
+      return true;
+    }
+  }
+
+  if (/^(coin|consumable|material|scroll|refillable) #\d+/i.test(label)) {
+    return true;
+  }
+
+  return false;
 }
 
 export const popupDataHelper = {
@@ -1136,4 +1467,19 @@ export const popupDataHelper = {
   isTowerCleared,
   extractEventGoals,
   exportTableData,
+  formatTitanArtifactLevels,
+  marchDuration,
+  rallyTooltip,
+  teamRows,
+  sortRows,
+  isNumericColumn,
+  buildingTooltip,
+  researchTooltip,
+  tableExportFilename,
+  isMarchExpired,
+  ITEM_GROUP_META,
+  getItemCategoryMeta,
+  getItemAbbr,
+  isResourceSelectableForHeader,
+  isDebugOrEventResource,
 };

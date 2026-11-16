@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { popupDataHelper } from '../src/utils/popupData.ts';
 
 class MockElement {
   constructor(tag) {
@@ -123,7 +124,6 @@ const mockDoc = {
 };
 
 const popupJs = await readFile(new URL('../extension/popup.js', import.meta.url), 'utf8');
-const popupDataJs = await readFile(new URL('../extension/popup-data.js', import.meta.url), 'utf8');
 
 const view = new MockElement('div');
 const status = new MockElement('p');
@@ -144,7 +144,8 @@ const context = {
   }
 };
 
-vm.runInNewContext(popupDataJs, context);
+context.hwaHelperPopupData = popupDataHelper;
+context.globalThis.hwaHelperPopupData = popupDataHelper;
 
 // Extract renderConfigOther and renderGuildChat functions
 const startIdx = popupJs.indexOf('function renderConfigOther(');

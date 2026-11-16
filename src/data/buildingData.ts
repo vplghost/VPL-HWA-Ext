@@ -29,10 +29,10 @@ export function getMissingRequirements(
   if (!meta || !meta.r) return [];
   const missing: MissingBuildingRequirement[] = [];
   const getLevel = (id: number): number => {
-    if (buildingLevelsMap instanceof Map) {
-      return buildingLevelsMap.get(id) ?? 0;
+    if (buildingLevelsMap instanceof Map || typeof (buildingLevelsMap as any)?.get === 'function') {
+      return (buildingLevelsMap as any).get(id) ?? (buildingLevelsMap as any).get(String(id)) ?? 0;
     }
-    return (buildingLevelsMap as Record<number, number>)[id] ?? 0;
+    return (buildingLevelsMap as Record<number, number>)[id] ?? (buildingLevelsMap as Record<string, number>)[String(id)] ?? 0;
   };
 
   for (const [reqBId, minLvl] of meta.r) {
@@ -53,10 +53,10 @@ export function getMissingCosts(
   if (!meta || !meta.c) return [];
   const missing: MissingBuildingCost[] = [];
   const getAmount = (id: number): number => {
-    if (resourcesMap instanceof Map) {
-      return resourcesMap.get(id) ?? 0;
+    if (resourcesMap instanceof Map || typeof (resourcesMap as any)?.get === 'function') {
+      return (resourcesMap as any).get(id) ?? (resourcesMap as any).get(String(id)) ?? 0;
     }
-    return (resourcesMap as Record<number, number>)[id] ?? 0;
+    return (resourcesMap as Record<number, number>)[id] ?? (resourcesMap as Record<string, number>)[String(id)] ?? 0;
   };
 
   for (const [matId, amount] of Object.entries(meta.c)) {

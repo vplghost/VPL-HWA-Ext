@@ -7,13 +7,37 @@ import { titanMetadata, titanArtifactEvolveCost, titanArtifactLevelCosts } from 
 import { questData } from '../src/data/questData.ts';
 import { resourceDataHelper } from '../src/utils/resourceData.ts';
 
-const context = { hwaHelperHeroGlyphs: heroGlyphs, hwaHelperSkinStats: skinStats, hwaHelperTitanMetadata: titanMetadata, hwaHelperTitanArtifactEvolveCost: titanArtifactEvolveCost, hwaHelperTitanArtifactLevelCosts: titanArtifactLevelCosts, hwaHelperQuestData: questData, hwaHelperResourceData: resourceDataHelper };
-for (const file of ['clan-versus-rules.js', 'data-names.js', 'name-map.js', 'hero-metadata.js', 'popup-data.js']) {
-  runInNewContext(await readFile(new URL(`../extension/${file}`, import.meta.url), 'utf8'), context);
-}
-const { heroSoulProgress, formatTitanArtifactLevels, isTitanArtifactUpgradable, exportTableData, teamRows, sortRows, isNumericColumn,
+import { nameMap } from '../src/data/nameData.ts';
+import { heroMetadata } from '../src/data/heroMetadata.ts';
+import { clanVersusRewards, clanVersusChestThresholds, clanVersusChallengeNames, clanVersusChallengePoints, clanVersusChallengeSteps, clanVersusRoundQuests } from '../src/data/clanVersusData.ts';
+import {
+  popupDataHelper, heroSoulProgress, formatTitanArtifactLevels, isTitanArtifactUpgradable, exportTableData, teamRows, sortRows, isNumericColumn,
   rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount, isTowerCleared,
-  isResourceSelectableForHeader, isDebugOrEventResource } = context.hwaHelperPopupData;
+  isResourceSelectableForHeader, isDebugOrEventResource, isMarchExpired, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans,
+  heroEquipmentRank, getHeroArtifactTier, getHeroArtifactTierStyle, draftStageDescription, formatCountdown, isDraftActive,
+  defaultDraftCandidates, observedDraftChoices, validateDraftPicks, getDraftActiveStep, buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, normalizeGoalKey, marchDuration
+} from '../src/utils/popupData.ts';
+
+const context = {
+  hwaHelperHeroGlyphs: heroGlyphs,
+  hwaHelperSkinStats: skinStats,
+  hwaHelperTitanMetadata: titanMetadata,
+  hwaHelperTitanArtifactEvolveCost: titanArtifactEvolveCost,
+  hwaHelperTitanArtifactLevelCosts: titanArtifactLevelCosts,
+  hwaHelperQuestData: questData,
+  hwaHelperResourceData: resourceDataHelper,
+  hwaHelperPopupData: popupDataHelper,
+  hwaHelperNameMap: nameMap,
+  hwaHelperHeroMetadata: heroMetadata,
+  hwaHelperClanVersusRules: {
+    chestRewards: clanVersusRewards,
+    chestThresholds: clanVersusChestThresholds,
+    challengeNames: clanVersusChallengeNames,
+    challengePoints: clanVersusChallengePoints,
+    challengeSteps: clanVersusChallengeSteps,
+    roundQuests: clanVersusRoundQuests,
+  },
+};
 
 test('solo attack stays visible through battle and expires after its return ETA', () => {
   const { isMarchExpired } = context.hwaHelperPopupData;

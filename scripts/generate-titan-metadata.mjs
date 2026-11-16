@@ -3,12 +3,12 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import vm from 'node:vm';
 
+import { nameData } from '../src/data/nameData.ts';
+
 const root = resolve(import.meta.dirname, '..');
 const assetsDir = join(root, 'extension/assets/titans');
 
-const namesContext = {};
-vm.runInNewContext(await readFile(join(root, 'extension/data-names.js'), 'utf8'), namesContext);
-const heroNames = namesContext.hwaHelperNameData.names.hero;
+const heroNames = nameData.names.hero;
 
 const splitlibTitans = JSON.parse(await readFile(join(root, 'temp/splitlib/titan.json'), 'utf8'));
 const splitlibHeroes = JSON.parse(await readFile(join(root, 'temp/splitlib/hero.json'), 'utf8'));
@@ -77,5 +77,5 @@ const outputJs = `// Generated titan metadata\n` +
   `globalThis.hwaHelperTitanArtifactEvolveCost = ${JSON.stringify(evolveCost, null, 2)};\n\n` +
   `globalThis.hwaHelperTitanArtifactLevelCosts = ${JSON.stringify(levelCosts)};\n`;
 
-await writeFile(join(root, 'extension/titan-metadata.js'), outputJs, 'utf8');
-console.log(`Wrote titan metadata to extension/titan-metadata.js (${Object.keys(metadata).length} titans).`);
+await writeFile(join(root, 'temp/titan-metadata.js'), outputJs, 'utf8');
+console.log(`Wrote titan metadata to temp/titan-metadata.js (${Object.keys(metadata).length} titans).`);
