@@ -1,5 +1,6 @@
 import type { HospitalRoomInfo, MineDefensePlan } from '../types/game/mineDefense';
 import { getInfirmaryCapacity } from '../data/mineDefenseData.ts';
+import { smartGatherService } from './queues/smartGather.ts';
 
 const list = (value: any): any[] =>
   Array.isArray(value) ? value : value && typeof value === 'object' ? Object.values(value) : [];
@@ -70,7 +71,8 @@ export function plan(
   const data = cache.incomingMineAttacks?.data;
   if (account == null || String(data?.accountId) !== String(account)) return null;
 
-  const smart = (globalThis as any).hwaHelperSmartGather;
+  const smart = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperSmartGather)
+    || smartGatherService;
   const rows = list(data.attacks)
     .filter((a: any) => a.attackerId !== String(account) && a.impactAt > now)
     .sort((a: any, b: any) => a.impactAt - b.impactAt);
@@ -169,7 +171,8 @@ export function sync(
   now: number
 ): Record<string, any> {
   const defense = state.defense || { attempted: [] };
-  const smart = (globalThis as any).hwaHelperSmartGather;
+  const smart = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperSmartGather)
+    || smartGatherService;
   const process = (pending: any) => {
     if (!pending || !smart) return null;
     const child = smart.sync(

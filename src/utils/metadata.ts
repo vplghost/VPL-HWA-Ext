@@ -17,7 +17,7 @@ import '../data/clanVersusData.ts';
 
 import { heroMetadata, getHeroMetadata as getTypedHeroMetadata, gearCraftData } from '../data/heroMetadata.ts';
 import { titanMetadata, getTitanMetadata as getTypedTitanMetadata } from '../data/titanMetadata.ts';
-import { getItemName as typedGetItemName, getBuildingName as typedGetBuildingName, getResearchName as typedGetResearchName } from '../data/nameData.ts';
+import { getItemName as typedGetItemName, getBuildingName as typedGetBuildingName, getResearchName as typedGetResearchName, nameData } from '../data/nameData.ts';
 import { heroEquipmentRank, heroSoulProgress, titanSoulProgress } from './popupData.ts';
 
 export interface HeroMeta {
@@ -92,22 +92,31 @@ export function getItemName(category: string, id: number | string): string {
     const tMeta = getTitanMetadata(strId);
     return `${tMeta?.name || `Titan #${strId}`} Titan Soul Stone`;
   }
+  const names = (typeof nameData !== 'undefined' ? nameData : null)
+    || (typeof globalThis !== 'undefined' ? (globalThis as any).hwaHelperNameData : null);
+
   if (category === 'fragmentGear') {
-    const gName = (typeof typedGetItemName === 'function' ? typedGetItemName('gear', strId) : null) || (globalThis as any).hwaHelperNameData?.names?.gear?.[strId] || `Gear #${strId}`;
+    const gName = (typeof typedGetItemName === 'function' ? typedGetItemName('gear', strId) : null)
+      || names?.names?.gear?.[strId]
+      || `Gear #${strId}`;
     return `${gName} Fragment`;
   }
   if (category === 'fragmentArtifact') {
-    const aName = (typeof typedGetItemName === 'function' ? typedGetItemName('artifact', strId) : null) || (globalThis as any).hwaHelperNameData?.names?.artifact?.[strId] || `Artifact #${strId}`;
+    const aName = (typeof typedGetItemName === 'function' ? typedGetItemName('artifact', strId) : null)
+      || names?.names?.artifact?.[strId]
+      || `Artifact #${strId}`;
     return `${aName} Fragment`;
   }
   if (category === 'fragmentScroll') {
-    const sName = (typeof typedGetItemName === 'function' ? typedGetItemName('scroll', strId) : null) || (globalThis as any).hwaHelperNameData?.names?.scroll?.[strId] || `Scroll #${strId}`;
+    const sName = (typeof typedGetItemName === 'function' ? typedGetItemName('scroll', strId) : null)
+      || names?.names?.scroll?.[strId]
+      || `Scroll #${strId}`;
     return `${sName} Fragment`;
   }
 
   const typedItem = typeof typedGetItemName === 'function' ? typedGetItemName(category, strId) : null;
   if (typedItem) return typedItem;
-  const nameMap = (globalThis as any).hwaHelperNameMap;
+  const nameMap = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperNameMap) || null;
   return nameMap?.item?.(category, strId) || `${category} #${strId}`;
 }
 

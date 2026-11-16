@@ -20,6 +20,7 @@ export function sameDay(entry: any, now: number | Date = Date.now()): boolean {
 }
 
 export function dailyDashboard(cache: Record<string, any> = {}, now: number | Date = Date.now()): DailyDashboardResult {
+  const nowMs = now instanceof Date ? now.getTime() : Number(now) || Date.now();
   const data = (key: string) => sameDay(cache[key], now) ? cache[key].data : null;
   const row = (id: string, title: string, icon: string, state: 'pending' | 'done' | 'info' | 'unknown', detail: string): DashboardRow => ({ id, title, icon, state, detail });
   const unknown = 'Waiting for game data';
@@ -56,15 +57,15 @@ export function dailyDashboard(cache: Record<string, any> = {}, now: number | Da
   activities.push(row('hydra', 'Hydra', '🐉', !hydra ? 'unknown' : tries > 0 ? 'pending' : 'info',
     !hydra ? unknown : `${hydra.tries ?? 0} regular · ${hydra.superTries ?? 0} super tries left`));
 
-  const qData = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperQuestData) || questData;
+  const qData = questData || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperQuestData);
   const quests = data('questGetAll');
-  const dailyList = qData?.dailyQuests(cache, now) || null;
+  const dailyList = qData?.dailyQuests(cache, nowMs) || null;
   const openDaily = dailyList?.filter((quest: any) => quest.state === 'inProgress') || [];
   const ready = Array.isArray(quests) ? quests.filter((quest: any) => quest?.state === 2).length : 0;
   const questRows = [row('daily-quests', 'Daily Quests', '📜', openDaily.length || ready ? 'pending' : dailyList || Array.isArray(quests) ? 'info' : 'unknown',
     dailyList ? `${openDaily.length} remaining of ${dailyList.length} · ${ready} rewards ready to claim` :
       Array.isArray(quests) ? `${ready} quest rewards ready to claim · Daily list unavailable` : unknown)];
-  const eventDailies = (qData?.visibleEvents(cache, now) || []).flatMap((event: any) =>
+  const eventDailies = (qData?.visibleEvents(cache, nowMs) || []).flatMap((event: any) =>
     event.groups.filter((group: any) => group.repeatType === 'daily' &&
       group.quests.some((quest: any) => quest.state === 'inProgress')).map((group: any) => ({ event, group })));
   if (eventDailies.length) {

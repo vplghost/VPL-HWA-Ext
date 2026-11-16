@@ -39,6 +39,7 @@ export function buildGearRecipeTree(gearId: number | string | null, cache: any):
     const cycle = ancestors.has(identity);
     const owned = allocate(category, id, required);
     const missing = Math.max(0, required - owned);
+    const globals = typeof globalThis !== 'undefined' ? (globalThis as any) : {};
     const craftMap = (category === 'gear' ? globals.hwaHelperGearCraftData : globals.hwaHelperScrollCraftData)
       || (category === 'gear' ? gearCraftData : scrollCraftData);
     const craftInfo = craftMap?.[id] || (category === 'gear' ? gearCraftData?.[id] : scrollCraftData?.[id]) || null;
