@@ -337,17 +337,29 @@ export function dailyPlan(cache: any, settings: any, now: number, state: any = {
       rows,
     };
   }
-  if (rows.some((row) => !row.done)) {
-    return { action: 'wait', reason: 'Daily resource squads already gathering', rows };
-  }
   const last = order.indexOf(settings.lastAutoMineType);
   const rotating = [...order.slice(last + 1), ...order.slice(0, last + 1)];
   const rotType = rotating.find(
     (t) => !marches.some((m: any) => typeOf(m, cache) === t && m.stage !== 'returnToOutpost' && m.kind !== 'return')
   );
-  return rotType
-    ? { action: 'target', type: rotType, reason: 'Daily chains covered; resource rotation', rows }
-    : { action: 'wait', reason: 'All resource types already gathering', rows };
+  if (rotType) {
+    const hasUnfinishedDaily = rows.some((row) => !row.done);
+    return {
+      action: 'target',
+      type: rotType,
+      reason: hasUnfinishedDaily
+        ? 'Daily resource squads active; rotating other resources'
+        : 'Daily chains covered; resource rotation',
+      rows,
+    };
+  }
+  return {
+    action: 'wait',
+    reason: rows.some((row) => !row.done)
+      ? 'Daily resource squads already gathering'
+      : 'All resource types already gathering',
+    rows,
+  };
 }
 
 export function equal(a: any, b: any): boolean {

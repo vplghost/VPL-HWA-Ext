@@ -8,7 +8,7 @@ labels:
   - gathering
   - spec:smart-auto-gathering
 createdAt: '2026-11-14T11:51:46.317Z'
-updatedAt: '2026-11-14T12:17:19.806Z'
+updatedAt: '2026-11-16T03:39:33.656Z'
 completedAt: '2026-11-14T11:58:02.183Z'
 timeSpent: 232
 spec: specs/smart-auto-gathering
@@ -45,5 +45,7 @@ Blocked by @task-VHE-MA5SJK{blocked-by}
 Implemented verified full-chain target metadata (quest/questChain MD5 verified), Smart opt-in, conservative progress increments since current-day quest snapshot, fresh quest/reset refresh, duplicate-resource prevention, confirmed recall/return state and UI status. Targeted 62 tests passed, including reset, first milestone vs full chain, double counting, unknown plan, account switch and RPC off. Review: no blocking findings; structural RPC matching ignores property order; content timer uses existing bridge context invalidation handling. Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass. System Decision Impact: none — implements task-specific spec choices using established shared RPC and observation patterns.
 
 Final integrated verification: 762 tests total,750 passed,12 optional skipped; typecheck passed; version0.10.80 WXT artifact built and validated. Review PASS (quality/architecture/security/completeness): own-outpost coordinate selection, current-account cache clearing, stale-input refresh, preserved daily baseline, safe pending-probe restart and shared-RPC dispatch gating verified. No live in-game account validation. AC-6 defense remains in separate blocked task VHE-CB9VBW per user-supplied-capture agreement.
+
+Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass
 <!-- SECTION:NOTES:END -->
 

@@ -8,7 +8,7 @@ labels:
   - gathering
   - spec:smart-auto-gathering
 createdAt: '2026-11-14T11:51:46.398Z'
-updatedAt: '2026-11-14T12:17:19.843Z'
+updatedAt: '2026-11-16T03:39:33.899Z'
 completedAt: '2026-11-14T12:01:39.419Z'
 timeSpent: 216
 spec: specs/smart-auto-gathering
@@ -46,5 +46,7 @@ Runtime foundation blocked by @task-VHE-WBZH46{blocked-by}
 Queue start now creates waiting_gather reservation, recalls one eligible nearest gathering squad, waits for confirmed return plus fresh march/unit snapshots, then delegates to existing raid/monster controller. All active queues suppress Smart gather. Interrupted mine retained only after recall success; getMineById validates resource before resume, target consumed only after attackMine confirmation. Runtime account mismatch/recall error/timeout stops pending queue. Focused integration tests 7 passed, including real background/controller wiring and terminal queue resumption; typecheck fix uses explicit storage status shape. Review found stale runtime overwrite after queue transition; fixed by reloading runtime/queue state before auto-gather evaluation. Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass. System Decision Impact: none — implements spec-specific coordination and established confirmed-mutation rules.
 
 Final integrated verification: 762 tests total,750 passed,12 optional skipped; typecheck passed; version0.10.80 WXT artifact built and validated. Review PASS (quality/architecture/security/completeness): own-outpost coordinate selection, current-account cache clearing, stale-input refresh, preserved daily baseline, safe pending-probe restart and shared-RPC dispatch gating verified. No live in-game account validation. AC-6 defense remains in separate blocked task VHE-CB9VBW per user-supplied-capture agreement.
+
+Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass
 <!-- SECTION:NOTES:END -->
 

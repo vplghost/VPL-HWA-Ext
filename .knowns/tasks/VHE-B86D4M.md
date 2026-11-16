@@ -5,7 +5,7 @@ status: done
 priority: high
 labels: []
 createdAt: '2026-11-14T18:00:51.818Z'
-updatedAt: '2026-11-14T18:05:31.456Z'
+updatedAt: '2026-11-16T03:39:31.470Z'
 completedAt: '2026-11-14T18:05:31.456Z'
 timeSpent: 262
 spec: specs/smart-auto-gathering
@@ -36,5 +36,7 @@ Investigate hwa-game-record-202611150055_relaod.json: user configures3 teams but
 
 <!-- SECTION:NOTES:BEGIN -->
 Confirmed startup blocker: capture timeline14 getOutpostSummary:outpost includes own606,376/mapId but was ignored, leaving Smart nearest waiting until getChunks at timeline39. Secondary reproduced bug: generic center587,340 from mine march overrode known own-base center in fixed-level searches. Added account-scoped own summary hydration with identity/time/map validation; prefer outposts[activeAccount] before generic center. Sanitized capture fixture and actual background/reducer/planner regression prove startup recovery without chunks and1→2→3 server-confirmed squads, no fourth; old-account/rejected/invalid/stale/relocated summaries covered. User max3 is the supplied requirement, not an exported setting. The44-entry, ~30s capture contains no helper search/attack request or persisted automation state, so root-cause report explicitly limits conclusions; simulated responses prove regression behavior, not live-game outcome. Full suite789 tests:777 passed,12 optional private-capture skips; typecheck/build PASS at0.10.84. Review: PASS, no P1/P2 remaining; preserved confirmation/freshness/queue/RPC/account guards. Spec Decision Compliance: D1=pass,D2=pass,D3=pass,D4=pass,D5=pass. System Decision Impact: none — fixes enforcement of existing own-outpost/account-scoping rules, no new durable policy. Canonical evidence: @doc/specs/smart-auto-gathering and @doc/api/world-map-rpc-contracts.
+
+Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass
 <!-- SECTION:NOTES:END -->
 

@@ -8,7 +8,7 @@ labels:
   - ux
   - modal
 createdAt: '2026-11-15T16:28:29.883Z'
-updatedAt: '2026-11-15T16:46:30.755Z'
+updatedAt: '2026-11-16T03:39:08.873Z'
 completedAt: '2026-11-15T16:46:30.755Z'
 timeSpent: 0
 assignee: '@me'
@@ -22,9 +22,9 @@ assignee: '@me'
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Create reusable StatusAlertBanner component with normal, loading, success, and error states
-- [ ] #2 Integrate StatusAlertBanner into RaidModal and MonsterModal error banners
-- [ ] #3 Clicking refresh executes troop and march RPC queries and updates status icon to success or error
-- [ ] #4 Unit tests verify banner state transitions and refresh trigger
+- [x] #1 Create reusable StatusAlertBanner component with normal, loading, success, and error states
+- [x] #2 Integrate StatusAlertBanner into RaidModal and MonsterModal error banners
+- [x] #3 Clicking refresh executes troop and march RPC queries and updates status icon to success or error
+- [x] #4 Unit tests verify banner state transitions and refresh trigger
 <!-- AC:END -->
 

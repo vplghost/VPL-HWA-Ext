@@ -236,3 +236,27 @@ test('game load record automatically releases persisted read timeout error on re
   assert.equal(synced.readTimeout, undefined);
   assert.match(synced.notice?.message || '', /Resuming Smart gathering/);
 });
+
+test('dailyPlan rotates to other resource types when active daily quest already has a gathering squad and march slots remain', () => {
+  const c = cache();
+  // Only Food daily quest is present in daily quests
+  c['getDailyQuests:quest'].data.quests = [{ id: 354, progress: 50000, state: 'inProgress' }];
+  // 1 squad is currently gathering food
+  const m1 = { squadId: 's1', mineId: 'm1', kind: 'food', stage: 'gathering', endsAt: now + 3600000 };
+  c.marchStatus.data.marches = [m1];
+
+  // With food squad active and incomplete, dailyPlan must NOT block with 'Daily resource squads already gathering'!
+  // It must rotate to next available resource (iron)!
+  const plan = smart.dailyPlan(c, { lastAutoMineType: 'food' }, now);
+  assert.equal(plan.action, 'target');
+  assert.equal(plan.type, 'iron');
+  assert.match(plan.reason, /rotating other resources/);
+
+  // If both food and iron squads are gathering, it rotates to stone
+  const m2 = { squadId: 's2', mineId: 'm2', kind: 'iron', stage: 'gathering', endsAt: now + 3600000 };
+  c.marchStatus.data.marches = [m1, m2];
+  const plan2 = smart.dailyPlan(c, { lastAutoMineType: 'iron' }, now);
+  assert.equal(plan2.action, 'target');
+  assert.equal(plan2.type, 'stone');
+  assert.match(plan2.reason, /rotating other resources/);
+});

@@ -8,7 +8,7 @@ labels:
   - gathering
   - spec:smart-auto-gathering
 createdAt: '2026-11-14T11:51:46.577Z'
-updatedAt: '2026-11-14T12:44:33.797Z'
+updatedAt: '2026-11-16T03:39:32.185Z'
 completedAt: '2026-11-14T12:43:20.836Z'
 timeSpent: 1070
 spec: specs/smart-auto-gathering
@@ -50,5 +50,7 @@ Missing E6 is resolved by supplied late-load/full-attack captures (SHA256 and co
 Final review PASS: incoming hydration/terminal handling, own-squad targeting, fresh hospital calculation, exact final10s/deadline, simultaneous attack confirmations, cancellation/account group cleanup and guarded mine resumption all wired. Verified774 tests total:762 passed,12 optional skipped; typecheck and validated0.10.81 WXT build passed. Minimal captured fixture is checked in; positive recall tests deliberately simulate insufficient hospital because the real captured hospital has enough free space. Direct and Piggyback behavior documented without a timing guarantee for absent natural RPC traffic. No live in-game validation.
 
 Final follow-up verification after account/Smart-disable cleanup tests:775 total,763 passed,12 optional skipped. Added regression proving queued per-attack defense groups are canceled when switching account or disabling Smart while basic Auto-Gather stays enabled. Rebuilt and validated0.10.81 artifact; no additional unverified behavior remains within task scope.
+
+Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass
 <!-- SECTION:NOTES:END -->
 

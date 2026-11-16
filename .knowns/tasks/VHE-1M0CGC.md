@@ -8,7 +8,7 @@ labels:
   - gathering
   - spec:smart-auto-gathering
 createdAt: '2026-11-14T11:51:46.522Z'
-updatedAt: '2026-11-14T12:17:19.954Z'
+updatedAt: '2026-11-16T03:39:18.192Z'
 completedAt: '2026-11-14T12:06:44.171Z'
 timeSpent: 155
 spec: specs/smart-auto-gathering
@@ -46,5 +46,7 @@ Runtime foundation blocked by @task-VHE-XXCNGQ{blocked-by}
 Priority auto-join now considers Smart slot preemption only after existing rally eligibility. Uses estimated configured return ETA strictly <29s and sufficient start window; reserves one rally, sends one recall, rechecks fresh details after confirmed return, joins once and waits for raid team return before resuming interrupted mine. Join errors/expired/full/departed rally do not rejoin; attempts persisted per account. Added lower-version details guard and account-scoped session attempt keys. Focused 60 tests passed, including full background recall→return→recheck→join flow and exact29s/unknown/insufficient-window bounds. Review pending final integrated verification. Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass. System Decision Impact: none — spec-specific priority arbitration using prior verified RPC lifecycle.
 
 Final integrated verification: 762 tests total,750 passed,12 optional skipped; typecheck passed; version0.10.80 WXT artifact built and validated. Review PASS (quality/architecture/security/completeness): own-outpost coordinate selection, current-account cache clearing, stale-input refresh, preserved daily baseline, safe pending-probe restart and shared-RPC dispatch gating verified. No live in-game account validation. AC-6 defense remains in separate blocked task VHE-CB9VBW per user-supplied-capture agreement.
+
+Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass
 <!-- SECTION:NOTES:END -->
 

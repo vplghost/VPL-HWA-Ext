@@ -8,7 +8,7 @@ labels:
   - gathering
   - spec:smart-auto-gathering
 createdAt: '2026-11-14T11:51:46.461Z'
-updatedAt: '2026-11-14T12:17:19.887Z'
+updatedAt: '2026-11-16T03:39:31.943Z'
 completedAt: '2026-11-14T12:04:08.387Z'
 timeSpent: 148
 spec: specs/smart-auto-gathering
@@ -46,5 +46,7 @@ Runtime foundation blocked by @task-VHE-WBZH46{blocked-by}
 Nearest mode searches one config per level (1–10), retaining bounded account/map/center-scoped candidates, orders Euclidean distance, and probes remaining resource with getMineById. Strict estimated >3600s from verified configured speed; exact3600 and unavailable probes rejected. Interrupted mine bypasses threshold through separate validated resume path. Empty/invalid search does not loop; explicit restart resets search. User approved configured-speed estimate; updated AC accordingly. Focused tests 8 passed, typecheck passed. Review: stale map/center selection resets state, no runtime CDN fetch. Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass. System Decision Impact: none — task-specific estimated mine policy, metadata follows existing hash-verified packaging.
 
 Final integrated verification: 762 tests total,750 passed,12 optional skipped; typecheck passed; version0.10.80 WXT artifact built and validated. Review PASS (quality/architecture/security/completeness): own-outpost coordinate selection, current-account cache clearing, stale-input refresh, preserved daily baseline, safe pending-probe restart and shared-RPC dispatch gating verified. No live in-game account validation. AC-6 defense remains in separate blocked task VHE-CB9VBW per user-supplied-capture agreement.
+
+Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass
 <!-- SECTION:NOTES:END -->
 

@@ -5,7 +5,7 @@ status: done
 priority: high
 labels: []
 createdAt: '2026-11-15T02:56:39.610Z'
-updatedAt: '2026-11-15T02:59:28.912Z'
+updatedAt: '2026-11-16T03:39:33.419Z'
 completedAt: '2026-11-15T02:59:28.912Z'
 timeSpent: 141
 spec: specs/smart-auto-gathering
@@ -38,5 +38,7 @@ User reports getMineById rejected by game: MineNotFound stopping Smart gathering
 Root cause: smart.sync routed every getMineById failure into persistent state.error, and nearestPlan required restart after candidate exhaustion. Reproduced 3 failing regressions before fixing. Exact MineNotFound on mine probe or confirmed attack rejection now invokes skipMine; candidates are excluded60s/bounded50 entries, legacy exact missing-mine stop clears only with no pending request, and nearest scans retry after60s. Actual background test proves another target is attacked with battleType:pve and confirmation waits for game response plus fresh rosters. Review: PASS, no unresolved P1/P2. Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass. System Decision Impact: none — restores existing unavailable-target recovery and bounded read/search backoff without changing product or mutation policy. Canonical: @doc/api/world-map-rpc-contracts.
 
 Final verification0.10.90: 815 tests total,803 passed,12 optional private-log skips; focused smart/background/reload28/28 passed; typecheck and production build passed; git diff --check passed. No new live game capture was supplied, so regression responses are synthetic and no live-account completion is claimed.
+
+Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass
 <!-- SECTION:NOTES:END -->
 

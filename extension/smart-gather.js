@@ -150,11 +150,27 @@
       if (complete.length) return { action: 'recall', march: complete[0], reason: `Daily target reached; switching to ${unserved.type}`, rows };
       return { action: 'target', type: unserved.type, reason: `Daily ${unserved.type}: ${Math.floor(unserved.estimated)}/${unserved.target}`, rows };
     }
-    if (rows.some(row => !row.done)) return { action: 'wait', reason: 'Daily resource squads already gathering', rows };
     const last = order.indexOf(settings.lastAutoMineType);
     const rotating = [...order.slice(last + 1), ...order.slice(0, last + 1)];
-    const type = rotating.find(type => !marches.some(m => typeOf(m, cache) === type && m.stage !== 'returnToOutpost' && m.kind !== 'return'));
-    return type ? { action: 'target', type, reason: 'Daily chains covered; resource rotation', rows } : { action: 'wait', reason: 'All resource types already gathering', rows };
+    const type = rotating.find(t => !marches.some(m => typeOf(m, cache) === t && m.stage !== 'returnToOutpost' && m.kind !== 'return'));
+    if (type) {
+      const hasUnfinishedDaily = rows.some(row => !row.done);
+      return {
+        action: 'target',
+        type,
+        reason: hasUnfinishedDaily
+          ? 'Daily resource squads active; rotating other resources'
+          : 'Daily chains covered; resource rotation',
+        rows
+      };
+    }
+    return {
+      action: 'wait',
+      reason: rows.some(row => !row.done)
+        ? 'Daily resource squads already gathering'
+        : 'All resource types already gathering',
+      rows
+    };
   }
   function equal(a, b) {
     if (a === b) return true;

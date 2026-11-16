@@ -5,7 +5,7 @@ status: done
 priority: medium
 labels: []
 createdAt: '2026-11-14T17:38:04.358Z'
-updatedAt: '2026-11-14T17:40:08.363Z'
+updatedAt: '2026-11-16T03:39:32.936Z'
 completedAt: '2026-11-14T17:40:08.363Z'
 timeSpent: 94
 spec: specs/smart-auto-gathering
@@ -35,5 +35,7 @@ User changes attacked-mine recall eligibility: wounded troops must exceed 50% to
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented strict occupancy guard room.wounded > room.capacity *0.5, with positive known capacity; retained fresh march/unit validation and all existing attack/lifecycle protections. UI now states the50% threshold. Spec D4 and SG-6/AC-6, user-facing docs and attack contract updated; existing memory6jiqu0 refreshed. Tests cover below/equal/above50%, squad-size independence, missing/stale/zero capacity and wake-time recheck; all15 mine-defense tests pass. Full suite786 tests:774 passed,12 optional private-log skips. Typecheck/build PASS. Review: PASS — narrow predicate/UI change; no P1/P2 findings. Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass (threshold updated per user's2026-11-15 instruction), D5=pass. System Decision Impact: none — threshold is maintained canonically in the linked spec's D4; no duplicate System Decision candidate created.
+
+Spec Decision Compliance: D1=pass, D2=pass, D3=pass, D4=pass, D5=pass
 <!-- SECTION:NOTES:END -->
 
