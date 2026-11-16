@@ -9,6 +9,7 @@ import { renderToString } from '@vue/server-renderer';
 import * as viewHelpers from '../src/utils/guildVersusView.ts';
 import { normalizeArray } from '../src/utils/troops.ts';
 import * as clanVersusDataModule from '../src/data/clanVersusData.ts';
+import * as popupDataModule from '../src/utils/popupData.ts';
 const require = createRequire(import.meta.url);
 const current = Vue.ref({});
 const { descriptor } = parse(await readFile(new URL('../src/components/dialogs/GuildVersusModal.vue', import.meta.url), 'utf8'));
@@ -19,7 +20,8 @@ const imports = {
   '@/src/composables/useRpcCache': { useRpcCache: () => ({ cache: current }) },
   '@/src/utils/guildVersusView': viewHelpers,
   '@/src/utils/troops': { normalizeArray },
-  '@/src/data/clanVersusData': clanVersusDataModule
+  '@/src/data/clanVersusData': clanVersusDataModule,
+  '@/src/utils/popupData': popupDataModule,
 };
 new Function('require', 'module', 'exports', js)(name => imports[name] || require(name), module, module.exports);
 const Component = module.exports.default;

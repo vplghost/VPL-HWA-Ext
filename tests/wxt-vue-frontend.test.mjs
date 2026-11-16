@@ -939,7 +939,7 @@ test('Prevent TypeError Symbol(Symbol.iterator) regressions on startup with obje
 
   // 2. TowerModal buff order safe normalization
   const towerModal = await readFile(join(root, 'src/components/dialogs/TowerModal.vue'), 'utf8');
-  assert.match(towerModal, /Array\.isArray\(\(globalThis as any\)\.hwaHelperTowerAutomation\?\.DEFAULT_BUFF_PRIORITY\)/, 'TowerModal must verify DEFAULT_BUFF_PRIORITY is array');
+  assert.match(towerModal, /Array\.isArray\(DEFAULT_BUFF_PRIORITY\)/, 'TowerModal must verify DEFAULT_BUFF_PRIORITY is array');
   assert.match(towerModal, /const savedList = Array\.isArray\(saved\) \? saved : \[\];/, 'TowerModal must ensure savedList is array');
 
   // 3. useSquadTeams availableHeroIds safe spread

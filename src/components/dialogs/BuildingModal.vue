@@ -17,12 +17,10 @@ import {
 } from '@/src/data/buildingData';
 import { buildingQueueService } from '@/src/services/queues/buildingQueue';
 
-// Resolve helper with fallback to typed module for runtime, and globalThis for test harness
 const bHelper = (typeof buildingDataHelper !== 'undefined' ? buildingDataHelper : null)
-  || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingData);
-
+  || (typeof globalThis !== 'undefined' ? ((globalThis as any).buildingDataHelper || (globalThis as any).hwaHelperBuildingData) : null);
 const bQueueHelper = (typeof buildingQueueService !== 'undefined' ? buildingQueueService : null)
-  || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperBuildingQueue);
+  || (typeof globalThis !== 'undefined' ? ((globalThis as any).buildingQueueService || (globalThis as any).hwaHelperBuildingQueue) : null);
 
 const getBuildingLevelData = (id: any, lvl: any) =>
   bHelper?.getBuildingLevelData?.(id, lvl)
@@ -315,9 +313,9 @@ const allBuildingsList = computed(() => {
     }
   }
 
-  const allDict = (typeof nameData !== 'undefined' ? nameData?.names?.building : undefined)
-    || (globalThis as any).hwaHelperNameData?.names?.building
-    || {};
+  const names = (typeof nameData !== 'undefined' ? nameData : null)
+    || (typeof globalThis !== 'undefined' ? ((globalThis as any).nameData || (globalThis as any).hwaHelperNameMap) : null);
+  const allDict = names?.names?.building || names?.building || {};
   for (const key of Object.keys(allDict)) {
     const bId = Number(key);
     if (!buildingMap.has(bId)) {

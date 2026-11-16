@@ -4,6 +4,8 @@ import { questRefreshCalls, sendQuestClaim } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { normalizeArray } from '@/src/utils/troops';
 import { questData } from '@/src/data/questData';
+import { getItemName } from '@/src/data/nameData';
+import { questLocaleMap } from '@/src/utils/popupData';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -97,7 +99,7 @@ function parseRewardText(reward: any): string {
       parts.push(`${Number(value).toLocaleString()} ${label}`);
     } else if (value && typeof value === 'object') {
       for (const [id, amount] of Object.entries(value)) {
-        const itemLabel = (globalThis as any).hwaHelperNameMap?.item?.(kind, id) || `${kind} #${id}`;
+        const itemLabel = getItemName(kind, id) || `${kind} #${id}`;
         parts.push(`${Number(amount).toLocaleString()} × ${itemLabel}`);
       }
     }
@@ -185,7 +187,7 @@ const allItems = computed<QuestCardItem[]>(() => {
       const qAllEntry = qAllMap.get(qIdStr);
 
       const repeatLabel = group.repeatType === 'daily' ? 'Event Daily' : 'Event Chain';
-      const questLocMap = (globalThis as any).hwaHelperPopupData?.questLocaleMap || {};
+      const questLocMap = questLocaleMap || {};
       const groupTitle = questData?.groupTitle
         ? questData.groupTitle(group.localeKey)
         : group.localeKey

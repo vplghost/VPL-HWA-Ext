@@ -3,6 +3,7 @@ import { ref, computed, watch, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { normalizeArray } from '@/src/utils/troops';
 import { guildVersusView, displayMetric, metric, metricPercent, challengeConvertedPoints } from '@/src/utils/guildVersusView';
+import { getChallengeResourceStock } from '@/src/utils/popupData';
 import {
   clanVersusChestThresholds,
   clanVersusRewards,
@@ -99,8 +100,10 @@ const currentTheme = computed(() => currentRound.value?.theme || (roundNumber.va
 const roundsList = computed(() => view.value.rounds);
 
 function getResourceStock(target: string | number): number | null {
-  const pData = (globalThis as any).hwaHelperPopupData;
-  return pData?.getChallengeResourceStock?.(cache.value, target) ?? null;
+  const fn = typeof getChallengeResourceStock === 'function'
+    ? getChallengeResourceStock
+    : (typeof globalThis !== 'undefined' ? ((globalThis as any).getChallengeResourceStock || (globalThis as any).hwaHelperPopupData?.getChallengeResourceStock) : null);
+  return fn ? fn(cache.value, target) : null;
 }
 
 function getQuestDisplayName(q: { label: string }): string {

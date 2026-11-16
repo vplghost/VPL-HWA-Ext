@@ -10,6 +10,8 @@ import { renderToString } from '@vue/server-renderer';
 import { deriveDailyDefinitions, conditionTitle } from '../scripts/generate-quest-data.mjs';
 import { normalizeArray } from '../src/utils/troops.ts';
 import * as questDataModule from '../src/data/questData.ts';
+import * as nameDataModule from '../src/data/nameData.ts';
+import * as popupDataModule from '../src/utils/popupData.ts';
 
 // Reduced pinned remote config, plus sanitized getDailyQuests from firstattack timeline 11.
 const fixture = JSON.parse(await readFile(new URL('fixtures/daily-quest-config.json', import.meta.url)));
@@ -58,7 +60,9 @@ const imports = {
   '@/src/composables/useRpcCache': { useRpcCache: () => ({ cache: current }) },
   '@/src/utils/dialogRpc': { questRefreshCalls: () => [], sendQuestClaim: () => ({ ok: false }) },
   '@/src/utils/troops': { normalizeArray },
-  '@/src/data/questData': questDataModule
+  '@/src/data/questData': questDataModule,
+  '@/src/data/nameData': nameDataModule,
+  '@/src/utils/popupData': popupDataModule,
 };
 new Function('require', 'module', 'exports', js)(name => imports[name] || require(name), module, module.exports);
 async function render(quests) {

@@ -19,12 +19,10 @@ import {
 } from '@/src/data/researchData';
 import { researchQueueService } from '@/src/services/queues/researchQueue';
 
-// Resolve helper with fallback to typed module for runtime, and globalThis for test harness
 const rHelper = (typeof researchDataHelper !== 'undefined' ? researchDataHelper : null)
-  || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchData);
-
+  || (typeof globalThis !== 'undefined' ? ((globalThis as any).researchDataHelper || (globalThis as any).hwaHelperResearchData) : null);
 const rQueueHelper = (typeof researchQueueService !== 'undefined' ? researchQueueService : null)
-  || (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperResearchQueue);
+  || (typeof globalThis !== 'undefined' ? ((globalThis as any).researchQueueService || (globalThis as any).hwaHelperResearchQueue) : null);
 
 const getMaxLevel = (id: any) =>
   rHelper?.getMaxLevel?.(id)
@@ -343,9 +341,9 @@ const allResearchesList = computed(() => {
     }
   }
 
-  const allDict = (typeof nameData !== 'undefined' ? nameData?.names?.research : undefined)
-    || (globalThis as any).hwaHelperNameData?.names?.research
-    || {};
+  const names = (typeof nameData !== 'undefined' ? nameData : null)
+    || (typeof globalThis !== 'undefined' ? ((globalThis as any).nameData || (globalThis as any).hwaHelperNameMap) : null);
+  const allDict = names?.names?.research || names?.research || {};
   for (const key of Object.keys(allDict)) {
     const rId = Number(key);
     if (!researchMap.has(rId)) {
