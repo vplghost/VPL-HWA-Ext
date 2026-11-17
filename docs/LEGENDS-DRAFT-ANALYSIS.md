@@ -195,32 +195,49 @@ Các tọa độ click chuột trên `canvas#gameCanvas` phản ánh chính xác
 
 ## 6. Các Phương Án Giải Mã Khả Thi (Decryption & Reverse Engineering)
 
-### Phương Án 1: Hook Trực Tiếp Bộ Nhớ WebAssembly / Unity Runtime (Khả Thi Tuyệt Đối - Đề Xuất)
+### Phương Án 1: Hook Trực Tiếp Bộ Nhớ WebAssembly / Unity Runtime (Khả Thi Tuyệt Đối - Đã Triển Khai)
 
-Vì client game chạy trên nền tảng **Unity WebGL compiled bằng Emscripten sang WebAssembly (`.wasm`)**, game engine bắt buộc phải giải mã buffer `draft` thành các đối tượng C#/C++ trong bộ nhớ (`Module.HEAPU8`) để Unity render các mô hình 3D thẻ bài tướng lên canvas.
+Vì client game chạy trên nền tảng **Unity WebGL compiled bằng Emscripten sang WebAssembly (`.wasm`)**, game engine bắt buộc phải giải mã buffer `draft` thành các đối tượng C#/C++ trong bộ nhớ (`Module.HEAPU8` / `Module.HEAPU32`) để Unity render các mô hình 3D thẻ bài tướng lên canvas.
+
+> [!NOTE]
+> **Hiện trạng kiến trúc mã nguồn:** Toàn bộ extension hiện tại vận hành hoàn toàn trên nền tảng **WXT + TypeScript**. Các file JavaScript đơn lẻ trong thư mục `extension/` (`extension/*.js`) là phiên bản cũ (legacy) và không còn được sử dụng trong bản build. Mã nguồn inject trực tiếp vào trang web hiện tại là:
+> - `entrypoints/interceptor.content.ts` -> [`src/content/interceptor.ts`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/src/content/interceptor.ts) (thực thi ở `world: "MAIN"`, can thiệp trực tiếp vào context của game và Unity WebAssembly).
+> - `entrypoints/bridge.content.ts` -> [`src/content/bridge.ts`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/src/content/bridge.ts) (thực thi ở `world: "ISOLATED"`, làm cầu nối giữa trang game và chrome extension storage / UI).
 
 ```mermaid
 flowchart LR
     A["Server RPC: randomDraft_getInfo"] -->|"draft Base64 buffer"| B["Unity WebAssembly (.wasm)"]
-    B -->|"Native C# Decryption / Deserializer"| C["WASM Memory HEAPU8"]
+    B -->|"Native C# Decryption / Deserializer"| C["WASM Memory HEAPU32 / HEAPU8"]
     C -->|"Instantiate Cards"| D["Canvas 3D Render"]
     
-    E["extension/intercept.js (World: MAIN)"] -.->|"Hook UTF8ToString / HEAP Scan"| C
+    E["src/content/interceptor.ts (World: MAIN)"] -.->|"Hook HEAPU32 candidate scan & UTF8/AsciiToString"| C
     E -->|"Extract 15 Hero IDs"| F["window.__hwa_legend_draft_candidates"]
-    F -->|"Extension Message Bridge"| G["DraftModal.vue (Extension UI)"]
+    F -->|"Bridge Message"| G["src/content/bridge.ts (ISOLATED)"]
+    G -->|"Storage rpcCache / sessionLog"| H["DraftModal.vue & LogTab.vue"]
 ```
 
-#### Kiến Trúc Kỹ Thuật:
-1. **Môi trường thực thi:** Extension đã có sẵn script inject chạy ở context `world: "MAIN"` thông qua [`extension/intercept.js`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/extension/intercept.js).
-2. **Điểm can thiệp (Hook Points):**
-   - Hook các hàm xuất chuỗi của Emscripten: `Module.UTF8ToString`, `Module.AsciiToString`, `Module.stringToUTF8`.
-   - Hook các `dynCall` hoặc hàm nạp dữ liệu mảng thẻ bài khi Unity chuyển cảnh vào Legend Draft.
-3. **Cơ chế bắt ứng viên:**
-   - Ngay khi Unity gọi hàm phân giải gói `draft`, Extension bắt mảng 15 Hero IDs và cấu hình sao/trang bị.
-   - Bắn sự kiện sang Extension Cache (`cache.legendDraft.candidates`).
-4. **Ưu điểm:**
-   - Không cần phá mã thuật toán mã hóa của máy chủ.
-   - Bất chấp máy chủ thay đổi khóa (seed) hay thuật toán sinh khóa phiên, dữ liệu sau giải mã trong bộ nhớ client luôn là dữ liệu chuẩn xác 100%.
+#### Kiến Trúc Kỹ Thuật Đã Triển Khai:
+1. **Môi trường thực thi:**
+   - Script chạy ở context `world: "MAIN"` thông qua [`src/content/interceptor.ts`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/src/content/interceptor.ts), truy cập trực tiếp biến toàn cục `window.Module` và `window.gameInstance`.
+2. **Hook bộ nhớ WebAssembly & Quét mảng ứng viên (`scanCandidateHeroArrays`):**
+   - Đọc con trỏ bộ nhớ `Module.HEAPU32` và `Module.HEAPU8`.
+   - Tìm kiếm cấu trúc mảng IL2CPP chứa chính xác 15 ứng viên (5 vòng x 3 thẻ) hoặc 25 ứng viên (lịch sử).
+   - Hàm xác thực ID tướng `isValidHeroId(val)` hỗ trợ cả tướng thông thường (`1..150`) và tướng đặc biệt (`500..599` như Kayla 500, Corvus 501, Morrigan 502, Alvanor 503).
+   - Kiểm tra tính phân bố độc lập (distinct chunks) giữa các bước draft để loại trừ dữ liệu rác.
+3. **Hook các hàm xuất chuỗi của Emscripten (`instrumentModuleStrings`):**
+   - Hook `Module.UTF8ToString`, `Module.AsciiToString`, và `Module.stringToUTF8` để bắt các chuỗi liên quan đến `hero`, `draft`, `randomDraft`.
+4. **Hệ thống chẩn đoán & Ghi log phiên Draft (Draft Diagnostics & Session Logging):**
+   - Cung cấp công tắc bật/tắt (Toggle) trong hộp thoại Log ([`src/components/tabs/LogTab.vue`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/src/components/tabs/LogTab.vue)) để tránh làm rối giao diện Draft chính và tiện dọn dẹp sau này.
+   - Khi bật ghi log, mọi sự kiện:
+     - Gói tin RPC gửi đi (`randomDraft_saveDefence`, `randomDraft_saveAttack`, `randomDraft_startBattle`, `randomDraft_result`).
+     - Gói tin RPC nhận về chứa kết quả stage, draft ciphertext, đối thủ.
+     - Kết quả quét bộ nhớ WASM HEAP (mảng ứng viên phát hiện, offset ciphertext, chuỗi trích xuất).
+     đều được lưu vào `chrome.storage.local.legendDraftSessionLog` (giới hạn 500 bản ghi).
+   - Nút **"Export Draft Session Log"** trong `LogTab.vue` cho phép xuất toàn bộ log này thành tệp JSON có cấu trúc để phục vụ nghiên cứu và hoàn thiện bộ giải mã thuần.
+   - Nút **"Clear Draft Logs"** cho phép làm sạch bộ nhớ log bất kỳ lúc nào.
+5. **Ưu điểm:**
+   - Hoạt động 100% độc lập, không phụ thuộc vào việc đảo ngược thuật toán sinh khóa phiên của server.
+   - Tự động bắt đúng pool 15 tướng ứng viên ngay khi client Unity hoàn tất giải mã trong bộ nhớ.
 
 ---
 
@@ -268,10 +285,14 @@ Hệ thống Legend Draft hiện đã được xây dựng hoàn thiện các l�
 4. **Dữ Liệu Thử Nghiệm ([`src/utils/popupData.ts`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/src/utils/popupData.ts)):**
    - Hàm `observedDraftChoices` đã lưu trữ dữ liệu thực nghiệm chuẩn của các trận đã ghi nhận, phục vụ kiểm thử và mô phỏng offline.
 
+5. **Chẩn Đoán & Xuất Dữ Liệu Phiên Draft ([`src/components/tabs/LogTab.vue`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/src/components/tabs/LogTab.vue)):**
+   - Hộp thoại Log cung cấp khu vực chẩn đoán riêng (`#legend-draft-log-section`) với công tắc bật/tắt ghi log, hiển thị huy hiệu số lượng log, nút xóa log và nút xuất JSON log phiên draft.
+   - Giữ giao diện DraftModal luôn gọn gàng, tách biệt phần debug sang tab Log.
+
 ---
 
 ## 8. Lộ Trình Triển Khai Tiếp Theo
 
-1. **Giai đoạn 1 (Hiện tại):** Duy trì và tối ưu giao diện DraftModal với 3 lựa chọn mỗi vòng, hiển thị cảnh báo an toàn và ghi nhận toàn bộ payload `draft` vào telemetry log.
-2. **Giai đoạn 2 (Trọng tâm kế tiếp):** Triển khai module hook bộ nhớ `HEAPU8` trong [`extension/intercept.js`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/extension/intercept.js) để bắt tự động 15 Candidate Hero IDs từ WebAssembly khi Unity khởi tạo giao diện Draft.
-3. **Giai đoạn 3 (Giải mã thuần):** Sau khi có thêm dữ liệu bắt từ WASM, phân tích hoàn chỉnh thuật toán Keystream để tiến tới bộ giải mã `decodeDraftPayload(base64String)` chạy độc lập 100% bằng JavaScript.
+1. **Giai đoạn 1 (Đã hoàn thành):** Xây dựng giao diện DraftModal với 3 lựa chọn mỗi vòng, hiển thị đối thủ, cảnh báo an toàn và chặn chọn sai tướng gây `ValidationError`.
+2. **Giai đoạn 2 (Đã hoàn thành):** Triển khai module hook bộ nhớ `Module.HEAPU32` / `HEAPU8` trong [`src/content/interceptor.ts`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/src/content/interceptor.ts), quét ma trận 15 ứng viên (hỗ trợ cả dải tướng đặc biệt 500..599), hook hàm xuất chuỗi của Emscripten, tích hợp cơ chế ghi log và xuất JSON trong `LogTab.vue`.
+3. **Giai đoạn 3 (Giải mã thuần độc lập):** Sử dụng các file log xuất được từ các phiên thi đấu thực tế để phân tích đối sánh Keystream, hoàn thiện hàm giải mã nhị phân `decodeDraftPayload(base64String)` chạy thuần túy bằng JavaScript.

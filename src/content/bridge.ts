@@ -18,16 +18,18 @@ export interface BridgeControlMessage {
   popupRpcEnabled: boolean;
   socketRefreshMode: string;
   recordingActive: boolean;
+  legendDraftLoggingEnabled?: boolean;
 }
 
 export function createControlPayload(
   settings: BridgeSettings | null,
   popupRpcEnabled: boolean,
   socketRefreshMode: string,
-  recordingActive: boolean
+  recordingActive: boolean,
+  legendDraftLoggingEnabled?: boolean
 ): BridgeControlMessage | null {
   if (!settings) return null;
-  return {
+  const payload: BridgeControlMessage = {
     source: 'hwa-helper-config',
     kind: 'control',
     interceptEnabled: settings.interceptEnabled !== false,
@@ -35,6 +37,10 @@ export function createControlPayload(
     socketRefreshMode,
     recordingActive
   };
+  if (typeof legendDraftLoggingEnabled === 'boolean') {
+    payload.legendDraftLoggingEnabled = legendDraftLoggingEnabled;
+  }
+  return payload;
 }
 
 export function createBridgeTimeoutManager(customWin?: any) {
@@ -143,11 +149,12 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   let socketRefreshMode = 'direct';
   let recordingActive = false;
   let recordingStateObserved = false;
+  let legendDraftLoggingEnabled = false;
   let freeSpinAccountId: string | null = null;
 
   function sendControl() {
     if (!currentSettings) return;
-    const payload = createControlPayload(currentSettings, popupRpcEnabled, socketRefreshMode, recordingActive);
+    const payload = createControlPayload(currentSettings, popupRpcEnabled, socketRefreshMode, recordingActive, legendDraftLoggingEnabled);
     if (payload) {
       win.postMessage(payload, win.location?.origin || '*');
     }
@@ -285,6 +292,20 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
             win.chrome?.storage?.local?.set?.({ rpcCache: cache });
           })?.catch?.(() => {});
         }
+      } catch (_) {}
+      return;
+    }
+
+    if (event.data.kind === 'legend-draft-log-entry' && event.data.entry) {
+      try {
+        win.chrome?.storage?.local?.get?.('legendDraftSessionLog')?.then?.((stored: any) => {
+          const logs = Array.isArray(stored?.legendDraftSessionLog) ? stored.legendDraftSessionLog : [];
+          logs.push(event.data.entry);
+          if (logs.length > 500) {
+            logs.splice(0, logs.length - 500);
+          }
+          win.chrome?.storage?.local?.set?.({ legendDraftSessionLog: logs });
+        })?.catch?.(() => {});
       } catch (_) {}
       return;
     }
@@ -588,7 +609,8 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     'dungeonRun',
     'buildingQueue',
     'researchQueue',
-    'gameEngineStatus'
+    'gameEngineStatus',
+    'legendDraftLoggingEnabled'
   ]).then((stored: any) => {
     const currentExtVersion = win.chrome?.runtime?.getManifest?.()?.version;
     const hasCanvas = typeof doc?.querySelector === 'function' && Boolean(doc.querySelector('canvas#unity-canvas, canvas#canvas, canvas'));
@@ -612,6 +634,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     if (stored?.captureSettings) currentSettings = { ...currentSettings, ...stored.captureSettings };
     if (stored?.popupRpcEnabled !== undefined) popupRpcEnabled = Boolean(stored.popupRpcEnabled);
     if (stored?.socketRefreshMode) socketRefreshMode = ['piggyback', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'direct';
+    if (stored?.legendDraftLoggingEnabled !== undefined) legendDraftLoggingEnabled = Boolean(stored.legendDraftLoggingEnabled);
     const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
     if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
     sendControl();
@@ -667,6 +690,10 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       }
       if ('socketRefreshMode' in changes) {
         socketRefreshMode = ['piggyback', 'mqtt-piggyback'].includes(changes.socketRefreshMode.newValue) ? changes.socketRefreshMode.newValue : 'direct';
+        configChanged = true;
+      }
+      if ('legendDraftLoggingEnabled' in changes) {
+        legendDraftLoggingEnabled = changes.legendDraftLoggingEnabled.newValue === true;
         configChanged = true;
       }
       if (configChanged) sendControl();

@@ -189,3 +189,120 @@ test('bridge handles legend-draft-hook-result and populates rpcCache.legendDraft
   await new Promise((r) => setTimeout(r, 10));
   assert.deepEqual(storedData.rpcCache.legendDraft.candidates, sampleCandidates);
 });
+
+test('isValidHeroId supports standard heroes [1..150] and special heroes [500..599]', () => {
+  const { context } = setupInterceptContext();
+  const hook = context.window.__hwaLegendDraftHook;
+
+  assert.equal(hook.isValidHeroId(1), true);
+  assert.equal(hook.isValidHeroId(78), true);
+  assert.equal(hook.isValidHeroId(150), true);
+  // Special heroes: Kayla 500, Corvus 501, Morrigan 502, Alvanor 503
+  assert.equal(hook.isValidHeroId(500), true);
+  assert.equal(hook.isValidHeroId(501), true);
+  assert.equal(hook.isValidHeroId(502), true);
+  assert.equal(hook.isValidHeroId(510), true);
+
+  // Invalid IDs
+  assert.equal(hook.isValidHeroId(0), false);
+  assert.equal(hook.isValidHeroId(-5), false);
+  assert.equal(hook.isValidHeroId(151), false);
+  assert.equal(hook.isValidHeroId(499), false);
+  assert.equal(hook.isValidHeroId(600), false);
+  assert.equal(hook.isValidHeroId(99999), false);
+  assert.equal(hook.isValidHeroId('50'), false);
+});
+
+test('scanCandidateHeroArrays detects 15-hero pool containing special heroes (500+)', () => {
+  const { context } = setupInterceptContext();
+  const hook = context.window.__hwaLegendDraftHook;
+
+  const heapU32 = new Uint32Array(512);
+  heapU32[10] = 15; // 15-hero pool (5 rounds x 3 cards)
+  const pool15 = [
+    500, 49, 12,    // Step 1: Kayla (500), Heidi (49), Astaroth (12)
+    501, 20, 38,    // Step 2: Corvus (501), ...
+    502, 2, 25,     // Step 3: Morrigan (502), ...
+    37, 73, 28,     // Step 4
+    5, 35, 17       // Step 5
+  ];
+  for (let i = 0; i < 15; i++) {
+    heapU32[11 + i] = pool15[i];
+  }
+
+  const results = hook.scanCandidateHeroArrays(heapU32);
+  assert.ok(results.length >= 1, 'Must detect 15-hero pool with special hero IDs');
+  assert.equal(results[0].count, 15);
+  assert.deepEqual([...results[0].heroIds], pool15);
+});
+
+test('draft logging toggle controls RPC and WASM scan emission', () => {
+  const { context, windowMessages } = setupInterceptContext();
+  const hook = context.window.__hwaLegendDraftHook;
+
+  assert.equal(hook.isLoggingEnabled(), false);
+
+  // When disabled, no log messages emitted
+  hook.handleLegendDraftRpcRequest(JSON.stringify({ calls: [{ name: 'randomDraft_saveDefence', args: { heroes: [1, 2, 3, 4, 5] } }] }));
+  assert.equal(windowMessages.filter((m) => m.kind === 'legend-draft-log-entry').length, 0);
+
+  // Enable logging
+  hook.setLoggingEnabled(true);
+  assert.equal(hook.isLoggingEnabled(), true);
+
+  // RPC Request emission
+  hook.handleLegendDraftRpcRequest(JSON.stringify({ calls: [{ name: 'randomDraft_saveDefence', args: { heroes: [1, 2, 3, 4, 5] } }] }));
+  const reqLog = windowMessages.find((m) => m.kind === 'legend-draft-log-entry' && m.entry?.type === 'rpc-request');
+  assert.ok(reqLog, 'Must emit rpc-request log entry when enabled');
+  assert.equal(reqLog.entry.calls[0].name, 'randomDraft_saveDefence');
+
+  // RPC Response emission
+  hook.handleLegendDraftRpcResponse(JSON.stringify({ results: [{ ident: 'randomDraft_saveDefence', result: { response: { ok: true } } }] }));
+  const resLog = windowMessages.find((m) => m.kind === 'legend-draft-log-entry' && m.entry?.type === 'rpc-response');
+  assert.ok(resLog, 'Must emit rpc-response log entry when enabled');
+});
+
+test('bridge stores legend-draft-log-entry in chrome.storage.local.legendDraftSessionLog', async () => {
+  let storedData = {
+    legendDraftSessionLog: []
+  };
+
+  const listeners = [];
+  const window = {
+    addEventListener: (name, handler) => { if (name === 'message') listeners.push(handler); },
+    postMessage: (data, origin) => {
+      for (const h of listeners) h({ source: window, origin, data });
+    }
+  };
+
+  const chrome = {
+    runtime: { id: 'test-ext', sendMessage: async () => ({}) },
+    storage: {
+      local: {
+        get: async (key) => (key === 'legendDraftSessionLog' ? { legendDraftSessionLog: storedData.legendDraftSessionLog } : storedData),
+        set: async (val) => { Object.assign(storedData, val); }
+      }
+    }
+  };
+
+  window.chrome = chrome;
+  window.document = { readyState: 'complete', getElementById: () => ({}) };
+  window.location = { origin: 'https://www.hero-wars-alliance.com' };
+  installBridge(window);
+
+  window.postMessage({
+    source: 'hwa-helper-api',
+    kind: 'legend-draft-log-entry',
+    entry: {
+      id: 'test-entry-1',
+      type: 'rpc-request',
+      calls: [{ name: 'randomDraft_getInfo' }]
+    }
+  }, 'https://www.hero-wars-alliance.com');
+
+  // Allow storage promise to resolve
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(storedData.legendDraftSessionLog.length, 1);
+  assert.equal(storedData.legendDraftSessionLog[0].id, 'test-entry-1');
+  assert.equal(storedData.legendDraftSessionLog[0].type, 'rpc-request');
+});

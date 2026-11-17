@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRecorder } from '@/src/composables/useRecorder';
 import { downloadJson } from '@/src/utils/metadata';
 import {
@@ -102,6 +102,104 @@ async function handleFileSelect(event: Event) {
     if (input) input.value = '';
   }
 }
+
+// Legends Draft Logging state & actions
+const legendDraftLoggingEnabled = ref(false);
+const draftLogsCount = ref(0);
+const lastDraftMatchId = ref<string | number | null>(null);
+const draftLogStatus = ref<string | null>(null);
+
+async function loadDraftLogStats() {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local?.get) return;
+  try {
+    const stored = await chrome.storage.local.get([
+      'legendDraftLoggingEnabled',
+      'legendDraftSessionLog',
+      'rpcCache'
+    ]);
+    legendDraftLoggingEnabled.value = Boolean(stored.legendDraftLoggingEnabled);
+    draftLogsCount.value = Array.isArray(stored.legendDraftSessionLog) ? stored.legendDraftSessionLog.length : 0;
+    lastDraftMatchId.value = stored.rpcCache?.legendDraft?.matchId || null;
+  } catch (_) {}
+}
+
+async function handleDraftLoggingToggle() {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local?.set) return;
+  try {
+    await chrome.storage.local.set({ legendDraftLoggingEnabled: legendDraftLoggingEnabled.value });
+    draftLogStatus.value = legendDraftLoggingEnabled.value
+      ? 'Đã bật ghi log phiên Draft (randomDraft). Các gói RPC và bộ nhớ WebAssembly sẽ được ghi lại.'
+      : 'Đã tắt ghi log phiên Draft.';
+  } catch (err: any) {
+    draftLogStatus.value = `Lỗi cập nhật cài đặt: ${err?.message || err}`;
+  }
+}
+
+async function exportDraftLog() {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local?.get) return;
+  try {
+    const stored = await chrome.storage.local.get([
+      'legendDraftSessionLog',
+      'legendDraftHookTelemetry',
+      'rpcCache'
+    ]);
+    const payload = {
+      _format: 'hwa-legend-draft-session-log',
+      _version: 1,
+      _exportedAt: new Date().toISOString(),
+      matchId: stored.rpcCache?.legendDraft?.matchId || null,
+      candidates: stored.rpcCache?.legendDraft?.candidates || [],
+      lastTelemetry: stored.legendDraftHookTelemetry || null,
+      entriesCount: Array.isArray(stored.legendDraftSessionLog) ? stored.legendDraftSessionLog.length : 0,
+      logs: stored.legendDraftSessionLog || []
+    };
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadJson(`hwa-legend-draft-session-${dateStr}.json`, payload);
+    draftLogStatus.value = `Đã xuất ${payload.entriesCount} dòng log phiên draft ra tệp JSON thành công!`;
+  } catch (err: any) {
+    draftLogStatus.value = `Xuất draft log thất bại: ${err?.message || err}`;
+  }
+}
+
+async function clearDraftLog() {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local?.set) return;
+  try {
+    await chrome.storage.local.set({ legendDraftSessionLog: [] });
+    draftLogsCount.value = 0;
+    draftLogStatus.value = 'Đã xóa toàn bộ log phiên draft hiện tại.';
+  } catch (err: any) {
+    draftLogStatus.value = `Xóa draft log thất bại: ${err?.message || err}`;
+  }
+}
+
+let draftStorageListener: ((changes: any, area: string) => void) | null = null;
+
+onMounted(() => {
+  loadDraftLogStats();
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    draftStorageListener = (changes: any, area: string) => {
+      if (area !== 'local') return;
+      if ('legendDraftLoggingEnabled' in changes) {
+        legendDraftLoggingEnabled.value = changes.legendDraftLoggingEnabled.newValue === true;
+      }
+      if ('legendDraftSessionLog' in changes) {
+        draftLogsCount.value = Array.isArray(changes.legendDraftSessionLog.newValue)
+          ? changes.legendDraftSessionLog.newValue.length
+          : 0;
+      }
+      if ('rpcCache' in changes) {
+        lastDraftMatchId.value = changes.rpcCache.newValue?.legendDraft?.matchId || null;
+      }
+    };
+    chrome.storage.onChanged.addListener(draftStorageListener);
+  }
+});
+
+onUnmounted(() => {
+  if (draftStorageListener && typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.removeListener(draftStorageListener);
+  }
+});
 </script>
 
 <template>
@@ -208,6 +306,96 @@ async function handleFileSelect(event: Event) {
           type="button"
           class="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold px-1"
           @click="importStatus = null"
+        >
+          ✕
+        </button>
+      </div>
+    </section>
+
+    <!-- Legends Draft Diagnostics & Session Log Section -->
+    <section
+      id="legend-draft-log-section"
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3 shadow-xs"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🛡️</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-xs font-bold text-slate-800 dark:text-slate-100">
+                Legends Draft (randomDraft) Diagnostics & Hook Logs
+              </h3>
+              <span
+                v-if="draftLogsCount > 0"
+                id="draft-logs-count-badge"
+                class="px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300"
+              >
+                {{ draftLogsCount }} entries
+              </span>
+            </div>
+            <p class="text-[10px] text-slate-400">
+              Ghi nhận các gói tin RPC và quét bộ nhớ WebAssembly (Unity HEAPU8/HEAPU32) ở phiên draft hiện tại
+            </p>
+          </div>
+        </div>
+
+        <!-- Toggle Switch -->
+        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+          <input
+            id="toggle-draft-logging"
+            v-model="legendDraftLoggingEnabled"
+            type="checkbox"
+            class="sr-only peer"
+            @change="handleDraftLoggingToggle"
+          />
+          <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600 relative"></div>
+          <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            {{ legendDraftLoggingEnabled ? 'Bật Ghi Log Draft' : 'Tắt Ghi Log Draft' }}
+          </span>
+        </label>
+      </div>
+
+      <!-- Action Row -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="text-[11px] text-slate-500">
+          <span v-if="lastDraftMatchId">Trận Draft gần nhất: <code class="font-mono font-semibold text-slate-700 dark:text-slate-300">#{{ lastDraftMatchId }}</code></span>
+          <span v-else>Chưa có dữ liệu trận draft nào trong phiên làm việc này.</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            id="clear-draft-log-btn"
+            class="cursor-pointer px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs text-slate-600 dark:text-slate-300 font-medium transition-colors"
+            :disabled="draftLogsCount === 0"
+            @click="clearDraftLog"
+          >
+            Clear Draft Logs
+          </button>
+          <button
+            type="button"
+            id="export-draft-log-btn"
+            class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="draftLogsCount === 0"
+            @click="exportDraftLog"
+          >
+            <span>📥</span>
+            <span>Export Draft Session Log</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Status banner -->
+      <div
+        v-if="draftLogStatus"
+        id="draft-log-status-banner"
+        class="text-xs p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2"
+      >
+        <span>{{ draftLogStatus }}</span>
+        <button
+          type="button"
+          class="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold px-1"
+          @click="draftLogStatus = null"
         >
           ✕
         </button>

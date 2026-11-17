@@ -645,6 +645,26 @@ export function installInterceptor(customWindow?: any): void {
   let lastDraftPayload: any = null;
   let draftHookScanTimers: any[] = [];
   const capturedDraftStrings: any[] = [];
+  let draftLoggingEnabled = false;
+
+  function isValidHeroId(val: number): boolean {
+    return typeof val === 'number' && Number.isInteger(val) && ((val >= 1 && val <= 150) || (val >= 500 && val <= 599));
+  }
+
+  function emitDraftLog(entry: any) {
+    if (!draftLoggingEnabled) return;
+    try {
+      win.postMessage({
+        source: 'hwa-helper-api',
+        kind: 'legend-draft-log-entry',
+        entry: {
+          ...entry,
+          id: `draft-log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          isoTime: new Date().toISOString()
+        }
+      }, loc.origin);
+    } catch (_) {}
+  }
 
   function getWasmMemory() {
     const mod = activeUnityInstance?.Module || win.Module || activeUnityInstance;
@@ -692,7 +712,7 @@ export function installInterceptor(customWindow?: any): void {
         const heroIds: number[] = [];
         for (let j = 1; j <= candidateCount; j++) {
           const val = heapU32[i + j];
-          if (val === undefined || val < 1 || val > 150) { valid = false; break; }
+          if (val === undefined || !isValidHeroId(val)) { valid = false; break; }
           heroIds.push(val);
         }
         if (valid) {
@@ -714,18 +734,27 @@ export function installInterceptor(customWindow?: any): void {
 
   function instrumentModuleStrings(mod: any) {
     if (!mod || mod.__hwaStringsHooked) return;
-    const origUTF8ToString = mod.UTF8ToString;
-    if (typeof origUTF8ToString === 'function') {
-      mod.UTF8ToString = function (this: any, ptr: any, maxBytesToRead: any) {
-        const str = origUTF8ToString.apply(this, arguments);
-        if (typeof str === 'string' && str.length > 0 && str.length < 250 && (str.includes('hero') || str.includes('draft') || str.includes('Hero') || str.includes('Draft'))) {
-          if (capturedDraftStrings.length > 100) capturedDraftStrings.shift();
-          capturedDraftStrings.push({ time: Date.now(), str, ptr });
-        }
-        return str;
-      };
-      mod.UTF8ToString.__hwaOriginal = origUTF8ToString;
-    }
+    const hookStrFn = (fnName: string) => {
+      const origFn = mod[fnName];
+      if (typeof origFn === 'function') {
+        mod[fnName] = function (this: any, ptr: any, maxBytesToRead: any) {
+          const str = origFn.apply(this, arguments);
+          if (typeof str === 'string' && str.length > 0 && str.length < 250 && (
+            str.includes('hero') || str.includes('draft') ||
+            str.includes('Hero') || str.includes('Draft') ||
+            str.includes('randomDraft')
+          )) {
+            if (capturedDraftStrings.length > 100) capturedDraftStrings.shift();
+            capturedDraftStrings.push({ time: Date.now(), fn: fnName, str, ptr });
+          }
+          return str;
+        };
+        mod[fnName].__hwaOriginal = origFn;
+      }
+    };
+    hookStrFn('UTF8ToString');
+    hookStrFn('AsciiToString');
+    hookStrFn('stringToUTF8');
     mod.__hwaStringsHooked = true;
   }
 
@@ -758,6 +787,21 @@ export function installInterceptor(customWindow?: any): void {
       capturedStringsCount: capturedDraftStrings.length
     };
     if (topCandidateIds) win.__hwa_legend_draft_candidates = topCandidateIds;
+
+    if (draftLoggingEnabled) {
+      emitDraftLog({
+        type: 'wasm-scan',
+        timestamp: Date.now(),
+        stageId: lastDraftPayload?.stageId ?? null,
+        topCandidateIds,
+        detectedPoolsCount: detectedPools.length,
+        detectedCandidatePools: detectedPools,
+        cipherOffsets,
+        capturedStringsCount: capturedDraftStrings.length,
+        sampleCapturedStrings: capturedDraftStrings.slice(-15)
+      });
+    }
+
     try {
       win.postMessage({ source: 'hwa-helper-api', kind: 'legend-draft-hook-result', payload: result }, loc.origin);
     } catch (_) {}
@@ -781,13 +825,51 @@ export function installInterceptor(customWindow?: any): void {
     }
   }
 
-  function handleLegendDraftRpcResponse(resText: string) {
-    if (!resText || !resText.includes('randomDraft_getInfo')) return;
+  function handleLegendDraftRpcRequest(reqText: any) {
+    if (!reqText) return;
+    try {
+      const text = typeof reqText === 'string' ? reqText : JSON.stringify(reqText);
+      if (!text.includes('randomDraft_')) return;
+      const parsed = typeof reqText === 'string' ? JSON.parse(reqText) : reqText;
+      const calls = Array.isArray(parsed?.calls) ? parsed.calls : (parsed?.name ? [parsed] : []);
+      const draftCalls = calls.filter((c: any) => typeof c?.name === 'string' && c.name.startsWith('randomDraft_'));
+      if (draftCalls.length && draftLoggingEnabled) {
+        emitDraftLog({
+          type: 'rpc-request',
+          timestamp: Date.now(),
+          calls: draftCalls
+        });
+      }
+    } catch (_) {}
+  }
+
+  function handleLegendDraftRpcResponse(resText: string | null) {
+    if (!resText || !resText.includes('randomDraft_')) return;
     try {
       const parsed = JSON.parse(resText);
-      const draftObj = parsed?.results?.find((r: any) => r.ident === 'randomDraft_getInfo' || r.result?.response?.draft)?.result?.response;
+      const results = Array.isArray(parsed?.results) ? parsed.results : [];
+      const draftResults = results.filter((r: any) =>
+        (typeof r?.ident === 'string' && r.ident.startsWith('randomDraft_')) ||
+        r?.result?.response?.draft ||
+        r?.result?.response?.matchId !== undefined
+      );
+
+      if (draftResults.length && draftLoggingEnabled) {
+        emitDraftLog({
+          type: 'rpc-response',
+          timestamp: Date.now(),
+          results: draftResults
+        });
+      }
+
+      const draftObj = results.find((r: any) => r.ident === 'randomDraft_getInfo' || r.result?.response?.draft)?.result?.response;
       if (draftObj && draftObj.draft) {
-        lastDraftPayload = { stageId: draftObj.stageId, draft: draftObj.draft, draftEnemy: draftObj.draftEnemy, receivedAt: Date.now() };
+        lastDraftPayload = {
+          stageId: draftObj.stageId,
+          draft: draftObj.draft,
+          draftEnemy: draftObj.draftEnemy,
+          receivedAt: Date.now()
+        };
         scheduleLegendDraftScans();
       }
     } catch (_) {}
@@ -800,7 +882,12 @@ export function installInterceptor(customWindow?: any): void {
     getCapturedStrings: () => [...capturedDraftStrings],
     findSequenceInHeap,
     scanCandidateHeroArrays,
-    handleLegendDraftRpcResponse
+    handleLegendDraftRpcResponse,
+    handleLegendDraftRpcRequest,
+    isLoggingEnabled: () => draftLoggingEnabled,
+    setLoggingEnabled: (val: boolean) => { draftLoggingEnabled = Boolean(val); },
+    emitDraftLog,
+    isValidHeroId
   };
 
   // --- Message Listener ---
@@ -812,6 +899,9 @@ export function installInterceptor(customWindow?: any): void {
       popupRpcEnabled = event.data.popupRpcEnabled === true;
       rpcDispatchMode = ['direct', 'mqtt-piggyback'].includes(event.data.socketRefreshMode) ? event.data.socketRefreshMode : 'piggyback';
       recordingActive = event.data.recordingActive === true;
+      if (event.data.legendDraftLoggingEnabled !== undefined) {
+        draftLoggingEnabled = event.data.legendDraftLoggingEnabled === true;
+      }
       if (!captureEnabled || !popupRpcEnabled || event.data.socketRefreshMode === 'direct') {
         if (queuedClaimKeys.size) reportClaimResult(false, 'Queued claims were cancelled by Settings.');
         queuedRpcCalls.clear();
@@ -1448,7 +1538,10 @@ export function installInterceptor(customWindow?: any): void {
                     responseBody: fullText
                   });
 
-                  if (fullText && fullText.includes('randomDraft_getInfo')) {
+                  if (piggyback.options?.body) {
+                    handleLegendDraftRpcRequest(piggyback.options.body);
+                  }
+                  if (fullText && fullText.includes('randomDraft_')) {
                     handleLegendDraftRpcResponse(fullText);
                   }
                   if (fullText.length > MAX_BODY_CHARS && extraResults.length) {
@@ -1479,8 +1572,12 @@ export function installInterceptor(customWindow?: any): void {
 
               if (isPost) {
                 Promise.all([requestBody, readFetchResponse(response)]).then(([request, received]) => {
+                  const reqText = request?.text ?? null;
                   const resText = received?.text ?? null;
-                  if (resText && resText.includes('randomDraft_getInfo')) {
+                  if (reqText && reqText.includes('randomDraft_')) {
+                    handleLegendDraftRpcRequest(reqText);
+                  }
+                  if (resText && resText.includes('randomDraft_')) {
                     handleLegendDraftRpcResponse(resText);
                   }
                   if (resText && resText.includes('"version"')) {
@@ -1658,16 +1755,22 @@ export function installInterceptor(customWindow?: any): void {
           if (String(info.method).toUpperCase() === 'POST') {
             const received = readXhrResponse(this);
             const resText = received?.text ?? null;
-            if (resText && resText.includes('randomDraft_getInfo')) {
+            if (resText && resText.includes('randomDraft_')) {
               handleLegendDraftRpcResponse(resText);
             }
-            info.requestBody.then((request: any) => record('xhr', info.method, info.url,
-              this.status || null, duration, info.outcome, {
-                requestBody: request?.text ?? null,
-                requestBodyTruncated: request?.truncated ?? false,
-                responseBody: received?.text ?? null,
-                responseBodyTruncated: received?.truncated ?? false
-              })).catch(() => record('xhr', info.method, info.url, this.status || null, duration, info.outcome));
+            info.requestBody.then((request: any) => {
+              const reqText = request?.text ?? null;
+              if (reqText && reqText.includes('randomDraft_')) {
+                handleLegendDraftRpcRequest(reqText);
+              }
+              record('xhr', info.method, info.url,
+                this.status || null, duration, info.outcome, {
+                  requestBody: request?.text ?? null,
+                  requestBodyTruncated: request?.truncated ?? false,
+                  responseBody: received?.text ?? null,
+                  responseBodyTruncated: received?.truncated ?? false
+                });
+            }).catch(() => record('xhr', info.method, info.url, this.status || null, duration, info.outcome));
           } else {
             record('xhr', info.method, info.url, this.status || null, duration, info.outcome);
           }

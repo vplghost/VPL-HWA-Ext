@@ -3,7 +3,7 @@ id: doc-45cb642564ea6f7fbd7553c41c582fe2
 title: Legend Draft System
 description: Legend Draft state machine, 3-choice per step protocol, Unity WebGL hooking architecture, and empirical verification data
 createdAt: '2026-11-02T06:43:38.355Z'
-updatedAt: '2026-11-17T05:15:27.195Z'
+updatedAt: '2026-11-17T07:20:37.835Z'
 tags:
   - draft
   - legend-draft
@@ -97,22 +97,29 @@ In the Extension UI:
 4. If candidate choices are unprobed for a new match, the UI falls back to the searchable hero list with a clear advisory notice.
 
 ## Core Implementation Strategy: Unity Runtime Memory Hooking (Direction 2)
-Because the game engine runs on Unity WebGL with IL2CPP compiled to WebAssembly (`.wasm`), the client application decodes the encrypted draft buffer in memory before rendering the 3D card draft interface.
+
+## Core Implementation Strategy: Unity Runtime Memory Hooking (Direction 2)
+Because the game engine runs on Unity WebGL with IL2CPP compiled to WebAssembly (.wasm), the client application decodes the encrypted draft buffer in memory before rendering the 3D card draft interface.
+
+> [!NOTE]
+> **Active Architecture:** The extension runs entirely on WXT TypeScript architecture (entrypoints/interceptor.content.ts -> src/content/interceptor.ts in world:  MAIN, and entrypoints/bridge.content.ts -> src/content/bridge.ts in world: ISOLATED). The previous loose JavaScript files under extension/*.js are legacy and are no longer bundled or used.
 
 ### Technical Architecture
 1. **Context & Execution Boundary:**
-   - Extension injection runs in `world: "MAIN"` via [`extension/intercept.js`](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/extension/intercept.js).
-   - The Unity WebGL instance is accessible via `window.__hwaUnityInstance` and its WebAssembly memory buffer `Module.HEAPU8`.
-2. **Hooking Mechanism:**
-   - **Bridge Interception:** Hook Unity engine string decoding exports (`UTF8ToString`, `AsciiToString`, `stringToUTF8`) or Emscripten dynCalls during the transition into Legend Draft UI.
-   - **Candidate Pool Extraction:** Capture the array of candidate hero IDs as soon as Unity instantiates or binds the Draft UI components.
-   - **State Broadcast:** Forward the extracted candidate IDs to `window.__hwa_legend_draft_candidates` and bridge to Extension Cache (`cache.legendDraft.candidates`).
-   - **Popup Selection UI:** Popup only renders hero cards that exist within `cache.legendDraft.candidates`, preventing invalid hero submissions and eliminating `ValidationError`.
+   - Interceptor executes in world: MAIN via src/content/interceptor.ts.
+   - Accesses window.Module, window.gameInstance, Module.HEAPU32, and Module.HEAPU8.
+2. **Hooking & Extraction Mechanism:**
+   - **Candidate Pool Extraction (scanCandidateHeroArrays):** Scans WebAssembly HEAPU32 for IL2CPP array headers of 15 elements (5 steps x 3 choices) or 25 elements. Validates with isValidHeroId(val) which supports standard heroes (1..150) and special heroes (500..599 e.g., Kayla 500, Corvus 501, Morrigan 502, Alvanor 503).
+   - **String Interception (instrumentModuleStrings):** Hooks Emscripten string decoders (UTF8ToString, AsciiToString, stringToUTF8) for draft-related telemetry.
+   - **Diagnostics & Session Logging:** Managed via a dedicated section #legend-draft-log-section in LogTab.vue. Captures RPC requests, responses, and WASM scan results into chrome.storage.local.legendDraftSessionLog (cap 500 entries) with JSON export and clear capabilities.
+   - **State Broadcast:** Broadcasts discovered candidates to window.__hwa_legend_draft_candidates and bridges to pcCache.legendDraft.candidates.
 
 ## Roadmap & Execution Focus
-- **Phase 1 (Safe HUD & 3-Choice Step Picker):** Deliver clean 3-choice-per-step UI; disallow free selection of invalid heroes when candidates are known; log raw `draft` strings alongside captured draft actions.
-- **Phase 2 (Unity Memory Hook Prototype):** Intercept Unity Emscripten string/data conversions in `extension/intercept.js` to extract candidate IDs from `HEAPU8`.
-- **Phase 3 (Decoder Analysis & Finalization):** Compare logged empirical data against decoded heap values to formalize the mathematical decoding algorithm into pure JS.
+
+## Roadmap & Execution Focus
+- **Phase 1 (Safe HUD & 3-Choice Step Picker - Completed):** Clean 3-choice-per-step UI; prevents selection of invalid heroes when candidates are known; logs raw draft strings.
+- **Phase 2 (WASM Memory Hook & Session Logging - Completed):** Intercepts Unity WebAssembly HEAPU32/HEAPU8 in src/content/interceptor.ts to detect 15 candidate hero IDs; provides session logging toggle, JSON export, and clear buttons in LogTab.vue.
+- **Phase 3 (Decoder Analysis & Finalization):** Use session logs exported from live matches to formalize the mathematical keystream decoding algorithm into pure JS.
 
 ## Vue 3 Dialog Implementation and RPC Tracking Scope
 In the WXT + Vue 3 architecture, src/components/dialogs/DraftModal.vue provides retained dialog parity for the Legend Draft system.
