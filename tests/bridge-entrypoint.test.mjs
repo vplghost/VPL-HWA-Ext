@@ -22,9 +22,6 @@ test('createControlPayload constructs valid control messages', () => {
   const disabledPayload = createControlPayload({ interceptEnabled: false }, false, 'disabled', false);
   assert.equal(disabledPayload.interceptEnabled, false);
   assert.equal(disabledPayload.popupRpcEnabled, false);
-
-  const draftLoggingPayload = createControlPayload({ interceptEnabled: true }, true, 'piggyback', false, true);
-  assert.equal(draftLoggingPayload.legendDraftLoggingEnabled, true);
 });
 
 test('createBridgeTimeoutManager tracks and cancels active timers', () => {

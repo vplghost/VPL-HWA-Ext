@@ -41,11 +41,10 @@ function close() {
   isOpen.value = false;
 }
 
-function handleAction(action: 'chat' | 'log' | 'draft') {
+function handleAction(action: 'chat' | 'log') {
   close();
   if (action === 'chat') openModal('guildChat');
   else if (action === 'log') openModal('log');
-  else if (action === 'draft') openModal('draft');
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -111,23 +110,6 @@ onUnmounted(() => {
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-            </button>
-          </div>
-
-          <!-- Legend Draft -->
-          <div class="flex items-center gap-2">
-            <span class="rounded bg-slate-900/80 px-2 py-0.5 text-[11px] font-medium text-white shadow-xs">
-              Legend Draft
-            </span>
-            <button
-              id="legend-draft-fab"
-              type="button"
-              title="Legend Draft"
-              aria-label="Open Legend Draft"
-              class="cursor-pointer relative flex size-10 items-center justify-center rounded-full bg-red-600 hover:bg-red-500 text-white shadow-md text-base transition-transform hover:scale-105"
-              @click="handleAction('draft')"
-            >
-              ⚔️
             </button>
           </div>
 

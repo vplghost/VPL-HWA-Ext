@@ -352,41 +352,6 @@ const researchTooltipText = computed(() => {
   return lines.join('\n');
 });
 
-// Legend Draft Alert
-function draftStageDescription(stageId?: number | null): string {
-  if (stageId === 1) return 'Matching...';
-  if (stageId === 2 || stageId === 3) return 'Defense Draft';
-  if (stageId === 4) return 'Attack Draft';
-  if (stageId === 5) return 'Ready for Battle';
-  if (stageId === 6) return 'Battle in Progress';
-  if (stageId === 7) return 'Match Completed';
-  return 'Not in match';
-}
-
-function formatDraftCountdown(finishTs?: number | null): string {
-  if (!finishTs || typeof finishTs !== 'number' || !Number.isFinite(finishTs)) return '';
-  const nowSec = Math.floor(now.value / 1000);
-  const remaining = Math.max(0, finishTs - nowSec);
-  const m = Math.floor(remaining / 60);
-  const s = remaining % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-const isDraftActive = computed(() => {
-  const draft = cache.value.legendDraftStatus?.data;
-  if (!draft || draft.active === false) return false;
-  const stageId = draft.stageId;
-  // Stages 1 through 6 are active Legend Draft phases (parity with isDraftActive).
-  return typeof stageId === 'number' && Number.isInteger(stageId) && stageId >= 1 && stageId <= 6;
-});
-
-const draftTooltip = computed(() => {
-  const draft = cache.value.legendDraftStatus?.data;
-  const stageDesc = draftStageDescription(draft?.stageId);
-  const countdown = formatDraftCountdown(draft?.stageFinishTs);
-  return `Legend Draft · ${stageDesc}${countdown ? ` · ${countdown}` : ''}`;
-});
-
 // Mail / Battle Reports Status
 const mailStatus = computed(() => {
   const rows = mail.rows(cache.value, now.value);
@@ -600,24 +565,6 @@ function toggleTheme() {
             <span>🔬</span>
             <span id="research-time" class="font-mono text-[11px]">{{ researchRemaining }}</span>
           </span>
-        </BaseTooltip>
-
-        <!-- Legend Draft Alert -->
-        <BaseTooltip
-          v-if="isDraftActive"
-          :content="draftTooltip"
-        >
-          <button
-            id="draft-alert"
-            type="button"
-            :aria-label="draftTooltip"
-            class="relative cursor-pointer inline-flex items-center justify-center size-6 rounded-full bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 ring-1 ring-red-300 dark:ring-red-700/60 transition-colors"
-            @click="openModal('draft')"
-          >
-            <span class="text-xs">⚔</span>
-            <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 animate-ping"></span>
-            <span class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-600"></span>
-          </button>
         </BaseTooltip>
 
         <!-- Mail / Reports Badge -->

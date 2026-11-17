@@ -2148,7 +2148,6 @@ export function socketRefreshCalls(record: any, cache: any): any[] {
   } catch (_) {
     return [];
   }
-  if (type === 'randomDraft_statusChanged') return [{ name: 'randomDraft_getInfo' }];
   if (['marchAttackDetected', 'marchAttackEnded'].includes(type || '')) return [{ name: 'getHealing', feature: 'unit' }];
   if (['gatheringMineCompleted', 'returnFromMineCompleted'].includes(type || ''))
     return [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }, { name: 'getHealing', feature: 'unit' }];
@@ -3037,8 +3036,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       return true;
     }
     if (
-      (message?.kind === 'draft-action' ||
-        message?.kind === 'refresh-rpc' ||
+      (message?.kind === 'refresh-rpc' ||
         message?.kind === 'claim-rewards' ||
         message?.kind === 'engine-ping' ||
         message?.kind === 'engine-send-message' ||
@@ -3139,24 +3137,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                     return;
                   }
                 }
-                if (message.kind === 'draft-action') {
-                  if (
-                    !['saveDefence', 'saveAttack'].includes(message.action) ||
-                    !Array.isArray(message.heroes) ||
-                    message.heroes.length !== 5 ||
-                    message.heroes.some((id: any) => !Number.isInteger(id))
-                  ) {
-                    sendResponse({ ok: false, error: 'Invalid Draft team.' });
-                    return;
-                  }
-                  calls = [
-                    {
-                      name: message.action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack',
-                      args: { heroes: message.heroes }
-                    },
-                    { name: 'randomDraft_getInfo' }
-                  ];
-                } else if (message.kind === 'campaign-raid') {
+                if (message.kind === 'campaign-raid') {
                   const missionId = Number(message.missionId);
                   const times = Math.max(1, Math.min(100, Number(message.times) || 1));
                   if (!Number.isInteger(missionId) || missionId <= 0) {

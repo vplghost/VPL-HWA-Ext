@@ -801,7 +801,6 @@ test('popup RPC calls and automatic follow-up refreshes are disabled by default'
   tabsList.push({ id: 42, url: gameSender.url });
   for (const message of [
     { kind: 'refresh-rpc', calls: [{ name: 'inventoryGet' }] },
-    { kind: 'draft-action', action: 'saveDefence', heroes: [1, 2, 3, 4, 5] },
     { kind: 'engine-send-message', method: 'test' }
   ]) {
     const reply = await new Promise((resolve) => listener(message, popupSender, resolve));
@@ -840,7 +839,7 @@ test('experimental actions require popup RPC and reach one game tab', async () =
   assert.equal(forwardedMessages[0].msg.kind, 'queue-rpc');
 });
 
-test('manual refresh, Draft and Experimental inherit both global dispatch modes', async () => {
+test('manual refresh and Experimental inherit both global dispatch modes', async () => {
   for (const mode of ['piggyback', 'direct', 'mqtt-piggyback']) {
     const { local, listener, tabsList, forwardedMessages, send } = setup();
     tabsList.push({ id: 1, url: gameSender.url }, { id: 2, url: gameSender.url });
@@ -848,7 +847,6 @@ test('manual refresh, Draft and Experimental inherit both global dispatch modes'
     local.socketRefreshMode = mode;
     const messages = [
       { kind: 'refresh-rpc', calls: [{ name: 'inventoryGet' }] },
-      { kind: 'draft-action', action: 'saveAttack', heroes: [1, 2, 3, 4, 5] },
       { kind: 'experimental-rpc', calls: [{ name: 'createRally', feature: 'mob', args: { startDelay: 300000 } }] }
     ];
     for (const message of messages) {
@@ -856,10 +854,9 @@ test('manual refresh, Draft and Experimental inherit both global dispatch modes'
       assert.equal(reply.ok, true);
       assert.equal(reply.queued, mode !== 'direct');
     }
-    assert.equal(forwardedMessages.length, 3);
+    assert.equal(forwardedMessages.length, 2);
     assert.ok(forwardedMessages.every(({ tabId, msg }) => tabId === 1 &&
       msg.kind === (mode === 'direct' ? 'refresh-rpc' : 'queue-rpc')));
-    assert.equal(forwardedMessages[1].msg.calls[0].name, 'randomDraft_saveAttack');
     await send('api-record', rpc([{ name: 'skin_upgrade', ident: 'skin-policy',
       args: { unitId: 501, skinId: 1002 } }],
     [{ ident: 'skin-policy', result: { response: { reward: [] } } }]),
@@ -997,22 +994,21 @@ test('MQTT pushes update rally return, report, quest, and guild chat without rec
 test('metadata-only MQTT pushes request authoritative RPC only when enabled', async () => {
   const { local, send, forwardedMessages } = setup();
   const sender = { ...gameSender, tab: { id: 42 } };
-  await send('api-record', socket('randomDraft_statusChanged', {}), sender);
+  await send('api-record', socket('newReport', { reportId: 'report-0' }), sender);
   assert.equal(forwardedMessages.length, 0);
   local.popupRpcEnabled = true;
-  for (const type of ['randomDraft_statusChanged', 'newReport', 'questUpdateAll',
+  for (const type of ['newReport', 'questUpdateAll',
     'rallyCompleted']) {
     await send('api-record', socket(type, type === 'newReport' ?
       { reportId: 'report-1' } : {}), sender);
   }
   assert.deepEqual(forwardedMessages.map((item) =>
     Array.from(item.msg.calls, (call) => call.name)),
-    [['randomDraft_getInfo'], ['getPage'],
+    [['getPage'],
       ['getDailyQuests', 'getSpecialQuestState', 'questGetAll', 'questGetEvents'], ['getMarches']]);
   assert.ok(forwardedMessages.every((item) => item.msg.kind === 'queue-rpc'));
   local.socketRefreshMode = 'direct';
-  await send('api-record', socket('randomDraft_statusChanged', {},
-    '2026-11-05T14:57:40.389Z'), sender);
+  await send('api-record', socket('newReport', { reportId: 'report-2' }, '2026-11-05T14:57:40.389Z'), sender);
   assert.equal(forwardedMessages.at(-1).msg.kind, 'refresh-rpc');
 });
 

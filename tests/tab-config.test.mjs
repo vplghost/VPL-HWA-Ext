@@ -256,7 +256,7 @@ test('renderConfigTabs renders rows with up/down buttons and visibility toggle',
 
   // Click Move Down on first item (Dashboard)
   await firstDownBtn.dispatch('click');
-  // First item is now Draft, second is Heroes
+  // First item is now Heroes, second is Dashboard
   assert.equal(helper.currentTabConfig[0].id, 'heroes');
   assert.equal(helper.currentTabConfig[1].id, 'dashboard');
   assert.ok(savedConfig);
@@ -272,14 +272,14 @@ test('renderConfigTabs renders rows with up/down buttons and visibility toggle',
   for (let i = 0; i < helper.currentTabConfig.length; i++) {
     helper.currentTabConfig[i].visible = false;
   }
-  // Leave only 1 visible: Draft
+  // Leave only 1 visible: Heroes
   helper.currentTabConfig[0].visible = true;
   helper.renderConfigTabs();
 
-  const draftCheckbox = tabsList.children[0].querySelector('.tab-visibility-toggle');
-  draftCheckbox.checked = false; // Try to uncheck the only remaining tab
-  await draftCheckbox.dispatch('change');
+  const onlyCheckbox = tabsList.children[0].querySelector('.tab-visibility-toggle');
+  onlyCheckbox.checked = false; // Try to uncheck the only remaining tab
+  await onlyCheckbox.dispatch('change');
   // Guard keeps it true!
-  assert.equal(draftCheckbox.checked, true);
+  assert.equal(onlyCheckbox.checked, true);
   assert.equal(helper.currentTabConfig[0].visible, true);
 });

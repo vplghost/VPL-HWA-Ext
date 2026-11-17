@@ -29,13 +29,4 @@ test('LogTab provides config export, full data export, and import with overwrite
   assert.match(content, /v-model="sort"/, 'Must preserve sort');
   assert.match(content, /record-clear/, 'Must preserve record-clear');
   assert.match(content, /record-export/, 'Must preserve record-export');
-
-  // Verify Legends Draft section & controls
-  assert.match(content, /id="legend-draft-log-section"/, 'Must have #legend-draft-log-section');
-  assert.match(content, /id="toggle-draft-logging"/, 'Must have #toggle-draft-logging');
-  assert.match(content, /id="export-draft-log-btn"/, 'Must have #export-draft-log-btn');
-  assert.match(content, /id="clear-draft-log-btn"/, 'Must have #clear-draft-log-btn');
-  assert.match(content, /legendDraftLoggingEnabled/, 'Must bind legendDraftLoggingEnabled');
-  assert.match(content, /exportDraftLog/, 'Must define exportDraftLog');
-  assert.match(content, /clearDraftLog/, 'Must define clearDraftLog');
 });

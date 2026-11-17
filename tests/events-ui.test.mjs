@@ -476,9 +476,9 @@ test('shortcut dial reveals actions only while open and closes on backdrop or Es
   context.window.addEventListener = originalAddListener;
 });
 
-const draftAlertStart = popupJs.indexOf('function renderRpcQueue(');
-const draftAlertEnd = popupJs.indexOf('function renderExperimental(');
-vm.runInContext(popupJs.slice(draftAlertStart, draftAlertEnd), context);
+const rpcQueueStart = popupJs.indexOf('function renderRpcQueue(');
+const rpcQueueEnd = popupJs.indexOf('function renderExperimental(');
+vm.runInContext(popupJs.slice(rpcQueueStart, rpcQueueEnd), context);
 
 // Extract marches and refreshTimed
 const refreshStart = popupJs.indexOf('const marchStyles =');
@@ -518,7 +518,7 @@ vm.runInContext(popupJs.slice(resStart, resEnd), context);
 
 // Extract renderInventoryGrid
 const gridStart = popupJs.indexOf('function renderInventoryGrid(');
-const gridEnd = popupJs.indexOf('let localDraftDefencePicks =');
+const gridEnd = popupJs.indexOf('function openGuildVersusModal(');
 if (gridStart !== -1 && gridEnd !== -1) {
   context.itemGroup = itemGroupSelect;
   context.formatNumber = (n) => String(n);

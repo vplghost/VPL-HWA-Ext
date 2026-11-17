@@ -40,7 +40,6 @@ export const CONFIG_KEYS = [
   'monsterQueue',
   'speedupSpendState',
   'guildChatLastReadTime',
-  'legendDraftLoggingEnabled',
 ];
 
 // Keys that are runtime/transient and should NOT be in config export
@@ -49,7 +48,6 @@ export const RUNTIME_EXCLUDE_KEYS = new Set([
   'recordingState',
   'rpcQueueCounts',
   'rpcCache',
-  'legendDraftSessionLog',
 ]);
 
 /**

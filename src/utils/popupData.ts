@@ -8,7 +8,6 @@ import {
   clanVersusChallengeSteps,
 } from '../data/clanVersusData.ts';
 import { questData } from '../data/questData.ts';
-import { getKnownDraftChoices } from './legendDraftDecoder.ts';
 
 // enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.293.0 (client 1.293.1010) splitlib asset.
 // Each value is the cost to evolve TO that star, not the current star.
@@ -144,114 +143,6 @@ export function formatCountdown(finishTs: number, nowSec: number = Math.floor(Da
   const m = Math.floor(remaining / 60);
   const s = remaining % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-export function draftStageDescription(stageId: number): string {
-  if (stageId === 1) return 'Matching...';
-  if (stageId === 2 || stageId === 3) return 'Defense Draft';
-  if (stageId === 4) return 'Attack Draft';
-  if (stageId === 5) return 'Ready for Battle';
-  if (stageId === 6) return 'Battle in Progress';
-  if (stageId === 7) return 'Match Completed';
-  return 'Not in match';
-}
-
-export function isDraftActive(stageId: number): boolean {
-  return Number.isInteger(stageId) && stageId >= 1 && stageId <= 6;
-}
-
-export function defaultDraftCandidates(mode = 'defense'): Array<Array<number | null>> {
-  return Array.from({ length: 5 }, () => [null, null, null]);
-}
-
-export function observedDraftChoices(matchId: number | string): { defense: number[][]; attack: number[][]; enemyDefence?: Array<Array<number | null>> } | null {
-  const id = Number(matchId);
-  if (id === 358789279) {
-    return {
-      defense: [
-        [4, 500, 8], [62, 19, 55], [501, 52, 25],
-        [70, 22, 10], [12, 26, 67]
-      ],
-      attack: [
-        [11, 1, 5], [24, 502, 70], [56, 33, 45],
-        [57, 62, 23], [3, 50, 73]
-      ],
-      enemyDefence: [
-        [null, 69, null], [10, null, null], [null, null, 53],
-        [75, null, null], [null, null, 71]
-      ]
-    };
-  }
-  if (id === 360504765) {
-    return {
-      defense: [
-        [11, 2, 6],
-        [75, 54, 25],
-        [71, 77, 18],
-        [66, 67, 36],
-        [16, 1, 78]
-      ],
-      attack: [
-        [55, 14, 62],
-        [61, 36, 16],
-        [5, 501, 37],
-        [15, 503, 64],
-        [72, 8, 45]
-      ],
-      enemyDefence: [
-        [null, null, null],
-        [null, null, null],
-        [null, null, null],
-        [null, null, null],
-        [null, null, null]
-      ]
-    };
-  }
-  const known = getKnownDraftChoices(id);
-  if (known) {
-    return {
-      defense: known.defense,
-      attack: known.attack,
-      enemyDefence: known.enemyDefence || [
-        [null, null, null],
-        [null, null, null],
-        [null, null, null],
-        [null, null, null],
-        [null, null, null]
-      ]
-    };
-  }
-  return null;
-}
-
-export function validateDraftPicks(picks: any[]): { valid: boolean; count: number; missingSteps: number[]; heroes: number[] } {
-  if (!Array.isArray(picks)) {
-    return { valid: false, count: 0, missingSteps: [1, 2, 3, 4, 5], heroes: [] };
-  }
-  const missingSteps: number[] = [];
-  const heroes: number[] = [];
-  for (let i = 0; i < 5; i++) {
-    const h = picks[i];
-    if (Number.isInteger(h) && h > 0) {
-      heroes.push(h);
-    } else {
-      missingSteps.push(i + 1);
-    }
-  }
-  return {
-    valid: heroes.length === 5 && missingSteps.length === 0,
-    count: heroes.length,
-    missingSteps,
-    heroes
-  };
-}
-
-export function getDraftActiveStep(picks: any[]): number {
-  if (!Array.isArray(picks)) return 0;
-  for (let i = 0; i < 5; i++) {
-    if (!Number.isInteger(picks[i]) || picks[i] <= 0) return i;
-  }
-  return 4;
 }
 
 export const questLocaleMap: Record<string, { key: string; title: string; category: string; unit: string; amount: number }> = {
@@ -1242,7 +1133,7 @@ export function exportTableData(tab: string, cache: any, query = '', itemGroupFi
         'accountStatus', 'buildingStatus', 'marchStatus',
         'researchStatus', 'productionConfigStatus', 'productionStatus',
         'productionBonusStatus', 'missionProgressStatus', 'clanVersusStatus', 'questEvents',
-        'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus', 'legendDraftStatus'].includes(entry.key)
+        'clanWarChampStatus', 'fortressEventStatus', 'clanClashStatus', 'brawlStatus'].includes(entry.key)
       && !entry.key.startsWith('resource:')
       && matchesFilter([entry.method, entry.feature || entry.group]));
     return entries.map((entry: any) => ({
@@ -1468,12 +1359,6 @@ export const popupDataHelper = {
   getHeroArtifactTier,
   getHeroArtifactTierStyle,
   formatCountdown,
-  draftStageDescription,
-  isDraftActive,
-  defaultDraftCandidates,
-  observedDraftChoices,
-  validateDraftPicks,
-  getDraftActiveStep,
   questLocaleMap,
   BATTLE_REPORT_CLAIM_TYPES,
   getPendingClaims,

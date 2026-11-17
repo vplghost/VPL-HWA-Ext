@@ -13,7 +13,6 @@ export type ModalName =
   | 'dungeon'
   | 'expeditions'
   | 'mail'
-  | 'draft'
   | 'guildVersus'
   | 'questDetail'
   | 'guildChat'
@@ -32,7 +31,6 @@ const modalState = reactive<Record<ModalName, boolean>>({
   dungeon: false,
   expeditions: false,
   mail: false,
-  draft: false,
   guildVersus: false,
   questDetail: false,
   guildChat: false,

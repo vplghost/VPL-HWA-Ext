@@ -100,7 +100,6 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     'src/components/dialogs/TowerModal.vue',
     'src/components/dialogs/DungeonModal.vue',
     'src/components/dialogs/QuestDetailModal.vue',
-    'src/components/dialogs/DraftModal.vue',
     'src/components/dialogs/GuildVersusModal.vue',
     'src/components/common/GuildChatPanel.vue',
   ];
@@ -112,14 +111,7 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
   }
 });
 
-test('DraftModal, GuildVersusModal, and GuildChatPanel have 1:1 ID parity with HTML', async () => {
-  const draft = await readFile(join(root, 'src/components/dialogs/DraftModal.vue'), 'utf8');
-  assert.match(draft, /id="draft-modal"/, 'Must have #draft-modal');
-  assert.match(draft, /id="draft-modal-title"/, 'Must have #draft-modal-title');
-  assert.match(draft, /id="draft-modal-stage-badge"/, 'Must have #draft-modal-stage-badge');
-  assert.match(draft, /id="draft-modal-close"/, 'Must have #draft-modal-close');
-  assert.match(draft, /id="draft-modal-body"/, 'Must have #draft-modal-body');
-
+test('GuildVersusModal and GuildChatPanel have 1:1 ID parity with HTML', async () => {
   const gvs = await readFile(join(root, 'src/components/dialogs/GuildVersusModal.vue'), 'utf8');
   assert.match(gvs, /id="guild-versus-modal"/, 'Must have #guild-versus-modal');
   assert.match(gvs, /id="gvs-modal-title"/, 'Must have #gvs-modal-title');
@@ -629,11 +621,6 @@ test('SettingsTab supports popupRpcEnabled toggle, socketRefreshMode direct, and
 test('Header.vue evaluates live mail rewards and opens the inbox instead of refreshing', async () => {
   const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');
 
-  // Legend Draft checks
-  assert.match(header, /stageId >= 1 && stageId <= 6/, 'Header must check stages 1 through 6 for active Legend Draft');
-  assert.match(header, /draftStageDescription/, 'Header must describe draft stages');
-  assert.match(header, /draftTooltip/, 'Header must provide dynamic tooltip for draft alert');
-  assert.doesNotMatch(header, /stageId !== 'finished'/, 'Header must not use naive stageId !== finished condition');
 
   // Mail checks
   assert.match(header, /unclaimedLetters/, 'Header must compute actual unclaimed letters');
@@ -987,7 +974,6 @@ test('Header tooltips use BaseTooltip to avoid browser native title flicker duri
   assert.match(header, /<BaseTooltip[\s\S]*?formatRaidQueueTooltip\(raidQueue\)/, 'Header must wrap raid queue in BaseTooltip');
   assert.match(header, /<BaseTooltip[\s\S]*?formatMonsterQueueTooltip\(monsterQueue\)/, 'Header must wrap monster queue in BaseTooltip');
   assert.match(header, /<BaseTooltip[\s\S]*?formatAutoGatherTooltip\(autoGatherSettings\)/, 'Header must wrap auto gather in BaseTooltip');
-  assert.match(header, /<BaseTooltip[\s\S]*?draftTooltip/, 'Header must wrap draft alert in BaseTooltip');
 
   const baseTooltip = await readFile(join(root, 'src/components/common/BaseTooltip.vue'), 'utf8');
   assert.match(baseTooltip, /<Teleport to="body">/, 'BaseTooltip must teleport tooltip to body');

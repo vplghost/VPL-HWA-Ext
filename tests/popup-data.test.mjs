@@ -14,8 +14,8 @@ import {
   popupDataHelper, heroSoulProgress, formatTitanArtifactLevels, isTitanArtifactUpgradable, exportTableData, teamRows, sortRows, isNumericColumn,
   rallyTooltip, getChallengeResourceStock, extractEventGoals, getUnreadChatCount, isTowerCleared,
   isResourceSelectableForHeader, isDebugOrEventResource, isMarchExpired, titanSoulProgress, isSoulUpgradeReady, countEvolvableHeroes, countEvolvableTitans,
-  heroEquipmentRank, getHeroArtifactTier, getHeroArtifactTierStyle, draftStageDescription, formatCountdown, isDraftActive,
-  defaultDraftCandidates, observedDraftChoices, validateDraftPicks, getDraftActiveStep, buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, normalizeGoalKey, marchDuration
+  heroEquipmentRank, getHeroArtifactTier, getHeroArtifactTierStyle, formatCountdown,
+  buildingTooltip, researchTooltip, formatChatRole, formatChatTime, tableExportFilename, normalizeGoalKey, marchDuration
 } from '../src/utils/popupData.ts';
 
 const context = {

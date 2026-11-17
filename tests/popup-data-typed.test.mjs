@@ -11,11 +11,6 @@ import {
   formatChatRole,
   formatChatTime,
   formatCountdown,
-  draftStageDescription,
-  isDraftActive,
-  observedDraftChoices,
-  validateDraftPicks,
-  getDraftActiveStep,
   questLocaleMap,
 } from '../src/utils/popupData.ts';
 
@@ -105,27 +100,7 @@ test('formatChatRole and formatChatTime format correctly', () => {
   assert.match(formattedTime, /^\d{2}\/\d{2} \d{2}:\d{2}$/);
 });
 
-test('observedDraftChoices, validateDraftPicks, and getDraftActiveStep operate accurately', () => {
-  const match = observedDraftChoices(358789279);
-  assert.ok(match);
-  assert.equal(match.defense.length, 5);
-  assert.equal(match.attack.length, 5);
-
-  const picks = [4, 62, 501, 70, 12];
-  const valid = validateDraftPicks(picks);
-  assert.equal(valid.valid, true);
-  assert.equal(valid.count, 5);
-  assert.equal(valid.missingSteps.length, 0);
-
-  assert.equal(getDraftActiveStep([4, 62, null]), 2);
-  assert.equal(getDraftActiveStep([4, 62, 501, 70, 12]), 4);
-});
-
-test('formatCountdown, draftStageDescription, and questLocaleMap exist and function', () => {
+test('formatCountdown and questLocaleMap exist and function', () => {
   assert.equal(formatCountdown(100, 40), '01:00');
-  assert.equal(draftStageDescription(1), 'Matching...');
-  assert.equal(draftStageDescription(4), 'Attack Draft');
-  assert.equal(isDraftActive(3), true);
-  assert.equal(isDraftActive(7), false);
   assert.ok(questLocaleMap.QUEST_TAB_NAME_LOGIN);
 });

@@ -386,9 +386,9 @@ test('piggyback queues read-only calls for the next game RPC and hides their res
   }, true, { Response, Headers });
 
   window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [
-    { name: 'randomDraft_getInfo' },
+    { name: 'inventoryGet' },
     { name: 'getMarches', feature: 'march' },
-    { name: 'randomDraft_getInfo' }
+    { name: 'inventoryGet' }
   ] }, 'https://www.hero-wars-alliance.com');
   assert.equal(sent.length, 0);
   const gameRequest = { calls: [{ name: 'userGetInfo', ident: 'game-1', args: {} }] };
@@ -400,7 +400,7 @@ test('piggyback queues read-only calls for the next game RPC and hides their res
     ['game-1']);
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0].request.calls.map((call) => call.name),
-    ['userGetInfo', 'randomDraft_getInfo', 'getMarches']);
+    ['userGetInfo', 'inventoryGet', 'getMarches']);
   assert.equal(sent[0].options.headers.get('x-request-id'), '42');
   assert.equal(sent[0].options.headers.has('x-auth-signature'), false);
   assert.equal(messages.length, 1);
@@ -427,7 +427,7 @@ test('piggyback retries after a failed RPC and records added results from a larg
   }, true, { Response, Headers });
   const original = { calls: [{ name: 'userGetInfo', ident: 'game-1', args: {} }] };
   window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc',
-    calls: [{ name: 'randomDraft_getInfo' }] }, 'https://www.hero-wars-alliance.com');
+    calls: [{ name: 'inventoryGet' }] }, 'https://www.hero-wars-alliance.com');
   const first = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
     method: 'POST', body: JSON.stringify(original)
   });
@@ -440,7 +440,7 @@ test('piggyback retries after a failed RPC and records added results from a larg
   assert.equal(messages.length, 3);
   const targeted = messages.at(-1).data.record;
   assert.deepEqual(JSON.parse(targeted.requestBody).calls.map((call) => call.name),
-    ['randomDraft_getInfo']);
+    ['inventoryGet']);
   assert.equal(JSON.parse(targeted.responseBody).results.length, 1);
 });
 
@@ -511,13 +511,13 @@ test('piggyback appends refresh when game sends JSON in a Blob body', async () =
     })) }), { status: 200, headers: { 'content-type': 'application/json' } });
   }, true, { Response, Headers });
   window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc',
-    calls: [{ name: 'randomDraft_getInfo' }] }, 'https://www.hero-wars-alliance.com');
+    calls: [{ name: 'inventoryGet' }] }, 'https://www.hero-wars-alliance.com');
   await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
     method: 'POST', body: new Blob([
       '{"calls":[{"name":"userGetInfo","ident":"game-1"}]}'
     ], { type: 'application/json' })
   });
-  assert.deepEqual(names, ['userGetInfo', 'randomDraft_getInfo']);
+  assert.deepEqual(names, ['userGetInfo', 'inventoryGet']);
 });
 
 test('failed piggyback claim reports failure without retrying action', async () => {
@@ -591,7 +591,7 @@ test('queue count tracks deduplication, expiry, dispatch and settings cancellati
   assert.equal(queueCounts.at(-1), 0);
 });
 
-test('legacy direct messages and Draft submissions piggyback by default with action results hidden', async () => {
+test('legacy direct messages and queued calls piggyback by default with action results hidden', async () => {
   const batches = [];
   const { window } = setup(async (_url, options) => {
     const request = JSON.parse(options.body); batches.push(request.calls);
@@ -603,14 +603,13 @@ test('legacy direct messages and Draft submissions piggyback by default with act
   window.postMessage({ source: 'hwa-helper-control', kind: 'refresh-rpc', calls: [
     { name: 'createRally', feature: 'mob', args: { startDelay: 300000, mobId: 'boss' } }
   ] }, origin);
-  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [{ name: 'randomDraft_getInfo' }] }, origin);
-  window.postMessage({ source: 'hwa-helper-control', kind: 'draft-action', action: 'saveDefence', heroes: [1, 2, 3, 4, 5] }, origin);
+  window.postMessage({ source: 'hwa-helper-control', kind: 'queue-rpc', calls: [{ name: 'inventoryGet' }] }, origin);
   assert.equal(batches.length, 0);
   const response = await window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
-    method: 'POST', body: JSON.stringify({ calls: [{ name: 'randomDraft_getInfo', ident: 'native' }] })
+    method: 'POST', body: JSON.stringify({ calls: [{ name: 'inventoryGet', ident: 'native' }] })
   });
   assert.deepEqual(batches[0].map((call) => call.name),
-    ['randomDraft_getInfo', 'createRally', 'randomDraft_saveDefence', 'randomDraft_getInfo']);
+    ['inventoryGet', 'createRally', 'inventoryGet']);
   assert.equal(batches[0][1].args.startDelay, 300000);
   assert.deepEqual(JSON.parse(await response.text()).results.map((result) => result.ident), ['native']);
 });

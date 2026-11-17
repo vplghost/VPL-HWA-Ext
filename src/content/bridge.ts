@@ -18,16 +18,13 @@ export interface BridgeControlMessage {
   popupRpcEnabled: boolean;
   socketRefreshMode: string;
   recordingActive: boolean;
-  legendDraftLoggingEnabled?: boolean;
 }
 
 export function createControlPayload(
   settings: BridgeSettings | null,
   popupRpcEnabled: boolean,
   socketRefreshMode: string,
-  recordingActive: boolean,
-  legendDraftLoggingEnabled?: boolean
-): BridgeControlMessage | null {
+  recordingActive: boolean): BridgeControlMessage | null {
   if (!settings) return null;
   const payload: BridgeControlMessage = {
     source: 'hwa-helper-config',
@@ -37,9 +34,6 @@ export function createControlPayload(
     socketRefreshMode,
     recordingActive
   };
-  if (typeof legendDraftLoggingEnabled === 'boolean') {
-    payload.legendDraftLoggingEnabled = legendDraftLoggingEnabled;
-  }
   return payload;
 }
 
@@ -149,12 +143,11 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   let socketRefreshMode = 'direct';
   let recordingActive = false;
   let recordingStateObserved = false;
-  let legendDraftLoggingEnabled = false;
   let freeSpinAccountId: string | null = null;
 
   function sendControl() {
     if (!currentSettings) return;
-    const payload = createControlPayload(currentSettings, popupRpcEnabled, socketRefreshMode, recordingActive, legendDraftLoggingEnabled);
+    const payload = createControlPayload(currentSettings, popupRpcEnabled, socketRefreshMode, recordingActive);
     if (payload) {
       win.postMessage(payload, win.location?.origin || '*');
     }
@@ -280,38 +273,6 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       return;
     }
 
-    if (event.data.kind === 'legend-draft-hook-result' && event.data.payload) {
-      try {
-        win.chrome?.storage?.local?.set?.({ legendDraftHookTelemetry: event.data.payload });
-        win.chrome?.storage?.local?.get?.(['rpcCache', 'legendDraftStatus'])?.then?.((stored: any) => {
-          const cache = stored?.rpcCache || {};
-          if (!cache.legendDraft) cache.legendDraft = {};
-          if (Array.isArray(event.data.payload.topCandidateIds) && event.data.payload.topCandidateIds.length > 0) {
-            cache.legendDraft.candidates = event.data.payload.topCandidateIds;
-            cache.legendDraft.candidatesDiscoveredAt = new Date().toISOString();
-          }
-          if (event.data.payload.matchId) {
-            cache.legendDraft.matchId = event.data.payload.matchId;
-          }
-          win.chrome?.storage?.local?.set?.({ rpcCache: cache });
-        })?.catch?.(() => {});
-      } catch (_) {}
-      return;
-    }
-
-    if (event.data.kind === 'legend-draft-log-entry' && event.data.entry) {
-      try {
-        win.chrome?.storage?.local?.get?.('legendDraftSessionLog')?.then?.((stored: any) => {
-          const logs = Array.isArray(stored?.legendDraftSessionLog) ? stored.legendDraftSessionLog : [];
-          logs.push(event.data.entry);
-          if (logs.length > 500) {
-            logs.splice(0, logs.length - 500);
-          }
-          win.chrome?.storage?.local?.set?.({ legendDraftSessionLog: logs });
-        })?.catch?.(() => {});
-      } catch (_) {}
-      return;
-    }
 
     if (event.data.kind === 'refresh-rpc-result') {
       try {
@@ -386,24 +347,6 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       }
       if (message?.kind === 'drop-rpc-group') {
         win.postMessage({ source: 'hwa-helper-control', kind: message.kind, group: message.group }, win.location.origin);
-        sendResponse?.({ ok: true });
-        return true;
-      }
-      if (message?.kind === 'draft-action') {
-        win.postMessage({
-          source: 'hwa-helper-control',
-          kind: 'draft-action',
-          action: message.action,
-          heroes: message.heroes
-        }, win.location.origin);
-        sendResponse?.({ ok: true });
-        return true;
-      }
-      if (message?.kind === 'legend-draft-scan') {
-        win.postMessage({
-          source: 'hwa-helper-control',
-          kind: 'legend-draft-scan'
-        }, win.location.origin);
         sendResponse?.({ ok: true });
         return true;
       }
@@ -620,8 +563,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     'dungeonRun',
     'buildingQueue',
     'researchQueue',
-    'gameEngineStatus',
-    'legendDraftLoggingEnabled'
+    'gameEngineStatus'
   ]).then((stored: any) => {
     const currentExtVersion = win.chrome?.runtime?.getManifest?.()?.version;
     const hasCanvas = typeof doc?.querySelector === 'function' && Boolean(doc.querySelector('canvas#unity-canvas, canvas#canvas, canvas'));
@@ -645,7 +587,6 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     if (stored?.captureSettings) currentSettings = { ...currentSettings, ...stored.captureSettings };
     if (stored?.popupRpcEnabled !== undefined) popupRpcEnabled = Boolean(stored.popupRpcEnabled);
     if (stored?.socketRefreshMode) socketRefreshMode = ['piggyback', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'direct';
-    if (stored?.legendDraftLoggingEnabled !== undefined) legendDraftLoggingEnabled = Boolean(stored.legendDraftLoggingEnabled);
     const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
     if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
     sendControl();
@@ -701,10 +642,6 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       }
       if ('socketRefreshMode' in changes) {
         socketRefreshMode = ['piggyback', 'mqtt-piggyback'].includes(changes.socketRefreshMode.newValue) ? changes.socketRefreshMode.newValue : 'direct';
-        configChanged = true;
-      }
-      if ('legendDraftLoggingEnabled' in changes) {
-        legendDraftLoggingEnabled = changes.legendDraftLoggingEnabled.newValue === true;
         configChanged = true;
       }
       if (configChanged) sendControl();

@@ -7,7 +7,6 @@
 import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { speedupService } from '../services/speedupService.ts';
 import { mailService } from '../services/mailService.ts';
-import { extractLegendDraftCandidates, decodeDraftCandidatesDetailed } from '../utils/legendDraftDecoder.ts';
 
 export interface InterceptRecord {
   endpoint: string;
@@ -123,7 +122,6 @@ export function installInterceptor(customWindow?: any): void {
   }
 
   const piggybackMethods = new Set([
-    'randomDraft_getInfo',
     'getPage',
     'questGetAll',
     'questGetEvents',
@@ -188,8 +186,6 @@ export function installInterceptor(customWindow?: any): void {
     'attackMob',
     'attackMine',
     'stopMineGathering',
-    'randomDraft_saveDefence',
-    'randomDraft_saveAttack',
     'magicTower_enterRoom',
     'magicTower_startBattle',
     'magicTower_activateBuff',
@@ -642,440 +638,6 @@ export function installInterceptor(customWindow?: any): void {
   watchGlobalProperty('Module');
   watchGlobalProperty('SendMessage');
 
-  // --- Legend Draft Memory Scanner ---
-  let lastDraftPayload: any = null;
-  let draftHookScanTimers: any[] = [];
-  const capturedDraftStrings: any[] = [];
-  let draftLoggingEnabled = false;
-
-  function isValidHeroId(val: number): boolean {
-    return typeof val === 'number' && Number.isInteger(val) && ((val >= 1 && val <= 150) || (val >= 500 && val <= 599));
-  }
-
-  function emitDraftLog(entry: any) {
-    if (!draftLoggingEnabled) return;
-    try {
-      win.postMessage({
-        source: 'hwa-helper-api',
-        kind: 'legend-draft-log-entry',
-        entry: {
-          ...entry,
-          id: `draft-log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          isoTime: new Date().toISOString()
-        }
-      }, loc.origin);
-    } catch (_) {}
-  }
-
-  function getWasmMemory() {
-    const mod = activeUnityInstance?.Module || win.Module || activeUnityInstance;
-    if (!mod) return null;
-    let heapU8: Uint8Array | null = null;
-    let heapU32: Uint32Array | null = null;
-    try {
-      if (mod.HEAPU8 && mod.HEAPU8.buffer && !mod.HEAPU8.buffer.detached) heapU8 = mod.HEAPU8;
-      else if (mod.wasmMemory?.buffer && !mod.wasmMemory.buffer.detached) heapU8 = new Uint8Array(mod.wasmMemory.buffer);
-      if (mod.HEAPU32 && mod.HEAPU32.buffer && !mod.HEAPU32.buffer.detached) heapU32 = mod.HEAPU32;
-      else if (mod.wasmMemory?.buffer && !mod.wasmMemory.buffer.detached) heapU32 = new Uint32Array(mod.wasmMemory.buffer);
-    } catch (_) {}
-    return { mod, heapU8, heapU32 };
-  }
-
-  function findSequenceInHeap(heapU8: Uint8Array, targetBytes: Uint8Array, maxMatches = 10) {
-    if (!heapU8 || !targetBytes || targetBytes.length === 0) return [];
-    const len = targetBytes.length;
-    const max = heapU8.length - len;
-    const first = targetBytes[0];
-    const matches: number[] = [];
-    for (let i = 0; i < max; i++) {
-      if (heapU8[i] === first) {
-        let match = true;
-        for (let j = 1; j < len; j++) {
-          if (heapU8[i + j] !== targetBytes[j]) { match = false; break; }
-        }
-        if (match) {
-          matches.push(i);
-          if (matches.length >= maxMatches) break;
-        }
-      }
-    }
-    return matches;
-  }
-
-  function scanCandidateHeroArrays(heapU32: Uint32Array, maxResults = 8) {
-    if (!heapU32) return [];
-    const results: any[] = [];
-    const len = heapU32.length - 26;
-    for (let i = 0; i < len; i++) {
-      const candidateCount = heapU32[i];
-      if (candidateCount === 25 || candidateCount === 15) {
-        let valid = true;
-        const heroIds: number[] = [];
-        for (let j = 1; j <= candidateCount; j++) {
-          const val = heapU32[i + j];
-          if (val === undefined || !isValidHeroId(val)) { valid = false; break; }
-          heroIds.push(val);
-        }
-        if (valid) {
-          const chunkSize = candidateCount === 25 ? 5 : 3;
-          let distinctInChunks = true;
-          for (let c = 0; c < candidateCount; c += chunkSize) {
-            const chunk = heroIds.slice(c, c + chunkSize);
-            if (new Set(chunk).size !== chunkSize) { distinctInChunks = false; break; }
-          }
-          if (distinctInChunks) {
-            results.push({ ptr: i * 4, count: candidateCount, heroIds });
-            if (results.length >= maxResults) break;
-          }
-        }
-      }
-    }
-    return results;
-  }
-
-  function instrumentModuleStrings(mod: any) {
-    if (!mod || mod.__hwaStringsHooked) return;
-    const hookStrFn = (fnName: string) => {
-      const origFn = mod[fnName];
-      if (typeof origFn === 'function') {
-        mod[fnName] = function (this: any, ptr: any, maxBytesToRead: any) {
-          const str = origFn.apply(this, arguments);
-          if (typeof str === 'string' && str.length > 0 && str.length < 250 && (
-            str.includes('hero') || str.includes('draft') ||
-            str.includes('Hero') || str.includes('Draft') ||
-            str.includes('randomDraft')
-          )) {
-            if (capturedDraftStrings.length > 100) capturedDraftStrings.shift();
-            capturedDraftStrings.push({ time: Date.now(), fn: fnName, str, ptr });
-          }
-          return str;
-        };
-        mod[fnName].__hwaOriginal = origFn;
-      }
-    };
-    hookStrFn('UTF8ToString');
-    hookStrFn('AsciiToString');
-    hookStrFn('stringToUTF8');
-    mod.__hwaStringsHooked = true;
-  }
-
-  function runLegendDraftMemoryScan() {
-    const memory = getWasmMemory();
-    if (!memory || !memory.mod) {
-      return { ok: false, error: 'Unity WebGL Module or WebAssembly memory buffer not available' };
-    }
-    instrumentModuleStrings(memory.mod);
-    let cipherOffsets: number[] = [];
-    let rawTargetBytes: Uint8Array | null = null;
-    if (lastDraftPayload?.draft) {
-      try {
-        const binStr = atob(lastDraftPayload.draft);
-        rawTargetBytes = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) rawTargetBytes[i] = binStr.charCodeAt(i);
-        if (memory.heapU8) cipherOffsets = findSequenceInHeap(memory.heapU8, rawTargetBytes);
-      } catch (_) {}
-    }
-    const detectedPools = memory.heapU32 ? scanCandidateHeroArrays(memory.heapU32) : [];
-    const decodedCandidateIds = lastDraftPayload?.draft
-      ? extractLegendDraftCandidates(lastDraftPayload.draft, lastDraftPayload.stageId ?? 2, lastDraftPayload.matchId)
-      : [];
-    const topCandidateIds = (decodedCandidateIds && decodedCandidateIds.length > 0)
-      ? decodedCandidateIds
-      : (detectedPools[0]?.heroIds || null);
-
-    const heapU8Slices: any[] = [];
-    if (memory.heapU8 && cipherOffsets.length > 0 && rawTargetBytes) {
-      for (const offset of cipherOffsets) {
-        const start = Math.max(0, offset - 16);
-        const end = Math.min(memory.heapU8.length, offset + rawTargetBytes.length + 16);
-        const slice = memory.heapU8.slice(start, end);
-        const hexDump = Array.from(slice).map((b) => b.toString(16).padStart(2, '0')).join(' ');
-        let asciiDump = '';
-        for (let i = 0; i < slice.length; i++) {
-          const b = slice[i];
-          asciiDump += (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.';
-        }
-        heapU8Slices.push({
-          cipherOffset: offset,
-          targetLength: rawTargetBytes.length,
-          sliceStart: start,
-          sliceEnd: end,
-          hexDump,
-          asciiDump
-        });
-      }
-    }
-
-    const detailedPools: any[] = [];
-    if (memory.heapU32 && detectedPools.length > 0) {
-      for (const pool of detectedPools) {
-        const dwordIdx = Math.floor(pool.ptr / 4);
-        const count = pool.count;
-        const dwords = Array.from(memory.heapU32.slice(dwordIdx, dwordIdx + count + 1));
-        detailedPools.push({
-          ptr: pool.ptr,
-          count: pool.count,
-          heroIds: pool.heroIds,
-          rawDwordsHex: dwords.map((v) => '0x' + (v >>> 0).toString(16).padStart(8, '0'))
-        });
-      }
-    }
-
-    const heapU8Extraction = {
-      targetLength: rawTargetBytes?.length ?? 0,
-      cipherMatches: cipherOffsets.length,
-      slices: heapU8Slices
-    };
-
-    const heapU32Extraction = {
-      detectedPoolsCount: detectedPools.length,
-      pools: detailedPools
-    };
-
-    const result = {
-      ok: true,
-      timestamp: new Date().toISOString(),
-      stageId: lastDraftPayload?.stageId ?? null,
-      draftBase64: lastDraftPayload?.draft ?? null,
-      cipherOffsets,
-      heapU8Extraction,
-      heapU32Extraction,
-      detectedPoolsCount: detectedPools.length,
-      detectedCandidatePools: detectedPools,
-      topCandidateIds,
-      capturedStringsCount: capturedDraftStrings.length
-    };
-    if (topCandidateIds) win.__hwa_legend_draft_candidates = topCandidateIds;
-
-    if (draftLoggingEnabled) {
-      emitDraftLog({
-        type: 'wasm-scan',
-        timestamp: Date.now(),
-        stageId: lastDraftPayload?.stageId ?? null,
-        topCandidateIds,
-        detectedPoolsCount: detectedPools.length,
-        detectedCandidatePools: detectedPools,
-        cipherOffsets,
-        heapU8Extraction,
-        heapU32Extraction,
-        capturedStringsCount: capturedDraftStrings.length,
-        sampleCapturedStrings: capturedDraftStrings.slice(-15)
-      });
-    }
-
-    try {
-      win.postMessage({ source: 'hwa-helper-api', kind: 'legend-draft-hook-result', payload: result }, loc.origin);
-    } catch (_) {}
-    return result;
-  }
-
-  function scheduleLegendDraftScans() {
-    draftHookScanTimers.forEach(clearTimer);
-    draftHookScanTimers = [];
-    const delays = [100, 300, 700, 1500, 3000];
-    for (const delay of delays) {
-      const timer = setTimer(() => {
-        const res = runLegendDraftMemoryScan();
-        if (res && res.ok && (res as any).topCandidateIds) {
-          draftHookScanTimers.forEach(clearTimer);
-          draftHookScanTimers = [];
-        }
-      }, delay);
-      if (timer && typeof (timer as any).unref === 'function') (timer as any).unref();
-      draftHookScanTimers.push(timer);
-    }
-  }
-
-  const pendingDraftCalls = new Map<string, any>();
-
-  function handleLegendDraftRpcRequest(reqText: any) {
-    if (!reqText) return;
-    try {
-      const parsedReq = typeof reqText === 'string' ? JSON.parse(reqText) : reqText;
-      const calls = Array.isArray(parsedReq?.calls) ? parsedReq.calls : (parsedReq?.name ? [parsedReq] : []);
-      const draftCalls = calls.filter((c: any) => typeof c?.name === 'string' && c.name.startsWith('randomDraft_'));
-      if (!draftCalls.length) return;
-
-      if (pendingDraftCalls.size > 50) {
-        const keys = Array.from(pendingDraftCalls.keys()).slice(0, 20);
-        for (const k of keys) pendingDraftCalls.delete(k);
-      }
-
-      for (const call of draftCalls) {
-        if (call.ident) pendingDraftCalls.set(call.ident, call);
-        pendingDraftCalls.set(call.name, call);
-      }
-
-      if (draftLoggingEnabled) {
-        emitDraftLog({
-          type: 'rpc-request',
-          timestamp: Date.now(),
-          calls: draftCalls
-        });
-
-        for (const call of draftCalls) {
-          const stepName = call.name.replace(/^randomDraft_/, '');
-          emitDraftLog({
-            type: 'step-input',
-            timestamp: Date.now(),
-            action: call.name,
-            step: stepName,
-            args: call.args || {},
-            heroes: Array.isArray(call.args?.heroes) ? call.args.heroes : undefined,
-            stageId: lastDraftPayload?.stageId ?? null
-          });
-        }
-      }
-    } catch (_) {}
-  }
-
-  function handleLegendDraftRpcResponse(resText: string | null) {
-    if (!resText) return;
-    try {
-      const parsed = typeof resText === 'string' ? JSON.parse(resText) : resText;
-      const results = Array.isArray(parsed?.results) ? parsed.results : [];
-      if (!results.length) return;
-
-      const draftResults: any[] = [];
-      for (const r of results) {
-        const ident = r?.ident;
-        const matchedCall = (ident && pendingDraftCalls.get(ident)) || (ident && pendingDraftCalls.get(`randomDraft_${ident}`));
-        const isDraft = (typeof ident === 'string' && (ident.startsWith('randomDraft_') || ident.includes('Draft'))) ||
-          Boolean(r?.result?.response?.draft || r?.result?.response?.draftEnemy || r?.result?.response?.matchId !== undefined) ||
-          Boolean(matchedCall);
-        if (isDraft) {
-          draftResults.push(r);
-        }
-      }
-
-      if (!draftResults.length) return;
-
-      const draftObj = draftResults.find((r: any) => r.result?.response?.draft || r.result?.response?.matchId !== undefined)?.result?.response;
-      if (draftObj) {
-        lastDraftPayload = {
-          matchId: draftObj.matchId ?? lastDraftPayload?.matchId ?? null,
-          stageId: draftObj.stageId ?? lastDraftPayload?.stageId ?? null,
-          draft: draftObj.draft ?? lastDraftPayload?.draft ?? null,
-          draftEnemy: draftObj.draftEnemy ?? lastDraftPayload?.draftEnemy ?? null,
-          receivedAt: Date.now()
-        };
-
-        // Option A: Direct Stream Cipher & Ground-Truth Candidate Decoding
-        if (draftObj.draft) {
-          try {
-            const decoded = decodeDraftCandidatesDetailed(draftObj.draft, draftObj.stageId, draftObj.matchId);
-            if (Array.isArray(decoded.candidates) && decoded.candidates.length > 0) {
-              win.__hwa_legend_draft_candidates = decoded.candidates;
-              win.postMessage({
-                source: 'hwa-helper-api',
-                kind: 'legend-draft-hook-result',
-                payload: {
-                  ok: true,
-                  timestamp: new Date().toISOString(),
-                  stageId: draftObj.stageId ?? null,
-                  matchId: draftObj.matchId ?? null,
-                  draftBase64: draftObj.draft,
-                  topCandidateIds: decoded.candidates,
-                  steps: decoded.steps,
-                  isGroundTruth: decoded.isGroundTruth,
-                  decoderOption: 'A-stream-cipher'
-                }
-              }, loc.origin);
-            }
-          } catch (_) {}
-        }
-
-        scheduleLegendDraftScans();
-      }
-
-      if (draftLoggingEnabled) {
-        emitDraftLog({
-          type: 'rpc-response',
-          timestamp: Date.now(),
-          results: draftResults
-        });
-
-        for (const r of draftResults) {
-          const ident = typeof r?.ident === 'string' ? r.ident : 'randomDraft_getInfo';
-          const matchedCall = pendingDraftCalls.get(ident) || pendingDraftCalls.get(r?.ident) || (pendingDraftCalls.size === 1 ? Array.from(pendingDraftCalls.values())[0] : null);
-          const actionName = matchedCall?.name || (ident.startsWith('randomDraft_') ? ident : `randomDraft_${ident}`);
-          const stepName = actionName.replace(/^randomDraft_/, '');
-          const response = r?.result?.response;
-          const error = r?.error || r?.result?.error;
-
-          emitDraftLog({
-            type: 'step-output',
-            timestamp: Date.now(),
-            action: actionName,
-            step: stepName,
-            ok: !error,
-            error: error ?? null,
-            stageId: response?.stageId ?? lastDraftPayload?.stageId ?? null,
-            matchId: response?.matchId ?? lastDraftPayload?.matchId ?? null,
-            draftEnemy: response?.draftEnemy ?? null,
-            defenceHeroes: Array.isArray(response?.defenceHeroes) ? response.defenceHeroes : undefined,
-            attackHeroes: Array.isArray(response?.attackHeroes) ? response.attackHeroes : undefined,
-            enemyDefenceHeroes: Array.isArray(response?.enemyDefenceHeroes) ? response.enemyDefenceHeroes : undefined,
-            battleReplay: response?.battleReplay ?? null,
-            battleResult: response?.battleResult ?? null,
-            rating: response?.rating ?? null,
-            hasDraftCipher: Boolean(response?.draft),
-            rawResponse: response ?? null
-          });
-
-          emitDraftLog({
-            type: 'draft-step',
-            timestamp: Date.now(),
-            action: actionName,
-            step: stepName,
-            ident: r?.ident || null,
-            in: {
-              args: matchedCall?.args || {},
-              heroes: Array.isArray(matchedCall?.args?.heroes) ? matchedCall.args.heroes : undefined,
-              matchId: matchedCall?.args?.matchId ?? null
-            },
-            out: {
-              ok: !error,
-              error: error ?? null,
-              stageId: response?.stageId ?? null,
-              matchId: response?.matchId ?? null,
-              draftEnemy: response?.draftEnemy ?? null,
-              defenceHeroes: Array.isArray(response?.defenceHeroes) ? response.defenceHeroes : undefined,
-              attackHeroes: Array.isArray(response?.attackHeroes) ? response.attackHeroes : undefined,
-              enemyDefenceHeroes: Array.isArray(response?.enemyDefenceHeroes) ? response.enemyDefenceHeroes : undefined,
-              battleReplay: response?.battleReplay ?? null,
-              battleResult: response?.battleResult ?? null,
-              rating: response?.rating ?? null,
-              hasDraftCipher: Boolean(response?.draft),
-              rawResponse: response ?? null
-            }
-          });
-        }
-      }
-    } catch (_) {}
-  }
-
-  function handleLegendDraftRpcTransaction(reqText: any, resText: any) {
-    if (reqText) handleLegendDraftRpcRequest(reqText);
-    if (resText) handleLegendDraftRpcResponse(resText);
-  }
-
-  win.__hwaLegendDraftHook = {
-    getMemory: getWasmMemory,
-    runScan: runLegendDraftMemoryScan,
-    getLastPayload: () => lastDraftPayload,
-    getCapturedStrings: () => [...capturedDraftStrings],
-    findSequenceInHeap,
-    scanCandidateHeroArrays,
-    handleLegendDraftRpcTransaction,
-    handleLegendDraftRpcResponse,
-    handleLegendDraftRpcRequest,
-    isLoggingEnabled: () => draftLoggingEnabled,
-    setLoggingEnabled: (val: boolean) => { draftLoggingEnabled = Boolean(val); },
-    emitDraftLog,
-    isValidHeroId
-  };
-
   // --- Message Listener ---
   win.addEventListener('message', (event: any) => {
     if (event.source !== win || event.origin !== loc.origin) return;
@@ -1085,9 +647,6 @@ export function installInterceptor(customWindow?: any): void {
       popupRpcEnabled = event.data.popupRpcEnabled === true;
       rpcDispatchMode = ['direct', 'mqtt-piggyback'].includes(event.data.socketRefreshMode) ? event.data.socketRefreshMode : 'piggyback';
       recordingActive = event.data.recordingActive === true;
-      if (event.data.legendDraftLoggingEnabled !== undefined) {
-        draftLoggingEnabled = event.data.legendDraftLoggingEnabled === true;
-      }
       if (!captureEnabled || !popupRpcEnabled || event.data.socketRefreshMode === 'direct') {
         if (queuedClaimKeys.size) reportClaimResult(false, 'Queued claims were cancelled by Settings.');
         queuedRpcCalls.clear();
@@ -1097,11 +656,6 @@ export function installInterceptor(customWindow?: any): void {
         claimQueueTimer = null;
       }
       reportQueueStatus();
-      return;
-    }
-
-    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'legend-draft-scan') {
-      runLegendDraftMemoryScan();
       return;
     }
 
@@ -1250,19 +804,6 @@ export function installInterceptor(customWindow?: any): void {
       } catch (err: any) {
         win.postMessage({ source: 'hwa-helper-api', kind: 'refresh-rpc-result', ok: false, error: err?.message || String(err) }, loc.origin);
       }
-      return;
-    }
-
-    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'draft-action') {
-      if (!popupRpcEnabled || !['saveDefence', 'saveAttack'].includes(event.data.action) || !Array.isArray(event.data.heroes) || event.data.heroes.length !== 5 || event.data.heroes.some((id: any) => !Number.isInteger(id))) return;
-      win.postMessage({
-        source: 'hwa-helper-control',
-        kind: 'refresh-rpc',
-        calls: [
-          { name: event.data.action === 'saveDefence' ? 'randomDraft_saveDefence' : 'randomDraft_saveAttack', args: { heroes: event.data.heroes } },
-          { name: 'randomDraft_getInfo' }
-        ]
-      }, loc.origin);
       return;
     }
 
@@ -1728,10 +1269,6 @@ export function installInterceptor(customWindow?: any): void {
                     requestBody: piggyback.options.body,
                     responseBody: fullText
                   });
-
-                  if (piggyback.options?.body && piggyback.options.body.includes('randomDraft_')) {
-                    handleLegendDraftRpcTransaction(piggyback.options.body, fullText);
-                  }
                   if (fullText.length > MAX_BODY_CHARS && extraResults.length) {
                     record('fetch', method, url, response.status, duration, 'completed', {
                       requestBody: JSON.stringify({ calls: piggyback.appended }),
@@ -1762,9 +1299,6 @@ export function installInterceptor(customWindow?: any): void {
                 Promise.all([requestBody, readFetchResponse(response)]).then(([request, received]) => {
                   const reqText = request?.text ?? null;
                   const resText = received?.text ?? null;
-                  if (reqText && reqText.includes('randomDraft_')) {
-                    handleLegendDraftRpcTransaction(reqText, resText);
-                  }
                   if (resText && resText.includes('"version"')) {
                     try {
                       const parsed = JSON.parse(resText);
@@ -1942,9 +1476,6 @@ export function installInterceptor(customWindow?: any): void {
             const resText = received?.text ?? null;
             info.requestBody.then((request: any) => {
               const reqText = request?.text ?? null;
-              if (reqText && reqText.includes('randomDraft_')) {
-                handleLegendDraftRpcTransaction(reqText, resText);
-              }
               record('xhr', info.method, info.url,
                 this.status || null, duration, info.outcome, {
                   requestBody: request?.text ?? null,
