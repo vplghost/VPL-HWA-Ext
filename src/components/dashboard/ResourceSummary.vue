@@ -78,7 +78,7 @@ const ironVal = computed(
 </script>
 
 <template>
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
     <!-- Gold Card -->
     <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-2xs flex items-center justify-between">
       <div>
@@ -107,7 +107,7 @@ const ironVal = computed(
         <div class="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
           <span>Energy</span>
           <span v-if="energyRefillSec" class="text-[9px] font-mono text-amber-600 dark:text-amber-400">
-            +1 in {{ formatDuration(energyRefillSec) }}
+            {{ formatDuration(energyRefillSec) }}
           </span>
         </div>
         <div class="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">
@@ -123,7 +123,7 @@ const ironVal = computed(
         <div class="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
           <span>World Energy</span>
           <span v-if="worldEnergyRefillSec" class="text-[9px] font-mono text-sky-600 dark:text-sky-400">
-            +1 in {{ formatDuration(worldEnergyRefillSec) }}
+            {{ formatDuration(worldEnergyRefillSec) }}
           </span>
         </div>
         <div class="text-sm font-bold text-sky-600 dark:text-sky-400 tabular-nums">
@@ -132,29 +132,43 @@ const ironVal = computed(
       </div>
       <span class="text-xl">🌐</span>
     </div>
-  </div>
 
-  <!-- City Resources Bar -->
-  <div class="grid grid-cols-4 gap-2 text-center text-xs p-1.5 rounded-lg bg-slate-100/70 dark:bg-slate-900/40">
-    <div class="flex items-center justify-center gap-1">
-      <span>🌾</span>
-      <span class="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Food:</span>
-      <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{{ formatResourceAmount(foodVal) }}</span>
-    </div>
-    <div class="flex items-center justify-center gap-1">
-      <span>🪵</span>
-      <span class="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Wood:</span>
-      <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{{ formatResourceAmount(woodVal) }}</span>
-    </div>
-    <div class="flex items-center justify-center gap-1">
-      <span>🪨</span>
-      <span class="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Stone:</span>
-      <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{{ formatResourceAmount(stoneVal) }}</span>
-    </div>
-    <div class="flex items-center justify-center gap-1">
-      <span>⚙️</span>
-      <span class="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Iron:</span>
-      <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{{ formatResourceAmount(ironVal) }}</span>
+    <!-- City Resources Card (4 ô mini ngang hàng) -->
+    <div class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-2xs flex flex-col justify-center col-span-2 sm:col-span-1">
+      <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-2xs">
+        <div class="flex items-center justify-between gap-1">
+          <span class="text-slate-500 dark:text-slate-400 text-[10px] flex items-center gap-0.5 truncate">
+            <span>🌾</span><span>Food:</span>
+          </span>
+          <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs">
+            {{ formatResourceAmount(foodVal) }}
+          </span>
+        </div>
+        <div class="flex items-center justify-between gap-1">
+          <span class="text-slate-500 dark:text-slate-400 text-[10px] flex items-center gap-0.5 truncate">
+            <span>🪵</span><span>Wood:</span>
+          </span>
+          <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs">
+            {{ formatResourceAmount(woodVal) }}
+          </span>
+        </div>
+        <div class="flex items-center justify-between gap-1">
+          <span class="text-slate-500 dark:text-slate-400 text-[10px] flex items-center gap-0.5 truncate">
+            <span>🪨</span><span>Stone:</span>
+          </span>
+          <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs">
+            {{ formatResourceAmount(stoneVal) }}
+          </span>
+        </div>
+        <div class="flex items-center justify-between gap-1">
+          <span class="text-slate-500 dark:text-slate-400 text-[10px] flex items-center gap-0.5 truncate">
+            <span>⚙️</span><span>Iron:</span>
+          </span>
+          <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs">
+            {{ formatResourceAmount(ironVal) }}
+          </span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
