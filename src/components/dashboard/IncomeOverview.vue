@@ -8,7 +8,14 @@ import {
   getUtcDayOffset,
   formatCompactNumber,
   INCOME_SOURCES,
+  SOURCE_COLORS,
+  getCurrentEmeraldAmount,
+  getTodayEmeraldSummary,
+  getTodayEmeraldFluctuations,
+  getDailyEmeraldTrend,
   type DayIncomeSummary,
+  type EmeraldDailySummary,
+  type EmeraldFluctuation,
 } from '@/src/utils/resourceIncome';
 
 const { cache } = useRpcCache();
@@ -22,9 +29,14 @@ const fromDate = ref(defaultRange.fromDate);
 const toDate = ref(defaultRange.toDate);
 const activePreset = ref<'7d' | '14d' | '30d' | 'custom'>('7d');
 
-// Hovered bar state for chart tooltip
+// Hover states for tooltips
 const hoveredDay = ref<DayIncomeSummary | null>(null);
 const hoveredIndex = ref<number | null>(null);
+const hoveredSlice = ref<string | null>(null);
+
+const hoveredEmeraldDay = ref<EmeraldDailySummary | null>(null);
+const hoveredEmeraldIndex = ref<number | null>(null);
+const hoveredFluctuation = ref<EmeraldFluctuation | null>(null);
 
 function applyPreset(preset: '7d' | '14d' | '30d') {
   activePreset.value = preset;
@@ -39,7 +51,11 @@ function onCustomDateChange() {
   activePreset.value = 'custom';
 }
 
-// Today's summary
+// -------------------------------------------------------------
+// GOLD ANALYTICS
+// -------------------------------------------------------------
+
+// Today's summary for gold
 const todaySummary = computed(() => getTodayIncome(cache?.value || {}));
 
 const todayTotal = computed(() => {
@@ -57,6 +73,7 @@ const todayBreakdown = computed(() => {
     .map(([sourceKey, amount]) => {
       const fallbackMeta = { label: 'Other Sources', icon: '📦' };
       const meta = INCOME_SOURCES[sourceKey] ?? INCOME_SOURCES['other'] ?? fallbackMeta;
+      const colorMeta = SOURCE_COLORS[sourceKey] ?? SOURCE_COLORS['other'] ?? { stroke: '#64748b', bg: 'bg-slate-500', text: 'text-slate-500' };
       const percent = total > 0 ? Math.round((amount / total) * 100) : 0;
       return {
         key: sourceKey,
@@ -64,12 +81,41 @@ const todayBreakdown = computed(() => {
         icon: meta.icon,
         amount,
         percent,
+        color: colorMeta.stroke,
+        bgClass: colorMeta.bg,
+        textClass: colorMeta.text,
       };
     })
     .sort((a, b) => b.amount - a.amount);
 });
 
-// Daily trend dataset based on selected date range
+// Donut Chart calculations (SVG)
+const donutRadius = 52;
+const donutCircumference = 2 * Math.PI * donutRadius; // ~326.72
+
+const donutSlices = computed(() => {
+  const total = todayTotal.value;
+  let currentOffset = 0;
+  return todayBreakdown.value.map((item) => {
+    const fraction = total > 0 ? item.amount / total : 0;
+    const length = Math.max(1, fraction * donutCircumference);
+    const offset = currentOffset;
+    currentOffset += length;
+    return {
+      ...item,
+      length,
+      offset,
+      circumference: donutCircumference,
+    };
+  });
+});
+
+const activeHoveredDonutItem = computed(() => {
+  if (!hoveredSlice.value) return null;
+  return todayBreakdown.value.find((b) => b.key === hoveredSlice.value) || null;
+});
+
+// Daily gold trend dataset
 const dailyTrend = computed(() => {
   return getDailyIncomeTrend(cache?.value || {}, {
     fromDate: fromDate.value,
@@ -77,20 +123,17 @@ const dailyTrend = computed(() => {
   });
 });
 
-// Chart calculations
-const chartMax = computed(() => {
-  const max = Math.max(
-    ...dailyTrend.value.map((d) => (activeResource.value === 'gold' ? d.gold : d.emerald)),
-    0
-  );
-  return max > 0 ? max : 1000;
-});
-
+// Gold Daily Bar Chart Dimensions
 const chartWidth = 500;
 const chartHeight = 130;
 const chartPadding = { top: 15, bottom: 25, left: 45, right: 15 };
 const plotWidth = chartWidth - chartPadding.left - chartPadding.right;
 const plotHeight = chartHeight - chartPadding.top - chartPadding.bottom;
+
+const chartMax = computed(() => {
+  const max = Math.max(...dailyTrend.value.map((d) => d.gold), 0);
+  return max > 0 ? max : 1000;
+});
 
 const barWidth = computed(() => {
   const count = dailyTrend.value.length || 1;
@@ -104,14 +147,133 @@ function getBarX(index: number): number {
   return chartPadding.left + index * step + (step - barWidth.value) / 2;
 }
 
-function getBarHeight(day: DayIncomeSummary): number {
-  const val = activeResource.value === 'gold' ? day.gold : day.emerald;
-  if (val <= 0) return 2; // subtle sliver to show day exists
-  return Math.max(2, (val / chartMax.value) * plotHeight);
+function getBarHeight(goldAmount: number): number {
+  if (goldAmount <= 0) return 2;
+  return Math.max(2, (goldAmount / chartMax.value) * plotHeight);
 }
 
-function getBarY(day: DayIncomeSummary): number {
-  return chartPadding.top + plotHeight - getBarHeight(day);
+function getBarY(goldAmount: number): number {
+  return chartPadding.top + plotHeight - getBarHeight(goldAmount);
+}
+
+// -------------------------------------------------------------
+// EMERALD ANALYTICS (FLUCTUATION & DAILY AGGREGATES)
+// -------------------------------------------------------------
+
+const currentEmeraldBalance = computed(() => {
+  return getCurrentEmeraldAmount(cache?.value || {}) ?? todayEmeraldSummary.value.endAmount;
+});
+
+const todayEmeraldSummary = computed(() => {
+  return getTodayEmeraldSummary(cache?.value || {});
+});
+
+const todayEmeraldFluctuations = computed(() => {
+  return getTodayEmeraldFluctuations(cache?.value || {});
+});
+
+// Daily Emerald Trend
+const dailyEmeraldTrend = computed(() => {
+  return getDailyEmeraldTrend(cache?.value || {}, {
+    fromDate: fromDate.value,
+    toDate: toDate.value,
+  });
+});
+
+// Emerald Intraday Chart calculations
+const intradayPoints = computed(() => {
+  const flucs = todayEmeraldFluctuations.value;
+  if (!flucs || flucs.length === 0) return [];
+
+  // Build sequential timeline points: start point + each fluctuation point
+  const points = [
+    {
+      id: 'start',
+      time: flucs[0].time || '00:00:00',
+      balance: flucs[0].prevAmount,
+      delta: 0,
+      prevAmount: flucs[0].prevAmount,
+      isStart: true,
+    },
+    ...flucs.map((f) => ({
+      id: f.id,
+      time: f.time,
+      balance: f.newAmount,
+      delta: f.delta,
+      prevAmount: f.prevAmount,
+      isStart: false,
+    })),
+  ];
+  return points;
+});
+
+const intradayBalanceRange = computed(() => {
+  const pts = intradayPoints.value;
+  if (pts.length === 0) {
+    const cur = currentEmeraldBalance.value || 0;
+    return { min: Math.max(0, cur - 100), max: cur + 100 };
+  }
+  const balances = pts.map((p) => p.balance);
+  let min = Math.min(...balances);
+  let max = Math.max(...balances);
+  if (min === max) {
+    min = Math.max(0, min - 50);
+    max = max + 50;
+  } else {
+    const pad = (max - min) * 0.15;
+    min = Math.max(0, Math.floor(min - pad));
+    max = Math.ceil(max + pad);
+  }
+  return { min, max };
+});
+
+function getIntradayX(index: number): number {
+  const count = intradayPoints.value.length;
+  if (count <= 1) return chartPadding.left + plotWidth / 2;
+  return chartPadding.left + (index / (count - 1)) * plotWidth;
+}
+
+function getIntradayY(balance: number): number {
+  const { min, max } = intradayBalanceRange.value;
+  const range = max - min || 1;
+  const ratio = (balance - min) / range;
+  return chartPadding.top + plotHeight - ratio * plotHeight;
+}
+
+const intradayPolylinePoints = computed(() => {
+  return intradayPoints.value
+    .map((p, idx) => `${getIntradayX(idx).toFixed(1)},${getIntradayY(p.balance).toFixed(1)}`)
+    .join(' ');
+});
+
+// Daily Emerald Date-Range Chart Calculations (Diverging bar chart)
+const emeraldMaxAbs = computed(() => {
+  const vals = dailyEmeraldTrend.value.map((d) => Math.max(d.totalGain, d.totalSpend, Math.abs(d.netDelta)));
+  const max = Math.max(...vals, 0);
+  return max > 0 ? max : 100;
+});
+
+const emeraldZeroY = computed(() => {
+  return chartPadding.top + plotHeight / 2;
+});
+
+function getEmeraldBarY(day: EmeraldDailySummary): number {
+  const max = emeraldMaxAbs.value;
+  const halfPlot = plotHeight / 2;
+  if (day.netDelta >= 0) {
+    const h = (day.netDelta / max) * (halfPlot - 4);
+    return emeraldZeroY.value - Math.max(2, h);
+  } else {
+    return emeraldZeroY.value;
+  }
+}
+
+function getEmeraldBarHeight(day: EmeraldDailySummary): number {
+  const max = emeraldMaxAbs.value;
+  const halfPlot = plotHeight / 2;
+  const abs = Math.abs(day.netDelta);
+  if (abs <= 0) return 2;
+  return Math.max(2, (abs / max) * (halfPlot - 4));
 }
 
 function formatDayLabel(dateStr: string): string {
@@ -125,10 +287,14 @@ function formatDayLabel(dateStr: string): string {
     <!-- Header with Resource View Switcher -->
     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
       <div class="flex items-center gap-2">
-        <span class="text-lg">📈</span>
+        <span class="text-lg">{{ activeResource === 'gold' ? '🪙' : '💎' }}</span>
         <div>
-          <h3 class="font-bold text-xs text-slate-800 dark:text-slate-100">Income Analytics</h3>
-          <p class="text-[10px] text-slate-400">Track daily resource earnings and source distributions</p>
+          <h3 class="font-bold text-xs text-slate-800 dark:text-slate-100">
+            {{ activeResource === 'gold' ? 'Gold Income Analytics' : 'Emerald Fluctuation Analytics' }}
+          </h3>
+          <p class="text-[10px] text-slate-400">
+            {{ activeResource === 'gold' ? 'Track today income sources and multi-day trend' : 'Track intraday emerald balance changes and daily aggregates' }}
+          </p>
         </div>
       </div>
 
@@ -163,238 +329,689 @@ function formatDayLabel(dateStr: string): string {
       </div>
     </div>
 
-    <!-- Section 1: Today's Income Card -->
-    <div class="rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 p-3">
-      <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Today's {{ activeResource === 'gold' ? 'Gold' : 'Emerald' }} Income</span>
-          <span class="text-[10px] text-slate-400 font-mono">({{ todaySummary.date }})</span>
-        </div>
-        <div class="text-sm font-extrabold tabular-nums" :class="activeResource === 'gold' ? 'text-amber-500' : 'text-emerald-500'">
-          +{{ formatCompactNumber(todayTotal) }}
-          <span class="text-xs font-semibold text-slate-400 ml-0.5">
-            ({{ todayTotal.toLocaleString('en-US') }})
-          </span>
-        </div>
-      </div>
-
-      <!-- Breakdown by Source List -->
-      <div v-if="todayBreakdown.length > 0" class="space-y-1.5 mt-2">
-        <div
-          v-for="item in todayBreakdown"
-          :key="item.key"
-          class="flex items-center justify-between text-xs py-1 px-2 rounded-md bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800"
-        >
-          <div class="flex items-center gap-1.5 min-w-0">
-            <span class="text-sm shrink-0">{{ item.icon }}</span>
-            <span class="font-medium text-slate-700 dark:text-slate-300 truncate">{{ item.label }}</span>
+    <!-- ========================================================= -->
+    <!-- GOLD VIEW                                                -->
+    <!-- ========================================================= -->
+    <template v-if="activeResource === 'gold'">
+      <!-- Section 1: Today's Gold Income (Pie/Donut Chart + Legends with Metrics) -->
+      <div class="rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 p-3 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Today's Gold Income</span>
+            <span class="text-[10px] text-slate-400 font-mono">({{ todaySummary.date }})</span>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <div class="w-16 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden hidden sm:block">
-              <div
-                class="h-full rounded-full transition-all"
-                :class="activeResource === 'gold' ? 'bg-amber-500' : 'bg-emerald-500'"
-                :style="{ width: `${item.percent}%` }"
-              ></div>
-            </div>
-            <span class="text-[10px] text-slate-400 w-8 text-right tabular-nums">{{ item.percent }}%</span>
-            <span class="font-bold tabular-nums" :class="activeResource === 'gold' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'">
-              +{{ formatCompactNumber(item.amount) }}
+          <div class="text-sm font-extrabold tabular-nums text-amber-500">
+            +{{ formatCompactNumber(todayTotal) }}
+            <span class="text-xs font-semibold text-slate-400 ml-0.5">
+              ({{ todayTotal.toLocaleString('en-US') }})
             </span>
           </div>
         </div>
-      </div>
-      <div v-else class="text-center py-2 text-xs text-slate-400">
-        No {{ activeResource === 'gold' ? 'gold' : 'emerald' }} recorded for today yet.
-      </div>
-    </div>
 
-    <!-- Section 2: Daily Income Trend Chart (Default: Previous 7 Days, Excludes Today) -->
-    <div class="space-y-2">
-      <!-- Chart Controls Bar -->
-      <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div class="flex items-center gap-1">
-          <span class="font-bold text-slate-700 dark:text-slate-200">Daily Trend</span>
-          <span class="text-[10px] text-slate-400">(Excludes today)</span>
-        </div>
+        <div v-if="todayBreakdown.length > 0" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+          <!-- Donut Chart Column -->
+          <div class="md:col-span-5 flex flex-col items-center justify-center p-2">
+            <div class="relative w-36 h-36 flex items-center justify-center">
+              <svg viewBox="0 0 150 150" class="w-full h-full transform -rotate-90 select-none">
+                <!-- Base track circle -->
+                <circle
+                  cx="75"
+                  cy="75"
+                  :r="donutRadius"
+                  fill="transparent"
+                  stroke-width="18"
+                  class="stroke-slate-200/70 dark:stroke-slate-700/50"
+                />
 
-        <div class="flex flex-wrap items-center gap-1.5">
-          <!-- Preset Range Buttons -->
-          <div class="inline-flex rounded-md bg-slate-100 dark:bg-slate-800 p-0.5 text-2xs font-semibold">
-            <button
-              type="button"
-              class="cursor-pointer px-2 py-0.5 rounded transition-all"
-              :class="activePreset === '7d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
-              @click="applyPreset('7d')"
-            >
-              Last 7 Days
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer px-2 py-0.5 rounded transition-all"
-              :class="activePreset === '14d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
-              @click="applyPreset('14d')"
-            >
-              14 Days
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer px-2 py-0.5 rounded transition-all"
-              :class="activePreset === '30d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
-              @click="applyPreset('30d')"
-            >
-              30 Days
-            </button>
+                <!-- Donut slices -->
+                <circle
+                  v-for="slice in donutSlices"
+                  :key="slice.key"
+                  cx="75"
+                  cy="75"
+                  :r="donutRadius"
+                  fill="transparent"
+                  :stroke="slice.color"
+                  :stroke-width="hoveredSlice === slice.key ? 22 : 18"
+                  :stroke-dasharray="`${slice.length} ${slice.circumference}`"
+                  :stroke-dashoffset="-slice.offset"
+                  class="transition-all duration-200 cursor-pointer"
+                  :class="hoveredSlice === slice.key ? 'filter drop-shadow-md' : 'opacity-95 hover:opacity-100'"
+                  @mouseenter="hoveredSlice = slice.key"
+                  @mouseleave="hoveredSlice = null"
+                />
+              </svg>
+
+              <!-- Donut Center Label -->
+              <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-2">
+                <template v-if="activeHoveredDonutItem">
+                  <span class="text-sm">{{ activeHoveredDonutItem.icon }}</span>
+                  <span class="text-xs font-black text-slate-800 dark:text-slate-100 tabular-nums">
+                    +{{ formatCompactNumber(activeHoveredDonutItem.amount) }}
+                  </span>
+                  <span class="text-[9px] font-bold text-amber-500 tabular-nums">
+                    {{ activeHoveredDonutItem.percent }}%
+                  </span>
+                </template>
+                <template v-else>
+                  <span class="text-xs font-black text-amber-500 tabular-nums">
+                    +{{ formatCompactNumber(todayTotal) }}
+                  </span>
+                  <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Total
+                  </span>
+                </template>
+              </div>
+            </div>
+            <span class="text-[10px] text-slate-400 mt-1 italic">Hover slice or legend to highlight</span>
           </div>
 
-          <!-- Date Inputs -->
-          <div class="inline-flex items-center gap-1 text-2xs text-slate-500 dark:text-slate-400">
-            <input
-              v-model="fromDate"
-              type="date"
-              class="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-2xs text-slate-700 dark:text-slate-200"
-              @change="onCustomDateChange"
-            />
-            <span>–</span>
-            <input
-              v-model="toDate"
-              type="date"
-              class="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-2xs text-slate-700 dark:text-slate-200"
-              @change="onCustomDateChange"
-            />
+          <!-- Legends with Metrics Column -->
+          <div class="md:col-span-7 space-y-1.5">
+            <div
+              v-for="(item, idx) in todayBreakdown"
+              :key="item.key"
+              class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg border transition-all cursor-pointer"
+              :class="
+                hoveredSlice === item.key
+                  ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 shadow-2xs'
+                  : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+              "
+              @mouseenter="hoveredSlice = item.key"
+              @mouseleave="hoveredSlice = null"
+            >
+              <!-- Left: Index + Color Dot + Icon + Label -->
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-[10px] font-mono text-slate-400 font-bold w-3">#{{ idx + 1 }}</span>
+                <span class="size-2 rounded-full shrink-0" :style="{ backgroundColor: item.color }"></span>
+                <span class="text-xs shrink-0">{{ item.icon }}</span>
+                <span class="font-medium text-slate-700 dark:text-slate-200 truncate">{{ item.label }}</span>
+              </div>
+
+              <!-- Right: Percentage Badge + Amount -->
+              <div class="flex items-center gap-2 shrink-0">
+                <span class="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 tabular-nums">
+                  {{ item.percent }}%
+                </span>
+                <span class="font-bold tabular-nums text-amber-600 dark:text-amber-400 text-right min-w-16">
+                  +{{ formatCompactNumber(item.amount) }}
+                </span>
+              </div>
+            </div>
           </div>
+        </div>
+
+        <div v-else class="text-center py-4 text-xs text-slate-400">
+          No gold recorded for today yet.
         </div>
       </div>
 
-      <!-- SVG Chart Container -->
-      <div class="relative w-full rounded-lg bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 p-2">
-        <svg
-          class="w-full h-36 overflow-visible select-none"
-          :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
-          preserveAspectRatio="none"
-        >
-          <!-- Grid Lines and Y-Axis Ticks -->
-          <g class="text-[9px] fill-slate-400 font-mono">
-            <!-- Top tick -->
-            <line
-              :x1="chartPadding.left"
-              :y1="chartPadding.top"
-              :x2="chartWidth - chartPadding.right"
-              :y2="chartPadding.top"
-              class="stroke-slate-200 dark:stroke-slate-800"
-              stroke-dasharray="3,3"
-            />
-            <text :x="chartPadding.left - 6" :y="chartPadding.top + 3" text-anchor="end">
-              {{ formatCompactNumber(chartMax) }}
-            </text>
+      <!-- Section 2: Daily Income Trend Chart (Gold) -->
+      <div class="space-y-2">
+        <!-- Chart Controls Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-1">
+            <span class="font-bold text-slate-700 dark:text-slate-200">Daily Gold Trend</span>
+            <span class="text-[10px] text-slate-400">(Excludes today)</span>
+          </div>
 
-            <!-- Mid tick -->
-            <line
-              :x1="chartPadding.left"
-              :y1="chartPadding.top + plotHeight / 2"
-              :x2="chartWidth - chartPadding.right"
-              :y2="chartPadding.top + plotHeight / 2"
-              class="stroke-slate-200 dark:stroke-slate-800"
-              stroke-dasharray="3,3"
-            />
-            <text :x="chartPadding.left - 6" :y="chartPadding.top + plotHeight / 2 + 3" text-anchor="end">
-              {{ formatCompactNumber(chartMax / 2) }}
-            </text>
-
-            <!-- Base tick (0) -->
-            <line
-              :x1="chartPadding.left"
-              :y1="chartPadding.top + plotHeight"
-              :x2="chartWidth - chartPadding.right"
-              :y2="chartPadding.top + plotHeight"
-              class="stroke-slate-200 dark:stroke-slate-700"
-            />
-            <text :x="chartPadding.left - 6" :y="chartPadding.top + plotHeight + 3" text-anchor="end">
-              0
-            </text>
-          </g>
-
-          <!-- Bars for Each Day -->
-          <g>
-            <g
-              v-for="(day, idx) in dailyTrend"
-              :key="day.date"
-              class="cursor-pointer group"
-              @mouseenter="hoveredDay = day; hoveredIndex = idx"
-              @mouseleave="hoveredDay = null; hoveredIndex = null"
-            >
-              <!-- Transparent Hover Hitbox -->
-              <rect
-                :x="getBarX(idx) - 2"
-                :y="chartPadding.top"
-                :width="barWidth + 4"
-                :height="plotHeight"
-                fill="transparent"
-              />
-
-              <!-- Actual Value Bar -->
-              <rect
-                :x="getBarX(idx)"
-                :y="getBarY(day)"
-                :width="barWidth"
-                :height="getBarHeight(day)"
-                rx="3"
-                class="transition-all duration-150"
-                :class="
-                  activeResource === 'gold'
-                    ? hoveredIndex === idx
-                      ? 'fill-amber-400 dark:fill-amber-300'
-                      : 'fill-amber-500/80 hover:fill-amber-400'
-                    : hoveredIndex === idx
-                      ? 'fill-emerald-400 dark:fill-emerald-300'
-                      : 'fill-emerald-500/80 hover:fill-emerald-400'
-                "
-              />
-
-              <!-- X-Axis Date Label -->
-              <text
-                :x="getBarX(idx) + barWidth / 2"
-                :y="chartPadding.top + plotHeight + 14"
-                text-anchor="middle"
-                class="text-[9px] fill-slate-400 font-mono"
-                :class="hoveredIndex === idx ? 'font-bold fill-slate-800 dark:fill-slate-100' : ''"
+          <div class="flex flex-wrap items-center gap-1.5">
+            <!-- Preset Range Buttons -->
+            <div class="inline-flex rounded-md bg-slate-100 dark:bg-slate-800 p-0.5 text-2xs font-semibold">
+              <button
+                type="button"
+                class="cursor-pointer px-2 py-0.5 rounded transition-all"
+                :class="activePreset === '7d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
+                @click="applyPreset('7d')"
               >
-                {{ formatDayLabel(day.date) }}
+                Last 7 Days
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer px-2 py-0.5 rounded transition-all"
+                :class="activePreset === '14d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
+                @click="applyPreset('14d')"
+              >
+                14 Days
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer px-2 py-0.5 rounded transition-all"
+                :class="activePreset === '30d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
+                @click="applyPreset('30d')"
+              >
+                30 Days
+              </button>
+            </div>
+
+            <!-- Date Inputs -->
+            <div class="inline-flex items-center gap-1 text-2xs text-slate-500 dark:text-slate-400">
+              <input
+                v-model="fromDate"
+                type="date"
+                class="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-2xs text-slate-700 dark:text-slate-200"
+                @change="onCustomDateChange"
+              />
+              <span>–</span>
+              <input
+                v-model="toDate"
+                type="date"
+                class="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-2xs text-slate-700 dark:text-slate-200"
+                @change="onCustomDateChange"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- SVG Gold Chart Container -->
+        <div class="relative w-full rounded-lg bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 p-2">
+          <svg
+            class="w-full h-36 overflow-visible select-none"
+            :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
+            preserveAspectRatio="none"
+          >
+            <!-- Grid Lines and Y-Axis Ticks -->
+            <g class="text-[9px] fill-slate-400 font-mono">
+              <line
+                :x1="chartPadding.left"
+                :y1="chartPadding.top"
+                :x2="chartWidth - chartPadding.right"
+                :y2="chartPadding.top"
+                class="stroke-slate-200 dark:stroke-slate-800"
+                stroke-dasharray="3,3"
+              />
+              <text :x="chartPadding.left - 6" :y="chartPadding.top + 3" text-anchor="end">
+                {{ formatCompactNumber(chartMax) }}
+              </text>
+
+              <line
+                :x1="chartPadding.left"
+                :y1="chartPadding.top + plotHeight / 2"
+                :x2="chartWidth - chartPadding.right"
+                :y2="chartPadding.top + plotHeight / 2"
+                class="stroke-slate-200 dark:stroke-slate-800"
+                stroke-dasharray="3,3"
+              />
+              <text :x="chartPadding.left - 6" :y="chartPadding.top + plotHeight / 2 + 3" text-anchor="end">
+                {{ formatCompactNumber(chartMax / 2) }}
+              </text>
+
+              <line
+                :x1="chartPadding.left"
+                :y1="chartPadding.top + plotHeight"
+                :x2="chartWidth - chartPadding.right"
+                :y2="chartPadding.top + plotHeight"
+                class="stroke-slate-200 dark:stroke-slate-700"
+              />
+              <text :x="chartPadding.left - 6" :y="chartPadding.top + plotHeight + 3" text-anchor="end">
+                0
               </text>
             </g>
-          </g>
-        </svg>
 
-        <!-- Hover Tooltip Box -->
-        <div
-          v-if="hoveredDay"
-          class="absolute bottom-2 left-2 right-2 sm:right-auto sm:left-14 z-10 p-2 rounded-lg bg-slate-900/95 text-white text-2xs shadow-lg border border-slate-700 backdrop-blur-xs pointer-events-none"
-        >
-          <div class="flex items-center justify-between gap-4 font-bold border-b border-slate-700 pb-1 mb-1">
-            <span>{{ hoveredDay.date }}</span>
-            <span :class="activeResource === 'gold' ? 'text-amber-400' : 'text-emerald-400'">
-              +{{ (activeResource === 'gold' ? hoveredDay.gold : hoveredDay.emerald).toLocaleString('en-US') }} {{ activeResource === 'gold' ? 'Gold' : 'Emeralds' }}
-            </span>
-          </div>
-          <!-- Sources list in tooltip -->
-          <div class="space-y-0.5">
-            <div
-              v-for="(amt, srcKey) in (activeResource === 'gold' ? hoveredDay.goldBySource : hoveredDay.emeraldBySource)"
-              :key="srcKey"
-              class="flex items-center justify-between gap-3 text-slate-300"
-            >
-              <span>{{ INCOME_SOURCES[srcKey]?.label || srcKey }}:</span>
-              <span class="font-mono text-slate-100">+{{ Number(amt).toLocaleString('en-US') }}</span>
+            <!-- Bars for Each Day -->
+            <g>
+              <g
+                v-for="(day, idx) in dailyTrend"
+                :key="day.date"
+                class="cursor-pointer group"
+                @mouseenter="hoveredDay = day; hoveredIndex = idx"
+                @mouseleave="hoveredDay = null; hoveredIndex = null"
+              >
+                <!-- Transparent Hover Hitbox -->
+                <rect
+                  :x="getBarX(idx) - 2"
+                  :y="chartPadding.top"
+                  :width="barWidth + 4"
+                  :height="plotHeight"
+                  fill="transparent"
+                />
+
+                <!-- Actual Value Bar -->
+                <rect
+                  :x="getBarX(idx)"
+                  :y="getBarY(day.gold)"
+                  :width="barWidth"
+                  :height="getBarHeight(day.gold)"
+                  rx="3"
+                  class="transition-all duration-150"
+                  :class="
+                    hoveredIndex === idx
+                      ? 'fill-amber-400 dark:fill-amber-300'
+                      : 'fill-amber-500/80 hover:fill-amber-400'
+                  "
+                />
+
+                <!-- X-Axis Date Label -->
+                <text
+                  :x="getBarX(idx) + barWidth / 2"
+                  :y="chartPadding.top + plotHeight + 14"
+                  text-anchor="middle"
+                  class="text-[9px] fill-slate-400 font-mono"
+                  :class="hoveredIndex === idx ? 'font-bold fill-slate-800 dark:fill-slate-100' : ''"
+                >
+                  {{ formatDayLabel(day.date) }}
+                </text>
+              </g>
+            </g>
+          </svg>
+
+          <!-- Hover Tooltip Box -->
+          <div
+            v-if="hoveredDay"
+            class="absolute bottom-2 left-2 right-2 sm:right-auto sm:left-14 z-10 p-2 rounded-lg bg-slate-900/95 text-white text-2xs shadow-lg border border-slate-700 backdrop-blur-xs pointer-events-none"
+          >
+            <div class="flex items-center justify-between gap-4 font-bold border-b border-slate-700 pb-1 mb-1">
+              <span>{{ hoveredDay.date }}</span>
+              <span class="text-amber-400">
+                +{{ hoveredDay.gold.toLocaleString('en-US') }} Gold
+              </span>
             </div>
-            <div
-              v-if="Object.keys(activeResource === 'gold' ? hoveredDay.goldBySource : hoveredDay.emeraldBySource).length === 0"
-              class="text-slate-400 italic"
-            >
-              No earnings on this date.
+            <div class="space-y-0.5">
+              <div
+                v-for="(amt, srcKey) in hoveredDay.goldBySource"
+                :key="srcKey"
+                class="flex items-center justify-between gap-3 text-slate-300"
+              >
+                <span>{{ INCOME_SOURCES[srcKey]?.label || srcKey }}:</span>
+                <span class="font-mono text-slate-100">+{{ Number(amt).toLocaleString('en-US') }}</span>
+              </div>
+              <div
+                v-if="Object.keys(hoveredDay.goldBySource).length === 0"
+                class="text-slate-400 italic"
+              >
+                No earnings on this date.
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </template>
+
+    <!-- ========================================================= -->
+    <!-- EMERALD VIEW (FLUCTUATION LOG & DAILY AGGREGATES)          -->
+    <!-- ========================================================= -->
+    <template v-else>
+      <!-- Section 1: Today's Emerald Fluctuation Card -->
+      <div class="rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 p-3 space-y-3">
+        <!-- Title and Stats Badges -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Today's Emerald Fluctuations</span>
+            <span class="text-[10px] text-slate-400 font-mono">({{ todayEmeraldSummary.date }})</span>
+          </div>
+
+          <!-- Key Metrics -->
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <div class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60">
+              <span class="text-[10px] text-slate-400">Balance:</span>
+              <span class="font-extrabold text-emerald-500 tabular-nums">💎 {{ currentEmeraldBalance.toLocaleString('en-US') }}</span>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60">
+              <span class="text-[10px] text-slate-400">Net Today:</span>
+              <span
+                class="font-extrabold tabular-nums"
+                :class="
+                  todayEmeraldSummary.netDelta > 0
+                    ? 'text-emerald-500'
+                    : todayEmeraldSummary.netDelta < 0
+                      ? 'text-rose-500'
+                      : 'text-slate-500'
+                "
+              >
+                {{ todayEmeraldSummary.netDelta > 0 ? '+' : '' }}{{ todayEmeraldSummary.netDelta.toLocaleString('en-US') }}
+              </span>
+            </div>
+            <div class="hidden sm:flex items-center gap-2 text-[10px]">
+              <span class="text-emerald-600 dark:text-emerald-400 font-bold tabular-nums">
+                +{{ todayEmeraldSummary.totalGain.toLocaleString('en-US') }}
+              </span>
+              <span class="text-slate-300 dark:text-slate-600">/</span>
+              <span class="text-rose-500 font-bold tabular-nums">
+                -{{ todayEmeraldSummary.totalSpend.toLocaleString('en-US') }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Biểu đồ tăng giảm trong ngày (Intraday Timeline Chart) -->
+        <div v-if="todayEmeraldFluctuations.length > 0" class="space-y-2">
+          <div class="relative w-full rounded-lg bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 p-2">
+            <svg
+              class="w-full h-32 overflow-visible select-none"
+              :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
+              preserveAspectRatio="none"
+            >
+              <!-- Grid lines & Y-axis labels -->
+              <g class="text-[9px] fill-slate-400 font-mono">
+                <line
+                  :x1="chartPadding.left"
+                  :y1="chartPadding.top"
+                  :x2="chartWidth - chartPadding.right"
+                  :y2="chartPadding.top"
+                  class="stroke-slate-200 dark:stroke-slate-800"
+                  stroke-dasharray="3,3"
+                />
+                <text :x="chartPadding.left - 6" :y="chartPadding.top + 3" text-anchor="end">
+                  {{ formatCompactNumber(intradayBalanceRange.max) }}
+                </text>
+
+                <line
+                  :x1="chartPadding.left"
+                  :y1="chartPadding.top + plotHeight / 2"
+                  :x2="chartWidth - chartPadding.right"
+                  :y2="chartPadding.top + plotHeight / 2"
+                  class="stroke-slate-200 dark:stroke-slate-800"
+                  stroke-dasharray="3,3"
+                />
+                <text :x="chartPadding.left - 6" :y="chartPadding.top + plotHeight / 2 + 3" text-anchor="end">
+                  {{ formatCompactNumber((intradayBalanceRange.max + intradayBalanceRange.min) / 2) }}
+                </text>
+
+                <line
+                  :x1="chartPadding.left"
+                  :y1="chartPadding.top + plotHeight"
+                  :x2="chartWidth - chartPadding.right"
+                  :y2="chartPadding.top + plotHeight"
+                  class="stroke-slate-200 dark:stroke-slate-700"
+                />
+                <text :x="chartPadding.left - 6" :y="chartPadding.top + plotHeight + 3" text-anchor="end">
+                  {{ formatCompactNumber(intradayBalanceRange.min) }}
+                </text>
+              </g>
+
+              <!-- Polyline connection for emerald balance progression -->
+              <polyline
+                fill="none"
+                class="stroke-emerald-500/80 dark:stroke-emerald-400"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                :points="intradayPolylinePoints"
+              />
+
+              <!-- Points for each fluctuation event -->
+              <g v-for="(p, idx) in intradayPoints" :key="p.id">
+                <!-- Transparent hover hitbox -->
+                <circle
+                  :cx="getIntradayX(idx)"
+                  :cy="getIntradayY(p.balance)"
+                  r="10"
+                  fill="transparent"
+                  class="cursor-pointer"
+                  @mouseenter="hoveredFluctuation = (p.isStart ? null : todayEmeraldFluctuations[idx - 1])"
+                  @mouseleave="hoveredFluctuation = null"
+                />
+
+                <!-- Point dot -->
+                <circle
+                  :cx="getIntradayX(idx)"
+                  :cy="getIntradayY(p.balance)"
+                  :r="p.isStart ? 3 : 4.5"
+                  :class="
+                    p.isStart
+                      ? 'fill-slate-400'
+                      : p.delta > 0
+                        ? 'fill-emerald-500 stroke-2 stroke-white dark:stroke-slate-900'
+                        : 'fill-rose-500 stroke-2 stroke-white dark:stroke-slate-900'
+                  "
+                />
+
+                <!-- Time label under point -->
+                <text
+                  :x="getIntradayX(idx)"
+                  :y="chartPadding.top + plotHeight + 14"
+                  text-anchor="middle"
+                  class="text-[8px] fill-slate-400 font-mono"
+                >
+                  {{ p.time.slice(0, 5) }}
+                </text>
+              </g>
+            </svg>
+
+            <!-- Tooltip for hovered fluctuation point -->
+            <div
+              v-if="hoveredFluctuation"
+              class="absolute bottom-2 left-2 right-2 sm:right-auto sm:left-14 z-10 p-2 rounded-lg bg-slate-900/95 text-white text-2xs shadow-lg border border-slate-700 backdrop-blur-xs pointer-events-none"
+            >
+              <div class="flex items-center justify-between gap-4 font-bold border-b border-slate-700 pb-1 mb-1">
+                <span>{{ hoveredFluctuation.time }}</span>
+                <span :class="hoveredFluctuation.delta > 0 ? 'text-emerald-400' : 'text-rose-400'">
+                  {{ hoveredFluctuation.delta > 0 ? '+' : '' }}{{ hoveredFluctuation.delta.toLocaleString('en-US') }} 💎
+                </span>
+              </div>
+              <div class="text-slate-300">
+                Balance: {{ hoveredFluctuation.prevAmount.toLocaleString('en-US') }} ➔
+                <span class="font-bold text-white">{{ hoveredFluctuation.newAmount.toLocaleString('en-US') }} 💎</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Today's Fluctuation History Log -->
+          <div class="space-y-1">
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Lịch sử biến động hôm nay ({{ todayEmeraldFluctuations.length }})
+            </span>
+            <div class="max-h-36 overflow-y-auto space-y-1 pr-1">
+              <div
+                v-for="fluc in [...todayEmeraldFluctuations].reverse()"
+                :key="fluc.id"
+                class="flex items-center justify-between text-xs py-1 px-2 rounded-md bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800"
+              >
+                <div class="flex items-center gap-1.5 font-mono text-[10px] text-slate-400">
+                  <span>⏱️ {{ fluc.time }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span
+                    class="font-bold tabular-nums"
+                    :class="fluc.delta > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'"
+                  >
+                    {{ fluc.delta > 0 ? '+' : '' }}{{ fluc.delta.toLocaleString('en-US') }} 💎
+                  </span>
+                  <span class="text-[10px] text-slate-400 font-mono">
+                    = {{ fluc.newAmount.toLocaleString('en-US') }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State for Emerald Today -->
+        <div v-else class="text-center py-4 px-2 space-y-1.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800">
+          <div class="text-xl">💎</div>
+          <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+            Chưa có biến động ngọc nào trong ngày hôm nay.
+          </p>
+          <p class="text-[10px] text-slate-400">
+            Số dư hiện tại: <span class="font-bold text-emerald-500 tabular-nums">💎 {{ currentEmeraldBalance.toLocaleString('en-US') }}</span>. Hệ thống sẽ tự động ghi nhận và vẽ biểu đồ khi số dư thay đổi.
+          </p>
+        </div>
+      </div>
+
+      <!-- Section 2: Emerald Daily Aggregates Chart (Từ ngày đến ngày) -->
+      <div class="space-y-2">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-1">
+            <span class="font-bold text-slate-700 dark:text-slate-200">Daily Emerald Aggregates</span>
+            <span class="text-[10px] text-slate-400">(Excludes today)</span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5">
+            <!-- Preset Range Buttons -->
+            <div class="inline-flex rounded-md bg-slate-100 dark:bg-slate-800 p-0.5 text-2xs font-semibold">
+              <button
+                type="button"
+                class="cursor-pointer px-2 py-0.5 rounded transition-all"
+                :class="activePreset === '7d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
+                @click="applyPreset('7d')"
+              >
+                Last 7 Days
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer px-2 py-0.5 rounded transition-all"
+                :class="activePreset === '14d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
+                @click="applyPreset('14d')"
+              >
+                14 Days
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer px-2 py-0.5 rounded transition-all"
+                :class="activePreset === '30d' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'"
+                @click="applyPreset('30d')"
+              >
+                30 Days
+              </button>
+            </div>
+
+            <!-- Date Inputs -->
+            <div class="inline-flex items-center gap-1 text-2xs text-slate-500 dark:text-slate-400">
+              <input
+                v-model="fromDate"
+                type="date"
+                class="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-2xs text-slate-700 dark:text-slate-200"
+                @change="onCustomDateChange"
+              />
+              <span>–</span>
+              <input
+                v-model="toDate"
+                type="date"
+                class="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-2xs text-slate-700 dark:text-slate-200"
+                @change="onCustomDateChange"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- SVG Daily Emerald Diverging Chart -->
+        <div class="relative w-full rounded-lg bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 p-2">
+          <svg
+            class="w-full h-36 overflow-visible select-none"
+            :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
+            preserveAspectRatio="none"
+          >
+            <!-- Grid Lines and Y-Axis Ticks -->
+            <g class="text-[9px] fill-slate-400 font-mono">
+              <!-- Top tick (+max) -->
+              <line
+                :x1="chartPadding.left"
+                :y1="chartPadding.top"
+                :x2="chartWidth - chartPadding.right"
+                :y2="chartPadding.top"
+                class="stroke-slate-200 dark:stroke-slate-800"
+                stroke-dasharray="3,3"
+              />
+              <text :x="chartPadding.left - 6" :y="chartPadding.top + 3" text-anchor="end">
+                +{{ formatCompactNumber(emeraldMaxAbs) }}
+              </text>
+
+              <!-- Zero baseline line -->
+              <line
+                :x1="chartPadding.left"
+                :y1="emeraldZeroY"
+                :x2="chartWidth - chartPadding.right"
+                :y2="emeraldZeroY"
+                class="stroke-slate-300 dark:stroke-slate-700"
+                stroke-width="1.5"
+              />
+              <text :x="chartPadding.left - 6" :y="emeraldZeroY + 3" text-anchor="end" class="font-bold">
+                0
+              </text>
+
+              <!-- Bottom tick (-max) -->
+              <line
+                :x1="chartPadding.left"
+                :y1="chartPadding.top + plotHeight"
+                :x2="chartWidth - chartPadding.right"
+                :y2="chartPadding.top + plotHeight"
+                class="stroke-slate-200 dark:stroke-slate-800"
+                stroke-dasharray="3,3"
+              />
+              <text :x="chartPadding.left - 6" :y="chartPadding.top + plotHeight + 3" text-anchor="end">
+                -{{ formatCompactNumber(emeraldMaxAbs) }}
+              </text>
+            </g>
+
+            <!-- Bars for Each Day -->
+            <g>
+              <g
+                v-for="(day, idx) in dailyEmeraldTrend"
+                :key="day.date"
+                class="cursor-pointer group"
+                @mouseenter="hoveredEmeraldDay = day; hoveredEmeraldIndex = idx"
+                @mouseleave="hoveredEmeraldDay = null; hoveredEmeraldIndex = null"
+              >
+                <!-- Transparent Hover Hitbox -->
+                <rect
+                  :x="getBarX(idx) - 2"
+                  :y="chartPadding.top"
+                  :width="barWidth + 4"
+                  :height="plotHeight"
+                  fill="transparent"
+                />
+
+                <!-- Actual Value Bar (Up for gain, down for spend) -->
+                <rect
+                  :x="getBarX(idx)"
+                  :y="getEmeraldBarY(day)"
+                  :width="barWidth"
+                  :height="getEmeraldBarHeight(day)"
+                  rx="2"
+                  class="transition-all duration-150"
+                  :class="
+                    day.netDelta >= 0
+                      ? hoveredEmeraldIndex === idx
+                        ? 'fill-emerald-400 dark:fill-emerald-300'
+                        : 'fill-emerald-500/80 hover:fill-emerald-400'
+                      : hoveredEmeraldIndex === idx
+                        ? 'fill-rose-400 dark:fill-rose-300'
+                        : 'fill-rose-500/80 hover:fill-rose-400'
+                  "
+                />
+
+                <!-- X-Axis Date Label -->
+                <text
+                  :x="getBarX(idx) + barWidth / 2"
+                  :y="chartPadding.top + plotHeight + 14"
+                  text-anchor="middle"
+                  class="text-[9px] fill-slate-400 font-mono"
+                  :class="hoveredEmeraldIndex === idx ? 'font-bold fill-slate-800 dark:fill-slate-100' : ''"
+                >
+                  {{ formatDayLabel(day.date) }}
+                </text>
+              </g>
+            </g>
+          </svg>
+
+          <!-- Hover Tooltip Box -->
+          <div
+            v-if="hoveredEmeraldDay"
+            class="absolute bottom-2 left-2 right-2 sm:right-auto sm:left-14 z-10 p-2.5 rounded-lg bg-slate-900/95 text-white text-2xs shadow-lg border border-slate-700 backdrop-blur-xs pointer-events-none"
+          >
+            <div class="flex items-center justify-between gap-4 font-bold border-b border-slate-700 pb-1 mb-1.5">
+              <span>{{ hoveredEmeraldDay.date }}</span>
+              <span :class="hoveredEmeraldDay.netDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                Net: {{ hoveredEmeraldDay.netDelta >= 0 ? '+' : '' }}{{ hoveredEmeraldDay.netDelta.toLocaleString('en-US') }} 💎
+              </span>
+            </div>
+            <div class="space-y-1 text-slate-300">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-emerald-400">Total Gained:</span>
+                <span class="font-mono text-emerald-300">+{{ hoveredEmeraldDay.totalGain.toLocaleString('en-US') }}</span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-rose-400">Total Spent:</span>
+                <span class="font-mono text-rose-300">-{{ hoveredEmeraldDay.totalSpend.toLocaleString('en-US') }}</span>
+              </div>
+              <div v-if="hoveredEmeraldDay.fluctuationCount > 0" class="flex items-center justify-between gap-3 text-slate-400 text-[10px]">
+                <span>Fluctuations:</span>
+                <span>{{ hoveredEmeraldDay.fluctuationCount }} events</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>

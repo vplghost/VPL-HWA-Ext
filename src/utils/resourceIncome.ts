@@ -87,6 +87,45 @@ export const INCOME_SOURCES: Record<string, IncomeSourceMeta> = {
   },
 };
 
+export const SOURCE_COLORS: Record<string, { stroke: string; bg: string; text: string }> = {
+  alchemy: { stroke: '#f59e0b', bg: 'bg-amber-500', text: 'text-amber-500' },
+  battles: { stroke: '#f43f5e', bg: 'bg-rose-500', text: 'text-rose-500' },
+  mail: { stroke: '#8b5cf6', bg: 'bg-violet-500', text: 'text-violet-500' },
+  campaign: { stroke: '#0ea5e9', bg: 'bg-sky-500', text: 'text-sky-500' },
+  tower: { stroke: '#10b981', bg: 'bg-emerald-500', text: 'text-emerald-500' },
+  quests: { stroke: '#f97316', bg: 'bg-orange-500', text: 'text-orange-500' },
+  dungeon: { stroke: '#6366f1', bg: 'bg-indigo-500', text: 'text-indigo-500' },
+  brigands: { stroke: '#14b8a6', bg: 'bg-teal-500', text: 'text-teal-500' },
+  other: { stroke: '#64748b', bg: 'bg-slate-500', text: 'text-slate-500' },
+};
+
+export interface EmeraldFluctuation {
+  id: string;
+  timestamp: number;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm:ss
+  prevAmount: number;
+  newAmount: number;
+  delta: number;
+}
+
+export interface EmeraldDailySummary {
+  date: string;
+  startAmount: number;
+  endAmount: number;
+  netDelta: number;
+  totalGain: number;
+  totalSpend: number;
+  fluctuationCount: number;
+}
+
+export interface EmeraldHistoryState {
+  lastKnownAmount?: number;
+  lastUpdatedAt?: number;
+  records: EmeraldFluctuation[];
+  dailyAggregates: Record<string, EmeraldDailySummary>;
+}
+
 /**
  * Format timestamp as YYYY-MM-DD UTC.
  */
@@ -499,4 +538,203 @@ export function formatCompactNumber(amount: number): string {
     return (amount / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
   }
   return amount.toLocaleString('en-US');
+}
+
+/**
+ * Get current emerald amount from cache slices.
+ */
+export function getCurrentEmeraldAmount(cache: Record<string, any> = {}): number | null {
+  const val =
+    cache?.['resource:starMoney']?.data?.amount ??
+    cache?.['resource:diamond']?.data?.amount ??
+    cache?.userGetInfo?.data?.user?.starMoney ??
+    cache?.userGetInfo?.data?.starMoney;
+  const num = Number(val);
+  return Number.isFinite(num) && num >= 0 ? num : null;
+}
+
+/**
+ * Extract emerald history state from cache.
+ */
+export function getEmeraldHistory(cache: Record<string, any> = {}): EmeraldHistoryState {
+  const data = cache?.emeraldHistory?.data ?? cache?.emeraldHistory ?? {};
+  return {
+    lastKnownAmount: typeof data.lastKnownAmount === 'number' ? data.lastKnownAmount : undefined,
+    lastUpdatedAt: typeof data.lastUpdatedAt === 'number' ? data.lastUpdatedAt : undefined,
+    records: Array.isArray(data.records) ? data.records : [],
+    dailyAggregates: data.dailyAggregates && typeof data.dailyAggregates === 'object' ? data.dailyAggregates : {},
+  };
+}
+
+/**
+ * Record an emerald snapshot / fluctuation into emerald history.
+ * Returns updated history state and whether a new fluctuation was logged.
+ */
+export function recordEmeraldFluctuation(
+  cache: Record<string, any>,
+  newAmount: number,
+  now: number = Date.now()
+): { updated: boolean; state: EmeraldHistoryState; fluctuation?: EmeraldFluctuation } {
+  if (!Number.isFinite(newAmount) || newAmount < 0) {
+    return { updated: false, state: getEmeraldHistory(cache) };
+  }
+
+  const state = getEmeraldHistory(cache);
+  const records = [...state.records];
+  const dailyAggregates = { ...state.dailyAggregates };
+
+  if (state.lastKnownAmount === undefined) {
+    const nextState: EmeraldHistoryState = {
+      lastKnownAmount: newAmount,
+      lastUpdatedAt: now,
+      records,
+      dailyAggregates,
+    };
+    return { updated: true, state: nextState };
+  }
+
+  if (state.lastKnownAmount === newAmount) {
+    return { updated: false, state };
+  }
+
+  const prevAmount = state.lastKnownAmount;
+  const delta = newAmount - prevAmount;
+  const actionDate = new Date(now);
+  const dateStr = formatUtcDay(now);
+  const timeStr = actionDate.toISOString().slice(11, 19);
+
+  const fluctuation: EmeraldFluctuation = {
+    id: `em-${now}-${Math.random().toString(36).slice(2, 6)}`,
+    timestamp: now,
+    date: dateStr,
+    time: timeStr,
+    prevAmount,
+    newAmount,
+    delta,
+  };
+
+  records.push(fluctuation);
+  // Keep up to 300 recent fluctuation records
+  const cappedRecords = records.length > 300 ? records.slice(-300) : records;
+
+  // Update daily aggregate
+  const prevDaily = dailyAggregates[dateStr] || {
+    date: dateStr,
+    startAmount: prevAmount,
+    endAmount: newAmount,
+    netDelta: 0,
+    totalGain: 0,
+    totalSpend: 0,
+    fluctuationCount: 0,
+  };
+
+  const updatedDaily: EmeraldDailySummary = {
+    date: dateStr,
+    startAmount: prevDaily.startAmount ?? prevAmount,
+    endAmount: newAmount,
+    netDelta: prevDaily.netDelta + delta,
+    totalGain: delta > 0 ? prevDaily.totalGain + delta : prevDaily.totalGain,
+    totalSpend: delta < 0 ? prevDaily.totalSpend + Math.abs(delta) : prevDaily.totalSpend,
+    fluctuationCount: prevDaily.fluctuationCount + 1,
+  };
+
+  dailyAggregates[dateStr] = updatedDaily;
+
+  const nextState: EmeraldHistoryState = {
+    lastKnownAmount: newAmount,
+    lastUpdatedAt: now,
+    records: cappedRecords,
+    dailyAggregates,
+  };
+
+  return { updated: true, state: nextState, fluctuation };
+}
+
+/**
+ * Get today's emerald fluctuations list.
+ */
+export function getTodayEmeraldFluctuations(cache: Record<string, any> = {}, now: number = Date.now()): EmeraldFluctuation[] {
+  const todayStr = formatUtcDay(now);
+  const history = getEmeraldHistory(cache);
+  return history.records.filter((r) => r.date === todayStr);
+}
+
+/**
+ * Get today's emerald aggregate summary.
+ */
+export function getTodayEmeraldSummary(cache: Record<string, any> = {}, now: number = Date.now()): EmeraldDailySummary {
+  const todayStr = formatUtcDay(now);
+  const history = getEmeraldHistory(cache);
+  const existing = history.dailyAggregates[todayStr];
+  const current = getCurrentEmeraldAmount(cache) ?? history.lastKnownAmount ?? 0;
+
+  if (existing) {
+    return existing;
+  }
+
+  const todayRecords = history.records.filter((r) => r.date === todayStr);
+  if (todayRecords.length > 0) {
+    let totalGain = 0;
+    let totalSpend = 0;
+    let netDelta = 0;
+    for (const r of todayRecords) {
+      netDelta += r.delta;
+      if (r.delta > 0) totalGain += r.delta;
+      else totalSpend += Math.abs(r.delta);
+    }
+    return {
+      date: todayStr,
+      startAmount: todayRecords[0].prevAmount,
+      endAmount: todayRecords[todayRecords.length - 1].newAmount,
+      netDelta,
+      totalGain,
+      totalSpend,
+      fluctuationCount: todayRecords.length,
+    };
+  }
+
+  return {
+    date: todayStr,
+    startAmount: current,
+    endAmount: current,
+    netDelta: 0,
+    totalGain: 0,
+    totalSpend: 0,
+    fluctuationCount: 0,
+  };
+}
+
+/**
+ * Get daily emerald trend aggregated by day across a date range.
+ */
+export function getDailyEmeraldTrend(
+  cache: Record<string, any> = {},
+  options: { fromDate?: string; toDate?: string; now?: number } = {}
+): EmeraldDailySummary[] {
+  const now = options.now ?? Date.now();
+  const defaultRange = getDefaultPrevious7DaysRange(now);
+  const fromDate = options.fromDate || defaultRange.fromDate;
+  const toDate = options.toDate || defaultRange.toDate;
+
+  const dateList = getDateRangeDays(fromDate, toDate);
+  const history = getEmeraldHistory(cache);
+  const allDaysIncome = aggregateIncomeByDate(cache, now);
+
+  return dateList.map((dateStr) => {
+    const existing = history.dailyAggregates[dateStr];
+    if (existing) return existing;
+
+    const fallbackDay = allDaysIncome.get(dateStr);
+    const fallbackEmerald = fallbackDay?.emerald || 0;
+
+    return {
+      date: dateStr,
+      startAmount: 0,
+      endAmount: 0,
+      netDelta: fallbackEmerald,
+      totalGain: fallbackEmerald,
+      totalSpend: 0,
+      fluctuationCount: fallbackEmerald > 0 ? 1 : 0,
+    };
+  });
 }

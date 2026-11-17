@@ -5215,6 +5215,86 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
         changed = true;
       }
     }
+
+    const currentEmerald = Number(
+      next['resource:starMoney']?.data?.amount ??
+      next['resource:diamond']?.data?.amount ??
+      next.userGetInfo?.data?.user?.starMoney ??
+      next.userGetInfo?.data?.starMoney
+    );
+    if (Number.isFinite(currentEmerald) && currentEmerald >= 0) {
+      const emHistory = next.emeraldHistory?.data ? { ...next.emeraldHistory.data } : {
+        lastKnownAmount: undefined,
+        lastUpdatedAt: undefined,
+        records: [],
+        dailyAggregates: {}
+      };
+      if (emHistory.lastKnownAmount === undefined) {
+        emHistory.lastKnownAmount = currentEmerald;
+        emHistory.lastUpdatedAt = Date.now();
+        next.emeraldHistory = {
+          key: 'emeraldHistory',
+          method: 'internal',
+          feature: null,
+          group: 'internal',
+          data: emHistory,
+          updatedAt: new Date().toISOString()
+        };
+        changed = true;
+      } else if (emHistory.lastKnownAmount !== currentEmerald) {
+        const prevAmount = emHistory.lastKnownAmount;
+        const delta = currentEmerald - prevAmount;
+        const now = Date.now();
+        const actionDate = new Date(now);
+        const dayStr = actionDate.toISOString().slice(0, 10);
+        const timeStr = actionDate.toISOString().slice(11, 19);
+        const record = {
+          id: `em-${now}-${Math.random().toString(36).slice(2, 6)}`,
+          timestamp: now,
+          date: dayStr,
+          time: timeStr,
+          prevAmount,
+          newAmount: currentEmerald,
+          delta
+        };
+        const records = Array.isArray(emHistory.records) ? [...emHistory.records, record] : [record];
+        emHistory.records = records.length > 300 ? records.slice(-300) : records;
+
+        const dailyAggs = emHistory.dailyAggregates ? { ...emHistory.dailyAggregates } : {};
+        const prevDaily = dailyAggs[dayStr] || {
+          date: dayStr,
+          startAmount: prevAmount,
+          endAmount: currentEmerald,
+          netDelta: 0,
+          totalGain: 0,
+          totalSpend: 0,
+          fluctuationCount: 0
+        };
+        dailyAggs[dayStr] = {
+          date: dayStr,
+          startAmount: prevDaily.startAmount ?? prevAmount,
+          endAmount: currentEmerald,
+          netDelta: prevDaily.netDelta + delta,
+          totalGain: delta > 0 ? prevDaily.totalGain + delta : prevDaily.totalGain,
+          totalSpend: delta < 0 ? prevDaily.totalSpend + Math.abs(delta) : prevDaily.totalSpend,
+          fluctuationCount: prevDaily.fluctuationCount + 1
+        };
+        emHistory.dailyAggregates = dailyAggs;
+        emHistory.lastKnownAmount = currentEmerald;
+        emHistory.lastUpdatedAt = now;
+
+        next.emeraldHistory = {
+          key: 'emeraldHistory',
+          method: 'internal',
+          feature: null,
+          group: 'internal',
+          data: emHistory,
+          updatedAt: new Date(now).toISOString()
+        };
+        changed = true;
+      }
+    }
+
     const pruned = pruneCache(next);
     if (pruned.changed) {
       next = pruned.cache;
