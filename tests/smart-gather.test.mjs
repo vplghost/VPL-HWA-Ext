@@ -19,7 +19,8 @@ function failureRecord(call, result, time = now + 1) {
 test('missing mine probes and explicitly rejected attacks skip the target rather than stopping', () => {
   for (const name of ['getMineById', 'attackMine']) for (const result of [
     { response: { errorCode: 'MineNotFound' } }, { error: 'MineNotFound' }, { error: { name: 'MineNotFound', message: 'The mine no longer exists' } },
-    { response: { error: 'MineNotFound' } }, { errorCode: 'MineNotFound' }
+    { response: { error: 'MineNotFound' } }, { errorCode: 'MineNotFound' },
+    { error: 'TargetAlreadyOccupied' }, { response: { error: 'TargetAlreadyOccupied' } }, { errorCode: 'TargetAlreadyOccupied' }
   ]) {
     const mine = { mineId: 'gone', mapId: 'map', configId: 68, coordinates: { x: 1, y: 0 } };
     const call = { name, feature: 'mine', args: { mineId: mine.mineId } };

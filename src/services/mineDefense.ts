@@ -242,12 +242,21 @@ export function plan(
       }
       count += n;
     }
-    if (room.wounded <= room.capacity * (thresholdPercent / 100)) continue;
+    const isAboveThreshold = room.wounded > room.capacity * (thresholdPercent / 100);
+
+    // If wounded troops are within threshold (safe infirmary space) but no intercept team is configured,
+    // we don't need to recall or intercept; gatherers can continue mining safely.
+    if (!isAboveThreshold && !interceptTeamId) {
+      continue;
+    }
+
     if (now < attack.impactAt - 10000) {
       return {
         ...base,
         action: 'wait',
-        reason: 'Mine threatened · recall scheduled for final 10s',
+        reason: isAboveThreshold
+          ? 'Mine threatened · recall scheduled for final 10s'
+          : 'Mine threatened · intercept scheduled for final 10s',
         room,
         count,
       };
@@ -261,8 +270,8 @@ export function plan(
       };
     }
 
-    // Intercept branch when interceptTeamId is specified
-    if (interceptTeamId) {
+    // Intercept branch: ONLY when wounded troops are within safe threshold (<= threshold) AND interceptTeamId is set
+    if (!isAboveThreshold && interceptTeamId) {
       const maxMarches =
         settings && Number.isInteger(settings.maxMarches)
           ? Number(settings.maxMarches)
@@ -368,6 +377,7 @@ export function plan(
       };
     }
 
+    // Above threshold: Hospital is overflowing -> recall gatherers back to base, NO intercept
     return {
       ...base,
       action: 'recall',

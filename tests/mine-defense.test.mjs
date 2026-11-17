@@ -252,7 +252,7 @@ test('custom defenseInfirmaryThreshold changes recall trigger threshold', () => 
 });
 
 test('intercept clears nearest gathering slot when marches are full, then dispatches intercept squad', () => {
-  const { helper, cache, clock, attack } = environment(); crowdHospital(cache);
+  const { helper, cache, clock, attack } = environment(); // hospital wounded = 11188 <= 50% (under threshold -> allows intercept)
   cache.customTeams = [{ id: 'combat-1', heroIds: [1, 2, 3, 4, 5] }];
   const settings = {
     defenseRecallEnabled: true,
@@ -275,6 +275,20 @@ test('intercept clears nearest gathering slot when marches are full, then dispat
   assert.equal(plan2?.call?.args?.squadId, '708cf95e-5e9c-4dc3-89df-dbc4c0efc50b');
   assert.equal(plan2?.intercept?.phase, 'intercepting');
   assert.equal(plan2?.calls?.[0]?.name, 'stopMineGathering');
+});
+
+test('when wounded troops exceed threshold, recall only and never intercept even with interceptTeamId', () => {
+  const { helper, cache, clock, attack } = environment(); crowdHospital(cache); // wounded = 23000 > 50%
+  cache.customTeams = [{ id: 'combat-1', heroIds: [1, 2, 3, 4, 5] }];
+  const settings = {
+    defenseRecallEnabled: true,
+    defenseInfirmaryThreshold: 50,
+    interceptTeamId: 'combat-1',
+    maxMarches: 3,
+  };
+  const plan = helper.plan(cache, {}, clock.now, settings);
+  assert.equal(plan?.action, 'recall', 'Must recall instead of intercept when infirmary exceeds threshold');
+  assert.match(plan?.reason, /above 50%/);
 });
 
 test('intercept switches squads back after battle impact, or after 5s when enemy retreats', () => {

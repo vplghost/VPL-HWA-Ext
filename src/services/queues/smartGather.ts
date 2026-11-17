@@ -467,12 +467,19 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
 
   if (reply && failure && pending.call.name !== 'joinRally') {
     state.pending = null;
+    const isTargetFailure =
+      typeof failure === 'string' &&
+      (['MineNotFound', 'BattleTypeMismatch'].includes(failure) ||
+        failure.includes('Occupied') ||
+        failure.includes('Target') ||
+        failure.includes('Mine'));
     if (
       pending.call.feature === 'mine' &&
-      ((['getMineById', 'attackMine'].includes(pending.call.name) && failure === 'MineNotFound') ||
-        (pending.call.name === 'attackMine' && failure === 'BattleTypeMismatch'))
+      ['getMineById', 'attackMine'].includes(pending.call.name) &&
+      isTargetFailure
     ) {
       skipMine(state, pending.call.args?.mineId, now, failure);
+      delete state.error;
     } else {
       state.error = `${pending.call.name} rejected by game: ${failure}; restart Smart gathering to retry`;
     }
@@ -562,8 +569,24 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
   }
 
   if (reply?.result?.error || reply?.result?.response?.error) {
+    const err = rpcFailure(reply?.result) || 'error';
     state.pending = null;
-    state.error = `${pending.call.name} rejected by game; restart Smart gathering to retry`;
+    const isTargetFailure =
+      typeof err === 'string' &&
+      (['MineNotFound', 'BattleTypeMismatch'].includes(err) ||
+        err.includes('Occupied') ||
+        err.includes('Target') ||
+        err.includes('Mine'));
+    if (
+      pending.call.feature === 'mine' &&
+      ['getMineById', 'attackMine'].includes(pending.call.name) &&
+      isTargetFailure
+    ) {
+      skipMine(state, pending.call.args?.mineId, now, err);
+      delete state.error;
+    } else {
+      state.error = `${pending.call.name} rejected by game; restart Smart gathering to retry`;
+    }
   } else if (reply && Object.hasOwn(reply.result || {}, 'response')) {
     const response = reply.result.response;
     if (pending.call.name === 'stopMineGathering' && response?.squadId === pending.call.args.squadId && response.route) {
