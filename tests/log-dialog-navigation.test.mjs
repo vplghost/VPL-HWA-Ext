@@ -21,8 +21,11 @@ test('Log FAB opens the log modal and keeps Tower/Dungeon only in Dashboard/glob
   vm.runInNewContext(script(source) + '\nglobalThis.api = { toggle, handleAction, isOpen };', boundary);
   boundary.api.toggle(); assert.equal(boundary.api.isOpen.value, true);
   boundary.api.handleAction('log'); assert.equal(boundary.api.isOpen.value, false);
-  assert.deepEqual(opened, ['log']);
-  assert.match(source, /id="log-fab"/); assert.doesNotMatch(source, /id="tower-fab"|id="dungeon-fab"/);
+  boundary.api.handleAction('draft');
+  assert.deepEqual(opened, ['log', 'draft']);
+  assert.match(source, /id="log-fab"/);
+  assert.match(source, /id="legend-draft-fab"/);
+  assert.doesNotMatch(source, /id="tower-fab"|id="dungeon-fab"/);
   const app = await read('entrypoints/popup/App.vue');
   assert.match(app, /<LogModal v-model="modalState.log"/);
   assert.match(app, /<TowerModal v-model="modalState.tower"/);

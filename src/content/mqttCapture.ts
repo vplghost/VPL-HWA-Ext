@@ -20,6 +20,7 @@ export function installMqttCapture(customWindow?: any): void {
   let popupRpcEnabled = false;
   let assistedMode = false;
   let recordingActive = false;
+  let draftLoggingEnabled = false;
   let triggerTemplate: any = null;
   let userPushTemplate: any = null;
   let viewedChunks: any = null;
@@ -39,6 +40,9 @@ export function installMqttCapture(customWindow?: any): void {
       popupRpcEnabled = event.data.popupRpcEnabled === true;
       assistedMode = event.data.socketRefreshMode === 'mqtt-piggyback';
       recordingActive = event.data.recordingActive === true;
+      if (event.data.legendDraftLoggingEnabled !== undefined) {
+        draftLoggingEnabled = event.data.legendDraftLoggingEnabled === true;
+      }
       if (!captureEnabled || !popupRpcEnabled) {
         triggerTemplate = null;
         userPushTemplate = null;
@@ -481,6 +485,40 @@ export function installMqttCapture(customWindow?: any): void {
             },
             loc.origin
           );
+
+          const isDraftLogging = Boolean(
+            draftLoggingEnabled ||
+            win.__hwaLegendDraftHook?.isLoggingEnabled?.()
+          );
+          if (isDraftLogging) {
+            const payloadInfo = describePayload(packet.payload);
+            const entry = {
+              type: 'mqtt-packet',
+              timestamp: getNow(),
+              direction,
+              topic: packet.topic,
+              qos: packet.qos,
+              ...payloadInfo
+            };
+            if (typeof win.__hwaLegendDraftHook?.emitDraftLog === 'function') {
+              win.__hwaLegendDraftHook.emitDraftLog(entry);
+            } else {
+              try {
+                win.postMessage(
+                  {
+                    source: 'hwa-helper-api',
+                    kind: 'legend-draft-log-entry',
+                    entry: {
+                      ...entry,
+                      id: `draft-log-${getNow()}-${Math.random().toString(36).slice(2, 7)}`,
+                      isoTime: new Date().toISOString()
+                    }
+                  },
+                  loc.origin
+                );
+              } catch (_) {}
+            }
+          }
         }
       })
       .catch(() => {});

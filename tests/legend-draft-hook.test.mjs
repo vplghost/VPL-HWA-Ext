@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installInterceptor } from '../src/content/interceptor.ts';
 import { installBridge } from '../src/content/bridge.ts';
+import { installMqttCapture } from '../src/content/mqttCapture.ts';
 
 function setupInterceptContext() {
   const windowMessages = [];
@@ -260,6 +261,138 @@ test('draft logging toggle controls RPC and WASM scan emission', () => {
   hook.handleLegendDraftRpcResponse(JSON.stringify({ results: [{ ident: 'randomDraft_saveDefence', result: { response: { ok: true } } }] }));
   const resLog = windowMessages.find((m) => m.kind === 'legend-draft-log-entry' && m.entry?.type === 'rpc-response');
   assert.ok(resLog, 'Must emit rpc-response log entry when enabled');
+
+  // Step input and step output emission
+  const stepInLog = windowMessages.find((m) => m.kind === 'legend-draft-log-entry' && m.entry?.type === 'step-input');
+  assert.ok(stepInLog, 'Must emit step-input log entry');
+  assert.equal(stepInLog.entry.step, 'saveDefence');
+  assert.deepEqual(stepInLog.entry.heroes, [1, 2, 3, 4, 5]);
+
+  const stepOutLog = windowMessages.find((m) => m.kind === 'legend-draft-log-entry' && m.entry?.type === 'step-output');
+  assert.ok(stepOutLog, 'Must emit step-output log entry');
+  assert.equal(stepOutLog.entry.step, 'saveDefence');
+  assert.equal(stepOutLog.entry.ok, true);
+});
+
+test('runLegendDraftMemoryScan extracts detailed HEAPU8 and HEAPU32 dumps', () => {
+  const { context, windowMessages } = setupInterceptContext();
+  const hook = context.window.__hwaLegendDraftHook;
+  hook.setLoggingEnabled(true);
+
+  const buffer = new ArrayBuffer(1024 * 32);
+  const heapU32 = new Uint32Array(buffer);
+  const heapU8 = new Uint8Array(buffer);
+
+  // Setup candidate pool in HEAPU32
+  heapU32[20] = 15;
+  const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+  for (let i = 0; i < 15; i++) heapU32[21 + i] = pool[i];
+
+  // Setup ciphertext in HEAPU8
+  const cipherBytes = new Uint8Array([0xaa, 0xbb, 0xcc, 0xdd, 0xee]);
+  heapU8.set(cipherBytes, 500);
+
+  // Attach mock module
+  context.window.Module = {
+    HEAPU8: heapU8,
+    HEAPU32: heapU32
+  };
+
+  // Provide draft payload
+  const b64Draft = Buffer.from(cipherBytes).toString('base64');
+  hook.handleLegendDraftRpcResponse(JSON.stringify({
+    results: [
+      { ident: 'randomDraft_getInfo', result: { response: { stageId: 2, draft: b64Draft } } }
+    ]
+  }));
+
+  const scanRes = hook.runScan();
+  assert.equal(scanRes.ok, true);
+  assert.equal(scanRes.cipherOffsets.length, 1);
+  assert.equal(scanRes.cipherOffsets[0], 500);
+  assert.ok(scanRes.heapU8Extraction, 'Must provide heapU8Extraction');
+  assert.equal(scanRes.heapU8Extraction.slices.length, 1);
+  assert.match(scanRes.heapU8Extraction.slices[0].hexDump, /aa bb cc dd ee/);
+  assert.ok(scanRes.heapU32Extraction, 'Must provide heapU32Extraction');
+  assert.equal(scanRes.heapU32Extraction.pools.length, 1);
+  assert.equal(scanRes.heapU32Extraction.pools[0].count, 15);
+  assert.ok(scanRes.heapU32Extraction.pools[0].rawDwordsHex.length >= 16);
+
+  // Check emitted wasm-scan log
+  const scanLog = windowMessages.find((m) => m.kind === 'legend-draft-log-entry' && m.entry?.type === 'wasm-scan');
+  assert.ok(scanLog, 'Must emit wasm-scan log entry');
+  assert.ok(scanLog.entry.heapU8Extraction);
+  assert.ok(scanLog.entry.heapU32Extraction);
+});
+
+test('mqttCapture logs MQTT packets to legend-draft-log-entry when draft logging is enabled', async () => {
+  const windowMessages = [];
+  const listeners = [];
+  const win = {
+    location: { origin: 'https://www.hero-wars-alliance.com', href: 'https://www.hero-wars-alliance.com/' },
+    addEventListener: (type, fn) => listeners.push(fn),
+    postMessage: (data) => windowMessages.push(data),
+    WebSocket: class MockWebSocket {
+      constructor(url) { this.url = url; this.readyState = 1; this.binaryType = 'arraybuffer'; }
+      addEventListener() {}
+      send() {}
+    }
+  };
+
+  installMqttCapture(win);
+
+  // Enable draft logging via config control message
+  for (const listener of listeners) {
+    listener({
+      source: win,
+      origin: 'https://www.hero-wars-alliance.com',
+      data: {
+        source: 'hwa-helper-config',
+        kind: 'control',
+        legendDraftLoggingEnabled: true
+      }
+    });
+  }
+
+  // Hook emitDraftLog on window
+  const draftLogs = [];
+  win.__hwaLegendDraftHook = {
+    isLoggingEnabled: () => true,
+    emitDraftLog: (entry) => draftLogs.push(entry)
+  };
+
+  // Create socket and receive frame
+  const socket = new win.WebSocket('wss://emqx-hwmb-wss.nextersglobal.com/mqtt');
+
+  // Build a simple MQTT Publish packet (type 3, QoS 0)
+  // Topic: "hwa/randomDraft/match"
+  const topic = 'hwa/randomDraft/match';
+  const payloadStr = JSON.stringify({ matchId: 'draft-999', status: 'ready' });
+  const topicBytes = new TextEncoder().encode(topic);
+  const payloadBytes = new TextEncoder().encode(payloadStr);
+
+  const varHeaderAndPayload = new Uint8Array(2 + topicBytes.length + payloadBytes.length);
+  varHeaderAndPayload[0] = (topicBytes.length >> 8) & 0xff;
+  varHeaderAndPayload[1] = topicBytes.length & 0xff;
+  varHeaderAndPayload.set(topicBytes, 2);
+  varHeaderAndPayload.set(payloadBytes, 2 + topicBytes.length);
+
+  // Fixed header: 0x30 (Publish QoS 0), remaining length
+  const frame = new Uint8Array(2 + varHeaderAndPayload.length);
+  frame[0] = 0x30;
+  frame[1] = varHeaderAndPayload.length;
+  frame.set(varHeaderAndPayload, 2);
+
+  // Dispatch message event
+  socket.send(frame.buffer);
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.ok(draftLogs.length >= 1, 'Must capture MQTT packet in draft logs');
+  assert.equal(draftLogs[0].type, 'mqtt-packet');
+  assert.equal(draftLogs[0].direction, 'sent');
+  assert.equal(draftLogs[0].topic, 'hwa/randomDraft/match');
+  assert.equal(draftLogs[0].eventMethod, undefined);
+  assert.ok(draftLogs[0].payload.includes('draft-999'));
 });
 
 test('bridge stores legend-draft-log-entry in chrome.storage.local.legendDraftSessionLog', async () => {

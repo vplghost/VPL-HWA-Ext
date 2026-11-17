@@ -765,22 +765,75 @@ export function installInterceptor(customWindow?: any): void {
     }
     instrumentModuleStrings(memory.mod);
     let cipherOffsets: number[] = [];
+    let rawTargetBytes: Uint8Array | null = null;
     if (lastDraftPayload?.draft) {
       try {
         const binStr = atob(lastDraftPayload.draft);
-        const rawTargetBytes = new Uint8Array(binStr.length);
+        rawTargetBytes = new Uint8Array(binStr.length);
         for (let i = 0; i < binStr.length; i++) rawTargetBytes[i] = binStr.charCodeAt(i);
         if (memory.heapU8) cipherOffsets = findSequenceInHeap(memory.heapU8, rawTargetBytes);
       } catch (_) {}
     }
     const detectedPools = memory.heapU32 ? scanCandidateHeroArrays(memory.heapU32) : [];
     const topCandidateIds = detectedPools[0]?.heroIds || null;
+
+    const heapU8Slices: any[] = [];
+    if (memory.heapU8 && cipherOffsets.length > 0 && rawTargetBytes) {
+      for (const offset of cipherOffsets) {
+        const start = Math.max(0, offset - 16);
+        const end = Math.min(memory.heapU8.length, offset + rawTargetBytes.length + 16);
+        const slice = memory.heapU8.slice(start, end);
+        const hexDump = Array.from(slice).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+        let asciiDump = '';
+        for (let i = 0; i < slice.length; i++) {
+          const b = slice[i];
+          asciiDump += (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.';
+        }
+        heapU8Slices.push({
+          cipherOffset: offset,
+          targetLength: rawTargetBytes.length,
+          sliceStart: start,
+          sliceEnd: end,
+          hexDump,
+          asciiDump
+        });
+      }
+    }
+
+    const detailedPools: any[] = [];
+    if (memory.heapU32 && detectedPools.length > 0) {
+      for (const pool of detectedPools) {
+        const dwordIdx = Math.floor(pool.ptr / 4);
+        const count = pool.count;
+        const dwords = Array.from(memory.heapU32.slice(dwordIdx, dwordIdx + count + 1));
+        detailedPools.push({
+          ptr: pool.ptr,
+          count: pool.count,
+          heroIds: pool.heroIds,
+          rawDwordsHex: dwords.map((v) => '0x' + (v >>> 0).toString(16).padStart(8, '0'))
+        });
+      }
+    }
+
+    const heapU8Extraction = {
+      targetLength: rawTargetBytes?.length ?? 0,
+      cipherMatches: cipherOffsets.length,
+      slices: heapU8Slices
+    };
+
+    const heapU32Extraction = {
+      detectedPoolsCount: detectedPools.length,
+      pools: detailedPools
+    };
+
     const result = {
       ok: true,
       timestamp: new Date().toISOString(),
       stageId: lastDraftPayload?.stageId ?? null,
       draftBase64: lastDraftPayload?.draft ?? null,
       cipherOffsets,
+      heapU8Extraction,
+      heapU32Extraction,
       detectedPoolsCount: detectedPools.length,
       detectedCandidatePools: detectedPools,
       topCandidateIds,
@@ -797,6 +850,8 @@ export function installInterceptor(customWindow?: any): void {
         detectedPoolsCount: detectedPools.length,
         detectedCandidatePools: detectedPools,
         cipherOffsets,
+        heapU8Extraction,
+        heapU32Extraction,
         capturedStringsCount: capturedDraftStrings.length,
         sampleCapturedStrings: capturedDraftStrings.slice(-15)
       });
@@ -839,6 +894,19 @@ export function installInterceptor(customWindow?: any): void {
           timestamp: Date.now(),
           calls: draftCalls
         });
+
+        for (const call of draftCalls) {
+          const stepName = call.name.replace(/^randomDraft_/, '');
+          emitDraftLog({
+            type: 'step-input',
+            timestamp: Date.now(),
+            action: call.name,
+            step: stepName,
+            args: call.args || {},
+            heroes: Array.isArray(call.args?.heroes) ? call.args.heroes : undefined,
+            stageId: lastDraftPayload?.stageId ?? null
+          });
+        }
       }
     } catch (_) {}
   }
@@ -860,6 +928,30 @@ export function installInterceptor(customWindow?: any): void {
           timestamp: Date.now(),
           results: draftResults
         });
+
+        for (const r of draftResults) {
+          const ident = typeof r?.ident === 'string' ? r.ident : 'randomDraft_getInfo';
+          const stepName = ident.replace(/^randomDraft_/, '');
+          const response = r?.result?.response;
+          const error = r?.error;
+          emitDraftLog({
+            type: 'step-output',
+            timestamp: Date.now(),
+            action: ident,
+            step: stepName,
+            ok: !error,
+            error: error ?? null,
+            stageId: response?.stageId ?? null,
+            draftEnemy: response?.draftEnemy ?? null,
+            matchId: response?.matchId ?? null,
+            defenceHeroes: Array.isArray(response?.defenceHeroes) ? response.defenceHeroes : undefined,
+            attackHeroes: Array.isArray(response?.attackHeroes) ? response.attackHeroes : undefined,
+            enemyDefenceHeroes: Array.isArray(response?.enemyDefenceHeroes) ? response.enemyDefenceHeroes : undefined,
+            battleResult: response?.battleResult ?? null,
+            hasDraftCipher: Boolean(response?.draft),
+            rawResponse: response ?? null
+          });
+        }
       }
 
       const draftObj = results.find((r: any) => r.ident === 'randomDraft_getInfo' || r.result?.response?.draft)?.result?.response;
