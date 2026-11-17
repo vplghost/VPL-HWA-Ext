@@ -46,6 +46,7 @@ const mobLevel = ref(1);
 const mobCount = ref(2);
 const isRunning = ref(false);
 const queueStatusText = ref('Idle');
+const monsterQueueState = ref<any>(null);
 
 const selectedMobId = ref<string>('');
 const isSearchingMonsters = ref(false);
@@ -116,6 +117,34 @@ const currentMonsterAttack = computed(() => {
   };
 });
 
+async function syncMonsterQueueState() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    try {
+      const stored = await chrome.storage.local.get<{
+        monsterPreferences?: { mobLevel?: number; teamId?: string; targetMobId?: string };
+        monsterQueue?: { phase?: string; [key: string]: any };
+        popupRpcEnabled?: boolean;
+        socketRefreshMode?: string;
+      }>(['monsterPreferences', 'monsterQueue', 'popupRpcEnabled', 'socketRefreshMode']);
+      if (stored.monsterPreferences) {
+        if (stored.monsterPreferences.mobLevel) mobLevel.value = stored.monsterPreferences.mobLevel;
+        // Team restoration is owned by useSquadTeams and its account-specific storage.
+        if (stored.monsterPreferences.targetMobId) selectedMobId.value = stored.monsterPreferences.targetMobId;
+      }
+      if (stored.monsterQueue) {
+        monsterQueueState.value = stored.monsterQueue;
+        const active = !['stopped', 'complete'].includes(stored.monsterQueue.phase);
+        isRunning.value = active;
+        queueStatusText.value = active ? (stored.monsterQueue.phase || 'Attacking') : 'Idle';
+      } else {
+        monsterQueueState.value = null;
+        isRunning.value = false;
+        queueStatusText.value = 'Idle';
+      }
+    } catch (_) {}
+  }
+}
+
 onMounted(async () => {
   await loadSquadData();
 
@@ -123,25 +152,19 @@ onMounted(async () => {
     now.value = Date.now();
   }, 1000);
 
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    try {
-      const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; monsterPreferences?: {mobLevel?: number; teamId?: string; targetMobId?: string}; monsterQueue?: {running?: boolean; phase?: string} }>(['monsterPreferences', 'monsterQueue', 'popupRpcEnabled', 'socketRefreshMode']);
-      if (stored.monsterPreferences) {
-        if (stored.monsterPreferences.mobLevel) mobLevel.value = stored.monsterPreferences.mobLevel;
-        // Team restoration is owned by useSquadTeams and its account-specific storage.
-        if (stored.monsterPreferences.targetMobId) selectedMobId.value = stored.monsterPreferences.targetMobId;
-      }
-      if (stored.monsterQueue) {
-        isRunning.value = stored.monsterQueue.running || false;
-        queueStatusText.value = stored.monsterQueue.phase || 'Idle';
-      }
-    } catch (_) {}
+  await syncMonsterQueueState();
 
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.monsterQueue) {
-        const q = changes.monsterQueue.newValue as { running?: boolean; phase?: string } | undefined;
-        isRunning.value = q?.running || false;
-        queueStatusText.value = q?.phase || 'Idle';
+        const q = changes.monsterQueue.newValue as { phase?: string; [key: string]: any } | undefined;
+        monsterQueueState.value = q || null;
+        const active = q ? !['stopped', 'complete'].includes(q.phase || 'stopped') : false;
+        isRunning.value = active;
+        queueStatusText.value = active ? (q?.phase || 'Attacking') : 'Idle';
+        if (!active && statusMessage.value?.includes('already running')) {
+          statusMessage.value = '';
+        }
       }
     });
   }
@@ -172,6 +195,7 @@ watch(
       now.value = Date.now();
       document.addEventListener('keydown', handleKeydown);
       loadSquadData();
+      syncMonsterQueueState();
     } else {
       getModalStackHelper()?.registerModalClose?.('monster');
       document.removeEventListener('keydown', handleKeydown);
@@ -353,13 +377,19 @@ async function startMonsterQueue(count = mobCount.value) {
     }).catch((err) => ({ error: String(err) }));
 
     if (res?.ok) {
+      isRunning.value = true;
       queueStatusText.value = res.queued ? 'Queued' : 'Attacking';
       statusMessage.value = res.queued
         ? 'Attack queued for next game interaction.'
         : `Attack dispatched against monster! Queue rounds: ${count}.`;
     } else {
-      isRunning.value = false;
-      queueStatusText.value = 'Idle';
+      if (res?.error?.includes('already running')) {
+        isRunning.value = true;
+        queueStatusText.value = 'Running';
+      } else {
+        isRunning.value = false;
+        queueStatusText.value = 'Idle';
+      }
       statusMessage.value = res?.error || 'Could not start monster attack.';
     }
   }
@@ -367,10 +397,36 @@ async function startMonsterQueue(count = mobCount.value) {
 
 async function stopMonsterQueue() {
   isRunning.value = false;
-  queueStatusText.value = 'Stopped';
-  statusMessage.value = 'Monster queue stopped.';
+  queueStatusText.value = 'Stopping...';
+  statusMessage.value = 'Stopping monster queue...';
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    chrome.runtime.sendMessage({ kind: 'monster-queue-stop' });
+    try {
+      const res = await chrome.runtime.sendMessage({ kind: 'monster-queue-stop' });
+      if (res?.ok) {
+        statusMessage.value = 'Monster queue stopped.';
+        queueStatusText.value = 'Stopped';
+      } else {
+        const stored = await chrome.storage?.local?.get('monsterQueue');
+        if (stored?.monsterQueue) {
+          await chrome.storage?.local?.set({
+            monsterQueue: { ...stored.monsterQueue, phase: 'stopped', reason: 'Stopped by user.' }
+          });
+        }
+        statusMessage.value = 'Monster queue stopped.';
+        queueStatusText.value = 'Stopped';
+      }
+    } catch {
+      try {
+        const stored = await chrome.storage?.local?.get('monsterQueue');
+        if (stored?.monsterQueue) {
+          await chrome.storage?.local?.set({
+            monsterQueue: { ...stored.monsterQueue, phase: 'stopped', reason: 'Stopped by user.' }
+          });
+        }
+      } catch {}
+      statusMessage.value = 'Monster queue stopped.';
+      queueStatusText.value = 'Stopped';
+    }
   }
 }
 </script>
@@ -703,7 +759,7 @@ async function stopMonsterQueue() {
         <div class="flex items-center justify-end gap-2 pt-2">
           <button
             type="button"
-            :disabled="isRunning || isSearchingMonsters"
+            :disabled="isRunning || isSearchingMonsters || Boolean(statusMessage?.includes('already running'))"
             class="cursor-pointer px-3.5 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors disabled:opacity-50"
             @click="startMonsterQueue(1)"
           >
@@ -711,7 +767,7 @@ async function stopMonsterQueue() {
           </button>
 
           <button
-            v-if="!isRunning"
+            v-if="!isRunning && !statusMessage?.includes('already running')"
             type="button"
             :disabled="isSearchingMonsters"
             class="cursor-pointer px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"

@@ -187,12 +187,12 @@ function handleMarchClick(march: any) {
 
 const isRaidQueueRunning = computed(() => {
   const q = raidQueue.value;
-  return Boolean(q && q.running && !['stopped', 'complete'].includes(q.phase));
+  return Boolean(q && !['stopped', 'complete'].includes(q.phase));
 });
 
 const isMonsterQueueRunning = computed(() => {
   const q = monsterQueue.value;
-  return Boolean(q && q.running && !['stopped', 'complete'].includes(q.phase));
+  return Boolean(q && !['stopped', 'complete'].includes(q.phase));
 });
 
 const isAutoGatherEnabled = computed(() => {

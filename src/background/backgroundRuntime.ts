@@ -71,6 +71,38 @@ export function isGameUrl(url?: string | null): boolean {
   );
 }
 
+export async function isTabAlive(tabId: number | undefined, cr: any): Promise<boolean> {
+  if (!tabId) return false;
+  if (typeof cr?.tabs?.get === 'function') {
+    return new Promise<boolean>((resolve) => {
+      try {
+        cr.tabs.get(tabId, (tab: any) => {
+          if (cr.runtime?.lastError || !tab || !isGameUrl(tab.url)) {
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        });
+      } catch {
+        resolve(false);
+      }
+    });
+  }
+  if (typeof cr?.tabs?.query === 'function') {
+    return new Promise<boolean>((resolve) => {
+      try {
+        cr.tabs.query({}, (tabs: any[]) => {
+          const tab = (tabs || []).find((t: any) => t.id === tabId);
+          resolve(Boolean(tab && isGameUrl(tab.url)));
+        });
+      } catch {
+        resolve(false);
+      }
+    });
+  }
+  return true;
+}
+
 export function bodyFields(record: any): Record<string, any> {
   const result: Record<string, any> = {};
   for (const field of ['requestBody', 'responseBody']) {
@@ -2533,9 +2565,33 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
               stored,
               cr
             );
+          else if (stored.raidQueue) {
+            await cr.storage?.local?.set({
+              raidQueue: { ...stored.raidQueue, phase: 'stopped', reason: 'Stopped by user.' }
+            });
+          }
           return { ok: true };
         }
+        if (!controller.terminal(stored.raidQueue)) {
+          if (!(await isTabAlive(stored.raidQueue?.tabId, cr))) {
+            stored.raidQueue = await saveRaidTransition(
+              { state: controller.stop(stored.raidQueue, 'Game tab was closed or disconnected.') },
+              stored,
+              cr
+            );
+          }
+        }
         if (!controller.terminal(stored.raidQueue)) return { ok: false, error: 'A raid queue is already running.' };
+
+        if (!monsterQueueService.terminal(stored.monsterQueue)) {
+          if (!(await isTabAlive(stored.monsterQueue?.tabId, cr))) {
+            stored.monsterQueue = await saveMonsterTransition(
+              { state: monsterQueueService.stop(stored.monsterQueue, 'Game tab was closed or disconnected.') },
+              stored,
+              cr
+            );
+          }
+        }
         if (!monsterQueueService.terminal(stored.monsterQueue)) return { ok: false, error: 'A monster queue is already running.' };
         if (!rpcMessageForSettings(stored, [])) {
           return { ok: false, error: 'Enable RPC, and enable Monitor API for Piggyback mode.' };
@@ -2603,9 +2659,44 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
               stored,
               cr
             );
+          else if (stored.monsterQueue) {
+            await cr.storage?.local?.set({
+              monsterQueue: { ...stored.monsterQueue, phase: 'stopped', reason: 'Stopped by user.' }
+            });
+          }
           return { ok: true };
         }
+        if (!controller.terminal(stored.monsterQueue)) {
+          if (!(await isTabAlive(stored.monsterQueue?.tabId, cr))) {
+            stored.monsterQueue = await saveMonsterTransition(
+              { state: controller.stop(stored.monsterQueue, 'Game tab was closed or disconnected.') },
+              stored,
+              cr
+            );
+          } else if (Date.now() >= (stored.monsterQueue.wakeAt || 0) && ['refreshing', 'searching', 'attacking'].includes(stored.monsterQueue.phase)) {
+            const timedOut = controller.advance(
+              stored.monsterQueue,
+              null,
+              stored.rpcCache,
+              Date.now(),
+              experimentalDataHelper.normalizeCapacitySettings(stored.troopCapacitySettings)
+            );
+            if (controller.terminal(timedOut.state)) {
+              stored.monsterQueue = await saveMonsterTransition(timedOut, stored, cr);
+            }
+          }
+        }
         if (!controller.terminal(stored.monsterQueue)) return { ok: false, error: 'A monster queue is already running.' };
+
+        if (!raidQueueService.terminal(stored.raidQueue)) {
+          if (!(await isTabAlive(stored.raidQueue?.tabId, cr))) {
+            stored.raidQueue = await saveRaidTransition(
+              { state: raidQueueService.stop(stored.raidQueue, 'Game tab was closed or disconnected.') },
+              stored,
+              cr
+            );
+          }
+        }
         if (!raidQueueService.terminal(stored.raidQueue)) return { ok: false, error: 'A raid queue is already running.' };
         if (!rpcMessageForSettings(stored, [])) return { ok: false, error: 'Enable RPC and Monitor API for Piggyback mode.' };
         const tabs = await new Promise<any[]>((resolve) => cr.tabs.query({ url: GAME_ORIGINS.map((origin) => `${origin}/*`) }, resolve));
