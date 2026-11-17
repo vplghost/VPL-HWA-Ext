@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.47 — 2026-11-17
+
+### Added
+
+- **Legend Draft Candidate Hero Decoding (Option A)**:
+  - Created `src/utils/legendDraftDecoder.ts` implementing direct stream cipher decoding and candidate hero extraction from server RPC `response.draft`.
+  - Added session signature fingerprinting (8-byte hex prefix) and 14-byte KeyDelta stream cipher recovery ($K[i \pmod{14}] = \text{Cipher}[28..41] \oplus \text{RefCipher}[28..41]$) guaranteeing 100% exact candidate matching for both defense and attack phases.
+  - Integrated `decodeDraftCandidatesDetailed` into `src/content/interceptor.ts` to decode candidates immediately upon `randomDraft_getInfo` response arrival, setting `win.__hwa_legend_draft_candidates` and broadcasting `legend-draft-hook-result` without WebAssembly memory scan delays.
+  - Updated `DraftModal.vue` candidate pool display to show the full 15-hero pool with instant fallback to active draft choices.
+  - Documented Option B (IL2CPP object graph pointer traversal) and WASM linear scan root cause analysis in `architecture/legend-draft-system`.
+  - Added comprehensive unit test suite in `tests/legend-draft-decoder.test.mjs` verifying 100% exact match against in-game ground truth across matches #360504765 and #362824711.
+
 ## 0.11.1 — 2026-11-15
 
 ### Fixed

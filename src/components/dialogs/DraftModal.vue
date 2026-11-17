@@ -172,6 +172,10 @@ const poolCandidates = computed<number[]>(() => {
   const fromDraftStatus = (cache.value as any).legendDraftStatus?.data?.candidates;
   if (Array.isArray(fromDraftStatus) && fromDraftStatus.length > 0) return fromDraftStatus;
   if (hookCandidates.value.length > 0) return hookCandidates.value;
+  if (observedChoices.value) {
+    const list = isAttackMode.value ? observedChoices.value.attack : observedChoices.value.defense;
+    if (Array.isArray(list) && list.length > 0) return list.flat().filter((id): id is number => typeof id === 'number');
+  }
   return [];
 });
 

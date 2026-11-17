@@ -7,6 +7,7 @@
 import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { speedupService } from '../services/speedupService.ts';
 import { mailService } from '../services/mailService.ts';
+import { extractLegendDraftCandidates, decodeDraftCandidatesDetailed } from '../utils/legendDraftDecoder.ts';
 
 export interface InterceptRecord {
   endpoint: string;
@@ -775,7 +776,12 @@ export function installInterceptor(customWindow?: any): void {
       } catch (_) {}
     }
     const detectedPools = memory.heapU32 ? scanCandidateHeroArrays(memory.heapU32) : [];
-    const topCandidateIds = detectedPools[0]?.heroIds || null;
+    const decodedCandidateIds = lastDraftPayload?.draft
+      ? extractLegendDraftCandidates(lastDraftPayload.draft, lastDraftPayload.stageId ?? 2, lastDraftPayload.matchId)
+      : [];
+    const topCandidateIds = (decodedCandidateIds && decodedCandidateIds.length > 0)
+      ? decodedCandidateIds
+      : (detectedPools[0]?.heroIds || null);
 
     const heapU8Slices: any[] = [];
     if (memory.heapU8 && cipherOffsets.length > 0 && rawTargetBytes) {
@@ -953,6 +959,32 @@ export function installInterceptor(customWindow?: any): void {
           draftEnemy: draftObj.draftEnemy ?? lastDraftPayload?.draftEnemy ?? null,
           receivedAt: Date.now()
         };
+
+        // Option A: Direct Stream Cipher & Ground-Truth Candidate Decoding
+        if (draftObj.draft) {
+          try {
+            const decoded = decodeDraftCandidatesDetailed(draftObj.draft, draftObj.stageId, draftObj.matchId);
+            if (Array.isArray(decoded.candidates) && decoded.candidates.length > 0) {
+              win.__hwa_legend_draft_candidates = decoded.candidates;
+              win.postMessage({
+                source: 'hwa-helper-api',
+                kind: 'legend-draft-hook-result',
+                payload: {
+                  ok: true,
+                  timestamp: new Date().toISOString(),
+                  stageId: draftObj.stageId ?? null,
+                  matchId: draftObj.matchId ?? null,
+                  draftBase64: draftObj.draft,
+                  topCandidateIds: decoded.candidates,
+                  steps: decoded.steps,
+                  isGroundTruth: decoded.isGroundTruth,
+                  decoderOption: 'A-stream-cipher'
+                }
+              }, loc.origin);
+            }
+          } catch (_) {}
+        }
+
         scheduleLegendDraftScans();
       }
 

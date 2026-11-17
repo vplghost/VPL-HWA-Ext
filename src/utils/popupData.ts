@@ -8,6 +8,7 @@ import {
   clanVersusChallengeSteps,
 } from '../data/clanVersusData.ts';
 import { questData } from '../data/questData.ts';
+import { getKnownDraftChoices } from './legendDraftDecoder.ts';
 
 // enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.293.0 (client 1.293.1010) splitlib asset.
 // Each value is the cost to evolve TO that star, not the current star.
@@ -163,7 +164,7 @@ export function defaultDraftCandidates(mode = 'defense'): Array<Array<number | n
   return Array.from({ length: 5 }, () => [null, null, null]);
 }
 
-export function observedDraftChoices(matchId: number | string): { defense: number[][]; attack: number[][]; enemyDefence: Array<Array<number | null>> } | null {
+export function observedDraftChoices(matchId: number | string): { defense: number[][]; attack: number[][]; enemyDefence?: Array<Array<number | null>> } | null {
   const id = Number(matchId);
   if (id === 358789279) {
     return {
@@ -198,6 +199,20 @@ export function observedDraftChoices(matchId: number | string): { defense: numbe
         [72, 8, 45]
       ],
       enemyDefence: [
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+        [null, null, null]
+      ]
+    };
+  }
+  const known = getKnownDraftChoices(id);
+  if (known) {
+    return {
+      defense: known.defense,
+      attack: known.attack,
+      enemyDefence: known.enemyDefence || [
         [null, null, null],
         [null, null, null],
         [null, null, null],
