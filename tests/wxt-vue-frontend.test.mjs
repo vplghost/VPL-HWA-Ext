@@ -100,6 +100,7 @@ test('WXT + Vue 3 Single File Components exist and are non-empty', async () => {
     'src/components/dialogs/TowerModal.vue',
     'src/components/dialogs/DungeonModal.vue',
     'src/components/dialogs/QuestDetailModal.vue',
+    'src/components/dialogs/EventDetailModal.vue',
     'src/components/dialogs/GuildVersusModal.vue',
     'src/components/common/GuildChatPanel.vue',
   ];

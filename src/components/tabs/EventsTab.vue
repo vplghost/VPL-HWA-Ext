@@ -177,7 +177,7 @@ const eventCards = computed<EventCard[]>(() => {
             id: qe.id,
             title,
           },
-          action: () => openModal('questDetail', { selectedQuestFilter: title }),
+          action: () => openModal('eventDetail', { selectedEventId: qe.id }),
         });
       }
     }
@@ -213,7 +213,7 @@ const eventCards = computed<EventCard[]>(() => {
           groups: summary?.groups ?? [],
           endDate: new Date(event.end).toLocaleString(),
         },
-        action: () => openModal('questDetail', { selectedQuestFilter: title }),
+        action: () => openModal('eventDetail', { selectedEventId: event.id }),
       });
     }
   }
@@ -235,7 +235,8 @@ const eventCards = computed<EventCard[]>(() => {
           farmedGold: bp.farmedGold,
           hasGoldenPass: bp.hasGoldenPass,
           endDate: bp.endTime ? new Date(bp.endTime * 1000).toLocaleString() : 'Active'
-        }
+        },
+        action: () => openModal('eventDetail', { selectedEventId: `bp:${bp.id}` }),
       });
     }
   }
@@ -561,6 +562,9 @@ async function refreshEvents() {
           <div class="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400">
             <span>Status: <strong class="text-slate-700 dark:text-slate-300">{{ c.data.hasGoldenPass ? 'Golden Pass Active' : 'Free Pass' }}</strong></span>
             <span>Ends: {{ c.data.endDate }}</span>
+          </div>
+          <div class="mt-2 text-right">
+            <span class="text-amber-600 dark:text-amber-400 font-semibold text-2xs">View Pass Milestones →</span>
           </div>
         </template>
 

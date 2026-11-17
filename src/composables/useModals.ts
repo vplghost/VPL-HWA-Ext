@@ -15,6 +15,7 @@ export type ModalName =
   | 'mail'
   | 'guildVersus'
   | 'questDetail'
+  | 'eventDetail'
   | 'guildChat'
   | 'log';
 
@@ -33,6 +34,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   mail: false,
   guildVersus: false,
   questDetail: false,
+  eventDetail: false,
   guildChat: false,
   log: false,
 });
@@ -40,6 +42,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
 const modalContext = reactive<{
   selectedHero?: any;
   selectedQuestFilter?: string;
+  selectedEventId?: number | string | null;
   selectedCampaignGearId?: number | string | null;
   selectedCampaignHeroId?: number | string | null;
 }>({});
@@ -94,12 +97,14 @@ export function useModals() {
   function openModal(name: ModalName, context?: {
     selectedHero?: any;
     selectedQuestFilter?: string;
+    selectedEventId?: number | string | null;
     selectedCampaignGearId?: number | string | null;
     selectedCampaignHeroId?: number | string | null;
   }) {
     if (context) {
       if (context.selectedHero !== undefined) modalContext.selectedHero = context.selectedHero;
       if (context.selectedQuestFilter !== undefined) modalContext.selectedQuestFilter = context.selectedQuestFilter;
+      if (context.selectedEventId !== undefined) modalContext.selectedEventId = context.selectedEventId;
       if (context.selectedCampaignGearId !== undefined) modalContext.selectedCampaignGearId = context.selectedCampaignGearId;
       if (context.selectedCampaignHeroId !== undefined) modalContext.selectedCampaignHeroId = context.selectedCampaignHeroId;
     }
