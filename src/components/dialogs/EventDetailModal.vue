@@ -308,7 +308,7 @@ async function claimAllReady() {
           :class="
             String(selectedEventId) === String(ev.id)
               ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
+              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
           "
           @click="selectedEventId = ev.id"
         >
@@ -334,7 +334,7 @@ async function claimAllReady() {
           :class="
             String(selectedEventId) === String(bp.id)
               ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
+              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
           "
           @click="selectedEventId = bp.id"
         >
@@ -355,7 +355,7 @@ async function claimAllReady() {
       <!-- 2. Current Event Header Banner -->
       <div
         v-if="currentEvent"
-        class="rounded-xl border border-purple-200/70 dark:border-purple-900/50 bg-gradient-to-r from-purple-50/70 via-indigo-50/40 to-white dark:from-purple-950/30 dark:via-indigo-950/20 dark:to-slate-900 p-3.5"
+        class="rounded-xl border border-purple-200/70 dark:border-purple-800/60 bg-gradient-to-r from-purple-50/70 via-indigo-50/40 to-white dark:from-purple-950/40 dark:via-indigo-950/30 dark:to-slate-900 p-3.5"
       >
         <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
           <div class="flex items-center gap-2">
@@ -367,14 +367,14 @@ async function claimAllReady() {
               View #{{ currentEvent.viewId }}
             </span>
           </div>
-          <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
+          <span class="text-xs font-medium text-slate-600 dark:text-slate-300">
             ⏳ {{ formatRemaining(currentEvent.end) }}
           </span>
         </div>
 
         <!-- Milestones Overall Progress Bar -->
         <div class="space-y-1.5">
-          <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+          <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
             <span>
               Overall Milestones:
               <strong class="text-purple-700 dark:text-purple-300 font-bold">
@@ -382,7 +382,7 @@ async function claimAllReady() {
               </strong>
               completed
             </span>
-            <span class="font-bold text-purple-600 dark:text-purple-400">{{ currentEvent.percent }}%</span>
+            <span class="font-bold text-purple-600 dark:text-purple-300">{{ currentEvent.percent }}%</span>
           </div>
           <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
             <div
@@ -396,7 +396,7 @@ async function claimAllReady() {
       <!-- Battle Pass Banner (when Battle Pass is selected) -->
       <div
         v-else-if="currentBattlePass"
-        class="rounded-xl border border-amber-200/70 dark:border-amber-900/50 bg-gradient-to-r from-amber-50/70 via-orange-50/40 to-white dark:from-amber-950/30 dark:via-orange-950/20 dark:to-slate-900 p-3.5"
+        class="rounded-xl border border-amber-200/70 dark:border-amber-800/60 bg-gradient-to-r from-amber-50/70 via-orange-50/40 to-white dark:from-amber-950/40 dark:via-orange-950/30 dark:to-slate-900 p-3.5"
       >
         <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
           <div class="flex items-center gap-2">
@@ -408,29 +408,29 @@ async function claimAllReady() {
               class="rounded-full px-2 py-0.5 text-3xs font-semibold"
               :class="
                 currentBattlePass.hasGoldenPass
-                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
-                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                  ? 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/60 dark:text-amber-200 dark:border-amber-700/60'
+                  : 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
               "
             >
               {{ currentBattlePass.hasGoldenPass ? '⭐ Golden Pass Active' : 'Free Pass' }}
             </span>
           </div>
-          <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
+          <span class="text-xs font-medium text-slate-600 dark:text-slate-300">
             ⏳ {{ formatRemaining(currentBattlePass.endTime * 1000) }}
           </span>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs">
-          <div class="rounded-lg bg-white dark:bg-slate-800 p-2 border border-slate-100 dark:border-slate-700">
-            <div class="text-2xs text-slate-400">Battle Pass Points</div>
+          <div class="rounded-lg bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700">
+            <div class="text-2xs text-slate-500 dark:text-slate-400">Battle Pass Points</div>
             <div class="text-amber-600 dark:text-amber-400 font-bold text-sm">{{ formatNumber(currentBattlePass.exp) }} EXP</div>
           </div>
-          <div class="rounded-lg bg-white dark:bg-slate-800 p-2 border border-slate-100 dark:border-slate-700">
-            <div class="text-2xs text-slate-400">Normal Rewards Farmed</div>
-            <div class="text-slate-800 dark:text-slate-200 font-bold text-sm">{{ currentBattlePass.farmedNormal }} Milestones</div>
+          <div class="rounded-lg bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700">
+            <div class="text-2xs text-slate-500 dark:text-slate-400">Normal Rewards Farmed</div>
+            <div class="text-slate-800 dark:text-slate-100 font-bold text-sm">{{ currentBattlePass.farmedNormal }} Milestones</div>
           </div>
-          <div class="rounded-lg bg-white dark:bg-slate-800 p-2 border border-slate-100 dark:border-slate-700">
-            <div class="text-2xs text-slate-400">Golden Rewards Farmed</div>
+          <div class="rounded-lg bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700">
+            <div class="text-2xs text-slate-500 dark:text-slate-400">Golden Rewards Farmed</div>
             <div class="text-amber-700 dark:text-amber-300 font-bold text-sm">{{ currentBattlePass.farmedGold }} Milestones</div>
           </div>
         </div>
@@ -441,40 +441,60 @@ async function claimAllReady() {
         <div class="flex items-center gap-1 flex-wrap">
           <button
             type="button"
-            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors"
-            :class="currentFilter === 'all' ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors border"
+            :class="
+              currentFilter === 'all'
+                ? 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-900/80 dark:text-purple-100 dark:border-purple-600 font-semibold shadow-xs'
+                : 'bg-transparent border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+            "
             @click="currentFilter = 'all'"
           >
             All ({{ processedChains.length }})
           </button>
           <button
             type="button"
-            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors"
-            :class="currentFilter === 'daily' ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors border"
+            :class="
+              currentFilter === 'daily'
+                ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-900/80 dark:text-amber-100 dark:border-amber-600 font-semibold shadow-xs'
+                : 'bg-transparent border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+            "
             @click="currentFilter = 'daily'"
           >
             Daily Resets
           </button>
           <button
             type="button"
-            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors"
-            :class="currentFilter === 'single' ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors border"
+            :class="
+              currentFilter === 'single'
+                ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-900/80 dark:text-blue-100 dark:border-blue-600 font-semibold shadow-xs'
+                : 'bg-transparent border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+            "
             @click="currentFilter = 'single'"
           >
             Single Chains
           </button>
           <button
             type="button"
-            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors"
-            :class="currentFilter === 'inProgress' ? 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors border"
+            :class="
+              currentFilter === 'inProgress'
+                ? 'bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-900/80 dark:text-indigo-100 dark:border-indigo-600 font-semibold shadow-xs'
+                : 'bg-transparent border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+            "
             @click="currentFilter = 'inProgress'"
           >
             In Progress
           </button>
           <button
             type="button"
-            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors"
-            :class="currentFilter === 'completed' ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded-md font-medium cursor-pointer transition-colors border"
+            :class="
+              currentFilter === 'completed'
+                ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/80 dark:text-emerald-100 dark:border-emerald-600 font-semibold shadow-xs'
+                : 'bg-transparent border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+            "
             @click="currentFilter = 'completed'"
           >
             Completed
@@ -486,19 +506,19 @@ async function claimAllReady() {
             v-model="searchQuery"
             type="text"
             placeholder="Search objectives..."
-            class="px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-purple-500 w-36 sm:w-48"
+            class="px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-purple-500 w-36 sm:w-48"
           />
           <button
             type="button"
-            class="px-2 py-1 rounded text-2xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+            class="px-2 py-1 rounded text-2xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer font-medium"
             @click="expandAll"
           >
             Expand All
           </button>
-          <span class="text-slate-300 dark:text-slate-700">|</span>
+          <span class="text-slate-300 dark:text-slate-600">|</span>
           <button
             type="button"
-            class="px-2 py-1 rounded text-2xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+            class="px-2 py-1 rounded text-2xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer font-medium"
             @click="collapseAll"
           >
             Collapse All
@@ -511,17 +531,21 @@ async function claimAllReady() {
         <div
           v-for="chain in filteredChains"
           :key="chain.id"
-          class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 overflow-hidden shadow-2xs transition-all"
+          class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden shadow-xs transition-all"
         >
           <!-- Chain Header Row -->
           <div
-            class="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/70 dark:bg-slate-800/40 cursor-pointer select-none hover:bg-slate-100/60 dark:hover:bg-slate-800 transition-colors"
+            class="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 dark:bg-slate-800 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors"
             @click="toggleChain(chain.id)"
           >
             <div class="flex items-center gap-2 min-w-0">
               <span
-                class="size-5 rounded-md flex items-center justify-center text-xs font-bold"
-                :class="chain.repeatType === 'daily' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400' : 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400'"
+                class="size-5 rounded-md flex items-center justify-center text-xs font-bold border"
+                :class="
+                  chain.repeatType === 'daily'
+                    ? 'bg-amber-100 border-amber-200 dark:bg-amber-900/50 dark:border-amber-700/60 text-amber-800 dark:text-amber-300'
+                    : 'bg-blue-100 border-blue-200 dark:bg-blue-900/50 dark:border-blue-700/60 text-blue-800 dark:text-blue-300'
+                "
               >
                 {{ chain.repeatType === 'daily' ? 'D' : 'C' }}
               </span>
@@ -529,16 +553,16 @@ async function claimAllReady() {
                 <span class="font-bold text-slate-900 dark:text-slate-100 text-xs truncate block">
                   {{ chain.title }}
                 </span>
-                <span class="text-3xs text-slate-400 dark:text-slate-500 block truncate">
+                <span class="text-3xs text-slate-500 dark:text-slate-400 block truncate">
                   {{ chain.localeKey }}
                 </span>
               </div>
               <span
-                class="rounded px-1.5 py-0.2 text-3xs font-semibold"
+                class="rounded px-1.5 py-0.2 text-3xs font-semibold border"
                 :class="
                   chain.repeatType === 'daily'
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                    : 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                    ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700/60'
+                    : 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/80 dark:text-blue-200 dark:border-blue-700/60'
                 "
               >
                 {{ chain.repeatType === 'daily' ? 'Daily Reset' : 'Single Chain' }}
@@ -546,12 +570,15 @@ async function claimAllReady() {
             </div>
 
             <div class="flex items-center gap-2.5 shrink-0">
-              <span class="text-xs font-semibold" :class="chain.isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-purple-600 dark:text-purple-400'">
+              <span
+                class="text-xs font-semibold"
+                :class="chain.isCompleted ? 'text-emerald-600 dark:text-emerald-300' : 'text-purple-600 dark:text-purple-300'"
+              >
                 {{ chain.completedCount }}/{{ chain.total }} ({{ chain.percent }}%)
               </span>
               <span
                 v-if="chain.isCompleted"
-                class="rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 text-3xs font-bold"
+                class="rounded-full bg-emerald-100 border border-emerald-300 dark:bg-emerald-950/80 dark:border-emerald-700/70 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 text-3xs font-bold"
               >
                 ✓ Completed
               </span>
@@ -561,7 +588,7 @@ async function claimAllReady() {
               >
                 Claim Ready!
               </span>
-              <span class="text-slate-400 text-xs transition-transform duration-200" :class="{ 'rotate-180': expandedChains[chain.id] }">
+              <span class="text-slate-400 dark:text-slate-300 text-xs transition-transform duration-200" :class="{ 'rotate-180': expandedChains[chain.id] }">
                 ▼
               </span>
             </div>
@@ -570,24 +597,24 @@ async function claimAllReady() {
           <!-- Active Objective Banner (when not completed) -->
           <div
             v-if="!chain.isCompleted && chain.activeMilestone"
-            class="px-3.5 py-2 bg-purple-50/50 dark:bg-purple-950/20 border-t border-b border-purple-100 dark:border-purple-900/30 flex items-center justify-between gap-2 flex-wrap text-xs"
+            class="px-3.5 py-2 bg-purple-50/80 dark:bg-purple-950/60 border-t border-b border-purple-200 dark:border-purple-800/70 flex items-center justify-between gap-2 flex-wrap text-xs"
           >
             <div class="flex items-center gap-2">
               <span class="text-2xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
                 Current Objective (#{{ chain.activeMilestone.index }}):
               </span>
               <span class="font-medium text-slate-800 dark:text-slate-200">
-                Progress: <strong class="text-purple-600 dark:text-purple-400">{{ formatNumber(chain.activeMilestone.progress) }}</strong>
+                Progress: <strong class="text-purple-600 dark:text-purple-300">{{ formatNumber(chain.activeMilestone.progress) }}</strong>
               </span>
             </div>
 
             <div class="flex items-center gap-2">
               <div v-if="chain.activeMilestone.rewards.length > 0" class="flex items-center gap-1 flex-wrap">
-                <span class="text-3xs text-slate-400">Reward:</span>
+                <span class="text-2xs text-slate-600 dark:text-slate-300 font-medium">Reward:</span>
                 <span
                   v-for="(r, idx) in chain.activeMilestone.rewards"
                   :key="idx"
-                  class="rounded px-1.5 py-0.2 text-3xs font-semibold"
+                  class="rounded px-1.5 py-0.2 text-2xs font-semibold"
                   :class="r.badgeClass"
                 >
                   {{ r.amount.toLocaleString() }} × {{ r.label }}
@@ -606,8 +633,8 @@ async function claimAllReady() {
           </div>
 
           <!-- Expanded Milestones Ladder -->
-          <div v-if="expandedChains[chain.id]" class="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            <div class="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">
+          <div v-if="expandedChains[chain.id]" class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700/80 space-y-2">
+            <div class="text-2xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-1.5">
               Milestone Tiers ({{ chain.milestones.length }} Total)
             </div>
 
@@ -618,22 +645,22 @@ async function claimAllReady() {
                 class="flex items-center justify-between p-2 rounded-lg border text-xs transition-colors"
                 :class="
                   m.state === 'completed'
-                    ? 'bg-slate-50/60 dark:bg-slate-850/50 border-slate-200 dark:border-slate-800/80 opacity-75'
+                    ? 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700'
                     : m.state === 'ready'
-                    ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800'
+                    ? 'bg-amber-50/80 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700'
                     : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                 "
               >
                 <!-- Tier & Status Icon -->
                 <div class="flex items-center gap-2 min-w-0">
                   <span
-                    class="size-5 rounded-full flex items-center justify-center text-3xs font-bold shrink-0"
+                    class="size-5 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 border"
                     :class="
                       m.state === 'completed'
-                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400'
+                        ? 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/60 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-300'
                         : m.state === 'ready'
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                        ? 'bg-amber-500 border-amber-500 text-white'
+                        : 'bg-slate-100 border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200'
                     "
                   >
                     {{ m.state === 'completed' ? '✓' : `#${m.index}` }}
@@ -642,10 +669,10 @@ async function claimAllReady() {
                   <div>
                     <div class="font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                       <span>Tier #{{ m.index }}</span>
-                      <span class="text-3xs text-slate-400">(Quest #{{ m.id }})</span>
+                      <span class="text-3xs text-slate-500 dark:text-slate-400">(Quest #{{ m.id }})</span>
                     </div>
-                    <div class="text-3xs text-slate-500 dark:text-slate-400">
-                      <span v-if="m.state === 'completed'">✓ Milestone completed</span>
+                    <div class="text-3xs text-slate-500 dark:text-slate-300">
+                      <span v-if="m.state === 'completed'" class="text-emerald-600 dark:text-emerald-400 font-medium">✓ Milestone completed</span>
                       <span v-else>Current progress: {{ formatNumber(m.progress) }}</span>
                     </div>
                   </div>
@@ -657,12 +684,12 @@ async function claimAllReady() {
                     <span
                       v-for="(r, rIdx) in m.rewards"
                       :key="rIdx"
-                      class="rounded px-1.5 py-0.5 text-3xs font-semibold"
+                      class="rounded px-1.5 py-0.5 text-2xs font-semibold"
                       :class="r.badgeClass"
                     >
                       {{ r.amount.toLocaleString() }} × {{ r.label }}
                     </span>
-                    <span v-if="m.rewards.length === 0" class="text-3xs text-slate-400 italic">
+                    <span v-if="m.rewards.length === 0" class="text-2xs text-slate-400 dark:text-slate-400 italic">
                       Standard Reward
                     </span>
                   </div>
@@ -678,7 +705,7 @@ async function claimAllReady() {
                   </button>
                   <span
                     v-else-if="m.state === 'completed'"
-                    class="text-emerald-600 dark:text-emerald-400 text-2xs font-bold px-2 py-0.5"
+                    class="text-emerald-600 dark:text-emerald-300 text-2xs font-bold px-2 py-0.5"
                   >
                     Claimed
                   </span>
@@ -688,7 +715,7 @@ async function claimAllReady() {
           </div>
         </div>
 
-        <div v-if="filteredChains.length === 0" class="text-center py-8 text-slate-400 text-xs">
+        <div v-if="filteredChains.length === 0" class="text-center py-8 text-slate-500 dark:text-slate-300 text-xs">
           No quest chains match the selected filter.
         </div>
       </div>
@@ -697,11 +724,11 @@ async function claimAllReady() {
     <!-- Modal Footer Actions -->
     <template #footer>
       <div class="flex items-center justify-between w-full">
-        <div class="text-2xs font-medium text-slate-500 dark:text-slate-400">
-          <span v-if="claimStatus" class="font-bold text-purple-600 dark:text-purple-400 animate-pulse">
+        <div class="text-2xs font-medium text-slate-600 dark:text-slate-300">
+          <span v-if="claimStatus" class="font-bold text-purple-600 dark:text-purple-300 animate-pulse">
             {{ claimStatus }}
           </span>
-          <span v-else-if="readyToClaimCount > 0" class="text-amber-600 dark:text-amber-400 font-bold">
+          <span v-else-if="readyToClaimCount > 0" class="text-amber-600 dark:text-amber-300 font-bold">
             🎉 {{ readyToClaimCount }} quest rewards ready to claim!
           </span>
           <span v-else>
@@ -722,7 +749,7 @@ async function claimAllReady() {
 
           <button
             type="button"
-            class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer transition-colors flex items-center gap-1"
+            class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs cursor-pointer transition-colors flex items-center gap-1"
             :disabled="isRefreshing"
             @click="refreshData"
           >

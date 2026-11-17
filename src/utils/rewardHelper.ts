@@ -11,12 +11,12 @@ export interface FormattedReward {
 }
 
 const standardLabels: Record<string, { label: string; badge: string }> = {
-  gold: { label: 'Gold', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' },
-  starmoney: { label: 'Emeralds', badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' },
-  stamina: { label: 'Energy', badge: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300' },
-  experience: { label: 'XP', badge: 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300' },
-  drafts_chip: { label: 'Draft Chips', badge: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300' },
-  vipPoints: { label: 'VIP Points', badge: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' },
+  gold: { label: 'Gold', badge: 'bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700/60' },
+  starmoney: { label: 'Emeralds', badge: 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700/60' },
+  stamina: { label: 'Energy', badge: 'bg-blue-100 text-blue-900 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-200 dark:border-blue-700/60' },
+  experience: { label: 'XP', badge: 'bg-purple-100 text-purple-900 border border-purple-300 dark:bg-purple-950/80 dark:text-purple-200 dark:border-purple-700/60' },
+  drafts_chip: { label: 'Draft Chips', badge: 'bg-indigo-100 text-indigo-900 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-200 dark:border-indigo-700/60' },
+  vipPoints: { label: 'VIP Points', badge: 'bg-rose-100 text-rose-900 border border-rose-300 dark:bg-rose-950/80 dark:text-rose-200 dark:border-rose-700/60' },
 };
 
 const coinNames: Record<number | string, string> = {
@@ -52,7 +52,7 @@ export function parseRewards(reward: any): FormattedReward[] {
       const amount = Number(item.amount) || 1;
 
       let label = standardLabels[type]?.label;
-      let badge = standardLabels[type]?.badge || 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200';
+      let badge = standardLabels[type]?.badge || 'bg-slate-100 text-slate-800 border border-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
       let icon: string | null = null;
 
       if (!label) {
@@ -83,7 +83,7 @@ export function parseRewards(reward: any): FormattedReward[] {
         const amount = Number(val);
         const meta = standardLabels[key];
         const label = meta?.label || key;
-        const badge = meta?.badge || 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200';
+        const badge = meta?.badge || 'bg-slate-100 text-slate-800 border border-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
         results.push({ type: key, label, amount, badgeClass: badge });
       } else if (val && typeof val === 'object') {
         for (const [subId, subAmount] of Object.entries(val)) {
@@ -103,7 +103,7 @@ export function parseRewards(reward: any): FormattedReward[] {
             label,
             amount,
             icon,
-            badgeClass: 'bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300'
+            badgeClass: 'bg-indigo-50 text-indigo-900 border border-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-200 dark:border-indigo-700/60'
           });
         }
       }
