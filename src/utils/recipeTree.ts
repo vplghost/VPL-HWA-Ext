@@ -1,6 +1,6 @@
 import { getMissionsForItem as typedGetMissionsForItem } from '../data/campaignData.ts';
 import { getItemName } from '../data/nameData.ts';
-import { gearCraftData, scrollCraftData } from '../data/heroMetadata.ts';
+import { gearCraftData, scrollCraftData, heroMetadata } from '../data/heroMetadata.ts';
 
 export interface RecipeNode {
   id: string;
@@ -42,8 +42,8 @@ export function buildGearRecipeTree(
     const cycle = ancestors.has(identity);
     const owned = allocate(category, id, required);
     const missing = Math.max(0, required - owned);
-    const craftMap = category === 'gear' ? (customCraftMap || gearCraftData) : scrollCraftData;
-    const craftInfo = craftMap?.[id] || null;
+    const craftInfo = (customCraftMap && customCraftMap[id]) ||
+      (category === 'gear' ? gearCraftData?.[id] : scrollCraftData?.[id]) || null;
     const resolvedName = getItemName(category, id) || `${category} #${id}`;
     const node: RecipeNode = {
       id, key, category, isScroll: category === 'scroll',
@@ -102,4 +102,194 @@ export function recipeMissions(node: RecipeNode | null): any[] {
   const missions = typedGetMissionsForItem(node.id) || [];
   const category = recipeFarmCategory(node);
   return missions.filter((mission: any) => mission.drops?.[category]?.some((id: any) => String(id) === node.id));
+}
+
+export interface HeroLeafResource {
+  id: string;
+  category: 'fragmentGear' | 'fragmentScroll' | 'gear' | 'scroll';
+  name: string;
+  requiredCount: number;
+  ownedCount: number;
+  remainingCount: number;
+  isFulfilled: boolean;
+  missions: any[];
+  sourceGears: Array<{ id: string; name: string }>;
+}
+
+export interface HeroLeafEquipmentSummary {
+  heroId: string;
+  heroName: string;
+  color: number;
+  missingSlotsCount: number;
+  missingGears: Array<{ slotNum: number; gearId: number; name: string }>;
+  leafResources: HeroLeafResource[];
+}
+
+/**
+ * Aggregates all deepest leaf resources (fragments or base drops) required to craft
+ * all missing/unequipped equipment slots of a hero at their current rank.
+ * Shared inventory is reserved once across all slots and branches.
+ */
+export function aggregateHeroLeafEquipment(
+  heroOrId: any,
+  cache: any,
+  customCraftMap?: Record<string, any>
+): HeroLeafEquipmentSummary | null {
+  if (!heroOrId) return null;
+
+  let hero: any = null;
+  if (typeof heroOrId === 'object' && heroOrId !== null && (heroOrId.id !== undefined || heroOrId.color !== undefined)) {
+    hero = heroOrId;
+  } else {
+    const heroesData = cache?.heroGetAll?.data || {};
+    const idStr = String(heroOrId);
+    hero = heroesData[idStr] || heroesData[Number(heroOrId)] || { id: Number(heroOrId), color: 1 };
+  }
+
+  const numHeroId = Number(hero.id);
+  const meta = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperHeroMetadata?.[numHeroId]) ||
+    heroMetadata?.[numHeroId] ||
+    heroMetadata?.[String(numHeroId)];
+  const colorStr = String(hero.color || 1);
+  const equipment: number[] = meta?.equipment?.[colorStr] || [];
+  const heroName = getItemName('hero', numHeroId) || meta?.name || `Hero #${numHeroId}`;
+
+  const missingGears: Array<{ slotNum: number; gearId: number; name: string }> = [];
+  for (let sIdx = 0; sIdx < 6; sIdx++) {
+    let isEquipped = false;
+    if (hero?.slots) {
+      if (Array.isArray(hero.slots)) {
+        isEquipped = sIdx < hero.slots.length && hero.slots[sIdx] !== undefined && hero.slots[sIdx] !== null;
+      } else if (typeof hero.slots === 'object') {
+        isEquipped = Object.hasOwn(hero.slots, String(sIdx)) || Object.hasOwn(hero.slots, sIdx);
+      }
+    }
+    const gearId = Number(equipment[sIdx]);
+    if (!isEquipped && Number.isFinite(gearId) && gearId > 0) {
+      const name = getItemName('gear', gearId) || `Gear #${gearId}`;
+      missingGears.push({ slotNum: sIdx + 1, gearId, name });
+    }
+  }
+
+  const inventory = cache?.inventoryGet?.data || {};
+  const reserved = new Map<string, number>();
+  const stock = (category: string, id: string) => Math.max(0, Number(inventory[category]?.[id]) || 0);
+
+  function allocate(category: string, id: string, required: number) {
+    const key = `${category}:${id}`;
+    const used = reserved.get(key) || 0;
+    const available = Math.max(0, stock(category, id) - used);
+    const take = Math.min(available, required);
+    reserved.set(key, used + take);
+    return available;
+  }
+
+  const leafMap = new Map<string, HeroLeafResource>();
+
+  function recordLeaf(
+    id: string,
+    category: 'fragmentGear' | 'fragmentScroll' | 'gear' | 'scroll',
+    count: number,
+    sourceGear: { id: string; name: string }
+  ) {
+    if (count <= 0) return;
+    const key = `${category}:${id}`;
+    let item = leafMap.get(key);
+    if (!item) {
+      const resolvedName = getItemName(category, id) || `${category} #${id}`;
+      const allMissions = typedGetMissionsForItem(id) || [];
+      const missions = allMissions.filter((m: any) =>
+        m.drops?.[category]?.some((dropId: any) => String(dropId) === String(id))
+      );
+      item = {
+        id: String(id),
+        category,
+        name: resolvedName,
+        requiredCount: 0,
+        ownedCount: stock(category, id),
+        remainingCount: 0,
+        isFulfilled: false,
+        missions,
+        sourceGears: []
+      };
+      leafMap.set(key, item);
+    }
+    item.requiredCount += count;
+    if (sourceGear && !item.sourceGears.some(g => g.id === sourceGear.id)) {
+      item.sourceGears.push(sourceGear);
+    }
+  }
+
+  function traverse(
+    id: string,
+    category: 'gear' | 'scroll',
+    required: number,
+    ancestors: Set<string>,
+    sourceGear: { id: string; name: string }
+  ) {
+    const identity = `${category}:${id}`;
+    if (ancestors.has(identity) || required <= 0) return;
+
+    // Check if whole item is already available in inventory
+    const owned = allocate(category, id, required);
+    const missing = Math.max(0, required - owned);
+    if (missing <= 0) return;
+
+    const craftInfo = (customCraftMap && customCraftMap[id]) ||
+      (category === 'gear' ? gearCraftData?.[id] : scrollCraftData?.[id]) || null;
+
+    // Case 1: Item is crafted from fragments -> fragments are the leaf!
+    if (Number(craftInfo?.fragmentCount) > 0) {
+      const fragCategory = category === 'scroll' ? 'fragmentScroll' : 'fragmentGear';
+      const neededFrags = Number(craftInfo.fragmentCount) * missing;
+      allocate(fragCategory, id, neededFrags);
+      recordLeaf(id, fragCategory, neededFrags, sourceGear);
+      return;
+    }
+
+    // Case 2: Composite recipe with sub-components
+    const hasRecipe = Boolean(craftInfo?.recipe || craftInfo?.scroll);
+    if (hasRecipe) {
+      const nextAncestors = new Set(ancestors).add(identity);
+      for (const [childCategory, recipe] of [['gear', craftInfo?.recipe], ['scroll', craftInfo?.scroll]] as const) {
+        for (const [childId, quantity] of Object.entries(recipe || {})) {
+          const count = Number(quantity);
+          if (Number.isFinite(count) && count > 0) {
+            traverse(childId, childCategory, count * missing, nextAncestors, sourceGear);
+          }
+        }
+      }
+      return;
+    }
+
+    // Case 3: Base item with direct campaign drop
+    recordLeaf(id, category, missing, sourceGear);
+  }
+
+  for (const gear of missingGears) {
+    traverse(String(gear.gearId), 'gear', 1, new Set(), { id: String(gear.gearId), name: gear.name });
+  }
+
+  const leafResources = Array.from(leafMap.values()).map(item => {
+    const remainingCount = Math.max(0, item.requiredCount - item.ownedCount);
+    return {
+      ...item,
+      remainingCount,
+      isFulfilled: item.ownedCount >= item.requiredCount
+    };
+  });
+
+  leafResources.sort((a, b) => {
+    if (a.isFulfilled !== b.isFulfilled) return a.isFulfilled ? 1 : -1;
+    return b.remainingCount - a.remainingCount || a.name.localeCompare(b.name);
+  });
+
+  return {
+    heroId: String(hero.id),
+    heroName,
+    color: Number(hero.color || 1),
+    missingSlotsCount: missingGears.length,
+    missingGears,
+    leafResources
+  };
 }

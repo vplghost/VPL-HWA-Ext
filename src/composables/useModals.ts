@@ -43,6 +43,7 @@ const modalContext = reactive<{
   selectedHero?: any;
   selectedQuestFilter?: string;
   selectedCampaignGearId?: number | string | null;
+  selectedCampaignHeroId?: number | string | null;
 }>({});
 
 export function useModals() {
@@ -50,11 +51,13 @@ export function useModals() {
     selectedHero?: any;
     selectedQuestFilter?: string;
     selectedCampaignGearId?: number | string | null;
+    selectedCampaignHeroId?: number | string | null;
   }) {
     if (context) {
       if (context.selectedHero !== undefined) modalContext.selectedHero = context.selectedHero;
       if (context.selectedQuestFilter !== undefined) modalContext.selectedQuestFilter = context.selectedQuestFilter;
       if (context.selectedCampaignGearId !== undefined) modalContext.selectedCampaignGearId = context.selectedCampaignGearId;
+      if (context.selectedCampaignHeroId !== undefined) modalContext.selectedCampaignHeroId = context.selectedCampaignHeroId;
     }
     modalState[name] = true;
   }

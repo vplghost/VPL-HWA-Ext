@@ -23,6 +23,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
   (e: 'openCampaign', gearId: number | string | null): void;
+  (e: 'openCampaignHero', heroId: number | string | null): void;
 }>();
 
 const { cache, dispatchRpc } = useRpcCache();
@@ -413,6 +414,13 @@ function handleFarmQuick() {
   openModal('campaign', { selectedCampaignGearId: gearId });
 }
 
+function handleHeroFarmAll() {
+  if (!activeHero.value?.id) return;
+  const numId = Number(activeHero.value.id);
+  emit('openCampaignHero', numId);
+  openModal('campaign', { selectedCampaignHeroId: numId, selectedCampaignGearId: null });
+}
+
 </script>
 
 <template>
@@ -767,13 +775,24 @@ function handleFarmQuick() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
-                @click="handleFarmQuick"
-              >
-                <span>⚔️</span> Farm Equipment
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  id="hero-farm-all-btn"
+                  type="button"
+                  class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
+                  title="Tổng hợp tất cả tài nguyên lá cần farm cho Hero này và mở dialog Campaign Farm"
+                  @click="handleHeroFarmAll"
+                >
+                  <span>🎯</span> Farm theo Hero
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
+                  @click="handleFarmQuick"
+                >
+                  <span>⚔️</span> Farm Equipment
+                </button>
+              </div>
             </div>
 
             <!-- 6 Slots Grid -->

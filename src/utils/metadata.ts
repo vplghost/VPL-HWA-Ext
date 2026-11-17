@@ -150,7 +150,7 @@ export function getResearchName(id: number | string): string {
   return typedGetResearchName(id) || (id ? `Research #${id}` : 'Research');
 }
 
-export { buildGearRecipeTree, findFirstUnfulfilledNode } from './recipeTree.ts';
+export { buildGearRecipeTree, findFirstUnfulfilledNode, aggregateHeroLeafEquipment } from './recipeTree.ts';
 
 export function starGlowClass(starCount: number, isLarge = false) {
   const prefix = isLarge ? 'avatar-star-lg-' : 'avatar-star-';
