@@ -61,7 +61,7 @@ const isTabOpenButtonVisible = ref(true);
 const raidQueue = ref<any>(null);
 const monsterQueue = ref<any>(null);
 const autoGatherSettings = ref<any>(null);
-const socketRefreshMode = ref<string>('piggyback');
+const socketRefreshMode = ref<string>('direct');
 const isRpcQueueVisible = computed(() => socketRefreshMode.value !== 'direct');
 
 onMounted(async () => {
@@ -113,6 +113,8 @@ onMounted(async () => {
         socketRefreshMode.value = String(stored.socketRefreshMode);
       } else if (stored.dispatchMode) {
         socketRefreshMode.value = String(stored.dispatchMode);
+      } else {
+        socketRefreshMode.value = 'direct';
       }
     } catch (_) {}
 

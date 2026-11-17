@@ -29,7 +29,7 @@ async function pingEngine() {
 }
 
 const dispatchMode = ref<'piggyback' | 'direct' | 'mqtt-piggyback'>('direct');
-const popupRpcEnabled = ref(false);
+const popupRpcEnabled = ref(true);
 const interceptEnabled = ref(true);
 const mqttCaptureEnabled = ref(true);
 
@@ -70,8 +70,10 @@ onMounted(async () => {
         dispatchMode.value = stored.socketRefreshMode;
       } else if (stored.dispatchMode) {
         dispatchMode.value = stored.dispatchMode;
+      } else {
+        dispatchMode.value = 'direct';
       }
-      popupRpcEnabled.value = stored.popupRpcEnabled === true;
+      popupRpcEnabled.value = stored.popupRpcEnabled !== false;
       if (stored.captureSettings?.interceptEnabled !== undefined) {
         interceptEnabled.value = stored.captureSettings.interceptEnabled !== false;
       }

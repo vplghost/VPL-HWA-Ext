@@ -227,3 +227,94 @@ test('disabling Smart while basic auto-gather remains enabled cancels queued def
   await ctx.tickMine(true);
   assert.ok(sent.some(msg => msg.kind === 'drop-rpc-group' && msg.group === 'mine-defense:' + attack.routeId));
 });
+
+test('defenseRecallEnabled=false suppresses recall/intercept on attack', () => {
+  const { helper, cache, clock } = environment(); crowdHospital(cache);
+  const planEnabled = helper.plan(cache, {}, clock.now, { defenseRecallEnabled: true });
+  assert.equal(planEnabled?.action, 'recall');
+  const planDisabled = helper.plan(cache, {}, clock.now, { defenseRecallEnabled: false });
+  assert.equal(planDisabled, null);
+});
+
+test('custom defenseInfirmaryThreshold changes recall trigger threshold', () => {
+  const { helper, cache, clock } = environment();
+  const healing = cache['getHealing:unit'].data;
+  // Hospital capacity is 23100. 40% = 9240. 60% = 13860.
+  healing.injuredUnits = [{ count: 10000 }]; // ~43%
+  // With 50% threshold: 10000 <= 11550 -> no recall
+  assert.equal(helper.plan(cache, {}, clock.now, { defenseInfirmaryThreshold: 50 }), null);
+  // With 40% threshold: 10000 > 9240 -> recalls
+  const plan40 = helper.plan(cache, {}, clock.now, { defenseInfirmaryThreshold: 40 });
+  assert.equal(plan40?.action, 'recall');
+  assert.match(plan40?.reason, /above 40%/);
+  // With 60% threshold: 10000 <= 13860 -> no recall
+  assert.equal(helper.plan(cache, {}, clock.now, { defenseInfirmaryThreshold: 60 }), null);
+});
+
+test('intercept clears nearest gathering slot when marches are full, then dispatches intercept squad', () => {
+  const { helper, cache, clock, attack } = environment(); crowdHospital(cache);
+  cache.customTeams = [{ id: 'combat-1', heroIds: [1, 2, 3, 4, 5] }];
+  const settings = {
+    defenseRecallEnabled: true,
+    defenseInfirmaryThreshold: 50,
+    interceptTeamId: 'combat-1',
+    maxMarches: 2, // 2 marches currently gathering -> 0 available slots
+  };
+
+  // Step 1: No free slots -> clear_slot by recalling nearest other gatherer
+  const plan1 = helper.plan(cache, {}, clock.now, settings);
+  assert.equal(plan1?.action, 'clear_slot');
+  assert.match(plan1?.reason, /Clearing march slot/);
+  assert.equal(plan1?.call?.args?.squadId, '0c64e739-6dcc-4067-889e-58ac500e95be');
+
+  // Step 2: When slots are available -> intercept (recall threatened gatherer & attackMine)
+  settings.maxMarches = 3;
+  const plan2 = helper.plan(cache, {}, clock.now, settings);
+  assert.equal(plan2?.action, 'intercept');
+  assert.match(plan2?.reason, /Intercepting mine attack/);
+  assert.equal(plan2?.call?.args?.squadId, '708cf95e-5e9c-4dc3-89df-dbc4c0efc50b');
+  assert.equal(plan2?.intercept?.phase, 'intercepting');
+  assert.equal(plan2?.calls?.[0]?.name, 'stopMineGathering');
+});
+
+test('intercept switches squads back after battle impact, or after 5s when enemy retreats', () => {
+  const { helper, cache, clock, attack } = environment();
+  const intercept = {
+    phase: 'intercepting',
+    mineId: attack.mineId,
+    mapId: attack.mapId,
+    attackRouteId: attack.routeId,
+    impactAt: attack.impactAt,
+    threatenedSquadId: '708cf95e-5e9c-4dc3-89df-dbc4c0efc50b',
+    interceptSquadId: 'intercept-squad-1',
+    farmingHeroIds: [42, 11, 44, 26, 32],
+  };
+
+  // Case A: Enemy aborts attack before impact -> waits 5s
+  delete cache.incomingMineAttacks.data.attacks[attack.routeId];
+  const waitPlan = helper.plan(cache, { intercept }, clock.now, { interceptTeamId: 'combat-1' });
+  assert.equal(waitPlan?.action, 'wait');
+  assert.equal(waitPlan?.intercept?.phase, 'awaiting_switch');
+  assert.equal(waitPlan?.intercept?.switchBackAt, clock.now + 5000);
+
+  // Still waiting at 4s
+  const waitStill = helper.plan(cache, { intercept: waitPlan.intercept }, clock.now + 4000, { interceptTeamId: 'combat-1' });
+  assert.equal(waitStill?.action, 'wait');
+
+  // At 5s: switch squads back
+  const switchPlan = helper.plan(cache, { intercept: waitPlan.intercept }, clock.now + 5000, { interceptTeamId: 'combat-1' });
+  assert.equal(switchPlan?.action, 'switch_back');
+  assert.match(switchPlan?.reason, /switching squads back/);
+  assert.equal(switchPlan?.calls?.[0]?.name, 'stopMineGathering');
+  assert.equal(switchPlan?.calls?.[0]?.args?.squadId, 'intercept-squad-1');
+
+  // Case B: Battle impact reached
+  const impactIntercept = structuredClone(intercept);
+  impactIntercept.phase = 'intercepting';
+  delete impactIntercept.enemyAborted;
+  delete impactIntercept.switchBackAt;
+  cache.incomingMineAttacks.data.attacks[attack.routeId] = attack;
+  const postImpactPlan = helper.plan(cache, { intercept: impactIntercept }, attack.impactAt, { interceptTeamId: 'combat-1' });
+  assert.equal(postImpactPlan?.action, 'switch_back');
+  assert.match(postImpactPlan?.reason, /Attack resolved/);
+});

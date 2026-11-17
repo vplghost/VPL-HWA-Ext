@@ -85,7 +85,7 @@ export function installInterceptor(customWindow?: any): void {
 
   let captureEnabled = false;
   let popupRpcEnabled = false;
-  let rpcDispatchMode = 'piggyback';
+  let rpcDispatchMode = 'direct';
   let recordingActive = false;
   let lastNudgeAt = -Infinity;
   let lastNudgeTrackId: string | null = null;
@@ -937,6 +937,7 @@ export function installInterceptor(customWindow?: any): void {
         (originalFetch || win.fetch)(url, {
           method: 'POST',
           headers,
+          credentials: 'include',
           body: JSON.stringify(payload)
         }).then(async (res: any) => {
           let responseText: string | null = null;

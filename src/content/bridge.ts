@@ -138,9 +138,9 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     return Promise.resolve({});
   }
 
-  let currentSettings: BridgeSettings | null = null;
+  let currentSettings: BridgeSettings = { interceptEnabled: true };
   let popupRpcEnabled = false;
-  let socketRefreshMode = 'piggyback';
+  let socketRefreshMode = 'direct';
   let recordingActive = false;
   let recordingStateObserved = false;
   let freeSpinAccountId: string | null = null;
@@ -571,6 +571,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   }
 
   // Storage initialization and watcher
+  sendControl();
   readLocal([
     'captureSettings',
     'popupRpcEnabled',
@@ -608,9 +609,9 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       });
     }
 
-    if (stored?.captureSettings) currentSettings = stored.captureSettings;
+    if (stored?.captureSettings) currentSettings = { ...currentSettings, ...stored.captureSettings };
     if (stored?.popupRpcEnabled !== undefined) popupRpcEnabled = Boolean(stored.popupRpcEnabled);
-    if (stored?.socketRefreshMode) socketRefreshMode = ['direct', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'piggyback';
+    if (stored?.socketRefreshMode) socketRefreshMode = ['piggyback', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'direct';
     const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
     if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
     sendControl();
@@ -665,7 +666,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         configChanged = true;
       }
       if ('socketRefreshMode' in changes) {
-        socketRefreshMode = ['direct', 'mqtt-piggyback'].includes(changes.socketRefreshMode.newValue) ? changes.socketRefreshMode.newValue : 'piggyback';
+        socketRefreshMode = ['piggyback', 'mqtt-piggyback'].includes(changes.socketRefreshMode.newValue) ? changes.socketRefreshMode.newValue : 'direct';
         configChanged = true;
       }
       if (configChanged) sendControl();

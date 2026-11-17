@@ -1797,7 +1797,7 @@ export async function evaluateMineDefense(record: any, cache: any, stored: any, 
   if (!helper) return { state, hold: false };
   state = helper.sync(state, record, cache, now);
   const defense = state.defense;
-  const plan = helper.plan(cache, defense, now);
+  const plan = helper.plan(cache, defense, now, stored?.autoGatherSettings, stored);
   state.wakeAt = plan?.wakeAt || null;
   const planWakeAt = plan?.wakeAt;
   if (planWakeAt && planWakeAt > now) cr?.alarms?.create?.('hwa-mine-defense', { when: planWakeAt });
@@ -1833,6 +1833,28 @@ export async function evaluateMineDefense(record: any, cache: any, stored: any, 
     ];
     defense.refreshAt = now;
     defense.status = plan.reason;
+  } else if (plan?.action === 'clear_slot') {
+    calls = [plan.call];
+    defense.intercept = plan.intercept;
+    expiresAt = plan.attack?.impactAt || (now + 15000);
+    group = 'mine-defense:intercept:' + (plan.attack?.routeId || 'slot');
+    defense.status = plan.reason;
+  } else if (plan?.action === 'intercept') {
+    calls = plan.calls || [plan.call];
+    defense.intercept = plan.intercept;
+    if (plan.attack && plan.march) {
+      const key = plan.attack.routeId + ':' + plan.march.squadId;
+      defense.attempted = [...(defense.attempted || []), key].slice(-100);
+    }
+    expiresAt = plan.attack?.impactAt || (now + 15000);
+    group = 'mine-defense:intercept:' + (plan.attack?.routeId || 'active');
+    defense.status = plan.reason;
+  } else if (plan?.action === 'switch_back') {
+    calls = plan.calls || [plan.call];
+    defense.intercept = null;
+    expiresAt = now + 15000;
+    group = 'mine-defense:switch-back';
+    defense.status = plan.reason;
   } else if (plan?.action === 'recall' && plan.attack && plan.march) {
     const attack = plan.attack;
     const key = attack.routeId + ':' + plan.march.squadId;
@@ -1849,7 +1871,10 @@ export async function evaluateMineDefense(record: any, cache: any, stored: any, 
     expiresAt = attack.impactAt;
     group = 'mine-defense:' + attack.routeId;
     defense.status = stored.socketRefreshMode === 'direct' ? plan.reason : 'Defensive recall queued · needs game RPC before impact';
-  } else defense.status = plan?.reason || '';
+  } else {
+    if (plan?.intercept) defense.intercept = plan.intercept;
+    defense.status = plan?.reason || '';
+  }
   if (!calls.length && defense.waiting?.length && now - (defense.refreshAt || 0) >= 3000) {
     calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
     defense.refreshAt = now;
@@ -1883,7 +1908,7 @@ export async function evaluateMineDefense(record: any, cache: any, stored: any, 
       });
     }
   }
-  return { state, hold: Boolean(defense.pending || defense.waiting?.length || (plan && (plan.action as string) !== 'monitor')) };
+  return { state, hold: Boolean(defense.pending || defense.waiting?.length || defense.intercept || (plan && (plan.action as string) !== 'monitor')) };
 }
 
 export async function evaluateSmartGather(
@@ -2328,9 +2353,19 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     setupQueueAlarms(cr);
     cr.storage?.local?.remove('apiRecords')?.catch?.(() => {});
     try {
-      const stored = await cr.storage?.local?.get(['socketRefreshMode']);
-      if (!stored?.socketRefreshMode) {
-        await cr.storage?.local?.set({ socketRefreshMode: 'piggyback' });
+      const stored = await cr.storage?.local?.get(['socketRefreshMode', 'popupRpcEnabled', 'captureSettings']);
+      const updates: Record<string, any> = {};
+      if (!stored?.socketRefreshMode || stored.socketRefreshMode === 'piggyback') {
+        updates.socketRefreshMode = 'direct';
+      }
+      if (stored?.popupRpcEnabled === undefined || stored.popupRpcEnabled === false) {
+        updates.popupRpcEnabled = true;
+      }
+      if (!stored?.captureSettings) {
+        updates.captureSettings = { interceptEnabled: true };
+      }
+      if (Object.keys(updates).length > 0) {
+        await cr.storage?.local?.set(updates);
       }
     } catch (_) {}
   });
@@ -3084,7 +3119,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                 if (!queued) cr.storage?.local?.remove('claimRpcStatus').catch(() => {});
                 forward(dispatch, queued);
               } else if (message.kind === 'engine-send-message') {
-                if (stored.socketRefreshMode !== 'direct') {
+                if ((stored.socketRefreshMode || 'direct') !== 'direct') {
                   sendResponse({ ok: false, error: 'Unity commands require Direct RPC mode.' });
                 } else forward();
               } else {

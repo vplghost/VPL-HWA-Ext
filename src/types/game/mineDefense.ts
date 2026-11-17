@@ -13,16 +13,34 @@ export interface MineAttackItem {
   [key: string]: any;
 }
 
+export interface ActiveIntercept {
+  phase: 'clearing_slot' | 'swapping' | 'intercepting' | 'awaiting_switch' | 'switching_back';
+  mineId: number;
+  mapId: string;
+  mineConfigId?: number;
+  attackRouteId: string;
+  impactAt: number;
+  threatenedSquadId?: string;
+  freedSquadId?: string;
+  interceptSquadId?: string;
+  farmingHeroIds?: number[];
+  switchBackAt?: number;
+  enemyAborted?: boolean;
+  coordinates?: { x: number; y: number };
+}
+
 export interface MineDefensePlan {
-  action: 'refresh' | 'wait' | 'recall';
+  action: 'refresh' | 'wait' | 'recall' | 'clear_slot' | 'intercept' | 'switch_back';
   reason: string;
   attack?: MineAttackItem;
   march?: any;
   wakeAt?: number;
   call?: any;
+  calls?: any[];
   mine?: any;
   room?: HospitalRoomInfo | null;
   count?: number;
+  intercept?: ActiveIntercept;
   [key: string]: any;
 }
 

@@ -180,7 +180,7 @@ async function ensureRpcEnabled() {
     const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; monsterPreferences?: {mobLevel?: number; teamId?: string; targetMobId?: string}; monsterQueue?: {running?: boolean; phase?: string} }>(['popupRpcEnabled', 'socketRefreshMode']);
     const updates: Record<string, any> = {};
     if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
-    if (!stored.socketRefreshMode) updates.socketRefreshMode = 'piggyback';
+    if (!stored.socketRefreshMode) updates.socketRefreshMode = 'direct';
     if (Object.keys(updates).length > 0) {
       await chrome.storage.local.set(updates);
     }

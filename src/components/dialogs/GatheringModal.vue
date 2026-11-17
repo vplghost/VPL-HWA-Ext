@@ -56,6 +56,9 @@ interface AutoGatherSettings {
   mineLevel: number | 'nearest';
   mineType: string;
   lastAutoMineType: string | null;
+  defenseRecallEnabled?: boolean;
+  defenseInfirmaryThreshold?: number;
+  interceptTeamId?: string;
 }
 
 const autoSettings = ref<AutoGatherSettings>({
@@ -65,6 +68,9 @@ const autoSettings = ref<AutoGatherSettings>({
   mineLevel: 10,
   mineType: 'rotate',
   lastAutoMineType: null,
+  defenseRecallEnabled: true,
+  defenseInfirmaryThreshold: 50,
+  interceptTeamId: '',
 });
 
 // Manual search
@@ -122,7 +128,7 @@ async function ensureRpcEnabled() {
     const stored = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode']);
     const updates: Record<string, any> = {};
     if (stored.popupRpcEnabled !== true) updates.popupRpcEnabled = true;
-    if (!stored.socketRefreshMode) updates.socketRefreshMode = 'piggyback';
+    if (!stored.socketRefreshMode) updates.socketRefreshMode = 'direct';
     if (Object.keys(updates).length > 0) {
       await chrome.storage.local.set(updates);
     }
@@ -455,7 +461,7 @@ async function recallMarch(march: any) {
         <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-600 dark:text-slate-400" role="status">
           {{ smartStatus || 'Waiting for current game data' }}
         </p>
-        <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-500">Mine defense recalls in the final 10 seconds when wounded troops exceed 50% of total Infirmary capacity. Piggyback requires a game RPC before impact.</p>
+        <p v-if="autoSettings.smartEnabled" class="text-[11px] text-slate-500">Smart gathering automatically prioritizes daily resource bonuses and coordinates march slots.</p>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <label class="block font-medium text-slate-700 dark:text-slate-300">
             Mine Target Type
@@ -498,6 +504,58 @@ async function recallMarch(march: any) {
               @change="saveAutoSettings"
             />
           </label>
+        </div>
+
+        <!-- Mine Defense & Intercept Controls -->
+        <div class="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-200">
+              <input
+                v-model="autoSettings.defenseRecallEnabled"
+                type="checkbox"
+                @change="saveAutoSettings"
+              />
+              🛡️ Mine Defense · Return when under attack
+            </label>
+          </div>
+
+          <div v-if="autoSettings.defenseRecallEnabled" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Infirmary Threshold (%)
+              <input
+                v-model.number="autoSettings.defenseInfirmaryThreshold"
+                type="number"
+                min="1"
+                max="100"
+                class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
+                @change="saveAutoSettings"
+              />
+            </label>
+
+            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Intercept Team (Optional)
+              <select
+                v-model="autoSettings.interceptTeamId"
+                class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
+                @change="saveAutoSettings"
+              >
+                <option value="">None (Recall only)</option>
+                <option v-for="team in teams" :key="team.id" :value="team.id">
+                  {{ team.label }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <p v-if="autoSettings.defenseRecallEnabled" class="text-[11px] text-slate-500 dark:text-slate-400">
+            Triggers in final 10s when wounded troops exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}% infirmary capacity.
+            <span v-if="autoSettings.interceptTeamId">
+              Intercept active: clears nearest gathering march if slots are full, swaps in the intercept team, and returns to gathering after battle (or 5s after enemy retreats).
+            </span>
+            <span v-else>
+              Recalls the threatened squad back to base.
+            </span>
+          </p>
         </div>
 
         <div class="rounded-lg bg-white/70 dark:bg-slate-900/60 p-2.5 text-[11px] text-slate-600 dark:text-slate-400">

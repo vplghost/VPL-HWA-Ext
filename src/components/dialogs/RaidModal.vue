@@ -213,8 +213,8 @@ onUnmounted(() => {
 
 async function ensureRpcEnabled() {
   const stored: any = await chrome.storage.local.get(['popupRpcEnabled', 'socketRefreshMode', 'captureSettings']);
-  if (stored.popupRpcEnabled !== true ||
-      (stored.socketRefreshMode !== 'direct' && stored.captureSettings?.interceptEnabled === false)) {
+  if (stored.popupRpcEnabled === false ||
+      (stored.socketRefreshMode && stored.socketRefreshMode !== 'direct' && stored.captureSettings?.interceptEnabled === false)) {
     statusMessage.value = 'Enable RPC in Settings, and Monitor API for Piggyback mode.';
     return false;
   }
