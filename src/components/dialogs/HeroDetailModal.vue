@@ -2,7 +2,13 @@
 import UnitStars from '@/src/components/common/UnitStars.vue';
 import { ref, computed, watch, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
-import { useModals } from '@/src/composables/useModals';
+import {
+  useModals,
+  isTopModal,
+  registerModalOpen,
+  registerModalClose,
+  getModalStackLevel,
+} from '@/src/composables/useModals';
 import {
   getHeroMetadata,
   getHeroName,
@@ -47,12 +53,17 @@ watch(
   { immediate: true }
 );
 
+const stackLevel = computed(() => getModalStackLevel('hero'));
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    if (!isTopModal('hero')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -61,14 +72,17 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      registerModalOpen('hero');
       document.addEventListener('keydown', handleKeydown);
     } else {
+      registerModalClose('hero');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
 );
 
 onUnmounted(() => {
+  registerModalClose('hero');
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -430,7 +444,8 @@ function handleHeroFarmAll() {
     role="dialog"
     aria-modal="true"
     aria-labelledby="hero-dialog-title"
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+    :style="{ zIndex: stackLevel }"
+    class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
 
   >
     <div

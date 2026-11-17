@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
+import {
+  isTopModal,
+  registerModalOpen,
+  registerModalClose,
+  getModalStackLevel,
+} from '@/src/composables/useModals';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -7,11 +13,26 @@ const props = defineProps<{
   icon?: string;
   maxWidth?: string;
   stackLevel?: number;
+  modalName?: string;
 }>();
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
+
+const modalId = computed(() => props.modalName || props.title || 'dialog');
+
+function checkIsTop(): boolean {
+  const fn = typeof isTopModal === 'function' ? isTopModal : (globalThis as any).__hwaModalStack?.isTopModal;
+  if (!fn) return true;
+  return fn(modalId.value);
+}
+
+const computedZIndex = computed(() => {
+  if (props.stackLevel != null) return props.stackLevel;
+  const fn = typeof getModalStackLevel === 'function' ? getModalStackLevel : (globalThis as any).__hwaModalStack?.getModalStackLevel;
+  return fn ? fn(modalId.value) : 50;
+});
 
 function close() {
   emit('update:modelValue', false);
@@ -19,7 +40,9 @@ function close() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
-    if (props.stackLevel != null) { e.stopPropagation(); e.stopImmediatePropagation(); }
+    if (!checkIsTop()) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -28,14 +51,20 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      const regOpen = typeof registerModalOpen === 'function' ? registerModalOpen : (globalThis as any).__hwaModalStack?.registerModalOpen;
+      if (regOpen) regOpen(modalId.value);
       document.addEventListener('keydown', handleKeydown, props.stackLevel != null);
     } else {
+      const regClose = typeof registerModalClose === 'function' ? registerModalClose : (globalThis as any).__hwaModalStack?.registerModalClose;
+      if (regClose) regClose(modalId.value);
       document.removeEventListener('keydown', handleKeydown, props.stackLevel != null);
     }
   }
 );
 
 onUnmounted(() => {
+  const regClose = typeof registerModalClose === 'function' ? registerModalClose : (globalThis as any).__hwaModalStack?.registerModalClose;
+  if (regClose) regClose(modalId.value);
   document.removeEventListener('keydown', handleKeydown, props.stackLevel != null);
 });
 </script>
@@ -47,8 +76,8 @@ onUnmounted(() => {
       role="dialog"
       aria-modal="true"
       :aria-label="title"
-      :style="stackLevel != null ? { zIndex: stackLevel } : undefined"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      :style="{ zIndex: computedZIndex }"
+      class="fixed inset-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
 
     >
       <div

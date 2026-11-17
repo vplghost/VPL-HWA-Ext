@@ -147,12 +147,19 @@ onMounted(async () => {
   }
 });
 
+const getModalStackHelper = () => (typeof globalThis !== 'undefined' ? (globalThis as any).__hwaModalStack : null);
+const stackLevel = computed(() => getModalStackHelper()?.getModalStackLevel?.('monster') ?? 50);
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    const helper = getModalStackHelper();
+    if (helper && !helper.isTopModal?.('monster')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -161,10 +168,12 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      getModalStackHelper()?.registerModalOpen?.('monster');
       now.value = Date.now();
       document.addEventListener('keydown', handleKeydown);
       loadSquadData();
     } else {
+      getModalStackHelper()?.registerModalClose?.('monster');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
@@ -172,6 +181,7 @@ watch(
 
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  getModalStackHelper()?.registerModalClose?.('monster');
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -372,7 +382,8 @@ async function stopMonsterQueue() {
     role="dialog"
     aria-modal="true"
     aria-labelledby="monster-dialog-title"
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+    :style="{ zIndex: stackLevel }"
+    class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
 
   >
     <div

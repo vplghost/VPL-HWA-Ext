@@ -48,3 +48,70 @@ test('shared dialog ignores backdrop clicks and closes explicitly with button or
   app.unmount();
   assert.equal(handlers.has('keydown'), false);
 });
+
+test('stacked modals close in LIFO order on Escape (top-most first, underlying modal remains open)', async () => {
+  const {
+    useModals,
+    registerModalOpen,
+    registerModalClose,
+    isTopModal,
+    getModalStackLevel,
+  } = await import('../src/composables/useModals.ts');
+
+  const { openModal, closeModal, modalState } = useModals();
+
+  // Initially, both modals closed
+  assert.equal(modalState.hero, false);
+  assert.equal(modalState.campaign, false);
+
+  // 1. Open hero modal first
+  openModal('hero');
+  assert.equal(modalState.hero, true);
+  assert.equal(isTopModal('hero'), true);
+  assert.equal(getModalStackLevel('hero'), 50);
+
+  // 2. Open campaign modal on top of hero
+  openModal('campaign');
+  assert.equal(modalState.campaign, true);
+  assert.equal(isTopModal('campaign'), true);
+  assert.equal(isTopModal('hero'), false, 'Hero modal must not be top modal while Campaign is stacked on top');
+  assert.equal(getModalStackLevel('campaign'), 60, 'Stacked Campaign modal must have higher z-index (60 > 50)');
+
+  // 3. Simulate Escape press when stacked
+  // Escape key event arrives at Hero listener:
+  let heroClosed = false;
+  let campaignClosed = false;
+
+  const simulateHeroEscape = () => {
+    if (isTopModal('hero')) {
+      heroClosed = true;
+      closeModal('hero');
+    }
+  };
+
+  const simulateCampaignEscape = () => {
+    if (isTopModal('campaign')) {
+      campaignClosed = true;
+      closeModal('campaign');
+    }
+  };
+
+  // First Escape press:
+  simulateHeroEscape();
+  simulateCampaignEscape();
+
+  // Campaign closed, Hero stayed open!
+  assert.equal(campaignClosed, true, 'Top-most Campaign modal must close on first Escape');
+  assert.equal(heroClosed, false, 'Underlying Hero modal must remain open on first Escape');
+  assert.equal(modalState.campaign, false);
+  assert.equal(modalState.hero, true);
+
+  // Now Hero is the top modal again!
+  assert.equal(isTopModal('hero'), true);
+  assert.equal(getModalStackLevel('hero'), 50);
+
+  // Second Escape press:
+  simulateHeroEscape();
+  assert.equal(heroClosed, true, 'Underlying Hero modal closes on second Escape');
+  assert.equal(modalState.hero, false);
+});

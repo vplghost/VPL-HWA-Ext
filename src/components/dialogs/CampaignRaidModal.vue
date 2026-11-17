@@ -15,7 +15,13 @@ import {
 } from '@/src/utils/recipeTree';
 import { waitForCampaignRaidResult } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
-import { useModals } from '@/src/composables/useModals';
+import {
+  useModals,
+  isTopModal,
+  registerModalOpen,
+  registerModalClose,
+  getModalStackLevel,
+} from '@/src/composables/useModals';
 import {
   buildGearRecipeTree,
   findFirstUnfulfilledNode,
@@ -100,14 +106,44 @@ function selectLeafResource(leaf: HeroLeafResource) {
   }
 }
 
+function selectHeroGear(gearId: number | string) {
+  selectedGearId.value = gearId;
+  const tree = buildGearRecipeTree(gearId, cache.value);
+  const unfulfilled = findFirstUnfulfilledNode(tree);
+  selectedRecipeNodeId.value = unfulfilled?.key ?? tree?.key ?? null;
+
+  if (selectedRecipeNodeId.value) {
+    const candidates = recipeMissions(findRecipeNode(tree, selectedRecipeNodeId.value));
+    const highest = resolveHighestRaidableMission(
+      candidates.map((m: any) => m.id),
+      cache.value?.missionGetAll?.data,
+      { disabledIds: disabledMissionsToday.value }
+    );
+    if (highest) {
+      missionId.value = highest;
+    }
+  }
+}
+
+function viewGearRecipeTree(gearId: number | string) {
+  farmMode.value = 'gear';
+  selectHeroGear(gearId);
+}
+
 function switchFarmMode(mode: 'gear' | 'hero') {
   farmMode.value = mode;
   if (mode === 'hero') {
     if (selectedLeafResource.value) {
       selectLeafResource(selectedLeafResource.value);
+    } else if (heroLeafResources.value.length > 0) {
+      const first = heroLeafResources.value.find((l) => !l.isFulfilled) || heroLeafResources.value[0];
+      if (first) selectLeafResource(first);
     }
   } else if (mode === 'gear') {
-    if (selectedRecipeNode.value) {
+    if (!selectedGearId.value && heroLeafSummary.value?.missingGears?.length) {
+      const targetGearId = selectedLeafResource.value?.sourceGears?.[0]?.gearId || heroLeafSummary.value.missingGears[0].gearId;
+      selectHeroGear(targetGearId);
+    } else if (selectedRecipeNode.value) {
       selectRecipeNode(selectedRecipeNode.value);
     }
   }
@@ -280,12 +316,17 @@ const maxPossibleTimes = computed(() => {
   return Math.max(1, Math.floor(cur / missionCost.value));
 });
 
+const stackLevel = computed(() => getModalStackLevel('campaign'));
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    if (!isTopModal('campaign')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -318,9 +359,11 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      registerModalOpen('campaign');
       document.addEventListener('keydown', handleKeydown);
       ensureRpcEnabled();
     } else {
+      registerModalClose('campaign');
       document.removeEventListener('keydown', handleKeydown);
     }
   },
@@ -328,6 +371,7 @@ watch(
 );
 
 onUnmounted(() => {
+  registerModalClose('campaign');
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -720,7 +764,8 @@ const hasDropItems = computed(() => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="campaign-dialog-title"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
+      :style="{ zIndex: stackLevel }"
+      class="fixed inset-0 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
 
     >
       <div
@@ -827,13 +872,16 @@ const hasDropItems = computed(() => {
 
               <!-- Missing slot tags -->
               <div class="flex items-center gap-1.5 flex-wrap">
-                <span
+                <button
                   v-for="g in heroLeafSummary.missingGears"
                   :key="g.slotNum"
-                  class="rounded bg-purple-100 dark:bg-purple-900/50 px-2 py-0.5 text-3xs font-semibold text-purple-800 dark:text-purple-200"
+                  type="button"
+                  class="rounded bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/50 dark:hover:bg-purple-900/80 px-2 py-0.5 text-3xs font-semibold text-purple-800 dark:text-purple-200 cursor-pointer transition-colors"
+                  title="View recipe tree for this equipment"
+                  @click="viewGearRecipeTree(g.gearId)"
                 >
-                  Slot {{ g.slotNum }}: {{ g.name }}
-                </span>
+                  Slot {{ g.slotNum }}: {{ g.name }} ↗
+                </button>
               </div>
             </div>
 
@@ -908,6 +956,21 @@ const hasDropItems = computed(() => {
 
           <!-- Recipe Tree Hierarchy Section (if farming a gear) -->
           <div v-if="farmMode === 'gear' && recipeTree" class="rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/30 dark:bg-indigo-950/20 p-3.5 space-y-2.5">
+            <!-- Slot Selector when inspecting gear under Hero -->
+            <div v-if="selectedHeroId && heroLeafSummary?.missingGears?.length" id="hero-recipe-slot-picker" class="flex items-center gap-1.5 flex-wrap pb-2 border-b border-indigo-100 dark:border-indigo-900/40">
+              <span class="text-2xs font-semibold text-slate-600 dark:text-slate-300">Equipment Slots:</span>
+              <button
+                v-for="g in heroLeafSummary.missingGears"
+                :key="g.slotNum"
+                type="button"
+                class="px-2.5 py-1 rounded-md text-2xs font-bold cursor-pointer transition-all border"
+                :class="selectedGearId == g.gearId ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'"
+                @click="selectHeroGear(g.gearId)"
+              >
+                Slot {{ g.slotNum }}: {{ g.name }}
+              </button>
+            </div>
+
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
                 <span>🛠️</span> Crafting Recipe Tree: <strong class="text-indigo-600 dark:text-indigo-400">{{ recipeTree.name }}</strong>
@@ -927,6 +990,10 @@ const hasDropItems = computed(() => {
               <RecipeTreeNode :node="recipeTree" :selected-key="selectedRecipeNodeId" :is-crafting="isCrafting" :is-running="isRaidRunning"
                 @select="selectRecipeNode" @craft="craftNode" />
             </div>
+          </div>
+
+          <div v-else-if="farmMode === 'gear' && !recipeTree" class="rounded-xl border border-dashed border-indigo-200 dark:border-indigo-900/60 p-4 text-center text-xs text-slate-500">
+            No equipment selected or all hero equipment slots are already equipped.
           </div>
 
           <!-- Mission Setup & Candidate Chips -->

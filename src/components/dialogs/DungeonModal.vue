@@ -2,6 +2,12 @@
 import UnitStars from '@/src/components/common/UnitStars.vue';
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import {
+  isTopModal,
+  registerModalOpen,
+  registerModalClose,
+  getModalStackLevel,
+} from '@/src/composables/useModals';
 import { getTitanMetadata } from '@/src/utils/metadata';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
@@ -122,12 +128,17 @@ const titanEntries = computed(() => {
   });
 });
 
+const stackLevel = computed(() => getModalStackLevel('dungeon'));
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    if (!isTopModal('dungeon')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -136,8 +147,10 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      registerModalOpen('dungeon');
       document.addEventListener('keydown', handleKeydown);
     } else {
+      registerModalClose('dungeon');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
@@ -145,11 +158,13 @@ watch(
 
 onMounted(() => {
   if (props.modelValue) {
+    registerModalOpen('dungeon');
     document.addEventListener('keydown', handleKeydown);
   }
 });
 
 onUnmounted(() => {
+  registerModalClose('dungeon');
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -191,7 +206,8 @@ function handleImgError(e: Event) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="dungeon-modal-title"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
+      :style="{ zIndex: stackLevel }"
+      class="fixed inset-0 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
 
     >
       <div

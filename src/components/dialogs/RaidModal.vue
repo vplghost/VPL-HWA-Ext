@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import {
+  isTopModal,
+  registerModalOpen,
+  registerModalClose,
+  getModalStackLevel,
+} from '@/src/composables/useModals';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import StatusAlertBanner from '@/src/components/common/StatusAlertBanner.vue';
@@ -183,12 +189,17 @@ onMounted(async () => {
   }
 });
 
+const stackLevel = computed(() => getModalStackLevel('raid'));
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    if (!isTopModal('raid')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -197,10 +208,12 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      registerModalOpen('raid');
       now.value = Date.now();
       document.addEventListener('keydown', handleKeydown);
       loadSquadData();
     } else {
+      registerModalClose('raid');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
@@ -208,6 +221,7 @@ watch(
 
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  registerModalClose('raid');
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -435,7 +449,8 @@ async function stopRaidQueue() {
     role="dialog"
     aria-modal="true"
     aria-labelledby="raid-dialog-title"
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+    :style="{ zIndex: stackLevel }"
+    class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
 
   >
     <div

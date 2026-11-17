@@ -144,4 +144,7 @@ test('CampaignRaidModal contains Hero Farm UI components, conditional tabs, and 
   assert.match(source, /id="hero-leaf-resources-list"/, 'Must contain #hero-leaf-resources-list');
   assert.match(source, /aggregateHeroLeafEquipment/, 'Must import and use aggregateHeroLeafEquipment');
   assert.match(source, /selectedLeafResource/, 'Must compute selectedLeafResource');
+  assert.match(source, /id="hero-recipe-slot-picker"/, 'Must contain #hero-recipe-slot-picker to switch gear slots under hero');
+  assert.match(source, /selectHeroGear/, 'Must have selectHeroGear to pick specific equipment slot for recipe tree');
+  assert.match(source, /viewGearRecipeTree/, 'Must have viewGearRecipeTree to jump from hero leaf resources to recipe tree');
 });

@@ -2,6 +2,12 @@
 import UnitStars from '@/src/components/common/UnitStars.vue';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import {
+  isTopModal,
+  registerModalOpen,
+  registerModalClose,
+  getModalStackLevel,
+} from '@/src/composables/useModals';
 import { getHeroMetadata } from '@/src/utils/metadata';
 import { observedDraftChoices } from '@/src/utils/popupData';
 import { formatNumber } from '@/src/utils/formatters';
@@ -224,12 +230,17 @@ function getStarGlow(star?: number | null): string {
   return 'ring-2 ring-rose-500 shadow-rose-500/50';
 }
 
+const stackLevel = computed(() => getModalStackLevel('draft'));
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    if (!isTopModal('draft')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -238,9 +249,11 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      registerModalOpen('draft');
       document.addEventListener('keydown', handleKeydown);
       loadDraftCandidatesFromStorage();
     } else {
+      registerModalClose('draft');
       document.removeEventListener('keydown', handleKeydown);
     }
   },
@@ -252,6 +265,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  registerModalClose('draft');
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -286,7 +300,8 @@ function handleImgError(e: Event) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="draft-modal-title"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
+      :style="{ zIndex: stackLevel }"
+      class="fixed inset-0 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
 
     >
       <div

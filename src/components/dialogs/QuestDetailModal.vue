@@ -36,12 +36,19 @@ watch(
   { immediate: true }
 );
 
+const getModalStackHelper = () => (typeof globalThis !== 'undefined' ? (globalThis as any).__hwaModalStack : null);
+const stackLevel = computed(() => getModalStackHelper()?.getModalStackLevel?.('questDetail') ?? 50);
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    const helper = getModalStackHelper();
+    if (helper && !helper.isTopModal?.('questDetail')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -50,14 +57,17 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      getModalStackHelper()?.registerModalOpen?.('questDetail');
       document.addEventListener('keydown', handleKeydown);
     } else {
+      getModalStackHelper()?.registerModalClose?.('questDetail');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
 );
 
 onUnmounted(() => {
+  getModalStackHelper()?.registerModalClose?.('questDetail');
   document.removeEventListener('keydown', handleKeydown);
 });
 
@@ -335,7 +345,8 @@ async function claimQuest(qId: string | number) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="quest-detail-dialog-title"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
+      :style="{ zIndex: stackLevel }"
+      class="fixed inset-0 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
 
     >
       <div

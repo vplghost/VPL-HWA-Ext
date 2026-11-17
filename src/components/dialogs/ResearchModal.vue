@@ -17,6 +17,12 @@ import {
   researchData as researchDataTyped,
   researchDataHelper,
 } from '@/src/data/researchData';
+import {
+  isTopModal,
+  registerModalOpen,
+  registerModalClose,
+  getModalStackLevel,
+} from '@/src/composables/useModals';
 import { researchQueueService } from '@/src/services/queues/researchQueue';
 
 const rHelper = researchDataHelper;
@@ -127,6 +133,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  registerModalClose('research');
   document.removeEventListener('keydown', handleKeydown);
   if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     try {
@@ -135,12 +142,17 @@ onUnmounted(() => {
   }
 });
 
+const stackLevel = computed(() => getModalStackLevel('research'));
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    if (!isTopModal('research')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -149,8 +161,10 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      registerModalOpen('research');
       document.addEventListener('keydown', handleKeydown);
     } else {
+      registerModalClose('research');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
@@ -601,7 +615,8 @@ async function refreshResearch() {
     role="dialog"
     aria-modal="true"
     aria-labelledby="research-dialog-title"
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+    :style="{ zIndex: stackLevel }"
+    class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
 
   >
     <div

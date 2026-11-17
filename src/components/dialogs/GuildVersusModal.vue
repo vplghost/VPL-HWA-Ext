@@ -143,8 +143,15 @@ function close() {
   emit('update:modelValue', false);
 }
 
+const getModalStackHelper = () => (typeof globalThis !== 'undefined' ? (globalThis as any).__hwaModalStack : null);
+const stackLevel = computed(() => getModalStackHelper()?.getModalStackLevel?.('guildVersus') ?? 50);
+
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    const helper = getModalStackHelper();
+    if (helper && !helper.isTopModal?.('guildVersus')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -153,14 +160,17 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      getModalStackHelper()?.registerModalOpen?.('guildVersus');
       document.addEventListener('keydown', handleKeydown);
     } else {
+      getModalStackHelper()?.registerModalClose?.('guildVersus');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
 );
 
 onUnmounted(() => {
+  getModalStackHelper()?.registerModalClose?.('guildVersus');
   document.removeEventListener('keydown', handleKeydown);
 });
 </script>
@@ -173,7 +183,8 @@ onUnmounted(() => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="gvs-modal-title"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
+      :style="{ zIndex: stackLevel }"
+      class="fixed inset-0 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
 
     >
       <div

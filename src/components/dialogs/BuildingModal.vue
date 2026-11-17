@@ -15,6 +15,12 @@ import {
   buildingLevelsData as buildingLevelsDataTyped,
   buildingDataHelper,
 } from '@/src/data/buildingData';
+import {
+  isTopModal,
+  registerModalOpen,
+  registerModalClose,
+  getModalStackLevel,
+} from '@/src/composables/useModals';
 import { buildingQueueService } from '@/src/services/queues/buildingQueue';
 
 const bHelper = buildingDataHelper;
@@ -119,6 +125,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  registerModalClose('building');
   document.removeEventListener('keydown', handleKeydown);
   if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     try {
@@ -127,12 +134,17 @@ onUnmounted(() => {
   }
 });
 
+const stackLevel = computed(() => getModalStackLevel('building'));
+
 function close() {
   emit('update:modelValue', false);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
+    if (!isTopModal('building')) return;
+    e.stopPropagation?.();
+    e.stopImmediatePropagation?.();
     close();
   }
 }
@@ -141,8 +153,10 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      registerModalOpen('building');
       document.addEventListener('keydown', handleKeydown);
     } else {
+      registerModalClose('building');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
@@ -507,7 +521,8 @@ async function refreshBuildings() {
     role="dialog"
     aria-modal="true"
     aria-labelledby="building-dialog-title"
-    class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+    :style="{ zIndex: stackLevel }"
+    class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
 
   >
     <div
