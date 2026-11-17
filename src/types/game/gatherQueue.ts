@@ -76,5 +76,6 @@ export interface SmartGatherState {
   lastAutoMineType?: string;
   reservation?: any;
   readTimeout?: { key: string; attempts: number };
+  marchLimitBackoffUntil?: number;
   [key: string]: any;
 }

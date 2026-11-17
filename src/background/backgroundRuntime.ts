@@ -2001,15 +2001,23 @@ export async function evaluateSmartGather(
     reason = 'Waiting for rally team to return before resuming gathering';
   } else if (!state.error) {
     if (state.reservation?.type === 'rally') state.reservation = null;
-    const plan = autoGatherService.planAutoGather(cache, { ...stored, smartGatherState: state }, now);
-    reason = plan.reason || (plan.action === 'gather' ? 'Dispatching gathering squad' : 'Searching for resource mine');
-    calls = plan.calls || (plan.call ? [plan.call] : []);
-    if (calls.length && now - (state.lastPlanAt || 0) < 5000) calls = [];
-    if (calls.length) calls = passiveMarchReads(cache, calls, now);
-    if (calls.length) {
-      state.lastPlanAt = now;
-      if (plan.nearest) state.nearest = plan.nearest;
-      state.pending = { ...plan.pending, call: calls[0], sentAt: now, expiresAt: now + 30000, phase: 'sent' };
+    if (state.marchLimitBackoffUntil && now < state.marchLimitBackoffUntil) {
+      reason = 'Server march limit reached (MarchLimitExceeded); waiting for squad return';
+      if (now - (state.lastRefreshAt || 0) >= 5000) {
+        calls = [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }];
+        state.lastRefreshAt = now;
+      }
+    } else {
+      const plan = autoGatherService.planAutoGather(cache, { ...stored, smartGatherState: state }, now);
+      reason = plan.reason || (plan.action === 'gather' ? 'Dispatching gathering squad' : 'Searching for resource mine');
+      calls = plan.calls || (plan.call ? [plan.call] : []);
+      if (calls.length && now - (state.lastPlanAt || 0) < 5000) calls = [];
+      if (calls.length) calls = passiveMarchReads(cache, calls, now);
+      if (calls.length) {
+        state.lastPlanAt = now;
+        if (plan.nearest) state.nearest = plan.nearest;
+        state.pending = { ...plan.pending, call: calls[0], sentAt: now, expiresAt: now + 30000, phase: 'sent' };
+      }
     }
   }
   const retriedRead = state.readTimeout && calls.some((c) => c.name + ':' + (c.feature || '') === state.readTimeout?.key);

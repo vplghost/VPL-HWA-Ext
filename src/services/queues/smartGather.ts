@@ -444,7 +444,7 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
 
   if (
     !state.pending &&
-    (/^(getMineById|attackMine) rejected by game: MineNotFound; restart Smart gathering to retry$/.test(state.error || '') ||
+    (/^(getMineById|attackMine) rejected by game: (MineNotFound|MarchLimitExceeded); restart Smart gathering to retry$/.test(state.error || '') ||
       /^getRallyById rejected by game:/.test(state.error || ''))
   ) {
     delete state.error;
@@ -454,6 +454,10 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
       expiresAt: now + 5000,
       message: 'Resuming gathering; checking available targets',
     };
+  }
+
+  if (state.marchLimitBackoffUntil && now >= state.marchLimitBackoffUntil) {
+    delete state.marchLimitBackoffUntil;
   }
 
   const pending = state.pending;
@@ -479,6 +483,16 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
         at: now,
         expiresAt: now + 5000,
         message: `Rally no longer available (${failure}); resuming gathering`,
+      };
+      return state;
+    }
+    if (failure === 'MarchLimitExceeded') {
+      delete state.error;
+      state.marchLimitBackoffUntil = now + 15000;
+      state.notice = {
+        at: now,
+        expiresAt: now + 30000,
+        message: 'Server march limit reached (MarchLimitExceeded); waiting for squad return',
       };
       return state;
     }

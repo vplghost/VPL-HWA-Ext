@@ -210,6 +210,16 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
   if (smart && smart.activeQueue(stored)) {
     return { action: 'wait', reason: 'Gathering paused while raid/monster queue is active' };
   }
+  if (
+    smart &&
+    stored?.smartGatherState?.marchLimitBackoffUntil &&
+    now < stored.smartGatherState.marchLimitBackoffUntil
+  ) {
+    return {
+      action: 'wait',
+      reason: 'Server march limit reached (MarchLimitExceeded); waiting for squad return',
+    };
+  }
   const resume = smart?.resumePlan(cache, stored?.smartGatherState, now);
   if (resume && resume.action !== 'target') return snapshotRefresh || resume;
 
