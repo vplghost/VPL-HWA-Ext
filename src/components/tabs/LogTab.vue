@@ -128,10 +128,10 @@ async function handleDraftLoggingToggle() {
   try {
     await chrome.storage.local.set({ legendDraftLoggingEnabled: legendDraftLoggingEnabled.value });
     draftLogStatus.value = legendDraftLoggingEnabled.value
-      ? 'Đã bật ghi log phiên Draft (randomDraft). Các gói RPC và bộ nhớ WebAssembly sẽ được ghi lại.'
-      : 'Đã tắt ghi log phiên Draft.';
+      ? 'Draft session logging enabled. RPC steps and WebAssembly memory scans will be recorded.'
+      : 'Draft session logging disabled.';
   } catch (err: any) {
-    draftLogStatus.value = `Lỗi cập nhật cài đặt: ${err?.message || err}`;
+    draftLogStatus.value = `Failed to update settings: ${err?.message || err}`;
   }
 }
 
@@ -143,21 +143,45 @@ async function exportDraftLog() {
       'legendDraftHookTelemetry',
       'rpcCache'
     ]);
+    const logs = Array.isArray(stored.legendDraftSessionLog) ? stored.legendDraftSessionLog : [];
+    let matchId = stored.rpcCache?.legendDraft?.matchId ||
+      stored.rpcCache?.legendDraftStatus?.data?.matchId ||
+      stored.legendDraftHookTelemetry?.matchId || null;
+    if (!matchId && logs.length > 0) {
+      for (let i = logs.length - 1; i >= 0; i--) {
+        const l = logs[i];
+        const m = l.out?.matchId || l.in?.matchId || l.matchId;
+        if (m) { matchId = m; break; }
+      }
+    }
+
+    let candidates = stored.rpcCache?.legendDraft?.candidates ||
+      stored.legendDraftHookTelemetry?.topCandidateIds || [];
+    if ((!Array.isArray(candidates) || candidates.length === 0) && logs.length > 0) {
+      for (let i = logs.length - 1; i >= 0; i--) {
+        const l = logs[i];
+        if (Array.isArray(l.topCandidateIds) && l.topCandidateIds.length > 0) {
+          candidates = l.topCandidateIds;
+          break;
+        }
+      }
+    }
+
     const payload = {
       _format: 'hwa-legend-draft-session-log',
-      _version: 1,
+      _version: 2,
       _exportedAt: new Date().toISOString(),
-      matchId: stored.rpcCache?.legendDraft?.matchId || null,
-      candidates: stored.rpcCache?.legendDraft?.candidates || [],
+      matchId,
+      candidates,
       lastTelemetry: stored.legendDraftHookTelemetry || null,
-      entriesCount: Array.isArray(stored.legendDraftSessionLog) ? stored.legendDraftSessionLog.length : 0,
-      logs: stored.legendDraftSessionLog || []
+      entriesCount: logs.length,
+      logs
     };
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
     downloadJson(`hwa-legend-draft-session-${dateStr}.json`, payload);
-    draftLogStatus.value = `Đã xuất ${payload.entriesCount} dòng log phiên draft ra tệp JSON thành công!`;
+    draftLogStatus.value = `Exported ${payload.entriesCount} draft log lines to JSON successfully!`;
   } catch (err: any) {
-    draftLogStatus.value = `Xuất draft log thất bại: ${err?.message || err}`;
+    draftLogStatus.value = `Failed to export draft log: ${err?.message || err}`;
   }
 }
 
@@ -166,9 +190,9 @@ async function clearDraftLog() {
   try {
     await chrome.storage.local.set({ legendDraftSessionLog: [] });
     draftLogsCount.value = 0;
-    draftLogStatus.value = 'Đã xóa toàn bộ log phiên draft hiện tại.';
+    draftLogStatus.value = 'Cleared all current draft session logs.';
   } catch (err: any) {
-    draftLogStatus.value = `Xóa draft log thất bại: ${err?.message || err}`;
+    draftLogStatus.value = `Failed to clear draft log: ${err?.message || err}`;
   }
 }
 
@@ -334,7 +358,7 @@ onUnmounted(() => {
               </span>
             </div>
             <p class="text-[10px] text-slate-400">
-              Ghi nhận các gói tin RPC và quét bộ nhớ WebAssembly (Unity HEAPU8/HEAPU32) ở phiên draft hiện tại
+              Capture RPC transactions (inputs & outputs) and WebAssembly memory scans (Unity HEAPU8/HEAPU32) for current draft session
             </p>
           </div>
         </div>
@@ -350,7 +374,7 @@ onUnmounted(() => {
           />
           <div class="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600 relative"></div>
           <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">
-            {{ legendDraftLoggingEnabled ? 'Bật Ghi Log Draft' : 'Tắt Ghi Log Draft' }}
+            {{ legendDraftLoggingEnabled ? 'Draft Logging Enabled' : 'Draft Logging Disabled' }}
           </span>
         </label>
       </div>
@@ -358,8 +382,8 @@ onUnmounted(() => {
       <!-- Action Row -->
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="text-[11px] text-slate-500">
-          <span v-if="lastDraftMatchId">Trận Draft gần nhất: <code class="font-mono font-semibold text-slate-700 dark:text-slate-300">#{{ lastDraftMatchId }}</code></span>
-          <span v-else>Chưa có dữ liệu trận draft nào trong phiên làm việc này.</span>
+          <span v-if="lastDraftMatchId">Latest Draft match: <code class="font-mono font-semibold text-slate-700 dark:text-slate-300">#{{ lastDraftMatchId }}</code></span>
+          <span v-else>No draft match recorded in this session yet.</span>
         </div>
 
         <div class="flex items-center gap-2">

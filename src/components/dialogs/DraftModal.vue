@@ -119,9 +119,54 @@ const observedChoices = computed(() => {
   return observedDraftChoices(matchId.value);
 });
 
+const hookCandidates = ref<number[]>([]);
+const isScanning = ref(false);
+
+async function loadDraftCandidatesFromStorage() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const stored = await chrome.storage.local.get(['legendDraftHookTelemetry', 'rpcCache']);
+      const tele = stored.legendDraftHookTelemetry;
+      if (Array.isArray(tele?.topCandidateIds) && tele.topCandidateIds.length > 0) {
+        hookCandidates.value = tele.topCandidateIds;
+      }
+      const c = stored.rpcCache?.legendDraft?.candidates;
+      if (Array.isArray(c) && c.length > 0) {
+        hookCandidates.value = c;
+      }
+    } catch (_) {}
+  }
+}
+
+async function triggerManualScan() {
+  if (isScanning.value) return;
+  isScanning.value = true;
+  try {
+    if (typeof chrome !== 'undefined' && chrome.tabs?.query) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const tab = tabs[0];
+        if (tab?.id) {
+          chrome.tabs.sendMessage(tab.id, { kind: 'legend-draft-scan' }).catch(() => {});
+        }
+      });
+    }
+    if (typeof window !== 'undefined') {
+      window.postMessage({ source: 'hwa-helper-control', kind: 'legend-draft-scan' }, '*');
+    }
+    await new Promise((r) => setTimeout(r, 600));
+    await loadDraftCandidatesFromStorage();
+  } finally {
+    isScanning.value = false;
+  }
+}
+
 const poolCandidates = computed<number[]>(() => {
-  const raw = (cache.value as any).legendDraft?.candidates;
-  return Array.isArray(raw) ? raw : [];
+  const fromCache = (cache.value as any).legendDraft?.candidates;
+  if (Array.isArray(fromCache) && fromCache.length > 0) return fromCache;
+  const fromDraftStatus = (cache.value as any).legendDraftStatus?.data?.candidates;
+  if (Array.isArray(fromDraftStatus) && fromDraftStatus.length > 0) return fromDraftStatus;
+  if (hookCandidates.value.length > 0) return hookCandidates.value;
+  return [];
 });
 
 const lastError = computed(() => draftStatus.value.lastError || null);
@@ -131,9 +176,22 @@ const lastErrorAction = computed(() => draftStatus.value.lastErrorAction || null
 const isRefreshing = ref(false);
 
 async function refreshDraft() {
+  if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
     await dispatchRpc([{ name: 'randomDraft_getInfo' }]);
+    if (typeof chrome !== 'undefined' && chrome.tabs?.query) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const tab = tabs[0];
+        if (tab?.id) {
+          chrome.tabs.sendMessage(tab.id, { kind: 'legend-draft-scan' }).catch(() => {});
+        }
+      });
+    }
+    await new Promise((r) => setTimeout(r, 400));
+    await loadDraftCandidatesFromStorage();
+  } catch (err) {
+    console.error('Failed to refresh Draft info:', err);
   } finally {
     isRefreshing.value = false;
   }
@@ -181,11 +239,17 @@ watch(
   (open) => {
     if (open) {
       document.addEventListener('keydown', handleKeydown);
+      loadDraftCandidatesFromStorage();
     } else {
       document.removeEventListener('keydown', handleKeydown);
     }
-  }
+  },
+  { immediate: true }
 );
+
+onMounted(() => {
+  loadDraftCandidatesFromStorage();
+});
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
@@ -606,7 +670,6 @@ function handleImgError(e: Event) {
 
           <!-- Candidate Hero Pool -->
           <div
-            v-if="poolCandidates.length > 0"
             id="draft-candidate-pool"
             class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60"
           >
@@ -614,12 +677,27 @@ function handleImgError(e: Event) {
               <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                 <span>🏊</span> Candidate Hero Pool
               </h3>
-              <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                {{ poolCandidates.length }} heroes
-              </span>
+              <div class="flex items-center gap-2">
+                <span
+                  v-if="poolCandidates.length > 0"
+                  class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                >
+                  {{ poolCandidates.length }} heroes
+                </span>
+                <button
+                  type="button"
+                  id="draft-scan-memory-btn"
+                  class="px-2.5 py-1 rounded text-2xs font-bold bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-950/80 dark:hover:bg-red-900 dark:text-red-300 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                  :disabled="isScanning"
+                  title="Scan WebAssembly memory (HEAPU8/HEAPU32) for candidate hero array"
+                  @click="triggerManualScan"
+                >
+                  <span>🔍</span> {{ isScanning ? 'Scanning...' : 'Scan Memory' }}
+                </button>
+              </div>
             </div>
 
-            <div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
+            <div v-if="poolCandidates.length > 0" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
               <div
                 v-for="cId in poolCandidates"
                 :key="'candidate-' + cId"
@@ -639,6 +717,10 @@ function handleImgError(e: Event) {
                 </div>
                 <span class="font-medium text-slate-800 dark:text-slate-200">{{ getHeroName(cId) }}</span>
               </div>
+            </div>
+
+            <div v-else class="text-xs text-slate-400 dark:text-slate-500 italic p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg flex items-center justify-between">
+              <span>No draft candidate heroes detected yet. Enter Legend Draft match in game or click Scan Memory.</span>
             </div>
           </div>
         </div>

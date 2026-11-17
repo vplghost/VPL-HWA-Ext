@@ -492,31 +492,37 @@ export function installMqttCapture(customWindow?: any): void {
           );
           if (isDraftLogging) {
             const payloadInfo = describePayload(packet.payload);
-            const entry = {
-              type: 'mqtt-packet',
-              timestamp: getNow(),
-              direction,
-              topic: packet.topic,
-              qos: packet.qos,
-              ...payloadInfo
-            };
-            if (typeof win.__hwaLegendDraftHook?.emitDraftLog === 'function') {
-              win.__hwaLegendDraftHook.emitDraftLog(entry);
-            } else {
-              try {
-                win.postMessage(
-                  {
-                    source: 'hwa-helper-api',
-                    kind: 'legend-draft-log-entry',
-                    entry: {
-                      ...entry,
-                      id: `draft-log-${getNow()}-${Math.random().toString(36).slice(2, 7)}`,
-                      isoTime: new Date().toISOString()
-                    }
-                  },
-                  loc.origin
-                );
-              } catch (_) {}
+            const isDraftMqtt =
+              /draft/i.test(packet.topic || '') ||
+              payloadInfo.eventType?.startsWith('randomDraft_') ||
+              (typeof payloadInfo.payload === 'string' && /randomDraft/i.test(payloadInfo.payload));
+            if (isDraftMqtt) {
+              const entry = {
+                type: 'mqtt-packet',
+                timestamp: getNow(),
+                direction,
+                topic: packet.topic,
+                qos: packet.qos,
+                ...payloadInfo
+              };
+              if (typeof win.__hwaLegendDraftHook?.emitDraftLog === 'function') {
+                win.__hwaLegendDraftHook.emitDraftLog(entry);
+              } else {
+                try {
+                  win.postMessage(
+                    {
+                      source: 'hwa-helper-api',
+                      kind: 'legend-draft-log-entry',
+                      entry: {
+                        ...entry,
+                        id: `draft-log-${getNow()}-${Math.random().toString(36).slice(2, 7)}`,
+                        isoTime: new Date().toISOString()
+                      }
+                    },
+                    loc.origin
+                  );
+                } catch (_) {}
+              }
             }
           }
         }

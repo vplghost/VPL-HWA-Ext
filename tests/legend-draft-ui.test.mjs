@@ -690,6 +690,8 @@ test('DraftModal tracks match status, live timer, opponent profile, and match re
   // Candidate Hero Pool & Error Logging
   assert.match(code, /id="draft-candidate-pool"/, 'Must have #draft-candidate-pool element');
   assert.match(code, /poolCandidates/, 'Must track poolCandidates');
+  assert.match(code, /id="draft-scan-memory-btn"/, 'Must have #draft-scan-memory-btn');
+  assert.match(code, /triggerManualScan/, 'Must support manual memory scan');
   assert.match(code, /id="draft-server-error"/, 'Must have #draft-server-error element');
   assert.match(code, /lastError/, 'Must track lastError');
   assert.match(code, /id="draft-refresh-btn"/, 'Must have #draft-refresh-btn');

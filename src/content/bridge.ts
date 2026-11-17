@@ -283,15 +283,18 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     if (event.data.kind === 'legend-draft-hook-result' && event.data.payload) {
       try {
         win.chrome?.storage?.local?.set?.({ legendDraftHookTelemetry: event.data.payload });
-        if (Array.isArray(event.data.payload.topCandidateIds) && event.data.payload.topCandidateIds.length >= 15) {
-          win.chrome?.storage?.local?.get?.('rpcCache')?.then?.((stored: any) => {
-            const cache = stored?.rpcCache || {};
-            if (!cache.legendDraft) cache.legendDraft = {};
+        win.chrome?.storage?.local?.get?.(['rpcCache', 'legendDraftStatus'])?.then?.((stored: any) => {
+          const cache = stored?.rpcCache || {};
+          if (!cache.legendDraft) cache.legendDraft = {};
+          if (Array.isArray(event.data.payload.topCandidateIds) && event.data.payload.topCandidateIds.length > 0) {
             cache.legendDraft.candidates = event.data.payload.topCandidateIds;
             cache.legendDraft.candidatesDiscoveredAt = new Date().toISOString();
-            win.chrome?.storage?.local?.set?.({ rpcCache: cache });
-          })?.catch?.(() => {});
-        }
+          }
+          if (event.data.payload.matchId) {
+            cache.legendDraft.matchId = event.data.payload.matchId;
+          }
+          win.chrome?.storage?.local?.set?.({ rpcCache: cache });
+        })?.catch?.(() => {});
       } catch (_) {}
       return;
     }
@@ -392,6 +395,14 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
           kind: 'draft-action',
           action: message.action,
           heroes: message.heroes
+        }, win.location.origin);
+        sendResponse?.({ ok: true });
+        return true;
+      }
+      if (message?.kind === 'legend-draft-scan') {
+        win.postMessage({
+          source: 'hwa-helper-control',
+          kind: 'legend-draft-scan'
         }, win.location.origin);
         sendResponse?.({ ok: true });
         return true;
