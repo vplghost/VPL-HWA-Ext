@@ -202,6 +202,7 @@ export function installInterceptor(customWindow?: any): void {
     'mission_raid',
     'heroUpgradeSkill',
     'heroInsertItem',
+    'heroPromote',
     'inventoryCraftFragments',
     'inventoryCraftRecipe',
     'cinemaGiveReward',

@@ -414,6 +414,21 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
           users: user ? { [String(userId)]: user } : {}
         }, 'clan')];
       }
+      if (type === 'newMail' && body.letter && typeof body.letter === 'object') {
+        const letter = {
+          ...body.letter,
+          createdAt: Number.isFinite(body.pushTs) ? body.pushTs * 1000 : Date.parse(record.timestamp)
+        };
+        const actions = [entry('mailStatus', 'header', { letters: [letter] }, 'letter')];
+        if (body.letter.type === 'promoteGift' && body.letter.params?.hero && body.letter.params?.toColor) {
+          actions.push(entry('heroPromoteAction', 'internal', {
+            heroId: body.letter.params.hero,
+            toColor: body.letter.params.toColor,
+            token: `mqtt:${body.pushId || record.timestamp}:heroPromote:${body.letter.params.hero}:${body.letter.params.toColor}`
+          }));
+        }
+        return actions;
+      }
       if (type === 'newReport' && typeof body.reportId === 'string') {
         return [entry('mailStatus', 'header', { reports: [{
           id: body.reportId, type: body.type || null, read: false,
@@ -1280,6 +1295,20 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
                 heroId: call.args.heroId,
                 slot: call.args.slot,
                 token: `${call.ident || record.timestamp}:heroEquip:${call.args.heroId}:${call.args.slot}`
+              },
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'heroPromote' && Number.isInteger(call.args?.heroId) && result && !result.error) {
+            return [{
+              key: 'heroPromoteAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                heroId: call.args.heroId,
+                quests: Array.isArray(result?.quests) ? result.quests : null,
+                token: `${call.ident || record.timestamp}:heroPromote:${call.args.heroId}`
               },
               updatedAt: record.timestamp
             }];
@@ -3630,6 +3659,59 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
                 updatedAt: entry.updatedAt
               };
             }
+          }
+
+          const history = { ...seen, [entry.data.token]: entry.updatedAt };
+          const tokens = Object.keys(history).sort((a, b) => history[b].localeCompare(history[a]));
+          for (const token of tokens.slice(500)) delete history[token];
+          next.resourceActionHistory = {
+            key: 'resourceActionHistory',
+            method: entry.method,
+            feature: null,
+            group: 'internal',
+            data: history,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'heroPromoteAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.heroId) continue;
+          const heroId = String(entry.data.heroId);
+          const heroSnap = next.heroGetAll?.data?.[heroId];
+
+          if (heroSnap) {
+            const curColor = Number(heroSnap.color) || 1;
+            const nextColor = entry.data.toColor ? Number(entry.data.toColor) : (curColor + 1);
+            const nextSlots = Array.isArray(heroSnap.slots) ? [] : {};
+            next.heroGetAll = {
+              ...next.heroGetAll,
+              data: {
+                ...next.heroGetAll.data,
+                [heroId]: {
+                  ...heroSnap,
+                  color: nextColor,
+                  slots: nextSlots
+                }
+              }
+            };
+          }
+
+          if (Array.isArray(entry.data.quests) && entry.data.quests.length > 0 && next.questGetAll?.data) {
+            const existingQuests = Array.isArray(next.questGetAll.data)
+              ? [...next.questGetAll.data]
+              : (next.questGetAll.data.quests ? [...next.questGetAll.data.quests] : []);
+            const questMap = new Map(existingQuests.map((q: any) => [q.id, q]));
+            for (const q of entry.data.quests) {
+              if (q && q.id) questMap.set(q.id, { ...(questMap.get(q.id) || {}), ...q });
+            }
+            const mergedList = Array.from(questMap.values());
+            next.questGetAll = {
+              ...next.questGetAll,
+              data: Array.isArray(next.questGetAll.data) ? mergedList : { ...next.questGetAll.data, quests: mergedList },
+              updatedAt: entry.updatedAt
+            };
           }
 
           const history = { ...seen, [entry.data.token]: entry.updatedAt };

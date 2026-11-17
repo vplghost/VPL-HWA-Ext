@@ -1136,9 +1136,15 @@ test('ResourceSummary and HeroDetailModal use accurate RPC keys and payload conv
   const interceptContent = await readFile(join(root, 'src/content/interceptor.ts'), 'utf8');
   assert.match(interceptContent, /'heroUpgradeSkill'/, 'intercept.js helperActionMethods must include heroUpgradeSkill');
   assert.match(interceptContent, /'heroInsertItem'/, 'intercept.js helperActionMethods must include heroInsertItem');
+  assert.match(interceptContent, /'heroPromote'/, 'intercept.js helperActionMethods must include heroPromote');
   assert.match(interceptContent, /'inventoryCraftFragments'/, 'intercept.js helperActionMethods must include inventoryCraftFragments');
   assert.match(heroDetailModalContent, /name:\s*['"]heroInsertItem['"]/, 'HeroDetailModal must dispatch heroInsertItem');
   assert.match(heroDetailModalContent, /handleEquip/, 'HeroDetailModal must have handleEquip function');
+  assert.match(heroDetailModalContent, /canPromote/, 'HeroDetailModal must compute canPromote');
+  assert.match(heroDetailModalContent, /handlePromote/, 'HeroDetailModal must implement handlePromote');
+  assert.match(heroDetailModalContent, /name:\s*['"]heroPromote['"]/, 'HeroDetailModal must dispatch heroPromote');
+  assert.match(heroDetailModalContent, /id="hero-promote-btn"/, 'HeroDetailModal must feature #hero-promote-btn');
+  assert.match(heroDetailModalContent, /id="hero-promote-banner"/, 'HeroDetailModal must feature #hero-promote-banner');
 });
 
 test('RaidModal and MonsterModal update title status with dynamic timer countdown and data-experimental-until', async () => {

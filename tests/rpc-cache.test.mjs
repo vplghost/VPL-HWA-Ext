@@ -2917,3 +2917,87 @@ test('merge safely handles soloAttackResults, specialQuest, and dungeon with obj
     assert.ok(Array.isArray(res2.specialQuestStatus.data.events), 'specialQuestStatus.events is array');
   });
 });
+
+test('heroPromote advances hero equipment rank color, clears slots, and updates quests', () => {
+  const initial = {
+    heroGetAll: {
+      updatedAt: '2026-11-17T12:00:00.000Z',
+      data: {
+        '37': {
+          id: 37,
+          color: 5,
+          slots: [0, 0, 0, 0, 0, 0],
+          power: 12500
+        }
+      }
+    },
+    questGetAll: {
+      updatedAt: '2026-11-17T12:00:00.000Z',
+      data: [
+        { id: 132, state: 2, progress: 26, reward: { gold: 40000 } }
+      ]
+    }
+  };
+
+  const promoteRecord = record(
+    [{ name: 'heroPromote', args: { heroId: 37 }, ident: 'promote-37' }],
+    [{ ident: 'promote-37', result: {
+      response: null,
+      quests: [{ id: 132, state: 3, progress: 27, multiplier: 0, reward: { gold: 41000 } }]
+    } }],
+    '2026-11-17T12:42:07.159Z'
+  );
+
+  const merged = cache.merge(initial, [promoteRecord]).cache;
+  const hero = merged.heroGetAll.data['37'];
+  assert.equal(hero.color, 6);
+  assert.deepEqual(hero.slots, []);
+  assert.equal(merged.questGetAll.data[0].progress, 27);
+  assert.equal(merged.questGetAll.data[0].state, 3);
+});
+
+test('MQTT newMail promoteGift advances hero equipment rank and records letter in mailStatus', () => {
+  const initial = {
+    heroGetAll: {
+      updatedAt: '2026-11-17T12:00:00.000Z',
+      data: {
+        '37': {
+          id: 37,
+          color: 5,
+          slots: [0, 0, 0, 0, 0, 0]
+        }
+      }
+    }
+  };
+
+  const mqttRecord = {
+    transport: 'websocket',
+    direction: 'received',
+    encoding: 'utf8',
+    endpoint: 'wss://emqx-hwmb-wss.nextersglobal.com/mqtt',
+    timestamp: '2026-11-17T12:42:07.213Z',
+    payload: JSON.stringify({
+      method: 'msg',
+      result: {
+        type: 'newMail',
+        body: {
+          letter: {
+            id: 3439380018,
+            type: 'promoteGift',
+            senderId: -3,
+            params: { hero: 37, fromColor: 5, toColor: 6 },
+            reward: { starmoney: 10 },
+            read: 0,
+            ctime: 1794919327
+          }
+        }
+      }
+    })
+  };
+
+  const merged = cache.merge(initial, [mqttRecord]).cache;
+  const hero = merged.heroGetAll.data['37'];
+  assert.equal(hero.color, 6);
+  assert.deepEqual(hero.slots, []);
+  assert.ok(merged.mailStatus.data.letters.some((l) => l.id === 3439380018));
+});

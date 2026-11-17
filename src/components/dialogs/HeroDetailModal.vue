@@ -363,6 +363,38 @@ const equipmentSlots = computed<EquipmentSlotStatus[]>(() => {
 
 const isCrafting = ref<Record<number, boolean>>({});
 const isEquipping = ref<Record<number, boolean>>({});
+const isPromoting = ref(false);
+
+const canPromote = computed(() => {
+  if (!activeHero.value || equipmentSlots.value.length < 6) return false;
+  return equipmentSlots.value.every((slot) => slot.isEquipped);
+});
+
+const nextRank = computed(() => {
+  const curColor = Number(activeHero.value?.color) || 1;
+  return getHeroEquipmentRank(curColor + 1);
+});
+
+async function handlePromote() {
+  if (!activeHero.value || !canPromote.value || isPromoting.value) return;
+  const numId = Number(activeHero.value.id);
+  isPromoting.value = true;
+  try {
+    await dispatchRpc([
+      {
+        name: 'heroPromote',
+        args: { heroId: numId },
+      },
+      { name: 'heroGetAll' },
+      { name: 'inventoryGet' },
+      { name: 'mailGetAll' },
+    ]);
+  } catch (err) {
+    console.error('Failed to promote hero:', err);
+  } finally {
+    isPromoting.value = false;
+  }
+}
 
 async function handleEquip(slot: EquipmentSlotStatus) {
   if (!activeHero.value || slot.isEquipped) return;
@@ -792,6 +824,18 @@ function handleHeroFarmAll() {
 
               <div class="flex items-center gap-2">
                 <button
+                  v-if="canPromote"
+                  id="hero-promote-btn"
+                  type="button"
+                  :disabled="isPromoting"
+                  class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5 animate-pulse disabled:opacity-50"
+                  :title="`All 6 equipment slots equipped! Promote to ${nextRank?.name || 'Next Rank'}`"
+                  @click="handlePromote"
+                >
+                  <span>⬆️</span>
+                  <span>{{ isPromoting ? 'Promoting...' : `Promote to ${nextRank?.name || 'Next Rank'}` }}</span>
+                </button>
+                <button
                   id="hero-farm-all-btn"
                   type="button"
                   class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
@@ -808,6 +852,26 @@ function handleHeroFarmAll() {
                   <span>⚔️</span> Farm Equipment
                 </button>
               </div>
+            </div>
+
+            <!-- Ready to Promote Alert Banner -->
+            <div
+              v-if="canPromote"
+              id="hero-promote-banner"
+              class="p-3 rounded-lg border border-emerald-300 bg-emerald-50/90 dark:border-emerald-800 dark:bg-emerald-950/40 flex items-center justify-between gap-3 text-xs"
+            >
+              <div class="flex items-center gap-2 text-emerald-800 dark:text-emerald-200 font-semibold">
+                <span class="text-base">✨</span>
+                <span>All 6 equipment slots equipped! Ready to advance to <strong>{{ nextRank?.name || 'Next Rank' }}</strong>.</span>
+              </div>
+              <button
+                type="button"
+                :disabled="isPromoting"
+                class="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all disabled:opacity-50 shrink-0"
+                @click="handlePromote"
+              >
+                {{ isPromoting ? 'Promoting...' : 'Promote Now' }}
+              </button>
             </div>
 
             <!-- 6 Slots Grid -->
