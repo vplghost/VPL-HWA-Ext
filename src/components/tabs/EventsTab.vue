@@ -186,12 +186,13 @@ const eventCards = computed<EventCard[]>(() => {
   if (questData?.visibleEvents) {
     for (const event of questData.visibleEvents(cache.value) || []) {
       const title = questData.title(event);
-      const open = event.groups.reduce(
+      const summary = (questData as any).getMilestoneSummary ? (questData as any).getMilestoneSummary(event) : null;
+      const open = summary?.inProgressCount ?? event.groups.reduce(
         (sum: number, group: any) =>
           sum + group.quests.filter((quest: any) => quest.state === 'inProgress').length,
         0
       );
-      const daily = event.groups.filter(
+      const daily = summary?.dailyGroups?.length ?? event.groups.filter(
         (group: any) =>
           group.repeatType === 'daily' && group.quests.some((quest: any) => quest.state === 'inProgress')
       ).length;
@@ -206,9 +207,35 @@ const eventCards = computed<EventCard[]>(() => {
           title,
           open,
           daily,
+          totalMilestones: summary?.totalMilestones ?? 0,
+          completedMilestones: summary?.completedMilestones ?? 0,
+          percent: summary?.percent ?? 0,
+          groups: summary?.groups ?? [],
           endDate: new Date(event.end).toLocaleString(),
         },
         action: () => openModal('questDetail', { selectedQuestFilter: title }),
+      });
+    }
+  }
+
+  // Battle Pass
+  const bpState = (questData as any).getBattlePassState ? (questData as any).getBattlePassState(cache.value) : [];
+  for (const bp of bpState) {
+    if (bp.exp > 0 || bp.farmedNormal > 0) {
+      cards.push({
+        id: `battlePass:${bp.id}`,
+        type: 'battle_pass',
+        title: `🎖️ ${bp.type === 'draft' ? 'Draft Pass' : 'Season Pass'} (#${bp.id})`,
+        searchStr: `battle pass season draft ${bp.id}`.toLowerCase(),
+        data: {
+          id: bp.id,
+          type: bp.type,
+          exp: formatNumber(bp.exp),
+          farmedNormal: bp.farmedNormal,
+          farmedGold: bp.farmedGold,
+          hasGoldenPass: bp.hasGoldenPass,
+          endDate: bp.endTime ? new Date(bp.endTime * 1000).toLocaleString() : 'Active'
+        }
       });
     }
   }
@@ -479,20 +506,61 @@ async function refreshEvents() {
 
         <!-- 6. Special Quest Events -->
         <template v-else-if="c.type === 'special_event'">
-          <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
             <span class="font-bold text-slate-900 dark:text-slate-100 text-sm">{{ c.title }}</span>
             <span class="rounded bg-purple-100 px-1.5 py-0.5 text-3xs font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
               Special Event
             </span>
           </div>
-          <div v-if="c.data.open !== undefined" class="text-xs text-slate-500 dark:text-slate-400">
-            {{ c.data.open }} open milestones · {{ c.data.daily }} daily groups · Ends {{ c.data.endDate }}
+
+          <div v-if="c.data.totalMilestones > 0" class="mb-2">
+            <div class="flex items-center justify-between text-2xs mb-1 text-slate-600 dark:text-slate-400">
+              <span>Milestones Progress: <strong class="text-purple-700 dark:text-purple-300 font-bold">{{ c.data.completedMilestones }}/{{ c.data.totalMilestones }}</strong></span>
+              <span class="font-semibold text-purple-600 dark:text-purple-400">{{ c.data.percent }}%</span>
+            </div>
+            <div class="w-full bg-slate-100 dark:bg-slate-700/60 rounded-full h-1.5 overflow-hidden">
+              <div class="bg-purple-600 dark:bg-purple-500 h-1.5 rounded-full transition-all" :style="{ width: `${c.data.percent}%` }"></div>
+            </div>
+          </div>
+
+          <div v-if="c.data.open !== undefined" class="flex items-center gap-1.5 flex-wrap text-3xs text-slate-500 dark:text-slate-400">
+            <span class="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-slate-600 dark:text-slate-300 font-medium">
+              {{ c.data.open }} open milestones
+            </span>
+            <span v-if="c.data.daily > 0" class="rounded bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 text-amber-700 dark:text-amber-400 font-medium">
+              {{ c.data.daily }} daily groups
+            </span>
+            <span class="text-slate-400 ml-auto">Ends {{ c.data.endDate }}</span>
           </div>
           <div v-else class="text-xs text-slate-500 dark:text-slate-400">
             Event ID: {{ c.data.id }} • Active Special Quests & Rewards
           </div>
           <div class="mt-2 text-right">
-            <span class="text-indigo-600 dark:text-indigo-400 font-semibold text-2xs">View Quests →</span>
+            <span class="text-indigo-600 dark:text-indigo-400 font-semibold text-2xs">View Quests & Rewards →</span>
+          </div>
+        </template>
+
+        <!-- Battle Pass Card -->
+        <template v-else-if="c.type === 'battle_pass'">
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+            <span class="font-bold text-slate-900 dark:text-slate-100 text-sm">{{ c.title }}</span>
+            <span class="rounded bg-amber-100 px-1.5 py-0.5 text-3xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+              Battle Pass
+            </span>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/40 p-2.5 text-xs mb-2">
+            <div>
+              <div class="text-2xs text-slate-500 dark:text-slate-400">Current Points</div>
+              <div class="text-amber-700 dark:text-amber-400 font-bold text-sm">{{ c.data.exp }} EXP</div>
+            </div>
+            <div class="text-right">
+              <div class="text-2xs text-slate-500 dark:text-slate-400">Farmed Rewards</div>
+              <div class="text-slate-800 dark:text-slate-200 font-semibold text-xs">{{ c.data.farmedNormal }} Normal / {{ c.data.farmedGold }} Gold</div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400">
+            <span>Status: <strong class="text-slate-700 dark:text-slate-300">{{ c.data.hasGoldenPass ? 'Golden Pass Active' : 'Free Pass' }}</strong></span>
+            <span>Ends: {{ c.data.endDate }}</span>
           </div>
         </template>
 

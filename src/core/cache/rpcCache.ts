@@ -74,6 +74,8 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
     'getRewardList:clanVersus': 'events',
     'collectResource:resourceProduction': 'header',
     'claimBattlepassRewardAll:battlepass': 'events',
+    battlePass_getAll: 'events',
+    remoteConfigInit: 'internal',
     questGetEvents: 'events',
     clanWarChampInfo_getBriefInfo: 'events',
     'getEventInfo:fortress': 'events',
@@ -1512,6 +1514,18 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
               updatedAt: record.timestamp
             }];
           }
+          if (call.name === 'battlePass_getAll' && result?.response) {
+            return [{
+              key: 'battlepassStatus',
+              method: call.name,
+              feature: call.feature || null,
+              group: 'events',
+              data: {
+                passes: Array.isArray(result.response) ? result.response : []
+              },
+              updatedAt: record.timestamp
+            }];
+          }
         }
         if (call.name === 'getInfo' && call.feature === 'clanVersus' && result?.response) {
           return [{
@@ -1783,10 +1797,32 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
         }
         if (call.name === 'remoteConfigInit' && result?.response?.index?.configs) {
           const configs = result.response.index.configs;
-          return [{ key: 'productionConfigStatus', method: call.name, feature: null,
-            group: 'internal', data: { bonusUrl: configs.bonus?.url,
-              campaignUrl: configs.resourceProductionCampaign?.url },
-            updatedAt: record.timestamp }];
+          return [
+            {
+              key: 'productionConfigStatus', method: call.name, feature: null,
+              group: 'internal', data: { bonusUrl: configs.bonus?.url,
+                campaignUrl: configs.resourceProductionCampaign?.url },
+              updatedAt: record.timestamp
+            },
+            {
+              key: 'remoteConfigStatus', method: call.name, feature: null,
+              group: 'internal', data: {
+                gameTimeShift: result.response.gameTimeShift,
+                specialQuestEventViewUrl: configs.specialQuestEventView?.url,
+                questUrl: configs.quest?.url,
+                questChainUrl: configs.questChain?.url,
+                questConditionUrl: configs.questCondition?.url,
+                battlepassTrackUrl: configs.battlepassTrack?.url,
+                battlepassRewardUrl: configs.battlepassReward?.url,
+                battlepassLevelUrl: configs.battlepassLevel?.url,
+                battlepassViewUrl: configs.battlepassView?.url,
+                battlepassLocalizationUrl: configs.battlepassLocalization?.url,
+                eventHubPopupUrl: configs.eventHubPopup?.url,
+                liveOpsSettingsUrl: configs.liveOpsSettings?.url
+              },
+              updatedAt: record.timestamp
+            }
+          ];
         }
         if (key === 'getSummary:resourceProduction' && Array.isArray(result?.response?.producers)) {
           return [{ key: 'productionStatus', method: call.name, feature: call.feature,
@@ -4423,6 +4459,32 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
             feature: entry.feature,
             group: 'events',
             data: { events: Array.from(evMap.values()) },
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'battlepassStatus') {
+          if (next.battlepassStatus?.updatedAt > entry.updatedAt) continue;
+          next.battlepassStatus = {
+            key: 'battlepassStatus',
+            method: entry.method,
+            feature: entry.feature,
+            group: 'events',
+            data: entry.data,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'remoteConfigStatus') {
+          if (next.remoteConfigStatus?.updatedAt > entry.updatedAt) continue;
+          next.remoteConfigStatus = {
+            key: 'remoteConfigStatus',
+            method: entry.method,
+            feature: entry.feature,
+            group: 'internal',
+            data: entry.data,
             updatedAt: entry.updatedAt
           };
           changed = true;

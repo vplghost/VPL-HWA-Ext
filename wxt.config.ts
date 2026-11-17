@@ -42,6 +42,7 @@ export default defineConfig({
     host_permissions: [
       'https://*.hero-wars-alliance.com/*',
       'https://hero-wars-alliance.com/*',
+      'https://*.nextersglobal.com/*',
     ],
     content_scripts: [
       {

@@ -24,6 +24,7 @@ import { mineDefenseService } from '../services/mineDefense.ts';
 import { worldReadService } from '../services/worldReadService.ts';
 import { experimentalDataHelper } from '../utils/experimentalData.ts';
 import { isTrackingUrl } from '../utils/trackingFilter.ts';
+import { eventCatalogService } from '../services/eventCatalogService.ts';
 
 export const RECORD_STATE_KEY = 'recordingState';
 export const RECORD_PREFIX = 'record:';
@@ -3283,6 +3284,9 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       observeMarchReads(record, cacheResult.cache);
       if (cacheResult.changed) {
         await cr.storage?.local?.set({ rpcCache: cacheResult.cache });
+      }
+      if (cacheResult.cache?.remoteConfigStatus?.data && cr.storage?.local) {
+        eventCatalogService.syncRemoteEventCatalog(cacheResult.cache.remoteConfigStatus.data, cr.storage.local).catch(() => {});
       }
       if (sender.tab?.id) await updateRaidQueue(record, sender.tab.id, cr);
       if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id, cr);

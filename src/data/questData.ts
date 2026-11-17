@@ -2,10 +2,11 @@ import type { DailyQuestDefinition, DailyQuestItem, LocaleTitleInfo, SpecialQues
 
 
   // Game configs: specialQuestEventView, quest_daily, specialQuestEvent_chain, specialQuestEvent_type
-  const defaultHiddenViewIds = [29, 30, 61, 67, 93, 95, 106, 107, 108, 116, 118, 119, 120, 129, 133];
+  const defaultHiddenViewIds = [29, 30, 61, 93, 95, 106, 107, 108, 116, 118, 119, 120, 129, 133];
   const hiddenViewIds: Set<number> = new Set(defaultHiddenViewIds);
 
   const viewTitles: Record<number | string, string> = {
+    8: 'Research Chest LiveOps',
     29: "Wendy's Special Gift",
     30: 'Hero Promotion Milestone',
     65: 'Clan Clash Event',
@@ -19,7 +20,12 @@ import type { DailyQuestDefinition, DailyQuestItem, LocaleTitleInfo, SpecialQues
     127: 'Faction Clash II',
     128: 'Faction Clash III',
     129: 'Relic Pass',
-    133: 'Season Battle Pass'
+    133: 'Season Battle Pass',
+    134: 'Hero’s Way / Season Quests',
+    135: 'Elemental Synergy & Titan Power',
+    136: 'Champions’ Season & Guild Growth',
+    137: 'Trial of Legends & Arena Glory',
+    146: 'Extended Battle Pass'
   };
 
   // BEGIN GENERATED DAILY QUESTS — npm run quests:update
@@ -92,7 +98,17 @@ import type { DailyQuestDefinition, DailyQuestItem, LocaleTitleInfo, SpecialQues
     LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_64: { title: 'Guild Activity & Titanite', category: 'Activities', unit: 'points', amount: 100 },
     LIB_SPECIAL_QUEST_EVENT_NAME_38: { title: 'Hero Ascension Milestones', category: 'Activities', unit: 'tiers', amount: 1 },
     UI_HERO78_TITLE: { title: 'Wodryn Hero Quests', category: 'Activities', unit: 'quests', amount: 1 },
-    LIB_SPECIAL_QUEST_EVENT_NAME_143: { title: 'Tower Floor Progress', category: 'Activities', unit: 'floors', amount: 5 }
+    LIB_SPECIAL_QUEST_EVENT_NAME_143: { title: 'Tower Floor Progress', category: 'Activities', unit: 'floors', amount: 5 },
+    STRATEGIC_BASE_INTERFACE_TROOPS_TRAIN: { title: 'Train Troops in Barracks', category: 'Activities', unit: 'troops', amount: 100 },
+    EVENT_GLORY_NAME_QUEST_1: { title: 'Rising Legend', category: 'Activities', unit: 'points', amount: 1 },
+    EVENT_GLORY_NAME_QUEST_2: { title: 'Trial of Legends', category: 'Activities', unit: 'battles', amount: 1 },
+    LIB_COIN_NAME_18: { title: 'Collect Fairy Dust', category: 'Resources', unit: 'dust', amount: 100 },
+    LIB_SPECIAL_QUEST_EVENT_NAME_969: { title: 'Rune Stones & Enchantment', category: 'Activities', unit: 'stones', amount: 10 },
+    UI_DIALOG_RATING_TAB_CLAN: { title: 'Guild Activity Points', category: 'Activities', unit: 'points', amount: 100 },
+    LIB_CONSUMABLE_NAME_20: { title: 'Spend Titan Potion', category: 'Resources', unit: 'potion', amount: 100 },
+    QUEST_TAB_NAME_HYDRA: { title: 'Fight Hydra Heads', category: 'Activities', unit: 'attacks', amount: 1 },
+    GACHA_LIVEOPS_HEADER: { title: 'Research Chest LiveOps', category: 'Activities', unit: 'chests', amount: 1 },
+    LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TEST_WENDYGIFT: { title: "Wendy's Daily Gift", category: 'Activities', unit: 'gifts', amount: 1 }
   };
 
   const questTemplates: Record<number | string, string> = {
@@ -146,13 +162,23 @@ import type { DailyQuestDefinition, DailyQuestItem, LocaleTitleInfo, SpecialQues
     }
   }
 
-  // Auto-load runtime overrides from storage
+  // Auto-load runtime overrides from storage & live dynamic catalog
   try {
     if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
-      chrome.storage.local.get(['questCatalog', 'questDefinitions']).then((stored) => {
+      chrome.storage.local.get(['questCatalog', 'questDefinitions', 'dynamicEventCatalog']).then((stored) => {
         if (stored?.questCatalog) registerRuntimeDefinitions(stored.questCatalog);
         if (stored?.questDefinitions) registerRuntimeDefinitions(stored.questDefinitions);
+        if (stored?.dynamicEventCatalog) registerRuntimeDefinitions(stored.dynamicEventCatalog);
       }).catch(() => {});
+
+      if (chrome.storage?.onChanged) {
+        chrome.storage.onChanged.addListener((changes: any, area: string) => {
+          if (area === 'local') {
+            if (changes.dynamicEventCatalog?.newValue) registerRuntimeDefinitions(changes.dynamicEventCatalog.newValue);
+            if (changes.questCatalog?.newValue) registerRuntimeDefinitions(changes.questCatalog.newValue);
+          }
+        });
+      }
     }
   } catch (_) {}
 
@@ -232,6 +258,64 @@ import type { DailyQuestDefinition, DailyQuestItem, LocaleTitleInfo, SpecialQues
 
   const isRecognizedQuest = (id: number | string): boolean => Boolean(dailyTitles[String(id)] || questTemplates[id]);
 
+  function getMilestoneSummary(event: any) {
+    const groups = visibleGroups(event) || [];
+    let totalMilestones = 0;
+    let completedMilestones = 0;
+    let inProgressCount = 0;
+    const groupSummaries = groups.map((g: any) => {
+      const qList = Array.isArray(g.quests) ? g.quests : [];
+      const total = qList.length;
+      const completed = qList.filter((q: any) => q.state === 'completed').length;
+      const inProgress = qList.filter((q: any) => q.state === 'inProgress');
+      totalMilestones += total;
+      completedMilestones += completed;
+      inProgressCount += inProgress.length;
+      const activeQuest = inProgress[0] || null;
+      return {
+        groupId: g.id,
+        repeatType: g.repeatType,
+        localeKey: g.localeKey,
+        title: groupTitle(g.localeKey),
+        totalMilestones: total,
+        completedMilestones: completed,
+        activeMilestoneIndex: activeQuest ? (total - inProgress.length + 1) : total,
+        activeProgress: activeQuest?.progress ?? 0,
+        isCompleted: completed >= total && total > 0
+      };
+    });
+    const percent = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
+    return {
+      totalMilestones,
+      completedMilestones,
+      inProgressCount,
+      percent,
+      dailyGroups: groupSummaries.filter(g => g.repeatType === 'daily'),
+      singleGroups: groupSummaries.filter(g => g.repeatType === 'single'),
+      groups: groupSummaries
+    };
+  }
+
+  function getBattlePassState(cache: any) {
+    const rawPasses = cache?.battlepassStatus?.data?.passes ||
+      cache?.battlepassStatus?.passes ||
+      cache?.['battlePass_getAll:events']?.data || [];
+    const list = Array.isArray(rawPasses) ? rawPasses : (rawPasses ? Object.values(rawPasses) : []);
+    return list.map((p: any) => {
+      const farmedNormal = Array.isArray(p.farmedRewards?.normal) ? p.farmedRewards.normal.length : 0;
+      const farmedGold = Array.isArray(p.farmedRewards?.gold) ? p.farmedRewards.gold.length : 0;
+      return {
+        id: p.id,
+        type: p.type || 'regular',
+        exp: Number(p.battlePassExp) || 0,
+        endTime: p.endTime ? Number(p.endTime) : 0,
+        farmedNormal,
+        farmedGold,
+        hasGoldenPass: Boolean(p.goldenPassPurchaseDate && p.goldenPassPurchaseDate > 0)
+      };
+    });
+  }
+
   const getCatalog = () => ({
     dailyTitles: { ...dailyTitles },
     dailyDefinitions: { ...dailyDefinitions },
@@ -263,6 +347,8 @@ export const questData = {
   dailyDefinitions,
   dailySources,
   dailyDefinition: (id: string | number) => dailyDefinitions[String(id)] || null,
+  getMilestoneSummary,
+  getBattlePassState,
   registerRuntimeDefinitions,
   getCatalog,
   exportCatalogJson
@@ -286,6 +372,8 @@ export {
   isRecognizedQuest,
   dailyDefinitions,
   dailySources,
+  getMilestoneSummary,
+  getBattlePassState,
   registerRuntimeDefinitions,
   getCatalog,
   exportCatalogJson
