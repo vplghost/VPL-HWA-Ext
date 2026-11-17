@@ -148,7 +148,7 @@ async function view(t) {
     useRpcCache: () => ({ cache, dispatchRpc: batch => { calls.push(batch); return new Promise(resolve => callbacks.push(resolve)); } }),
     expeditionRows, expeditionPlan, expeditionRefreshCalls,
     setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {}, getHeroMetadata: id => ({ name: `Hero ${id}` }) };
-  vm.runInNewContext(js + '\nglobalThis.ui = { startAvailable, startNext, collect, pending, autoRunning, message, rows, plan };', boundary);
+  vm.runInNewContext(js + '\nglobalThis.ui = { startAvailable, startNext, collect, refresh, refreshing, isSlotBusy, getSlotBusyText, transitioningSlots, pending, autoRunning, message, rows, plan };', boundary);
   t.after(() => stops.forEach(stop => stop()));
   return { ...boundary.ui, cache, clock, props, calls, callbacks, timers };
 }
@@ -276,3 +276,34 @@ test('Tower completed final boss snapshot stays Done after briefInfo in either o
   legacy.towerStatus = entry({ floorNumber: 1, isCleared: false }, at + 1);
   assert.equal(towerActivityState(legacy, at + 1).state, 'pending');
 });
+
+test('dialog refresh and slot actions manage in-place busy state without flashing empty UI', async t => {
+  const v = await view(t);
+  // Initial state has rows populated from state
+  assert.equal(v.rows.value.length, 8);
+  assert.equal(v.refreshing.value, false);
+
+  // Trigger refresh
+  const refreshPromise = v.refresh();
+  assert.equal(v.refreshing.value, true, 'refreshing overlay must activate immediately');
+  assert.equal(v.calls.length, 1);
+  assert.equal(v.calls[0][0].name, 'userGetInfo');
+
+  // While refreshing is in flight, rows remain stable
+  assert.equal(v.rows.value.length, 8, 'rows must not collapse or blank out during refresh');
+
+  // Complete refresh RPC response
+  v.callbacks.shift()({ ok: true });
+  await refreshPromise;
+  // Timer for smooth finish
+  if (v.timers.length) v.timers.at(-1)();
+  assert.equal(v.refreshing.value, false);
+
+  // Test slot-level busy state during collect
+  v.cache.value = { ...state(rows.map(row => row.id === 1 ? { ...row, status: 2, endTime: at / 1000 - 1, heroes: [1], attemptsLeft: 0 } : row)), heroGetAll: entry(owned) };
+  assert.equal(v.isSlotBusy(2, 1), false);
+  v.collect(2);
+  assert.equal(v.isSlotBusy(2, 1), true, 'slot must be marked busy during collection');
+  assert.match(v.getSlotBusyText(2, 1), /Collecting rewards/);
+});
+
