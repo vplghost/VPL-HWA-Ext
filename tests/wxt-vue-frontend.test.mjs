@@ -466,10 +466,20 @@ test('resourceData resolves human-readable worldMaterialNames instead of raw mat
 test('TeamsTab loads server-saved teams from teamGetAll cache with clone action and refresh', async () => {
   const teams = await readFile(join(root, 'src/components/tabs/TeamsTab.vue'), 'utf8');
   assert.match(teams, /server-teams-section/, 'TeamsTab must have #server-teams-section');
+  assert.match(teams, /custom-teams-section/, 'TeamsTab must have #custom-teams-section');
   assert.match(teams, /serverTeams/, 'TeamsTab must compute serverTeams');
   assert.match(teams, /btn-clone-server-team/, 'TeamsTab must have .btn-clone-server-team');
   assert.match(teams, /btn-toolbar-refresh-teams/, 'TeamsTab must have #btn-toolbar-refresh-teams');
   assert.match(teams, /cloneServerTeamToCustom/, 'TeamsTab must implement cloneServerTeamToCustom');
+
+  // Verify custom preset teams are placed above server-saved teams
+  const customIdx = teams.indexOf('id="custom-teams-section"');
+  const serverIdx = teams.indexOf('id="server-teams-section"');
+  assert.ok(customIdx > 0 && serverIdx > 0, 'Both sections must exist');
+  assert.ok(customIdx < serverIdx, 'Custom preset teams section must be placed above server-saved teams');
+
+  // Verify unified multi-column grid layout matching server teams
+  assert.match(teams, /custom-teams-section[\s\S]*?grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2\.5/, 'Custom teams must share unified multi-column grid layout');
 });
 
 test('ItemsTab and TitansTab support unified view switchers, count badges, and export functionality', async () => {
