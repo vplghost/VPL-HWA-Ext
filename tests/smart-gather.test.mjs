@@ -259,3 +259,50 @@ test('dailyPlan rotates to other resource types when active daily quest already 
   assert.equal(plan2.type, 'stone');
   assert.match(plan2.reason, /rotating other resources/);
 });
+
+test('getRallyById rejected with RallyNotFound does not set state.error and clears rally reservation', () => {
+  const rallyCall = { name: 'getRallyById', feature: 'rally', args: { rallyId: 'rally-999' } };
+  const state = {
+    accountId: 1,
+    reservation: { type: 'rally', rallyId: 'rally-999', expiresAt: now + 30000 },
+    pending: { call: rallyCall, phase: 'sent', sentAt: now },
+  };
+  const failureRec = failureRecord(rallyCall, { errorCode: 'RallyNotFound' });
+  const next = smart.sync(state, failureRec, cache(), now + 1);
+
+  assert.equal(next.error, undefined, 'error must not be set on RallyNotFound');
+  assert.equal(next.pending, null, 'pending must be cleared');
+  assert.equal(next.reservation, null, 'reservation must be cleared');
+  assert.ok(next.attemptedRallies?.includes('rally-999'), 'failed rallyId should be tracked in attemptedRallies');
+  assert.match(next.notice?.message || '', /Rally no longer available/);
+});
+
+test('persisted getRallyById rejected error is auto-healed on sync', () => {
+  const state = {
+    accountId: 1,
+    error: 'getRallyById rejected by game: RallyNotFound; restart Smart gathering to retry',
+    reservation: { type: 'rally', rallyId: 'rally-123' },
+  };
+  const next = smart.sync(state, null, cache(), now);
+
+  assert.equal(next.error, undefined, 'persisted getRallyById error must be cleared');
+  assert.equal(next.reservation, null, 'persisted rally reservation must be cleared');
+  assert.match(next.notice?.message || '', /Resuming gathering/);
+});
+
+test('getRallyById read timeout after 3 attempts does not halt smart gathering', () => {
+  const rallyCall = { name: 'getRallyById', feature: 'rally', args: { rallyId: 'rally-timeout' } };
+  const state = {
+    accountId: 1,
+    reservation: { type: 'rally', rallyId: 'rally-timeout' },
+    readTimeout: { key: 'getRallyById:rally', attempts: 2 },
+    pending: { call: rallyCall, phase: 'sent', sentAt: now, expiresAt: now + 30000 },
+  };
+  const next = smart.sync(state, null, cache(), now + 35000);
+
+  assert.equal(next.error, undefined, 'state.error must not be set when getRallyById times out 3 times');
+  assert.equal(next.readTimeout, undefined, 'readTimeout must be cleared');
+  assert.equal(next.reservation, null, 'reservation must be cleared');
+  assert.match(next.notice?.message || '', /Rally read timed out; resuming standard gathering rotation/);
+});
+

@@ -9,6 +9,18 @@ import { TOWER_FLOOR_COUNT } from '@/src/utils/towerRules';
 import { towerBuffs } from '@/src/data/towerData';
 import { DEFAULT_BUFF_PRIORITY } from '@/src/services/queues/towerAutomation';
 import { formatNumber } from '@/src/utils/formatters';
+import { getItemIcon } from '@/src/utils/itemResources';
+import { getItemName, getHeroName } from '@/src/data/nameData';
+
+export interface TowerRewardItem {
+  key: string;
+  category: string;
+  id?: string | number;
+  name: string;
+  amount: number;
+  iconPath?: string | null;
+  emoji: string;
+}
 
 const props = defineProps<{
   modelValue: boolean;
@@ -223,6 +235,150 @@ async function refreshTower() {
   await dispatchRpc([{ name: 'magicTower_briefInfo' }, { name: 'magicTower_getAll' }]);
 }
 
+// -------------------------------------------------------------
+// REWARDS PARSING & SUMMARY
+// -------------------------------------------------------------
+
+function parseTowerReward(reward: any): TowerRewardItem[] {
+  if (!reward || typeof reward !== 'object') return [];
+  const items: TowerRewardItem[] = [];
+
+  const add = (category: string, id: string | number | undefined, name: string, amount: number, emoji: string) => {
+    if (!amount || !Number.isFinite(amount) || amount <= 0) return;
+    const iconPath = id ? getItemIcon(category, id) : null;
+    items.push({
+      key: id ? `${category}:${id}` : category,
+      category,
+      id,
+      name,
+      amount,
+      iconPath,
+      emoji,
+    });
+  };
+
+  // Direct currency / resource fields
+  if (reward.gold) {
+    add('gold', undefined, 'Gold', Number(reward.gold), '🪙');
+  }
+  if (reward.starmoney || reward.starMoney) {
+    add('emerald', undefined, 'Emeralds', Number(reward.starmoney || reward.starMoney), '💎');
+  }
+  if (reward.towerCoin) {
+    add('coin', 3, 'Tower coin', Number(reward.towerCoin), '🗼');
+  }
+  if (reward.skullCoin) {
+    add('coin', 7, 'Skull coin', Number(reward.skullCoin), '💀');
+  }
+  if (reward.stamina || reward.energy) {
+    add('energy', undefined, 'Energy', Number(reward.stamina || reward.energy), '⚡');
+  }
+  if (reward.experience || reward.xp) {
+    add('experience', undefined, 'XP', Number(reward.experience || reward.xp), '✨');
+  }
+
+  // Nested dictionary fields (coin, gear, consumable, fragmentHero, etc.)
+  for (const [groupKey, groupVal] of Object.entries(reward)) {
+    if (['gold', 'starmoney', 'starMoney', 'towerCoin', 'skullCoin', 'stamina', 'energy', 'experience', 'xp', 'towerPoints', 'points'].includes(groupKey)) {
+      continue;
+    }
+    if (groupVal && typeof groupVal === 'object' && !Array.isArray(groupVal)) {
+      for (const [id, amt] of Object.entries(groupVal as Record<string, any>)) {
+        const numAmt = Number(amt);
+        if (!numAmt || numAmt <= 0) continue;
+
+        let name = getItemName(groupKey, id);
+        let emoji = '📦';
+
+        if (groupKey === 'coin') {
+          if (String(id) === '3') { name = 'Tower coin'; emoji = '🗼'; }
+          else if (String(id) === '7') { name = 'Skull coin'; emoji = '💀'; }
+          else { name = name || `Coin #${id}`; emoji = '🪙'; }
+        } else if (groupKey === 'gear') {
+          name = name || `Gear #${id}`;
+          emoji = '🛡️';
+        } else if (groupKey === 'fragmentHero') {
+          const heroName = getHeroName(id);
+          name = heroName ? `${heroName} Soul Stone` : `Hero #${id} Soul Stone`;
+          emoji = '🦸';
+        } else if (groupKey === 'consumable') {
+          name = name || `Item #${id}`;
+          emoji = '🧪';
+        } else if (groupKey === 'scroll') {
+          name = name || `Recipe #${id}`;
+          emoji = '📜';
+        } else if (groupKey === 'material') {
+          name = name || `Material #${id}`;
+          emoji = '🧱';
+        } else {
+          name = name || `${groupKey} #${id}`;
+        }
+
+        add(groupKey, id, name, numAmt, emoji);
+      }
+    } else if (typeof groupVal === 'number' || (typeof groupVal === 'string' && Number.isFinite(Number(groupVal)))) {
+      const numAmt = Number(groupVal);
+      if (numAmt > 0) {
+        add('other', undefined, groupKey, numAmt, '🎁');
+      }
+    }
+  }
+
+  return items;
+}
+
+const totalChestsOpened = computed(() => {
+  const history = session.value?.history || [];
+  return history.filter((ev: any) => ev.action === 'openChest').length;
+});
+
+const totalBattlesWon = computed(() => {
+  const history = session.value?.history || [];
+  return history.filter((ev: any) => ev.action === 'endBattle' && ev.win).length;
+});
+
+const towerTotalRewards = computed(() => {
+  const history = session.value?.history || [];
+  const map = new Map<string, TowerRewardItem>();
+
+  for (const ev of history) {
+    if (!ev.reward) continue;
+    const items = parseTowerReward(ev.reward);
+    for (const item of items) {
+      const existing = map.get(item.key);
+      if (existing) {
+        existing.amount += item.amount;
+      } else {
+        map.set(item.key, { ...item });
+      }
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const order: Record<string, number> = { gold: 1, 'coin:3': 2, emerald: 3, 'coin:7': 4 };
+    const orderA = order[a.key] || order[a.category] || 99;
+    const orderB = order[b.key] || order[b.category] || 99;
+    if (orderA !== orderB) return orderA - orderB;
+    return b.amount - a.amount;
+  });
+});
+
+const towerCurrencies = computed(() => {
+  const all = towerTotalRewards.value;
+  return {
+    gold: all.find((r) => r.key === 'gold')?.amount || 0,
+    towerCoin: all.find((r) => r.key === 'coin:3' || r.name === 'Tower coin')?.amount || 0,
+    emerald: all.find((r) => r.key === 'emerald')?.amount || 0,
+    skullCoin: all.find((r) => r.key === 'coin:7' || r.name === 'Skull coin')?.amount || 0,
+  };
+});
+
+const towerOtherRewards = computed(() => {
+  return towerTotalRewards.value.filter(
+    (r) => !['gold', 'coin:3', 'emerald', 'coin:7'].includes(r.key) && r.name !== 'Tower coin' && r.name !== 'Skull coin'
+  );
+});
+
 // Accordion floor tracking
 const expandedFloor = ref<number | null>(null);
 
@@ -367,6 +523,110 @@ watch(() => props.modelValue, (open) => {
           {{ towerAutomationMessage }}
         </div>
       </div>
+
+      <!-- Khung tổng hợp phần thưởng của Tower -->
+      <section
+        id="tower-rewards-summary"
+        class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs"
+      >
+        <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🏆</span>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Tower Run Rewards Summary
+              </h3>
+              <p class="text-[11px] text-slate-400">
+                Total accumulated rewards from chests and floor clears today
+              </p>
+            </div>
+          </div>
+
+          <!-- Quick stats badge -->
+          <div class="flex items-center gap-2 text-2xs font-semibold">
+            <span class="px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-950/80 text-violet-800 dark:text-violet-300">
+              {{ totalBattlesWon }} Battles Won
+            </span>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">
+              {{ totalChestsOpened }} Chests Opened
+            </span>
+          </div>
+        </div>
+
+        <!-- Currencies and items breakdown -->
+        <div v-if="towerTotalRewards.length > 0" class="space-y-3">
+          <!-- Key Currencies Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <!-- Gold -->
+            <div class="rounded-lg p-2.5 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60">
+              <div class="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300 font-semibold">
+                <span>🪙</span>
+                <span>Gold</span>
+              </div>
+              <div class="text-sm font-black text-amber-600 dark:text-amber-400 tabular-nums mt-0.5">
+                +{{ formatNumber(towerCurrencies.gold) }}
+              </div>
+            </div>
+
+            <!-- Tower Coin -->
+            <div class="rounded-lg p-2.5 bg-violet-50/70 dark:bg-violet-950/30 border border-violet-200/80 dark:border-violet-800/60">
+              <div class="flex items-center gap-1.5 text-xs text-violet-800 dark:text-violet-300 font-semibold">
+                <span>🗼</span>
+                <span>Tower Coin</span>
+              </div>
+              <div class="text-sm font-black text-violet-600 dark:text-violet-400 tabular-nums mt-0.5">
+                +{{ formatNumber(towerCurrencies.towerCoin) }}
+              </div>
+            </div>
+
+            <!-- Emeralds -->
+            <div class="rounded-lg p-2.5 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60">
+              <div class="flex items-center gap-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-semibold">
+                <span>💎</span>
+                <span>Emeralds</span>
+              </div>
+              <div class="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
+                +{{ formatNumber(towerCurrencies.emerald) }}
+              </div>
+            </div>
+
+            <!-- Skull Coins -->
+            <div class="rounded-lg p-2.5 bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <div class="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold">
+                <span>💀</span>
+                <span>Skull Coins</span>
+              </div>
+              <div class="text-sm font-black text-slate-700 dark:text-slate-200 tabular-nums mt-0.5">
+                +{{ formatNumber(towerCurrencies.skullCoin) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Other items (Gear, Consumables, Soul Stones) -->
+          <div v-if="towerOtherRewards.length > 0" class="space-y-1.5">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Items & Equipment Earned ({{ towerOtherRewards.length }})
+            </span>
+            <div class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+              <div
+                v-for="item in towerOtherRewards"
+                :key="item.key"
+                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"
+              >
+                <img v-if="item.iconPath" :src="item.iconPath" class="size-4 object-contain" />
+                <span v-else>{{ item.emoji }}</span>
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ item.name }}</span>
+                <span class="font-bold text-violet-600 dark:text-violet-400 font-mono">×{{ item.amount }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty state if no rewards yet -->
+        <div v-else class="text-center py-3 text-xs text-slate-400 italic">
+          No rewards recorded for this Tower run yet. Open chests and clear floors to track rewards.
+        </div>
+      </section>
 
       <!-- Tower Team (5 Hero Selectors) -->
       <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs">
@@ -520,29 +780,90 @@ watch(() => props.modelValue, (open) => {
                 <span v-if="group.buff" class="text-violet-700 dark:text-violet-300">
                   ✨ {{ getBuffInfo(group.buff.buffId).name }}
                 </span>
-                <span v-if="group.chest" class="text-emerald-700 dark:text-emerald-400">
-                  🎁 Chest #{{ group.chest.number }}
-                </span>
+
+                <!-- Opened Chest with summary badges in header -->
+                <div v-if="group.chest" class="inline-flex items-center gap-1.5 flex-wrap">
+                  <span class="font-semibold text-emerald-700 dark:text-emerald-400">
+                    🎁 Chest #{{ group.chest.number }}
+                  </span>
+                  <template v-if="parseTowerReward(group.chest.reward).length > 0">
+                    <span
+                      v-for="rew in parseTowerReward(group.chest.reward)"
+                      :key="rew.key"
+                      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60"
+                    >
+                      <img v-if="rew.iconPath" :src="rew.iconPath" class="size-3.5 object-contain" />
+                      <span v-else>{{ rew.emoji }}</span>
+                      <span>+{{ formatNumber(rew.amount) }} {{ rew.name }}</span>
+                    </span>
+                  </template>
+                </div>
               </div>
               <span class="text-slate-400 text-xs">{{ expandedFloor === group.floor ? '▲' : '▼' }}</span>
             </button>
 
+            <!-- Expanded floor detail panel -->
             <div
               v-if="expandedFloor === group.floor"
               :id="`tower-floor-detail-${group.floor}`"
-              class="border-t border-slate-200/80 dark:border-slate-800 p-3 space-y-1 bg-slate-50/70 dark:bg-slate-950/40 text-xs text-slate-600 dark:text-slate-400"
+              class="border-t border-slate-200/80 dark:border-slate-800 p-3 space-y-2 bg-slate-50/70 dark:bg-slate-950/40 text-xs text-slate-600 dark:text-slate-400"
             >
-              <div v-for="(ev, evIdx) in group.events" :key="evIdx">
-                <span v-if="ev.action === 'endBattle'">
-                  Floor {{ ev.floor }}, Room {{ ev.room }}: {{ ev.win ? 'Victory' : 'Defeat' }}
-                  {{ ev.stars != null ? ` · ${ev.stars} stars` : '' }}
-                </span>
-                <span v-else-if="ev.action === 'activateBuff'">
-                  Floor {{ ev.floor }}, Room {{ ev.room }}: Selected {{ getBuffInfo(ev.buffId).name }}
-                </span>
-                <span v-else-if="ev.action === 'openChest'">
-                  Floor {{ ev.floor }}, Room {{ ev.room }}: Opened chest #{{ ev.number }}
-                </span>
+              <div v-for="(ev, evIdx) in group.events" :key="evIdx" class="space-y-1">
+                <!-- Battle Event -->
+                <div v-if="ev.action === 'endBattle'" class="flex items-center justify-between flex-wrap gap-1">
+                  <div class="flex items-center gap-1.5">
+                    <span>⚔️ Floor {{ ev.floor }}, Room {{ ev.room }}: {{ ev.win ? 'Victory' : 'Defeat' }}</span>
+                    <span v-if="ev.stars != null" class="text-amber-500 font-bold">({{ ev.stars }} ⭐)</span>
+                  </div>
+                  <div v-if="parseTowerReward(ev.reward).length > 0" class="flex flex-wrap gap-1">
+                    <span
+                      v-for="rew in parseTowerReward(ev.reward)"
+                      :key="rew.key"
+                      class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                    >
+                      {{ rew.emoji }} +{{ formatNumber(rew.amount) }} {{ rew.name }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Buff Event -->
+                <div v-else-if="ev.action === 'activateBuff'">
+                  ✨ Floor {{ ev.floor }}, Room {{ ev.room }}: Selected <strong>{{ getBuffInfo(ev.buffId).name }}</strong>
+                </div>
+
+                <!-- Chest Event with detailed reward cards -->
+                <div
+                  v-else-if="ev.action === 'openChest'"
+                  class="rounded-lg p-2.5 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/80 space-y-1.5"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                      <span>🎁</span> Floor {{ ev.floor }}, Room {{ ev.room }}: Opened chest #{{ ev.number }}
+                    </span>
+                    <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60">
+                      Free Chest
+                    </span>
+                  </div>
+
+                  <!-- Reward items pills -->
+                  <div v-if="parseTowerReward(ev.reward).length > 0" class="flex flex-wrap gap-1.5 pt-0.5">
+                    <div
+                      v-for="rew in parseTowerReward(ev.reward)"
+                      :key="rew.key"
+                      class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                    >
+                      <img v-if="rew.iconPath" :src="rew.iconPath" class="size-4 object-contain" />
+                      <span v-else class="text-xs">{{ rew.emoji }}</span>
+                      <span>{{ rew.name }}:</span>
+                      <span class="font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                        +{{ formatNumber(rew.amount) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div v-else class="text-[11px] text-slate-400 italic">
+                    Reward recorded.
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -444,13 +444,15 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
 
   if (
     !state.pending &&
-    /^(getMineById|attackMine) rejected by game: MineNotFound; restart Smart gathering to retry$/.test(state.error || '')
+    (/^(getMineById|attackMine) rejected by game: MineNotFound; restart Smart gathering to retry$/.test(state.error || '') ||
+      /^getRallyById rejected by game:/.test(state.error || ''))
   ) {
     delete state.error;
+    if (state.reservation?.type === 'rally') state.reservation = null;
     state.notice = {
       at: now,
       expiresAt: now + 5000,
-      message: 'Resuming gathering after a missing mine; checking available targets',
+      message: 'Resuming gathering; checking available targets',
     };
   }
 
@@ -467,6 +469,19 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
 
   if (reply && failure && pending.call.name !== 'joinRally') {
     state.pending = null;
+    if (pending.call.name === 'getRallyById') {
+      if (state.reservation?.type === 'rally') state.reservation = null;
+      if (pending.call.args?.rallyId) {
+        state.attemptedRallies = [...(state.attemptedRallies || []), pending.call.args.rallyId].slice(-100);
+      }
+      delete state.error;
+      state.notice = {
+        at: now,
+        expiresAt: now + 5000,
+        message: `Rally no longer available (${failure}); resuming gathering`,
+      };
+      return state;
+    }
     const isTargetFailure =
       typeof failure === 'string' &&
       (['MineNotFound', 'BattleTypeMismatch'].includes(failure) ||
@@ -571,21 +586,34 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
   if (reply?.result?.error || reply?.result?.response?.error) {
     const err = rpcFailure(reply?.result) || 'error';
     state.pending = null;
-    const isTargetFailure =
-      typeof err === 'string' &&
-      (['MineNotFound', 'BattleTypeMismatch'].includes(err) ||
-        err.includes('Occupied') ||
-        err.includes('Target') ||
-        err.includes('Mine'));
-    if (
-      pending.call.feature === 'mine' &&
-      ['getMineById', 'attackMine'].includes(pending.call.name) &&
-      isTargetFailure
-    ) {
-      skipMine(state, pending.call.args?.mineId, now, err);
+    if (pending.call.name === 'getRallyById') {
+      if (state.reservation?.type === 'rally') state.reservation = null;
+      if (pending.call.args?.rallyId) {
+        state.attemptedRallies = [...(state.attemptedRallies || []), pending.call.args.rallyId].slice(-100);
+      }
       delete state.error;
+      state.notice = {
+        at: now,
+        expiresAt: now + 5000,
+        message: `Rally no longer available (${err}); resuming gathering`,
+      };
     } else {
-      state.error = `${pending.call.name} rejected by game; restart Smart gathering to retry`;
+      const isTargetFailure =
+        typeof err === 'string' &&
+        (['MineNotFound', 'BattleTypeMismatch'].includes(err) ||
+          err.includes('Occupied') ||
+          err.includes('Target') ||
+          err.includes('Mine'));
+      if (
+        pending.call.feature === 'mine' &&
+        ['getMineById', 'attackMine'].includes(pending.call.name) &&
+        isTargetFailure
+      ) {
+        skipMine(state, pending.call.args?.mineId, now, err);
+        delete state.error;
+      } else {
+        state.error = `${pending.call.name} rejected by game; restart Smart gathering to retry`;
+      }
     }
   } else if (reply && Object.hasOwn(reply.result || {}, 'response')) {
     const response = reply.result.response;
@@ -616,6 +644,18 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
         confirmedAt: Date.parse(record.timestamp),
       };
     } else if (!['stopMineGathering', 'attackMine'].includes(pending.call.name)) {
+      if (pending.call.name === 'getRallyById' && !response?.rally) {
+        if (state.reservation?.type === 'rally') state.reservation = null;
+        if (pending.call.args?.rallyId) {
+          state.attemptedRallies = [...(state.attemptedRallies || []), pending.call.args.rallyId].slice(-100);
+        }
+        delete state.error;
+        state.notice = {
+          at: now,
+          expiresAt: now + 5000,
+          message: 'Reserved rally no longer available; resuming gathering',
+        };
+      }
       state.pending = null;
     }
   }
@@ -647,12 +687,18 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
     state.readTimeout = { key, attempts };
     state.notice = { at: now, message: `Retrying expired read ${key} (${attempts}/3)` };
     if (attempts >= 3) {
-      if (key === 'getDailyQuests:quest' || key === 'user_getNextDayTime:') {
+      if (key === 'getDailyQuests:quest' || key === 'user_getNextDayTime:' || key === 'getRallyById:rally') {
         delete state.readTimeout;
+        if (key === 'getRallyById:rally' && state.reservation?.type === 'rally') {
+          state.reservation = null;
+        }
         state.notice = {
           at: now,
           expiresAt: now + 60000,
-          message: 'Daily quest read timed out; falling back to standard gathering rotation',
+          message:
+            key === 'getRallyById:rally'
+              ? 'Rally read timed out; resuming standard gathering rotation'
+              : 'Daily quest read timed out; falling back to standard gathering rotation',
         };
       } else {
         state.error = `Read ${key} timed out after 3 attempts; press F5 in the game tab and restart Smart gathering`;

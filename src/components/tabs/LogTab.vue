@@ -1,17 +1,220 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useRecorder } from '@/src/composables/useRecorder';
 import { downloadJson } from '@/src/utils/metadata';
+import {
+  createConfigExportPayload,
+  createFullDataExportPayload,
+  prepareImportUpdates,
+} from '@/src/utils/dataBackup';
 
 const { logs, filteredLogs, search, sort, error, busy, control } = useRecorder();
+
 async function exportLogs() {
   const payload = await control('record-export');
   if (payload) downloadJson(`hwa-api-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.json`, payload);
+}
+
+// Backup & Restore state
+const overwriteExisting = ref(true);
+const importStatus = ref<{ type: 'success' | 'error'; message: string } | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const isExporting = ref(false);
+
+async function exportConfig() {
+  isExporting.value = true;
+  importStatus.value = null;
+  try {
+    const all = (typeof chrome !== 'undefined' && chrome.storage?.local?.get)
+      ? await chrome.storage.local.get(null)
+      : {};
+    const payload = createConfigExportPayload(all);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadJson(`hwa-config-${dateStr}.json`, payload);
+  } catch (err: any) {
+    importStatus.value = { type: 'error', message: `Export config failed: ${err?.message || err}` };
+  } finally {
+    isExporting.value = false;
+  }
+}
+
+async function exportAllData() {
+  isExporting.value = true;
+  importStatus.value = null;
+  try {
+    const all = (typeof chrome !== 'undefined' && chrome.storage?.local?.get)
+      ? await chrome.storage.local.get(null)
+      : {};
+    const payload = createFullDataExportPayload(all);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadJson(`hwa-full-data-${dateStr}.json`, payload);
+  } catch (err: any) {
+    importStatus.value = { type: 'error', message: `Export all data failed: ${err?.message || err}` };
+  } finally {
+    isExporting.value = false;
+  }
+}
+
+function triggerImportPicker() {
+  importStatus.value = null;
+  fileInputRef.value?.click();
+}
+
+async function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  importStatus.value = null;
+
+  try {
+    const text = await file.text();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      importStatus.value = { type: 'error', message: 'Tệp không hợp lệ: Không thể đọc định dạng JSON.' };
+      return;
+    }
+
+    const currentLocal = (typeof chrome !== 'undefined' && chrome.storage?.local?.get)
+      ? await chrome.storage.local.get(null)
+      : {};
+
+    const prep = prepareImportUpdates(parsed, currentLocal, overwriteExisting.value);
+    if (!prep.success || !prep.updates) {
+      importStatus.value = { type: 'error', message: prep.error || 'Import thất bại.' };
+      return;
+    }
+
+    if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+      await chrome.storage.local.set(prep.updates);
+    }
+
+    const modeText = overwriteExisting.value ? 'ghi đè' : 'hợp nhất giữ nguyên giá trị máy này';
+    importStatus.value = {
+      type: 'success',
+      message: `Import thành công ${prep.keysCount} mục dữ liệu (${modeText})!`,
+    };
+  } catch (err: any) {
+    importStatus.value = { type: 'error', message: `Import lỗi: ${err?.message || err}` };
+  } finally {
+    if (input) input.value = '';
+  }
 }
 </script>
 
 <template>
   <div class="space-y-3">
-    <!-- Toolbar -->
+    <!-- Backup, Export & Import Section -->
+    <section
+      id="data-backup-section"
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3 shadow-xs"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">💾</span>
+          <div>
+            <h3 class="text-xs font-bold text-slate-800 dark:text-slate-100">
+              Data & Configuration Management
+            </h3>
+            <p class="text-[10px] text-slate-400">
+              Backup configs or full user data (teams, queues, income, settings) and restore across machines
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons Row -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <!-- Export Group -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Export Config Button -->
+          <button
+            type="button"
+            id="export-config-btn"
+            class="cursor-pointer px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5 shadow-2xs"
+            :disabled="isExporting"
+            @click="exportConfig"
+          >
+            <span>⚙️</span>
+            <span>Export Config</span>
+          </button>
+
+          <!-- Export All Data Button -->
+          <button
+            type="button"
+            id="export-all-data-btn"
+            class="cursor-pointer px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1.5"
+            :disabled="isExporting"
+            @click="exportAllData"
+          >
+            <span>📦</span>
+            <span>Export All Data</span>
+          </button>
+        </div>
+
+        <!-- Import Group -->
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Overwrite Checkbox -->
+          <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs select-none text-slate-600 dark:text-slate-300">
+            <input
+              id="import-overwrite-checkbox"
+              v-model="overwriteExisting"
+              type="checkbox"
+              class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-0 cursor-pointer"
+            />
+            <span class="text-[11px] font-medium">Overwrite local values</span>
+          </label>
+
+          <!-- Hidden File Input -->
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept=".json,application/json"
+            class="hidden"
+            @change="handleFileSelect"
+          />
+
+          <!-- Import Button -->
+          <button
+            type="button"
+            id="import-data-btn"
+            class="cursor-pointer px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1.5"
+            @click="triggerImportPicker"
+          >
+            <span>📥</span>
+            <span>Import Backup JSON</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Import Feedback Alert Banner -->
+      <div
+        v-if="importStatus"
+        id="import-status-banner"
+        class="rounded-lg p-2.5 text-xs flex items-center justify-between gap-2 border"
+        :class="
+          importStatus.type === 'success'
+            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+            : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+        "
+      >
+        <div class="flex items-center gap-2">
+          <span>{{ importStatus.type === 'success' ? '✅' : '⚠️' }}</span>
+          <span class="font-medium">{{ importStatus.message }}</span>
+        </div>
+        <button
+          type="button"
+          class="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold px-1"
+          @click="importStatus = null"
+        >
+          ✕
+        </button>
+      </div>
+    </section>
+
+    <!-- Toolbar for API Logs -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
       <div class="relative w-full sm:w-64">
         <input
@@ -49,6 +252,7 @@ async function exportLogs() {
         <option value="duration-desc">Slowest first</option><option value="duration-asc">Fastest first</option>
       </select>
     </div>
+
     <!-- Logs list -->
     <div v-if="filteredLogs.length === 0" class="p-8 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
       No API logs captured yet in this session.
