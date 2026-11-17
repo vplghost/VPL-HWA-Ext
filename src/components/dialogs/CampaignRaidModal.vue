@@ -67,20 +67,8 @@ const selectedHeroId = ref<string | null>(null);
 const farmMode = ref<'gear' | 'hero'>('gear');
 const selectedLeafKey = ref<string | null>(null);
 
-const availableHeroes = computed(() => {
-  const heroesData = cache.value?.heroGetAll?.data || {};
-  return Object.entries(heroesData)
-    .map(([id, h]: [string, any]) => ({
-      id: String(id),
-      name: getItemName('hero', id) || `Hero #${id}`,
-      power: Number(h?.power) || 0,
-      color: Number(h?.color || 1),
-    }))
-    .sort((a, b) => b.power - a.power || a.name.localeCompare(b.name));
-});
-
 const heroLeafSummary = computed<HeroLeafEquipmentSummary | null>(() => {
-  const hId = selectedHeroId.value || availableHeroes.value[0]?.id;
+  const hId = selectedHeroId.value;
   if (!hId) return null;
   return aggregateHeroLeafEquipment(hId, cache.value);
 });
@@ -115,9 +103,6 @@ function selectLeafResource(leaf: HeroLeafResource) {
 function switchFarmMode(mode: 'gear' | 'hero') {
   farmMode.value = mode;
   if (mode === 'hero') {
-    if (!selectedHeroId.value && availableHeroes.value[0]?.id) {
-      selectedHeroId.value = availableHeroes.value[0].id;
-    }
     if (selectedLeafResource.value) {
       selectLeafResource(selectedLeafResource.value);
     }
@@ -125,13 +110,6 @@ function switchFarmMode(mode: 'gear' | 'hero') {
     if (selectedRecipeNode.value) {
       selectRecipeNode(selectedRecipeNode.value);
     }
-  }
-}
-
-function onHeroChange() {
-  selectedLeafKey.value = null;
-  if (selectedLeafResource.value) {
-    selectLeafResource(selectedLeafResource.value);
   }
 }
 
@@ -248,15 +226,9 @@ watch(
     if (props.modelValue) {
       loadDisabledMissions();
     }
-    if (modalContext.selectedCampaignHeroId != null) {
-      selectedHeroId.value = String(modalContext.selectedCampaignHeroId);
-      farmMode.value = 'hero';
-      selectedLeafKey.value = null;
-      if (selectedLeafResource.value) {
-        selectLeafResource(selectedLeafResource.value);
-      }
-    } else if (modalContext.selectedCampaignGearId != null) {
+    if (modalContext.selectedCampaignGearId != null) {
       selectedGearId.value = modalContext.selectedCampaignGearId;
+      selectedHeroId.value = null;
       farmMode.value = 'gear';
       const tree = buildGearRecipeTree(selectedGearId.value, cache.value);
       const unfulfilled = findFirstUnfulfilledNode(tree);
@@ -273,12 +245,16 @@ watch(
           missionId.value = highest;
         }
       }
-    } else {
-      if (selectedGearId.value == null && selectedHeroId.value == null) {
-        if (availableHeroes.value[0]?.id) {
-          selectedHeroId.value = availableHeroes.value[0].id;
-        }
+    } else if (modalContext.selectedCampaignHeroId != null) {
+      selectedHeroId.value = String(modalContext.selectedCampaignHeroId);
+      selectedGearId.value = null;
+      farmMode.value = 'hero';
+      selectedLeafKey.value = null;
+      if (selectedLeafResource.value) {
+        selectLeafResource(selectedLeafResource.value);
       }
+    } else {
+      farmMode.value = 'gear';
     }
   },
   { immediate: true }
@@ -812,8 +788,8 @@ const hasDropItems = computed(() => {
             </button>
           </div>
 
-          <!-- Farm Mode Switcher Tabs -->
-          <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 flex-wrap gap-2">
+          <!-- Farm Mode Switcher Tabs (Only shown when a hero is selected; hidden in item farm mode) -->
+          <div v-if="selectedHeroId" class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 flex-wrap gap-2">
             <div class="flex items-center gap-1.5 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold">
               <button
                 type="button"
@@ -822,7 +798,7 @@ const hasDropItems = computed(() => {
                 :class="farmMode === 'hero' ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
                 @click="switchFarmMode('hero')"
               >
-                <span>🎯</span> Farm theo Hero
+                <span>🎯</span> Hero Farm
               </button>
               <button
                 type="button"
@@ -831,23 +807,8 @@ const hasDropItems = computed(() => {
                 :class="farmMode === 'gear' ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
                 @click="switchFarmMode('gear')"
               >
-                <span>🛠️</span> Cây công thức trang bị
+                <span>🛠️</span> Equipment Recipe Tree
               </button>
-            </div>
-
-            <!-- Hero Selector (in hero mode) -->
-            <div v-if="farmMode === 'hero'" class="flex items-center gap-2">
-              <label for="campaign-hero-select" class="text-2xs font-bold text-slate-500 dark:text-slate-400">Hero:</label>
-              <select
-                id="campaign-hero-select"
-                v-model="selectedHeroId"
-                class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none"
-                @change="onHeroChange"
-              >
-                <option v-for="h in availableHeroes" :key="h.id" :value="h.id">
-                  {{ h.name }} (Rank {{ h.color }})
-                </option>
-              </select>
             </div>
           </div>
 
@@ -857,10 +818,10 @@ const hasDropItems = computed(() => {
               <div class="space-y-0.5">
                 <div class="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100">
                   <span>🎯</span>
-                  <span>Tài nguyên lá cần farm cho: <strong class="text-purple-600 dark:text-purple-400">{{ heroLeafSummary.heroName }}</strong> (Rank {{ heroLeafSummary.color }})</span>
+                  <span>Leaf resources needed for: <strong class="text-purple-600 dark:text-purple-400">{{ heroLeafSummary.heroName }}</strong> (Rank {{ heroLeafSummary.color }})</span>
                 </div>
                 <div class="text-2xs text-slate-500 dark:text-slate-400">
-                  {{ heroLeafSummary.missingSlotsCount }} slot trang bị chưa gắn • {{ heroLeafResources.filter(r => !r.isFulfilled).length }} loại tài nguyên đang thiếu
+                  {{ heroLeafSummary.missingSlotsCount }} unequipped slots • {{ heroLeafResources.filter(r => !r.isFulfilled).length }} missing resource types
                 </div>
               </div>
 
@@ -903,7 +864,7 @@ const hasDropItems = computed(() => {
                       </span>
                     </div>
                     <div class="text-3xs text-slate-400 dark:text-slate-500 truncate">
-                      Cần cho: {{ leaf.sourceGears.map(g => g.name).join(', ') }}
+                      Needed for: {{ leaf.sourceGears.map(g => g.name).join(', ') }}
                     </div>
                   </div>
                 </div>
@@ -918,10 +879,10 @@ const hasDropItems = computed(() => {
                       <span class="text-slate-400"> / {{ leaf.requiredCount }}</span>
                     </div>
                     <div v-if="!leaf.isFulfilled" class="text-3xs text-amber-600 dark:text-amber-400 font-semibold">
-                      Thiếu {{ leaf.remainingCount }}
+                      Need {{ leaf.remainingCount }}
                     </div>
                     <div v-else class="text-3xs text-emerald-600 dark:text-emerald-400 font-semibold">
-                      Đã đủ
+                      Fulfilled
                     </div>
                   </div>
 
@@ -929,7 +890,7 @@ const hasDropItems = computed(() => {
                     class="rounded-full px-2 py-0.5 text-3xs font-bold shrink-0"
                     :class="leaf.isFulfilled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'"
                   >
-                    {{ leaf.missions.length }} ải
+                    {{ leaf.missions.length }} missions
                   </span>
                 </div>
               </div>
@@ -939,9 +900,9 @@ const hasDropItems = computed(() => {
             <div v-if="selectedLeafResource" class="p-2 rounded-lg bg-purple-100/60 dark:bg-purple-900/30 text-2xs flex items-center justify-between text-purple-900 dark:text-purple-200">
               <span class="flex items-center gap-1.5">
                 <span>🎯</span>
-                <span>Đang chọn farm: <strong>{{ selectedLeafResource.name }}</strong> (Cần thêm {{ selectedLeafResource.remainingCount }} / {{ selectedLeafResource.requiredCount }})</span>
+                <span>Targeting: <strong>{{ selectedLeafResource.name }}</strong> (Need {{ selectedLeafResource.remainingCount }} more / {{ selectedLeafResource.requiredCount }})</span>
               </span>
-              <span class="text-3xs text-slate-500 dark:text-slate-400">Chọn ải bên dưới để bắt đầu raid</span>
+              <span class="text-3xs text-slate-500 dark:text-slate-400">Select a mission below to start raid</span>
             </div>
           </div>
 

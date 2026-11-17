@@ -404,14 +404,14 @@ function openFarmForSlot(slot: EquipmentSlotStatus) {
   if (slot.isEquipped) return;
   const gearId = slot.itemId;
   emit('openCampaign', gearId);
-  openModal('campaign', { selectedCampaignGearId: gearId });
+  openModal('campaign', { selectedCampaignGearId: gearId, selectedCampaignHeroId: null });
 }
 
 function handleFarmQuick() {
   const firstMissing = equipmentSlots.value.find((s) => !s.isEquipped && s.itemId);
   const gearId = firstMissing?.itemId || colorEquipmentItems.value[0] || null;
   emit('openCampaign', gearId);
-  openModal('campaign', { selectedCampaignGearId: gearId });
+  openModal('campaign', { selectedCampaignGearId: gearId, selectedCampaignHeroId: null });
 }
 
 function handleHeroFarmAll() {
@@ -780,10 +780,10 @@ function handleHeroFarmAll() {
                   id="hero-farm-all-btn"
                   type="button"
                   class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
-                  title="Tổng hợp tất cả tài nguyên lá cần farm cho Hero này và mở dialog Campaign Farm"
+                  title="Aggregate all leaf resources needed to farm for this Hero and open Campaign Farm dialog"
                   @click="handleHeroFarmAll"
                 >
-                  <span>🎯</span> Farm theo Hero
+                  <span>🎯</span> Farm by Hero
                 </button>
                 <button
                   type="button"

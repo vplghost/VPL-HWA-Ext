@@ -129,15 +129,18 @@ test('shared inventory allocates once and aggregates duplicate leaf resources ac
 test('HeroDetailModal has #hero-farm-all-btn button and transfers selectedCampaignHeroId', async () => {
   const source = await readFile(new URL('../src/components/dialogs/HeroDetailModal.vue', import.meta.url), 'utf8');
   assert.match(source, /id="hero-farm-all-btn"/, 'Must contain #hero-farm-all-btn');
-  assert.match(source, /Farm theo Hero/, 'Must contain Farm theo Hero label');
+  assert.match(source, /Farm by Hero/, 'Must contain Farm by Hero label in English');
   assert.match(source, /openModal\('campaign',\s*\{\s*selectedCampaignHeroId/, 'Must pass selectedCampaignHeroId to openModal');
+  // Check that slot and quick farm explicitly clear selectedCampaignHeroId
+  assert.match(source, /openModal\('campaign',\s*\{\s*selectedCampaignGearId:\s*gearId,\s*selectedCampaignHeroId:\s*null\s*\}\)/, 'Must reset hero id when farming by equipment slot');
 });
 
-test('CampaignRaidModal contains Hero Farm UI components, tabs, and flat list', async () => {
+test('CampaignRaidModal contains Hero Farm UI components, conditional tabs, and flat list without clutter dropdown', async () => {
   const source = await readFile(new URL('../src/components/dialogs/CampaignRaidModal.vue', import.meta.url), 'utf8');
   assert.match(source, /id="tab-mode-hero"/, 'Must contain #tab-mode-hero');
   assert.match(source, /id="tab-mode-gear"/, 'Must contain #tab-mode-gear');
-  assert.match(source, /id="campaign-hero-select"/, 'Must contain #campaign-hero-select');
+  assert.match(source, /v-if="selectedHeroId"/, 'Tabs must be hidden when farming by item without selected hero');
+  assert.equal(source.includes('id="campaign-hero-select"'), false, 'Must NOT contain hero select dropdown to avoid UI clutter');
   assert.match(source, /id="hero-leaf-resources-list"/, 'Must contain #hero-leaf-resources-list');
   assert.match(source, /aggregateHeroLeafEquipment/, 'Must import and use aggregateHeroLeafEquipment');
   assert.match(source, /selectedLeafResource/, 'Must compute selectedLeafResource');
