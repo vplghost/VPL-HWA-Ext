@@ -3440,6 +3440,24 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         ]);
         if (dispatch) cr.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
       }
+      const isVersusChestClaim = rpcCacheService.extract(record).some((e: any) => e.key === 'clanVersusChestAction');
+      if (stored.popupRpcEnabled === true && cacheResult.changed && isVersusChestClaim && sender.tab?.id) {
+        const dispatch = rpcMessageForSettings(stored, [
+          { name: 'userGetInfo' },
+          { name: 'inventoryGet' },
+          { name: 'refillableGetAll', feature: 'refillable' }
+        ]);
+        if (dispatch) cr.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+      }
+      const isBattlepassClaim = rpcCacheService.extract(record).some((e: any) => e.key === 'battlepassClaimAction');
+      if (stored.popupRpcEnabled === true && cacheResult.changed && isBattlepassClaim && sender.tab?.id) {
+        const dispatch = rpcMessageForSettings(stored, [
+          { name: 'userGetInfo' },
+          { name: 'inventoryGet' },
+          { name: 'refillableGetAll', feature: 'refillable' }
+        ]);
+        if (dispatch) cr.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+      }
       const rawClaims = cacheResult.cache.questClaimStatus?.data?.claims;
       const claims = Array.isArray(rawClaims) ? rawClaims : rawClaims && typeof rawClaims === 'object' ? Object.values(rawClaims) : [];
       const latestClaim = claims.length > 0 ? claims[claims.length - 1] : null;

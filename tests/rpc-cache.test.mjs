@@ -906,6 +906,69 @@ test('claimChest in clanVersus extracts rewards and updates energy, resources, a
   assert.equal(withProgress.clanVersusStatus.data.progress, 45000);
 });
 
+test('collectResource in resourceProduction extracts material rewards and updates balances', () => {
+  const at = '2026-11-17T07:06:45.000Z';
+  const baseline = {
+    'resource:material:4': { key: 'resource:material:4', data: { amount: 1000000, label: 'Wood' }, updatedAt: '2026-11-17T07:00:00.000Z' },
+    'resource:material:5': { key: 'resource:material:5', data: { amount: 2000000, label: 'Food' }, updatedAt: '2026-11-17T07:00:00.000Z' },
+    'resource:material:3': { key: 'resource:material:3', data: { amount: 500000, label: 'Stone' }, updatedAt: '2026-11-17T07:00:00.000Z' },
+    'resource:material:2': { key: 'resource:material:2', data: { amount: 100000, label: 'Iron' }, updatedAt: '2026-11-17T07:00:00.000Z' },
+    'resource:material:1': { key: 'resource:material:1', data: { amount: 10000, label: 'Elarite Shards' }, updatedAt: '2026-11-17T07:00:00.000Z' }
+  };
+
+  const collectRecord = record([
+    { name: 'collectResource', feature: 'resourceProduction', ident: 'col-1', args: { producerId: 1, collectDate: 1794899201679, collectedAmount: 8246966 } },
+    { name: 'collectResource', feature: 'resourceProduction', ident: 'col-2', args: { producerId: 2, collectDate: 1794899201679, collectedAmount: 7175374 } },
+    { name: 'collectResource', feature: 'resourceProduction', ident: 'col-3', args: { producerId: 3, collectDate: 1794899201679, collectedAmount: 1663504 } },
+    { name: 'collectResource', feature: 'resourceProduction', ident: 'col-4', args: { producerId: 4, collectDate: 1794899201679, collectedAmount: 397184 } },
+    { name: 'collectResource', feature: 'resourceProduction', ident: 'col-5', args: { producerId: 5, collectDate: 1794899201679, collectedAmount: 36840 } }
+  ], [
+    { ident: 'col-1', result: { response: {} } },
+    { ident: 'col-2', result: { response: {} } },
+    { ident: 'col-3', result: { response: {} } },
+    { ident: 'col-4', result: { response: {} } },
+    { ident: 'col-5', result: { response: {} } }
+  ], at);
+
+  const extracted = cache.extract(collectRecord);
+  assert.equal(extracted.filter(e => e.key === 'collectResourceAction').length, 5);
+  assert.equal(extracted.some(e => e.key === 'resourceAction' && e.data.resourceKey === 'resource:material:4' && e.data.delta === 8246966), true);
+  assert.equal(extracted.some(e => e.key === 'resourceAction' && e.data.resourceKey === 'resource:material:5' && e.data.delta === 7175374), true);
+
+  const merged = cache.merge(baseline, [collectRecord]).cache;
+  assert.equal(merged['resource:material:4'].data.amount, 9246966);
+  assert.equal(merged['resource:material:5'].data.amount, 9175374);
+  assert.equal(merged['resource:material:3'].data.amount, 2163504);
+  assert.equal(merged['resource:material:2'].data.amount, 497184);
+  assert.equal(merged['resource:material:1'].data.amount, 46840);
+
+  // Idempotency check: re-merging does not duplicate
+  const remerged = cache.merge(merged, [collectRecord]).cache;
+  assert.equal(remerged['resource:material:4'].data.amount, 9246966);
+});
+
+test('claimBattlepassRewardAll in battlepass extracts battlepassClaimAction', () => {
+  const at = '2026-11-17T07:05:42.000Z';
+  const bpRecord = record([
+    { name: 'claimBattlepassRewardAll', feature: 'battlepass', ident: 'bp-1', args: {
+      battlepassId: 1037,
+      levelIdAndTrackIdToClaim: [[975, 107], [976, 107]],
+      claimedAt: at
+    } }
+  ], [
+    { ident: 'bp-1', result: { response: {} } }
+  ], at);
+
+  const extracted = cache.extract(bpRecord);
+  assert.equal(extracted.length, 1);
+  assert.equal(extracted[0].key, 'battlepassClaimAction');
+  assert.equal(extracted[0].data.battlepassId, 1037);
+  assert.deepEqual(extracted[0].data.levelIdAndTrackIdToClaim, [[975, 107], [976, 107]]);
+
+  const merged = cache.merge({}, [bpRecord]).cache;
+  assert.equal(merged.battlepassClaimAction?.data?.battlepassId, 1037);
+});
+
 test('clanVersusStatus resets opened chests and scores on a new day or when server returns authoritative empty chestNumbers', () => {
   const day1Progress = record([
     { name: 'getUserProgress', feature: 'clanVersus', ident: 'prog-1' }

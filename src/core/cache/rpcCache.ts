@@ -72,6 +72,8 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
     'getCurrentBattle:clanVersus': 'events',
     'getUserProgress:clanVersus': 'events',
     'getRewardList:clanVersus': 'events',
+    'collectResource:resourceProduction': 'header',
+    'claimBattlepassRewardAll:battlepass': 'events',
     questGetEvents: 'events',
     clanWarChampInfo_getBriefInfo: 'events',
     'getEventInfo:fortress': 'events',
@@ -1466,6 +1468,21 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
             });
             return actions;
           }
+          if (call.name === 'claimBattlepassRewardAll' && call.feature === 'battlepass' && result && !result.error) {
+            return [{
+              key: 'battlepassClaimAction',
+              method: call.name,
+              feature: call.feature,
+              group: 'events',
+              data: {
+                battlepassId: call.args?.battlepassId,
+                levelIdAndTrackIdToClaim: call.args?.levelIdAndTrackIdToClaim || [],
+                claimedAt: call.args?.claimedAt || record.timestamp,
+                token: `${call.ident}:battlepass:${call.args?.battlepassId}`
+              },
+              updatedAt: record.timestamp
+            }];
+          }
         }
         if (call.name === 'getInfo' && call.feature === 'clanVersus' && result?.response) {
           return [{
@@ -1749,6 +1766,33 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
               .map((producer) => ({ id: producer.id,
                 residentCount: Array.isArray(producer.residents) ? producer.residents.length : 0 })) },
             updatedAt: record.timestamp }];
+        }
+        if (key === 'collectResource:resourceProduction' && result && !result.error) {
+          const producerId = Number(call.args?.producerId);
+          const collectedAmount = Number(call.args?.collectedAmount);
+          const producerMaterialMap: Record<number, number> = { 1: 4, 2: 5, 3: 3, 4: 2, 5: 1 };
+          const matId = producerMaterialMap[producerId];
+          const actions = [];
+          if (matId && Number.isFinite(collectedAmount) && collectedAmount > 0) {
+            const matKey = `material:${matId}`;
+            const label = worldMaterialNames[matId] || `Material #${matId}`;
+            actions.push(...resourceAction(record, call, matKey, collectedAmount, label, `producer:${producerId}`));
+          }
+          actions.push({
+            key: 'collectResourceAction',
+            method: call.name,
+            feature: call.feature,
+            group: 'internal',
+            data: {
+              producerId,
+              collectedAmount,
+              materialId: matId || null,
+              collectDate: call.args?.collectDate || null,
+              token: `${call.ident}:collect:${producerId}`
+            },
+            updatedAt: record.timestamp
+          });
+          return actions;
         }
         if (key === 'getSummary:bonus' && Array.isArray(result?.response?.persistentBonuses)) {
           const active = result.response;
@@ -3263,6 +3307,26 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
             next.userGetInfo = {
               ...next.userGetInfo,
               data: { ...next.userGetInfo.data, starMoney: data.amount }
+            };
+          } else if (rawResKey === 'energy' && Array.isArray(next.userGetInfo?.data?.refillable)) {
+            next.userGetInfo = {
+              ...next.userGetInfo,
+              data: {
+                ...next.userGetInfo.data,
+                refillable: next.userGetInfo.data.refillable.map((r: any) =>
+                  r?.id === 1 ? { ...r, amount: data.amount } : r
+                )
+              }
+            };
+          } else if (rawResKey === 'world-energy' && Array.isArray(next.userGetInfo?.data?.refillable)) {
+            next.userGetInfo = {
+              ...next.userGetInfo,
+              data: {
+                ...next.userGetInfo.data,
+                refillable: next.userGetInfo.data.refillable.map((r: any) =>
+                  r?.id === 2 ? { ...r, amount: data.amount } : r
+                )
+              }
             };
           } else if (rawResKey.includes(':')) {
             const [rType, rId] = rawResKey.split(':');
