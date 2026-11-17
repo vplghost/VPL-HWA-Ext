@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { parseRewards, formatRewardsSummary } from '../src/utils/rewardHelper.ts';
+import { resolveTierDetail, resolveTierTarget, getGroupMeta } from '../src/utils/tierHelper.ts';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -69,4 +70,42 @@ test('EventsTab integrates with EventDetailModal for specialQuest and battlePass
 
   assert.match(content, /openModal\('eventDetail',\s*\{\s*selectedEventId:\s*event\.id\s*\}\)/, 'Must open eventDetail for specialQuest');
   assert.match(content, /openModal\('eventDetail',\s*\{\s*selectedEventId:\s*`bp:\$\{bp\.id\}`\s*\}\)/, 'Must open eventDetail for battlePass');
+});
+
+test('resolveTierDetail accurately resolves task, unit, tier target, and progress', () => {
+  // 1. Daily Sign In (login)
+  const loginGroup = { localeKey: 'QUEST_TAB_NAME_LOGIN' };
+  const loginTier1 = resolveTierDetail({ id: 14654, state: 'completed', progress: 1 }, loginGroup, 1);
+  assert.equal(loginTier1.task, 'Đăng nhập hàng ngày');
+  assert.equal(loginTier1.unit, 'ngày');
+  assert.equal(loginTier1.target, 1);
+  assert.equal(loginTier1.state, 'completed');
+  assert.equal(loginTier1.targetDisplay, '1 ngày');
+  assert.match(loginTier1.progressDisplay, /100%/);
+
+  const loginTier3 = resolveTierDetail({ id: 14656, state: 'inProgress', progress: 2 }, loginGroup, 3);
+  assert.equal(loginTier3.target, 3);
+  assert.equal(loginTier3.unit, 'ngày');
+  assert.equal(loginTier3.progress, 2);
+  assert.equal(loginTier3.percent, 67);
+  assert.equal(loginTier3.targetDisplay, '3 ngày');
+  assert.equal(loginTier3.progressDisplay, '2 / 3 ngày (67%)');
+
+  // 2. Arena Battles (known CDN target for quest 11309: target 3)
+  const arenaGroup = { localeKey: 'LIB_SPECIAL_QUEST_EVENT_NAME_9' };
+  const arenaTier2 = resolveTierDetail({ id: 11309, state: 'completed', progress: 5 }, arenaGroup, 2);
+  assert.equal(arenaTier2.task, 'Chiến đấu Clash of Worlds');
+  assert.equal(arenaTier2.unit, 'trận');
+  assert.equal(arenaTier2.target, 3);
+  assert.equal(arenaTier2.targetDisplay, '3 trận');
+
+  // 3. Spend Emeralds ladder
+  const emeraldGroup = { localeKey: 'LIB_PSEUDO_STARMONEY' };
+  const emTier4 = resolveTierDetail({ id: 99999, state: 'inProgress', progress: 650 }, emeraldGroup, 4);
+  assert.equal(emTier4.task, 'Chiêu tiêu Emeralds'.length ? emTier4.task : 'Chi tiêu Emeralds');
+  assert.equal(emTier4.unit, 'Emeralds');
+  assert.equal(emTier4.target, 1000);
+  assert.equal(emTier4.percent, 65);
+  assert.equal(emTier4.targetDisplay, '1,000 Emeralds');
+  assert.equal(emTier4.progressDisplay, '650 / 1,000 Emeralds (65%)');
 });

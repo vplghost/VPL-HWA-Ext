@@ -6,6 +6,7 @@ import { questData } from '@/src/data/questData';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
 import { parseRewards } from '@/src/utils/rewardHelper';
+import { resolveTierDetail } from '@/src/utils/tierHelper';
 import { questRefreshCalls, sendQuestClaim } from '@/src/utils/dialogRpc';
 
 const props = defineProps<{
@@ -143,21 +144,7 @@ const processedChains = computed(() => {
 
     const milestones = qList.map((q: any, idx: number) => {
       const qAllEntry = qAllMap.value.get(String(q.id));
-      const isReady = q.state === 2 || qAllEntry?.state === 2;
-      const isCompleted = q.state === 'completed' || q.state === 3 || qAllEntry?.state === 3;
-      const progress = Number(qAllEntry?.progress ?? q.progress) || 0;
-      const rewardRaw = qAllEntry?.reward || q.reward || null;
-      const rewards = parseRewards(rewardRaw);
-
-      return {
-        id: q.id,
-        index: idx + 1,
-        state: isReady ? 'ready' : isCompleted ? 'completed' : 'inProgress',
-        progress,
-        completionCount: q.completionCount || 0,
-        rewards,
-        raw: q,
-      };
+      return resolveTierDetail(q, g, idx + 1, qAllEntry);
     });
 
     const completedCount = milestones.filter((m: any) => m.state === 'completed').length;
@@ -597,20 +584,38 @@ async function claimAllReady() {
           <!-- Active Objective Banner (when not completed) -->
           <div
             v-if="!chain.isCompleted && chain.activeMilestone"
-            class="px-3.5 py-2 bg-purple-50/80 dark:bg-purple-950/60 border-t border-b border-purple-200 dark:border-purple-800/70 flex items-center justify-between gap-2 flex-wrap text-xs"
+            class="px-3.5 py-2.5 bg-purple-50/80 dark:bg-purple-950/60 border-t border-b border-purple-200 dark:border-purple-800/70 flex items-center justify-between gap-3 flex-wrap text-xs"
           >
-            <div class="flex items-center gap-2">
-              <span class="text-2xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
-                Current Objective (#{{ chain.activeMilestone.index }}):
-              </span>
-              <span class="font-medium text-slate-800 dark:text-slate-200">
-                Progress: <strong class="text-purple-600 dark:text-purple-300">{{ formatNumber(chain.activeMilestone.progress) }}</strong>
-              </span>
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-2xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
+                  Mục tiêu hiện tại / Current Objective (#{{ chain.activeMilestone.index }}):
+                </span>
+                <span class="font-bold text-slate-900 dark:text-slate-100">
+                  {{ chain.activeMilestone.task }}
+                </span>
+                <span class="text-3xs font-semibold px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200 border border-purple-200 dark:border-purple-700">
+                  Mức: {{ chain.activeMilestone.targetDisplay }}
+                </span>
+              </div>
+
+              <!-- Mini Progress Bar & Progress Details -->
+              <div class="flex items-center gap-2 flex-wrap">
+                <div class="w-24 sm:w-32 bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden shrink-0">
+                  <div
+                    class="bg-gradient-to-r from-purple-500 to-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                    :style="{ width: `${chain.activeMilestone.percent}%` }"
+                  ></div>
+                </div>
+                <span class="text-2xs text-slate-600 dark:text-slate-300 font-medium">
+                  Tiến độ: <strong class="text-purple-600 dark:text-purple-300 font-bold">{{ formatNumber(chain.activeMilestone.progress) }}</strong> / {{ chain.activeMilestone.targetDisplay }} ({{ chain.activeMilestone.percent }}%)
+                </span>
+              </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 shrink-0">
               <div v-if="chain.activeMilestone.rewards.length > 0" class="flex items-center gap-1 flex-wrap">
-                <span class="text-2xs text-slate-600 dark:text-slate-300 font-medium">Reward:</span>
+                <span class="text-2xs text-slate-600 dark:text-slate-300 font-medium">Thưởng:</span>
                 <span
                   v-for="(r, idx) in chain.activeMilestone.rewards"
                   :key="idx"
@@ -623,26 +628,26 @@ async function claimAllReady() {
               <button
                 v-if="chain.activeMilestone.state === 'ready'"
                 type="button"
-                class="px-2.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-2xs cursor-pointer shadow-xs transition-colors"
+                class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-2xs cursor-pointer shadow-xs transition-colors animate-pulse"
                 :disabled="isClaiming"
                 @click.stop="claimSingleQuest(chain.activeMilestone.id)"
               >
-                Claim
+                Nhận thưởng
               </button>
             </div>
           </div>
 
           <!-- Expanded Milestones Ladder -->
           <div v-if="expandedChains[chain.id]" class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700/80 space-y-2">
-            <div class="text-2xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-1.5">
-              Milestone Tiers ({{ chain.milestones.length }} Total)
+            <div class="text-2xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-1.5 flex items-center justify-between">
+              <span>Danh sách các bậc (Milestone Tiers - {{ chain.milestones.length }} Tiers)</span>
             </div>
 
             <div class="space-y-1.5">
               <div
                 v-for="m in chain.milestones"
                 :key="m.id"
-                class="flex items-center justify-between p-2 rounded-lg border text-xs transition-colors"
+                class="flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors gap-2"
                 :class="
                   m.state === 'completed'
                     ? 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700'
@@ -651,29 +656,52 @@ async function claimAllReady() {
                     : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                 "
               >
-                <!-- Tier & Status Icon -->
-                <div class="flex items-center gap-2 min-w-0">
+                <!-- Tier & Status Icon + Task & Target Details -->
+                <div class="flex items-center gap-2.5 min-w-0">
                   <span
-                    class="size-5 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 border"
+                    class="size-6 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 border"
                     :class="
                       m.state === 'completed'
                         ? 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/60 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-300'
                         : m.state === 'ready'
-                        ? 'bg-amber-500 border-amber-500 text-white'
+                        ? 'bg-amber-500 border-amber-500 text-white animate-pulse'
                         : 'bg-slate-100 border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200'
                     "
                   >
                     {{ m.state === 'completed' ? '✓' : `#${m.index}` }}
                   </span>
 
-                  <div>
-                    <div class="font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                      <span>Tier #{{ m.index }}</span>
-                      <span class="text-3xs text-slate-500 dark:text-slate-400">(Quest #{{ m.id }})</span>
+                  <div class="space-y-0.5 min-w-0">
+                    <div class="font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
+                      <span class="font-bold text-xs">Tier #{{ m.index }}: {{ m.task }}</span>
+                      <span class="rounded px-1.5 py-0.2 text-3xs font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        🎯 Mức: {{ m.targetDisplay }}
+                      </span>
+                      <span class="text-3xs text-slate-400 dark:text-slate-500 font-normal">(#{{ m.id }})</span>
                     </div>
-                    <div class="text-3xs text-slate-500 dark:text-slate-300">
-                      <span v-if="m.state === 'completed'" class="text-emerald-600 dark:text-emerald-400 font-medium">✓ Milestone completed</span>
-                      <span v-else>Current progress: {{ formatNumber(m.progress) }}</span>
+
+                    <!-- Progress vs Target & Mini Bar -->
+                    <div class="flex items-center gap-2 text-2xs text-slate-600 dark:text-slate-300 flex-wrap">
+                      <span v-if="m.state === 'completed'" class="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <span>✓ Hoàn thành ({{ m.targetDisplay }})</span>
+                      </span>
+                      <span v-else-if="m.state === 'ready'" class="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
+                        <span>🎉 Đạt mục tiêu: {{ m.progressDisplay }}</span>
+                      </span>
+                      <span v-else class="flex items-center gap-1.5">
+                        <span>Tiến độ:</span>
+                        <strong class="text-purple-600 dark:text-purple-300 font-semibold">{{ formatNumber(m.progress) }}</strong>
+                        <span>/ {{ m.targetDisplay }}</span>
+                        <span class="text-slate-400 dark:text-slate-400">({{ m.percent }}%)</span>
+                      </span>
+
+                      <!-- Mini Progress Bar for inProgress -->
+                      <div v-if="m.state === 'inProgress'" class="w-16 sm:w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-1 overflow-hidden inline-block shrink-0">
+                        <div
+                          class="bg-purple-500 h-1 rounded-full"
+                          :style="{ width: `${m.percent}%` }"
+                        ></div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -697,7 +725,7 @@ async function claimAllReady() {
                   <button
                     v-if="m.state === 'ready'"
                     type="button"
-                    class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-2xs cursor-pointer shadow-xs transition-colors"
+                    class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-2xs cursor-pointer shadow-xs transition-colors shrink-0"
                     :disabled="isClaiming"
                     @click.stop="claimSingleQuest(m.id)"
                   >
@@ -705,7 +733,7 @@ async function claimAllReady() {
                   </button>
                   <span
                     v-else-if="m.state === 'completed'"
-                    class="text-emerald-600 dark:text-emerald-300 text-2xs font-bold px-2 py-0.5"
+                    class="text-emerald-600 dark:text-emerald-300 text-2xs font-bold px-2 py-0.5 shrink-0"
                   >
                     Claimed
                   </span>
