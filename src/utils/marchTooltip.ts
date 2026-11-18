@@ -2,6 +2,7 @@ import { formatNumber } from './formatters.ts';
 import { rallyPowerTooltip } from './rallyPower.ts';
 import { normalizeArray } from './troops.ts';
 import { gatheringProgress } from './gatheringProgress.ts';
+import { RESOURCE_THEMES } from './resourceData.ts';
 import {
   bossLevel,
   soloMonsterLevel,
@@ -195,7 +196,8 @@ export function formatMarchTooltip(march: any, now = Date.now(), cache: any = {}
   // ==================== GATHERING ====================
   if (isMine) {
     const progress = gatheringProgress(march, now, cache);
-    lines.push(`⛏️ Gathering · ${progress.target}`);
+    const gatherIcon = progress.type && RESOURCE_THEMES[progress.type]?.icon ? RESOURCE_THEMES[progress.type].icon : '⛏️';
+    lines.push(`${gatherIcon} Gathering · ${progress.target}`);
     const remaining = progress.remainingSeconds == null ? 'Timing unavailable' : formatMarchDuration(progress.remainingSeconds * 1000);
     lines.push(`Status: ${progress.phase === 'Gathering' ? 'Gathering resources' : progress.phase} · ${remaining}`);
     if (progress.progress != null) lines.push(`Collection progress: ${progress.progress}%`);

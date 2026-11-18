@@ -110,7 +110,7 @@ export function dashboardMarches(cache: Record<string, any>, now = Date.now()) {
   return normalizeArray(cache.marchStatus?.data?.marches)
     .filter((march: any) => march && typeof march === 'object' && !isMarchExpired(march, now))
     .map((march: any, index: number) => {
-      const badge = getMarchBadgeInfo(march, now);
+      const badge = getMarchBadgeInfo(march, now, cache);
       const returning = march.kind === 'return' || march.stage === 'returnToOutpost';
       const arrival = march.targetArrivalAt ?? march.rally?.arrivalAt;
       const waiting = march.stage === 'waitingForRallyStart' || (march.rally?.waitUntil > now);

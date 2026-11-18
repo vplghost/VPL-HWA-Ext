@@ -210,7 +210,15 @@ function handleMarchClick(category: string) {
                   m.stage === 'In battle'
                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
                     : m.category === 'gather'
-                      ? 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300'
+                      ? (m.gathering?.type === 'food'
+                        ? 'bg-lime-100 text-lime-900 dark:bg-lime-950/70 dark:text-lime-200'
+                        : m.gathering?.type === 'wood'
+                          ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-200'
+                          : m.gathering?.type === 'stone'
+                            ? 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                            : m.gathering?.type === 'iron'
+                              ? 'bg-cyan-100 text-cyan-900 dark:bg-cyan-950/70 dark:text-cyan-200'
+                              : 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300')
                       : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300'
                 "
               >
@@ -240,9 +248,36 @@ function handleMarchClick(category: string) {
                     :aria-valuemin="0"
                     :aria-valuemax="100"
                   >
-                    <div class="h-full bg-teal-500 transition-[width]" :style="{ width: `${m.gathering.progress}%` }" />
+                    <div
+                      class="h-full transition-[width]"
+                      :class="
+                        m.gathering.type === 'food'
+                          ? 'bg-lime-500'
+                          : m.gathering.type === 'wood'
+                            ? 'bg-emerald-500'
+                            : m.gathering.type === 'stone'
+                              ? 'bg-slate-500'
+                              : m.gathering.type === 'iron'
+                                ? 'bg-cyan-500'
+                                : 'bg-teal-500'
+                      "
+                      :style="{ width: `${m.gathering.progress}%` }"
+                    />
                   </div>
-                  <span class="shrink-0 tabular-nums font-mono text-[9px] text-teal-700 dark:text-teal-300 font-semibold">
+                  <span
+                    class="shrink-0 tabular-nums font-mono text-[9px] font-semibold"
+                    :class="
+                      m.gathering.type === 'food'
+                        ? 'text-lime-700 dark:text-lime-300'
+                        : m.gathering.type === 'wood'
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : m.gathering.type === 'stone'
+                            ? 'text-slate-700 dark:text-slate-300'
+                            : m.gathering.type === 'iron'
+                              ? 'text-cyan-700 dark:text-cyan-300'
+                              : 'text-teal-700 dark:text-teal-300'
+                    "
+                  >
                     {{ m.gathering.progress }}%<template v-if="m.gathering.collected != null"> ({{ formatCompact(m.gathering.collected) }}<template v-if="m.gathering.total != null">/{{ formatCompact(m.gathering.total) }}</template>)</template>
                   </span>
                 </div>

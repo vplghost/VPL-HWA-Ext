@@ -140,7 +140,7 @@ const ironVal = computed(
           <span class="text-slate-500 dark:text-slate-400 text-[10px] flex items-center gap-0.5 truncate">
             <span>🌾</span><span>Food:</span>
           </span>
-          <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs">
+          <span class="font-bold text-lime-600 dark:text-lime-400 tabular-nums text-xs">
             {{ formatResourceAmount(foodVal) }}
           </span>
         </div>
@@ -148,7 +148,7 @@ const ironVal = computed(
           <span class="text-slate-500 dark:text-slate-400 text-[10px] flex items-center gap-0.5 truncate">
             <span>🪵</span><span>Wood:</span>
           </span>
-          <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs">
+          <span class="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums text-xs">
             {{ formatResourceAmount(woodVal) }}
           </span>
         </div>
@@ -156,7 +156,7 @@ const ironVal = computed(
           <span class="text-slate-500 dark:text-slate-400 text-[10px] flex items-center gap-0.5 truncate">
             <span>🪨</span><span>Stone:</span>
           </span>
-          <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs">
+          <span class="font-bold text-slate-600 dark:text-slate-300 tabular-nums text-xs">
             {{ formatResourceAmount(stoneVal) }}
           </span>
         </div>
@@ -164,7 +164,7 @@ const ironVal = computed(
           <span class="text-slate-500 dark:text-slate-400 text-[10px] flex items-center gap-0.5 truncate">
             <span>⚙️</span><span>Iron:</span>
           </span>
-          <span class="font-bold text-slate-700 dark:text-slate-200 tabular-nums text-xs">
+          <span class="font-bold text-cyan-600 dark:text-cyan-400 tabular-nums text-xs">
             {{ formatResourceAmount(ironVal) }}
           </span>
         </div>

@@ -14,6 +14,7 @@ import {
   isSelectableForHeader,
   getMarchBadgeInfo,
   isMarchExpired,
+  RESOURCE_THEMES,
 } from '@/src/utils/resourceData';
 import {
   formatMarchTooltip,
@@ -272,6 +273,17 @@ const isMonsterQueueRunning = computed(() => {
 
 const isAutoGatherEnabled = computed(() => {
   return Boolean(autoGatherSettings.value?.enabled);
+});
+
+const autoGatherBadge = computed(() => {
+  const type = autoGatherSettings.value?.mineType;
+  const theme = type && RESOURCE_THEMES[type] ? RESOURCE_THEMES[type] : null;
+  return {
+    icon: type === 'rotate' ? '🔄' : theme ? theme.icon : '⛏️',
+    classes: theme
+      ? theme.badgeClasses
+      : 'bg-emerald-100 text-emerald-900 ring-emerald-400 dark:bg-emerald-950/70 dark:text-emerald-200 dark:ring-emerald-700',
+  };
 });
 
 const hasActiveRaidMarch = computed(() => {
@@ -621,11 +633,12 @@ function toggleTheme() {
           >
             <button
               type="button"
-              class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 bg-emerald-100 text-emerald-900 ring-emerald-400 dark:bg-emerald-950/70 dark:text-emerald-200 dark:ring-emerald-700 transition-transform hover:scale-110"
+              class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 transition-transform hover:scale-110"
+              :class="autoGatherBadge.classes"
               :aria-label="formatAutoGatherTooltip(autoGatherSettings)"
               @click="openModal('gathering')"
             >
-              ⛏️
+              {{ autoGatherBadge.icon }}
             </button>
           </BaseTooltip>
         </div>

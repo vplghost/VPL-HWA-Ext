@@ -7,7 +7,7 @@ import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import GatheringProgress from '@/src/components/common/GatheringProgress.vue';
 import { formatNumber, formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
-import { isMarchExpired, getMarchBadgeInfo } from '@/src/utils/resourceData';
+import { isMarchExpired, getMarchBadgeInfo, RESOURCE_THEMES } from '@/src/utils/resourceData';
 import { gatheringProgress } from '@/src/utils/gatheringProgress';
 import { calculateAccountMaxMarches } from '@/src/utils/dashboardState';
 import {
@@ -650,10 +650,10 @@ async function recallMarch(march: any) {
             v-model="manualMineType"
             class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200"
           >
-            <option value="food">🍞 Food Mine</option>
-            <option value="wood">🌲 Wood Mine</option>
-            <option value="stone">◆ Stone Mine</option>
-            <option value="iron">⚙ Iron Mine</option>
+            <option value="food">🌾 Food Farm</option>
+            <option value="wood">🪵 Lumber Mill</option>
+            <option value="stone">🪨 Stone Quarry</option>
+            <option value="iron">⚙️ Iron Mine</option>
           </select>
 
           <!-- Mine Level 1 to 10 -->
@@ -696,7 +696,8 @@ async function recallMarch(march: any) {
                 <div class="font-bold text-slate-800 dark:text-slate-200">
                   Mine #{{ Number(idx) + 1 }} · ({{ mine.coordinates?.x ?? '?' }}, {{ mine.coordinates?.y ?? '?' }})
                 </div>
-                <div class="text-[11px] text-slate-400">
+                <div class="text-[11px] font-medium" :class="RESOURCE_THEMES[manualMineType]?.textClass || 'text-slate-400'">
+                  <span>{{ RESOURCE_THEMES[manualMineType]?.icon }} </span>
                   {{ manualMineType.charAt(0).toUpperCase() + manualMineType.slice(1) }} · Lv.{{ manualMineLevel }}
                 </div>
               </div>
@@ -735,7 +736,7 @@ async function recallMarch(march: any) {
             class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"
           >
             <div class="flex items-center gap-2">
-              <span class="text-base">⛏️</span>
+              <span class="text-base">{{ march.progress?.type && RESOURCE_THEMES[march.progress.type]?.icon ? RESOURCE_THEMES[march.progress.type].icon : '⛏️' }}</span>
               <div>
                 <span class="font-bold text-slate-800 dark:text-slate-200">{{ march.progress.target }}</span>
                 <span class="text-[11px] text-slate-400 ml-2">{{ march.stage }}</span>
@@ -744,7 +745,20 @@ async function recallMarch(march: any) {
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="font-mono text-xs font-semibold text-teal-600 dark:text-teal-400">
+              <span
+                class="font-mono text-xs font-semibold px-2 py-0.5 rounded"
+                :class="
+                  march.progress?.type === 'food'
+                    ? 'bg-lime-100 text-lime-800 dark:bg-lime-950/60 dark:text-lime-300'
+                    : march.progress?.type === 'wood'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                      : march.progress?.type === 'stone'
+                        ? 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                        : march.progress?.type === 'iron'
+                          ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300'
+                          : 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300'
+                "
+              >
                 {{ march.timerText }}
               </span>
               <button

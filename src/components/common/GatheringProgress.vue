@@ -1,7 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { formatNumber, formatCompact } from '@/src/utils/formatters';
 import type { gatheringProgress } from '@/src/utils/gatheringProgress';
-defineProps<{ progress: ReturnType<typeof gatheringProgress>; compact?: boolean }>();
+import { RESOURCE_THEMES } from '@/src/utils/resourceData';
+
+const props = defineProps<{ progress: ReturnType<typeof gatheringProgress>; compact?: boolean }>();
+
+const progressBarClass = computed(() => {
+  const type = props.progress?.type;
+  if (type && RESOURCE_THEMES[type]?.progressBarClass) {
+    return RESOURCE_THEMES[type].progressBarClass;
+  }
+  return 'bg-teal-500';
+});
 </script>
 
 <template>
@@ -12,7 +23,7 @@ defineProps<{ progress: ReturnType<typeof gatheringProgress>; compact?: boolean 
       <span v-if="progress.progress != null" class="font-mono tabular-nums">{{ progress.progress }}%</span>
     </div>
     <div v-if="progress.progress != null" role="progressbar" :aria-label="`${progress.resource} collection progress`" :aria-valuenow="progress.progress" :aria-valuemin="0" :aria-valuemax="100" class="h-1 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700">
-      <div class="h-full bg-teal-500 transition-[width]" :style="{ width: `${progress.progress}%` }" />
+      <div class="h-full transition-[width]" :class="progressBarClass" :style="{ width: `${progress.progress}%` }" />
     </div>
   </div>
 </template>

@@ -4,7 +4,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import type { AutoGatherSettings } from '@/src/types';
 import { formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
-import { isMarchExpired, getMarchBadgeInfo } from '@/src/utils/resourceData';
+import { isMarchExpired, getMarchBadgeInfo, resolveMarchResourceType, RESOURCE_THEMES } from '@/src/utils/resourceData';
 import { calculateAccountMaxMarches } from '@/src/utils/dashboardState';
 
 const { cache, dispatchRpc } = useRpcCache();
@@ -94,12 +94,17 @@ const activeMarches = computed(() => {
         stageLabel = 'Marching to mine';
       }
 
+      const resType = resolveMarchResourceType(m, cache.value);
+      const theme = resType ? RESOURCE_THEMES[resType] : null;
+
       return {
         id: m.id || m.marchId || m.squadId,
         type: stageLabel,
         target: m.targetName || (m.mineId ? `Mine #${m.mineId}` : 'Resource Mine'),
         remainingSec,
         timerText: remainingSec > 0 ? formatDuration(remainingSec) : 'In progress',
+        resType,
+        icon: isReturning ? '↩️' : isMoving && remainingSec > 0 ? '🚶‍♂️' : (theme ? theme.icon : '⛏️'),
       };
     });
 });
@@ -229,13 +234,26 @@ async function triggerManualSearch() {
           class="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between text-xs"
         >
           <div class="flex items-center gap-2.5">
-            <span class="text-lg">⛏️</span>
+            <span class="text-lg">{{ m.icon }}</span>
             <div>
               <div class="font-semibold text-slate-800 dark:text-slate-200">{{ m.target }}</div>
               <div class="text-[10px] text-slate-400">{{ m.type }}</div>
             </div>
           </div>
-          <span class="px-2.5 py-1 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-mono font-bold text-xs">
+          <span
+            class="px-2.5 py-1 rounded-md font-mono font-bold text-xs"
+            :class="
+              m.resType === 'food'
+                ? 'bg-lime-100 text-lime-800 dark:bg-lime-950/60 dark:text-lime-300'
+                : m.resType === 'wood'
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                  : m.resType === 'stone'
+                    ? 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                    : m.resType === 'iron'
+                      ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300'
+                      : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300'
+            "
+          >
             {{ m.timerText }}
           </span>
         </div>
