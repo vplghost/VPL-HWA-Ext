@@ -89,8 +89,8 @@ const troopCards = computed(() => {
 <template>
   <section id="dashboard-troops-section" class="space-y-2">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-1.5">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-1.5 shrink-0">
         <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
           <span>🪖</span> Troops
         </h3>
@@ -98,44 +98,58 @@ const troopCards = computed(() => {
       </div>
 
       <div class="flex items-center gap-2">
-        <!-- Sync Healed Button -->
-        <button
-          v-if="isHealingReady"
-          id="dashboard-troops-heal-sync-btn"
-          type="button"
-          :disabled="isSyncLoading"
-          class="cursor-pointer inline-flex items-center gap-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-60"
-          @click="syncHealed"
-        >
-          <span :class="{ 'animate-spin': isSyncLoading }">{{ isSyncLoading ? '↻' : '✓' }}</span>
-          <span>{{ isSyncLoading ? 'Syncing...' : 'Sync Healed' }}</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- Sync Healed Button -->
+          <button
+            v-if="isHealingReady"
+            id="dashboard-troops-heal-sync-btn"
+            type="button"
+            :disabled="isSyncLoading"
+            class="cursor-pointer inline-flex items-center gap-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-60"
+            @click="syncHealed"
+          >
+            <span :class="{ 'animate-spin': isSyncLoading }">{{ isSyncLoading ? '↻' : '✓' }}</span>
+            <span>{{ isSyncLoading ? 'Syncing...' : 'Sync Healed' }}</span>
+          </button>
 
-        <!-- Heal All Button -->
-        <button
-          v-else-if="totalInjured > 0 && !isHealingActive"
-          id="dashboard-troops-heal-all-btn"
-          type="button"
-          :disabled="isHealLoading"
-          class="cursor-pointer inline-flex items-center gap-1 rounded bg-rose-600 hover:bg-rose-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-60"
-          @click="healAll"
-        >
-          <span :class="{ 'animate-spin': isHealLoading }">{{ isHealLoading ? '↻' : '🏥' }}</span>
-          <span>{{ isHealLoading ? 'Healing...' : `Heal All (${formatNumber(totalInjured)})` }}</span>
-        </button>
+          <!-- Heal All Button -->
+          <button
+            v-else-if="totalInjured > 0 && !isHealingActive"
+            id="dashboard-troops-heal-all-btn"
+            type="button"
+            :disabled="isHealLoading"
+            class="cursor-pointer inline-flex items-center gap-1 rounded bg-rose-600 hover:bg-rose-500 text-white px-2 py-0.5 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-60"
+            @click="healAll"
+          >
+            <span :class="{ 'animate-spin': isHealLoading }">{{ isHealLoading ? '↻' : '🏥' }}</span>
+            <span>{{ isHealLoading ? 'Healing...' : `Heal All (${formatNumber(totalInjured)})` }}</span>
+          </button>
 
-        <!-- Refresh Button -->
-        <button
-          id="dashboard-troops-refresh-btn"
-          type="button"
-          title="Refresh troops, hospital, and training status"
-          :disabled="isRefreshing"
-          class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors disabled:opacity-50"
-          @click="refreshTroops"
+          <!-- Refresh Button -->
+          <button
+            id="dashboard-troops-refresh-btn"
+            type="button"
+            title="Refresh troops, hospital, and training status"
+            :disabled="isRefreshing"
+            class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+            @click="refreshTroops"
+          >
+            <span class="text-sm" :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
+            <span class="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
+
+        <!-- Status Message to the right of buttons -->
+        <div
+          v-if="healStatus"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px] sm:max-w-xs"
+          :title="healStatus"
         >
-          <span class="text-sm" :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
-          <span class="hidden sm:inline">Refresh</span>
-        </button>
+          {{ healStatus }}
+        </div>
       </div>
     </div>
 
@@ -307,14 +321,6 @@ const troopCards = computed(() => {
             </div>
           </div>
       </div>
-    </div>
-    <div
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-      class="h-8 overflow-y-auto break-words text-xs leading-4 text-slate-500 dark:text-slate-400"
-    >
-      {{ healStatus }}
     </div>
   </section>
 </template>
