@@ -10,6 +10,7 @@ import { towerRules as typedTowerRules } from '../../data/towerData.ts';
 import { refillableRules as typedRefillableRules } from '../../data/refillableData.ts';
 import { speedupData as typedSpeedupData } from '../../data/speedupData.ts';
 import { heroMetadata as typedHeroMetadata, gearCraftData as typedGearCraftData, scrollCraftData as typedScrollCraftData } from '../../data/heroMetadata.ts';
+import { getTeamLevelExpDelta as typedGetTeamLevelExpDelta } from '../../data/teamLevelData.ts';
 
 const getNameMap = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperNameMap) || typedNameMap;
 const getMineTypes = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMineTypes) || typedMineTypes;
@@ -25,6 +26,7 @@ const getSpeedupData = (): any => (typeof globalThis !== 'undefined' && (globalT
 const getHeroMetadata = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperHeroMetadata) || typedHeroMetadata;
 const getScrollCraftData = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperScrollCraftData) || typedScrollCraftData;
 const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGearCraftData) || typedGearCraftData;
+const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGetTeamLevelExpDelta) || typedGetTeamLevelExpDelta;
 
   const definitions = {
     heroGetAll: 'heroes',
@@ -1988,7 +1990,8 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
               level: teamLevel,
               id: info.id ? Number(info.id) : null,
               exp: info.experience != null ? Number(info.experience) : undefined,
-              maxLevel: info.maxLevel != null ? Number(info.maxLevel) : undefined
+              maxLevel: info.maxLevel != null ? Number(info.maxLevel) : undefined,
+              nextLevelExp: getTeamLevelExpDelta()(teamLevel) ?? undefined
             },
             updatedAt: record.timestamp
           });

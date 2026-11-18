@@ -28,6 +28,7 @@ import { useGameConnection } from '@/src/composables/useGameConnection';
 import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 import { getResourceIcon } from '@/src/utils/itemResources';
 import { mail } from '@/src/utils/mail';
+import { getTeamLevelExpDelta } from '@/src/data/teamLevelData';
 
 const { cache, rpcQueueCount, dispatchRpc } = useRpcCache();
 const { theme, applyTheme } = useTheme();
@@ -179,13 +180,26 @@ const accountMaxLevel = computed(() => {
   return Number.isFinite(Number(max)) ? Number(max) : null;
 });
 
+const accountNextLevelExp = computed(() => {
+  if (!accountLevel.value) return null;
+  const fromCache = cache.value.accountStatus?.data?.nextLevelExp;
+  if (Number.isFinite(Number(fromCache))) return Number(fromCache);
+  return getTeamLevelExpDelta(accountLevel.value);
+});
+
 const levelTooltip = computed(() => {
   if (!accountLevel.value) return 'Team Level';
   const parts: string[] = [
     `Team Level: ${accountLevel.value}${accountMaxLevel.value ? ` / ${accountMaxLevel.value}` : ''}`,
   ];
   if (accountExp.value != null) {
-    parts.push(`EXP: ${formatResourceAmount(accountExp.value)}`);
+    if (accountNextLevelExp.value != null && accountNextLevelExp.value > 0) {
+      parts.push(`EXP: ${formatResourceAmount(accountExp.value)} / ${formatResourceAmount(accountNextLevelExp.value)}`);
+    } else if (accountLevel.value >= (accountMaxLevel.value || 120) || accountNextLevelExp.value === 0) {
+      parts.push(`EXP: ${formatResourceAmount(accountExp.value)} (Max Level)`);
+    } else {
+      parts.push(`EXP: ${formatResourceAmount(accountExp.value)}`);
+    }
   }
   return parts.join('\n');
 });

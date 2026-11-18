@@ -229,8 +229,17 @@ test('Header.vue contains account-level badge and EXP tooltip', async () => {
   assert.ok(headerContent.includes('id="account-level"'), 'Header.vue must include account-level badge');
   assert.ok(headerContent.includes('accountLevel'), 'Header.vue must compute accountLevel');
   assert.ok(headerContent.includes('accountExp'), 'Header.vue must compute accountExp');
+  assert.ok(headerContent.includes('accountNextLevelExp'), 'Header.vue must compute accountNextLevelExp');
   assert.ok(headerContent.includes('levelTooltip'), 'Header.vue must compute levelTooltip');
   assert.ok(headerContent.includes('Lv. {{ accountLevel }}'), 'Header.vue must render Lv. {{ accountLevel }}');
+
+  const { getTeamLevelExpDelta } = await import('../src/data/teamLevelData.ts');
+  assert.equal(getTeamLevelExpDelta(1), 20);
+  assert.equal(getTeamLevelExpDelta(87), 4350);
+  assert.equal(getTeamLevelExpDelta(88), 4400);
+  assert.equal(getTeamLevelExpDelta(89), 4450);
+  assert.equal(getTeamLevelExpDelta(120), 0);
+  assert.equal(getTeamLevelExpDelta(121), null);
 });
 
 test('rpcCache extracts exp and maxLevel from userGetInfo and clears zeppelinGiftGet availability on zeppelinGiftFarm', async () => {
@@ -265,6 +274,7 @@ test('rpcCache extracts exp and maxLevel from userGetInfo and clears zeppelinGif
   assert.equal(cacheAfterUser.accountStatus?.data?.name, 'VplGhost');
   assert.equal(cacheAfterUser.accountStatus?.data?.level, 89);
   assert.equal(cacheAfterUser.accountStatus?.data?.exp, 695);
+  assert.equal(cacheAfterUser.accountStatus?.data?.nextLevelExp, 4450);
   assert.equal(cacheAfterUser.accountStatus?.data?.maxLevel, 120);
 
   // Set initial zeppelinGiftGet with available: true
