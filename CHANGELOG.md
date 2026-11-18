@@ -5,7 +5,7 @@
 ### Fixed
 
 - **Dashboard Troops Section Status Layout**:
-  - Moved the `healStatus` notification message from the bottom of `TroopsOverview.vue` up to the section header title bar, positioned directly to the right of the action buttons (`Sync Healed`, `Heal All`, `Refresh`).
+  - Moved the `healStatus` notification message from the bottom of `TroopsOverview.vue` up to the section header title bar, positioned directly to the left of the action buttons (`Sync Healed`, `Heal All`, `Refresh`) with a fixed right-anchored button group (`shrink-0`) to prevent buttons from jittering or jumping after clicking.
   - Removed the fixed `h-8` bottom container, eliminating the abnormal vertical gap between the Troops section and the subsequent Queues section on the Dashboard.
 
 ## 0.11.72 — 2026-11-18

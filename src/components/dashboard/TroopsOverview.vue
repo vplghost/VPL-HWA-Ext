@@ -98,7 +98,19 @@ const troopCards = computed(() => {
       </div>
 
       <div class="flex items-center gap-2">
-        <div class="flex items-center gap-2">
+        <!-- Status Message to the left of buttons -->
+        <div
+          v-if="healStatus"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px] sm:max-w-xs text-right"
+          :title="healStatus"
+        >
+          {{ healStatus }}
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
           <!-- Sync Healed Button -->
           <button
             v-if="isHealingReady"
@@ -137,18 +149,6 @@ const troopCards = computed(() => {
             <span class="text-sm" :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
             <span class="hidden sm:inline">Refresh</span>
           </button>
-        </div>
-
-        <!-- Status Message to the right of buttons -->
-        <div
-          v-if="healStatus"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px] sm:max-w-xs"
-          :title="healStatus"
-        >
-          {{ healStatus }}
         </div>
       </div>
     </div>
