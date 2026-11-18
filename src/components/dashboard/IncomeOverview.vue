@@ -542,7 +542,7 @@ watch(
                 <span>⚔️</span> Auto-Join
               </span>
             </div>
-            <div class="my-1 flex items-baseline gap-1.5 flex-wrap">
+            <div class="my-0.5 flex items-baseline gap-1.5 flex-wrap">
               <span class="text-xs font-black text-indigo-600 dark:text-indigo-400 tabular-nums">
                 {{ activityStats.extAutoJoinCount }} <span class="text-[9px] font-semibold text-slate-400">Ext</span>
               </span>
@@ -550,6 +550,14 @@ watch(
               <span class="text-xs font-bold text-slate-600 dark:text-slate-300 tabular-nums">
                 {{ activityStats.gameAutoJoinCount }} <span class="text-[9px] font-semibold text-slate-400">Game</span>
               </span>
+            </div>
+            <!-- Defeat/Loss Slot or Whitespace Placeholder -->
+            <div class="h-4 flex items-center text-[10px] leading-none">
+              <span v-if="activityStats.autoJoinLosses > 0" class="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-0.5">
+                <span class="text-[9px]">⚠️</span>
+                <span>{{ activityStats.autoJoinLosses }} {{ activityStats.autoJoinLosses === 1 ? 'loss' : 'losses' }}</span>
+              </span>
+              <span v-else class="text-transparent select-none pointer-events-none">&nbsp;</span>
             </div>
             <div class="text-[9px] text-slate-400 truncate" title="Extension auto-recalls gathering squads vs in-game auto join">
               Auto-recall & join
@@ -561,8 +569,16 @@ watch(
             <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <span>🗺️</span> Campaign
             </span>
-            <div class="my-1 text-sm font-black text-sky-600 dark:text-sky-400 tabular-nums">
+            <div class="my-0.5 text-sm font-black text-sky-600 dark:text-sky-400 tabular-nums">
               {{ formatNumber(activityStats.campaignCount) }}
+            </div>
+            <!-- Defeat/Loss Slot or Whitespace Placeholder -->
+            <div class="h-4 flex items-center text-[10px] leading-none">
+              <span v-if="activityStats.campaignLosses > 0" class="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-0.5">
+                <span class="text-[9px]">⚠️</span>
+                <span>{{ activityStats.campaignLosses }} {{ activityStats.campaignLosses === 1 ? 'loss' : 'losses' }}</span>
+              </span>
+              <span v-else class="text-transparent select-none pointer-events-none">&nbsp;</span>
             </div>
             <div class="text-[9px] text-slate-400 truncate">
               Raids completed
@@ -574,8 +590,16 @@ watch(
             <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <span>🚩</span> Rallies Led
             </span>
-            <div class="my-1 text-sm font-black text-purple-600 dark:text-purple-400 tabular-nums">
+            <div class="my-0.5 text-sm font-black text-purple-600 dark:text-purple-400 tabular-nums">
               {{ formatNumber(activityStats.organizedRalliesCount) }}
+            </div>
+            <!-- Defeat/Loss Slot or Whitespace Placeholder -->
+            <div class="h-4 flex items-center text-[10px] leading-none">
+              <span v-if="activityStats.rallyLosses > 0" class="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-0.5">
+                <span class="text-[9px]">⚠️</span>
+                <span>{{ activityStats.rallyLosses }} {{ activityStats.rallyLosses === 1 ? 'loss' : 'losses' }}</span>
+              </span>
+              <span v-else class="text-transparent select-none pointer-events-none">&nbsp;</span>
             </div>
             <div class="text-[9px] text-slate-400 truncate">
               Organized
@@ -587,8 +611,16 @@ watch(
             <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <span>👹</span> Monsters
             </span>
-            <div class="my-1 text-sm font-black text-orange-600 dark:text-orange-400 tabular-nums">
+            <div class="my-0.5 text-sm font-black text-orange-600 dark:text-orange-400 tabular-nums">
               {{ formatNumber(activityStats.monstersCount) }}
+            </div>
+            <!-- Defeat/Loss Slot or Whitespace Placeholder -->
+            <div class="h-4 flex items-center text-[10px] leading-none">
+              <span v-if="activityStats.monsterLosses > 0" class="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-0.5">
+                <span class="text-[9px]">⚠️</span>
+                <span>{{ activityStats.monsterLosses }} {{ activityStats.monsterLosses === 1 ? 'loss' : 'losses' }}</span>
+              </span>
+              <span v-else class="text-transparent select-none pointer-events-none">&nbsp;</span>
             </div>
             <div class="text-[9px] text-slate-400 truncate">
               Solo hunted
@@ -600,8 +632,16 @@ watch(
             <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <span>⛺</span> Camps
             </span>
-            <div class="my-1 text-sm font-black text-teal-600 dark:text-teal-400 tabular-nums">
+            <div class="my-0.5 text-sm font-black text-teal-600 dark:text-teal-400 tabular-nums">
               {{ formatNumber(activityStats.brigandCampsCount) }}
+            </div>
+            <!-- Defeat/Loss Slot or Whitespace Placeholder -->
+            <div class="h-4 flex items-center text-[10px] leading-none">
+              <span v-if="activityStats.campLosses > 0" class="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-0.5">
+                <span class="text-[9px]">⚠️</span>
+                <span>{{ activityStats.campLosses }} {{ activityStats.campLosses === 1 ? 'loss' : 'losses' }}</span>
+              </span>
+              <span v-else class="text-transparent select-none pointer-events-none">&nbsp;</span>
             </div>
             <div class="text-[9px] text-slate-400 truncate">
               Brigands cleared

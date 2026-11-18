@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.11.90 — 2026-11-18
+
+### Changed
+
+- **Visual Theme Harmonization across Building and Research Components**:
+  - Harmonized ResearchModal with the cool purple theme (status badges, active queue cards, target level badges, auto-advance queue items, and researching state in directory).
+  - Harmonized QueuesOverview on Dashboard to use warm amber for Building and cool purple for Research (progress fills, timer badges, manage arrows).
+  - Updated Header badges to highlight active Building in warm amber and active Research in cool purple.
+  - Updated SpeedupControl to dynamically style research speedup with purple and building speedup with amber.
+  - Recorded and accepted System Decision `20261118-1956-visual-theme-separation-warm-amber-for-building-and-cool-purple-for-research`.
+
+- **Daily Activity Cards Loss Metrics & Layout Alignment (`IncomeOverview.vue`)**:
+  - Added loss indicators (`⚠️ X loss(es)`) under rally, raid, and monster metrics.
+  - Added fixed-height `h-4` slot with whitespace placeholder (`&nbsp;`) across all 5 activity cards to guarantee horizontal baseline alignment.
+
 ## 0.11.88 — 2026-11-18
 
 ### Fixed

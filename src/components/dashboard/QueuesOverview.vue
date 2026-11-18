@@ -62,14 +62,24 @@ function handleMarchClick(category: string) {
           v-for="group in queueGroups"
           :key="group.id"
           type="button"
-          class="relative overflow-hidden w-full h-[76px] p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-left cursor-pointer transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700/60 flex flex-col justify-between"
+          class="relative overflow-hidden w-full h-[76px] p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-left cursor-pointer transition-colors border border-transparent flex flex-col justify-between"
+          :class="
+            group.id === 'research'
+              ? 'hover:border-purple-300 dark:hover:border-purple-700/60'
+              : 'hover:border-amber-300 dark:hover:border-amber-700/60'
+          "
           :aria-label="`Open ${group.title}`"
           @click="group.id === 'building' ? openModal('building') : openModal('research')"
         >
           <!-- Background Progress Bar Fill for Active / Ready Items -->
           <div
             v-if="group.rows.length && group.rows[0]?.state === 'active' && (group.rows[0]?.progressPercent ?? 0) > 0"
-            class="absolute inset-y-0 left-0 bg-sky-500/10 dark:bg-sky-400/15 pointer-events-none transition-all duration-500 ease-out"
+            class="absolute inset-y-0 left-0 pointer-events-none transition-all duration-500 ease-out"
+            :class="
+              group.id === 'research'
+                ? 'bg-purple-500/15 dark:bg-purple-400/20'
+                : 'bg-amber-500/15 dark:bg-amber-400/20'
+            "
             :style="{ width: `${group.rows[0].progressPercent}%` }"
           />
           <div
@@ -89,7 +99,9 @@ function handleMarchClick(category: string) {
               :class="
                 group.rows[0].state === 'ready'
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                  : 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
+                  : group.id === 'research'
+                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
               "
             >
               {{ group.rows[0].timerText }}
@@ -135,7 +147,16 @@ function handleMarchClick(category: string) {
                   : 'Idle · Click to manage'
               }}
             </span>
-            <span class="shrink-0 text-[9px] opacity-70">Manage →</span>
+            <span
+              class="shrink-0 text-[9px] font-medium transition-colors"
+              :class="
+                group.id === 'research'
+                  ? 'text-purple-600 dark:text-purple-400'
+                  : 'text-amber-600 dark:text-amber-400'
+              "
+            >
+              Manage →
+            </span>
           </div>
         </button>
       </div>

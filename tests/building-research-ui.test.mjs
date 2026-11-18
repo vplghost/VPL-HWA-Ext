@@ -1112,3 +1112,33 @@ test('renderResearchDialog supports sorting next research candidates by research
   assert.ok(gridDesc.children[2].innerHTML.includes('Short Tech'));
 });
 
+test('Building components use warm amber theme while Research components consistently use cool purple theme', async () => {
+  const fs = await import('node:fs/promises');
+  const researchModalContent = await fs.readFile(new URL('../src/components/dialogs/ResearchModal.vue', import.meta.url), 'utf8');
+  const buildingModalContent = await fs.readFile(new URL('../src/components/dialogs/BuildingModal.vue', import.meta.url), 'utf8');
+  const queuesOverviewContent = await fs.readFile(new URL('../src/components/dashboard/QueuesOverview.vue', import.meta.url), 'utf8');
+  const speedupControlContent = await fs.readFile(new URL('../src/components/common/SpeedupControl.vue', import.meta.url), 'utf8');
+
+  // 1. ResearchModal should use cool purple theme
+  assert.ok(researchModalContent.includes('bg-purple-100 text-purple-800'), 'Research status/queue badge must use purple theme');
+  assert.ok(researchModalContent.includes('border-purple-200 bg-purple-50'), 'Active research queue card must use purple theme');
+  assert.ok(researchModalContent.includes('bg-purple-200 text-purple-900'), 'Research target level badge must use purple theme');
+  assert.ok(researchModalContent.includes('bg-purple-500'), 'Research progress bar or status dot must use purple theme');
+  assert.ok(!researchModalContent.includes('bg-amber-100 text-amber-800'), 'ResearchModal must not leak building amber badge theme');
+  assert.ok(!researchModalContent.includes('border-amber-200 bg-amber-50/60'), 'ResearchModal must not leak building amber queue card');
+
+  // 2. BuildingModal should use warm amber theme
+  assert.ok(buildingModalContent.includes('bg-amber-100 text-amber-800'), 'Building status/queue badge must use amber theme');
+  assert.ok(buildingModalContent.includes('border-amber-200 bg-amber-50'), 'Active building queue card must use amber theme');
+  assert.ok(buildingModalContent.includes('bg-amber-500'), 'Building progress bar must use amber theme');
+
+  // 3. QueuesOverview differentiates building (amber) and research (purple)
+  assert.ok(queuesOverviewContent.includes("group.id === 'research'") && queuesOverviewContent.includes('bg-purple-100 text-purple-800'), 'QueuesOverview must use purple badge for research');
+  assert.ok(queuesOverviewContent.includes('bg-amber-100 text-amber-800'), 'QueuesOverview must use amber badge for building');
+  assert.ok(queuesOverviewContent.includes("group.id === 'research'") && queuesOverviewContent.includes('bg-purple-500/15'), 'QueuesOverview must use purple progress fill for research');
+
+  // 4. SpeedupControl supports distinct themes for research (purple) vs building (amber)
+  assert.ok(speedupControlContent.includes("kind === 'research'") && speedupControlContent.includes('text-purple-600'), 'SpeedupControl must style research button with purple');
+  assert.ok(speedupControlContent.includes('text-amber-600'), 'SpeedupControl must style building button with amber');
+});
+

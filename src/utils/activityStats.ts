@@ -6,11 +6,16 @@ export interface DailyActivityStats {
   extAutoJoinCount: number;
   gameAutoJoinCount: number;
   totalAutoJoinCount: number;
+  autoJoinLosses: number;
   // Activities
   campaignCount: number;
+  campaignLosses: number;
   organizedRalliesCount: number;
+  rallyLosses: number;
   monstersCount: number;
+  monsterLosses: number;
   brigandCampsCount: number;
+  campLosses: number;
   // Energy consumption
   campaignEnergySpent: number;
   worldEnergySpent: number;
@@ -148,7 +153,73 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     }
   }
 
-  // 7. Energy Consumption Calculations
+  // 7. Losses / Defeats by Activity
+  let rallyLosses = 0;
+  let autoJoinLosses = 0;
+  let monsterLosses = 0;
+  let campLosses = 0;
+  let campaignLosses = 0;
+
+  const rawReports: any[] = [];
+  for (const k of ['getPage:report', 'mailStatus']) {
+    const list = cache?.[k]?.data?.reports ?? cache?.[k]?.reports;
+    if (Array.isArray(list)) rawReports.push(...list);
+    else if (list && typeof list === 'object') rawReports.push(...Object.values(list));
+  }
+
+  const seenReportIds = new Set<string>();
+  for (const rep of rawReports) {
+    if (!rep || rep.id == null || seenReportIds.has(String(rep.id))) continue;
+    seenReportIds.add(String(rep.id));
+
+    const repDay = rep.createdAt ? formatUtcDay(Number(rep.createdAt)) : '';
+    if (repDay && repDay !== today) continue;
+
+    const res = String(rep.result ?? rep.payload?.result ?? '').toLowerCase();
+    const isLoss = ['lose', 'loss', 'defeat', 'failed'].includes(res);
+    if (!isLoss) continue;
+
+    const type = String(rep.type || '');
+    if (type === 'rallyMobAttackResult' || type === 'mobRallyAttackResult') {
+      const isLeader = Boolean(rep.payload?.isLeader || rep.isLeader);
+      if (isLeader) {
+        rallyLosses++;
+      } else {
+        autoJoinLosses++;
+      }
+    } else if (type === 'soloMobAttackResult' || type === 'mobAttackResult' || type === 'mobSoloAttackResult') {
+      monsterLosses++;
+    } else if (type === 'campBattleResult' || type === 'brigandCampResult') {
+      campLosses++;
+    }
+  }
+
+  // Preserve overall losses from battleReportSummary if individual reports were claimed/pruned
+  if (todayReports?.losses && Number(todayReports.losses) > (rallyLosses + autoJoinLosses + monsterLosses + campLosses)) {
+    const unassigned = Number(todayReports.losses) - (rallyLosses + autoJoinLosses + monsterLosses + campLosses);
+    if (rallyReports > 0 && organizedRalliesCount > 0) {
+      rallyLosses += unassigned;
+    } else if (monsterReports > 0) {
+      monsterLosses += unassigned;
+    } else {
+      rallyLosses += unassigned;
+    }
+  }
+
+  // Check campaign loss if any
+  const lastCampaign = cache?.lastCampaignRaidResult;
+  if (lastCampaign) {
+    const timeVal = lastCampaign.updatedAt || lastCampaign.at;
+    const dateStr = timeVal ? formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal) : '';
+    if (dateStr === today) {
+      const success = lastCampaign.data?.success ?? lastCampaign.success;
+      if (success === false) {
+        campaignLosses++;
+      }
+    }
+  }
+
+  // 8. Energy Consumption Calculations
   // Only host/organized rallies consume World Energy (joining rallies costs 0 World Energy)
   const campaignEnergySpent = campaignCount * CAMPAIGN_ENERGY_COST;
   const worldEnergySpent =
@@ -163,10 +234,15 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     extAutoJoinCount,
     gameAutoJoinCount,
     totalAutoJoinCount: extAutoJoinCount + gameAutoJoinCount,
+    autoJoinLosses,
     campaignCount,
+    campaignLosses,
     organizedRalliesCount,
+    rallyLosses,
     monstersCount,
+    monsterLosses,
     brigandCampsCount,
+    campLosses,
     campaignEnergySpent,
     worldEnergySpent,
     totalEnergySpent,
@@ -192,10 +268,15 @@ export function getActivityStatsForDay(
     // Merge live with existing stored records (taking maximums)
     const extAuto = Math.max(liveToday.extAutoJoinCount, existing.extAutoJoinCount || 0);
     const gameAuto = Math.max(liveToday.gameAutoJoinCount, existing.gameAutoJoinCount || 0);
+    const autoLoss = Math.max(liveToday.autoJoinLosses, existing.autoJoinLosses || 0);
     const campaign = Math.max(liveToday.campaignCount, existing.campaignCount || 0);
+    const campLoss = Math.max(liveToday.campaignLosses, existing.campaignLosses || 0);
     const orgRallies = Math.max(liveToday.organizedRalliesCount, existing.organizedRalliesCount || 0);
+    const rallyLoss = Math.max(liveToday.rallyLosses, existing.rallyLosses || 0);
     const monsters = Math.max(liveToday.monstersCount, existing.monstersCount || 0);
+    const monsterLoss = Math.max(liveToday.monsterLosses, existing.monsterLosses || 0);
     const camps = Math.max(liveToday.brigandCampsCount, existing.brigandCampsCount || 0);
+    const campBattleLoss = Math.max(liveToday.campLosses, existing.campLosses || 0);
 
     const campaignEnergy = campaign * CAMPAIGN_ENERGY_COST;
     // Only host/organized rallies consume World Energy
@@ -209,10 +290,15 @@ export function getActivityStatsForDay(
       extAutoJoinCount: extAuto,
       gameAutoJoinCount: gameAuto,
       totalAutoJoinCount: extAuto + gameAuto,
+      autoJoinLosses: autoLoss,
       campaignCount: campaign,
+      campaignLosses: campLoss,
       organizedRalliesCount: orgRallies,
+      rallyLosses: rallyLoss,
       monstersCount: monsters,
+      monsterLosses: monsterLoss,
       brigandCampsCount: camps,
+      campLosses: campBattleLoss,
       campaignEnergySpent: campaignEnergy,
       worldEnergySpent: worldEnergy,
       totalEnergySpent: campaignEnergy + worldEnergy,
@@ -253,6 +339,20 @@ export function getActivityStatsForDay(
   const monsters = Math.max(history?.monstersCount || 0, monsterReports);
   const camps = Math.max(history?.brigandCampsCount || 0, campReports);
 
+  const autoLoss = history?.autoJoinLosses || 0;
+  const campLoss = history?.campaignLosses || 0;
+  let rallyLoss = history?.rallyLosses || 0;
+  let monsterLoss = history?.monsterLosses || 0;
+  let campBattleLoss = history?.campLosses || 0;
+
+  // Attribute past day losses if summary has losses not yet broken down
+  if (dayReports?.losses && Number(dayReports.losses) > (rallyLoss + autoLoss + monsterLoss + campBattleLoss)) {
+    const unassigned = Number(dayReports.losses) - (rallyLoss + autoLoss + monsterLoss + campBattleLoss);
+    if (rallyReports > 0 && orgRallies > 0) rallyLoss += unassigned;
+    else if (monsterReports > 0) monsterLoss += unassigned;
+    else rallyLoss += unassigned;
+  }
+
   const campaignEnergy = campaign * CAMPAIGN_ENERGY_COST;
   // Only host/organized rallies consume World Energy
   const worldEnergy =
@@ -265,10 +365,15 @@ export function getActivityStatsForDay(
     extAutoJoinCount: extAuto,
     gameAutoJoinCount: gameAuto,
     totalAutoJoinCount: extAuto + gameAuto,
+    autoJoinLosses: autoLoss,
     campaignCount: campaign,
+    campaignLosses: campLoss,
     organizedRalliesCount: orgRallies,
+    rallyLosses: rallyLoss,
     monstersCount: monsters,
+    monsterLosses: monsterLoss,
     brigandCampsCount: camps,
+    campLosses: campBattleLoss,
     campaignEnergySpent: campaignEnergy,
     worldEnergySpent: worldEnergy,
     totalEnergySpent: campaignEnergy + worldEnergy,

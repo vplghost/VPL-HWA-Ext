@@ -636,7 +636,12 @@ function toggleTheme() {
             id="building-badge"
             tabindex="0"
             aria-label="Building time remaining (Click to view City Buildings)"
-            class="cursor-pointer inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            class="cursor-pointer inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors"
+            :class="
+              buildingRemaining !== 'Idle' && buildingRemaining !== '—'
+                ? 'text-amber-700 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/50 border border-amber-200/80 dark:border-amber-800/60'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            "
             @click="openModal('building')"
           >
             <span>🏗</span>
@@ -650,7 +655,12 @@ function toggleTheme() {
             id="research-badge"
             tabindex="0"
             aria-label="Research time remaining (Click to view Personal Research)"
-            class="cursor-pointer inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            class="cursor-pointer inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors"
+            :class="
+              researchRemaining !== 'Idle' && researchRemaining !== '—'
+                ? 'text-purple-700 dark:text-purple-300 bg-purple-50/80 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            "
             @click="openModal('research')"
           >
             <span>🔬</span>

@@ -76,7 +76,20 @@ async function confirm() {
 
 <template>
   <span class="inline-flex items-center align-middle" data-speedup-control>
-    <button type="button" :aria-label="`Speed up ${targetLabel}`" :title="waiting ? 'Speedup awaiting game confirmation' : `Speed up ${targetLabel}`" class="inline-flex cursor-pointer items-center justify-center bg-transparent p-0.5 text-amber-600 hover:text-amber-500 dark:text-amber-400" @click.stop="openForm">
+    <button
+      type="button"
+      :aria-label="`Speed up ${targetLabel}`"
+      :title="waiting ? 'Speedup awaiting game confirmation' : `Speed up ${targetLabel}`"
+      class="inline-flex cursor-pointer items-center justify-center bg-transparent p-0.5 transition-colors"
+      :class="
+        kind === 'research'
+          ? 'text-purple-600 hover:text-purple-500 dark:text-purple-400'
+          : kind === 'healing'
+          ? 'text-emerald-600 hover:text-emerald-500 dark:text-emerald-400'
+          : 'text-amber-600 hover:text-amber-500 dark:text-amber-400'
+      "
+      @click.stop="openForm"
+    >
       <svg viewBox="0 0 24 24" class="size-3.5" fill="currentColor" aria-hidden="true"><path d="M3 4v16l9-8-9-8Zm9 0v16l9-8-9-8Z" /></svg>
     </button>
     <ModalDialog :model-value="formOpen && !confirmation" :title="`Speed up ${targetLabel}`" icon="⏩" :stack-level="70" @update:model-value="formOpen = false">
@@ -107,7 +120,21 @@ async function confirm() {
       </template>
       <template #footer>
         <button type="button" class="cursor-pointer rounded border border-slate-300 px-3 py-1.5" @click="confirmation = null">Cancel</button>
-        <button type="button" :disabled="!confirmValid || waiting" class="cursor-pointer rounded bg-amber-600 px-3 py-1.5 text-white disabled:opacity-50" @click="confirm">Confirm &amp; use items</button>
+        <button
+          type="button"
+          :disabled="!confirmValid || waiting"
+          class="cursor-pointer rounded px-3 py-1.5 text-white disabled:opacity-50 transition-colors"
+          :class="
+            kind === 'research'
+              ? 'bg-purple-600 hover:bg-purple-500'
+              : kind === 'healing'
+              ? 'bg-emerald-600 hover:bg-emerald-500'
+              : 'bg-amber-600 hover:bg-amber-500'
+          "
+          @click="confirm"
+        >
+          Confirm &amp; use items
+        </button>
       </template>
     </ModalDialog>
   </span>

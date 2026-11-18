@@ -10,10 +10,15 @@ test('getTodayActivityStats returns zeroes on empty cache', () => {
   assert.equal(stats.extAutoJoinCount, 0);
   assert.equal(stats.gameAutoJoinCount, 0);
   assert.equal(stats.totalAutoJoinCount, 0);
+  assert.equal(stats.autoJoinLosses, 0);
   assert.equal(stats.campaignCount, 0);
+  assert.equal(stats.campaignLosses, 0);
   assert.equal(stats.organizedRalliesCount, 0);
+  assert.equal(stats.rallyLosses, 0);
   assert.equal(stats.monstersCount, 0);
+  assert.equal(stats.monsterLosses, 0);
   assert.equal(stats.brigandCampsCount, 0);
+  assert.equal(stats.campLosses, 0);
   assert.equal(stats.campaignEnergySpent, 0);
   assert.equal(stats.worldEnergySpent, 0);
   assert.equal(stats.totalEnergySpent, 0);
@@ -80,4 +85,34 @@ test('getTodayActivityStats aggregates extension vs game auto joins, campaign, r
 
   // Total Energy: 90 + 85 = 175
   assert.equal(stats.totalEnergySpent, 175);
+});
+
+test('getTodayActivityStats extracts rally, monster, and campaign losses from reports', () => {
+  const cache = {
+    mailStatus: {
+      data: {
+        reports: [
+          // Rally loss as leader
+          { id: 'rep-1', type: 'rallyMobAttackResult', createdAt: testNow - 1000, result: 'defeat', isLeader: true },
+          // Rally loss as auto-join participant
+          { id: 'rep-2', type: 'rallyMobAttackResult', createdAt: testNow - 2000, result: 'lose', isLeader: false },
+          // Solo monster loss
+          { id: 'rep-3', type: 'soloMobAttackResult', createdAt: testNow - 3000, payload: { result: 'defeat' } },
+          // Solo monster win
+          { id: 'rep-4', type: 'soloMobAttackResult', createdAt: testNow - 4000, payload: { result: 'win' } },
+        ],
+      },
+    },
+    lastCampaignRaidResult: {
+      updatedAt: '2026-11-18T09:00:00Z',
+      data: { success: false },
+    },
+  };
+
+  const stats = getTodayActivityStats(cache, testNow);
+  assert.equal(stats.rallyLosses, 1);
+  assert.equal(stats.autoJoinLosses, 1);
+  assert.equal(stats.monsterLosses, 1);
+  assert.equal(stats.campaignLosses, 1);
+  assert.equal(stats.campLosses, 0);
 });

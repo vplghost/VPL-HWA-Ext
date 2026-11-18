@@ -644,9 +644,9 @@ async function refreshResearch() {
           <div id="research-dialog-status" class="flex items-center gap-2 truncate">
             <span
               v-if="activeQueues.length > 0"
-              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
             >
-              <span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+              <span class="size-1.5 rounded-full bg-purple-500 animate-pulse"></span>
               Active: <span class="truncate max-w-[140px]">{{ getResearchName(activeQueues[0].researchId) }}</span>
               {{ activeQueues[0].level ? ` Lv. ${activeQueues[0].level}` : '' }} ·
               {{ formatDuration(Math.max(0, Math.ceil(((activeQueues[0].startDate + activeQueues[0].durationMs) - now) / 1000))) }}
@@ -740,7 +740,7 @@ async function refreshResearch() {
             <div
               v-for="q in activeQueues"
               :key="`act-${q.researchId}-${q.startDate}`"
-              class="rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/20"
+              class="rounded-lg border border-purple-200 bg-purple-50/60 p-3.5 dark:border-purple-900/50 dark:bg-purple-950/20"
             >
               <div class="flex items-center justify-between gap-2 flex-wrap">
                 <div class="flex items-center gap-2 min-w-0">
@@ -763,10 +763,10 @@ async function refreshResearch() {
                   </div>
                 </div>
                 <div class="text-right">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-purple-200 text-purple-900 dark:bg-purple-900/60 dark:text-purple-200">
                     Target Lv. {{ q.level ?? '?' }}
                   </span>
-                  <div class="text-xs font-mono font-bold text-amber-800 dark:text-amber-300 mt-1">
+                  <div class="text-xs font-mono font-bold text-purple-800 dark:text-purple-300 mt-1">
                     {{ formatDuration(Math.max(0, Math.ceil(((q.startDate + q.durationMs) - now) / 1000))) }} remaining
                   </div>
                 </div>
@@ -821,7 +821,7 @@ async function refreshResearch() {
                   <input
                     v-model="researchQueue.enabled"
                     type="checkbox"
-                    class="rounded border-slate-300 text-amber-500 focus:ring-amber-400 h-3.5 w-3.5"
+                    class="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
                     @change="saveResearchQueue"
                   />
                   <span>Auto-advance</span>
@@ -847,7 +847,7 @@ async function refreshResearch() {
                 class="flex items-center justify-between gap-2 p-2 rounded-lg border border-slate-200/80 bg-slate-50/70 text-xs dark:border-slate-700/60 dark:bg-slate-800/60"
               >
                 <div class="min-w-0 flex items-center gap-2 flex-1">
-                  <span class="inline-flex items-center justify-center size-5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 text-2xs font-bold shrink-0">
+                  <span class="inline-flex items-center justify-center size-5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 text-2xs font-bold shrink-0">
                     #{{ Number(idx) + 1 }}
                   </span>
                   <div class="min-w-0">
@@ -864,7 +864,7 @@ async function refreshResearch() {
                       <span class="text-2xs font-normal text-slate-400">(ID: {{ item.researchId }})</span>
                     </div>
                     <div class="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
-                      <span class="font-bold text-amber-600 dark:text-amber-400">
+                      <span class="font-bold text-purple-600 dark:text-purple-400">
                         Lv. {{ item.currentLevel ?? '?' }} ➔ {{ item.nextLevel }}
                       </span>
                       <span>·</span>
@@ -989,7 +989,7 @@ async function refreshResearch() {
                           log.action === 'error'
                             ? 'bg-rose-200 text-rose-900 dark:bg-rose-900 dark:text-rose-100'
                             : log.action === 'skip_completed'
-                            ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100'
+                            ? 'bg-purple-200 text-purple-900 dark:bg-purple-900 dark:text-purple-100'
                             : log.action === 'start'
                             ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100'
                             : log.action === 'complete'
@@ -1072,7 +1072,7 @@ async function refreshResearch() {
             <div
               v-for="r in filteredNextResearch"
               :key="`rcandidate-${r.id}`"
-              class="rounded-xl border border-slate-200/90 bg-white p-3 space-y-2 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between"
+              class="rounded-xl border border-slate-200/90 bg-white p-3 space-y-2 dark:border-slate-800 dark:bg-slate-800/80 shadow-2xs hover:border-purple-300 hover:bg-purple-50/30 dark:hover:border-purple-800/60 transition-all flex flex-col justify-between"
             >
               <div class="flex items-center justify-between gap-2 min-w-0">
                 <div class="flex items-center gap-1.5 min-w-0 flex-1">
@@ -1254,9 +1254,9 @@ async function refreshResearch() {
                 <div>
                   <span
                     v-if="r.isResearching"
-                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"
                   >
-                    <span class="size-1 rounded-full bg-amber-500 animate-pulse"></span>Researching
+                    <span class="size-1 rounded-full bg-purple-500 animate-pulse"></span>Researching
                   </span>
                   <span
                     v-else-if="r.isCompleted"

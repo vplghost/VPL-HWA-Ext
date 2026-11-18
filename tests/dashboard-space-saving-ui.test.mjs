@@ -46,4 +46,11 @@ test('IncomeOverview.vue lays out gold and progress/automation diagrams in 1:2 r
   assert.ok(content.includes('goldViewMode'), 'Must support in-place view mode switching for gold');
   assert.ok(content.includes('w-24 text-center'), 'Must have fixed-width date container to avoid jitter');
   assert.ok(content.includes('changeDay'), 'Must support day navigation with changeDay');
+
+  // Verify loss slots and whitespace placeholders across all cards
+  assert.ok(content.includes('activityStats.rallyLosses'), 'Must track rally losses');
+  assert.ok(content.includes('activityStats.monsterLosses'), 'Must track monster losses');
+  assert.ok(content.includes('activityStats.campaignLosses'), 'Must track campaign raid losses');
+  assert.ok(content.includes('&nbsp;'), 'Must render whitespace placeholder when 0 losses to align cards');
+  assert.ok(content.includes('h-4 flex items-center text-[10px]'), 'Must provide fixed height slot across cards');
 });
