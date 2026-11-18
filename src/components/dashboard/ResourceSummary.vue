@@ -133,7 +133,7 @@ const ironVal = computed(
       <span class="text-xl">🌐</span>
     </div>
 
-    <!-- City Resources Card (4 ô mini ngang hàng) -->
+    <!-- City Resources Card (4 mini cells inline) -->
     <div class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-2xs flex flex-col justify-center col-span-2 sm:col-span-1">
       <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-2xs">
         <div class="flex items-center justify-between gap-1">

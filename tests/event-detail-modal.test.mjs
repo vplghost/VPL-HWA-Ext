@@ -76,36 +76,75 @@ test('resolveTierDetail accurately resolves task, unit, tier target, and progres
   // 1. Daily Sign In (login)
   const loginGroup = { localeKey: 'QUEST_TAB_NAME_LOGIN' };
   const loginTier1 = resolveTierDetail({ id: 14654, state: 'completed', progress: 1 }, loginGroup, 1);
-  assert.equal(loginTier1.task, 'Đăng nhập hàng ngày');
-  assert.equal(loginTier1.unit, 'ngày');
+  assert.equal(loginTier1.task, 'Daily Sign In');
+  assert.equal(loginTier1.unit, 'days');
   assert.equal(loginTier1.target, 1);
   assert.equal(loginTier1.state, 'completed');
-  assert.equal(loginTier1.targetDisplay, '1 ngày');
+  assert.equal(loginTier1.targetDisplay, '1 days');
   assert.match(loginTier1.progressDisplay, /100%/);
 
   const loginTier3 = resolveTierDetail({ id: 14656, state: 'inProgress', progress: 2 }, loginGroup, 3);
   assert.equal(loginTier3.target, 3);
-  assert.equal(loginTier3.unit, 'ngày');
+  assert.equal(loginTier3.unit, 'days');
   assert.equal(loginTier3.progress, 2);
   assert.equal(loginTier3.percent, 67);
-  assert.equal(loginTier3.targetDisplay, '3 ngày');
-  assert.equal(loginTier3.progressDisplay, '2 / 3 ngày (67%)');
+  assert.equal(loginTier3.targetDisplay, '3 days');
+  assert.equal(loginTier3.progressDisplay, '2 / 3 days (67%)');
 
   // 2. Arena Battles (known CDN target for quest 11309: target 3)
   const arenaGroup = { localeKey: 'LIB_SPECIAL_QUEST_EVENT_NAME_9' };
   const arenaTier2 = resolveTierDetail({ id: 11309, state: 'completed', progress: 5 }, arenaGroup, 2);
-  assert.equal(arenaTier2.task, 'Chiến đấu Clash of Worlds');
-  assert.equal(arenaTier2.unit, 'trận');
+  assert.equal(arenaTier2.task, 'Clash of Worlds Battles');
+  assert.equal(arenaTier2.unit, 'battles');
   assert.equal(arenaTier2.target, 3);
-  assert.equal(arenaTier2.targetDisplay, '3 trận');
+  assert.equal(arenaTier2.targetDisplay, '3 battles');
 
   // 3. Spend Emeralds ladder
   const emeraldGroup = { localeKey: 'LIB_PSEUDO_STARMONEY' };
   const emTier4 = resolveTierDetail({ id: 99999, state: 'inProgress', progress: 650 }, emeraldGroup, 4);
-  assert.equal(emTier4.task, 'Chiêu tiêu Emeralds'.length ? emTier4.task : 'Chi tiêu Emeralds');
+  assert.equal(emTier4.task, 'Spend Emeralds');
   assert.equal(emTier4.unit, 'Emeralds');
   assert.equal(emTier4.target, 1000);
   assert.equal(emTier4.percent, 65);
   assert.equal(emTier4.targetDisplay, '1,000 Emeralds');
   assert.equal(emTier4.progressDisplay, '650 / 1,000 Emeralds (65%)');
+
+  // 4. Trial of Legends (viewId 137 / EVENT_GLORY_NAME_QUEST_2) steps: 5, 10, 15, 20, 25, 30, 33, 35, 40...
+  const gloryGroup = { localeKey: 'EVENT_GLORY_NAME_QUEST_2' };
+  const tolTier1 = resolveTierDetail({ id: 14820, state: 'completed', progress: 9 }, gloryGroup, 1);
+  assert.equal(tolTier1.target, 5);
+  assert.equal(tolTier1.targetDisplay, '5 battles');
+
+  const tolTier2 = resolveTierDetail({ id: 14821, state: 'completed', progress: 10 }, gloryGroup, 2);
+  assert.equal(tolTier2.target, 10);
+  assert.equal(tolTier2.targetDisplay, '10 battles');
+
+  const tolTier3 = resolveTierDetail({ id: 14822, state: 'inProgress', progress: 13 }, gloryGroup, 3);
+  assert.equal(tolTier3.target, 15);
+  assert.equal(tolTier3.targetDisplay, '15 battles');
+  assert.equal(tolTier3.progressDisplay, '13 / 15 battles (87%)');
+
+  const tolTier4 = resolveTierDetail({ id: 14823, state: 'inProgress', progress: 13 }, gloryGroup, 4);
+  assert.equal(tolTier4.target, 20);
+  assert.equal(tolTier4.targetDisplay, '20 battles');
+
+  const tolTier5 = resolveTierDetail({ id: 14824, state: 'inProgress', progress: 13 }, gloryGroup, 5);
+  assert.equal(tolTier5.target, 25);
+  assert.equal(tolTier5.targetDisplay, '25 battles');
+
+  const tolTier6 = resolveTierDetail({ id: 14825, state: 'inProgress', progress: 13 }, gloryGroup, 6);
+  assert.equal(tolTier6.target, 30);
+  assert.equal(tolTier6.targetDisplay, '30 battles');
+
+  const tolTier7 = resolveTierDetail({ id: 14826, state: 'inProgress', progress: 13 }, gloryGroup, 7);
+  assert.equal(tolTier7.target, 33);
+  assert.equal(tolTier7.targetDisplay, '33 battles');
+
+  const tolTier8 = resolveTierDetail({ id: 14827, state: 'inProgress', progress: 13 }, gloryGroup, 8);
+  assert.equal(tolTier8.target, 35);
+  assert.equal(tolTier8.targetDisplay, '35 battles');
+
+  const tolTier9 = resolveTierDetail({ id: 14828, state: 'inProgress', progress: 13 }, gloryGroup, 9);
+  assert.equal(tolTier9.target, 40);
+  assert.equal(tolTier9.targetDisplay, '40 battles');
 });

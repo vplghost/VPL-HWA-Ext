@@ -52,8 +52,9 @@ export function deriveDailyDefinitions(quests, chains, conditions, packs, locale
     const template = locale?.[localeKey];
     const title = conditionTitle(condition, template, locale);
     if (!title) continue;
+    const englishLabel = (quest.label && !/[\u0400-\u04FF]/.test(quest.label)) ? quest.label : (title ? `[Daily 4X] ${title}` : quest.label);
     definitions[quest.id] = { chainId: quest.chainId, phase: quest.chainOrder, transferProgress: chain.transferProgress === true,
-      condition, translationMethod, localeKey, template, label: quest.label };
+      condition, translationMethod, localeKey, template, label: englishLabel };
     titles[quest.id] = title;
   }
   if (definitions[364]?.condition.name !== 'globalMapCampVictories' || definitions[364]?.condition.target !== 10) throw Error('Quest #364 contract changed; review before generating');

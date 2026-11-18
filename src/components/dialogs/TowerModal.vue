@@ -524,7 +524,7 @@ watch(() => props.modelValue, (open) => {
         </div>
       </div>
 
-      <!-- Khung tổng hợp phần thưởng của Tower -->
+      <!-- Tower Rewards Summary Card -->
       <section
         id="tower-rewards-summary"
         class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs"

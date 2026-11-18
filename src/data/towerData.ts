@@ -13,7 +13,7 @@ export const towerBuffs: Record<string, TowerBuffMeta> = {
   "10": { name: "Everwood Buckler", description: "Blocks the first 5 hits" },
   "11": { name: "Vampiric Charm", description: "Grants additional Vampirism" },
   "12": { name: "Spelldance Boots", description: "Increases Dodge based on Magic Defense" },
-  "13": { name: "Executioner's Fervor", description: "Increases Сritical Hit Chance based on Physical Attack" },
+  "13": { name: "Executioner's Fervor", description: "Increases Critical Hit Chance based on Physical Attack" },
   "14": { name: "Bladehoner", description: "Increases Armor Penetration over time" },
   "15": { name: "Arcane Drain", description: "Lowers enemies' Magic Defense over time" },
   "16": { name: "Soulreaver", description: "Grants temporary Vampirism after using the first skill" },

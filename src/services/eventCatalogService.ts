@@ -34,6 +34,7 @@ export interface RemoteConfigIndexData {
 
 export function cleanLocaleTitle(key?: string | null): string {
   if (!key || typeof key !== 'string') return 'Special Event';
+  if (/[\u0400-\u04FF]/.test(key)) return 'Special Event';
   if (questData.localeTitles[key]?.title) return questData.localeTitles[key].title;
 
   // If already mixed-case and has spaces without underscores, preserve it
@@ -79,7 +80,7 @@ export function parseQuestChains(rawJson: any): Record<string | number, string> 
     const id = val?.id ?? (Array.isArray(rawJson) ? null : item[0]);
     if (id == null) continue;
 
-    const rawTitle = val?.name || val?.label || val?.localeKey;
+    const rawTitle = val?.name_localeKey || val?.localeKey || val?.name || (!/[\u0400-\u04FF]/.test(val?.label || '') ? val?.label : null) || val?.title;
     const title = cleanLocaleTitle(rawTitle);
     result[Number(id)] = title;
   }

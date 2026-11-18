@@ -589,13 +589,13 @@ async function claimAllReady() {
             <div class="space-y-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-2xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
-                  Mục tiêu hiện tại / Current Objective (#{{ chain.activeMilestone.index }}):
+                  Current Objective (#{{ chain.activeMilestone.index }}):
                 </span>
                 <span class="font-bold text-slate-900 dark:text-slate-100">
                   {{ chain.activeMilestone.task }}
                 </span>
                 <span class="text-3xs font-semibold px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200 border border-purple-200 dark:border-purple-700">
-                  Mức: {{ chain.activeMilestone.targetDisplay }}
+                  Target: {{ chain.activeMilestone.targetDisplay }}
                 </span>
               </div>
 
@@ -608,14 +608,14 @@ async function claimAllReady() {
                   ></div>
                 </div>
                 <span class="text-2xs text-slate-600 dark:text-slate-300 font-medium">
-                  Tiến độ: <strong class="text-purple-600 dark:text-purple-300 font-bold">{{ formatNumber(chain.activeMilestone.progress) }}</strong> / {{ chain.activeMilestone.targetDisplay }} ({{ chain.activeMilestone.percent }}%)
+                  Progress: <strong class="text-purple-600 dark:text-purple-300 font-bold">{{ formatNumber(chain.activeMilestone.progress) }}</strong> / {{ chain.activeMilestone.targetDisplay }} ({{ chain.activeMilestone.percent }}%)
                 </span>
               </div>
             </div>
 
             <div class="flex items-center gap-2 shrink-0">
               <div v-if="chain.activeMilestone.rewards.length > 0" class="flex items-center gap-1 flex-wrap">
-                <span class="text-2xs text-slate-600 dark:text-slate-300 font-medium">Thưởng:</span>
+                <span class="text-2xs text-slate-600 dark:text-slate-300 font-medium">Rewards:</span>
                 <span
                   v-for="(r, idx) in chain.activeMilestone.rewards"
                   :key="idx"
@@ -632,7 +632,7 @@ async function claimAllReady() {
                 :disabled="isClaiming"
                 @click.stop="claimSingleQuest(chain.activeMilestone.id)"
               >
-                Nhận thưởng
+                Claim Reward
               </button>
             </div>
           </div>
@@ -640,7 +640,7 @@ async function claimAllReady() {
           <!-- Expanded Milestones Ladder -->
           <div v-if="expandedChains[chain.id]" class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700/80 space-y-2">
             <div class="text-2xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-1.5 flex items-center justify-between">
-              <span>Danh sách các bậc (Milestone Tiers - {{ chain.milestones.length }} Tiers)</span>
+              <span>Milestone Tiers ({{ chain.milestones.length }} Tiers)</span>
             </div>
 
             <div class="space-y-1.5">
@@ -675,7 +675,7 @@ async function claimAllReady() {
                     <div class="font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
                       <span class="font-bold text-xs">Tier #{{ m.index }}: {{ m.task }}</span>
                       <span class="rounded px-1.5 py-0.2 text-3xs font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                        🎯 Mức: {{ m.targetDisplay }}
+                        🎯 Target: {{ m.targetDisplay }}
                       </span>
                       <span class="text-3xs text-slate-400 dark:text-slate-500 font-normal">(#{{ m.id }})</span>
                     </div>
@@ -683,13 +683,13 @@ async function claimAllReady() {
                     <!-- Progress vs Target & Mini Bar -->
                     <div class="flex items-center gap-2 text-2xs text-slate-600 dark:text-slate-300 flex-wrap">
                       <span v-if="m.state === 'completed'" class="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                        <span>✓ Hoàn thành ({{ m.targetDisplay }})</span>
+                        <span>✓ Completed ({{ m.targetDisplay }})</span>
                       </span>
                       <span v-else-if="m.state === 'ready'" class="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
-                        <span>🎉 Đạt mục tiêu: {{ m.progressDisplay }}</span>
+                        <span>🎉 Target reached: {{ m.progressDisplay }}</span>
                       </span>
                       <span v-else class="flex items-center gap-1.5">
-                        <span>Tiến độ:</span>
+                        <span>Progress:</span>
                         <strong class="text-purple-600 dark:text-purple-300 font-semibold">{{ formatNumber(m.progress) }}</strong>
                         <span>/ {{ m.targetDisplay }}</span>
                         <span class="text-slate-400 dark:text-slate-400">({{ m.percent }}%)</span>

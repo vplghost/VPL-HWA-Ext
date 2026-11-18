@@ -73,7 +73,7 @@ async function handleFileSelect(event: Event) {
     try {
       parsed = JSON.parse(text);
     } catch {
-      importStatus.value = { type: 'error', message: 'Tệp không hợp lệ: Không thể đọc định dạng JSON.' };
+      importStatus.value = { type: 'error', message: 'Invalid file: Unable to parse JSON format.' };
       return;
     }
 
@@ -83,7 +83,7 @@ async function handleFileSelect(event: Event) {
 
     const prep = prepareImportUpdates(parsed, currentLocal, overwriteExisting.value);
     if (!prep.success || !prep.updates) {
-      importStatus.value = { type: 'error', message: prep.error || 'Import thất bại.' };
+      importStatus.value = { type: 'error', message: prep.error || 'Import failed.' };
       return;
     }
 
@@ -91,13 +91,13 @@ async function handleFileSelect(event: Event) {
       await chrome.storage.local.set(prep.updates);
     }
 
-    const modeText = overwriteExisting.value ? 'ghi đè' : 'hợp nhất giữ nguyên giá trị máy này';
+    const modeText = overwriteExisting.value ? 'overwrite' : 'merge (preserve local values)';
     importStatus.value = {
       type: 'success',
-      message: `Import thành công ${prep.keysCount} mục dữ liệu (${modeText})!`,
+      message: `Successfully imported ${prep.keysCount} data items (${modeText})!`,
     };
   } catch (err: any) {
-    importStatus.value = { type: 'error', message: `Import lỗi: ${err?.message || err}` };
+    importStatus.value = { type: 'error', message: `Import error: ${err?.message || err}` };
   } finally {
     if (input) input.value = '';
   }
