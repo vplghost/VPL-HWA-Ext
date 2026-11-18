@@ -152,3 +152,46 @@ test('smartGatherService - sync state mutations', () => {
   assert.ok(synced.nearest?.selected, 'Eligible mine should be selected');
   assert.equal(synced.nearest?.selected?.mineId, 'm99');
 });
+
+test('autoGatherService - planAutoGather with optimizeTeam dispatches optimized squad', () => {
+  const now = 100000;
+  const stored = {
+    popupRpcEnabled: true,
+    autoGatherSettings: {
+      enabled: true,
+      mineType: 'food',
+      mineLevel: 1,
+      selectedTeam: 'optimized',
+    },
+  };
+  const cache = {
+    accountStatus: { data: { id: 'acc1' } },
+    experimentalMapContext: { data: { mapId: 'map1', center: { x: 10, y: 20 } } },
+    heroGetAll: {
+      data: {
+        10: { power: 1000 },
+        20: { power: 5000 },
+      },
+    },
+    'getUnitSummary:unit': {
+      data: {
+        available: [{ unitId: 7, count: 500 }],
+      },
+    },
+    marchStatus: { data: { marches: [] } },
+    experimentalMineSearch: {
+      data: {
+        mineConfigId: 27,
+        mines: [{ mineId: 'm1' }],
+      },
+    },
+  };
+
+  const plan = planAutoGather(cache, stored, now);
+  assert.equal(plan.action, 'gather');
+  assert.equal(plan.mineId, 'm1');
+  assert.equal(plan.call.name, 'attackMine');
+  assert.equal(plan.call.args.squad.heroes.length, 1);
+  assert.equal(plan.call.args.squad.heroes[0].heroId, 10);
+  assert.equal(plan.call.args.squad.units[0].count, 37);
+});

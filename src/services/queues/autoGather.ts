@@ -54,6 +54,8 @@ export function normalizeAutoGatherSettings(settings: any, cache?: any): AutoGat
     (BASIC_MINE_TYPES as readonly string[]).includes(raw.lastAutoMineType)
       ? raw.lastAutoMineType
       : null;
+  const selectedTeam = typeof raw.selectedTeam === 'string' ? raw.selectedTeam : undefined;
+  const optimizeTeam = raw.optimizeTeam === true || raw.selectedTeam === 'optimized';
 
   return {
     enabled: raw.enabled === true,
@@ -62,6 +64,8 @@ export function normalizeAutoGatherSettings(settings: any, cache?: any): AutoGat
     mineLevel,
     mineType,
     lastAutoMineType,
+    ...(selectedTeam ? { selectedTeam } : {}),
+    ...(optimizeTeam ? { optimizeTeam: true } : {}),
   };
 }
 
@@ -290,8 +294,16 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
   if (!summary) return { action: 'wait', reason: 'Unit summary unavailable' };
 
   const availableHeroIds = data.availableHeroIds(heroes, summary, marches);
-  if (availableHeroIds.length < 5) {
-    return { action: 'wait', reason: `Fewer than 5 heroes available (${availableHeroIds.length})` };
+  const isOptimized = settings.selectedTeam === 'optimized' || settings.optimizeTeam === true;
+
+  if (isOptimized) {
+    if (availableHeroIds.length < 1) {
+      return { action: 'wait', reason: 'No heroes available' };
+    }
+  } else {
+    if (availableHeroIds.length < 5) {
+      return { action: 'wait', reason: `Fewer than 5 heroes available (${availableHeroIds.length})` };
+    }
   }
 
   const targetMineType =
@@ -322,22 +334,43 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
 
   if (matchingMines.length > 0) {
     const selectedMine = matchingMines[0];
-    const heroIds = data.lowestPowerHeroes(heroes, availableHeroIds);
-    if (heroIds.length !== 5) {
-      return { action: 'wait', reason: 'Could not select 5 lowest power heroes' };
+    let squad: any = null;
+
+    if (isOptimized) {
+      const myId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
+      const opt = data.buildOptimizedGatheringTeam({
+        heroes,
+        availableHeroIds,
+        unitSummary: summary,
+        mineType: targetMineType,
+        mineLevel: targetMineLevel,
+        resourcesAmount: selectedMine.resourcesAmount,
+        capacitySettings: data.normalizeCapacitySettings(stored?.troopCapacitySettings),
+        accountId: myId,
+      });
+      if (!opt.heroIds.length || !opt.allocatedTroops.length) {
+        return { action: 'wait', reason: 'Could not allocate optimized gathering team' };
+      }
+      squad = data.buildSquad(opt.heroIds, opt.allocatedTroops);
+    } else {
+      const heroIds = data.lowestPowerHeroes(heroes, availableHeroIds);
+      if (heroIds.length !== 5) {
+        return { action: 'wait', reason: 'Could not select 5 lowest power heroes' };
+      }
+
+      const myId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
+      const capacity = data.capacityModel(
+        heroIds,
+        heroes,
+        cache?.troopCapacityEvidence?.data,
+        data.normalizeCapacitySettings(stored?.troopCapacitySettings),
+        myId
+      ).total;
+      const availSummary = Array.isArray(summary?.available) ? summary : { available: safeList(summary?.units) };
+      const troops = data.allocateTroops(availSummary, capacity);
+      squad = data.buildSquad(heroIds, troops);
     }
 
-    const myId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
-    const capacity = data.capacityModel(
-      heroIds,
-      heroes,
-      cache?.troopCapacityEvidence?.data,
-      data.normalizeCapacitySettings(stored?.troopCapacitySettings),
-      myId
-    ).total;
-    const availSummary = Array.isArray(summary?.available) ? summary : { available: safeList(summary?.units) };
-    const troops = data.allocateTroops(availSummary, capacity);
-    const squad = data.buildSquad(heroIds, troops);
     if (!squad) return { action: 'wait', reason: 'Could not allocate squad troops' };
 
     const gatherCall = data.buildGatherCall(mapId, selectedMine.mineId, squad);

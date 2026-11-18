@@ -310,3 +310,85 @@ test('autoJoinTeamOptions includes highest power default, custom teams, in-game 
   assert.equal(options[3].id, 'weakest');
   assert.deepEqual(Array.from(options[3].heroIds), [1, 5, 3, 2, 6]);
 });
+
+test('resource cargo weights and troop cargo capacities conform to game rules', () => {
+  assert.equal(data.RESOURCE_CARGO_WEIGHT.food, 1);
+  assert.equal(data.RESOURCE_CARGO_WEIGHT.wood, 1);
+  assert.equal(data.RESOURCE_CARGO_WEIGHT.stone, 5);
+  assert.equal(data.RESOURCE_CARGO_WEIGHT.iron, 20);
+
+  assert.equal(data.TROOP_CARGO_CAPACITY_BY_LEVEL[1], 240);
+  assert.equal(data.TROOP_CARGO_CAPACITY_BY_LEVEL[4], 440);
+  assert.equal(data.TROOP_CARGO_CAPACITY_BY_LEVEL[7], 1900);
+  assert.equal(data.TROOP_CARGO_CAPACITY_BY_LEVEL[8], 3000);
+  assert.equal(data.TROOP_CARGO_CAPACITY_BY_LEVEL[10], 10000);
+});
+
+test('calculateMineCargo computes total cargo by level and resource density', () => {
+  assert.equal(data.calculateMineCargo('food', 1), 70000);
+  assert.equal(data.calculateMineCargo('wood', 1), 70000);
+  assert.equal(data.calculateMineCargo('stone', 1), 70000);
+  assert.equal(data.calculateMineCargo('iron', 1), 70000);
+  assert.equal(data.calculateMineCargo('food', 8), 7500000);
+  assert.equal(data.calculateMineCargo('iron', 8), 7500000);
+
+  assert.equal(data.calculateMineCargo('food', 8, 100000), 100000);
+  assert.equal(data.calculateMineCargo('stone', 8, 20000), 100000);
+  assert.equal(data.calculateMineCargo('iron', 8, 5000), 100000);
+});
+
+test('buildOptimizedGatheringTeam selects lowest power heroes and stops when troops cover mine', () => {
+  const heroes = {
+    10: { power: 1200 },
+    11: { power: 800 },
+    12: { power: 2500 },
+    13: { power: 1800 },
+    14: { power: 950 },
+    15: { power: 4000 },
+    16: { power: 500 },
+  };
+  const availableHeroIds = [10, 11, 12, 13, 14, 15, 16];
+  const unitSummary = {
+    available: [
+      { unitId: 7, count: 10000 },
+    ],
+  };
+
+  const optLv1 = data.buildOptimizedGatheringTeam({
+    heroes,
+    availableHeroIds,
+    unitSummary,
+    mineType: 'food',
+    mineLevel: 1,
+  });
+  assert.equal(optLv1.requiredCargo, 70000);
+  assert.equal(optLv1.requiredTroops, 37);
+  assert.deepEqual(Array.from(optLv1.heroIds), [16]);
+  assert.equal(optLv1.squadCapacity, 1550);
+  assert.equal(optLv1.allocatedTroops.reduce((s, u) => s + u.count, 0), 37);
+
+  const optLv6Stone = data.buildOptimizedGatheringTeam({
+    heroes,
+    availableHeroIds,
+    unitSummary,
+    mineType: 'stone',
+    mineLevel: 6,
+  });
+  assert.equal(optLv6Stone.requiredCargo, 3000000);
+  assert.equal(optLv6Stone.requiredTroops, 1579);
+  assert.deepEqual(Array.from(optLv6Stone.heroIds), [16, 11]);
+  assert.equal(optLv6Stone.squadCapacity, 2150);
+  assert.equal(optLv6Stone.allocatedTroops.reduce((s, u) => s + u.count, 0), 1579);
+
+  const optLv10 = data.buildOptimizedGatheringTeam({
+    heroes,
+    availableHeroIds,
+    unitSummary,
+    mineType: 'food',
+    mineLevel: 10,
+  });
+  assert.equal(optLv10.requiredCargo, 14000000);
+  assert.equal(optLv10.requiredTroops, 7369);
+  assert.deepEqual(Array.from(optLv10.heroIds), [16, 11, 14, 10, 13]);
+  assert.equal(optLv10.heroIds.length, 5);
+});

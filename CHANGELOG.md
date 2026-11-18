@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.11.81 — 2026-11-18
+## 0.11.83 — 2026-11-18
+
+### Added
+
+- **Auto Gather "Optimize Squad / Team" (`buildOptimizedGatheringTeam`)**:
+  - Added "⚡ Tối ưu team (Lowest Power)" (`id: 'optimized'`) option to the Gathering Team selection dropdown in `GatheringModal.vue` and `useSquadTeams`.
+  - Dynamically calculates the minimal lowest-power hero squad required to gather 100% of the target mine's resources.
+  - Sorts all available heroes by power ascending (`power` lowest to highest) and greedily picks heroes starting from the lowest power.
+  - Stops adding heroes as soon as the total troop capacity of the selected heroes is sufficient to carry all resources from the target mine, or when reaching 5 hero slots (max squad capacity).
+  - Factored in exact troop cargo capacity by level (Level 1: 240, Level 2: 260, Level 3: 280, Level 4: 440, Level 5: 800, Level 6: 1200, Level 7: 1900, Level 8: 3000, Level 9: 6000, Level 10: 10000).
+  - Factored in resource densities/weights per resource type: Food: 1, Wood: 1, Stone: 5, Iron: 20 (e.g. 1 Lv7 troop carries 1900 Food/Wood, 380 Stone, or 95 Iron).
+  - Updated `autoGatherPlan` and `dispatchSquadToMine` to automatically build and dispatch optimized squads with exact required troop counts, conserving available heroes and troops for base defense.
+
 
 ### Added
 

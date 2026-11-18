@@ -13,6 +13,7 @@ import {
   teamTroopCapacity as getTeamTroopCapacity,
   allocateTroops as getAllocateTroops,
   unitInfo as getUnitInfoData,
+  buildOptimizedGatheringTeam,
 } from '@/src/utils/experimentalData';
 
 export interface SquadTeamOption {
@@ -111,6 +112,15 @@ export function useSquadTeams(
     if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.removeListener(onSquadStorageChanged);
   });
 
+  const gatherContext = ref<{ mineType?: string; mineLevel?: number }>({
+    mineType: 'food',
+    mineLevel: 10,
+  });
+
+  function setGatherContext(ctx: { mineType?: string; mineLevel?: number }) {
+    gatherContext.value = { ...gatherContext.value, ...ctx };
+  }
+
   // Available hero IDs not committed in active non-returned marches
   const availableHeroIds = computed<number[]>(() => {
     return getAvailableHeroIds(heroesData.value, unitSummaryData.value, marchData.value);
@@ -124,64 +134,79 @@ export function useSquadTeams(
       customTeams.value,
       availableHeroIds.value
     );
-    if (Array.isArray(opts) && opts.length > 0) {
-      return opts;
-    }
+    let list: SquadTeamOption[] = Array.isArray(opts) && opts.length > 0 ? [...opts] : [];
 
-    // Pure fallback implementation
-    const list: SquadTeamOption[] = [];
-
-    // Custom teams
-    normalizeArray(customTeams.value).forEach((team) => {
-      const validHeroIds = normalizeArray(team?.heroIds).filter((id) => heroesData.value[String(id)]);
-      if (validHeroIds.length > 0) {
-        list.push({
-          id: `custom:${team.id}`,
-          label: `Custom · ${team.name}`,
-          heroIds: validHeroIds.slice(0, 5),
-          maxTroops: team.maxTroops,
-        });
-      }
-    });
-
-    // 5 Lowest power heroes
-    const sortedAvailable = [...normalizeArray(availableHeroIds.value)]
-      .filter((id) => heroesData.value[String(id)])
-      .sort((a, b) => {
-        const pa = Number(heroesData.value[String(a)]?.power) || 0;
-        const pb = Number(heroesData.value[String(b)]?.power) || 0;
-        return pa - pb;
-      });
-    if (sortedAvailable.length >= 5) {
-      list.push({
-        id: 'weakest',
-        label: '5 lowest power heroes',
-        heroIds: sortedAvailable.slice(0, 5),
-      });
-    }
-
-    // Server-saved teams
-    const serverTeamsData = cache.value.teamGetAll?.data || {};
-    for (const [mode, members] of Object.entries(serverTeamsData)) {
-      if (!members) continue;
-      const groups: any[] = Array.isArray(members)
-        ? (members.some(Array.isArray) ? members : [members])
-        : typeof members === 'object'
-        ? Object.values(members)
-        : [];
-
-      groups.forEach((group: any, idx: number) => {
-        let ids: number[] = [];
-        if (Array.isArray(group)) {
-          ids = group.map(Number).filter((n) => Number.isInteger(n) && heroesData.value[String(n)]);
-        }
-        if (ids.length > 0) {
+    if (!list.length) {
+      // Pure fallback implementation
+      // Custom teams
+      normalizeArray(customTeams.value).forEach((team) => {
+        const validHeroIds = normalizeArray(team?.heroIds).filter((id) => heroesData.value[String(id)]);
+        if (validHeroIds.length > 0) {
           list.push({
-            id: `${mode}:${idx}`,
-            label: `${mode}${groups.length > 1 ? ` #${idx + 1}` : ''}`,
-            heroIds: ids.slice(0, 5),
+            id: `custom:${team.id}`,
+            label: `Custom · ${team.name}`,
+            heroIds: validHeroIds.slice(0, 5),
+            maxTroops: team.maxTroops,
           });
         }
+      });
+
+      // 5 Lowest power heroes
+      const sortedAvailable = [...normalizeArray(availableHeroIds.value)]
+        .filter((id) => heroesData.value[String(id)])
+        .sort((a, b) => {
+          const pa = Number(heroesData.value[String(a)]?.power) || 0;
+          const pb = Number(heroesData.value[String(b)]?.power) || 0;
+          return pa - pb;
+        });
+      if (sortedAvailable.length >= 5) {
+        list.push({
+          id: 'weakest',
+          label: '5 lowest power heroes',
+          heroIds: sortedAvailable.slice(0, 5),
+        });
+      }
+
+      // Server-saved teams
+      const serverTeamsData = cache.value.teamGetAll?.data || {};
+      for (const [mode, members] of Object.entries(serverTeamsData)) {
+        if (!members) continue;
+        const groups: any[] = Array.isArray(members)
+          ? (members.some(Array.isArray) ? members : [members])
+          : typeof members === 'object'
+          ? Object.values(members)
+          : [];
+
+        groups.forEach((group: any, idx: number) => {
+          let ids: number[] = [];
+          if (Array.isArray(group)) {
+            ids = group.map(Number).filter((n) => Number.isInteger(n) && heroesData.value[String(n)]);
+          }
+          if (ids.length > 0) {
+            list.push({
+              id: `${mode}:${idx}`,
+              label: `${mode}${groups.length > 1 ? ` #${idx + 1}` : ''}`,
+              heroIds: ids.slice(0, 5),
+            });
+          }
+        });
+      }
+    }
+
+    if (preferenceStorageKey === 'autoGatherSettings') {
+      const opt = buildOptimizedGatheringTeam({
+        heroes: heroesData.value,
+        availableHeroIds: availableHeroIds.value,
+        unitSummary: unitSummaryData.value,
+        mineType: gatherContext.value.mineType || 'food',
+        mineLevel: gatherContext.value.mineLevel || 10,
+        capacitySettings: capacitySettings.value,
+        accountId: accountId.value,
+      });
+      list.unshift({
+        id: 'optimized',
+        label: '⚡ Tối ưu team (Lowest Power)',
+        heroIds: opt.heroIds,
       });
     }
 
@@ -202,6 +227,18 @@ export function useSquadTeams(
   const squadCapacity = computed<number>(() => {
     const team = selectedTeam.value;
     if (!team) return 0;
+    if (team.id === 'optimized') {
+      const opt = buildOptimizedGatheringTeam({
+        heroes: heroesData.value,
+        availableHeroIds: availableHeroIds.value,
+        unitSummary: unitSummaryData.value,
+        mineType: gatherContext.value.mineType || 'food',
+        mineLevel: gatherContext.value.mineLevel || 10,
+        capacitySettings: capacitySettings.value,
+        accountId: accountId.value,
+      });
+      return opt.squadCapacity;
+    }
     const model = getCapacityModel(
       team.heroIds,
       heroesData.value,
@@ -214,6 +251,19 @@ export function useSquadTeams(
 
   // Unit allocation
   const allocatedTroops = computed<Array<{ unitId: number; count: number }>>(() => {
+    const team = selectedTeam.value;
+    if (team?.id === 'optimized') {
+      const opt = buildOptimizedGatheringTeam({
+        heroes: heroesData.value,
+        availableHeroIds: availableHeroIds.value,
+        unitSummary: unitSummaryData.value,
+        mineType: gatherContext.value.mineType || 'food',
+        mineLevel: gatherContext.value.mineLevel || 10,
+        capacitySettings: capacitySettings.value,
+        accountId: accountId.value,
+      });
+      return opt.allocatedTroops;
+    }
     const cap = squadCapacity.value;
     if (!cap || cap <= 0) return [];
     return getAllocateTroops(unitSummaryData.value, cap) || [];
@@ -341,5 +391,8 @@ export function useSquadTeams(
     getHeroName,
     getHeroAvatarUrl,
     getHeroGlow,
+    availableHeroIds,
+    gatherContext,
+    setGatherContext,
   };
 }

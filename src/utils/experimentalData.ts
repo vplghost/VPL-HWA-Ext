@@ -88,7 +88,7 @@ export function squadCapacity(
   base = 950,
   defaultHero = 600
 ): number | null {
-  if (!Array.isArray(ids) || ids.length !== 5 || new Set(ids).size !== 5 || !Number.isSafeInteger(base) || base < 0) {
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 5 || new Set(ids).size !== ids.length || !Number.isSafeInteger(base) || base < 0) {
     return null;
   }
   return base + ids.reduce((sum, id) => sum + heroCapacity(id, heroes[id], capacities?.[id], defaultHero), 0);
@@ -200,7 +200,7 @@ export function capacityModel(
       .map((row) => row.total)
   );
   const total =
-    ids?.length === 5 && new Set(ids).size === 5
+    ids?.length >= 1 && ids?.length <= 5 && new Set(ids).size === ids.length
       ? Math.max(observed, settings.base + counts.reduce((a, b) => a + b, 0))
       : null;
 
@@ -414,7 +414,7 @@ export function buildSquad(heroIds: number[], units: Array<{ unitId: number; cou
   const troops = asArray(units).filter(
     (unit) => Number.isInteger(unit?.unitId) && unit.unitId > 0 && Number.isInteger(unit?.count) && unit.count > 0
   );
-  if (ids.length !== 5 || !troops.length) return null;
+  if (ids.length < 1 || ids.length > 5 || !troops.length) return null;
   return { heroes: ids.map((heroId) => ({ heroId })), units: troops };
 }
 
@@ -525,6 +525,165 @@ export function autoJoinTeamOptions(teams: any, heroes: any, customTeams: any[] 
   return list;
 }
 
+export const RESOURCE_CARGO_WEIGHT: Record<string, number> = {
+  food: 1,
+  wood: 1,
+  stone: 5,
+  iron: 20,
+};
+
+export const MINE_LEVEL_TOTAL_CARGO: Record<number, number> = {
+  1: 70000,
+  2: 150000,
+  3: 300000,
+  4: 600000,
+  5: 1200000,
+  6: 3000000,
+  7: 5000000,
+  8: 7500000,
+  9: 10500000,
+  10: 14000000,
+};
+
+export const TROOP_CARGO_CAPACITY_BY_LEVEL: Record<number, number> = {
+  1: 240,
+  2: 260,
+  3: 280,
+  4: 440,
+  5: 800,
+  6: 1200,
+  7: 1900,
+  8: 3000,
+  9: 6000,
+  10: 10000,
+};
+
+export function calculateMineCargo(
+  mineType: string,
+  mineLevel: number,
+  resourcesAmount?: number
+): number {
+  const normType = (mineType || 'food').toLowerCase();
+  const weight = RESOURCE_CARGO_WEIGHT[normType] ?? 1;
+  if (Number.isFinite(resourcesAmount) && (resourcesAmount as number) > 0) {
+    return Math.ceil((resourcesAmount as number) * weight);
+  }
+  const lvl = Math.min(10, Math.max(1, Math.floor(mineLevel) || 1));
+  return MINE_LEVEL_TOTAL_CARGO[lvl] ?? 70000;
+}
+
+export function calculateRequiredTroopsForCargo(cargo: number, unitSummary?: any): number {
+  if (!Number.isFinite(cargo) || cargo <= 0) return 0;
+  const avail = asArray(unitSummary?.available || unitSummary?.units);
+  const stacks: Array<{ level: number; count: number }> = [];
+  for (const item of avail) {
+    const id = Number(item?.unitId);
+    const count = Number(item?.count);
+    if (Number.isSafeInteger(id) && Number.isSafeInteger(count) && count > 0) {
+      const info = unitInfo(id);
+      const level = info?.level || (id % 10) || 1;
+      stacks.push({ level, count });
+    }
+  }
+  stacks.sort((a, b) => b.level - a.level);
+
+  let cargoRemaining = cargo;
+  let troopsNeeded = 0;
+  for (const stack of stacks) {
+    if (cargoRemaining <= 0) break;
+    const troopCap = TROOP_CARGO_CAPACITY_BY_LEVEL[stack.level] ?? 240;
+    const stackCargo = stack.count * troopCap;
+    if (stackCargo <= cargoRemaining) {
+      troopsNeeded += stack.count;
+      cargoRemaining -= stackCargo;
+    } else {
+      troopsNeeded += Math.ceil(cargoRemaining / troopCap);
+      cargoRemaining = 0;
+      break;
+    }
+  }
+
+  if (cargoRemaining > 0) {
+    const bestLevel = stacks[0]?.level || 7;
+    const troopCap = TROOP_CARGO_CAPACITY_BY_LEVEL[bestLevel] ?? 1900;
+    troopsNeeded += Math.ceil(cargoRemaining / troopCap);
+  }
+
+  return Math.max(1, troopsNeeded);
+}
+
+export interface OptimizedGatheringTeamParams {
+  heroes: Record<string | number, any>;
+  availableHeroIds: number[];
+  unitSummary?: any;
+  mineType?: string;
+  mineLevel?: number;
+  resourcesAmount?: number;
+  capacitySettings?: any;
+  accountId?: any;
+}
+
+export interface OptimizedGatheringTeamResult {
+  heroIds: number[];
+  requiredCargo: number;
+  requiredTroops: number;
+  squadCapacity: number;
+  allocatedTroops: Array<{ unitId: number; count: number }>;
+}
+
+export function buildOptimizedGatheringTeam(
+  params: OptimizedGatheringTeamParams
+): OptimizedGatheringTeamResult {
+  const {
+    heroes = {},
+    availableHeroIds = [],
+    unitSummary,
+    mineType = 'food',
+    mineLevel = 10,
+    resourcesAmount,
+    capacitySettings,
+  } = params;
+
+  const requiredCargo = calculateMineCargo(mineType, mineLevel, resourcesAmount);
+  const requiredTroops = calculateRequiredTroopsForCargo(requiredCargo, unitSummary);
+
+  const sortedHeroIds = [...availableHeroIds]
+    .filter((id) => heroes[String(id)])
+    .sort((a, b) => {
+      const pa = Number(heroes[String(a)]?.power) || 0;
+      const pb = Number(heroes[String(b)]?.power) || 0;
+      if (pa !== pb) return pa - pb;
+      return Number(a) - Number(b);
+    });
+
+  const normSettings = normalizeCapacitySettings(capacitySettings);
+  const baseCapacity = normSettings.base;
+
+  const selectedHeroIds: number[] = [];
+  let currentSquadCapacity = baseCapacity;
+
+  for (const heroId of sortedHeroIds) {
+    selectedHeroIds.push(heroId);
+    const heroCap = heroCapacity(heroId, heroes[String(heroId)], null, normSettings.defaultHero);
+    currentSquadCapacity += heroCap;
+
+    if (currentSquadCapacity >= requiredTroops || selectedHeroIds.length >= 5) {
+      break;
+    }
+  }
+
+  const targetTroops = Math.min(currentSquadCapacity, requiredTroops);
+  const allocatedTroops = allocateTroops(unitSummary, targetTroops);
+
+  return {
+    heroIds: selectedHeroIds,
+    requiredCargo,
+    requiredTroops,
+    squadCapacity: currentSquadCapacity,
+    allocatedTroops,
+  };
+}
+
 export const experimentalDataHelper = {
   rallyWaitOptions,
   capacitySignature,
@@ -556,6 +715,12 @@ export const experimentalDataHelper = {
   buildMineSearchCall,
   rallyMembers,
   rallyPhase,
+  RESOURCE_CARGO_WEIGHT,
+  MINE_LEVEL_TOTAL_CARGO,
+  TROOP_CARGO_CAPACITY_BY_LEVEL,
+  calculateMineCargo,
+  calculateRequiredTroopsForCargo,
+  buildOptimizedGatheringTeam,
 };
 
 export default experimentalDataHelper;

@@ -7,6 +7,8 @@ export interface AutoGatherSettings {
   mineLevel: number | 'nearest';
   mineType: 'rotate' | BasicResourceType | string;
   lastAutoMineType?: BasicResourceType | string | null;
+  selectedTeam?: string;
+  optimizeTeam?: boolean;
   [key: string]: any;
 }
 

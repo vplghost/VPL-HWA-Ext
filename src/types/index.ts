@@ -47,6 +47,8 @@ export interface AutoGatherSettings {
   mineLevel: number;
   mineType: 'rotate' | 'gold' | 'food' | 'wood' | 'stone' | 'iron';
   lastAutoMineType: string | null;
+  selectedTeam?: string;
+  optimizeTeam?: boolean;
 }
 
 export interface TabConfigItem {

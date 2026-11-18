@@ -607,6 +607,11 @@ test('GatheringModal supports mine levels up to 10, real searchMine, found targe
   // Verify march recall
   assert.match(gather, /recallMarch/, 'GatheringModal must implement recallMarch');
   assert.match(gather, /stopMineGathering/, 'GatheringModal must call stopMineGathering');
+
+  // Verify optimize team option
+  assert.match(gather, /buildOptimizedGatheringTeam/, 'GatheringModal must import buildOptimizedGatheringTeam');
+  assert.match(gather, /id="gather-team-select"/, 'GatheringModal must feature #gather-team-select');
+  assert.match(gather, /selectedTeamId === 'optimized'/, 'GatheringModal must handle optimized team selection');
 });
 
 test('SettingsTab supports popupRpcEnabled toggle, socketRefreshMode direct, and piggyback modes', async () => {

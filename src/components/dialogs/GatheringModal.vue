@@ -15,6 +15,7 @@ import {
   buildSquad,
   buildGatherCall,
   buildMineSearchCall,
+  buildOptimizedGatheringTeam,
 } from '@/src/utils/experimentalData';
 
 const props = defineProps<{
@@ -48,6 +49,8 @@ const {
   getHeroName,
   getHeroAvatarUrl,
   getHeroGlow,
+  availableHeroIds,
+  setGatherContext,
 } = useSquadTeams('autoGatherSettings', 'selectedTeam');
 
 interface AutoGatherSettings {
@@ -60,6 +63,8 @@ interface AutoGatherSettings {
   defenseRecallEnabled?: boolean;
   defenseInfirmaryThreshold?: number;
   interceptTeamId?: string;
+  selectedTeam?: string;
+  optimizeTeam?: boolean;
 }
 
 const autoSettings = ref<AutoGatherSettings>({
@@ -72,7 +77,19 @@ const autoSettings = ref<AutoGatherSettings>({
   defenseRecallEnabled: true,
   defenseInfirmaryThreshold: 50,
   interceptTeamId: '',
+  selectedTeam: '',
+  optimizeTeam: false,
 });
+
+watch(
+  [() => autoSettings.value.mineType, () => autoSettings.value.mineLevel],
+  ([type, level]) => {
+    const normType = type === 'rotate' ? 'food' : type;
+    const normLevel = level === 'nearest' ? 10 : Number(level) || 10;
+    setGatherContext({ mineType: normType, mineLevel: normLevel });
+  },
+  { immediate: true }
+);
 
 // Manual search
 const manualMineType = ref<'food' | 'wood' | 'stone' | 'iron'>('food');
@@ -142,6 +159,8 @@ async function saveAutoSettings() {
   if (!autoSettings.value.smartEnabled && autoSettings.value.mineLevel === 'nearest') autoSettings.value.mineLevel = 10;
   const maxLimit = accountMaxMarches.value;
   autoSettings.value.maxMarches = Math.max(1, Math.min(maxLimit, autoSettings.value.maxMarches || 1));
+  autoSettings.value.selectedTeam = selectedTeamId.value;
+  autoSettings.value.optimizeTeam = selectedTeamId.value === 'optimized';
   await ensureRpcEnabled();
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     await chrome.storage.local.set({ autoGatherSettings: autoSettings.value });
@@ -263,15 +282,40 @@ async function handleManualSearch() {
 
 async function dispatchSquadToMine(mine: any) {
   await ensureRpcEnabled();
-  const team = selectedTeam.value;
-  if (!team || team.heroIds.length !== 5) {
-    searchStatus.value = '⚠️ Please select a complete 5-hero team first.';
-    return;
+  const isOptimized = selectedTeamId.value === 'optimized';
+  let heroIds: number[] = [];
+  let troops: Array<{ unitId: number; count: number }> = [];
+
+  if (isOptimized) {
+    const opt = buildOptimizedGatheringTeam({
+      heroes: cache.value.heroGetAll?.data || {},
+      availableHeroIds: availableHeroIds.value,
+      unitSummary: cache.value['getUnitSummary:unit']?.data || cache.value.inventoryGet?.data?.unit || {},
+      mineType: mine?.mineType || mine?.type || manualMineType.value,
+      mineLevel: mine?.level || manualMineLevel.value,
+      resourcesAmount: mine?.resourcesAmount,
+      capacitySettings: cache.value.troopCapacitySettings,
+      accountId: cache.value.accountStatus?.data?.id,
+    });
+    heroIds = opt.heroIds;
+    troops = opt.allocatedTroops;
+    if (!heroIds.length || !troops.length) {
+      searchStatus.value = '⚠️ No available heroes or troops for optimized squad.';
+      return;
+    }
+  } else {
+    const team = selectedTeam.value;
+    if (!team || team.heroIds.length < 1) {
+      searchStatus.value = '⚠️ Please select a team first.';
+      return;
+    }
+    heroIds = team.heroIds;
+    troops = allocatedTroops.value;
   }
 
-  const squad = buildSquad(team.heroIds, allocatedTroops.value) || {
-    heroes: team.heroIds.map((heroId) => ({ heroId })),
-    units: allocatedTroops.value,
+  const squad = buildSquad(heroIds, troops) || {
+    heroes: heroIds.map((heroId) => ({ heroId })),
+    units: troops,
   };
 
   const mapId = mapContext.value?.mapId;
@@ -367,6 +411,17 @@ async function recallMarch(march: any) {
               {{ t.label }} ({{ t.heroIds.length }}/5)
             </option>
           </select>
+        </div>
+
+        <!-- Optimize Team Information Badge -->
+        <div v-if="selectedTeamId === 'optimized'" class="p-2.5 rounded-lg bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-200 text-2xs space-y-1">
+          <div class="font-semibold flex items-center gap-1.5">
+            <span>⚡</span>
+            <span>Tối ưu team: Chọn hero từ power thấp nhất, dừng lại khi đủ lính gom hết mỏ (hoặc tối đa 5 heroes).</span>
+          </div>
+          <div class="text-teal-600 dark:text-teal-400">
+            Sức chứa tính theo loại tài nguyên (Food: 1 · Wood: 1 · Stone: 5 · Iron: 20) & cấp lính (Level 1–10).
+          </div>
         </div>
 
         <!-- Team Chips Preview -->
