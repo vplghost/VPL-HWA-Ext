@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.11.86 — 2026-11-18
+
+### Added
+
+- **Daily Progress & Automation Tracking (`src/utils/activityStats.ts`, `IncomeOverview.vue`)**:
+  - Implemented 30-day activity tracking & persistence in `chrome.storage.local` under `dailyActivityHistory`.
+  - Aggregates daily metrics: Raid Auto-Join (extension auto-recall vs in-game auto), Campaign sweep count, rallies, solo monsters, and brigand camps.
+  - Aggregates total energy consumption across World Energy and Campaign Energy below activity indicators.
+  - Added anti-jitter day navigator (`◀` and `▶`, `w-24 font-mono tabular-nums`, `w-12` jump container) allowing navigation back up to 30 days without UI jumping.
+
+### Changed
+
+- **Dashboard Income Overview Redesign (`IncomeOverview.vue`)**:
+  - Completely removed "Multi-Day Historical Trends" collapsible section and Emerald charts.
+  - Replaced Column 1 with an in-place view switcher (`🍩` / `📊`) toggling between Today Donut and Multi-Day Gold Trend bar chart (`7d`, `14d`, `30d` presets).
+  - Adopted 1:2 layout ratio for Gold vs Daily Progress & Automation.
+
+### Enforced
+
+- **English-Only UI Standardization Across Extension Components**:
+  - Replaced remaining Vietnamese text occurrences across UI dialogs, badges, and dropdowns.
+  - Formally recorded and accepted system decision `20261118-1904-enforce-english-only-ui-language-across-extension-components`.
+
 ## 0.11.84 — 2026-11-18
 
 ### Fixed

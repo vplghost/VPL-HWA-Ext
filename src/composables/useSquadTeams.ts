@@ -205,7 +205,7 @@ export function useSquadTeams(
       });
       list.unshift({
         id: 'optimized',
-        label: '⚡ Tối ưu team (Lowest Power)',
+        label: '⚡ Optimized Squad (Lowest Power)',
         heroIds: opt.heroIds,
       });
     }

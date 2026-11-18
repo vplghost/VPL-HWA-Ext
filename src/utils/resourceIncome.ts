@@ -1,5 +1,12 @@
+export {
+  getTodayActivityStats,
+  getActivityStatsForDay,
+  loadDailyActivityHistory,
+  persistDailyActivityStats,
+  type DailyActivityStats,
+} from './activityStats.ts';
+
 /**
- * Resource income aggregation and analytics utilities.
  * Tracks Gold and Emerald income across observed game activities:
  * - Alchemy / Emerald Exchange (video free spins and paid spins)
  * - Mail Letters & System Rewards (Arena rankings, event rewards)
@@ -684,8 +691,8 @@ export function getTodayEmeraldSummary(cache: Record<string, any> = {}, now: num
     }
     return {
       date: todayStr,
-      startAmount: todayRecords[0].prevAmount,
-      endAmount: todayRecords[todayRecords.length - 1].newAmount,
+      startAmount: todayRecords[0]?.prevAmount ?? current,
+      endAmount: todayRecords[todayRecords.length - 1]?.newAmount ?? current,
       netDelta,
       totalGain,
       totalSpend,

@@ -417,10 +417,10 @@ async function recallMarch(march: any) {
         <div v-if="selectedTeamId === 'optimized'" class="p-2.5 rounded-lg bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-200 text-2xs space-y-1">
           <div class="font-semibold flex items-center gap-1.5">
             <span>⚡</span>
-            <span>Tối ưu team: Chọn hero từ power thấp nhất, dừng lại khi đủ lính gom hết mỏ (hoặc tối đa 5 heroes).</span>
+            <span>Optimized Squad: Selects lowest power heroes, stopping once squad capacity covers all mine resources (up to 5 heroes).</span>
           </div>
           <div class="text-teal-600 dark:text-teal-400">
-            Sức chứa tính theo loại tài nguyên (Food: 1 · Wood: 1 · Stone: 5 · Iron: 20) & cấp lính (Level 1–10).
+            Capacity scaled by resource density (Food: 1 · Wood: 1 · Stone: 5 · Iron: 20) & troop tier (Level 1–10).
           </div>
         </div>
 

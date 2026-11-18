@@ -26,16 +26,24 @@ test('ResourceSummary.vue places 4 mini resources in same row as currencies and 
   assert.ok(!content.includes('City Resources Bar'), 'Must remove separate bottom city resources bar');
 });
 
-test('IncomeOverview.vue lays out gold and emerald diagrams in 2 columns without right legend or bottom history list', async () => {
+test('IncomeOverview.vue lays out gold and progress/automation diagrams in 1:2 ratio columns without right legend or bottom history list', async () => {
   const content = await readFile(new URL('../src/components/dashboard/IncomeOverview.vue', import.meta.url), 'utf8');
 
-  // Verify 2-column grid layout
-  assert.ok(content.includes('grid-cols-1 md:grid-cols-2 gap-3'), 'Must layout gold and emerald in 2 columns');
+  // Verify 1:2 ratio grid layout (lg:grid-cols-3 with lg:col-span-1 and lg:col-span-2)
+  assert.ok(content.includes('grid-cols-1 lg:grid-cols-3 gap-3'), 'Must layout gold and progress/automation in 1:2 ratio');
+  assert.ok(content.includes('lg:col-span-1'), 'Must have 1-col span for gold');
+  assert.ok(content.includes('lg:col-span-2'), 'Must have 2-col span for progress and automation');
 
   // Verify right-side legend table was removed from gold view
   assert.ok(!content.includes('Legends with Metrics Column'), 'Must remove separate right legend column');
   assert.ok(!content.includes('md:col-span-7'), 'Must not have 7-column legend block');
 
-  // Verify "Lịch sử biến động hôm nay" was removed from emerald view
+  // Verify "Lịch sử biến động hôm nay" and "Multi-Day Historical Trends" were removed
   assert.ok(!content.includes('Lịch sử biến động hôm nay'), 'Must remove bottom fluctuation history list');
+  assert.ok(!content.includes('Multi-Day Historical Trends'), 'Must completely remove bottom Multi-Day Historical Trends section');
+
+  // Verify in-place view switcher for gold and anti-jitter date navigator
+  assert.ok(content.includes('goldViewMode'), 'Must support in-place view mode switching for gold');
+  assert.ok(content.includes('w-24 text-center'), 'Must have fixed-width date container to avoid jitter');
+  assert.ok(content.includes('changeDay'), 'Must support day navigation with changeDay');
 });

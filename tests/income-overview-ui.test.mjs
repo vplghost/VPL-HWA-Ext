@@ -18,8 +18,17 @@ async function setup(name, exports, extra = {}) {
   const context = {
     ref,
     computed,
+    watch: (src, cb) => {},
     onMounted() {},
     onUnmounted() {},
+    chrome: {
+      storage: {
+        local: {
+          get: (keys, cb) => (cb ? cb({}) : Promise.resolve({})),
+          set: (items, cb) => (cb ? cb() : Promise.resolve()),
+        },
+      },
+    },
     ...resourceIncome,
     useModals: () => ({ openModal() {} }),
     useGameConnection: () => ({ hasGameTab: ref(true) }),
@@ -30,7 +39,7 @@ async function setup(name, exports, extra = {}) {
   return context.api;
 }
 
-test('IncomeOverview.vue computes today income and breakdown by source', async () => {
+test('IncomeOverview.vue computes today income and breakdown by source and supports view switching', async () => {
   const cache = ref({
     battleReportSummary: {
       data: {
@@ -38,7 +47,6 @@ test('IncomeOverview.vue computes today income and breakdown by source', async (
           [new Date().toISOString().slice(0, 10)]: {
             rewards: {
               'resource:gold': 120000,
-              'resource:starMoney': 50,
             },
           },
         },
@@ -56,12 +64,12 @@ test('IncomeOverview.vue computes today income and breakdown by source', async (
   const useRpcCache = () => ({ cache });
   const ui = await setup(
     'IncomeOverview.vue',
-    'activeResource, todayTotal, todayBreakdown, dailyTrend, activePreset, applyPreset, fromDate, toDate',
+    'goldViewMode, toggleGoldViewMode, todayTotal, todayBreakdown, dailyTrend, activePreset, applyPreset, fromDate, toDate',
     { useRpcCache }
   );
 
-  // Default active resource is gold
-  assert.equal(ui.activeResource.value, 'gold');
+  // Default active gold view mode is 'today' (donut)
+  assert.equal(ui.goldViewMode.value, 'today');
   // Today's total gold = 120,000 (battles) + 73,800 (alchemy) = 193,800
   assert.equal(ui.todayTotal.value, 193800);
   assert.equal(ui.todayBreakdown.value.length, 2);
@@ -69,12 +77,11 @@ test('IncomeOverview.vue computes today income and breakdown by source', async (
   assert.ok(alchemyItem);
   assert.equal(alchemyItem.amount, 73800);
 
-  // Switch to emeralds
-  ui.activeResource.value = 'emerald';
-  assert.equal(ui.todayTotal.value, 50);
-  assert.equal(ui.todayBreakdown.value.length, 1);
-  assert.equal(ui.todayBreakdown.value[0].key, 'battles');
-  assert.equal(ui.todayBreakdown.value[0].amount, 50);
+  // Toggle view mode in-place to 'trend' and back
+  ui.toggleGoldViewMode();
+  assert.equal(ui.goldViewMode.value, 'trend');
+  ui.toggleGoldViewMode();
+  assert.equal(ui.goldViewMode.value, 'today');
 
   // Verify daily trend defaults to 7 days
   assert.equal(ui.activePreset.value, '7d');
@@ -96,48 +103,9 @@ test('DashboardTab.vue renders IncomeOverview component below ResourceSummary', 
   assert.match(source, /<ResourceSummary \/>\s*<!--[^>]*-->\s*<IncomeOverview \/>/, 'Must render IncomeOverview right below ResourceSummary');
 });
 
-test('IncomeOverview.vue generates donut slices for gold and tracks emerald fluctuations', async () => {
+test('IncomeOverview.vue generates donut slices for gold and supports day navigation up to 30 days', async () => {
   const todayStr = new Date().toISOString().slice(0, 10);
   const cache = ref({
-    'resource:starMoney': {
-      data: { amount: 15420 },
-    },
-    emeraldHistory: {
-      data: {
-        lastKnownAmount: 15420,
-        records: [
-          {
-            id: 'em-1',
-            timestamp: Date.now() - 3600000,
-            date: todayStr,
-            time: '08:00:00',
-            prevAmount: 15000,
-            newAmount: 15500,
-            delta: 500,
-          },
-          {
-            id: 'em-2',
-            timestamp: Date.now() - 1800000,
-            date: todayStr,
-            time: '08:30:00',
-            prevAmount: 15500,
-            newAmount: 15420,
-            delta: -80,
-          },
-        ],
-        dailyAggregates: {
-          [todayStr]: {
-            date: todayStr,
-            startAmount: 15000,
-            endAmount: 15420,
-            netDelta: 420,
-            totalGain: 500,
-            totalSpend: 80,
-            fluctuationCount: 2,
-          },
-        },
-      },
-    },
     freeAlchemySpinAction: {
       updatedAt: new Date().toISOString(),
       data: {
@@ -161,7 +129,7 @@ test('IncomeOverview.vue generates donut slices for gold and tracks emerald fluc
   const useRpcCache = () => ({ cache });
   const ui = await setup(
     'IncomeOverview.vue',
-    'activeResource, donutSlices, todayBreakdown, todayEmeraldSummary, todayEmeraldFluctuations, currentEmeraldBalance, dailyEmeraldTrend',
+    'donutSlices, todayBreakdown, selectedDayOffset, changeDay, jumpToToday, selectedDate, maxDaysBack',
     { useRpcCache }
   );
 
@@ -170,11 +138,58 @@ test('IncomeOverview.vue generates donut slices for gold and tracks emerald fluc
   const totalLength = ui.donutSlices.value.reduce((acc, s) => acc + s.length, 0);
   assert.ok(Math.abs(totalLength - 326.72) < 2);
 
-  // Emerald analytics
-  assert.equal(ui.currentEmeraldBalance.value, 15420);
-  assert.equal(ui.todayEmeraldFluctuations.value.length, 2);
-  assert.equal(ui.todayEmeraldSummary.value.netDelta, 420);
-  assert.equal(ui.todayEmeraldSummary.value.totalGain, 500);
-  assert.equal(ui.todayEmeraldSummary.value.totalSpend, 80);
-  assert.equal(ui.dailyEmeraldTrend.value.length, 7);
+  // Day navigation
+  assert.equal(ui.selectedDayOffset.value, 0);
+  assert.equal(ui.maxDaysBack, 30);
+  assert.equal(ui.selectedDate.value, todayStr);
+
+  // Navigate back 1 day
+  ui.changeDay(-1);
+  assert.equal(ui.selectedDayOffset.value, -1);
+
+  // Jump back to today
+  ui.jumpToToday();
+  assert.equal(ui.selectedDayOffset.value, 0);
+  assert.equal(ui.selectedDate.value, todayStr);
+});
+
+test('IncomeOverview.vue computes and exposes activityStats with auto-join, campaign, and energy metrics', async () => {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const cache = ref({
+    priorityAutoJoinedRallies: { data: ['r1', 'r2'] },
+    campaignRaidReceipts: {
+      data: [{ at: new Date().toISOString(), times: 12, missionId: 10 }],
+    },
+    battleReportSummary: {
+      data: {
+        days: {
+          [todayStr]: {
+            types: {
+              rallyMobAttackResult: 3, // 2 ext + 1 game
+              soloMobAttackResult: 5,  // 5 monsters
+              campBattleResult: 1,     // 1 camp
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const useRpcCache = () => ({ cache });
+  const ui = await setup(
+    'IncomeOverview.vue',
+    'activityStats',
+    { useRpcCache }
+  );
+
+  assert.ok(ui.activityStats.value);
+  assert.equal(ui.activityStats.value.extAutoJoinCount, 2);
+  assert.equal(ui.activityStats.value.gameAutoJoinCount, 1);
+  assert.equal(ui.activityStats.value.campaignCount, 12);
+  assert.equal(ui.activityStats.value.monstersCount, 5);
+  assert.equal(ui.activityStats.value.brigandCampsCount, 1);
+  assert.equal(ui.activityStats.value.campaignEnergySpent, 72); // 12 * 6
+  // World Energy: (3 rallies * 25) + (5 monsters * 10) + (1 camp * 10) = 75 + 50 + 10 = 135
+  assert.equal(ui.activityStats.value.worldEnergySpent, 135);
+  assert.equal(ui.activityStats.value.totalEnergySpent, 207);   // 72 + 135
 });
