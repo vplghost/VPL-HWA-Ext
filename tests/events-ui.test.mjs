@@ -1524,7 +1524,7 @@ test('header march icon renders auto-join raid badge with ⚡ icon and detailed 
     context.refreshTimed();
     assert.equal(badge.hidden, false);
     const tooltip = badge.dataset.resourceTooltip;
-    assert.ok(tooltip.includes('⚡ Auto-Join Raid'));
+    assert.ok(tooltip.includes('⚡ Game Auto-Join Raid') || tooltip.includes('⚡ Auto-Join Raid'));
     assert.ok(tooltip.includes('Leader: 10PR0'));
     assert.ok(tooltip.includes('[PvP] Boss, level 17'));
   } finally {

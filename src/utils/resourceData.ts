@@ -187,13 +187,28 @@ export function isMarchExpired(march: any, now = Date.now()): boolean {
   return false;
 }
 
-export function getMarchBadgeInfo(march: any, now = Date.now()): {
+export function getMarchBadgeInfo(march: any, now = Date.now(), cache?: any): {
   category: string;
   icon: string;
   classes: string;
   isPulse: boolean;
 } {
-  const isAutoJoin = Boolean(march?.rally?.isAutoJoin);
+  const rallyId = march?.rally?.id;
+  const isHelperFromCache = Boolean(rallyId && (
+    cache?.priorityAutoJoinedRallies?.data?.includes(rallyId) ||
+    cache?.experimentalPriorityAutoJoinedRallies?.data?.includes(rallyId)
+  ));
+  const isHelperAutoJoin = Boolean(
+    march?.rally?.isHelperAutoJoin ||
+    march?.rally?.autoJoinSource === 'extension' ||
+    march?.rally?.autoJoinSource === 'helper' ||
+    isHelperFromCache
+  );
+  const isGameAutoJoin = Boolean(
+    march?.rally?.autoJoinSource === 'game' ||
+    (!isHelperAutoJoin && Boolean(march?.rally?.isAutoJoin))
+  );
+  const isAutoJoin = isHelperAutoJoin || isGameAutoJoin;
   const isRaid = Boolean(march?.rally) || march?.kind === 'raid' || march?.previousKind === 'raid';
   const isMine =
     Boolean(march?.mineId) ||
@@ -222,7 +237,9 @@ export function getMarchBadgeInfo(march: any, now = Date.now()): {
     } else if (march?.stage === 'moveToTargetInRally' || march?.stage === 'moveToTarget') {
       icon = '🏹';
     } else if (march?.stage === 'waitingForRallyStart' || (march?.rally?.waitUntil && now < march.rally.waitUntil)) {
-      icon = isAutoJoin ? '⚡' : '⏳';
+      icon = isHelperAutoJoin ? '🤖' : (isAutoJoin ? '⚡' : '⏳');
+    } else if (isHelperAutoJoin) {
+      icon = '🤖';
     } else if (isAutoJoin) {
       icon = '⚡';
     } else {

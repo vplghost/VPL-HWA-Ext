@@ -1385,6 +1385,24 @@ export async function evaluatePriorityAutoJoin(record: any, cache: any, stored: 
     const dispatch = rpcMessageForSettings(stored, [joinCall]);
     if (dispatch) {
       attemptedAutoJoinRallies.add(attemptKey);
+      const existingAutoJoins = Array.isArray(cache.priorityAutoJoinedRallies?.data) ? cache.priorityAutoJoinedRallies.data : [];
+      if (!existingAutoJoins.includes(rallyId)) {
+        cache.priorityAutoJoinedRallies = {
+          key: 'priorityAutoJoinedRallies',
+          group: 'internal',
+          updatedAt: new Date().toISOString(),
+          data: [...existingAutoJoins, rallyId].slice(-200),
+        };
+      }
+      const marchList = cache.marchStatus?.data?.marches;
+      if (Array.isArray(marchList)) {
+        const targetSquadId = (squad as any)?.squadId;
+        const march = marchList.find((m: any) => m?.rally?.id === rallyId || (targetSquadId && m?.squadId === targetSquadId));
+        if (march) {
+          march.rally = { ...march.rally, isAutoJoin: true, autoJoinSource: 'extension', isHelperAutoJoin: true };
+        }
+      }
+      await cr?.storage?.local?.set({ rpcCache: cache });
       if (smart && runtime) {
         runtime.attemptedRallies = [...(runtime.attemptedRallies || []), rallyId].slice(-100);
         runtime.pending = { call: joinCall, sentAt: Date.now(), phase: 'sent' };

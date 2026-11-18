@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.72 — 2026-11-18
+
+### Added
+
+- **Header Marches Auto-Join Differentiation (Extension vs. Game)**:
+  - Distinguished Extension Priority Auto-Join from Native Game Auto-Join in Header march icons and tooltips.
+  - **Icons**:
+    - Extension Auto-Join: `🤖` (Helper robot icon).
+    - Game Auto-Join: `⚡` (Game lightning auto-join icon).
+    - Manual Rally: `⚔️` / `⏳` (Regular raid icons).
+  - **Tooltips**:
+    - Extension Auto-Join: `🤖 Helper Auto-Join Raid · ${targetLabel}`.
+    - Game Auto-Join: `⚡ Game Auto-Join Raid · ${targetLabel}`.
+    - Manual Rally: `⚔️ Rally Raid · ${targetLabel}`.
+  - Tracked Extension Auto-Join rallies in `rpcCache` (`priorityAutoJoinedRallies`) and `backgroundRuntime.ts` (`evaluatePriorityAutoJoin`), tagging marches with `autoJoinSource: 'extension'` and `isHelperAutoJoin: true`.
+  - Preserved native game auto-join source `autoJoinSource: 'game'` from websocket `socketAutojoined` (`rallyUserAutojoined`).
+  - Added unit test coverage in `tests/wxt-vue-frontend.test.mjs` verifying distinct badge icons and tooltips.
+
 ## 0.11.66 — 2026-11-18
 
 ### Added

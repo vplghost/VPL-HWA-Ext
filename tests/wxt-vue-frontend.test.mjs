@@ -737,6 +737,7 @@ test('Header march tooltips provide comprehensive details on time, stage, heroes
     formatMonsterQueueTooltip,
     formatAutoGatherTooltip,
   } = await import('../src/utils/marchTooltip.ts');
+  const { getMarchBadgeInfo } = await import('../src/utils/resourceData.ts');
 
   const now = 1000000000;
 
@@ -792,6 +793,62 @@ test('Header march tooltips provide comprehensive details on time, stage, heroes
   assert.match(raidTooltip, /Heroes \(5\/5\):/);
   assert.match(raidTooltip, /Troops: 125,000 troops/);
   assert.match(raidTooltip, /\(Click to view Raid dialog\)/);
+
+  // 3b. Distinguish Extension Auto-Join vs Game Auto-Join
+  const helperAutoJoinMarch = {
+    kind: 'raid',
+    stage: 'moveToRallyLeader',
+    endsAt: now + 20000,
+    rally: {
+      id: 'rally-helper-1',
+      mobConfigId: 80,
+      leaderName: 'AlphaLeader',
+      target: 'Boss Level 21',
+      isAutoJoin: true,
+      autoJoinSource: 'extension',
+      isHelperAutoJoin: true,
+      waitUntil: now + 40000,
+    },
+  };
+  const helperBadge = getMarchBadgeInfo(helperAutoJoinMarch, now);
+  assert.equal(helperBadge.icon, '🤖', 'Extension auto-join must display robot icon');
+  const helperTooltip = formatMarchTooltip(helperAutoJoinMarch, now);
+  assert.match(helperTooltip, /🤖 Helper Auto-Join Raid · Level 21 Boss/);
+
+  const gameAutoJoinMarch = {
+    kind: 'raid',
+    stage: 'waitingForRallyStart',
+    endsAt: now + 20000,
+    rally: {
+      id: 'rally-game-1',
+      mobConfigId: 80,
+      leaderName: 'BetaLeader',
+      target: 'Boss Level 21',
+      isAutoJoin: true,
+      autoJoinSource: 'game',
+      waitUntil: now + 40000,
+    },
+  };
+  const gameBadge = getMarchBadgeInfo(gameAutoJoinMarch, now);
+  assert.equal(gameBadge.icon, '⚡', 'Game auto-join must display lightning icon');
+  const gameTooltip = formatMarchTooltip(gameAutoJoinMarch, now);
+  assert.match(gameTooltip, /⚡ Game Auto-Join Raid · Level 21 Boss/);
+
+  // Test detection via cache.priorityAutoJoinedRallies
+  const cachedHelperMarch = {
+    kind: 'raid',
+    stage: 'moveToRallyLeader',
+    rally: {
+      id: 'rally-cached-1',
+      mobConfigId: 80,
+      isAutoJoin: true,
+    },
+  };
+  const cacheWithHelper = {
+    priorityAutoJoinedRallies: { data: ['rally-cached-1'] },
+  };
+  assert.equal(getMarchBadgeInfo(cachedHelperMarch, now, cacheWithHelper).icon, '🤖');
+  assert.match(formatMarchTooltip(cachedHelperMarch, now, cacheWithHelper), /🤖 Helper Auto-Join Raid/);
 
   // 4. Monster march tooltip
   const monsterMarch = {

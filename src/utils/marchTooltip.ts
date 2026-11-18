@@ -129,7 +129,29 @@ export function formatMarchTooltip(march: any, now = Date.now(), cache: any = {}
     const configId = rally.mobConfigId ?? march.mobConfigId;
     const lvl = configId ? bossLevel(configId) : null;
     const targetLabel = lvl ? `Level ${lvl} Boss` : (rally.target || (configId ? `Boss #${configId}` : 'Guild Boss'));
-    const title = `${isAutoJoin ? '⚡ Auto-Join Raid' : '⚔️ Rally Raid'} · ${targetLabel}`;
+    const rallyId = rally.id;
+    const isHelperFromCache = Boolean(rallyId && (
+      cache?.priorityAutoJoinedRallies?.data?.includes(rallyId) ||
+      cache?.experimentalPriorityAutoJoinedRallies?.data?.includes(rallyId)
+    ));
+    const isHelperAutoJoin = Boolean(
+      rally.isHelperAutoJoin ||
+      rally.autoJoinSource === 'extension' ||
+      rally.autoJoinSource === 'helper' ||
+      isHelperFromCache
+    );
+    const isGameAutoJoin = Boolean(
+      rally.autoJoinSource === 'game' ||
+      (!isHelperAutoJoin && Boolean(rally.isAutoJoin || isAutoJoin))
+    );
+
+    let raidPrefix = '⚔️ Rally Raid';
+    if (isHelperAutoJoin) {
+      raidPrefix = '🤖 Helper Auto-Join Raid';
+    } else if (isGameAutoJoin) {
+      raidPrefix = '⚡ Game Auto-Join Raid';
+    }
+    const title = `${raidPrefix} · ${targetLabel}`;
     lines.push(title);
 
     if (rally.leaderName) {

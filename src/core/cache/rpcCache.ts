@@ -2986,11 +2986,51 @@ const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (g
             if (index < 0) index = marches.findIndex((march) =>
               march.squadId === entry.data.squadId);
             const previous = index >= 0 ? marches[index] : null;
+            const isHelper = Boolean(
+              next.priorityAutoJoinedRallies?.data?.includes(entry.data.rallyId) ||
+              previous?.rally?.isHelperAutoJoin ||
+              previous?.rally?.autoJoinSource === 'extension'
+            );
             const joined = { ...previous, squadId: entry.data.squadId,
               kind: 'raid', stage: 'moveToRallyLeader', endsAt: entry.data.endsAt,
               rally: { ...previous?.rally, id: entry.data.rallyId,
-                isAutoJoin: true, team: entry.data.team,
+                isAutoJoin: true,
+                autoJoinSource: isHelper ? 'extension' : (previous?.rally?.autoJoinSource || 'game'),
+                isHelperAutoJoin: isHelper,
+                team: entry.data.team,
                 memberEta: entry.data.endsAt } };
+            if (index >= 0) marches[index] = joined;
+            else marches.push(joined);
+          } else if (entry.data.action === 'join') {
+            if (index < 0 && entry.data.squadId) {
+              index = marches.findIndex((march) => march.squadId === entry.data.squadId);
+            }
+            if (index < 0 && entry.data.rallyId) {
+              index = marches.findIndex((march) => march.rally?.id === entry.data.rallyId);
+            }
+            const previous = index >= 0 ? marches[index] : null;
+            const isHelper = Boolean(
+              next.priorityAutoJoinedRallies?.data?.includes(entry.data.rallyId) ||
+              previous?.rally?.isHelperAutoJoin ||
+              previous?.rally?.autoJoinSource === 'extension' ||
+              entry.data.autoJoinSource === 'extension' ||
+              entry.data.isHelperAutoJoin
+            );
+            const joined = {
+              ...previous,
+              squadId: entry.data.squadId || previous?.squadId,
+              kind: 'raid',
+              stage: 'moveToRallyLeader',
+              endsAt: entry.data.endsAt || previous?.endsAt,
+              rally: {
+                ...previous?.rally,
+                id: entry.data.rallyId,
+                team: entry.data.team || previous?.rally?.team,
+                isAutoJoin: true,
+                autoJoinSource: isHelper ? 'extension' : (previous?.rally?.autoJoinSource || 'extension'),
+                isHelperAutoJoin: isHelper,
+              }
+            };
             if (index >= 0) marches[index] = joined;
             else marches.push(joined);
           } else if (entry.data.action === 'socketResult') {
@@ -3069,6 +3109,21 @@ const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (g
                   team,
                   leaderName: entry.data.leader?.user?.name || previous.rally?.leaderName,
                   isAutoJoin: isLeader ? false : myMember ? true : previous.rally?.isAutoJoin || false,
+                  autoJoinSource: isLeader
+                    ? undefined
+                    : previous.rally?.autoJoinSource ||
+                      (next.priorityAutoJoinedRallies?.data?.includes(entry.data.rallyId)
+                        ? 'extension'
+                        : myMember
+                          ? 'game'
+                          : undefined),
+                  isHelperAutoJoin: isLeader
+                    ? false
+                    : Boolean(
+                        previous.rally?.isHelperAutoJoin ||
+                        previous.rally?.autoJoinSource === 'extension' ||
+                        next.priorityAutoJoinedRallies?.data?.includes(entry.data.rallyId)
+                      ),
                   memberEta: myMember?.eta,
                   outboundMs: entry.data.outboundMs,
                   returnMs: entry.data.returnMs
@@ -3081,6 +3136,11 @@ const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (g
               const stage = myMember && Number.isFinite(myMember.eta) && now < myMember.eta ?
                 'moveToRallyLeader' : 'waitingForRallyStart';
               const endsAt = stage === 'moveToRallyLeader' ? myMember.eta : entry.data.waitUntil;
+              const isHelper = Boolean(
+                !isLeader &&
+                (next.priorityAutoJoinedRallies?.data?.includes(entry.data.rallyId) ||
+                 index >= 0 && (marches[index]?.rally?.isHelperAutoJoin || marches[index]?.rally?.autoJoinSource === 'extension'))
+              );
 
               marches.push({
                 squadId,
@@ -3095,6 +3155,10 @@ const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (g
                   team,
                   leaderName: entry.data.leader?.user?.name,
                   isAutoJoin: Boolean(myMember && !isLeader),
+                  autoJoinSource: (myMember && !isLeader)
+                    ? (isHelper ? 'extension' : 'game')
+                    : undefined,
+                  isHelperAutoJoin: isHelper,
                   memberEta: myMember?.eta,
                   outboundMs: entry.data.outboundMs,
                   returnMs: entry.data.returnMs

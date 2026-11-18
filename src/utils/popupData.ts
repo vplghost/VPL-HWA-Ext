@@ -1444,7 +1444,15 @@ export function marchDuration(ms: number, precise = false): string {
 
 export function rallyTooltip(march: any, now: number, heroName: (id: number | string) => string): string {
   const rally = march.rally || {};
-  const isAutoJoin = Boolean(rally.isAutoJoin);
+  const isHelperAutoJoin = Boolean(rally.isHelperAutoJoin || rally.autoJoinSource === 'extension' || rally.autoJoinSource === 'helper');
+  const isGameAutoJoin = Boolean(rally.autoJoinSource === 'game' || (!isHelperAutoJoin && Boolean(rally.isAutoJoin)));
+  const raidTitle = isHelperAutoJoin
+    ? '🤖 Helper Auto-Join Raid'
+    : isGameAutoJoin
+      ? '⚡ Game Auto-Join Raid'
+      : rally.isAutoJoin
+        ? '⚡ Auto-Join Raid'
+        : 'Raid';
   const heroes = (rally.team?.heroIds || []).map((id: any) => heroName(id) || `Hero #${id}`);
   const troops = (rally.team?.units || []).map((unit: any) => `#${unit.id} ×${Number(unit.count).toLocaleString('en-US')}`);
   const isJoiningLeader = Number.isFinite(rally.memberEta) && rally.memberEta > now;
@@ -1453,7 +1461,7 @@ export function rallyTooltip(march: any, now: number, heroName: (id: number | st
   const arrival = !Number.isFinite(arrivalAt) ? 'Route pending' : arrivalAt! > now ? `${Number.isFinite(rally.arrivalAt) ? '' : '~'}${marchDuration(arrivalAt! - now)} remaining` : Number.isFinite(rally.arrivalAt) ? 'Reached' : 'Due; awaiting route update';
   const returning = Number.isFinite(rally.returnAt) ? `${rally.returnAt > now ? `${marchDuration(rally.returnAt - now)} remaining` : 'Due now'}` : Number.isFinite(rally.returnMs) ? `~${marchDuration(rally.returnMs, true)} travel after battle` : 'Route pending';
   return [
-    `${isAutoJoin ? '⚡ Auto-Join Raid' : 'Raid'} · ${rally.target || 'Target pending'}`,
+    `${raidTitle} · ${rally.target || 'Target pending'}`,
     ...(rally.leaderName ? [`Leader: ${rally.leaderName}`] : []),
     `Team: ${heroes.join(', ') || '—'}`,
     ...(troops.length ? [`Troops: ${troops.join(', ')}`] : []),

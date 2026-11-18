@@ -241,8 +241,8 @@ const activeMarches = computed(() => {
     .filter(({ march }: { march: any }) => !isMarchExpired(march, now.value));
 
   return list.sort((a, b) => {
-    const catA = MARCH_CATEGORY_ORDER[getMarchBadgeInfo(a.march, now.value).category] ?? 99;
-    const catB = MARCH_CATEGORY_ORDER[getMarchBadgeInfo(b.march, now.value).category] ?? 99;
+    const catA = MARCH_CATEGORY_ORDER[getMarchBadgeInfo(a.march, now.value, cache.value).category] ?? 99;
+    const catB = MARCH_CATEGORY_ORDER[getMarchBadgeInfo(b.march, now.value, cache.value).category] ?? 99;
     if (catA !== catB) return catA - catB;
 
     const timeA = getMarchStartTime(a.march);
@@ -254,7 +254,7 @@ const activeMarches = computed(() => {
 });
 
 function handleMarchClick(march: any) {
-  const info = getMarchBadgeInfo(march, now.value);
+  const info = getMarchBadgeInfo(march, now.value, cache.value);
   if (info.category === 'raid') openModal('raid');
   else if (info.category === 'gather') openModal('gathering');
   else if (info.category === 'monster') openModal('monster');
@@ -275,15 +275,15 @@ const isAutoGatherEnabled = computed(() => {
 });
 
 const hasActiveRaidMarch = computed(() => {
-  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value).category === 'raid');
+  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value, cache.value).category === 'raid');
 });
 
 const hasActiveGatherMarch = computed(() => {
-  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value).category === 'gather');
+  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value, cache.value).category === 'gather');
 });
 
 const hasActiveMonsterMarch = computed(() => {
-  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value).category === 'monster');
+  return activeMarches.value.some((item) => getMarchBadgeInfo(item.march, now.value, cache.value).category === 'monster');
 });
 
 // Building remaining time & tooltip
@@ -574,13 +574,13 @@ function toggleTheme() {
               type="button"
               class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold ring-1 transition-transform hover:scale-110"
               :class="[
-                getMarchBadgeInfo(item.march, now).classes,
-                getMarchBadgeInfo(item.march, now).isPulse ? 'animate-pulse' : '',
+                getMarchBadgeInfo(item.march, now, cache).classes,
+                getMarchBadgeInfo(item.march, now, cache).isPulse ? 'animate-pulse' : '',
               ]"
               :aria-label="formatMarchTooltip(item.march, now, cache)"
               @click="handleMarchClick(item.march)"
             >
-              {{ getMarchBadgeInfo(item.march, now).icon }}
+              {{ getMarchBadgeInfo(item.march, now, cache).icon }}
             </button>
           </BaseTooltip>
 
