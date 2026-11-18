@@ -3191,10 +3191,15 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                   'mailFarm',
                   'readAndClaimAll',
                   'quest_multiFarm',
+                  'completeQuest',
+                  'claimBattlepassRewardAll',
                   'attentionBonus_collectReward',
                   'cinemaGiveReward',
                   'refillable_alchemyUseVideo',
                   'zeppelinGiftGet',
+                  'zeppelinGiftFarm',
+                  'subscriptionFarm',
+                  'subscriptionGetInfo',
                   'dailyBonus_claim',
                   'offerFarmReward',
                   'userGetInfo',
@@ -3204,15 +3209,23 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                   'offerGetAll',
                   'mailGetAll',
                   'questGetAll',
+                  'getDailyQuests',
+                  'getSpecialQuestState',
+                  'getBattlepassState',
+                  'user_getNextDayTime',
                 ]);
                 const claimNames = new Set([
                   'mailFarm',
                   'readAndClaimAll',
                   'quest_multiFarm',
+                  'completeQuest',
+                  'claimBattlepassRewardAll',
                   'attentionBonus_collectReward',
                   'cinemaGiveReward',
                   'refillable_alchemyUseVideo',
                   'zeppelinGiftGet',
+                  'zeppelinGiftFarm',
+                  'subscriptionFarm',
                   'dailyBonus_claim',
                   'offerFarmReward',
                 ]);
@@ -3566,7 +3579,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         const dispatch = rpcMessageForSettings(stored, [
           { name: 'userGetInfo' },
           { name: 'inventoryGet' },
-          { name: 'refillableGetAll', feature: 'refillable' }
+          { name: 'refillableGetAll', feature: 'refillable' },
+          { name: 'getBattlepassState', feature: 'battlepass' },
         ]);
         if (dispatch) cr.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
       }

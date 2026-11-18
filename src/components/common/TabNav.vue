@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { countEvolvableHeroes, countEvolvableTitans } from '@/src/utils/popupData';
+import { countClaimableEvents } from '@/src/utils/eventClaimHelper';
 
 export interface TabConfigItem {
   id: string;
@@ -94,13 +95,9 @@ const titansBadge = computed(() => {
   return count > 0 ? count : null;
 });
 
-const hasActiveEvents = computed(() => {
-  return Boolean(
-    cache.value.clanVersusStatus ||
-    cache.value.clanWarChampStatus ||
-    cache.value.clanClashStatus ||
-    cache.value.brawlStatus
-  );
+const eventsBadge = computed(() => {
+  const count = countClaimableEvents(cache.value);
+  return count > 0 ? count : null;
 });
 
 function selectTab(id: string) {
@@ -152,13 +149,13 @@ function selectTab(id: string) {
         {{ titansBadge }}
       </span>
 
-      <!-- Events Live Badge -->
+      <!-- Events Claimable Badge -->
       <span
-        v-if="t.id === 'events' && hasActiveEvents"
+        v-if="t.id === 'events' && eventsBadge"
         id="events-tab-badge"
-        class="ml-0.5 rounded-full bg-emerald-600 px-1.5 py-0.2 text-[9px] font-bold text-white uppercase"
+        class="ml-0.5 rounded-full bg-emerald-600 px-1.5 py-0.2 text-[9px] font-bold text-white"
       >
-        Live
+        {{ eventsBadge }}
       </span>
     </button>
 

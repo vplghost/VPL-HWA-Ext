@@ -7,7 +7,7 @@ import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
 import { parseRewards } from '@/src/utils/rewardHelper';
 import { resolveTierDetail } from '@/src/utils/tierHelper';
-import { questRefreshCalls, sendQuestClaim } from '@/src/utils/dialogRpc';
+import { questRefreshCalls, sendQuestClaim, sendEventQuestClaim } from '@/src/utils/dialogRpc';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -227,7 +227,7 @@ async function claimSingleQuest(questId: number | string) {
   isClaiming.value = true;
   claimStatus.value = `Claiming quest #${questId}...`;
   try {
-    const res = await sendQuestClaim(questId);
+    const res = await sendEventQuestClaim(questId);
     if (res.ok) {
       claimStatus.value = 'Reward claimed!';
       await refreshData();
@@ -256,7 +256,7 @@ async function claimAllReady() {
       }
     }
     if (readyIds.length > 0) {
-      const res = await sendQuestClaim(readyIds);
+      const res = await sendEventQuestClaim(readyIds);
       if (res.ok) {
         claimStatus.value = `Claimed ${readyIds.length} rewards!`;
         await refreshData();

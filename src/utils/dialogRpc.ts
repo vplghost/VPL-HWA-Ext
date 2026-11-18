@@ -14,6 +14,23 @@ export function questClaimCalls(questId: string | number | Array<string | number
   ];
 }
 
+export function eventQuestClaimCalls(questId: string | number | Array<string | number>) {
+  const ids = Array.isArray(questId) ? questId : [questId];
+  const calls: any[] = ids.map((id) => ({
+    name: 'completeQuest',
+    feature: 'quest',
+    args: { questId: Number(id) },
+  }));
+  calls.push(
+    { name: 'getSpecialQuestState', feature: 'quest', args: {} },
+    { name: 'getDailyQuests', feature: 'quest', args: {} },
+    { name: 'getBattlepassState', feature: 'battlepass', args: {} },
+    { name: 'userGetInfo', args: {} },
+    { name: 'inventoryGet', args: {} }
+  );
+  return calls;
+}
+
 interface QuestClaimResponse { ok: boolean; queued?: boolean; error?: string }
 
 /** Claim actions require their dedicated envelope to pass the background allowlist. */
@@ -24,6 +41,22 @@ export async function sendQuestClaim(
 ): Promise<QuestClaimResponse> {
   try {
     const response = await send({ kind: 'claim-rewards', calls: questClaimCalls(questIds) });
+    if (!response || typeof response !== 'object') return { ok: false, error: 'No response from reward claim.' };
+    const result = response as QuestClaimResponse;
+    return result.ok === true ? result : { ok: false, error: result.error || 'Reward claim rejected.' };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Special event quest claim action using completeQuest RPC. */
+export async function sendEventQuestClaim(
+  questIds: string | number | Array<string | number>,
+  send: (message: { kind: 'claim-rewards'; calls: ReturnType<typeof eventQuestClaimCalls> }) => Promise<unknown> =
+    message => chrome.runtime.sendMessage(message),
+): Promise<QuestClaimResponse> {
+  try {
+    const response = await send({ kind: 'claim-rewards', calls: eventQuestClaimCalls(questIds) });
     if (!response || typeof response !== 'object') return { ok: false, error: 'No response from reward claim.' };
     const result = response as QuestClaimResponse;
     return result.ok === true ? result : { ok: false, error: result.error || 'Reward claim rejected.' };

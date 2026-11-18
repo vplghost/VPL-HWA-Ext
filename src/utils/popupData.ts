@@ -8,6 +8,15 @@ import {
   clanVersusChallengeSteps,
 } from '../data/clanVersusData.ts';
 import { questData } from '../data/questData.ts';
+import {
+  resolveClaimableEventQuests,
+  resolveClaimableBattlePassRewards,
+  countClaimableEvents,
+  countClaimableEventQuests,
+  countClaimableBattlePass,
+  type ClaimableQuestItem,
+  type ClaimableBattlePassItem,
+} from './eventClaimHelper.ts';
 import { getAttentionBonusAvailability } from './freeChestHelper.ts';
 import { freeAlchemyAvailability } from '../services/freeAlchemy.ts';
 
@@ -844,6 +853,8 @@ export interface PendingClaimsResult {
   letterIds: Array<string | number>;
   hasReports: boolean;
   questIds: Array<string | number>;
+  eventQuests: ClaimableQuestItem[];
+  battlePassRewards: ClaimableBattlePassItem[];
   attentionBonusIds: number[];
   videoBoxNums: number[];
   hasAlchemySpin: boolean;
@@ -853,17 +864,20 @@ export interface PendingClaimsResult {
   totalCount: number;
 }
 
-export function getPendingClaims(cache: any, now = Date.now()): PendingClaimsResult {
+export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: any): PendingClaimsResult {
   if (!cache || typeof cache !== 'object') {
     return {
       letterIds: [],
       hasReports: false,
       questIds: [],
+      eventQuests: [],
+      battlePassRewards: [],
       attentionBonusIds: [],
       videoBoxNums: [],
       hasAlchemySpin: false,
       hasAirshipGift: false,
       hasDailyBonus: false,
+      freeOfferIds: [],
       totalCount: 0,
     };
   }
@@ -969,6 +983,12 @@ export function getPendingClaims(cache: any, now = Date.now()): PendingClaimsRes
     }
   }
 
+  // Event Quests & Battle Pass Claims
+  const eventQuests = resolveClaimableEventQuests(cache);
+  const battlePassRewards = resolveClaimableBattlePassRewards(cache, dynamicCatalog);
+  const battlePassRewardsCount = battlePassRewards.reduce((sum, item) => sum + item.count, 0);
+
+  // Total Freebies Count (excludes dynamic events which are managed on the Events tab)
   const totalCount =
     letterIds.length +
     (hasReports ? 1 : 0) +
@@ -984,6 +1004,8 @@ export function getPendingClaims(cache: any, now = Date.now()): PendingClaimsRes
     letterIds,
     hasReports,
     questIds,
+    eventQuests,
+    battlePassRewards,
     attentionBonusIds,
     videoBoxNums,
     hasAlchemySpin,
@@ -994,9 +1016,13 @@ export function getPendingClaims(cache: any, now = Date.now()): PendingClaimsRes
   };
 }
 
-export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.now()) {
-  const opt = normalizeAutoClaim(options);
-  const pending = getPendingClaims(cache, now);
+export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.now(), dynamicCatalog?: any) {
+  const opt = {
+    ...normalizeAutoClaim(options),
+    eventQuests: options?.eventQuests === true,
+    battlePass: options?.battlePass === true,
+  };
+  const pending = getPendingClaims(cache, now, dynamicCatalog);
   const calls: any[] = [];
 
   if (opt.mail && pending.letterIds.length > 0) {
@@ -1019,6 +1045,30 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
       name: 'quest_multiFarm',
       args: { questIds: pending.questIds },
     });
+  }
+
+  if (opt.eventQuests && pending.eventQuests.length > 0) {
+    for (const eq of pending.eventQuests) {
+      calls.push({
+        name: 'completeQuest',
+        args: { questId: eq.questId },
+        feature: 'quest',
+      });
+    }
+  }
+
+  if (opt.battlePass && pending.battlePassRewards.length > 0) {
+    for (const bp of pending.battlePassRewards) {
+      calls.push({
+        name: 'claimBattlepassRewardAll',
+        args: {
+          battlepassId: bp.battlepassId,
+          levelIdAndTrackIdToClaim: bp.levelIdAndTrackIdToClaim,
+          claimedAt: new Date(now).toISOString(),
+        },
+        feature: 'battlepass',
+      });
+    }
   }
 
   if (opt.attentionBonuses && pending.attentionBonusIds.length > 0) {
@@ -1048,7 +1098,11 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
 
   if (opt.airshipGift && pending.hasAirshipGift) {
     calls.push({
-      name: 'zeppelinGiftGet',
+      name: 'subscriptionFarm',
+      args: {},
+    });
+    calls.push({
+      name: 'zeppelinGiftFarm',
       args: {},
     });
   }
@@ -1077,12 +1131,39 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
       (opt.alchemySpin && pending.hasAlchemySpin) ||
       (opt.airshipGift && pending.hasAirshipGift) ||
       (opt.dailyBonus && pending.hasDailyBonus) ||
-      (opt.freeOffers && pending.freeOfferIds.length > 0)
+      (opt.freeOffers && pending.freeOfferIds.length > 0) ||
+      (opt.eventQuests && pending.eventQuests.length > 0) ||
+      (opt.battlePass && pending.battlePassRewards.length > 0)
     ) {
       calls.push(
         { name: 'userGetInfo', args: {} },
         { name: 'refillableGetAll', args: { getAt: now }, feature: 'refillable' },
-        { name: 'inventoryGet', args: {} },
+        { name: 'inventoryGet', args: {} }
+      );
+    }
+    if (
+      (opt.eventQuests && pending.eventQuests.length > 0) ||
+      (opt.battlePass && pending.battlePassRewards.length > 0)
+    ) {
+      calls.push(
+        { name: 'getDailyQuests', feature: 'quest', args: {} },
+        { name: 'getSpecialQuestState', feature: 'quest', args: {} },
+        { name: 'getBattlepassState', feature: 'battlepass', args: {} },
+        { name: 'user_getNextDayTime', args: {} }
+      );
+    }
+    if (opt.airshipGift && pending.hasAirshipGift) {
+      calls.push(
+        { name: 'zeppelinGiftGet', args: {} },
+        { name: 'subscriptionGetInfo', args: {} }
+      );
+    }
+    if (
+      (opt.attentionBonuses && pending.attentionBonusIds.length > 0) ||
+      (opt.videoBoxes && pending.videoBoxNums.length > 0) ||
+      (opt.freeOffers && pending.freeOfferIds.length > 0)
+    ) {
+      calls.push(
         { name: 'cinemaGetCounters', args: {} },
         { name: 'offerGetAll', args: {} }
       );
@@ -1540,6 +1621,14 @@ export function isDebugOrEventResource(entry: any, nameMapInstance: any = nameMa
   return false;
 }
 
+export {
+  countClaimableEvents,
+  countClaimableEventQuests,
+  countClaimableBattlePass,
+  resolveClaimableEventQuests,
+  resolveClaimableBattlePassRewards,
+};
+
 export const popupDataHelper = {
   heroSoulProgress,
   titanSoulProgress,
@@ -1579,4 +1668,9 @@ export const popupDataHelper = {
   getItemAbbr,
   isResourceSelectableForHeader,
   isDebugOrEventResource,
+  countClaimableEvents,
+  countClaimableEventQuests,
+  countClaimableBattlePass,
+  resolveClaimableEventQuests,
+  resolveClaimableBattlePassRewards,
 };

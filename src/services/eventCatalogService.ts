@@ -127,7 +127,9 @@ export async function syncRemoteEventCatalog(
   const urlsChanged =
     !existingCatalog.sourceUrls ||
     existingCatalog.sourceUrls.viewUrl !== currentUrls.viewUrl ||
-    existingCatalog.sourceUrls.chainUrl !== currentUrls.chainUrl;
+    existingCatalog.sourceUrls.chainUrl !== currentUrls.chainUrl ||
+    existingCatalog.sourceUrls.bpLevelUrl !== currentUrls.bpLevelUrl ||
+    existingCatalog.sourceUrls.bpTrackUrl !== currentUrls.bpTrackUrl;
 
   if (!urlsChanged && Object.keys(existingCatalog.viewTitles || {}).length > 0) {
     return { updated: false, catalog: existingCatalog };
@@ -135,6 +137,8 @@ export async function syncRemoteEventCatalog(
 
   const newViewTitles: Record<string | number, string> = { ...existingCatalog.viewTitles };
   const newChainTitles: Record<string | number, string> = { ...existingCatalog.chainTitles };
+  let bpLevels = existingCatalog.battlepass?.levels || [];
+  let bpTracks = existingCatalog.battlepass?.tracks || [];
 
   // Fetch view titles
   if (currentUrls.viewUrl) {
@@ -154,9 +158,29 @@ export async function syncRemoteEventCatalog(
     }
   }
 
+  // Fetch battlepass levels
+  if (currentUrls.bpLevelUrl) {
+    const levelData = await fetchJsonSafely(currentUrls.bpLevelUrl);
+    if (levelData) {
+      bpLevels = Array.isArray(levelData) ? levelData : Object.values(levelData);
+    }
+  }
+
+  // Fetch battlepass tracks
+  if (currentUrls.bpTrackUrl) {
+    const trackData = await fetchJsonSafely(currentUrls.bpTrackUrl);
+    if (trackData) {
+      bpTracks = Array.isArray(trackData) ? trackData : Object.values(trackData);
+    }
+  }
+
   const updatedCatalog: DynamicEventCatalog = {
     viewTitles: newViewTitles,
     chainTitles: newChainTitles,
+    battlepass: {
+      levels: bpLevels,
+      tracks: bpTracks
+    },
     sourceUrls: currentUrls,
     lastSyncedAt: new Date().toISOString()
   };
