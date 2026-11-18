@@ -125,7 +125,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
     'speedUpUnitTraining', 'speedUpUniversal', 'speedUpUnitHealing',
     'speedUpConstruction', 'speedUpResearch', 'teleporter', 'lootboxChanced', 'patron']);
   const worldMaterialNames = { 1: 'Elarite Shards', 2: 'Iron', 3: 'Stone',
-    4: 'Wood', 5: 'Food', 12: 'Honor Marks' };
+    4: 'Wood', 5: 'Food', 12: 'Honor Marks', 14: 'Blueprints' };
   const producedMaterialIds = new Set([1, 2, 3, 4, 5]);
   const typeNames = { speedUpUnitTraining: 'Training Speedup',
     speedUpUniversal: 'Universal Speedup', speedUpUnitHealing: 'Healing Speedup',
@@ -5473,16 +5473,21 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           entry.data.cap = next[entry.key].data.cap;
         }
         if (entry.key === 'inventoryGet' && entry.data) {
-          for (const k of Object.keys(next)) {
-            if (k.startsWith('resource:coin:')) {
-              const id = k.replace('resource:coin:', '');
-              if (entry.data.coin && !Object.hasOwn(entry.data.coin, id) && next[k]?.data) {
-                next[k].data.amount = 0;
-              }
-            } else if (k.startsWith('resource:consumable:')) {
-              const id = k.replace('resource:consumable:', '');
-              if (entry.data.consumable && !Object.hasOwn(entry.data.consumable, id) && next[k]?.data) {
-                next[k].data.amount = 0;
+          const invCategories = [
+            'coin', 'consumable', 'gear', 'scroll', 'fragmentHero', 'fragmentTitan',
+            'fragmentGear', 'fragmentScroll', 'fragmentArtifact', 'fragmentSkin', 'artifact', 'patron'
+          ];
+          for (const cat of invCategories) {
+            const catData = entry.data[cat];
+            if (catData && typeof catData === 'object') {
+              const prefix = `resource:${cat}:`;
+              for (const k of Object.keys(next)) {
+                if (k.startsWith(prefix)) {
+                  const id = k.slice(prefix.length);
+                  if (!Object.hasOwn(catData, id) && next[k]?.data) {
+                    next[k].data.amount = 0;
+                  }
+                }
               }
             }
           }

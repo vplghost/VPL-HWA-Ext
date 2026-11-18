@@ -2,9 +2,10 @@
 import { ref, computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { getItemName, downloadJson } from '@/src/utils/metadata';
-import { getItemIcon } from '@/src/utils/itemResources';
+import { getItemIcon, isInactiveResource } from '@/src/utils/itemResources';
 import { formatNumber } from '@/src/utils/formatters';
 import { popupDataHelper } from '@/src/utils/popupData';
+import { isItemResourceKey, CHEST_REFILLABLES } from '@/src/utils/resourceData';
 
 const { cache, dispatchRpc } = useRpcCache();
 
@@ -20,15 +21,22 @@ const categories = [
   'artifact',
   'fragmentArtifact',
   'scroll',
+  'fragmentScroll',
   'consumable',
+  'lootboxChanced',
   'coin',
   'fragmentHero',
   'fragmentTitan',
+  'fragmentSkin',
+  'patron',
+  'speedUp',
+  'teleporter',
 ];
 
 interface InventoryEntry {
   id: string | number;
   category: string;
+  rawCategory: string;
   name: string;
   amount: number;
 }
@@ -38,26 +46,74 @@ const arenaCoinAmount = computed(() => {
 });
 
 const items = computed<InventoryEntry[]>(() => {
-  const inventory = cache.value.inventoryGet?.data || {};
-  const list: InventoryEntry[] = [];
+  const itemMap = new Map<string, InventoryEntry>();
 
+  const recordItem = (rawCat: string, id: string | number, count: number) => {
+    if (!Number.isFinite(count) || count <= 0) return;
+    const strId = String(id);
+    let category = rawCat;
+    if (rawCat.startsWith('speedUp')) {
+      category = 'speedUp';
+    } else if (rawCat === 'refillable' && CHEST_REFILLABLES.has(strId)) {
+      category = 'lootboxChanced';
+    } else if (rawCat === 'lootboxChoiced') {
+      category = 'lootboxChanced';
+    }
+
+    if (isInactiveResource({ key: `resource:${rawCat}:${strId}` }, Date.now())) {
+      return;
+    }
+
+    const mapKey = `${category}:${strId}`;
+    const name = getItemName(rawCat, strId) || getItemName(category, strId) || `${category} #${strId}`;
+    itemMap.set(mapKey, {
+      id: strId,
+      category,
+      rawCategory: rawCat,
+      amount: count,
+      name,
+    });
+  };
+
+  // 1. From inventoryGet
+  const inventory = cache.value.inventoryGet?.data || {};
   for (const [cat, map] of Object.entries(inventory)) {
     if (typeof map === 'object' && map !== null) {
       for (const [id, amount] of Object.entries(map as Record<string, any>)) {
-        const count = Number(amount) || 0;
-        if (count > 0) {
-          list.push({
-            id,
-            category: cat,
-            amount: count,
-            name: getItemName(cat, id),
-          });
+        recordItem(cat, id, Number(amount) || 0);
+      }
+    }
+  }
+
+  // 2. From strategic inventory
+  const stratItems = cache.value['getInventory:inventory']?.data?.inventory?.items;
+  if (Array.isArray(stratItems)) {
+    for (const it of stratItems) {
+      if (it && it.type && it.id != null) {
+        recordItem(it.type, it.id, Number(it.quantity) || 0);
+      }
+    }
+  }
+
+  // 3. From resource:* entries
+  for (const [key, val] of Object.entries(cache.value)) {
+    if (key.startsWith('resource:') && val?.data && Number.isFinite(val.data.amount)) {
+      if (isItemResourceKey(key)) {
+        const parts = key.split(':');
+        const rCat = parts[1];
+        const rId = parts[2];
+        if (rCat && rId) {
+          // If inventoryGet already has this category loaded and this ID was missing from it, then it was consumed
+          if (inventory[rCat] && typeof inventory[rCat] === 'object' && !Object.hasOwn(inventory[rCat], rId)) {
+            continue;
+          }
+          recordItem(rCat, rId, Number(val.data.amount) || 0);
         }
       }
     }
   }
 
-  return list;
+  return Array.from(itemMap.values());
 });
 
 const filteredItems = computed(() => {
@@ -91,10 +147,16 @@ const categoryLabels: Record<string, { label: string; icon: string }> = {
   artifact: { label: 'Artifacts', icon: '🔮' },
   fragmentArtifact: { label: 'Artifact Fragments', icon: '✨' },
   scroll: { label: 'Recipe Scrolls', icon: '📜' },
+  fragmentScroll: { label: 'Recipe Fragments', icon: '📄' },
   consumable: { label: 'Consumables & Potions', icon: '🧪' },
+  lootboxChanced: { label: 'Chests & Caskets', icon: '🎁' },
   coin: { label: 'Coins & Tokens', icon: '🪙' },
   fragmentHero: { label: 'Hero Soul Stones', icon: '💎' },
   fragmentTitan: { label: 'Titan Soul Stones', icon: '🗿' },
+  fragmentSkin: { label: 'Skin Fragments', icon: '👘' },
+  patron: { label: 'Relic Shards', icon: '🛡️' },
+  speedUp: { label: 'Speedups', icon: '⏱️' },
+  teleporter: { label: 'Teleporters', icon: '🌀' },
 };
 
 const categorizedSections = computed<CategorySection[]>(() => {
@@ -117,10 +179,16 @@ const categorizedSections = computed<CategorySection[]>(() => {
     'artifact',
     'fragmentArtifact',
     'scroll',
+    'fragmentScroll',
     'consumable',
+    'lootboxChanced',
     'coin',
     'fragmentHero',
     'fragmentTitan',
+    'fragmentSkin',
+    'patron',
+    'speedUp',
+    'teleporter',
   ];
 
   const map = new Map<string, InventoryEntry[]>();
@@ -163,12 +231,14 @@ const categorizedSections = computed<CategorySection[]>(() => {
 
 const failedIcons = ref<Set<string>>(new Set());
 function getItemImgSrc(item: InventoryEntry): string {
-  if (failedIcons.value.has(`${item.category}:${item.id}`)) return '';
-  const path = getItemIcon(item.category, item.id);
+  const iconKey = `${item.rawCategory || item.category}:${item.id}`;
+  if (failedIcons.value.has(iconKey)) return '';
+  const path = getItemIcon(item.rawCategory, item.id) || getItemIcon(item.category, item.id);
   return path && typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL(path) : path || '';
 }
 function handleItemImageError(item: InventoryEntry) {
-  failedIcons.value = new Set(failedIcons.value).add(`${item.category}:${item.id}`);
+  const iconKey = `${item.rawCategory || item.category}:${item.id}`;
+  failedIcons.value = new Set(failedIcons.value).add(iconKey);
 }
 
 function getCategoryIcon(cat: string): string {

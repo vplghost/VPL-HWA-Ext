@@ -42,17 +42,14 @@ test('duplicate matching follows actual Items category/ID and positive-stock sem
   assert.equal(formatting.isListedInventoryItem({ key: 'resource:coin:1' }, null), false);
 });
 
-test('Resources hides only items listed in Items and reacts when inventory arrives or changes', () => {
+test('Resources hides items belonging to Items tab and displays genuine resources', () => {
   const runtime = setup({ 'resource:gold': resource(50, 'Gold'),
     'resource:lootboxChanced:27': resource(2, 'Tomes Casket'),
     'resource:coin:1': resource(5, 'Arena Coin'), 'resource:material:1': resource(10, 'Elarite') });
-  assert.equal(runtime.api.allResources.value.length, 4, 'Keep balances when no inventory snapshot exists');
-  runtime.cache.value.inventoryGet = { data: { lootboxChanced: { 27: 2 }, coin: { 1: 5 } } };
+  assert.equal(runtime.api.allResources.value.length, 2, 'Only genuine resources appear in Resources');
   assert.deepEqual(Array.from(runtime.api.allResources.value, item => item.key), ['resource:gold', 'resource:material:1']);
   assert.equal(runtime.api.pinnedResourceCount.value, 1);
   assert.deepEqual(runtime.pins.value, ['resource:gold', 'resource:lootboxChanced:27'], 'Do not erase header pin preferences');
-  runtime.cache.value.inventoryGet.data.lootboxChanced[27] = 0;
-  assert.ok(runtime.api.allResources.value.some(item => item.key === 'resource:lootboxChanced:27'));
 });
 
 test('search, pinned filtering and JSON export use the same deduplicated resource list', () => {
@@ -86,10 +83,10 @@ test('expired events and technical counters are absent from Resources and export
 });
 
 test('resource images fall back to the category icon after a load failure', async () => {
-  const runtime = setup({ 'resource:lootboxChanced:27': resource(1, 'Tomes Casket') });
-  assert.match(await runtime.html(), /assets\/items\/lootboxChanced\/27.png/);
-  runtime.api.handleResourceImageError('resource:lootboxChanced:27');
-  assert.doesNotMatch(await runtime.html(), /assets\/items\/lootboxChanced\/27.png/);
+  const runtime = setup({ 'resource:refillable:2': resource(1, 'Valkyrie Favor') });
+  assert.match(await runtime.html(), /assets\/items\/refillable\/2.png/);
+  runtime.api.handleResourceImageError('resource:refillable:2');
+  assert.doesNotMatch(await runtime.html(), /assets\/items\/refillable\/2.png/);
 });
 
 test('actual Resources template renders compact automatic columns and accessible pin controls', async () => {

@@ -2646,7 +2646,45 @@ export const nameData: NameDataGroup = {
     },
     "teleporter": {
       "1": "Advanced Teleport",
-      "2": "Random Teleport"
+      "2": "Random Teleport",
+      "6": "Guild Teleport"
+    },
+    "patron": {
+      "1": "Relic Shard",
+      "2": "Somna Relic Shard",
+      "3": "Arachne Relic Shard",
+      "4": "Kai Relic Shard",
+      "5": "Folio Relic Shard",
+      "6": "Electra von Grave Relic Shard",
+      "7": "Jhu Relic Shard",
+      "8": "Maya Relic Shard",
+      "9": "Iris Relic Shard",
+      "10": "Byrna Relic Shard",
+      "11": "Kayla Relic Shard",
+      "12": "Yasmine Relic Shard",
+      "13": "Dante Relic Shard",
+      "14": "Drayne Relic Shard",
+      "15": "Alvanor Relic Shard",
+      "16": "Oya Relic Shard",
+      "17": "Phobos Relic Shard",
+      "18": "Miu Relic Shard",
+      "19": "Tempus Relic Shard",
+      "20": "Lian Relic Shard",
+      "21": "Kendle Relic Shard",
+      "22": "Dorian Relic Shard",
+      "24": "Cascade Relic Shard",
+      "25": "Crow Relic Shard",
+      "26": "Satori Relic Shard",
+      "27": "Peech Relic Shard",
+      "28": "Cleaver Relic Shard",
+      "29": "Tristan Relic Shard",
+      "50": "Guus Relic Shard",
+      "56": "Nebula Relic Shard",
+      "57": "Eva Relic Shard",
+      "58": "Luther Relic Shard",
+      "59": "Julius Relic Shard",
+      "61": "Wodryn Relic Shard",
+      "62": "Mushy and Shroom Relic Shard"
     }
   }
 };
@@ -2661,7 +2699,8 @@ const itemGroups: Record<string, string> = {
   fragmentGear: 'gear',
   fragmentScroll: 'scroll',
   fragmentArtifact: 'artifact',
-  fragmentSkin: 'skin'
+  fragmentSkin: 'skin',
+  patron: 'patron'
 };
 
 export function lookupName(group: string, id: string | number): string | null {

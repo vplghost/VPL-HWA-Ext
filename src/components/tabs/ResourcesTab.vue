@@ -12,6 +12,7 @@ import {
   resourceLabel,
   isSelectableForHeader,
   isListedInventoryItem,
+  isItemResourceKey,
 } from '@/src/utils/resourceData';
 
 const { cache, dispatchRpc } = useRpcCache();
@@ -30,6 +31,7 @@ const allResources = computed(() => {
   const list: any[] = [];
   for (const [key, val] of Object.entries(cache.value)) {
     if (key.startsWith('resource:') && val?.data && Number.isFinite(val.data.amount) &&
+        !isItemResourceKey(key) &&
         !isListedInventoryItem({ key }, cache.value.inventoryGet?.data) && !isInactiveResource({ key }, now.value)) {
       const entry = { key, data: val.data };
       const label = resourceLabel(entry);

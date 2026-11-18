@@ -1291,15 +1291,37 @@ export const itemResources: ItemResourcesData = {
       "1": "assets/items/patron/1.png",
       "2": "assets/items/patron/2.png",
       "3": "assets/items/patron/3.png",
+      "4": "assets/items/patron/4.png",
       "5": "assets/items/patron/5.png",
+      "6": "assets/items/patron/6.png",
+      "7": "assets/items/patron/7.png",
+      "8": "assets/items/patron/8.png",
+      "9": "assets/items/patron/9.png",
+      "10": "assets/items/patron/10.png",
+      "11": "assets/items/patron/11.png",
+      "12": "assets/items/patron/12.png",
       "13": "assets/items/patron/13.png",
       "14": "assets/items/patron/14.png",
       "15": "assets/items/patron/15.png",
       "16": "assets/items/patron/16.png",
+      "17": "assets/items/patron/17.png",
       "18": "assets/items/patron/18.png",
+      "19": "assets/items/patron/19.png",
       "20": "assets/items/patron/20.png",
+      "21": "assets/items/patron/21.png",
+      "22": "assets/items/patron/22.png",
+      "24": "assets/items/patron/24.png",
+      "25": "assets/items/patron/25.png",
+      "26": "assets/items/patron/26.png",
       "27": "assets/items/patron/27.png",
-      "57": "assets/items/patron/57.png"
+      "28": "assets/items/patron/28.png",
+      "29": "assets/items/patron/29.png",
+      "50": "assets/items/patron/50.png",
+      "56": "assets/items/patron/56.png",
+      "57": "assets/items/patron/57.png",
+      "58": "assets/items/patron/58.png",
+      "59": "assets/items/patron/59.png",
+      "61": "assets/items/patron/61.png"
     },
     "refillable": {
       "2": "assets/items/refillable/2.png",
@@ -1884,7 +1906,9 @@ export const itemResources: ItemResourcesData = {
       "7": {},
       "8": {},
       "12": {},
-      "14": {}
+      "14": {
+        "name": "Blueprints"
+      }
     },
     "patron": {
       "1": {
@@ -1896,8 +1920,32 @@ export const itemResources: ItemResourcesData = {
       "3": {
         "name": "Arachne Relic Shard"
       },
+      "4": {
+        "name": "Kai Relic Shard"
+      },
       "5": {
         "name": "Folio Relic Shard"
+      },
+      "6": {
+        "name": "Electra von Grave Relic Shard"
+      },
+      "7": {
+        "name": "Jhu Relic Shard"
+      },
+      "8": {
+        "name": "Maya Relic Shard"
+      },
+      "9": {
+        "name": "Iris Relic Shard"
+      },
+      "10": {
+        "name": "Byrna Relic Shard"
+      },
+      "11": {
+        "name": "Kayla Relic Shard"
+      },
+      "12": {
+        "name": "Yasmine Relic Shard"
       },
       "13": {
         "name": "Dante Relic Shard"
@@ -1911,17 +1959,62 @@ export const itemResources: ItemResourcesData = {
       "16": {
         "name": "Oya Relic Shard"
       },
+      "17": {
+        "name": "Phobos Relic Shard"
+      },
       "18": {
         "name": "Miu Relic Shard"
+      },
+      "19": {
+        "name": "Tempus Relic Shard"
       },
       "20": {
         "name": "Lian Relic Shard"
       },
+      "21": {
+        "name": "Kendle Relic Shard"
+      },
+      "22": {
+        "name": "Dorian Relic Shard"
+      },
+      "24": {
+        "name": "Cascade Relic Shard"
+      },
+      "25": {
+        "name": "Crow Relic Shard"
+      },
+      "26": {
+        "name": "Satori Relic Shard"
+      },
       "27": {
         "name": "Peech Relic Shard"
       },
+      "28": {
+        "name": "Cleaver Relic Shard"
+      },
+      "29": {
+        "name": "Tristan Relic Shard"
+      },
+      "50": {
+        "name": "Guus Relic Shard"
+      },
+      "56": {
+        "name": "Nebula Relic Shard"
+      },
       "57": {
         "name": "Eva Relic Shard"
+      },
+      "58": {
+        "name": "Luther Relic Shard"
+      },
+      "59": {
+        "name": "Julius Relic Shard"
+      },
+      "61": {
+        "name": "Wodryn Relic Shard"
+      },
+      "62": {
+        "name": "Mushy and Shroom Relic Shard"
       }
     },
     "refillable": {
@@ -2001,42 +2094,49 @@ export const itemResources: ItemResourcesData = {
         "internal": true
       },
       "21": {
-        "ident": "grand_arena_battle"
+        "ident": "grand_arena_battle",
+        "name": "Grand Arena Battles"
       },
       "22": {
         "ident": "shopReset_socialShop",
+        "name": "Social Shop Reset",
         "internal": true
       },
       "23": {
-        "ident": "trial_chrono_gold"
+        "ident": "trial_chrono_gold",
+        "name": "Chrono Gold Trial"
       },
       "24": {
         "ident": "trial_chrono_gold_cooldown",
         "internal": true
       },
       "25": {
-        "ident": "trial_chrono_exp"
+        "ident": "trial_chrono_exp",
+        "name": "Chrono EXP Trial"
       },
       "26": {
         "ident": "trial_chrono_exp_cooldown",
         "internal": true
       },
       "27": {
-        "ident": "trial_phys"
+        "ident": "trial_phys",
+        "name": "Physical Trial"
       },
       "28": {
         "ident": "trial_phys_cooldown",
         "internal": true
       },
       "29": {
-        "ident": "trial_mag"
+        "ident": "trial_mag",
+        "name": "Magic Trial"
       },
       "30": {
         "ident": "trial_mag_cooldown",
         "internal": true
       },
       "31": {
-        "ident": "trial_perk"
+        "ident": "trial_perk",
+        "name": "Perk Trial"
       },
       "32": {
         "ident": "trial_perk_cooldown",
@@ -2047,16 +2147,20 @@ export const itemResources: ItemResourcesData = {
         "internal": true
       },
       "34": {
-        "ident": "clanAdmire"
+        "ident": "clanAdmire",
+        "name": "Guild Tribute"
       },
       "35": {
-        "ident": "diamondFreeChest"
+        "ident": "diamondFreeChest",
+        "name": "Diamond Free Chest"
       },
       "36": {
-        "ident": "boss_battle"
+        "ident": "boss_battle",
+        "name": "Boss Battles"
       },
       "37": {
-        "ident": "chest_town"
+        "ident": "chest_town",
+        "name": "Town Chest"
       },
       "38": {
         "ident": "shopReset_boss",
@@ -2067,45 +2171,56 @@ export const itemResources: ItemResourcesData = {
         "internal": true
       },
       "40": {
-        "ident": "lootBox_egg_blue"
+        "ident": "lootBox_egg_blue",
+        "name": "Blue Egg Chest"
       },
       "41": {
-        "ident": "lootBox_egg_purple"
+        "ident": "lootBox_egg_purple",
+        "name": "Purple Egg Chest"
       },
       "42": {
-        "ident": "lootBox_egg_orange"
+        "ident": "lootBox_egg_orange",
+        "name": "Golden Egg Chest"
       },
       "43": {
-        "ident": "lootBox_easter_blue"
+        "ident": "lootBox_easter_blue",
+        "name": "Blue Easter Chest"
       },
       "44": {
-        "ident": "lootBox_eeaster_purple"
+        "ident": "lootBox_eeaster_purple",
+        "name": "Purple Easter Chest"
       },
       "45": {
-        "ident": "lootBox_easter_orange"
+        "ident": "lootBox_easter_orange",
+        "name": "Golden Easter Chest"
       },
       "50": {
-        "ident": "robber_battle"
+        "ident": "robber_battle",
+        "name": "Brigand Battles"
       },
       "51": {
         "ident": "robber_cooldown",
         "internal": true
       },
       "52": {
-        "ident": "raid_battle"
+        "ident": "raid_battle",
+        "name": "Raid Battles"
       },
       "53": {
-        "ident": "alchemy_video"
+        "ident": "alchemy_video",
+        "name": "Video Alchemy"
       },
       "54": {
         "ident": "shopReset_battlepass",
         "internal": true
       },
       "55": {
-        "ident": "skill_point_video"
+        "ident": "skill_point_video",
+        "name": "Video Skill Points"
       },
       "56": {
-        "ident": "missionRewardForVideo"
+        "ident": "missionRewardForVideo",
+        "name": "Video Mission Rewards"
       },
       "57": {
         "ident": "shopReset_Hydra",
@@ -2194,7 +2309,8 @@ export const itemResources: ItemResourcesData = {
         "name": "Guardian Energy"
       },
       "78": {
-        "ident": "event_picker"
+        "ident": "event_picker",
+        "name": "Event Picker"
       },
       "79": {
         "expiresAt": 1761530400000,

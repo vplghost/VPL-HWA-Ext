@@ -237,7 +237,48 @@ export const worldMaterialNames: Record<number, string> = {
   4: 'Wood',
   5: 'Food',
   12: 'Honor Marks',
+  14: 'Blueprints',
 };
+
+export const ITEM_CATEGORIES = new Set([
+  'gear',
+  'fragmentGear',
+  'artifact',
+  'fragmentArtifact',
+  'scroll',
+  'fragmentScroll',
+  'consumable',
+  'coin',
+  'fragmentHero',
+  'fragmentTitan',
+  'fragmentSkin',
+  'patron',
+  'lootboxChanced',
+  'lootboxChoiced',
+  'speedUpUnitTraining',
+  'speedUpUniversal',
+  'speedUpUnitHealing',
+  'speedUpConstruction',
+  'speedUpResearch',
+  'teleporter',
+  'talisman',
+]);
+
+export const CHEST_REFILLABLES = new Set([
+  '3', '4', '35', '37', '40', '41', '42', '43', '44', '45',
+]);
+
+export function isItemResourceKey(key: string | undefined): boolean {
+  if (!key) return false;
+  const parts = key.split(':');
+  if (parts.length < 2 || parts[0] !== 'resource') return false;
+  const category = parts[1];
+  const id = parts[2] || '';
+  if (ITEM_CATEGORIES.has(category)) return true;
+  if (category.startsWith('speedUp')) return true;
+  if (category === 'refillable' && CHEST_REFILLABLES.has(id)) return true;
+  return false;
+}
 
 export const typeNames: Record<string, string> = {
   speedUpUnitTraining: 'Training Speedup',
@@ -427,6 +468,9 @@ export const resourceDataHelper = {
   resourceAppearance,
   resourceLabel,
   isListedInventoryItem,
+  isItemResourceKey,
+  ITEM_CATEGORIES,
+  CHEST_REFILLABLES,
   isSelectableForHeader,
   isMarchExpired,
   getMarchBadgeInfo,

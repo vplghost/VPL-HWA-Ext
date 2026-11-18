@@ -52,7 +52,7 @@ test('bundled names identify client1.293.1010 and the verified current locale re
   assert.match(data.assetUrl, /\/1\.293\.0\/v0065\//);
   for (const [category, count] of Object.entries({ lootboxChanced: 30, lootboxChoiced: 3,
     material: 10, speedUpConstruction: 5, speedUpResearch: 5, speedUpUniversal: 5,
-    speedUpUnitTraining: 5, speedUpUnitHealing: 5, teleporter: 2, talisman: 163 })) {
+    speedUpUnitTraining: 5, speedUpUnitHealing: 5, teleporter: 3, patron: 35, talisman: 163 })) {
     assert.equal(Object.keys(data.names[category]).length, count, category);
   }
 });
@@ -60,10 +60,15 @@ test('bundled names identify client1.293.1010 and the verified current locale re
 test('Items and Resources resolve the same current names instead of cached type#ID placeholders', () => {
   for (const [category, id, expected] of [
     ['lootboxChanced', 27, 'Tomes Casket'], ['lootboxChoiced', 2, 'Materials Chest Lv.1'],
-    ['material', 9, 'Blueprints'], ['speedUpConstruction', 3, '1h Construction Speedup'],
+    ['material', 9, 'Blueprints'], ['material', 14, 'Blueprints'],
+    ['speedUpConstruction', 3, '1h Construction Speedup'],
     ['speedUpResearch', 3, '1h Research Speedup'], ['speedUpUniversal', 3, '1h General Speedup'],
     ['speedUpUnitTraining', 3, '1h Training Speedup'], ['speedUpUnitHealing', 3, '1h Healing Speedup'],
-    ['teleporter', 1, 'Advanced Teleport'], ['talisman', 1, 'Talisman of Research'],
+    ['teleporter', 1, 'Advanced Teleport'], ['teleporter', 6, 'Guild Teleport'],
+    ['patron', 61, 'Wodryn Relic Shard'], ['patron', 21, 'Kendle Relic Shard'],
+    ['patron', 22, 'Dorian Relic Shard'],
+    ['refillable', 45, 'Golden Easter Chest'], ['refillable', 50, 'Brigand Battles'],
+    ['talisman', 1, 'Talisman of Research'],
   ]) {
     assert.equal(nameMap.item(category, id), expected);
     assert.equal(getItemName(category, id), expected);
