@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.79 — 2026-11-18
+
+### Added
+
+- **Dashboard Queue Card Progress Fill**:
+  - Implemented card background fill as an active progress bar for construction and research upgrades in `QueuesOverview.vue`.
+  - Added `queueProgressPercent` calculation in `dashboardState.ts` accurately measuring elapsed progress from start to completion.
+  - Rendered subtle dynamic fill layers (`bg-sky-500/10` while in progress, `bg-emerald-500/10` when ready) behind text content with `z-10` layer isolation.
+  - Added tabular progress percentage indicator (e.g., `45.2%` / `Ready (100%)`) on line 2 of queue cards.
+
+### Changed
+
+- **Dashboard Active Marches 2-Column Grid**:
+  - Arranged active march cards in a 2-column grid (`grid grid-cols-2 gap-2`) matching the 2-row `h-[160px]` height of the Queue Status column.
+  - Displays up to 4 marches simultaneously without scrolling, completely eliminating the scrollbar for 3 or 4 active marches.
+  - Added dynamic empty squad slot placeholders up to 4 slots to preserve symmetrical 2x2 grid alignment with the Queue Status section without layout shifts.
+  - Automatically enables smooth scrolling (`overflow-y-auto`) only when more than 4 marches are active.
+
 ## 0.11.76 — 2026-11-18
 
 ### Changed

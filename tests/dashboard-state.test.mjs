@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { ref, computed } from 'vue';
 import { expeditionActivity } from '../src/utils/expeditions.ts';
-import { dashboardQueues, dashboardMarches, queueEndMs } from '../src/utils/dashboardState.ts';
+import { dashboardQueues, dashboardMarches, queueEndMs, queueProgressPercent } from '../src/utils/dashboardState.ts';
 import { towerActivityState, arenaActivityState, dungeonActivityState, observedToday, readyQuestCount } from '../src/composables/activityState.ts';
 
 const now = new Date(2026, 10, 13, 12).getTime();
@@ -29,7 +29,11 @@ test('queues show every active/ready upgrade, object maps and distinguish unknow
   const model = dashboardQueues(cache, 'building', now);
   assert.deepEqual(model.rows.map(row => row.state), ['active', 'ready']);
   assert.equal(model.rows[0].level, 2);
+  assert.equal(model.rows[0].progressPercent, 0);
   assert.equal(model.rows[1].timerText, 'Ready');
+  assert.equal(model.rows[1].progressPercent, 100);
+  assert.equal(queueProgressPercent({ startDate: now, durationMs: 60000 }, now + 30000), 50);
+  assert.equal(queueProgressPercent({ startDate: now, durationMs: 60000 }, now + 60000), 100);
   assert.equal(dashboardQueues(cache, 'building', now + 60000).rows[0].state, 'ready');
   assert.equal(dashboardQueues({}, 'research', now).state, 'unknown');
   assert.equal(dashboardQueues({ researchStatus: entry({ queues: [] }) }, 'research', now).state, 'idle');

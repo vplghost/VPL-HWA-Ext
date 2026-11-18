@@ -60,12 +60,23 @@ function handleMarchClick(category: string) {
           v-for="group in queueGroups"
           :key="group.id"
           type="button"
-          class="w-full h-[76px] p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-left cursor-pointer transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700/60 flex flex-col justify-between"
+          class="relative overflow-hidden w-full h-[76px] p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-left cursor-pointer transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700/60 flex flex-col justify-between"
           :aria-label="`Open ${group.title}`"
           @click="group.id === 'building' ? openModal('building') : openModal('research')"
         >
+          <!-- Background Progress Bar Fill for Active / Ready Items -->
+          <div
+            v-if="group.rows.length && group.rows[0]?.state === 'active' && (group.rows[0]?.progressPercent ?? 0) > 0"
+            class="absolute inset-y-0 left-0 bg-sky-500/10 dark:bg-sky-400/15 pointer-events-none transition-all duration-500 ease-out"
+            :style="{ width: `${group.rows[0].progressPercent}%` }"
+          />
+          <div
+            v-else-if="group.rows.length && group.rows[0]?.state === 'ready'"
+            class="absolute inset-y-0 left-0 bg-emerald-500/10 dark:bg-emerald-400/15 pointer-events-none transition-all duration-500 ease-out w-full"
+          />
+
           <!-- Line 1: Title & Icon on Left, Timer / Status Badge on Right -->
-          <div class="flex items-center justify-between gap-2">
+          <div class="relative z-10 flex items-center justify-between gap-2">
             <span class="flex items-center gap-1.5 font-semibold text-xs text-slate-800 dark:text-slate-200 truncate">
               <span>{{ group.icon }}</span>
               <span class="truncate">{{ group.title }}</span>
@@ -90,7 +101,7 @@ function handleMarchClick(category: string) {
           </div>
 
           <!-- Line 2: Target Name & Level on Left, Status State on Right -->
-          <div class="flex items-center justify-between gap-2 text-xs">
+          <div class="relative z-10 flex items-center justify-between gap-2 text-xs">
             <div v-if="group.rows.length && group.rows[0]" class="font-medium text-slate-800 dark:text-slate-200 truncate min-w-0">
               {{ group.rows[0].name }}<span v-if="group.rows[0].level != null" class="text-slate-500 dark:text-slate-400 font-normal"> (Lv.{{ group.rows[0].level }})</span>
             </div>
@@ -98,13 +109,21 @@ function handleMarchClick(category: string) {
               {{ group.state === 'unknown' ? 'Waiting for game data' : group.id === 'building' ? 'No construction running' : 'No technology researching' }}
             </div>
 
-            <span class="shrink-0 text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-              {{ group.rows.length ? (group.rows[0].state === 'ready' ? 'Ready' : 'In progress') : 'Available' }}
+            <span class="shrink-0 text-[10px] text-slate-400 dark:text-slate-500 font-medium font-mono tabular-nums">
+              {{
+                group.rows.length && group.rows[0]
+                  ? group.rows[0].state === 'ready'
+                    ? 'Ready (100%)'
+                    : group.rows[0].progressPercent != null
+                      ? `${group.rows[0].progressPercent}%`
+                      : 'In progress'
+                  : 'Available'
+              }}
             </span>
           </div>
 
           <!-- Line 3: Action Hint & Arrow -->
-          <div class="h-3.5 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
+          <div class="relative z-10 h-3.5 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
             <span class="truncate">
               {{
                 group.rows.length && group.rows[0]
@@ -137,8 +156,12 @@ function handleMarchClick(category: string) {
         <span class="text-[10px] text-slate-400/80 mt-0.5">All squads are idle in outpost</span>
       </div>
 
-      <!-- Marches List: Exactly 160px height with smooth scrolling for 3rd+ march -->
-      <div v-else class="h-[160px] overflow-y-auto space-y-2 pr-0.5">
+      <!-- Marches List: Exactly 160px height in a 2-column grid, eliminating scroll for <= 4 marches -->
+      <div
+        v-else
+        class="h-[160px] grid grid-cols-2 gap-2 content-start"
+        :class="marches.length > 4 ? 'overflow-y-auto pr-0.5' : 'overflow-hidden'"
+      >
         <BaseTooltip
           v-for="m in marches"
           :key="m.id"
@@ -219,23 +242,24 @@ function handleMarchClick(category: string) {
           </button>
         </BaseTooltip>
 
-        <!-- Slot 2 Placeholder if exactly 1 march (to maintain perfect 2-slot symmetry) -->
+        <!-- Placeholders up to 4 slots (to maintain perfect 2x2 grid symmetry and 160px height) -->
         <div
-          v-if="marches.length === 1"
+          v-for="idx in Math.max(0, 4 - marches.length)"
+          :key="`march-slot-${idx}`"
           class="w-full h-[76px] p-2.5 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20 flex flex-col justify-between text-xs text-slate-400"
         >
           <div class="flex items-center justify-between">
-            <span class="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+            <span class="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400 truncate">
               <span>🚩</span> Squad Slot Available
             </span>
-            <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-400">
+            <span class="shrink-0 px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-400">
               Idle
             </span>
           </div>
-          <div class="text-[11px] text-slate-400/90">Ready for gathering, boss raid, or monster hunt</div>
+          <div class="text-[11px] text-slate-400/90 truncate">Ready for gathering, boss raid, or monster hunt</div>
           <div class="h-3.5 flex items-center justify-between text-[10px] text-slate-400/70">
-            <span>Dispatched squads will appear here</span>
-            <span class="text-[9px]">Outpost ready</span>
+            <span class="truncate">Dispatched squads will appear here</span>
+            <span class="shrink-0 text-[9px]">Outpost ready</span>
           </div>
         </div>
       </div>

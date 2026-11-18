@@ -18,6 +18,23 @@ export function queueEndMs(queue: any): number | null {
   return start !== null && duration !== null && duration >= 0 ? start + duration : null;
 }
 
+export function queueProgressPercent(queue: any, now = Date.now()): number {
+  const end = queueEndMs(queue);
+  if (end === null) return 0;
+  if (now >= end) return 100;
+  const rawStart = timestampMs(queue?.startDate ?? queue?.startTime);
+  const duration = Number.isFinite(queue?.durationMs) ? queue.durationMs
+    : Number.isFinite(queue?.duration) ? queue.duration * 1000 : null;
+  const start = rawStart !== null ? rawStart : (duration !== null ? end - duration : null);
+  if (start !== null && end > start) {
+    const elapsed = Math.max(0, now - start);
+    const total = end - start;
+    const pct = (elapsed / total) * 100;
+    return Math.min(100, Math.max(0, Number(pct.toFixed(1))));
+  }
+  return 0;
+}
+
 export function dashboardQueues(cache: Record<string, any>, kind: 'building' | 'research', now = Date.now()) {
   const status = cache[`${kind}Status`]?.data ?? cache[`${kind}_getQueue`]?.data;
   if (status == null) return { state: 'unknown', rows: [] };
@@ -27,12 +44,14 @@ export function dashboardQueues(cache: Record<string, any>, kind: 'building' | '
   const rows = normalizeArray(raw).filter((queue) => queue && typeof queue === 'object').map((queue: any, index: number) => {
     const end = queueEndMs(queue);
     const remaining = end === null ? null : Math.max(0, Math.ceil((end - now) / 1000));
+    const state = end === null ? 'unknown' : end > now ? 'active' : 'ready';
     return {
       id: `${queue.queueNumber ?? index}:${queue[`${kind}Id`] ?? queue.id ?? index}`,
       entityId: queue[`${kind}Id`] ?? queue.id,
       level: queue.level ?? queue.nextLevel ?? queue.targetLevel,
-      state: end === null ? 'unknown' : end > now ? 'active' : 'ready',
+      state,
       timerText: remaining === null ? 'Unknown' : remaining > 0 ? formatDuration(remaining) : 'Ready',
+      progressPercent: state === 'ready' ? 100 : queueProgressPercent(queue, now),
     };
   });
   return { state: rows.length ? 'active' : 'idle', rows };
