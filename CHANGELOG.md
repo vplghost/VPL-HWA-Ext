@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Free Skill Points Video Claim**:
+  - Added a `+10 Free` claim button (`#claim-free-skill-points-btn` / `.btn-claim-free-skill-points`) next to the skill points counter `⚡ #/10` in `HeroDetailModal.vue` when the video bonus (refillable ID 55) is available and skill points are below capacity.
+  - Sourced video claim protocol from network trace `hwa-game-record-202611181243_free_skillpoints.json`, dispatching `refillable_skillpointsUseVideo` with `{ type: 'skill_points' }` and syncing `userGetInfo` and `inventoryGet`.
+  - Whitelisted `refillable_skillpointsUseVideo` in `interceptor.ts` and `backgroundRuntime.ts`.
+  - Updated `rpcCache.ts` reducer to immediately set `refillable:2` (Skill Points) to 10 and mark `refillable:55` consumed upon successful response.
+
 - **Hero Skill Max Upgrade & Batched RPC Dispatch**:
   - Added a global `Max All` button (`#upgrade-all-skills-max-btn`) in `HeroDetailModal.vue` skills header to allocate all available skill points across unlocked skills in a single click up to their maximum levels.
   - Added a per-skill `+Max` button (`.btn-upgrade-skill-max`) in each skill card allowing players to max a specific skill with one click.

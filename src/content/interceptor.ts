@@ -206,7 +206,8 @@ export function installInterceptor(customWindow?: any): void {
     'inventoryCraftFragments',
     'inventoryCraftRecipe',
     'cinemaGiveReward',
-    'cinemaGetCounters'
+    'cinemaGetCounters',
+    'refillable_skillpointsUseVideo'
   ]);
 
   function isHelperAction(call: any): boolean {
@@ -235,6 +236,9 @@ export function installInterceptor(customWindow?: any): void {
     }
     if (call?.name === 'refillable_alchemyUseVideo') {
       return !call.feature && call.args?.type === 'alchemy' && Object.keys(call.args).length === 1;
+    }
+    if (call?.name === 'refillable_skillpointsUseVideo') {
+      return !call.feature && call.args?.type === 'skill_points' && Object.keys(call.args || {}).length === 1;
     }
     return helperActionMethods.has(call?.name);
   }
@@ -750,7 +754,7 @@ export function installInterceptor(customWindow?: any): void {
       const rawUrl = (lastRpcUrl && lastRpcUrl.includes('/api/rpc')) ? lastRpcUrl : ((storedUrl && storedUrl.includes('/api/rpc')) ? storedUrl : null);
       const url = rawUrl || 'https://api.hero-wars-alliance.com/api/rpc';
       if (!url || !Array.isArray(calls) || calls.length === 0) return;
-      if (calls.some((call: any) => (['refillable_alchemyUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) || /^speedUp.*WithResources$/.test(call?.name)) && !isHelperAction(call))) return;
+      if (calls.some((call: any) => (['refillable_alchemyUseVideo', 'refillable_skillpointsUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) || /^speedUp.*WithResources$/.test(call?.name)) && !isHelperAction(call))) return;
 
       let headersToUse = lastRpcHeaders;
       if (!headersToUse && s) {

@@ -58,6 +58,7 @@ export const RPC_CACHE_DEFINITIONS: Record<string, string> = {
   clanClash_getCurrentState: 'events',
   clanClash_claimReward: 'events',
   refillable_alchemyUseVideo: 'header',
+  refillable_skillpointsUseVideo: 'heroes',
   brawl_getAll: 'events',
   heroEvolve: 'heroes',
   titanEvolve: 'titans',

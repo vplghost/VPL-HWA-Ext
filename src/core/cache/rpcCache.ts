@@ -90,6 +90,7 @@ const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (g
     clanClash_getCurrentState: 'events',
     clanClash_claimReward: 'events',
     refillable_alchemyUseVideo: 'header',
+    refillable_skillpointsUseVideo: 'heroes',
     brawl_getAll: 'events',
     heroEvolve: 'heroes',
     titanEvolve: 'titans',
@@ -1739,6 +1740,27 @@ const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (g
             data: { token: call.ident, success: !error, error: error ? String(typeof error === 'object' ? error.message || error.description || JSON.stringify(error) : error).slice(0, 200) : null,
               gold: error ? 0 : gold, cooldownUntil, results: rows, quests: Array.isArray(result.quests) ? result.quests : [] },
             updatedAt: record.timestamp }];
+        }
+        if (call.name === 'refillable_skillpointsUseVideo') {
+          if (call.args?.type !== 'skill_points' || call.feature || !result) return [];
+          const res = result.response;
+          const points = Number(res?.skill_point ?? 10);
+          const error = result.error || res?.error;
+          const entries = [];
+          if (!error && points > 0) {
+            entries.push(...resource('refillable:2', points, record, call.name, 'Skill Points', {
+              lastRefillAt: Date.parse(record.timestamp),
+              refillEveryMs: 300000,
+              refillAmount: 1,
+              cap: 10,
+              renewable: true
+            }));
+            entries.push(...resource('refillable:55', 0, record, call.name, 'Skill Point Video', {
+              lastRefillAt: Date.parse(record.timestamp),
+              cap: 1
+            }));
+          }
+          return entries;
         }
         if (call.name === 'cinemaGiveReward') {
           const response = result?.response;

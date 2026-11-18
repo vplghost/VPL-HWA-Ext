@@ -259,6 +259,46 @@ const totalSkillMaxAddable = computed(() => {
   return Math.min(skillPoints.value, totalSkillPointsNeeded.value);
 });
 
+// Free skill points via video refill (refillable ID 55)
+const isClaimingFreeSkillPoints = ref(false);
+
+const hasFreeSkillPoints = computed(() => {
+  const quota = cache.value?.['resource:refillable:55'];
+  const fromUser = cache.value?.userGetInfo?.data?.refillable?.find((r: any) => r?.id === 55);
+  const amount = quota?.data?.amount ?? fromUser?.amount;
+  const lastRefill = quota?.data?.lastRefillAt
+    ? quota.data.lastRefillAt / 1000
+    : fromUser?.lastRefill;
+
+  if (Number.isFinite(amount)) {
+    if (amount > 0) return true;
+    if (Number.isFinite(lastRefill)) {
+      // 28800 seconds = 8 hours
+      return Date.now() >= lastRefill * 1000 + 28800000;
+    }
+    return false;
+  }
+  return false;
+});
+
+async function claimFreeSkillPoints() {
+  if (isClaimingFreeSkillPoints.value || isUpgradingSkills.value || skillPoints.value >= 10) return;
+  isClaimingFreeSkillPoints.value = true;
+
+  try {
+    await dispatchRpc([
+      {
+        name: 'refillable_skillpointsUseVideo',
+        args: { type: 'skill_points' },
+      },
+      { name: 'userGetInfo' },
+      { name: 'inventoryGet' },
+    ]);
+  } finally {
+    isClaimingFreeSkillPoints.value = false;
+  }
+}
+
 async function upgradeSkill(s: SkillSlotConfig) {
   if (!activeHero.value || isUpgradingSkills.value) return;
   const numId = Number(currentHeroId.value);
@@ -769,6 +809,29 @@ function handleHeroFarmAll() {
                 >
                   <span>⚡</span> {{ skillPoints }}/10
                 </span>
+                <button
+                  v-if="hasFreeSkillPoints"
+                  type="button"
+                  id="claim-free-skill-points-btn"
+                  :disabled="isClaimingFreeSkillPoints || isUpgradingSkills || skillPoints >= 10"
+                  class="btn-claim-free-skill-points inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="
+                    skillPoints < 10 && !isClaimingFreeSkillPoints && !isUpgradingSkills
+                      ? 'bg-amber-400 hover:bg-amber-300 text-amber-950 ring-1 ring-amber-500/50 animate-pulse hover:animate-none'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                  "
+                  :title="
+                    skillPoints >= 10
+                      ? 'Skill points are full (10/10). Spend points before claiming.'
+                      : 'Claim free 10 skill points (Video Bonus)'
+                  "
+                  aria-label="Claim free skill points"
+                  @click="claimFreeSkillPoints"
+                >
+                  <span v-if="isClaimingFreeSkillPoints" class="text-3xs">⏳</span>
+                  <span v-else>🎬</span>
+                  <span>+10 Free</span>
+                </button>
                 <button
                   type="button"
                   id="upgrade-all-skills-max-btn"

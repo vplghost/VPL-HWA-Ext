@@ -81,3 +81,46 @@ test('HeroDetailModal.vue implements Max All and per-skill Max upgrade with batc
   assert.equal(skill3Calls.length, 0);
   assert.equal(available, 0);
 });
+
+test('HeroDetailModal.vue implements free skill points claim via refillable_skillpointsUseVideo', async () => {
+  const modalContent = await readFile(resolve(root, 'src/components/dialogs/HeroDetailModal.vue'), 'utf8');
+
+  // Verify UI buttons and functions
+  assert.ok(modalContent.includes('btn-claim-free-skill-points'), 'HeroDetailModal must have Free Skill Points button');
+  assert.ok(modalContent.includes('claim-free-skill-points-btn'), 'HeroDetailModal must have claim-free-skill-points-btn ID');
+  assert.ok(modalContent.includes('hasFreeSkillPoints'), 'HeroDetailModal must compute hasFreeSkillPoints');
+  assert.ok(modalContent.includes('claimFreeSkillPoints'), 'HeroDetailModal must have claimFreeSkillPoints method');
+  assert.ok(modalContent.includes("name: 'refillable_skillpointsUseVideo'"), 'Must call refillable_skillpointsUseVideo');
+  assert.ok(modalContent.includes("type: 'skill_points'"), 'Must pass type: skill_points');
+
+  // Test rpcCache reducer for refillable_skillpointsUseVideo
+  const { merge } = await import('../src/core/cache/rpcCache.ts');
+  const initialCache = {
+    'resource:refillable:2': { data: { amount: 2 }, updatedAt: '2026-11-18T10:00:00.000Z' },
+    'resource:refillable:55': { data: { amount: 1 }, updatedAt: '2026-11-18T10:00:00.000Z' },
+  };
+
+  const recordFreeSkillPoints = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-18T12:43:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{ name: 'refillable_skillpointsUseVideo', args: { type: 'skill_points' }, ident: 'sp1' }],
+    }),
+    responseBody: JSON.stringify({
+      results: [
+        {
+          ident: 'sp1',
+          result: {
+            response: { skill_point: 10 },
+          },
+        },
+      ],
+    }),
+  };
+
+  const { cache: updatedCache } = merge(initialCache, [recordFreeSkillPoints]);
+  assert.equal(updatedCache['resource:refillable:2']?.data?.amount, 10, 'Skill points must be updated to 10');
+  assert.equal(updatedCache['resource:refillable:55']?.data?.amount, 0, 'Free skill point video must be marked 0 (consumed)');
+});
