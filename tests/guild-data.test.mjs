@@ -19,7 +19,7 @@ function rpc(name, response, feature, timestamp = at) {
 const base = { accountStatus: { data: { id: 1 } } };
 const roster = (guildId = '10', members = {
   1: { id: '1', name: 'Alpha', level: '80', clanId: guildId, clanRole: '255', lastLoginTime: '1794600000' },
-  2: { id: '2', name: 'Beta', level: '90', clanId: guildId, clanRole: '4' },
+  2: { id: '2', name: 'Beta', level: '90', clanId: guildId, clanRole: '3' },
 }) => rpc('user_getClanInfo', { clanData: { clan: { id: guildId, title: 'Test Guild', ownerId: '1', level: '1', membersCount: '2', members,
   roleNames: { officer: 'Elder' } }, membersStat: [{ userId: '2', todayActivity: 0, activitySum: 500,
     todayDungeonActivity: 75, dungeonActivitySum: 900, wasChampion: true, raidDamage: { 7: 100, 10: 200 } }] }, clanRole: 255 });
@@ -51,6 +51,16 @@ test('Guild and account transitions cannot expose former member or outpost data'
   assert.equal(currentGuild(left).guild, null); assert.deepEqual(guildMembers(left), []);
   assert.equal(reducer.merge(initial, [rpc('user_getClanInfo', {})]).cache.guildStatus.data.guild.id, '10');
   assert.equal(guildRole({ id: 5, clanRole: 77 }, {}), 'Role unavailable');
+  assert.equal(guildRole({ id: 1, clanRole: 255 }, { ownerId: 1 }), 'Guild Master');
+  assert.equal(guildRole({ id: 1, clanRole: 255 }, { ownerId: 1, roleNames: { leader: 'Master' } }), 'Master');
+  assert.equal(guildRole({ id: 2, clanRole: 4 }, {}), 'Warlord');
+  assert.equal(guildRole({ id: 2, clanRole: 4 }, { roleNames: { warlord: 'Champion' } }), 'Champion');
+  assert.equal(guildRole({ id: 3, clanRole: 3 }, {}), 'Officer');
+  assert.equal(guildRole({ id: 3, clanRole: 3 }, { roleNames: { officer: 'Elder' } }), 'Elder');
+  assert.equal(guildRole({ id: 4, clanRole: 2 }, {}), 'Member');
+  assert.equal(guildRole({ id: 4, clanRole: 2 }, { roleNames: { member: 'Novice' } }), 'Novice');
+  assert.equal(initial.guildStatus.data.members['2'].role, 'Elder');
+  assert.equal(initial.guildStatus.data.selfRoleTitle, 'Guild Master');
 });
 
 test('actual Guild tab renders useful member/outpost fields, filters and exports without printing technical IDs', async () => {

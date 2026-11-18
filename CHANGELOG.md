@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.11.84 — 2026-11-18
+
+### Fixed
+
+- **Guild Member Role Mapping (`src/utils/guildData.ts`, `src/utils/popupData.ts`)**:
+  - Corrected game role codes according to official client specification (`clan_role.json`):
+    - `255` (or `member.id === guild.ownerId`): Guild Master / Leader (`UI_DIALOG_CLAN_INFO_ROLE_LEADER`).
+    - `4`: Warlord (`UI_DIALOG_CLAN_INFO_ROLE_WARLORD`).
+    - `3`: Officer (`UI_DIALOG_CLAN_INFO_ROLE_OFFICER`).
+    - `2`: Member (`UI_DIALOG_CLAN_INFO_ROLE_MEMBER`).
+  - Fixed issue where regular members (`clanRole: 2`) previously defaulted to `"Role unavailable"`, officers were shown as `"Member"`, and warlords were shown as `"Officer"`.
+  - Updated `formatChatRole` in popup data to recognize `4` as Warlord, `3` as Officer, `2` as Member, and `255` as Leader.
+
+### Added
+
+- **Guild Role Caching in RPC Reducer (`src/core/cache/rpcCache.ts`)**:
+  - In `guildRosterAction` reducer, automatically compute and store each member's resolved role title directly into `members[id].role` in the `guildStatus` cache.
+  - Automatically compute and store the active player's role title directly into `guildStatus.data.selfRoleTitle`.
+  - Updated `guildMembers` in `guildData.ts` to consume pre-computed `member.role` with fallback to `guildRole(member, data.guild)`.
+
+
 ## 0.11.83 — 2026-11-18
 
 ### Added

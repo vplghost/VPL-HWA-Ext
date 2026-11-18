@@ -11,6 +11,7 @@ import { refillableRules as typedRefillableRules } from '../../data/refillableDa
 import { speedupData as typedSpeedupData } from '../../data/speedupData.ts';
 import { heroMetadata as typedHeroMetadata, gearCraftData as typedGearCraftData, scrollCraftData as typedScrollCraftData } from '../../data/heroMetadata.ts';
 import { getTeamLevelExpDelta as typedGetTeamLevelExpDelta } from '../../data/teamLevelData.ts';
+import { guildRole as typedGuildRole } from '../../utils/guildData.ts';
 
 const getNameMap = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperNameMap) || typedNameMap;
 const getMineTypes = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMineTypes) || typedMineTypes;
@@ -27,6 +28,7 @@ const getHeroMetadata = (): any => (typeof globalThis !== 'undefined' && (global
 const getScrollCraftData = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperScrollCraftData) || typedScrollCraftData;
 const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGearCraftData) || typedGearCraftData;
 const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGetTeamLevelExpDelta) || typedGetTeamLevelExpDelta;
+const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGuildRole) || typedGuildRole;
 
   const definitions = {
     heroGetAll: 'heroes',
@@ -2460,9 +2462,16 @@ const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (g
           }
           const members = {};
           const stats = new Map(normalizeArrayData(entry.data.clanData.membersStat).map(row => [String(row.userId), row]));
+          const getRole = getGuildRole();
           for (const [id, member] of Object.entries(raw.members || {})) {
             if (!member || !/^\d+$/.test(String(member.id ?? id)) || (member.clanId != null && String(member.clanId) !== String(raw.id))) continue;
-            members[String(member.id ?? id)] = { ...member, stats: stats.get(String(member.id ?? id)) || {}, observedAt: entry.updatedAt };
+            const role = typeof getRole === 'function' ? getRole(member, raw) : 'Member';
+            members[String(member.id ?? id)] = {
+              ...member,
+              role,
+              stats: stats.get(String(member.id ?? id)) || {},
+              observedAt: entry.updatedAt
+            };
           }
           if (!Object.hasOwn(members, String(accountId))) continue; // user_getClanInfo is the active player's own Guild.
           const sameGuild = previous?.accountId === String(accountId) && String(previous?.guild?.id) === String(raw.id);
@@ -2474,8 +2483,10 @@ const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (g
             if (Object.hasOwn(members, id)) outposts[id] = outpost;
           }
           const { members: ignored, ...guild } = raw;
+          const selfRole = entry.data.selfRole;
+          const selfRoleTitle = typeof getRole === 'function' ? getRole({ id: accountId, clanRole: selfRole }, raw) : 'Member';
           next.guildStatus = { key: 'guildStatus', method: entry.method, group: 'other',
-            data: { accountId: String(accountId), guild, selfRole: entry.data.selfRole,
+            data: { accountId: String(accountId), guild, selfRole, selfRoleTitle,
               members, outposts, stats: entry.data.clanData.stat || {}, serverResetTime: entry.data.clanData.serverResetTime },
             updatedAt: entry.updatedAt };
           if (!sameGuild && pendingOutposts?.guildId && String(pendingOutposts.guildId) !== String(raw.id)) delete next.guildOutposts;

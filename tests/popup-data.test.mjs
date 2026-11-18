@@ -205,8 +205,9 @@ test('buildingTooltip and researchTooltip display queue details with name, level
 test('formatChatRole and formatChatTime format roles and timestamps properly', () => {
   const { formatChatRole, formatChatTime } = context.hwaHelperPopupData;
   assert.equal(formatChatRole('255').label, 'Leader');
-  assert.equal(formatChatRole('4').label, 'Officer');
-  assert.equal(formatChatRole('3').label, 'Member');
+  assert.equal(formatChatRole('4').label, 'Warlord');
+  assert.equal(formatChatRole('3').label, 'Officer');
+  assert.equal(formatChatRole('2').label, 'Member');
   assert.equal(formatChatRole('99').label, 'Role #99');
   assert.equal(formatChatRole(null).label, 'Member');
 

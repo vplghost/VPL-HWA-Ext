@@ -133,8 +133,9 @@ export function getUnreadChatCount(messages: any[], lastReadTime: number | strin
 export function formatChatRole(role: string | number): { label: string; badgeClass: string } {
   const r = String(role ?? '');
   if (r === '255') return { label: 'Leader', badgeClass: 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' };
-  if (r === '4') return { label: 'Officer', badgeClass: 'bg-blue-100 text-blue-800 ring-1 ring-blue-300' };
-  if (r === '3') return { label: 'Member', badgeClass: 'bg-slate-100 text-slate-700' };
+  if (r === '4') return { label: 'Warlord', badgeClass: 'bg-purple-100 text-purple-800 ring-1 ring-purple-300' };
+  if (r === '3') return { label: 'Officer', badgeClass: 'bg-blue-100 text-blue-800 ring-1 ring-blue-300' };
+  if (r === '2') return { label: 'Member', badgeClass: 'bg-slate-100 text-slate-700' };
   return { label: r ? `Role #${r}` : 'Member', badgeClass: 'bg-slate-100 text-slate-600' };
 }
 

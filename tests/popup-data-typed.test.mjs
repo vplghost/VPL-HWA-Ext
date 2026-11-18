@@ -93,8 +93,9 @@ test('getUnreadChatCount respects lastReadTime and 3-day cutoff', () => {
 
 test('formatChatRole and formatChatTime format correctly', () => {
   assert.equal(formatChatRole(255).label, 'Leader');
-  assert.equal(formatChatRole(4).label, 'Officer');
-  assert.equal(formatChatRole(3).label, 'Member');
+  assert.equal(formatChatRole(4).label, 'Warlord');
+  assert.equal(formatChatRole(3).label, 'Officer');
+  assert.equal(formatChatRole(2).label, 'Member');
 
   const formattedTime = formatChatTime(1700000000);
   assert.match(formattedTime, /^\d{2}\/\d{2} \d{2}:\d{2}$/);

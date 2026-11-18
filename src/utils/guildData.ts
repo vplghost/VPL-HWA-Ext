@@ -11,9 +11,25 @@ export function currentGuild(cache: Record<string, any>) {
 }
 
 export function guildRole(member: any, guild: any): string {
-  if (String(member.id) === String(guild.ownerId) || String(member.clanRole) === '255') return 'Guild Master';
-  if (String(member.clanRole) === '4') return guild.roleNames?.officer || 'Officer';
-  if (String(member.clanRole) === '3') return guild.roleNames?.member || 'Member';
+  if (!member) return 'Role unavailable';
+  const roleCode = String(member.clanRole ?? member.roleCode ?? '');
+  const isOwner = guild?.ownerId != null && String(member.id) === String(guild.ownerId);
+
+  if (isOwner || roleCode === '255') {
+    return guild?.roleNames?.leader || 'Guild Master';
+  }
+  if (roleCode === '4') {
+    return guild?.roleNames?.warlord || 'Warlord';
+  }
+  if (roleCode === '3') {
+    return guild?.roleNames?.officer || 'Officer';
+  }
+  if (roleCode === '2') {
+    return guild?.roleNames?.member || 'Member';
+  }
+  if (typeof member.role === 'string' && member.role) {
+    return member.role;
+  }
   return 'Role unavailable';
 }
 
@@ -26,7 +42,7 @@ export function guildMembers(cache: Record<string, any>) {
     return {
       id, name: String(member.name || 'Unknown member'), level: numeric(member.level),
       server: member.serverId == null ? null : String(member.serverId),
-      role: guildRole(member, data.guild), lastLoginAt: lastLogin == null || lastLogin <= 0 ? null : lastLogin * 1000,
+      role: member.role || guildRole(member, data.guild), lastLoginAt: lastLogin == null || lastLogin <= 0 ? null : lastLogin * 1000,
       activityToday: numeric(stats.todayActivity), activityTotal: numeric(stats.activitySum),
       titaniteToday: numeric(stats.todayDungeonActivity), titaniteTotal: numeric(stats.dungeonActivitySum),
       wasChampion: stats.wasChampion === true,
