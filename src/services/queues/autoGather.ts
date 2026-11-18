@@ -4,6 +4,7 @@ import type {
 } from '../../types/game/gatherQueue.ts';
 import type { BasicResourceType } from '../../types/game/march.ts';
 import * as expData from '../../utils/experimentalData.ts';
+import { calculateAccountMaxMarches } from '../../utils/dashboardState.ts';
 import smartGatherService from './smartGather.ts';
 import { unsafeMineIds as getUnsafeMineIds } from '../mineDefense.ts';
 
@@ -30,12 +31,13 @@ export function safeList<T = any>(raw: any): T[] {
   return [];
 }
 
-export function normalizeAutoGatherSettings(settings: any): AutoGatherSettings {
+export function normalizeAutoGatherSettings(settings: any, cache?: any): AutoGatherSettings {
   const raw = settings && typeof settings === 'object' ? settings : {};
-  const maxMarches =
+  const baseMax =
     Number.isInteger(raw.maxMarches) && raw.maxMarches >= 1 && raw.maxMarches <= 10
       ? raw.maxMarches
       : 3;
+  const maxMarches = cache ? Math.min(baseMax, calculateAccountMaxMarches(cache)) : baseMax;
   const mineLevel =
     raw.smartEnabled === true && raw.mineLevel === 'nearest'
       ? 'nearest'
@@ -165,7 +167,7 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
   if (stored?.popupRpcEnabled !== true) {
     return { action: 'idle', reason: 'Popup RPC disabled' };
   }
-  const settings = normalizeAutoGatherSettings(stored?.autoGatherSettings);
+  const settings = normalizeAutoGatherSettings(stored?.autoGatherSettings, cache);
   if (!settings.enabled) {
     return { action: 'idle', reason: 'Auto-gather disabled' };
   }

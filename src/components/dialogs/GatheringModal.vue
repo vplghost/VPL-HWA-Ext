@@ -9,6 +9,7 @@ import { formatNumber, formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import { isMarchExpired, getMarchBadgeInfo } from '@/src/utils/resourceData';
 import { gatheringProgress } from '@/src/utils/gatheringProgress';
+import { calculateAccountMaxMarches } from '@/src/utils/dashboardState';
 import {
   getMineConfigId,
   buildSquad,
@@ -81,6 +82,8 @@ const searchStatus = ref<string>('');
 const isDispatching = ref<string | null>(null);
 
 const smartStatus = ref('');
+const accountMaxMarches = computed(() => calculateAccountMaxMarches(cache.value));
+
 function onGatherStorage(changes: Record<string, chrome.storage.StorageChange>, area: string) {
   if (area !== 'local') return;
   if (changes.smartGatherState) smartStatus.value = (changes.smartGatherState.newValue as { status?: string } | undefined)?.status || '';
@@ -137,6 +140,8 @@ async function ensureRpcEnabled() {
 
 async function saveAutoSettings() {
   if (!autoSettings.value.smartEnabled && autoSettings.value.mineLevel === 'nearest') autoSettings.value.mineLevel = 10;
+  const maxLimit = accountMaxMarches.value;
+  autoSettings.value.maxMarches = Math.max(1, Math.min(maxLimit, autoSettings.value.maxMarches || 1));
   await ensureRpcEnabled();
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     await chrome.storage.local.set({ autoGatherSettings: autoSettings.value });
@@ -495,14 +500,18 @@ async function recallMarch(march: any) {
 
           <label class="block font-medium text-slate-700 dark:text-slate-300">
             Max Gathering Marches
-            <input
+            <select
               v-model.number="autoSettings.maxMarches"
-              type="number"
-              min="1"
-              max="10"
               class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               @change="saveAutoSettings"
-            />
+            >
+              <option v-for="m in accountMaxMarches" :key="m" :value="m">
+                {{ m }} squad{{ m > 1 ? 's' : '' }}{{ m === accountMaxMarches ? ' (Account Max)' : '' }}
+              </option>
+            </select>
+            <span class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block font-normal">
+              Account limit: {{ accountMaxMarches }} squad{{ accountMaxMarches > 1 ? 's' : '' }}
+            </span>
           </label>
         </div>
 

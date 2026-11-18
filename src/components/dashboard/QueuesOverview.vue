@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import { useNow } from '@/src/composables/useNow';
-import { dashboardQueues, dashboardMarches } from '@/src/utils/dashboardState';
+import { dashboardQueues, dashboardMarches, calculateAccountMaxMarches } from '@/src/utils/dashboardState';
 import { getBuildingName, getResearchName } from '@/src/utils/metadata';
 import { formatMarchTooltip } from '@/src/utils/marchTooltip';
 import { formatCompact } from '@/src/utils/formatters';
@@ -12,6 +12,8 @@ import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 const { cache } = useRpcCache();
 const { openModal } = useModals();
 const now = useNow();
+
+const maxMarches = computed(() => calculateAccountMaxMarches(cache.value));
 
 const buildingQueue = computed(() => dashboardQueues(cache.value, 'building', now.value));
 const researchQueue = computed(() => dashboardQueues(cache.value, 'research', now.value));
@@ -146,21 +148,21 @@ function handleMarchClick(category: string) {
         <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
           <span>🚩</span> Active Marches
         </h4>
-        <span class="text-[10px] text-slate-400 tabular-nums">{{ marches.length }} active</span>
+        <span class="text-[10px] text-slate-400 tabular-nums">{{ marches.length }} / {{ maxMarches }} active</span>
       </div>
 
       <!-- Marches Cards Container: Height locked to exactly 160px (matching the 2 queue cards) -->
       <div v-if="marches.length === 0" class="h-[160px] flex flex-col justify-center items-center rounded-lg bg-slate-50 dark:bg-slate-900/40 text-center text-xs text-slate-400 p-4 border border-dashed border-slate-200 dark:border-slate-800">
         <span class="text-base mb-1">🚩</span>
         <span class="font-medium text-slate-600 dark:text-slate-300">{{ marchesKnown ? 'No active squad marches outside city' : 'Waiting for game data' }}</span>
-        <span class="text-[10px] text-slate-400/80 mt-0.5">All squads are idle in outpost</span>
+        <span class="text-[10px] text-slate-400/80 mt-0.5">All {{ maxMarches }} squad slots are idle in outpost</span>
       </div>
 
       <!-- Marches List: Exactly 160px height in a 2-column grid, eliminating scroll for <= 4 marches -->
       <div
         v-else
         class="h-[160px] grid grid-cols-2 gap-2 content-start"
-        :class="marches.length > 4 ? 'overflow-y-auto pr-0.5' : 'overflow-hidden'"
+        :class="marches.length > maxMarches || marches.length > 4 ? 'overflow-y-auto pr-0.5' : 'overflow-hidden'"
       >
         <BaseTooltip
           v-for="m in marches"
@@ -242,15 +244,15 @@ function handleMarchClick(category: string) {
           </button>
         </BaseTooltip>
 
-        <!-- Placeholders up to 4 slots (to maintain perfect 2x2 grid symmetry and 160px height) -->
+        <!-- Placeholders up to account maxMarches (to maintain visual symmetry without false slots) -->
         <div
-          v-for="idx in Math.max(0, 4 - marches.length)"
+          v-for="idx in Math.max(0, maxMarches - marches.length)"
           :key="`march-slot-${idx}`"
           class="w-full h-[76px] p-2.5 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20 flex flex-col justify-between text-xs text-slate-400"
         >
           <div class="flex items-center justify-between">
             <span class="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400 truncate">
-              <span>🚩</span> Squad Slot Available
+              <span>🚩</span> Squad Slot {{ marches.length + idx }}
             </span>
             <span class="shrink-0 px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-400">
               Idle

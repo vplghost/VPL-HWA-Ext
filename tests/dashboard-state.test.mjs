@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { ref, computed } from 'vue';
 import { expeditionActivity } from '../src/utils/expeditions.ts';
-import { dashboardQueues, dashboardMarches, queueEndMs, queueProgressPercent } from '../src/utils/dashboardState.ts';
+import { dashboardQueues, dashboardMarches, queueEndMs, queueProgressPercent, calculateAccountMaxMarches } from '../src/utils/dashboardState.ts';
 import { towerActivityState, arenaActivityState, dungeonActivityState, observedToday, readyQuestCount } from '../src/composables/activityState.ts';
 
 const now = new Date(2026, 10, 13, 12).getTime();
@@ -40,6 +40,33 @@ test('queues show every active/ready upgrade, object maps and distinguish unknow
   assert.equal(dashboardQueues({ research_getQueue: entry({ 0: { researchId: 4, finishTime: now + 1000 } }) }, 'research', now).rows[0].entityId, 4);
   assert.equal(dashboardQueues({ building_getQueue: entry({ buildingId: 9, finishTime: now + 1000 }) }, 'building', now).rows.length, 1);
   assert.equal(dashboardQueues({ researchStatus: entry({ queue: [{ researchId: 5 }] }) }, 'research', now).rows[0].state, 'unknown');
+});
+
+test('calculateAccountMaxMarches parses base, Tactics I/II researches and subscription bonuses', () => {
+  // Brand new account with no researches completed
+  assert.equal(calculateAccountMaxMarches({ researchStatus: entry({ completedResearches: [] }) }), 1);
+
+  // Completed Command Tactics I (id: 7)
+  assert.equal(calculateAccountMaxMarches({
+    researchStatus: entry({ completedResearches: [{ researchId: 7, level: 1 }] })
+  }), 2);
+
+  // Completed Command Tactics I (id: 7) and Command Tactics II (id: 94)
+  assert.equal(calculateAccountMaxMarches({
+    researchStatus: entry({ completedResearches: [{ researchId: 7, level: 1 }, { researchId: 94, level: 1 }] })
+  }), 3);
+
+  // With active subscription (+1 march)
+  assert.equal(calculateAccountMaxMarches({
+    researchStatus: entry({ completedResearches: [{ researchId: 7, level: 1 }, { researchId: 94, level: 1 }] }),
+    subscriptionGetInfo: entry({ subscription: { isActive: true } }),
+  }), 4);
+
+  // Floored at currently deployed marches
+  assert.equal(calculateAccountMaxMarches({
+    researchStatus: entry({ completedResearches: [] }),
+    marchStatus: entry({ marches: [{}, {}, {}] }),
+  }), 3);
 });
 
 test('marches retain normalized gathering, battle and return stages and remove only expired returns', () => {
@@ -151,7 +178,7 @@ async function setupComponent(file, expose, initial = {}) {
   const setup = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
   const cache = ref(initial), clock = ref(now), opened = [];
   const context = { computed, ref, useNow: () => clock, useRpcCache: () => ({ cache }),
-    useModals: () => ({ openModal: id => opened.push(id) }), dashboardQueues, dashboardMarches,
+    useModals: () => ({ openModal: id => opened.push(id) }), dashboardQueues, dashboardMarches, calculateAccountMaxMarches,
     getBuildingName: id => `Building ${id}`, getResearchName: id => `Research ${id}`,
     expeditionActivity, towerActivityState, arenaActivityState, observedToday, dungeonActivityState: (cache, time) => dungeonActivityState(cache, time, meta), readyQuestCount };
   const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');

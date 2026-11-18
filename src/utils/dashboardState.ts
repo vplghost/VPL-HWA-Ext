@@ -35,6 +35,55 @@ export function queueProgressPercent(queue: any, now = Date.now()): number {
   return 0;
 }
 
+/**
+ * Calculates the account's maximum squad/march capacity based on permanent research and active subscription.
+ * - Base capacity: 1 squad queue
+ * - Command Tactics I (Research ID 7, Level >= 1): +1 squad queue
+ * - Command Tactics II (Research ID 94, Level >= 1): +1 squad queue
+ * - Active Subscription (Bonus 3732): +1 squad queue
+ * - Floored at current active marches/squads in game cache.
+ * Defaults to 3 if research cache is not yet populated.
+ */
+export function calculateAccountMaxMarches(cache: Record<string, any>): number {
+  if (!cache || typeof cache !== 'object') return 3;
+
+  const researchStatus = cache.researchStatus?.data;
+  let baseAndBonuses = 1;
+
+  if (researchStatus != null) {
+    const rawResearches = researchStatus.completedResearches ?? researchStatus.researches ?? researchStatus;
+    const completed = normalizeArray(rawResearches);
+
+    // Command Tactics I (Research ID 7)
+    const hasTac1 = completed.some((r: any) => (r?.researchId ?? r?.id) === 7 && (r?.level ?? 1) >= 1);
+    if (hasTac1) baseAndBonuses += 1;
+
+    // Command Tactics II (Research ID 94)
+    const hasTac2 = completed.some((r: any) => (r?.researchId ?? r?.id) === 94 && (r?.level ?? 1) >= 1);
+    if (hasTac2) baseAndBonuses += 1;
+
+    // 30-day Subscription bonus
+    const sub = cache.subscriptionGetInfo?.data?.subscription ?? cache.subscriptionStatus?.data?.subscription;
+    if (sub && (sub.isActive === true || (sub.endTime && (sub.endTime > Date.now() / 1000 || sub.endTime > Date.now())))) {
+      baseAndBonuses += 1;
+    }
+  } else {
+    // If researchStatus is not yet populated in cache, fallback to stored settings or 3
+    const storedMax = cache.autoGatherSettings?.data?.maxMarches ?? cache.autoGatherSettings?.maxMarches;
+    baseAndBonuses = Number.isInteger(storedMax) && storedMax >= 1 ? storedMax : 3;
+  }
+
+  // Ensure capacity is at least as large as currently deployed marches or squads
+  const rawMarches = cache.marchStatus?.data?.marches;
+  const marchesCount = normalizeArray(rawMarches).length;
+
+  const rawSquads = cache['getUnitSummary:unit']?.data?.squads;
+  const squadsCount = normalizeArray(rawSquads).length;
+
+  const maxMarches = Math.max(baseAndBonuses, marchesCount, squadsCount);
+  return Math.max(1, Math.min(10, maxMarches));
+}
+
 export function dashboardQueues(cache: Record<string, any>, kind: 'building' | 'research', now = Date.now()) {
   const status = cache[`${kind}Status`]?.data ?? cache[`${kind}_getQueue`]?.data;
   if (status == null) return { state: 'unknown', rows: [] };

@@ -5,8 +5,10 @@ import type { AutoGatherSettings } from '@/src/types';
 import { formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import { isMarchExpired, getMarchBadgeInfo } from '@/src/utils/resourceData';
+import { calculateAccountMaxMarches } from '@/src/utils/dashboardState';
 
 const { cache, dispatchRpc } = useRpcCache();
+const accountMaxMarches = computed(() => calculateAccountMaxMarches(cache.value));
 
 const settings = ref<AutoGatherSettings>({
   enabled: false,
@@ -39,6 +41,8 @@ onUnmounted(() => {
 });
 
 async function saveSettings() {
+  const maxLimit = accountMaxMarches.value;
+  settings.value.maxMarches = Math.max(1, Math.min(maxLimit, settings.value.maxMarches || 1));
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     await chrome.storage.local.set({ autoGatherSettings: settings.value });
   }
@@ -187,12 +191,12 @@ async function triggerManualSearch() {
             Max Active Marches
           </label>
           <select
-            v-model="settings.maxMarches"
+            v-model.number="settings.maxMarches"
             class="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-hidden"
             @change="saveSettings"
           >
-            <option v-for="m in 5" :key="m" :value="m">
-              {{ m }} squad{{ m > 1 ? 's' : '' }}
+            <option v-for="m in accountMaxMarches" :key="m" :value="m">
+              {{ m }} squad{{ m > 1 ? 's' : '' }}{{ m === accountMaxMarches ? ' (Max)' : '' }}
             </option>
           </select>
         </div>

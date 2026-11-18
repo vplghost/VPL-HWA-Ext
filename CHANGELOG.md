@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.81 — 2026-11-18
+
+### Added
+
+- **Account Maximum Marches Capacity Calculation (`calculateAccountMaxMarches`)**:
+  - Dynamically calculates true account march capacity based on base queue (1) + completed Academy researches (`Command Tactics I` id: 7 gives +1, `Command Tactics II` id: 94 gives +1) + active 30-day subscription (+1).
+  - Ensures accurate ground-truth march capacity (e.g. exactly 3 squads for accounts with Tactics I & II completed).
+  - Floored at current live deployed marches/squads to avoid under-counting during active operations.
+
+### Changed
+
+- **Auto Gather Squad Limits Clamped to Account Capacity**:
+  - Bound Auto Gather settings in `GatheringModal.vue`, `GatheringTab.vue`, and `autoGatherPlan` service to never exceed the account's actual maximum marches limit.
+  - Replaced arbitrary numeric inputs with bounded squad selectors showing the account limit (e.g., `3 squads (Account Max)`).
+- **Dashboard Active Marches Dynamic Placeholders**:
+  - Replaced hardcoded 4 placeholders with dynamic placeholders matching `Math.max(0, accountMaxMarches - marches.length)`.
+  - Added march slot numbering (e.g. `Squad Slot 3`) and updated header indicator to `{{ marches.length }} / {{ maxMarches }} active` (e.g., `2 / 3 active`).
+
 ## 0.11.79 — 2026-11-18
 
 ### Added
