@@ -7,6 +7,7 @@ import QueuesOverview from './QueuesOverview.vue';
 import ActivityGoals from './ActivityGoals.vue';
 import FreeAlchemySpinButton from './FreeAlchemySpinButton.vue';
 import FreeBoxButton from './FreeBoxButton.vue';
+import FreeChestButton from './FreeChestButton.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import { useGameConnection } from '@/src/composables/useGameConnection';
@@ -163,6 +164,7 @@ async function refreshAllDashboard() {
       <div id="dashboard-actions" class="flex flex-wrap items-center gap-2">
         <FreeAlchemySpinButton :has-game-tab="hasGameTab" />
         <FreeBoxButton :has-game-tab="hasGameTab" />
+        <FreeChestButton :has-game-tab="hasGameTab" />
         <!-- Refresh Browser Button -->
         <button
           v-if="needsRefresh"

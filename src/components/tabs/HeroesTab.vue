@@ -24,7 +24,7 @@ const selectedClass = ref('All');
 const selectedFaction = ref('All');
 const filterFavsOnly = ref(false);
 const filterEvolveOnly = ref(false);
-const viewMode = ref<'table' | 'grid'>('table');
+const viewMode = ref<'table' | 'grid'>('grid');
 
 // Sorting
 type SortColumn = 'fav' | 'id' | 'name' | 'level' | 'star' | 'rank' | 'soul' | 'power';
@@ -178,8 +178,16 @@ function openHeroDetail(hero: any) {
   showHeroModal.value = true;
 }
 
+const isRefreshing = ref(false);
+
 async function refreshHeroes() {
-  await dispatchRpc([{ name: 'heroGetAll' }]);
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([{ name: 'heroGetAll' }]);
+  } finally {
+    isRefreshing.value = false;
+  }
 }
 
 function exportHeroesJson() {
@@ -289,20 +297,20 @@ function exportHeroesJson() {
             <button
               type="button"
               class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
-              :class="viewMode === 'table' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
-              title="Table View (Snapshot)"
-              @click="viewMode = 'table'"
-            >
-              📋 Table
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
               :class="viewMode === 'grid' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
               title="Grid View (Cards)"
               @click="viewMode = 'grid'"
             >
               🔲 Grid
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-1 rounded text-xs transition-colors"
+              :class="viewMode === 'table' ? 'bg-white dark:bg-slate-700 font-semibold text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'"
+              title="Table View (Snapshot)"
+              @click="viewMode = 'table'"
+            >
+              📋 Table
             </button>
           </div>
 
@@ -317,14 +325,17 @@ function exportHeroesJson() {
             📥 Export
           </button>
 
+          <!-- Refresh button -->
           <button
             id="btn-toolbar-refresh-heroes"
             type="button"
-            class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors"
-            title="Refresh Heroes via RPC"
+            :disabled="isRefreshing"
+            class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors disabled:opacity-50"
+            title="Refresh heroes via RPC"
             @click="refreshHeroes"
           >
-            🔄 Refresh
+            <span :class="{ 'inline-block animate-spin': isRefreshing }">🔄</span>
+            <span>Refresh</span>
           </button>
         </div>
       </div>

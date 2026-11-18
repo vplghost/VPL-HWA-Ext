@@ -83,5 +83,6 @@ export * from './game/raidEnergyAuto';
 export * from './game/gatherQueue';
 export * from './game/towerAutomation';
 export * from './game/dungeonAutomation';
+export * from './game/attentionBonus';
 export * from './game/rpcCache';
 

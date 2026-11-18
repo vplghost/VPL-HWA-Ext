@@ -302,6 +302,7 @@ const filteredQuests = computed(() => {
 });
 
 async function refreshQuests() {
+  if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
     await dispatchRpc(questRefreshCalls());

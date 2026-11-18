@@ -39,9 +39,17 @@ onMounted(() => {
   void loadSpend().catch(() => {});
 });
 onUnmounted(() => { revision++; if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.removeListener(storageChanged); });
+const refreshing = ref(false);
+
 async function refresh() {
-  const result = await dispatchRpc(speedup.refreshCalls(props.kind));
-  message.value = result?.ok ? 'Inventory and timer refresh requested. Waiting for game data.' : result?.error || 'Refresh failed.';
+  if (refreshing.value) return;
+  refreshing.value = true;
+  try {
+    const result = await dispatchRpc(speedup.refreshCalls(props.kind));
+    message.value = result?.ok ? 'Inventory and timer refresh requested. Waiting for game data.' : result?.error || 'Refresh failed.';
+  } finally {
+    refreshing.value = false;
+  }
 }
 function review() {
   if (!formOpen.value || !quote.value || waiting.value) return;
@@ -73,7 +81,7 @@ async function confirm() {
     </button>
     <ModalDialog :model-value="formOpen && !confirmation" :title="`Speed up ${targetLabel}`" icon="⏩" :stack-level="70" @update:model-value="formOpen = false">
     <div class="space-y-3 text-xs" data-speedup-form>
-    <div class="flex items-center justify-between gap-2"><span class="font-semibold">{{ targetLabel }}</span><button type="button" class="cursor-pointer text-blue-600 dark:text-blue-400" @click="refresh">Refresh items &amp; timer</button></div>
+    <div class="flex items-center justify-between gap-2"><span class="font-semibold">{{ targetLabel }}</span><button type="button" :disabled="refreshing" class="cursor-pointer text-blue-600 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed" @click="refresh">{{ refreshing ? 'Refreshing…' : 'Refresh items &amp; timer' }}</button></div>
     <div class="flex flex-wrap items-center gap-2">
       <select v-model.number="itemId" :disabled="waiting" aria-label="Speedup item" class="min-w-0 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1">
         <option v-if="!items.length" :value="0">No verified items · Refresh</option>

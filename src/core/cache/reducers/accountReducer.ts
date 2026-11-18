@@ -35,6 +35,9 @@ export function reduceAccountChange(next: RpcCacheState, entry: CacheEntry): boo
     delete next.cinemaGiveRewardStatus;
     delete next.cinemaGiveRewardReceipts;
     delete next.cinemaGetCounters;
+    delete next.attentionBonusStatus;
+    delete next.attentionBonusCollectStatus;
+    delete next.attentionBonusCollectReceipts;
     delete next.mailStatus;
     delete next.mailGetAll;
     delete next['getPage:report'];

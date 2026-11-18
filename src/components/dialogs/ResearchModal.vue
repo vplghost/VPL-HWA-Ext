@@ -603,8 +603,16 @@ const filteredResearchDirectory = computed(() => {
     });
 });
 
+const isRefreshing = ref(false);
+
 async function refreshResearch() {
-  await dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'personalResearch' }]);
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([{ name: 'clan_getSummary' }, { name: 'getSummary', feature: 'personalResearch' }]);
+  } finally {
+    isRefreshing.value = false;
+  }
 }
 </script>
 
@@ -681,10 +689,12 @@ async function refreshResearch() {
             </span>
             <button
               type="button"
-              class="cursor-pointer text-2xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 lowercase font-normal"
+              :disabled="isRefreshing"
+              class="cursor-pointer text-2xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 lowercase font-normal disabled:opacity-50 inline-flex items-center gap-0.5"
               @click="refreshResearch"
             >
-              ↻ refresh
+              <span :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
+              <span>refresh</span>
             </button>
           </h3>
 

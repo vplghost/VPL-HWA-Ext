@@ -231,8 +231,16 @@ async function toggleTowerRun() {
   }
 }
 
+const isRefreshing = ref(false);
+
 async function refreshTower() {
-  await dispatchRpc([{ name: 'magicTower_briefInfo' }, { name: 'magicTower_getAll' }]);
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([{ name: 'magicTower_briefInfo' }, { name: 'magicTower_getAll' }]);
+  } finally {
+    isRefreshing.value = false;
+  }
 }
 
 // -------------------------------------------------------------
@@ -475,10 +483,12 @@ watch(() => props.modelValue, (open) => {
         <div class="flex items-center gap-2">
           <button
             type="button"
-            class="cursor-pointer text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            :disabled="isRefreshing"
+            class="cursor-pointer text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
             @click="refreshTower"
           >
-            ↻ Refresh
+            <span :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
+            <span>Refresh</span>
           </button>
 
           <!-- Tower Cleared Status Badge (Hides Start Auto when cleared) -->

@@ -285,6 +285,7 @@ const filteredCards = computed(() => {
 });
 
 async function refreshEvents() {
+  if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
     await dispatchRpc([

@@ -105,6 +105,7 @@ function handleScroll() {
 }
 
 async function refreshChat() {
+  if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
     await dispatchRpc([{ name: 'chatGetAll', args: { chatType: 'clan' } }]);
@@ -188,7 +189,8 @@ watch(
         <button
           id="guild-chat-refresh"
           type="button"
-          class="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+          :disabled="isRefreshing"
+          class="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           :class="{ 'animate-spin': isRefreshing }"
           title="Refresh messages"
           aria-label="Refresh messages"

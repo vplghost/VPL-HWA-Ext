@@ -31,8 +31,16 @@ async function toggleTowerRun() {
   }
 }
 
+const isRefreshing = ref(false);
+
 async function refreshTower() {
-  await dispatchRpc([{ name: 'towerGetInfo' }]);
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([{ name: 'towerGetInfo' }]);
+  } finally {
+    isRefreshing.value = false;
+  }
 }
 </script>
 
@@ -58,10 +66,12 @@ async function refreshTower() {
         <div class="flex items-center gap-2">
           <button
             type="button"
-            class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+            :disabled="isRefreshing"
+            class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50 inline-flex items-center gap-1"
             @click="refreshTower"
           >
-            ↻ Refresh
+            <span :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
+            <span>Refresh</span>
           </button>
 
           <!-- Tower Cleared Badge (Hides Start Auto when cleared) -->

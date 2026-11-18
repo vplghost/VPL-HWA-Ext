@@ -287,6 +287,7 @@ watch([bossLevel, waitSeconds, minMembers, raidCount, autoCancel], () => {
 const isLocatingMap = ref(false);
 
 async function refreshMapCoordinates() {
+  if (isLocatingMap.value) return;
   isLocatingMap.value = true;
   statusMessage.value = 'Locating coordinates from game...';
   try {

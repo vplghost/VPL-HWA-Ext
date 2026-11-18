@@ -29,6 +29,8 @@ export const RPC_CACHE_DEFINITIONS: Record<string, string> = {
   completeHealing: 'teams',
   questGetAll: 'other',
   cinemaGetCounters: 'other',
+  attentionBonus_collectReward: 'other',
+  liveOps_refresh: 'other',
   user_getClanInfo: 'other',
   'getUserClanMembersOutposts:globalMap': 'other',
   arenaGetAll: 'other',

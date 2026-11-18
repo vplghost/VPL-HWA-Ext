@@ -27,8 +27,16 @@ async function toggleDungeonRun() {
   }
 }
 
+const isRefreshing = ref(false);
+
 async function refreshDungeon() {
-  await dispatchRpc([{ name: 'dungeonGetInfo' }]);
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    await dispatchRpc([{ name: 'dungeonGetInfo' }]);
+  } finally {
+    isRefreshing.value = false;
+  }
 }
 </script>
 
@@ -52,10 +60,12 @@ async function refreshDungeon() {
         <div class="flex items-center gap-2">
           <button
             type="button"
-            class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+            :disabled="isRefreshing"
+            class="cursor-pointer text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50 inline-flex items-center gap-1"
             @click="refreshDungeon"
           >
-            ↻ Refresh
+            <span :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
+            <span>Refresh</span>
           </button>
 
           <button

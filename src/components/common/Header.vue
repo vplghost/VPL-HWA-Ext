@@ -170,12 +170,36 @@ function openInTab() {
   }
 }
 
-// Active Marches
+// Active Marches sorted by:
+// 1) Category: rally (raid) -> monster -> gather (mine)
+// 2) Start time: newer on the left, older on the right
+const MARCH_CATEGORY_ORDER: Record<string, number> = {
+  raid: 1,
+  monster: 2,
+  gather: 3,
+};
+
+function getMarchStartTime(m: any): number {
+  return Number(m?.startedAt || m?.gatheringStartedAt || m?.route?.startedAt || m?.plannedStartTime || 0);
+}
+
 const activeMarches = computed(() => {
   const marches = normalizeArray(cache.value.marchStatus?.data?.marches);
-  return marches
+  const list = marches
     .map((m: any, idx: number) => ({ march: m, index: idx }))
     .filter(({ march }: { march: any }) => !isMarchExpired(march, now.value));
+
+  return list.sort((a, b) => {
+    const catA = MARCH_CATEGORY_ORDER[getMarchBadgeInfo(a.march, now.value).category] ?? 99;
+    const catB = MARCH_CATEGORY_ORDER[getMarchBadgeInfo(b.march, now.value).category] ?? 99;
+    if (catA !== catB) return catA - catB;
+
+    const timeA = getMarchStartTime(a.march);
+    const timeB = getMarchStartTime(b.march);
+    if (timeA !== timeB) return timeB - timeA; // newer on left, older on right
+
+    return a.index - b.index;
+  });
 });
 
 function handleMarchClick(march: any) {

@@ -55,6 +55,8 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
     completeHealing: 'teams',
     questGetAll: 'other',
     cinemaGetCounters: 'other',
+    attentionBonus_collectReward: 'other',
+    liveOps_refresh: 'other',
     user_getClanInfo: 'other',
     'getUserClanMembersOutposts:globalMap': 'other',
     arenaGetAll: 'other',
@@ -1742,6 +1744,45 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
             updatedAt: record.timestamp
           }];
         }
+        if (call.name === 'attentionBonus_collectReward') {
+          const bonusList = Array.isArray(result?.liveOps_UPDATE_ATTENTION_BONUS)
+            ? result.liveOps_UPDATE_ATTENTION_BONUS
+            : [];
+          const error = result?.error;
+          const actions: any[] = [{
+            key: 'attentionBonusCollectAction',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: {
+              token: call.ident,
+              id: call.args?.id,
+              success: !error,
+              error: error ? String(typeof error === 'object' ? error.message || error.description || JSON.stringify(error) : error).slice(0, 200) : null,
+              bonuses: bonusList
+            },
+            updatedAt: record.timestamp
+          }];
+          if (bonusList.length > 0) {
+            actions.push({
+              key: 'attentionBonusStatus',
+              method: call.name,
+              group: 'other',
+              data: { bonuses: bonusList },
+              updatedAt: record.timestamp
+            });
+          }
+          return actions;
+        }
+        if (Array.isArray(result?.liveOps_UPDATE_ATTENTION_BONUS) && result.liveOps_UPDATE_ATTENTION_BONUS.length > 0) {
+          return [{
+            key: 'attentionBonusStatus',
+            method: call.name,
+            group: 'other',
+            data: { bonuses: result.liveOps_UPDATE_ATTENTION_BONUS },
+            updatedAt: record.timestamp
+          }];
+        }
         if (call.name === 'clanClash_claimReward') {
           const response = result?.response;
           if (!call.ident || result?.error || !response || typeof response !== 'object' ||
@@ -2186,6 +2227,20 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
             error: error ? String(error).slice(0, 200) : null
           }, updatedAt: record.timestamp });
       }
+      for (const res of response.results || []) {
+        const r = res.result || res;
+        if (Array.isArray(r?.liveOps_UPDATE_ATTENTION_BONUS) && r.liveOps_UPDATE_ATTENTION_BONUS.length > 0) {
+          if (!actions.some(a => a.key === 'attentionBonusStatus')) {
+            actions.push({
+              key: 'attentionBonusStatus',
+              method: 'liveOps_UPDATE_ATTENTION_BONUS',
+              group: 'other',
+              data: { bonuses: r.liveOps_UPDATE_ATTENTION_BONUS },
+              updatedAt: record.timestamp
+            });
+          }
+        }
+      }
       return actions;
     } catch (_) {
       return [];
@@ -2279,6 +2334,9 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
           delete next.cinemaGiveRewardStatus;
           delete next.cinemaGiveRewardReceipts;
           delete next.cinemaGetCounters;
+          delete next.attentionBonusStatus;
+          delete next.attentionBonusCollectStatus;
+          delete next.attentionBonusCollectReceipts;
           delete next.mailStatus;
           delete next.mailGetAll;
           delete next['getPage:report'];
@@ -2613,6 +2671,48 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
           if (entry.data.success && entry.data.reward) {
             const actions = extractRewardActions(record, { name: entry.method, ident: entry.data.token }, entry.data.reward, 'cinemaBox');
             entries.push(...actions.filter(action => !entries.some(snapshot => snapshot.key === action.data.resourceKey && snapshot.updatedAt >= entry.updatedAt)));
+          }
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'attentionBonusStatus') {
+          const prevBonuses = next.attentionBonusStatus?.data?.bonuses || {};
+          const incoming = Array.isArray(entry.data?.bonuses)
+            ? entry.data.bonuses
+            : Object.values(entry.data?.bonuses || {});
+          const merged = { ...prevBonuses };
+          for (const b of incoming) {
+            if (b && b.id != null) {
+              merged[b.id] = { ...b };
+            }
+          }
+          next.attentionBonusStatus = {
+            key: 'attentionBonusStatus',
+            group: 'other',
+            data: { bonuses: merged },
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'attentionBonusCollectAction') {
+          const receipts = normalizeArrayData(next.attentionBonusCollectReceipts?.data);
+          if (receipts.some(receipt => receipt?.token === entry.data.token)) continue;
+          next.attentionBonusCollectReceipts = {
+            key: 'attentionBonusCollectReceipts',
+            method: entry.method,
+            group: 'internal',
+            data: [...receipts, { token: entry.data.token, id: entry.data.id, at: entry.updatedAt }].slice(-100),
+            updatedAt: entry.updatedAt
+          };
+          if (!next.attentionBonusCollectStatus || next.attentionBonusCollectStatus.updatedAt <= entry.updatedAt) {
+            next.attentionBonusCollectStatus = {
+              key: 'attentionBonusCollectStatus',
+              method: entry.method,
+              group: 'internal',
+              data: { ...entry.data },
+              updatedAt: entry.updatedAt
+            };
           }
           changed = true;
           continue;

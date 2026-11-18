@@ -43,6 +43,7 @@ const visibleResources = computed(() => {
 });
 
 async function refreshGoals() {
+  if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
     await dispatchRpc([
