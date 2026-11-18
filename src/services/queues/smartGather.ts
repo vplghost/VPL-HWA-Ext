@@ -249,7 +249,13 @@ export function resumePlan(cache: any, state: any, now: number = Date.now()): an
   const info = smartData?.mines?.[(mine as any).configId];
   if (!info) return { action: 'wait', reason: 'Interrupted mine configuration unavailable' };
   if (state.resumeCandidate?.mineId === (mine as any).mineId && state.resumeCandidate.checkedAt > now - 30000) {
-    return { action: 'target', mine, type: info.type, level: info.level };
+    const remaining = state.resumeCandidate.resourceAmount ?? (mine as any).resourceAmount ?? (mine as any).resourcesAmount;
+    return {
+      action: 'target',
+      mine: { ...mine, resourceAmount: remaining, resourcesAmount: remaining },
+      type: info.type,
+      level: info.level,
+    };
   }
   return {
     action: 'probe',
@@ -551,7 +557,13 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
       duration !== null &&
       duration > 3600
     ) {
-      state.nearest.selected = { ...pending.mine, checkedAt: now, estimatedSeconds: duration };
+      state.nearest.selected = {
+        ...pending.mine,
+        checkedAt: now,
+        estimatedSeconds: duration,
+        resourceAmount: amount,
+        resourcesAmount: amount,
+      };
     } else {
       state.nearest.candidates = state.nearest.candidates.filter((m: any) => m.mineId !== pending.mine.mineId);
       state.nearest.selected = null;
@@ -570,7 +582,12 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
       amount > 0 &&
       reply.result?.response?.mineId === pending.mine.mineId
     ) {
-      state.resumeCandidate = { mineId: pending.mine.mineId, checkedAt: now };
+      state.resumeCandidate = {
+        mineId: pending.mine.mineId,
+        checkedAt: now,
+        resourceAmount: amount,
+        resourcesAmount: amount,
+      };
     } else {
       state.interrupted = list(state.interrupted).filter((m: any) => m.mineId !== pending.mine.mineId);
       state.resumeCandidate = null;

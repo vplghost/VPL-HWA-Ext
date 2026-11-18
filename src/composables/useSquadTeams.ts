@@ -112,12 +112,24 @@ export function useSquadTeams(
     if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.removeListener(onSquadStorageChanged);
   });
 
-  const gatherContext = ref<{ mineType?: string; mineLevel?: number }>({
+  const gatherContext = ref<{
+    mineType?: string;
+    mineLevel?: number;
+    resourcesAmount?: number;
+    resourceAmount?: number;
+    targetMine?: any;
+  }>({
     mineType: 'food',
     mineLevel: 10,
   });
 
-  function setGatherContext(ctx: { mineType?: string; mineLevel?: number }) {
+  function setGatherContext(ctx: {
+    mineType?: string;
+    mineLevel?: number;
+    resourcesAmount?: number;
+    resourceAmount?: number;
+    targetMine?: any;
+  }) {
     gatherContext.value = { ...gatherContext.value, ...ctx };
   }
 
@@ -194,12 +206,21 @@ export function useSquadTeams(
     }
 
     if (preferenceStorageKey === 'autoGatherSettings') {
+      const targetAmount =
+        gatherContext.value.resourceAmount ??
+        gatherContext.value.resourcesAmount ??
+        gatherContext.value.targetMine?.resourceAmount ??
+        gatherContext.value.targetMine?.resourcesAmount;
+
       const opt = buildOptimizedGatheringTeam({
         heroes: heroesData.value,
         availableHeroIds: availableHeroIds.value,
         unitSummary: unitSummaryData.value,
         mineType: gatherContext.value.mineType || 'food',
         mineLevel: gatherContext.value.mineLevel || 10,
+        resourcesAmount: targetAmount,
+        resourceAmount: targetAmount,
+        targetMine: gatherContext.value.targetMine,
         capacitySettings: capacitySettings.value,
         accountId: accountId.value,
       });
@@ -228,12 +249,21 @@ export function useSquadTeams(
     const team = selectedTeam.value;
     if (!team) return 0;
     if (team.id === 'optimized') {
+      const targetAmount =
+        gatherContext.value.resourceAmount ??
+        gatherContext.value.resourcesAmount ??
+        gatherContext.value.targetMine?.resourceAmount ??
+        gatherContext.value.targetMine?.resourcesAmount;
+
       const opt = buildOptimizedGatheringTeam({
         heroes: heroesData.value,
         availableHeroIds: availableHeroIds.value,
         unitSummary: unitSummaryData.value,
         mineType: gatherContext.value.mineType || 'food',
         mineLevel: gatherContext.value.mineLevel || 10,
+        resourcesAmount: targetAmount,
+        resourceAmount: targetAmount,
+        targetMine: gatherContext.value.targetMine,
         capacitySettings: capacitySettings.value,
         accountId: accountId.value,
       });
@@ -253,12 +283,21 @@ export function useSquadTeams(
   const allocatedTroops = computed<Array<{ unitId: number; count: number }>>(() => {
     const team = selectedTeam.value;
     if (team?.id === 'optimized') {
+      const targetAmount =
+        gatherContext.value.resourceAmount ??
+        gatherContext.value.resourcesAmount ??
+        gatherContext.value.targetMine?.resourceAmount ??
+        gatherContext.value.targetMine?.resourcesAmount;
+
       const opt = buildOptimizedGatheringTeam({
         heroes: heroesData.value,
         availableHeroIds: availableHeroIds.value,
         unitSummary: unitSummaryData.value,
         mineType: gatherContext.value.mineType || 'food',
         mineLevel: gatherContext.value.mineLevel || 10,
+        resourcesAmount: targetAmount,
+        resourceAmount: targetAmount,
+        targetMine: gatherContext.value.targetMine,
         capacitySettings: capacitySettings.value,
         accountId: accountId.value,
       });

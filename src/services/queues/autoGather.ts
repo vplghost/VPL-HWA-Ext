@@ -338,13 +338,22 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
 
     if (isOptimized) {
       const myId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
+      const remainingAmount =
+        selectedMine?.resourceAmount ??
+        selectedMine?.resourcesAmount ??
+        selectedMine?.amount ??
+        cache?.mineMap?.[selectedMine?.mineId]?.resourceAmount ??
+        cache?.mineMap?.[selectedMine?.mineId]?.resourcesAmount;
+
       const opt = data.buildOptimizedGatheringTeam({
         heroes,
         availableHeroIds,
         unitSummary: summary,
         mineType: targetMineType,
         mineLevel: targetMineLevel,
-        resourcesAmount: selectedMine.resourcesAmount,
+        resourcesAmount: remainingAmount,
+        resourceAmount: remainingAmount,
+        targetMine: selectedMine,
         capacitySettings: data.normalizeCapacitySettings(stored?.troopCapacitySettings),
         accountId: myId,
       });

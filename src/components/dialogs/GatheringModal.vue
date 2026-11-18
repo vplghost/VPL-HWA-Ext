@@ -7,7 +7,7 @@ import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import GatheringProgress from '@/src/components/common/GatheringProgress.vue';
 import { formatNumber, formatDuration } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
-import { isMarchExpired, getMarchBadgeInfo, RESOURCE_THEMES } from '@/src/utils/resourceData';
+import { isMarchExpired, getMarchBadgeInfo, RESOURCE_THEMES, formatResourceAmount } from '@/src/utils/resourceData';
 import { gatheringProgress } from '@/src/utils/gatheringProgress';
 import { calculateAccountMaxMarches } from '@/src/utils/dashboardState';
 import {
@@ -82,11 +82,25 @@ const autoSettings = ref<AutoGatherSettings>({
 });
 
 watch(
-  [() => autoSettings.value.mineType, () => autoSettings.value.mineLevel],
-  ([type, level]) => {
+  [() => autoSettings.value.mineType, () => autoSettings.value.mineLevel, () => foundMines.value],
+  ([type, level, mines]) => {
     const normType = type === 'rotate' ? 'food' : type;
     const normLevel = level === 'nearest' ? 10 : Number(level) || 10;
-    setGatherContext({ mineType: normType, mineLevel: normLevel });
+    const firstMine = Array.isArray(mines) && mines.length > 0 ? mines[0] : null;
+    const remaining =
+      firstMine?.resourceAmount ??
+      firstMine?.resourcesAmount ??
+      firstMine?.amount ??
+      cache.value.mineMap?.[firstMine?.mineId]?.resourceAmount ??
+      cache.value.mineMap?.[firstMine?.mineId]?.resourcesAmount;
+
+    setGatherContext({
+      mineType: normType,
+      mineLevel: normLevel,
+      resourceAmount: remaining,
+      resourcesAmount: remaining,
+      targetMine: firstMine,
+    });
   },
   { immediate: true }
 );
@@ -287,13 +301,22 @@ async function dispatchSquadToMine(mine: any) {
   let troops: Array<{ unitId: number; count: number }> = [];
 
   if (isOptimized) {
+    const remainingAmount =
+      mine?.resourceAmount ??
+      mine?.resourcesAmount ??
+      mine?.amount ??
+      cache.value.mineMap?.[mine?.mineId]?.resourceAmount ??
+      cache.value.mineMap?.[mine?.mineId]?.resourcesAmount;
+
     const opt = buildOptimizedGatheringTeam({
       heroes: cache.value.heroGetAll?.data || {},
       availableHeroIds: availableHeroIds.value,
       unitSummary: cache.value['getUnitSummary:unit']?.data || cache.value.inventoryGet?.data?.unit || {},
       mineType: mine?.mineType || mine?.type || manualMineType.value,
       mineLevel: mine?.level || manualMineLevel.value,
-      resourcesAmount: mine?.resourcesAmount,
+      resourcesAmount: remainingAmount,
+      resourceAmount: remainingAmount,
+      targetMine: mine,
       capacitySettings: cache.value.troopCapacitySettings,
       accountId: cache.value.accountStatus?.data?.id,
     });
@@ -417,7 +440,7 @@ async function recallMarch(march: any) {
         <div v-if="selectedTeamId === 'optimized'" class="p-2.5 rounded-lg bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-200 text-2xs space-y-1">
           <div class="font-semibold flex items-center gap-1.5">
             <span>⚡</span>
-            <span>Optimized Squad: Selects lowest power heroes, stopping once squad capacity covers all mine resources (up to 5 heroes).</span>
+            <span>Optimized Squad: Selects lowest power heroes, stopping once squad capacity covers the target mine's remaining resources (up to 5 heroes).</span>
           </div>
           <div class="text-teal-600 dark:text-teal-400">
             Capacity scaled by resource density (Food: 1 · Wood: 1 · Stone: 5 · Iron: 20) & troop tier (Level 1–10).
@@ -699,6 +722,12 @@ async function recallMarch(march: any) {
                 <div class="text-[11px] font-medium" :class="RESOURCE_THEMES[manualMineType]?.textClass || 'text-slate-400'">
                   <span>{{ RESOURCE_THEMES[manualMineType]?.icon }} </span>
                   {{ manualMineType.charAt(0).toUpperCase() + manualMineType.slice(1) }} · Lv.{{ manualMineLevel }}
+                  <span
+                    v-if="mine.resourceAmount || mine.resourcesAmount || cache.mineMap?.[mine.mineId]?.resourceAmount"
+                    class="ml-1 text-slate-500 font-normal"
+                  >
+                    ({{ formatResourceAmount(mine.resourceAmount || mine.resourcesAmount || cache.mineMap?.[mine.mineId]?.resourceAmount) }} left)
+                  </span>
                 </div>
               </div>
 

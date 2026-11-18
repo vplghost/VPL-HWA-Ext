@@ -565,8 +565,9 @@ export function calculateMineCargo(
 ): number {
   const normType = (mineType || 'food').toLowerCase();
   const weight = RESOURCE_CARGO_WEIGHT[normType] ?? 1;
-  if (Number.isFinite(resourcesAmount) && (resourcesAmount as number) > 0) {
-    return Math.ceil((resourcesAmount as number) * weight);
+  const num = Number(resourcesAmount);
+  if (Number.isFinite(num) && num > 0) {
+    return Math.ceil(num * weight);
   }
   const lvl = Math.min(10, Math.max(1, Math.floor(mineLevel) || 1));
   return MINE_LEVEL_TOTAL_CARGO[lvl] ?? 70000;
@@ -619,6 +620,10 @@ export interface OptimizedGatheringTeamParams {
   mineType?: string;
   mineLevel?: number;
   resourcesAmount?: number;
+  resourceAmount?: number;
+  remainingAmount?: number;
+  targetMine?: any;
+  mine?: any;
   capacitySettings?: any;
   accountId?: any;
 }
@@ -634,15 +639,28 @@ export interface OptimizedGatheringTeamResult {
 export function buildOptimizedGatheringTeam(
   params: OptimizedGatheringTeamParams
 ): OptimizedGatheringTeamResult {
+  const target = params.targetMine || params.mine;
   const {
     heroes = {},
     availableHeroIds = [],
     unitSummary,
-    mineType = 'food',
-    mineLevel = 10,
-    resourcesAmount,
+    mineType = target?.mineType || target?.type || 'food',
+    mineLevel = target?.level || 10,
     capacitySettings,
   } = params;
+
+  const rawAmount =
+    params.resourcesAmount ??
+    params.resourceAmount ??
+    params.remainingAmount ??
+    target?.resourceAmount ??
+    target?.resourcesAmount ??
+    target?.amount ??
+    target?.remainingAmount ??
+    target?.remainingResourceAmount;
+
+  const numAmount = Number(rawAmount);
+  const resourcesAmount = Number.isFinite(numAmount) && numAmount > 0 ? numAmount : undefined;
 
   const requiredCargo = calculateMineCargo(mineType, mineLevel, resourcesAmount);
   const requiredTroops = calculateRequiredTroopsForCargo(requiredCargo, unitSummary);

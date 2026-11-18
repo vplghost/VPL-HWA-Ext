@@ -775,7 +775,17 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           const mineType = getMineTypes()?.[mineConfigId] || 'mine';
           const mines = {};
           for (const m of result.response.mines) {
-            if (m?.mineId) mines[m.mineId] = { mineConfigId, mineType, coordinates: m.coordinates, mapId: call.args.mapId };
+            if (m?.mineId) {
+              const resAmount = m.resourceAmount ?? m.resourcesAmount ?? m.amount ?? null;
+              mines[m.mineId] = {
+                mineConfigId,
+                mineType,
+                resourceAmount: resAmount,
+                resourcesAmount: resAmount,
+                coordinates: m.coordinates,
+                mapId: call.args.mapId,
+              };
+            }
           }
           return [{ key: 'experimentalMineSearch', method: call.name,
             feature: call.feature, group: 'internal', data: {
