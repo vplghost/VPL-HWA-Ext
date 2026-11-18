@@ -149,10 +149,10 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
   }
 
   // 7. Energy Consumption Calculations
+  // Only host/organized rallies consume World Energy (joining rallies costs 0 World Energy)
   const campaignEnergySpent = campaignCount * CAMPAIGN_ENERGY_COST;
-  const totalRallies = organizedRalliesCount + extAutoJoinCount + gameAutoJoinCount;
   const worldEnergySpent =
-    totalRallies * RALLY_ENERGY_COST +
+    organizedRalliesCount * RALLY_ENERGY_COST +
     monstersCount * MONSTER_ENERGY_COST +
     brigandCampsCount * BRIGAND_ENERGY_COST;
 
@@ -198,8 +198,9 @@ export function getActivityStatsForDay(
     const camps = Math.max(liveToday.brigandCampsCount, existing.brigandCampsCount || 0);
 
     const campaignEnergy = campaign * CAMPAIGN_ENERGY_COST;
+    // Only host/organized rallies consume World Energy
     const worldEnergy =
-      (orgRallies + extAuto + gameAuto) * RALLY_ENERGY_COST +
+      orgRallies * RALLY_ENERGY_COST +
       monsters * MONSTER_ENERGY_COST +
       camps * BRIGAND_ENERGY_COST;
 
@@ -253,8 +254,9 @@ export function getActivityStatsForDay(
   const camps = Math.max(history?.brigandCampsCount || 0, campReports);
 
   const campaignEnergy = campaign * CAMPAIGN_ENERGY_COST;
+  // Only host/organized rallies consume World Energy
   const worldEnergy =
-    (orgRallies + extAuto + gameAuto) * RALLY_ENERGY_COST +
+    orgRallies * RALLY_ENERGY_COST +
     monsters * MONSTER_ENERGY_COST +
     camps * BRIGAND_ENERGY_COST;
 

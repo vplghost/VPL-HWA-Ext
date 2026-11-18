@@ -129,7 +129,7 @@ test('IncomeOverview.vue generates donut slices for gold and supports day naviga
   const useRpcCache = () => ({ cache });
   const ui = await setup(
     'IncomeOverview.vue',
-    'donutSlices, todayBreakdown, selectedDayOffset, changeDay, jumpToToday, selectedDate, maxDaysBack',
+    'donutSlices, todayBreakdown, hoveredSlice, activeHoveredDonutItem, selectedDayOffset, changeDay, jumpToToday, selectedDate, maxDaysBack',
     { useRpcCache }
   );
 
@@ -137,6 +137,17 @@ test('IncomeOverview.vue generates donut slices for gold and supports day naviga
   assert.equal(ui.donutSlices.value.length, 2);
   const totalLength = ui.donutSlices.value.reduce((acc, s) => acc + s.length, 0);
   assert.ok(Math.abs(totalLength - 326.72) < 2);
+
+  // Slices contain full labels
+  const battlesSlice = ui.donutSlices.value.find((s) => s.key === 'battles');
+  assert.ok(battlesSlice);
+  assert.equal(battlesSlice.label, 'Combat Reports');
+
+  // Hovering slice exposes full active label and details
+  ui.hoveredSlice.value = 'battles';
+  assert.ok(ui.activeHoveredDonutItem.value);
+  assert.equal(ui.activeHoveredDonutItem.value.label, 'Combat Reports');
+  assert.equal(ui.activeHoveredDonutItem.value.amount, 50000);
 
   // Day navigation
   assert.equal(ui.selectedDayOffset.value, 0);
@@ -189,7 +200,8 @@ test('IncomeOverview.vue computes and exposes activityStats with auto-join, camp
   assert.equal(ui.activityStats.value.monstersCount, 5);
   assert.equal(ui.activityStats.value.brigandCampsCount, 1);
   assert.equal(ui.activityStats.value.campaignEnergySpent, 72); // 12 * 6
-  // World Energy: (3 rallies * 25) + (5 monsters * 10) + (1 camp * 10) = 75 + 50 + 10 = 135
-  assert.equal(ui.activityStats.value.worldEnergySpent, 135);
-  assert.equal(ui.activityStats.value.totalEnergySpent, 207);   // 72 + 135
+  // World Energy: Only organized rallies (0 * 25) + (5 monsters * 10) + (1 camp * 10) = 60
+  // (Joining rallies costs 0 World Energy)
+  assert.equal(ui.activityStats.value.worldEnergySpent, 60);
+  assert.equal(ui.activityStats.value.totalEnergySpent, 132);   // 72 + 60
 });

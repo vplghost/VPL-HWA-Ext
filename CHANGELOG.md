@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.88 — 2026-11-18
+
+### Fixed
+
+- **World Energy Consumed Calculation (`src/utils/activityStats.ts`)**:
+  - Restrict world energy consumption solely to player-organized/hosted rallies (`organizedRalliesCount * 25`).
+  - Joining rallies (both extension auto-recall and game auto-join) does not consume World Energy.
+
+### Added
+
+- **Detailed Source Labels on Donut Hover (`IncomeOverview.vue`)**:
+  - Display full source name (e.g. `Combat Reports`, `Emerald Exchange`, `Dungeon`, `Quests`) and icon in the donut center.
+  - Display detailed colored indicator bar below donut with full amount and percentage on slice hover.
+
 ## 0.11.86 — 2026-11-18
 
 ### Added

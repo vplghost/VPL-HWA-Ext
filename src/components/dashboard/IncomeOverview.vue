@@ -305,19 +305,25 @@ watch(
                 :stroke-dashoffset="-slice.offset"
                 class="transition-all duration-200 cursor-pointer"
                 :class="hoveredSlice === slice.key ? 'filter drop-shadow-md' : 'opacity-95 hover:opacity-100'"
+                :title="`${slice.label}: +${slice.amount.toLocaleString('en-US')} (${slice.percent}%)`"
                 @mouseenter="hoveredSlice = slice.key"
                 @mouseleave="hoveredSlice = null"
-              />
+              >
+                <title>{{ slice.label }}: +{{ slice.amount.toLocaleString('en-US') }} ({{ slice.percent }}%)</title>
+              </circle>
             </svg>
 
             <!-- Donut Center Label -->
-            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-2">
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-1.5 overflow-hidden">
               <template v-if="activeHoveredDonutItem">
-                <span class="text-sm">{{ activeHoveredDonutItem.icon }}</span>
-                <span class="text-xs font-black text-slate-800 dark:text-slate-100 tabular-nums">
+                <span class="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[84px] leading-tight flex items-center justify-center gap-0.5" :title="activeHoveredDonutItem.label">
+                  <span class="text-xs">{{ activeHoveredDonutItem.icon }}</span>
+                  <span class="truncate">{{ activeHoveredDonutItem.label }}</span>
+                </span>
+                <span class="text-xs font-black text-slate-800 dark:text-slate-100 tabular-nums leading-tight mt-0.5">
                   +{{ formatCompactNumber(activeHoveredDonutItem.amount) }}
                 </span>
-                <span class="text-[9px] font-bold text-amber-500 tabular-nums">
+                <span class="text-[9px] font-bold text-amber-500 tabular-nums leading-tight">
                   {{ activeHoveredDonutItem.percent }}%
                 </span>
               </template>
@@ -335,7 +341,17 @@ watch(
           <div v-else class="flex-1 flex items-center justify-center py-8 text-xs text-slate-400">
             No gold recorded for today yet.
           </div>
-          <span v-if="todayBreakdown.length > 0" class="text-[10px] text-slate-400 mt-1 italic">Hover slice to view source</span>
+          
+          <!-- Active Hovered Source Detailed Label / Fallback Hint -->
+          <div v-if="todayBreakdown.length > 0" class="mt-1 h-5 flex items-center justify-center text-center px-1">
+            <div v-if="activeHoveredDonutItem" class="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 animate-fadeIn truncate">
+              <span class="size-2 rounded-full inline-block shrink-0" :style="{ backgroundColor: activeHoveredDonutItem.color }"></span>
+              <span class="truncate max-w-[120px]">{{ activeHoveredDonutItem.label }}:</span>
+              <span class="text-amber-500 tabular-nums font-black shrink-0">+{{ activeHoveredDonutItem.amount.toLocaleString('en-US') }}</span>
+              <span class="text-slate-400 text-3xs font-semibold shrink-0">({{ activeHoveredDonutItem.percent }}%)</span>
+            </div>
+            <span v-else class="text-[10px] text-slate-400 italic">Hover slice to view source</span>
+          </div>
         </div>
 
         <!-- View 2: Multi-Day Gold Bar Chart (In-Place) -->

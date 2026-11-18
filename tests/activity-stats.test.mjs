@@ -74,9 +74,10 @@ test('getTodayActivityStats aggregates extension vs game auto joins, campaign, r
   // Campaign Energy: 15 * 6 = 90
   assert.equal(stats.campaignEnergySpent, 90);
 
-  // World Energy: (1 org + 3 ext + 2 game) * 25 + 4 monsters * 10 + 2 camps * 10 = 6 * 25 + 40 + 20 = 150 + 60 = 210
-  assert.equal(stats.worldEnergySpent, 210);
+  // World Energy: Only organized rallies (1 * 25) + monsters (4 * 10) + camps (2 * 10) = 25 + 40 + 20 = 85
+  // (Joining rallies costs 0 World Energy)
+  assert.equal(stats.worldEnergySpent, 85);
 
-  // Total Energy: 90 + 210 = 300
-  assert.equal(stats.totalEnergySpent, 300);
+  // Total Energy: 90 + 85 = 175
+  assert.equal(stats.totalEnergySpent, 175);
 });
