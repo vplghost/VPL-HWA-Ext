@@ -219,6 +219,7 @@ function getSkillProgressPercent(s: SkillSlotConfig): number {
 }
 
 const upgradingSkills = ref<Record<number, boolean>>({});
+const isUpgradingSkills = ref(false);
 
 // Available skill points and gold
 const skillPoints = computed(() => {
@@ -238,11 +239,32 @@ const currentGold = computed(() => {
   return 0;
 });
 
+function getSkillPointsNeeded(s: SkillSlotConfig): number {
+  if (!activeHero.value) return 0;
+  const isUnlocked = heroColor.value >= s.rankReq || s.slot <= skillKeys.value.length;
+  if (!isUnlocked || s.maxLvl <= 0) return 0;
+  return Math.max(0, s.maxLvl - getSkillDisplayLevel(s));
+}
+
+function getSkillMaxAddable(s: SkillSlotConfig): number {
+  const needed = getSkillPointsNeeded(s);
+  return Math.min(skillPoints.value, needed);
+}
+
+const totalSkillPointsNeeded = computed(() => {
+  return skillSlots.value.reduce((sum, s) => sum + getSkillPointsNeeded(s), 0);
+});
+
+const totalSkillMaxAddable = computed(() => {
+  return Math.min(skillPoints.value, totalSkillPointsNeeded.value);
+});
+
 async function upgradeSkill(s: SkillSlotConfig) {
-  if (!activeHero.value) return;
+  if (!activeHero.value || isUpgradingSkills.value) return;
   const numId = Number(currentHeroId.value);
-  if (skillPoints.value <= 0) return;
+  if (skillPoints.value <= 0 || isSkillMax(s)) return;
   upgradingSkills.value[s.slot] = true;
+  isUpgradingSkills.value = true;
 
   // Display only server-observed skill levels, including queued/rejected RPCs.
   try {
@@ -253,9 +275,75 @@ async function upgradeSkill(s: SkillSlotConfig) {
       },
       { name: 'heroGetAll' },
       { name: 'inventoryGet' },
+      { name: 'userGetInfo' },
     ]);
   } finally {
     upgradingSkills.value[s.slot] = false;
+    isUpgradingSkills.value = false;
+  }
+}
+
+async function upgradeSkillMax(s: SkillSlotConfig) {
+  if (!activeHero.value || isUpgradingSkills.value) return;
+  const numId = Number(currentHeroId.value);
+  const count = getSkillMaxAddable(s);
+  if (count <= 0) return;
+
+  upgradingSkills.value[s.slot] = true;
+  isUpgradingSkills.value = true;
+
+  try {
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+    for (let i = 0; i < count; i++) {
+      calls.push({
+        name: 'heroUpgradeSkill',
+        args: { heroId: numId, skill: s.slot },
+      });
+    }
+    calls.push({ name: 'heroGetAll' });
+    calls.push({ name: 'inventoryGet' });
+    calls.push({ name: 'userGetInfo' });
+
+    await dispatchRpc(calls);
+  } finally {
+    upgradingSkills.value[s.slot] = false;
+    isUpgradingSkills.value = false;
+  }
+}
+
+async function upgradeAllSkillsMax() {
+  if (!activeHero.value || isUpgradingSkills.value) return;
+  const numId = Number(currentHeroId.value);
+  let available = skillPoints.value;
+  if (available <= 0) return;
+
+  const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+  for (const s of skillSlots.value) {
+    if (available <= 0) break;
+    const needed = getSkillPointsNeeded(s);
+    if (needed > 0) {
+      const toAdd = Math.min(available, needed);
+      for (let i = 0; i < toAdd; i++) {
+        calls.push({
+          name: 'heroUpgradeSkill',
+          args: { heroId: numId, skill: s.slot },
+        });
+      }
+      available -= toAdd;
+    }
+  }
+
+  if (calls.length === 0) return;
+
+  isUpgradingSkills.value = true;
+  try {
+    calls.push({ name: 'heroGetAll' });
+    calls.push({ name: 'inventoryGet' });
+    calls.push({ name: 'userGetInfo' });
+
+    await dispatchRpc(calls);
+  } finally {
+    isUpgradingSkills.value = false;
   }
 }
 
@@ -681,6 +769,35 @@ function handleHeroFarmAll() {
                 >
                   <span>⚡</span> {{ skillPoints }}/10
                 </span>
+                <button
+                  type="button"
+                  id="upgrade-all-skills-max-btn"
+                  :disabled="isUpgradingSkills || totalSkillMaxAddable <= 0"
+                  class="btn-upgrade-all-skills-max inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                  :class="
+                    totalSkillMaxAddable > 0 && !isUpgradingSkills
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                  "
+                  :title="
+                    totalSkillPointsNeeded <= 0
+                      ? 'All unlocked skills are at max level'
+                      : skillPoints <= 0
+                        ? 'No skill points available'
+                        : `Add maximum available skill points (+${totalSkillMaxAddable}) across unlocked skills`
+                  "
+                  @click="upgradeAllSkillsMax"
+                >
+                  <span v-if="isUpgradingSkills" class="text-3xs">⏳</span>
+                  <span v-else>⚡</span>
+                  <span>Max All</span>
+                  <span
+                    v-if="totalSkillMaxAddable > 0"
+                    class="text-2xs opacity-90 font-mono"
+                  >
+                    (+{{ totalSkillMaxAddable }})
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -718,7 +835,7 @@ function handleHeroFarmAll() {
                   </div>
 
                   <!-- Right Action Wrap -->
-                  <div class="shrink-0 flex items-center">
+                  <div class="shrink-0 flex items-center gap-1.5">
                     <span
                       v-if="!(heroColor >= s.rankReq || s.slot <= skillKeys.length)"
                       class="px-1.5 py-0.5 rounded text-3xs text-slate-400 bg-slate-100 dark:bg-slate-800 dark:text-slate-500"
@@ -731,24 +848,39 @@ function handleHeroFarmAll() {
                     >
                       MAX
                     </span>
-                    <button
-                      v-else
-                      type="button"
-                      :disabled="upgradingSkills[s.slot] || skillPoints <= 0"
-                      class="btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
-                      :title="
-                        skillPoints <= 0
-                          ? 'No skill points available'
-                          : `Upgrade ${meta?.skills?.[s.slot - 1] || s.label} to Lv. ${getSkillDisplayLevel(s) + 1}`
-                      "
-                      :aria-label="`Upgrade ${meta?.skills?.[s.slot - 1] || s.label}`"
-                      @click="upgradeSkill(s)"
-                    >
-                      <span v-if="upgradingSkills[s.slot]" class="text-3xs">⏳</span>
-                      <svg v-else class="size-3.5 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
-                    </button>
+                    <template v-else>
+                      <button
+                        type="button"
+                        :disabled="isUpgradingSkills || getSkillMaxAddable(s) <= 0"
+                        class="btn-upgrade-skill-max inline-flex items-center justify-center px-1.5 h-6 rounded-md text-2xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-300 dark:ring-emerald-700/60 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                        :title="
+                          getSkillMaxAddable(s) <= 0
+                            ? 'No skill points available'
+                            : `Upgrade ${meta?.skills?.[s.slot - 1] || s.label} to maximum possible (+${getSkillMaxAddable(s)} lvls)`
+                        "
+                        :aria-label="`Max upgrade ${meta?.skills?.[s.slot - 1] || s.label}`"
+                        @click="upgradeSkillMax(s)"
+                      >
+                        <span v-if="upgradingSkills[s.slot]" class="text-3xs">⏳</span>
+                        <span v-else>+{{ getSkillMaxAddable(s) > 1 ? getSkillMaxAddable(s) : 'Max' }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        :disabled="isUpgradingSkills || skillPoints <= 0"
+                        class="btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        :title="
+                          skillPoints <= 0
+                            ? 'No skill points available'
+                            : `Upgrade ${meta?.skills?.[s.slot - 1] || s.label} to Lv. ${getSkillDisplayLevel(s) + 1}`
+                        "
+                        :aria-label="`Upgrade ${meta?.skills?.[s.slot - 1] || s.label}`"
+                        @click="upgradeSkill(s)"
+                      >
+                        <svg class="size-3.5 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </button>
+                    </template>
                   </div>
                 </div>
 

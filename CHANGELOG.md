@@ -4,6 +4,13 @@
 
 ### Added
 
+- **Hero Skill Max Upgrade & Batched RPC Dispatch**:
+  - Added a global `Max All` button (`#upgrade-all-skills-max-btn`) in `HeroDetailModal.vue` skills header to allocate all available skill points across unlocked skills in a single click up to their maximum levels.
+  - Added a per-skill `+Max` button (`.btn-upgrade-skill-max`) in each skill card allowing players to max a specific skill with one click.
+  - Batched multiple `heroUpgradeSkill` calls into a single RPC POST payload alongside post-upgrade sync queries (`heroGetAll`, `inventoryGet`, `userGetInfo`), allowing seamless multi-point upgrades without individual request round-trip delays.
+  - Added UI lock (`isUpgradingSkills`) to disable all upgrade buttons and display loading indicators during in-flight RPCs, preventing double-clicks and state race conditions.
+  - Added unit test in `tests/hero-skill-upgrade-max.test.mjs` verifying max-point computation and batched RPC payload construction.
+
 - **Header Account Level & EXP Hover Tooltip**:
   - Added account level pill badge (`Lv. {level}`) next to the account name on `Header.vue`.
   - Added EXP progress and level threshold tooltip on hover (`BaseTooltip`) showing `Team Level: {level} / {maxLevel}` and `EXP: {exp} / {nextLevelExp}` (e.g., `EXP: 2,183 / 4,450`), and `(Max Level)` when reaching level 120.
