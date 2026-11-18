@@ -3187,12 +3187,40 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           .then((stored: any) => {
             if (stored.popupRpcEnabled === true) {
               if (message.kind === 'claim-rewards') {
-                const allowed = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm', 'mailGetAll', 'questGetAll']);
+                const allowed = new Set([
+                  'mailFarm',
+                  'readAndClaimAll',
+                  'quest_multiFarm',
+                  'attentionBonus_collectReward',
+                  'cinemaGiveReward',
+                  'refillable_alchemyUseVideo',
+                  'zeppelinGiftGet',
+                  'dailyBonus_claim',
+                  'offerFarmReward',
+                  'userGetInfo',
+                  'refillableGetAll',
+                  'inventoryGet',
+                  'cinemaGetCounters',
+                  'offerGetAll',
+                  'mailGetAll',
+                  'questGetAll',
+                ]);
+                const claimNames = new Set([
+                  'mailFarm',
+                  'readAndClaimAll',
+                  'quest_multiFarm',
+                  'attentionBonus_collectReward',
+                  'cinemaGiveReward',
+                  'refillable_alchemyUseVideo',
+                  'zeppelinGiftGet',
+                  'dailyBonus_claim',
+                  'offerFarmReward',
+                ]);
                 if (
                   !Array.isArray(message.calls) ||
                   !message.calls.length ||
                   message.calls.some((call: any) => !allowed.has(call?.name)) ||
-                  !message.calls.some((call: any) => ['mailFarm', 'readAndClaimAll', 'quest_multiFarm'].includes(call.name))
+                  !message.calls.some((call: any) => claimNames.has(call?.name))
                 ) {
                   sendResponse({ ok: false, error: 'Invalid reward claim calls.' });
                   return;

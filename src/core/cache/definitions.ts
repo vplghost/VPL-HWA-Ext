@@ -10,6 +10,7 @@ export const RPC_CACHE_DEFINITIONS: Record<string, string> = {
   'getInventory:inventory': 'items',
   shopGetMany: 'items',
   offerGetAll: 'items',
+  offerFarmReward: 'items',
   titanGetAll: 'titans',
   titan_artifactGetCounters: 'titans',
   teamGetAll: 'teams',

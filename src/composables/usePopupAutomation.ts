@@ -1,12 +1,8 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
-import { getPendingClaims, buildAutoClaimCalls } from '../utils/popupData.ts';
+import { getPendingClaims, buildAutoClaimCalls, normalizeAutoClaim, type AutoClaimSettings } from '../utils/popupData.ts';
 import { availableHeroIds, autoJoinTeamOptions } from '../utils/experimentalData.ts';
 
-export function normalizeAutoClaim(value: any = {}) {
-  value = value || {};
-  return { mail: value.mail !== false, reports: value.reports !== false,
-    quests: value.quests !== false, onOpen: value.onOpen === true };
-}
+export { normalizeAutoClaim, type AutoClaimSettings };
 export function normalizePriorityJoin(value: any = {}) {
   value = value || {};
   return { enabled: value.enabled === true,
@@ -44,9 +40,19 @@ export function usePopupAutomation(
   const pending = computed(() => {
     return resolvePendingClaims(cache.value);
   });
-  const selectedCount = computed(() => (autoClaimSettings.value.mail ? pending.value.letterIds.length : 0) +
-    (autoClaimSettings.value.reports && pending.value.hasReports ? 1 : 0) +
-    (autoClaimSettings.value.quests ? pending.value.questIds.length : 0));
+  const selectedCount = computed(() => {
+    const p = pending.value;
+    const s = autoClaimSettings.value;
+    return (s.mail ? (p?.letterIds?.length || 0) : 0) +
+      (s.reports && p?.hasReports ? 1 : 0) +
+      (s.quests ? (p?.questIds?.length || 0) : 0) +
+      (s.attentionBonuses ? (p?.attentionBonusIds?.length || 0) : 0) +
+      (s.videoBoxes ? (p?.videoBoxNums?.length || 0) : 0) +
+      (s.alchemySpin && p?.hasAlchemySpin ? 1 : 0) +
+      (s.airshipGift && p?.hasAirshipGift ? 1 : 0) +
+      (s.dailyBonus && p?.hasDailyBonus ? 1 : 0) +
+      (s.freeOffers ? (p?.freeOfferIds?.length || 0) : 0);
+  });
   const teams = computed<any[]>(() => {
     const c = cache.value;
     const heroes = c.heroGetAll?.data || {};

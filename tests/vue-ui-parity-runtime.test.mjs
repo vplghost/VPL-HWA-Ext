@@ -56,8 +56,20 @@ test('Vue recorder reacts to session changes and uses background clear/export co
 });
 
 test('automation normalization preserves opt-out defaults and clamps rally level', () => {
-  assert.deepEqual(normalizeAutoClaim(), { mail: true, reports: true, quests: true, onOpen: false });
+  assert.deepEqual(normalizeAutoClaim(), {
+    mail: true,
+    reports: true,
+    quests: true,
+    attentionBonuses: true,
+    videoBoxes: true,
+    alchemySpin: true,
+    airshipGift: true,
+    dailyBonus: true,
+    freeOffers: true,
+    onOpen: false,
+  });
   assert.equal(normalizeAutoClaim({ mail: false }).mail, false);
+  assert.equal(normalizeAutoClaim({ attentionBonuses: false }).attentionBonuses, false);
   assert.equal(normalizePriorityJoin({ minLevel: 99 }).minLevel, 30);
   assert.equal(normalizePriorityJoin({ minLevel: -10 }).minLevel, 1);
   assert.equal(normalizePriorityJoin().enabled, false);

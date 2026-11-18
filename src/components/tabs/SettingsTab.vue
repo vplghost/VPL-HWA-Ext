@@ -392,17 +392,143 @@ async function toggleRecording() {
       <p role="status" class="text-xs text-slate-500">{{ autoFreeSpinStatus }}</p>
     </section>
 
-    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
-      <h3 class="text-sm font-bold">Reward Claims · {{ pendingClaims.totalCount }} ready</h3>
-      <div class="flex flex-wrap gap-4">
-        <label v-for="option in (['mail', 'reports', 'quests', 'onOpen'] as const)" :key="option" class="flex items-center gap-2">
-          <input v-model="autoClaimSettings[option]" type="checkbox" :id="'autoclaim-opt-' + option" @change="saveAutoClaim" />
-          {{ option === 'onOpen' ? 'Claim when popup opens' : option }}
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Auto Claim Freebies & Rewards</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Configure separate auto-claim rules for each daily reward channel</p>
+        </div>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+          {{ pendingClaims.totalCount }} total ready
+        </span>
+      </div>
+
+      <!-- Freebie Groups Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <!-- 1. Mail -->
+        <label for="autoclaim-opt-mail" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-mail" v-model="autoClaimSettings.mail" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>✉️ Developer Mail</span>
+              <span v-if="pendingClaims.letterIds?.length" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ pendingClaims.letterIds.length }} ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Collect inbox letters containing rewards</div>
+          </div>
+        </label>
+
+        <!-- 2. Reports -->
+        <label for="autoclaim-opt-reports" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-reports" v-model="autoClaimSettings.reports" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>⚔️ Battle Reports</span>
+              <span v-if="pendingClaims.hasReports" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Claim rewards from defense and battle reports</div>
+          </div>
+        </label>
+
+        <!-- 3. Quests -->
+        <label for="autoclaim-opt-quests" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-quests" v-model="autoClaimSettings.quests" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>📋 Daily Quests</span>
+              <span v-if="pendingClaims.questIds?.length" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ pendingClaims.questIds.length }} ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Turn in completed daily quest rewards</div>
+          </div>
+        </label>
+
+        <!-- 4. Attention Bonuses / Free Chests -->
+        <label for="autoclaim-opt-attention-bonuses" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-attention-bonuses" v-model="autoClaimSettings.attentionBonuses" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>🎁 Free Chests & Gifts</span>
+              <span v-if="pendingClaims.attentionBonusIds?.length" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ pendingClaims.attentionBonusIds.length }} ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Collect LiveOps free gifts (Energy, coins)</div>
+          </div>
+        </label>
+
+        <!-- 5. Video Boxes -->
+        <label for="autoclaim-opt-video-boxes" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-video-boxes" v-model="autoClaimSettings.videoBoxes" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>🎬 Video Mystery Boxes</span>
+              <span v-if="pendingClaims.videoBoxNums?.length" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ pendingClaims.videoBoxNums.length }} ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Free video ad placement mystery boxes (0-4)</div>
+          </div>
+        </label>
+
+        <!-- 6. Alchemy Spin -->
+        <label for="autoclaim-opt-alchemy-spin" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-alchemy-spin" v-model="autoClaimSettings.alchemySpin" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>⚗️ Alchemy Free Spin</span>
+              <span v-if="pendingClaims.hasAlchemySpin" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Daily free emerald exchange roll for gold</div>
+          </div>
+        </label>
+
+        <!-- 7. Valkyrie Airship Gift -->
+        <label for="autoclaim-opt-airship-gift" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-airship-gift" v-model="autoClaimSettings.airshipGift" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>🎈 Airship Valkyrie Gift</span>
+              <span v-if="pendingClaims.hasAirshipGift" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Collect Valkyrie daily blessing gift</div>
+          </div>
+        </label>
+
+        <!-- 8. Daily Sign-In Bonus -->
+        <label for="autoclaim-opt-daily-bonus" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-daily-bonus" v-model="autoClaimSettings.dailyBonus" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>📅 Daily Sign-In Bonus</span>
+              <span v-if="pendingClaims.hasDailyBonus" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Claim monthly calendar login reward</div>
+          </div>
+        </label>
+
+        <!-- 9. Special Offer Free Gifts (Progressive Bundles) -->
+        <label for="autoclaim-opt-free-offers" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-free-offers" v-model="autoClaimSettings.freeOffers" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>✨ Special Offer Free Gifts</span>
+              <span v-if="pendingClaims.freeOfferIds?.length" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ pendingClaims.freeOfferIds.length }} ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Claim free tiers from progressive bundle ladders and event offers</div>
+          </div>
         </label>
       </div>
-      <button id="btn-claim-all" type="button" :disabled="claimBusy || !popupRpcEnabled || selectedCount === 0" @click="claimRewards"
-        class="rounded-lg px-3 py-2 bg-emerald-600 text-white disabled:opacity-50">Claim Selected Rewards ({{ selectedCount }})</button>
-      <p role="status" class="text-slate-500">{{ claimMessage }}</p>
+
+      <!-- Trigger Option: onOpen -->
+      <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+        <label for="autoclaim-opt-on-open" class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+          <input id="autoclaim-opt-on-open" v-model="autoClaimSettings.onOpen" type="checkbox" class="rounded" @change="saveAutoClaim" />
+          <span>⚡ Auto-claim all enabled groups when extension popup opens</span>
+        </label>
+      </div>
+
+      <div class="flex items-center gap-3 pt-1">
+        <button id="btn-claim-all" type="button" :disabled="claimBusy || !popupRpcEnabled || selectedCount === 0" @click="claimRewards"
+          class="rounded-lg px-4 py-2 bg-emerald-600 text-white font-medium text-xs hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+          Claim Selected Rewards ({{ selectedCount }})
+        </button>
+        <p role="status" class="text-xs text-slate-500">{{ claimMessage }}</p>
+      </div>
     </section>
 
     <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">

@@ -8,6 +8,8 @@ import {
   clanVersusChallengeSteps,
 } from '../data/clanVersusData.ts';
 import { questData } from '../data/questData.ts';
+import { getAttentionBonusAvailability } from './freeChestHelper.ts';
+import { freeAlchemyAvailability } from '../services/freeAlchemy.ts';
 
 // enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.293.0 (client 1.293.1010) splitlib asset.
 // Each value is the cost to evolve TO that star, not the current star.
@@ -809,16 +811,61 @@ export const BATTLE_REPORT_CLAIM_TYPES = [
   'outpostAttackDenied',
 ] as const;
 
+export interface AutoClaimSettings {
+  mail: boolean;
+  reports: boolean;
+  quests: boolean;
+  attentionBonuses: boolean;
+  videoBoxes: boolean;
+  alchemySpin: boolean;
+  airshipGift: boolean;
+  dailyBonus: boolean;
+  freeOffers: boolean;
+  onOpen: boolean;
+}
+
+export function normalizeAutoClaim(value: any = {}): AutoClaimSettings {
+  value = value || {};
+  return {
+    mail: value.mail !== false,
+    reports: value.reports !== false,
+    quests: value.quests !== false,
+    attentionBonuses: value.attentionBonuses !== false,
+    videoBoxes: value.videoBoxes !== false,
+    alchemySpin: value.alchemySpin !== false,
+    airshipGift: value.airshipGift !== false,
+    dailyBonus: value.dailyBonus !== false,
+    freeOffers: value.freeOffers !== false,
+    onOpen: value.onOpen === true,
+  };
+}
+
 export interface PendingClaimsResult {
   letterIds: Array<string | number>;
   hasReports: boolean;
   questIds: Array<string | number>;
+  attentionBonusIds: number[];
+  videoBoxNums: number[];
+  hasAlchemySpin: boolean;
+  hasAirshipGift: boolean;
+  hasDailyBonus: boolean;
+  freeOfferIds: number[];
   totalCount: number;
 }
 
-export function getPendingClaims(cache: any): PendingClaimsResult {
+export function getPendingClaims(cache: any, now = Date.now()): PendingClaimsResult {
   if (!cache || typeof cache !== 'object') {
-    return { letterIds: [], hasReports: false, questIds: [], totalCount: 0 };
+    return {
+      letterIds: [],
+      hasReports: false,
+      questIds: [],
+      attentionBonusIds: [],
+      videoBoxNums: [],
+      hasAlchemySpin: false,
+      hasAirshipGift: false,
+      hasDailyBonus: false,
+      totalCount: 0,
+    };
   }
 
   const letters = Array.isArray(cache.mailStatus?.data?.letters)
@@ -834,7 +881,7 @@ export function getPendingClaims(cache: any): PendingClaimsResult {
       l &&
       !l.deleted &&
       (l.reward || l.q_reward || l.items) &&
-      !(Number(l.availableUntil) > 0 && Number(l.availableUntil) * 1000 <= Date.now()) &&
+      !(Number(l.availableUntil) > 0 && Number(l.availableUntil) * 1000 <= now) &&
       !l.claimed &&
       !l.rewardReceived &&
       !l.rewardClaimed
@@ -856,14 +903,100 @@ export function getPendingClaims(cache: any): PendingClaimsResult {
   const readyQuests = quests.filter((q: any) => q && q.state === 2);
   const questIds = readyQuests.map((q: any) => q.id).filter((id: any) => id != null);
 
-  const totalCount = letterIds.length + (hasReports ? 1 : 0) + questIds.length;
+  // Attention bonus free chests
+  const bonuses = cache.attentionBonusStatus?.data?.bonuses;
+  let attentionBonusIds: number[] = [];
+  if (bonuses && (Array.isArray(bonuses) ? bonuses.length > 0 : Object.keys(bonuses).length > 0)) {
+    const avail = getAttentionBonusAvailability(bonuses, now);
+    attentionBonusIds = avail.ready ? avail.readyBonusIds : [];
+  }
 
-  return { letterIds, hasReports, questIds, totalCount };
+  // Video mystery boxes (firstPlacement 0..4)
+  let videoBoxNums: number[] = [];
+  const cinemaCounters = cache.cinemaGetCounters?.data;
+  if (cinemaCounters && typeof cinemaCounters === 'object') {
+    const placementViewed = Number(cinemaCounters.placementViewed ?? 0);
+    const placementAvailable = Number(cinemaCounters.placementAvailable ?? 0);
+    const placementRewards = Array.isArray(cinemaCounters.placementRewards) ? cinemaCounters.placementRewards : [];
+    const claimedSet = new Set(placementRewards.map((r: any) => Number(r?.boxNum)));
+    const remaining = [0, 1, 2, 3, 4].filter((num) => !claimedSet.has(num));
+    if (placementViewed < 5) {
+      if (placementAvailable > 0) {
+        videoBoxNums = remaining.slice(0, placementAvailable);
+      } else if (placementRewards.length === 0 && placementViewed === 0) {
+        videoBoxNums = [0, 1, 2, 3, 4];
+      }
+    }
+  }
+
+  // Alchemy free spin (only when alchemy quota/status is present in cache)
+  const hasAlchemyData = Boolean(cache['resource:refillable:53'] || cache.freeAlchemySpinStatus);
+  const hasAlchemySpin = hasAlchemyData && freeAlchemyAvailability(cache, now).ready;
+
+  // Airship Valkyrie gift
+  const hasAirshipGift = Boolean(cache.zeppelinGiftGet?.data?.available);
+
+  // Daily calendar bonus
+  const hasDailyBonus = Boolean(cache.dailyBonusGetInfo?.data?.availableToday);
+
+  // Special Offer & Progressive Bundle Free Gifts
+  let freeOfferIds: number[] = [];
+  const offers = Array.isArray(cache.offerGetAll?.data)
+    ? cache.offerGetAll.data
+    : Array.isArray(cache.offerGetAll)
+    ? cache.offerGetAll
+    : [];
+  for (const o of offers) {
+    if (!o || !o.isActive || o.id == null) continue;
+    // Progressive bundle
+    if (o.offerType === 'progressiveBundle' && o.offerData?.progressive?.slot) {
+      const stage = Number(o.clientData?.stage ?? 0);
+      const slots = o.offerData.progressive.slot;
+      if (stage < slots.length) {
+        const currentSlot = slots[stage];
+        const hasFree = Array.isArray(currentSlot) && currentSlot.some((item: any) => item && item.freeReward);
+        if (hasFree) {
+          freeOfferIds.push(Number(o.id));
+          continue;
+        }
+      }
+    }
+    // Daily reward offer
+    if (o.offerType === 'dailyReward' || o.type === 'reward') {
+      if (o.freeRewardObtained === false || (o.reward && !o.freeRewardObtained)) {
+        freeOfferIds.push(Number(o.id));
+      }
+    }
+  }
+
+  const totalCount =
+    letterIds.length +
+    (hasReports ? 1 : 0) +
+    questIds.length +
+    attentionBonusIds.length +
+    videoBoxNums.length +
+    (hasAlchemySpin ? 1 : 0) +
+    (hasAirshipGift ? 1 : 0) +
+    (hasDailyBonus ? 1 : 0) +
+    freeOfferIds.length;
+
+  return {
+    letterIds,
+    hasReports,
+    questIds,
+    attentionBonusIds,
+    videoBoxNums,
+    hasAlchemySpin,
+    hasAirshipGift,
+    hasDailyBonus,
+    freeOfferIds,
+    totalCount,
+  };
 }
 
-export function buildAutoClaimCalls(cache: any, options: any = {}) {
-  const opt = { mail: true, reports: true, quests: true, ...options };
-  const pending = getPendingClaims(cache);
+export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.now()) {
+  const opt = normalizeAutoClaim(options);
+  const pending = getPendingClaims(cache, now);
   const calls: any[] = [];
 
   if (opt.mail && pending.letterIds.length > 0) {
@@ -888,8 +1021,72 @@ export function buildAutoClaimCalls(cache: any, options: any = {}) {
     });
   }
 
+  if (opt.attentionBonuses && pending.attentionBonusIds.length > 0) {
+    for (const id of pending.attentionBonusIds) {
+      calls.push({
+        name: 'attentionBonus_collectReward',
+        args: { id },
+      });
+    }
+  }
+
+  if (opt.videoBoxes && pending.videoBoxNums.length > 0) {
+    for (const boxNum of pending.videoBoxNums) {
+      calls.push({
+        name: 'cinemaGiveReward',
+        args: { type: 'firstPlacement', boxNum },
+      });
+    }
+  }
+
+  if (opt.alchemySpin && pending.hasAlchemySpin) {
+    calls.push({
+      name: 'refillable_alchemyUseVideo',
+      args: { type: 'alchemy' },
+    });
+  }
+
+  if (opt.airshipGift && pending.hasAirshipGift) {
+    calls.push({
+      name: 'zeppelinGiftGet',
+      args: {},
+    });
+  }
+
+  if (opt.dailyBonus && pending.hasDailyBonus) {
+    calls.push({
+      name: 'dailyBonus_claim',
+      args: {},
+    });
+  }
+
+  if (opt.freeOffers && pending.freeOfferIds.length > 0) {
+    for (const offerId of pending.freeOfferIds) {
+      calls.push({
+        name: 'offerFarmReward',
+        args: { offerId },
+      });
+    }
+  }
+
   if (calls.length > 0) {
     calls.push({ name: 'mailGetAll', args: {} }, { name: 'questGetAll', args: {} });
+    if (
+      (opt.attentionBonuses && pending.attentionBonusIds.length > 0) ||
+      (opt.videoBoxes && pending.videoBoxNums.length > 0) ||
+      (opt.alchemySpin && pending.hasAlchemySpin) ||
+      (opt.airshipGift && pending.hasAirshipGift) ||
+      (opt.dailyBonus && pending.hasDailyBonus) ||
+      (opt.freeOffers && pending.freeOfferIds.length > 0)
+    ) {
+      calls.push(
+        { name: 'userGetInfo', args: {} },
+        { name: 'refillableGetAll', args: { getAt: now }, feature: 'refillable' },
+        { name: 'inventoryGet', args: {} },
+        { name: 'cinemaGetCounters', args: {} },
+        { name: 'offerGetAll', args: {} }
+      );
+    }
   }
 
   return { calls, pending };
