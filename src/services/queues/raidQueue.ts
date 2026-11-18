@@ -208,6 +208,8 @@ export function start(
     options: { ...options, autoCancel: options.autoCancel !== false },
     started: 0,
     completed: 0,
+    createdRallyIds: [],
+    completedRallyIds: [],
     bossQueue: { remain_raid_count: options.count, queue: [] },
     failedBossIds: [],
     wonBossIds: [],
@@ -490,6 +492,7 @@ export function advance(
         return { state: stop(state, 'Incomplete rally confirmation.') };
       }
       state.started++;
+      state.createdRallyIds = [...(state.createdRallyIds || []), response.rally.rallyId];
       state.phase = 'active';
       state.expected = [];
       Object.assign(state.current as RaidCurrentTarget, {
@@ -604,6 +607,9 @@ export function advance(
         return { state: stop(state, 'Rally finished before cancellation was confirmed. Queue stopped.') };
       }
       state.completed++;
+      if (current.rallyId) {
+        state.completedRallyIds = [...(state.completedRallyIds || []), current.rallyId];
+      }
       consumeBoss(state);
       if (state.bossQueue.remain_raid_count === 0) {
         return { state: { ...state, phase: 'complete', wakeAt: null } };

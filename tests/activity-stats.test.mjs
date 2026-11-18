@@ -110,9 +110,106 @@ test('getTodayActivityStats extracts rally, monster, and campaign losses from re
   };
 
   const stats = getTodayActivityStats(cache, testNow);
+  assert.equal(stats.organizedRalliesCount, 1);
   assert.equal(stats.rallyLosses, 1);
   assert.equal(stats.autoJoinLosses, 1);
   assert.equal(stats.monsterLosses, 1);
   assert.equal(stats.campaignLosses, 1);
   assert.equal(stats.campLosses, 0);
+});
+
+test('getTodayActivityStats tracks rallies led from createdRalliesHistory and computes World Energy', () => {
+  const cache = {
+    accountStatus: { data: { id: 100 } },
+    createdRalliesHistory: {
+      data: [
+        { rallyId: 'rally-lead-1', timestamp: testNow - 60000, mobId: 'mob-1' },
+        { rallyId: 'rally-lead-2', timestamp: testNow - 120000, mobId: 'mob-2' },
+        { rallyId: 'rally-old', timestamp: testNow - 86400000 * 2, mobId: 'mob-old' }, // 2 days ago
+      ],
+    },
+  };
+
+  const stats = getTodayActivityStats(cache, testNow);
+  assert.equal(stats.organizedRalliesCount, 2);
+  // 2 rallies led * 25 energy = 50 World Energy
+  assert.equal(stats.worldEnergySpent, 50);
+});
+
+test('getTodayActivityStats tracks rallies led from raidQueue immediately upon start/dispatch', () => {
+  const cache = {
+    accountStatus: { data: { id: 100 } },
+    raidQueue: {
+      phase: 'active',
+      started: 3,
+      completed: 2,
+      createdRallyIds: ['rally-q-1', 'rally-q-2', 'rally-q-3'],
+      current: { rallyId: 'rally-q-3' },
+    },
+  };
+
+  const stats = getTodayActivityStats(cache, testNow);
+  assert.equal(stats.organizedRalliesCount, 3);
+  assert.equal(stats.worldEnergySpent, 75);
+});
+
+test('getTodayActivityStats tracks rallies led from battle reports without misattributing to game auto-joins', () => {
+  const cache = {
+    accountStatus: { data: { id: 100 } },
+    mailStatus: {
+      data: {
+        reports: [
+          // Won rally hosted by player
+          {
+            id: 'rep-lead-win',
+            type: 'rallyMobAttackResult',
+            createdAt: testNow - 5000,
+            result: 'win',
+            isLeader: true,
+            payload: { rallyId: 'rally-won-1', isLeader: true },
+          },
+          // Lost rally hosted by player
+          {
+            id: 'rep-lead-loss',
+            type: 'rallyMobAttackResult',
+            createdAt: testNow - 10000,
+            result: 'defeat',
+            isLeader: true,
+            payload: { rallyId: 'rally-loss-1', isLeader: true },
+          },
+          // Extension auto-joined rally
+          {
+            id: 'rep-ext-join',
+            type: 'rallyMobAttackResult',
+            createdAt: testNow - 15000,
+            result: 'win',
+            isLeader: false,
+            payload: { rallyId: 'rally-ext-1', isLeader: false },
+          },
+        ],
+      },
+    },
+    priorityAutoJoinedRallies: {
+      data: ['rally-ext-1'],
+    },
+    battleReportSummary: {
+      data: {
+        days: {
+          '2026-11-18': {
+            types: {
+              rallyMobAttackResult: 3, // 2 led + 1 ext
+            },
+          },
+        },
+      },
+    },
+  };
+
+  const stats = getTodayActivityStats(cache, testNow);
+  assert.equal(stats.organizedRalliesCount, 2);
+  assert.equal(stats.rallyLosses, 1);
+  assert.equal(stats.extAutoJoinCount, 1);
+  // Total 3 reports - 2 led - 1 ext = 0 unassigned, NOT falsely counted as game auto joins!
+  assert.equal(stats.gameAutoJoinCount, 0);
+  assert.equal(stats.worldEnergySpent, 50); // 2 led * 25
 });

@@ -720,7 +720,8 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                   mobId: rep.payload?.mobId,
                   result: rep.payload?.result,
                   createdAt: rep.createdAt,
-                  mobConfigId: rep.payload?.mobConfigId
+                  mobConfigId: rep.payload?.mobConfigId,
+                  isLeader: Boolean(rep.payload?.isLeader || rep.isLeader)
                 },
                 updatedAt: record.timestamp
               });
@@ -740,8 +741,12 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                 type: r.type,
                 read: r.read,
                 claimedReward: r.claimedReward,
-                createdAt: r.createdAt, result: r.payload?.result,
-                expiresAt: r.expiresAt, reward: r.reward ?? r.payload?.reward
+                createdAt: r.createdAt,
+                result: r.payload?.result ?? r.result,
+                expiresAt: r.expiresAt,
+                reward: r.reward ?? r.payload?.reward,
+                isLeader: Boolean(r.payload?.isLeader || r.isLeader),
+                payload: r.payload
               }))
             },
             updatedAt: record.timestamp
@@ -3087,15 +3092,43 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           } else if (entry.data.action === 'create') {
             if (!entry.data.squadId ||
                 !Number.isFinite(entry.data.waitUntil)) continue;
+            const existingCreated = normalizeArrayData(next.createdRalliesHistory?.data);
+            const rallyId = entry.data.rallyId;
+            if (rallyId && !existingCreated.some((item) => item?.rallyId === rallyId)) {
+              next.createdRalliesHistory = {
+                key: 'createdRalliesHistory',
+                group: 'internal',
+                method: entry.method,
+                updatedAt: entry.updatedAt,
+                data: [
+                  {
+                    rallyId,
+                    mobId: entry.data.mobId,
+                    mapId: entry.data.mapId,
+                    squadId: entry.data.squadId,
+                    at: entry.updatedAt,
+                    timestamp: Date.parse(entry.updatedAt) || Date.now(),
+                  },
+                  ...existingCreated,
+                ].slice(0, 200),
+              };
+              changed = true;
+            }
             if (index < 0) index = marches.findIndex((march) => march.squadId === entry.data.squadId);
+            const leaderUserId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id;
             const created = { squadId: entry.data.squadId, kind: 'raid',
               stage: 'waitingForRallyStart', endsAt: entry.data.waitUntil,
               rally: { id: entry.data.rallyId, waitUntil: entry.data.waitUntil,
                 mobId: entry.data.mobId, mapId: entry.data.mapId,
-                team: entry.data.team } };
+                team: entry.data.team,
+                isLeader: true,
+                leader: leaderUserId ? { userId: leaderUserId } : undefined } };
             if (index >= 0) {
-              if (marches[index].rally?.id === entry.data.rallyId) continue;
-              marches[index] = { ...marches[index], kind: 'raid', rally: created.rally };
+              marches[index] = {
+                ...marches[index],
+                kind: 'raid',
+                rally: { ...marches[index].rally, ...created.rally, isLeader: true }
+              };
             } else {
               marches.push(created);
             }

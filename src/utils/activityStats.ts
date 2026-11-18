@@ -86,16 +86,121 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
   const monsterReports = Number(reportTypes.soloMobAttackResult || reportTypes.mobAttackResult || reportTypes.mobSoloAttackResult || 0);
   const campReports = Number(reportTypes.campBattleResult || reportTypes.brigandCampResult || reportTypes.winCampBattle || 0);
 
-  // 3. Organized Rallies (Player as Leader)
-  let organizedRalliesCount = marchOrganizedRallies;
-  const raidQueueState = cache?.raidQueue;
-  if (raidQueueState && Number.isFinite(raidQueueState.completed)) {
-    organizedRalliesCount = Math.max(organizedRalliesCount, Number(raidQueueState.completed));
+  // 3. Battle Reports Analysis (Losses and Leader Rallies)
+  const rawReports: any[] = [];
+  for (const k of ['getPage:report', 'mailStatus']) {
+    const list = cache?.[k]?.data?.reports ?? cache?.[k]?.reports;
+    if (Array.isArray(list)) rawReports.push(...list);
+    else if (list && typeof list === 'object') rawReports.push(...Object.values(list));
   }
+
+  let rallyLosses = 0;
+  let autoJoinLosses = 0;
+  let monsterLosses = 0;
+  let campLosses = 0;
+  let campaignLosses = 0;
+
+  const organizedRallyIds = new Set<string>();
+  const seenReportIds = new Set<string>();
+
+  for (const rep of rawReports) {
+    if (!rep || rep.id == null || seenReportIds.has(String(rep.id))) continue;
+    seenReportIds.add(String(rep.id));
+
+    const repDay = rep.createdAt ? formatUtcDay(Number(rep.createdAt)) : '';
+    if (repDay && repDay !== today) continue;
+
+    const type = String(rep.type || '');
+    const res = String(rep.result ?? rep.payload?.result ?? '').toLowerCase();
+    const isLoss = ['lose', 'loss', 'defeat', 'failed'].includes(res);
+
+    if (type === 'rallyMobAttackResult' || type === 'mobRallyAttackResult') {
+      const isLeader = Boolean(
+        rep.payload?.isLeader ||
+        rep.isLeader ||
+        (accountId && (
+          String(rep.payload?.leader?.userId) === accountId ||
+          String(rep.payload?.leaderUserId) === accountId
+        ))
+      );
+      if (isLeader) {
+        const rId = rep.payload?.rallyId || rep.rallyId || String(rep.id);
+        if (rId) organizedRallyIds.add(String(rId));
+        if (isLoss) rallyLosses++;
+      } else {
+        if (isLoss) autoJoinLosses++;
+      }
+    } else if (type === 'soloMobAttackResult' || type === 'mobAttackResult' || type === 'mobSoloAttackResult') {
+      if (isLoss) monsterLosses++;
+    } else if (type === 'campBattleResult' || type === 'brigandCampResult') {
+      if (isLoss) campLosses++;
+    }
+  }
+
+  // 4. Organized Rallies (Player as Leader)
+  // 4a. From createdRalliesHistory in cache
+  const createdHistory = Array.isArray(cache?.createdRalliesHistory?.data)
+    ? cache.createdRalliesHistory.data
+    : [];
+  for (const item of createdHistory) {
+    if (!item) continue;
+    const timeVal = item.timestamp || item.at || item.createdAt;
+    if (timeVal) {
+      const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+      if (dateStr === today && item.rallyId) {
+        organizedRallyIds.add(String(item.rallyId));
+      }
+    }
+  }
+
+  // 4b. Single rallyAction create action
   const rallyAction = cache?.rallyAction?.data;
   if (rallyAction?.action === 'create' && cache?.rallyAction?.updatedAt) {
     if (formatUtcDay(Date.parse(cache.rallyAction.updatedAt)) === today) {
-      organizedRalliesCount = Math.max(organizedRalliesCount, 1);
+      if (rallyAction.rallyId) {
+        organizedRallyIds.add(String(rallyAction.rallyId));
+      }
+    }
+  }
+
+  // 4c. Active leader marches
+  for (const m of marches) {
+    if (!m?.rally) continue;
+    const isLeader = Boolean(m.rally.isLeader || (accountId && String(m.rally.leader?.userId) === accountId));
+    if (isLeader) {
+      const rId = m.rally.id || m.rally.rallyId;
+      if (rId) organizedRallyIds.add(String(rId));
+    }
+  }
+
+  // 4d. Raid queue state (completed / started)
+  const raidQueueState = cache?.raidQueue;
+  let raidQueueCount = 0;
+  if (raidQueueState) {
+    if (Array.isArray(raidQueueState.createdRallyIds)) {
+      for (const id of raidQueueState.createdRallyIds) {
+        if (id) organizedRallyIds.add(String(id));
+      }
+    }
+    if (raidQueueState.current?.rallyId) {
+      organizedRallyIds.add(String(raidQueueState.current.rallyId));
+    }
+    const completed = Number(raidQueueState.completed);
+    const started = Number(raidQueueState.started);
+    raidQueueCount = Math.max(
+      Number.isFinite(completed) ? completed : 0,
+      Number.isFinite(started) ? started : 0
+    );
+  }
+
+  let organizedRalliesCount = Math.max(
+    organizedRallyIds.size,
+    marchOrganizedRallies,
+    raidQueueCount
+  );
+  if (organizedRalliesCount === 0 && rallyAction?.action === 'create' && cache?.rallyAction?.updatedAt) {
+    if (formatUtcDay(Date.parse(cache.rallyAction.updatedAt)) === today) {
+      organizedRalliesCount = 1;
     }
   }
 
@@ -106,7 +211,7 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     gameAutoJoinCount = Math.max(gameAutoJoinCount, unassignedRallies);
   }
 
-  // 4. Campaign Raids
+  // 5. Campaign Raids
   let campaignCount = 0;
   const campaignReceipts = Array.isArray(cache?.campaignRaidReceipts?.data)
     ? cache.campaignRaidReceipts.data
@@ -137,60 +242,19 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     }
   }
 
-  // 5. Solo Monsters Hunted
+  // 6. Solo Monsters Hunted
   let monstersCount = Math.max(monsterReports, marchMonsters);
   const monsterQueueState = cache?.monsterQueue;
   if (monsterQueueState && Number.isFinite(monsterQueueState.completed)) {
     monstersCount = Math.max(monstersCount, Number(monsterQueueState.completed));
   }
 
-  // 6. Brigand Camps Cleared
+  // 7. Brigand Camps Cleared
   let brigandCampsCount = campReports;
   const brigandStatus = cache?.brigandCampStatus?.data;
   if (brigandStatus?.success && cache?.brigandCampStatus?.updatedAt) {
     if (formatUtcDay(Date.parse(cache.brigandCampStatus.updatedAt)) === today) {
       brigandCampsCount = Math.max(brigandCampsCount, 1);
-    }
-  }
-
-  // 7. Losses / Defeats by Activity
-  let rallyLosses = 0;
-  let autoJoinLosses = 0;
-  let monsterLosses = 0;
-  let campLosses = 0;
-  let campaignLosses = 0;
-
-  const rawReports: any[] = [];
-  for (const k of ['getPage:report', 'mailStatus']) {
-    const list = cache?.[k]?.data?.reports ?? cache?.[k]?.reports;
-    if (Array.isArray(list)) rawReports.push(...list);
-    else if (list && typeof list === 'object') rawReports.push(...Object.values(list));
-  }
-
-  const seenReportIds = new Set<string>();
-  for (const rep of rawReports) {
-    if (!rep || rep.id == null || seenReportIds.has(String(rep.id))) continue;
-    seenReportIds.add(String(rep.id));
-
-    const repDay = rep.createdAt ? formatUtcDay(Number(rep.createdAt)) : '';
-    if (repDay && repDay !== today) continue;
-
-    const res = String(rep.result ?? rep.payload?.result ?? '').toLowerCase();
-    const isLoss = ['lose', 'loss', 'defeat', 'failed'].includes(res);
-    if (!isLoss) continue;
-
-    const type = String(rep.type || '');
-    if (type === 'rallyMobAttackResult' || type === 'mobRallyAttackResult') {
-      const isLeader = Boolean(rep.payload?.isLeader || rep.isLeader);
-      if (isLeader) {
-        rallyLosses++;
-      } else {
-        autoJoinLosses++;
-      }
-    } else if (type === 'soloMobAttackResult' || type === 'mobAttackResult' || type === 'mobSoloAttackResult') {
-      monsterLosses++;
-    } else if (type === 'campBattleResult' || type === 'brigandCampResult') {
-      campLosses++;
     }
   }
 
@@ -329,8 +393,21 @@ export function getActivityStatsForDay(
     }
   }
 
+  let pastCreatedCount = 0;
+  const createdHistory = Array.isArray(cache?.createdRalliesHistory?.data)
+    ? cache.createdRalliesHistory.data
+    : [];
+  for (const item of createdHistory) {
+    if (!item) continue;
+    const timeVal = item.timestamp || item.at || item.createdAt;
+    if (timeVal) {
+      const dStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+      if (dStr === dateStr) pastCreatedCount++;
+    }
+  }
+
   const campaign = Math.max(history?.campaignCount || 0, campaignCountFromReceipts);
-  const orgRallies = history?.organizedRalliesCount || 0;
+  const orgRallies = Math.max(history?.organizedRalliesCount || 0, pastCreatedCount);
   const extAuto = history?.extAutoJoinCount || 0;
   let gameAuto = history?.gameAutoJoinCount || 0;
   if (rallyReports > 0) {
@@ -412,10 +489,15 @@ export async function persistDailyActivityStats(
       extAutoJoinCount: Math.max(existing?.extAutoJoinCount || 0, stats.extAutoJoinCount),
       gameAutoJoinCount: Math.max(existing?.gameAutoJoinCount || 0, stats.gameAutoJoinCount),
       totalAutoJoinCount: Math.max(existing?.totalAutoJoinCount || 0, stats.totalAutoJoinCount),
+      autoJoinLosses: Math.max(existing?.autoJoinLosses || 0, stats.autoJoinLosses),
       campaignCount: Math.max(existing?.campaignCount || 0, stats.campaignCount),
+      campaignLosses: Math.max(existing?.campaignLosses || 0, stats.campaignLosses),
       organizedRalliesCount: Math.max(existing?.organizedRalliesCount || 0, stats.organizedRalliesCount),
+      rallyLosses: Math.max(existing?.rallyLosses || 0, stats.rallyLosses),
       monstersCount: Math.max(existing?.monstersCount || 0, stats.monstersCount),
+      monsterLosses: Math.max(existing?.monsterLosses || 0, stats.monsterLosses),
       brigandCampsCount: Math.max(existing?.brigandCampsCount || 0, stats.brigandCampsCount),
+      campLosses: Math.max(existing?.campLosses || 0, stats.campLosses),
       campaignEnergySpent: Math.max(existing?.campaignEnergySpent || 0, stats.campaignEnergySpent),
       worldEnergySpent: Math.max(existing?.worldEnergySpent || 0, stats.worldEnergySpent),
       totalEnergySpent: Math.max(existing?.totalEnergySpent || 0, stats.totalEnergySpent),

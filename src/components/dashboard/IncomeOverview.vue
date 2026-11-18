@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { formatNumber } from '@/src/utils/formatters';
 import {
@@ -156,10 +156,22 @@ function formatDayLabel(dateStr: string): string {
 // 0 = Today, -1 = Yesterday, ..., -29 = 30 days ago
 const selectedDayOffset = ref(0);
 const storedHistory = ref<Record<string, DailyActivityStats>>({});
+const raidQueueState = ref<any>(null);
+const monsterQueueState = ref<any>(null);
+
+// Combined effective cache incorporating storage queues (raidQueue, monsterQueue)
+const effectiveCache = computed(() => {
+  const base = cache?.value || {};
+  return {
+    ...base,
+    raidQueue: raidQueueState.value ?? base.raidQueue,
+    monsterQueue: monsterQueueState.value ?? base.monsterQueue,
+  };
+});
 
 // Compute today's live activity stats
 const liveTodayStats = computed<DailyActivityStats>(() => {
-  return getTodayActivityStats(cache?.value || {});
+  return getTodayActivityStats(effectiveCache.value);
 });
 
 // Selected date string (YYYY-MM-DD, UTC)
@@ -169,7 +181,7 @@ const selectedDate = computed(() => {
 
 // Stats for the currently selected date
 const activityStats = computed<DailyActivityStats>(() => {
-  return getActivityStatsForDay(cache?.value || {}, selectedDate.value, storedHistory.value);
+  return getActivityStatsForDay(effectiveCache.value, selectedDate.value, storedHistory.value);
 });
 
 const maxDaysBack = 30;
@@ -185,15 +197,42 @@ function jumpToToday() {
   selectedDayOffset.value = 0;
 }
 
+function handleStorageChange(changes: Record<string, chrome.storage.StorageChange>, area: string) {
+  if (area === 'local') {
+    if (changes.raidQueue) {
+      raidQueueState.value = changes.raidQueue.newValue || null;
+    }
+    if (changes.monsterQueue) {
+      monsterQueueState.value = changes.monsterQueue.newValue || null;
+    }
+    if (changes.dailyActivityHistory) {
+      storedHistory.value = changes.dailyActivityHistory.newValue || {};
+    }
+  }
+}
+
 onMounted(async () => {
   try {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      const stored = await chrome.storage.local.get(['raidQueue', 'monsterQueue', 'dailyActivityHistory']);
+      if (stored.raidQueue) raidQueueState.value = stored.raidQueue;
+      if (stored.monsterQueue) monsterQueueState.value = stored.monsterQueue;
+      if (stored.dailyActivityHistory) storedHistory.value = stored.dailyActivityHistory;
+      chrome.storage.onChanged.addListener(handleStorageChange);
+    }
     const loaded = await loadDailyActivityHistory();
-    storedHistory.value = loaded;
+    storedHistory.value = { ...storedHistory.value, ...loaded };
     if (liveTodayStats.value) {
       const updated = await persistDailyActivityStats(liveTodayStats.value);
       storedHistory.value = updated;
     }
   } catch {}
+});
+
+onUnmounted(() => {
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.removeListener(handleStorageChange);
+  }
 });
 
 // Automatically persist live updates for today

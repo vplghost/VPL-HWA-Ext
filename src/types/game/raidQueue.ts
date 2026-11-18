@@ -54,6 +54,8 @@ export interface RaidQueueState {
   options: RaidQueueOptions;
   started: number;
   completed: number;
+  createdRallyIds?: Array<string | number>;
+  completedRallyIds?: Array<string | number>;
   phase: RaidQueuePhase;
   current: RaidCurrentTarget | null;
   bossQueue: RaidBossQueue | null;
