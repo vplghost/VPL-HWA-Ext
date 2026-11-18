@@ -19,7 +19,8 @@
 
 - **Header Account Level & EXP Hover Tooltip**:
   - Added account level pill badge (`Lv. {level}`) next to the account name on `Header.vue`.
-  - Added EXP progress and level threshold tooltip on hover (`BaseTooltip`) showing `Team Level: {level} / {maxLevel}` and `EXP: {exp} / {nextLevelExp}` (e.g., `EXP: 2,183 / 4,450`), and `(Max Level)` when reaching level 120.
+  - Added visual EXP progress background fill (`#account-level-progress`) to the level badge displaying the exact percentage towards next level (`exp / nextLevelExp`).
+  - Added EXP progress and level threshold tooltip on hover (`BaseTooltip`) showing `Team Level: {level} / {maxLevel}` and `EXP: {exp} / {nextLevelExp} ({percent}%)`, and `(Max Level)` when reaching level 120.
   - Sourced official team level progression delta tables (levels 1–120) from client game data (`splitlib/level_teamDelta.json`) into `src/data/teamLevelData.ts`.
   - Extracted `experience`, `maxLevel`, and `nextLevelExp` from `userGetInfo` in `rpcCache.ts` into `accountStatus` cache data.
 

@@ -227,9 +227,11 @@ test('Header.vue contains account-level badge and EXP tooltip', async () => {
   const headerContent = await readFile(new URL('../src/components/common/Header.vue', import.meta.url), 'utf8');
 
   assert.ok(headerContent.includes('id="account-level"'), 'Header.vue must include account-level badge');
+  assert.ok(headerContent.includes('id="account-level-progress"'), 'Header.vue must include account-level-progress bar');
   assert.ok(headerContent.includes('accountLevel'), 'Header.vue must compute accountLevel');
   assert.ok(headerContent.includes('accountExp'), 'Header.vue must compute accountExp');
   assert.ok(headerContent.includes('accountNextLevelExp'), 'Header.vue must compute accountNextLevelExp');
+  assert.ok(headerContent.includes('expProgressPercent'), 'Header.vue must compute expProgressPercent');
   assert.ok(headerContent.includes('levelTooltip'), 'Header.vue must compute levelTooltip');
   assert.ok(headerContent.includes('Lv. {{ accountLevel }}'), 'Header.vue must render Lv. {{ accountLevel }}');
 

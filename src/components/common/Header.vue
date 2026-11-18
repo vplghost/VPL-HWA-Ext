@@ -187,6 +187,16 @@ const accountNextLevelExp = computed(() => {
   return getTeamLevelExpDelta(accountLevel.value);
 });
 
+const expProgressPercent = computed(() => {
+  if (!accountLevel.value) return 0;
+  if (accountLevel.value >= (accountMaxLevel.value || 120)) return 100;
+  if (accountNextLevelExp.value != null && accountNextLevelExp.value > 0) {
+    const current = Math.max(0, accountExp.value || 0);
+    return Math.min(100, Math.max(0, Math.round((current / accountNextLevelExp.value) * 100)));
+  }
+  return 0;
+});
+
 const levelTooltip = computed(() => {
   if (!accountLevel.value) return 'Team Level';
   const parts: string[] = [
@@ -194,7 +204,7 @@ const levelTooltip = computed(() => {
   ];
   if (accountExp.value != null) {
     if (accountNextLevelExp.value != null && accountNextLevelExp.value > 0) {
-      parts.push(`EXP: ${formatResourceAmount(accountExp.value)} / ${formatResourceAmount(accountNextLevelExp.value)}`);
+      parts.push(`EXP: ${formatResourceAmount(accountExp.value)} / ${formatResourceAmount(accountNextLevelExp.value)} (${expProgressPercent.value}%)`);
     } else if (accountLevel.value >= (accountMaxLevel.value || 120) || accountNextLevelExp.value === 0) {
       parts.push(`EXP: ${formatResourceAmount(accountExp.value)} (Max Level)`);
     } else {
@@ -516,9 +526,15 @@ function toggleTheme() {
             id="account-level"
             tabindex="0"
             :aria-label="levelTooltip"
-            class="cursor-pointer inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 text-2xs font-bold text-blue-700 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+            class="relative cursor-pointer inline-flex items-center rounded-md overflow-hidden bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 text-2xs font-bold text-blue-700 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-800/60 hover:ring-blue-300 dark:hover:ring-blue-700 transition-colors"
           >
-            Lv. {{ accountLevel }}
+            <!-- EXP Progress Background Fill -->
+            <span
+              id="account-level-progress"
+              class="absolute inset-y-0 left-0 bg-blue-200/70 dark:bg-blue-600/40 pointer-events-none transition-all duration-300"
+              :style="{ width: `${expProgressPercent}%` }"
+            />
+            <span class="relative z-10">Lv. {{ accountLevel }}</span>
           </span>
         </BaseTooltip>
         <!-- Open in New Tab Button -->
