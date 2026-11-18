@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.76 — 2026-11-18
+
+### Changed
+
+- **Dashboard Queue Status & Active Marches Unified Layout**:
+  - Unified the design language across Building Queue, Research Queue, and March cards (Gathering, Raid, Monster) with a consistent 3-line structural layout:
+    - Line 1: Icon and title on left, font-mono timer badge on right with state color coding.
+    - Line 2: Entity / target name and level on left, secondary state or progress on right.
+    - Line 3: Progress bar (for gathering) or status hint on left, action indicator on right.
+  - Standardized card height to `h-[76px]` across all queue and march cards, ensuring exact visual balance and symmetry between the Queue Status and Active Marches columns.
+  - Locked the Active Marches container height to exactly `h-[160px]` with smooth internal scrolling (`overflow-y-auto`), matching the 2 queue cards (`76px + 8px + 76px = 160px`).
+  - Added an idle squad slot placeholder when exactly 1 march is active to preserve 2-card visual symmetry.
+  - Prevented UI layout jitter and vertical shifts when a 3rd or subsequent march appears by keeping the section height strictly fixed at 160px.
+
 ## 0.11.73 — 2026-11-18
 
 ### Fixed
