@@ -63,6 +63,9 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
     expeditionGet: 'other',
     dailyBonusGetInfo: 'other',
     zeppelinGiftGet: 'other',
+    zeppelinGiftFarm: 'other',
+    subscriptionFarm: 'other',
+    subscriptionGetInfo: 'other',
     missionGetAll: 'other',
     'getDailyQuests:quest': 'events',
     'getSpecialQuestState:quest': 'events',
@@ -76,6 +79,7 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
     'getRewardList:clanVersus': 'events',
     'collectResource:resourceProduction': 'header',
     'claimBattlepassRewardAll:battlepass': 'events',
+    'getBattlepassState:battlepass': 'events',
     battlePass_getAll: 'events',
     remoteConfigInit: 'internal',
     questGetEvents: 'events',
@@ -1528,6 +1532,16 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
               updatedAt: record.timestamp
             }];
           }
+          if (call.name === 'getBattlepassState' && call.feature === 'battlepass' && result?.response) {
+            return [{
+              key: 'battlepassLiveStatus',
+              method: call.name,
+              feature: call.feature,
+              group: 'events',
+              data: result.response,
+              updatedAt: record.timestamp
+            }];
+          }
         }
         if (call.name === 'getInfo' && call.feature === 'clanVersus' && result?.response) {
           return [{
@@ -1969,7 +1983,14 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
           ];
           if (typeof info.name === 'string' && info.name.trim()) entries.push({
             key: 'accountStatus', method: call.name, feature: null, group: 'header',
-            data: { name: info.name.slice(0, 80), level: teamLevel, id: info.id ? Number(info.id) : null }, updatedAt: record.timestamp
+            data: {
+              name: info.name.slice(0, 80),
+              level: teamLevel,
+              id: info.id ? Number(info.id) : null,
+              exp: info.experience != null ? Number(info.experience) : undefined,
+              maxLevel: info.maxLevel != null ? Number(info.maxLevel) : undefined
+            },
+            updatedAt: record.timestamp
           });
           for (const item of info.refillable || []) {
             const rule = getRefillableRules()?.[item.id];
@@ -2717,6 +2738,19 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
           changed = true;
           continue;
         }
+        if (entry.key === 'zeppelinGiftFarm') {
+          if (next.zeppelinGiftGet?.data) {
+            next.zeppelinGiftGet = {
+              ...next.zeppelinGiftGet,
+              data: {
+                ...next.zeppelinGiftGet.data,
+                available: false,
+              },
+              updatedAt: entry.updatedAt,
+            };
+            changed = true;
+          }
+        }
         if (entry.key === 'clanClashClaimAction') {
           const claims = normalizeArrayData(next.clanClashClaimStatus?.data?.claims);
           if (claims.some(claim => claim?.token === entry.data.token)) continue;
@@ -2747,6 +2781,22 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
           }
           const claim = { id: entry.data.questId, token: entry.data.token,
             needsSync: !reward, at: entry.updatedAt };
+          if (Array.isArray(next.specialQuestStatus?.data?.events)) {
+            for (const ev of next.specialQuestStatus.data.events) {
+              if (Array.isArray(ev?.groups)) {
+                for (const g of ev.groups) {
+                  if (Array.isArray(g?.quests)) {
+                    for (const q of g.quests) {
+                      if (q && q.id === entry.data.questId) {
+                        q.state = 'completed';
+                        q.completionCount = (Number(q.completionCount) || 0) + 1;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
           next.questClaimStatus = { key: 'questClaimStatus', method: entry.method,
             feature: entry.feature, group: 'internal',
             data: { claims: [...previousClaims, claim].slice(-50) },
@@ -4568,6 +4618,48 @@ const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globa
           if (next.battlepassStatus?.updatedAt > entry.updatedAt) continue;
           next.battlepassStatus = {
             key: 'battlepassStatus',
+            method: entry.method,
+            feature: entry.feature,
+            group: 'events',
+            data: entry.data,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'battlepassLiveStatus') {
+          if (next.battlepassLiveStatus?.updatedAt > entry.updatedAt) continue;
+          next.battlepassLiveStatus = {
+            key: 'battlepassLiveStatus',
+            method: entry.method,
+            feature: entry.feature,
+            group: 'events',
+            data: entry.data,
+            updatedAt: entry.updatedAt
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'battlepassClaimAction') {
+          const bpId = Number(entry.data?.battlepassId);
+          const pairs = Array.isArray(entry.data?.levelIdAndTrackIdToClaim)
+            ? entry.data.levelIdAndTrackIdToClaim
+            : [];
+          if (bpId && pairs.length > 0 && Array.isArray(next.battlepassLiveStatus?.data?.battlepasses)) {
+            const bp = next.battlepassLiveStatus.data.battlepasses.find(
+              (p: any) => Number(p?.battlepassId) === bpId
+            );
+            if (bp) {
+              if (!Array.isArray(bp.claimedRewards)) bp.claimedRewards = [];
+              for (const [lvlId, trkId] of pairs) {
+                if (!bp.claimedRewards.some((r: any) => r.levelId === lvlId && r.trackId === trkId)) {
+                  bp.claimedRewards.push({ levelId: lvlId, trackId: trkId });
+                }
+              }
+            }
+          }
+          next.battlepassClaimAction = {
+            key: 'battlepassClaimAction',
             method: entry.method,
             feature: entry.feature,
             group: 'events',

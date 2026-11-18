@@ -163,6 +163,33 @@ const accountName = computed(() => {
   );
 });
 
+// Account Level & EXP
+const accountLevel = computed(() => {
+  const level = cache.value.accountStatus?.data?.level ?? cache.value.userGetInfo?.data?.level;
+  return Number.isFinite(Number(level)) ? Number(level) : null;
+});
+
+const accountExp = computed(() => {
+  const exp = cache.value.accountStatus?.data?.exp ?? cache.value.userGetInfo?.data?.experience;
+  return Number.isFinite(Number(exp)) ? Number(exp) : null;
+});
+
+const accountMaxLevel = computed(() => {
+  const max = cache.value.accountStatus?.data?.maxLevel ?? cache.value.userGetInfo?.data?.maxLevel;
+  return Number.isFinite(Number(max)) ? Number(max) : null;
+});
+
+const levelTooltip = computed(() => {
+  if (!accountLevel.value) return 'Team Level';
+  const parts: string[] = [
+    `Team Level: ${accountLevel.value}${accountMaxLevel.value ? ` / ${accountMaxLevel.value}` : ''}`,
+  ];
+  if (accountExp.value != null) {
+    parts.push(`EXP: ${formatResourceAmount(accountExp.value)}`);
+  }
+  return parts.join('\n');
+});
+
 // Open Popup in Tab
 function openInTab() {
   if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
@@ -470,6 +497,16 @@ function toggleTheme() {
         >
           {{ accountName }}
         </span>
+        <BaseTooltip v-if="accountLevel" :content="levelTooltip">
+          <span
+            id="account-level"
+            tabindex="0"
+            :aria-label="levelTooltip"
+            class="cursor-pointer inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 text-2xs font-bold text-blue-700 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+          >
+            Lv. {{ accountLevel }}
+          </span>
+        </BaseTooltip>
         <!-- Open in New Tab Button -->
         <button
           v-if="isTabOpenButtonVisible"

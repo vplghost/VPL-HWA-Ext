@@ -5,12 +5,26 @@ import { useModals } from '@/src/composables/useModals';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import { questData } from '@/src/data/questData';
+import {
+  resolveClaimableEventQuests,
+  resolveClaimableBattlePassRewards,
+} from '@/src/utils/eventClaimHelper';
 
 const { cache, dispatchRpc } = useRpcCache();
 const { openModal } = useModals();
 
 const search = ref('');
 const isRefreshing = ref(false);
+const isClaiming = ref(false);
+
+const claimableQuests = computed(() => resolveClaimableEventQuests(cache.value));
+const claimableBattlePass = computed(() => resolveClaimableBattlePassRewards(cache.value));
+const claimableCount = computed(() => {
+  return (
+    claimableQuests.value.length +
+    claimableBattlePass.value.reduce((sum, item) => sum + item.count, 0)
+  );
+});
 
 interface EventCard {
   id: string;
@@ -207,6 +221,7 @@ const eventCards = computed<EventCard[]>(() => {
           title,
           open,
           daily,
+          claimableCount: claimableQuests.value.filter((q) => q.eventId === event.id).length,
           totalMilestones: summary?.totalMilestones ?? 0,
           completedMilestones: summary?.completedMilestones ?? 0,
           percent: summary?.percent ?? 0,
@@ -218,10 +233,43 @@ const eventCards = computed<EventCard[]>(() => {
     }
   }
 
-  // Battle Pass
+  // Battle Pass (Live Ops)
+  const bpLive =
+    cache.value?.battlepassLiveStatus?.data?.battlepasses ||
+    cache.value?.['getBattlepassState:battlepass']?.data?.battlepasses ||
+    [];
+  const seenBpIds = new Set<number>();
+
+  for (const bp of Array.isArray(bpLive) ? bpLive : []) {
+    const id = Number(bp.battlepassId);
+    if (!id || seenBpIds.has(id)) continue;
+    seenBpIds.add(id);
+    const claimable =
+      claimableBattlePass.value.find((b) => b.battlepassId === id)?.count || 0;
+    const isHeroWay = id === 1017;
+    const title = isHeroWay ? `Hero's Way (#${id})` : `Battle Pass (#${id})`;
+    cards.push({
+      id: `battlePass:${id}`,
+      type: 'battle_pass',
+      title: `🎖️ ${title}`,
+      searchStr: `battle pass hero's way ${id}`.toLowerCase(),
+      data: {
+        id,
+        exp: formatNumber(bp.points || 0),
+        claimableCount: claimable,
+        hasGoldenPass: (bp.activatedTrackIds || []).length > 1,
+        endDate: bp.expiresAt ? new Date(bp.expiresAt).toLocaleString() : 'Active',
+      },
+      action: () => openModal('eventDetail', { selectedEventId: `bp:${id}` }),
+    });
+  }
+
+  // Legacy Battle Pass
   const bpState = (questData as any).getBattlePassState ? (questData as any).getBattlePassState(cache.value) : [];
   for (const bp of bpState) {
+    if (seenBpIds.has(bp.id)) continue;
     if (bp.exp > 0 || bp.farmedNormal > 0) {
+      seenBpIds.add(bp.id);
       cards.push({
         id: `battlePass:${bp.id}`,
         type: 'battle_pass',
@@ -284,14 +332,57 @@ const filteredCards = computed(() => {
   return eventCards.value.filter((c) => c.title.toLowerCase().includes(q) || c.searchStr.includes(q));
 });
 
+async function claimAllEventRewards() {
+  if (isClaiming.value || claimableCount.value === 0) return;
+  isClaiming.value = true;
+  try {
+    const calls: any[] = [];
+    for (const q of claimableQuests.value) {
+      calls.push({
+        name: 'completeQuest',
+        args: { questId: q.questId },
+        feature: 'quest',
+      });
+    }
+    for (const bp of claimableBattlePass.value) {
+      calls.push({
+        name: 'claimBattlepassRewardAll',
+        args: {
+          battlepassId: bp.battlepassId,
+          levelIdAndTrackIdToClaim: bp.levelIdAndTrackIdToClaim,
+          claimedAt: new Date().toISOString(),
+        },
+        feature: 'battlepass',
+      });
+    }
+    if (calls.length > 0) {
+      calls.push(
+        { name: 'userGetInfo', args: {} },
+        { name: 'inventoryGet', args: {} },
+        { name: 'refillableGetAll', args: { getAt: Date.now() }, feature: 'refillable' },
+        { name: 'getDailyQuests', feature: 'quest', args: {} },
+        { name: 'getSpecialQuestState', feature: 'quest', args: {} },
+        { name: 'getBattlepassState', feature: 'battlepass', args: {} },
+        { name: 'user_getNextDayTime', args: {} }
+      );
+      await dispatchRpc(calls);
+    }
+  } finally {
+    isClaiming.value = false;
+  }
+}
+
 async function refreshEvents() {
   if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
     await dispatchRpc([
       { name: 'getInfo', feature: 'clanVersus', args: {} },
-      { name: 'dungeonGetInfo' },
-      { name: 'questGetAll' },
+      { name: 'dungeonGetInfo', args: {} },
+      { name: 'questGetAll', args: {} },
+      { name: 'getDailyQuests', feature: 'quest', args: {} },
+      { name: 'getSpecialQuestState', feature: 'quest', args: {} },
+      { name: 'getBattlepassState', feature: 'battlepass', args: {} },
     ]);
   } finally {
     isRefreshing.value = false;
@@ -311,10 +402,16 @@ async function refreshEvents() {
               Active Events & Competitions
             </h3>
             <span
-              v-if="eventCards.length > 0"
-              class="rounded-full bg-emerald-600 px-2 py-0.5 text-3xs font-bold text-white uppercase tracking-wider"
+              v-if="claimableCount > 0"
+              class="rounded-full bg-emerald-600 px-2 py-0.5 text-3xs font-bold text-white tracking-wider animate-pulse"
             >
-              Live ({{ eventCards.length }})
+              {{ claimableCount }} Claimable
+            </span>
+            <span
+              v-else-if="eventCards.length > 0"
+              class="rounded-full bg-slate-500/20 text-slate-500 dark:text-slate-400 px-2 py-0.5 text-3xs font-medium uppercase tracking-wider"
+            >
+              {{ eventCards.length }} Active
             </span>
           </div>
           <p class="text-xs text-slate-400">
@@ -324,6 +421,18 @@ async function refreshEvents() {
       </div>
 
       <div class="flex items-center gap-2 w-full sm:w-auto">
+        <button
+          v-if="claimableCount > 0"
+          type="button"
+          :disabled="isClaiming || isRefreshing"
+          class="cursor-pointer shrink-0 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+          title="Claim all ready event quests and battle pass rewards"
+          @click="claimAllEventRewards"
+        >
+          <span v-if="isClaiming" class="inline-block animate-spin">↻</span>
+          <span v-else>🎁</span>
+          <span>Claim All ({{ claimableCount }})</span>
+        </button>
         <div class="relative flex-1 sm:w-64">
           <input
             v-model="search"
@@ -510,9 +619,17 @@ async function refreshEvents() {
         <template v-else-if="c.type === 'special_event'">
           <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
             <span class="font-bold text-slate-900 dark:text-slate-100 text-sm">{{ c.title }}</span>
-            <span class="rounded bg-purple-100 px-1.5 py-0.5 text-3xs font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-              Special Event
-            </span>
+            <div class="flex items-center gap-1.5">
+              <span
+                v-if="c.data.claimableCount > 0"
+                class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-3xs font-bold text-white animate-pulse"
+              >
+                {{ c.data.claimableCount }} Ready
+              </span>
+              <span class="rounded bg-purple-100 px-1.5 py-0.5 text-3xs font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                Special Event
+              </span>
+            </div>
           </div>
 
           <div v-if="c.data.totalMilestones > 0" class="mb-2">
@@ -546,9 +663,17 @@ async function refreshEvents() {
         <template v-else-if="c.type === 'battle_pass'">
           <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
             <span class="font-bold text-slate-900 dark:text-slate-100 text-sm">{{ c.title }}</span>
-            <span class="rounded bg-amber-100 px-1.5 py-0.5 text-3xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-              Battle Pass
-            </span>
+            <div class="flex items-center gap-1.5">
+              <span
+                v-if="c.data.claimableCount > 0"
+                class="rounded-full bg-emerald-600 px-1.5 py-0.5 text-3xs font-bold text-white animate-pulse"
+              >
+                {{ c.data.claimableCount }} Ready
+              </span>
+              <span class="rounded bg-amber-100 px-1.5 py-0.5 text-3xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                Battle Pass
+              </span>
+            </div>
           </div>
           <div class="flex items-center justify-between rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/40 p-2.5 text-xs mb-2">
             <div>

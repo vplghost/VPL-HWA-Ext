@@ -1,6 +1,29 @@
 # Changelog
 
-## 0.11.47 — 2026-11-17
+## 0.11.65 — 2026-11-18
+
+### Added
+
+- **Header Account Level & EXP Hover Tooltip**:
+  - Added account level pill badge (`Lv. {level}`) next to the account name on `Header.vue`.
+  - Added EXP and level progress tooltip on hover (`BaseTooltip`) showing `Team Level: {level} / {maxLevel}` and `EXP: {exp}` (100% English UI).
+  - Extracted `experience` and `maxLevel` from `userGetInfo` in `rpcCache.ts` into `accountStatus` cache data.
+
+### Fixed
+
+- **Valkyrie Airship Gift Claim**:
+  - Corrected claim RPC dispatch from query `zeppelinGiftGet` to actual server claim calls `subscriptionFarm` and `zeppelinGiftFarm` based on network tracking data.
+  - Added automatic post-claim sync querying `zeppelinGiftGet`, `subscriptionGetInfo`, `inventoryGet`, and `userGetInfo`.
+  - Allowed `subscriptionFarm`, `zeppelinGiftFarm`, and `subscriptionGetInfo` in background RPC whitelist and claim groups.
+  - Optimistically updated `zeppelinGiftGet.data.available = false` in cache upon `zeppelinGiftFarm` response.
+
+- **Event Milestone Precision & Claim Separation**:
+  - Removed dynamic event quests and Battle Pass claims from the Dashboard quick actions button (`ClaimAllFreebiesButton.vue`), keeping Dashboard auto-claim strictly dedicated to fixed daily freebies.
+  - Eliminated false event quest completions caused by synthetic ladders in `tierHelper.ts` (which previously produced 49 phantom claimable quests and `ValidationError` failures).
+  - Restricted `resolveClaimableEventQuests` to only verified criteria: explicit server readiness (`state: 'ready'`), explicit condition targets (`quest.target`), or exact verified CDN targets (`knownQuestTargets`).
+  - Enforced linear chain dependency so that only the first incomplete quest in each chain is evaluated (`break`), preventing subsequent locked tiers from being claimed out of order.
+  - Maintained dedicated "Claim All" button on Events tab for verified event quests and battle pass tiers.
+
 
 ### Added
 
