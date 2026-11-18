@@ -104,6 +104,11 @@ const englishCorrections = {
     182: 'Headquarters 1',
     183: 'Headquarters 2',
     184: 'Headquarters 3'
+  },
+  research: {
+    633: 'Additional Infirmary I',
+    634: 'Additional Infirmary II',
+    635: 'New Drill Ground I'
   }
 };
 for (const [group, corrections] of Object.entries(englishCorrections)) {

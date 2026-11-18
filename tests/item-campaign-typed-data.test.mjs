@@ -49,6 +49,9 @@ test('typed nameData correctly resolves hero, item, and category names with 100%
   assert.equal(getArtifactName(1001), "Selias' Legacy");
   assert.equal(getBuildingName(9999), 'Building #9999');
   assert.equal(getResearchName(9999), 'Research #9999');
+  assert.equal(getResearchName(633), 'Additional Infirmary I');
+  assert.equal(getResearchName(634), 'Additional Infirmary II');
+  assert.equal(getResearchName(635), 'New Drill Ground I');
 
   // Verify nameMap interface parity
   assert.equal(nameMap.hero(1), 'Aurora');

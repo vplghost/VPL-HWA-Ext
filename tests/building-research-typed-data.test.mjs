@@ -24,6 +24,7 @@ import {
   requiresSpecialResource,
   researchDataHelper,
 } from '../src/data/researchData.ts';
+import { getResearchName } from '../src/data/nameData.ts';
 
 test('buildingData exports complete data and typed helpers with 100% parity', () => {
   assert.equal(Object.keys(buildingLevelsData).length, 154, 'Should contain 154 building types');
@@ -119,4 +120,11 @@ test('researchData exports complete data and typed helpers with 100% parity', ()
   // Typed helper
   assert.ok(researchDataHelper);
   assert.equal(researchDataHelper.getMaxLevel, getMaxLevel);
+
+  // All 229 research technologies have verified canonical names without placeholder fallbacks
+  for (const researchId of Object.keys(researchData)) {
+    const name = getResearchName(researchId);
+    assert.ok(name, `Research ${researchId} should have a name`);
+    assert.equal(name.startsWith('Research #'), false, `Research ${researchId} should not use fallback name: ${name}`);
+  }
 });

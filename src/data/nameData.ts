@@ -2400,7 +2400,10 @@ export const nameData: NameDataGroup = {
       "590": "Clash Master",
       "591": "Buff — Building Power",
       "592": "Buff — Research Power",
-      "593": "Advanced Rewards II"
+      "593": "Advanced Rewards II",
+      "633": "Additional Infirmary I",
+      "634": "Additional Infirmary II",
+      "635": "New Drill Ground I"
     },
     "building": {
       "20": "Hall of Heroes",
