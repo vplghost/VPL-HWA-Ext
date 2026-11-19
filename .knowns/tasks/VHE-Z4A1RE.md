@@ -1,12 +1,14 @@
 ---
 id: VHE-Z4A1RE
 title: Add comprehensive unit tests for dynamic event titles, battle pass catalog, and dialog view parity
-status: todo
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-19T12:44:30.319Z'
-updatedAt: '2026-11-19T12:44:30.319Z'
+updatedAt: '2026-11-19T12:54:55.046Z'
+completedAt: '2026-11-19T12:54:55.046Z'
 timeSpent: 0
+assignee: '@me'
 ---
 # Add comprehensive unit tests for dynamic event titles, battle pass catalog, and dialog view parity
 
@@ -18,8 +20,8 @@ Add and run unit tests for event and battle pass title resolution, BattlePassMod
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Unit tests cover cleanLocaleTitle, parseSpecialQuestEventViews, and battle pass naming
-- [ ] #2 Unit tests cover BattlePassModal and EventDetailModal contracts
-- [ ] #3 All tests in npm test pass with 0 failures
+- [x] #1 Unit tests cover cleanLocaleTitle, parseSpecialQuestEventViews, and battle pass naming
+- [x] #2 Unit tests cover BattlePassModal and EventDetailModal contracts
+- [x] #3 All tests in npm test pass with 0 failures
 <!-- AC:END -->
 
