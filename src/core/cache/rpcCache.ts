@@ -1493,15 +1493,60 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
             }
             return actions;
           }
-          if ((call.name === 'quest_multiFarm' || call.name === 'quest_farm' ||
-               call.name === 'questFarm' || call.name === 'dailyQuestFarm') &&
-              result?.response) {
-            return extractRewardActions(record, call, result.response, 'quest');
+          if (call.name === 'quest_multiFarm' || call.name === 'quest_farm' ||
+              call.name === 'questFarm' || call.name === 'dailyQuestFarm') {
+            const actions: any[] = [];
+            const response = result?.response;
+            if (response && typeof response === 'object') {
+              actions.push(...extractRewardActions(record, call, response, 'quest'));
+            }
+            const questIds: number[] = [];
+            if (Array.isArray(call.args?.questIds)) {
+              for (const qId of call.args.questIds) {
+                const n = Number(qId);
+                if (Number.isInteger(n)) questIds.push(n);
+              }
+            } else if (call.args?.questId != null) {
+              const n = Number(call.args.questId);
+              if (Number.isInteger(n)) questIds.push(n);
+            }
+            if (questIds.length > 0) {
+              actions.push({
+                key: 'questClaimAction',
+                method: call.name,
+                feature: call.feature || null,
+                group: 'internal',
+                data: {
+                  questIds,
+                  questId: questIds[0],
+                  token: call.ident,
+                  reward: response || null,
+                  quests: Array.isArray(result?.quests) ? result.quests : [],
+                  newQuests: Array.isArray(result?.newQuests) ? result.newQuests : []
+                },
+                updatedAt: record.timestamp
+              });
+            }
+            return actions;
           }
-          if (call.name === 'completeQuest' && Number.isInteger(call.args?.questId)) {
-            return [{ key: 'questClaimAction', method: call.name, feature: call.feature || null,
-              group: 'internal', data: { questId: call.args.questId, token: call.ident,
-                reward: result.response?.reward || null }, updatedAt: record.timestamp }];
+          if (call.name === 'completeQuest' && call.args?.questId != null) {
+            const qId = Number(call.args.questId);
+            const reward = result.response?.reward || (result.response && typeof result.response === 'object' && Object.keys(result.response).length > 0 ? result.response : null);
+            return [{
+              key: 'questClaimAction',
+              method: call.name,
+              feature: call.feature || null,
+              group: 'internal',
+              data: {
+                questId: qId,
+                questIds: [qId],
+                token: call.ident,
+                reward,
+                quests: Array.isArray(result?.quests) ? result.quests : [],
+                newQuests: Array.isArray(result?.newQuests) ? result.newQuests : []
+              },
+              updatedAt: record.timestamp
+            }];
           }
           if (call.name === 'claimChest' && call.feature === 'clanVersus') {
             const chestNumber = call.args?.chestNumber;
@@ -2830,25 +2875,44 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           const previous = next.questClaimStatus?.data || { claims: [] };
           const previousClaims = normalizeArrayData(previous.claims);
           if (previousClaims.some((claim) => claim?.token === entry.data.token)) continue;
+
+          const claimedIds: number[] = Array.isArray(entry.data.questIds) && entry.data.questIds.length > 0
+            ? entry.data.questIds
+            : (entry.data.questId != null ? [entry.data.questId] : []);
+          const claimedIdSet = new Set(claimedIds.map(Number));
+
           const quest = Array.isArray(next.questGetAll?.data) ?
-            next.questGetAll.data.find((item) => item.id === entry.data.questId) : null;
+            next.questGetAll.data.find((item: any) => claimedIdSet.has(Number(item?.id))) : null;
           const reward = entry.data.reward || quest?.reward || null;
           if (reward) {
             entries.push(...extractRewardActions(record,
-              { name: 'completeQuest', feature: entry.feature, ident: entry.data.token },
-              reward, `quest:${entry.data.questId}`));
+              { name: entry.method || 'completeQuest', feature: entry.feature, ident: entry.data.token },
+              reward, `quest:${claimedIds.join(',')}`));
           }
-          const claim = { id: entry.data.questId, token: entry.data.token,
-            needsSync: !reward, at: entry.updatedAt };
-          if (Array.isArray(next.specialQuestStatus?.data?.events)) {
-            for (const ev of next.specialQuestStatus.data.events) {
-              if (Array.isArray(ev?.groups)) {
-                for (const g of ev.groups) {
-                  if (Array.isArray(g?.quests)) {
-                    for (const q of g.quests) {
-                      if (q && q.id === entry.data.questId) {
-                        q.state = 'completed';
-                        q.completionCount = (Number(q.completionCount) || 0) + 1;
+          const newClaims = claimedIds.map((id) => ({
+            id,
+            token: entry.data.token,
+            needsSync: !reward,
+            at: entry.updatedAt
+          }));
+
+          // 1. Synchronize specialQuestStatus, getSpecialQuestState, and questEvents
+          const eventContainers = [
+            next.specialQuestStatus?.data?.events,
+            next['getSpecialQuestState:quest']?.data?.events,
+            next.questEvents?.data?.events
+          ];
+          for (const evList of eventContainers) {
+            if (Array.isArray(evList)) {
+              for (const ev of evList) {
+                if (Array.isArray(ev?.groups)) {
+                  for (const g of ev.groups) {
+                    if (Array.isArray(g?.quests)) {
+                      for (const q of g.quests) {
+                        if (q && claimedIdSet.has(Number(q.id))) {
+                          q.state = 'completed';
+                          q.completionCount = (Number(q.completionCount) || 0) + 1;
+                        }
                       }
                     }
                   }
@@ -2856,9 +2920,63 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
               }
             }
           }
+
+          // 2. Synchronize questGetAll (mark claimed quests state: 3, merge updated/new quests)
+          if (next.questGetAll?.data) {
+            const rawQuests = Array.isArray(next.questGetAll.data)
+              ? [...next.questGetAll.data]
+              : (Array.isArray(next.questGetAll.data.quests) ? [...next.questGetAll.data.quests] : []);
+            const questMap = new Map(rawQuests.map((q: any) => [Number(q.id), { ...q }]));
+
+            for (const cId of claimedIds) {
+              const existing = questMap.get(cId);
+              if (existing) {
+                existing.state = 3;
+              }
+            }
+
+            const incomingUpdates = [
+              ...(Array.isArray(entry.data.quests) ? entry.data.quests : []),
+              ...(Array.isArray(entry.data.newQuests) ? entry.data.newQuests : [])
+            ];
+            for (const q of incomingUpdates) {
+              if (q && q.id != null) {
+                const existing = questMap.get(Number(q.id)) || {};
+                questMap.set(Number(q.id), { ...existing, ...q });
+              }
+            }
+
+            const mergedQuests = Array.from(questMap.values());
+            next.questGetAll = {
+              ...next.questGetAll,
+              data: Array.isArray(next.questGetAll.data) ? mergedQuests : { ...next.questGetAll.data, quests: mergedQuests },
+              updatedAt: entry.updatedAt
+            };
+          }
+
+          // 3. Synchronize getDailyQuests and dailyQuests
+          if (next.getDailyQuests?.data) {
+            const dqData = next.getDailyQuests.data;
+            const quests = Array.isArray(dqData) ? dqData : (Array.isArray(dqData.quests) ? dqData.quests : []);
+            for (const q of quests) {
+              if (q && claimedIdSet.has(Number(q.id))) {
+                q.state = 3;
+              }
+            }
+          }
+          if (next.dailyQuests?.data) {
+            const dqData = next.dailyQuests.data;
+            const quests = Array.isArray(dqData) ? dqData : (Array.isArray(dqData.quests) ? dqData.quests : []);
+            for (const q of quests) {
+              if (q && claimedIdSet.has(Number(q.id))) {
+                q.state = 3;
+              }
+            }
+          }
+
           next.questClaimStatus = { key: 'questClaimStatus', method: entry.method,
             feature: entry.feature, group: 'internal',
-            data: { claims: [...previousClaims, claim].slice(-50) },
+            data: { claims: [...previousClaims, ...newClaims].slice(-50) },
             updatedAt: entry.updatedAt };
           changed = true;
           continue;
