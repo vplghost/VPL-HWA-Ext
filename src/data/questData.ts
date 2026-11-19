@@ -24,7 +24,7 @@ import type { DailyQuestDefinition, DailyQuestItem, LocaleTitleInfo, SpecialQues
     134: 'Hero’s Way / Season Quests',
     135: 'Elemental Synergy & Titan Power',
     136: 'Champions’ Season & Guild Growth',
-    137: 'Trial of Legends & Arena Glory',
+    137: 'Spark of Glory',
     146: 'Extended Battle Pass'
   };
 

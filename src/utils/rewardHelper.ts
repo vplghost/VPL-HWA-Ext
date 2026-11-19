@@ -28,7 +28,21 @@ const coinNames: Record<number | string, string> = {
   6: 'Highway Coins',
   7: 'Pet Potions',
   8: 'Friendship Chips',
+  9: 'Strength Skin Stone',
+  10: 'Agility Skin Stone',
   18: 'Fairy Dust',
+  1000: 'Ticket',
+  1008: 'Soul Stones',
+  1010: 'Skin Shop Certificate',
+  100008: 'Holiday Particle',
+  100010: 'Pirate Coin',
+  40196: 'Valor Coin',
+  40207: 'Ascension Coin',
+  40208: 'Legend Coin',
+  40211: 'Star Coin',
+  40213: 'Ascension Coin',
+  40214: 'Legend Coin',
+  40217: 'Ascension Crests',
 };
 
 const consumableNames: Record<number | string, string> = {

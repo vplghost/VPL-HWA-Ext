@@ -225,5 +225,5 @@ test('rpcCache accurately extracts and merges remoteConfigStatus and battlepassS
   assert.ok(titles.includes('Hero Upgrade Event'));
   assert.ok(titles.includes('Elemental Synergy & Titan Power'));
   assert.ok(titles.includes('Champions’ Season & Guild Growth'));
-  assert.ok(titles.includes('Trial of Legends & Arena Glory'));
+  assert.ok(titles.includes('Spark of Glory'));
 });

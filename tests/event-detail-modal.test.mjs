@@ -148,4 +148,43 @@ test('resolveTierDetail accurately resolves task, unit, tier target, and progres
   const tolTier9 = resolveTierDetail({ id: 14828, state: 'inProgress', progress: 13 }, gloryGroup, 9);
   assert.equal(tolTier9.target, 40);
   assert.equal(tolTier9.targetDisplay, '40 battles');
+
+  // Verify rewards are populated and non-empty for Trial of Legends
+  assert.ok(tolTier1.rewards.length > 0, 'Trial of Legends tier 1 must have rewards');
+  assert.equal(tolTier1.rewards[0].type, 'coin');
+
+  // 5. Training (STRATEGIC_BASE_INTERFACE_TROOPS_TRAIN in Spark of Glory)
+  const trainingGroup = { localeKey: 'STRATEGIC_BASE_INTERFACE_TROOPS_TRAIN' };
+  const trainTier1 = resolveTierDetail({ id: 14855, state: 'inProgress', progress: 1072 }, trainingGroup, 1);
+  assert.equal(trainTier1.target, 3000);
+  assert.equal(trainTier1.targetDisplay, '3,000 troops');
+  assert.equal(trainTier1.percent, 36);
+  assert.equal(trainTier1.state, 'inProgress');
+  assert.ok(trainTier1.rewards.length >= 2, 'Training tier 1 must have Gold and Legend Coin rewards');
+  assert.equal(trainTier1.rewards[0].label, 'Gold');
+  assert.equal(trainTier1.rewards[0].amount, 500000);
+  assert.equal(trainTier1.rewards[1].label, 'Legend Coin');
+  assert.equal(trainTier1.rewards[1].amount, 10);
+
+  const trainTier10 = resolveTierDetail({ id: 14864, state: 'inProgress', progress: 1072 }, trainingGroup, 10);
+  assert.equal(trainTier10.target, 62000);
+  assert.equal(trainTier10.targetDisplay, '62,000 troops');
+
+  // 6. Rising Legend (EVENT_GLORY_NAME_QUEST_1 in Spark of Glory)
+  const risingLegendGroup = { localeKey: 'EVENT_GLORY_NAME_QUEST_1' };
+  const rlTier1 = resolveTierDetail({ id: 14803, state: 'completed', progress: 12 }, risingLegendGroup, 1);
+  assert.equal(rlTier1.target, 10);
+  assert.equal(rlTier1.state, 'completed');
+  assert.ok(rlTier1.rewards.length > 0, 'Rising Legend tier 1 must have rewards');
+
+  const rlTier6 = resolveTierDetail({ id: 14808, state: 'inProgress', progress: 85 }, risingLegendGroup, 6);
+  assert.equal(rlTier6.target, 90);
+  assert.equal(rlTier6.percent, 94);
+  assert.equal(rlTier6.state, 'inProgress');
+
+  const rlTier7 = resolveTierDetail({ id: 14809, state: 'inProgress', progress: 85 }, risingLegendGroup, 7);
+  assert.equal(rlTier7.target, 110);
+
+  const rlTier17 = resolveTierDetail({ id: 14819, state: 'inProgress', progress: 85 }, risingLegendGroup, 17);
+  assert.equal(rlTier17.target, 270);
 });

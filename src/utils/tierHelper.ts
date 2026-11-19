@@ -18,6 +18,8 @@ export interface GroupTierMeta {
   category: 'Activities' | 'Resources' | 'Hero Growth' | 'Guild';
   ladder?: number[];
   defaultStep?: number;
+  rewardsLadder?: any[];
+  defaultReward?: (tierIndex: number, target: number) => any;
 }
 
 export interface TierResolution {
@@ -66,9 +68,24 @@ export const knownQuestTargets: Record<number | string, number> = {
   // Event 100309 (viewId 99): Hero's Way Pass
   13427: 5, 13428: 10, 13429: 90, 13430: 9, 13431: 18, 13432: 6, 13433: 8,
 
-  // Event 100382 (viewId 137): Trial of Legends & Arena Glory
-  14820: 5, 14821: 10, 14822: 15, 14823: 20, 14824: 25, 14825: 30, 14826: 33,
-  14827: 35, 14828: 40, 14829: 45, 14830: 50, 14831: 55, 14832: 60, 14833: 65, 14834: 70,
+  // Event 100382 (viewId 137): Spark of Glory / Glory of the Chosen
+  // Sub-quest: Training (Train Troops in Barracks - 10 tiers)
+  14855: 3000, 14856: 7500, 14857: 10000, 14858: 12500, 14859: 17500,
+  14860: 25000, 14861: 30000, 14862: 41000, 14863: 54000, 14864: 62000,
+
+  // Sub-quest: Rising Legend (Glory Points - 17 tiers)
+  14803: 10, 14804: 20, 14805: 30, 14806: 50, 14807: 70,
+  14808: 90, 14809: 110, 14810: 120, 14811: 130, 14812: 140,
+  14813: 155, 14814: 170, 14815: 185, 14816: 200, 14817: 225,
+  14818: 245, 14819: 270,
+
+  // Sub-quest: Trial of Legends (Trial Battles - 15 tiers)
+  14820: 5, 14821: 10, 14822: 15, 14823: 20, 14824: 25,
+  14825: 30, 14826: 33, 14827: 35, 14828: 40, 14829: 45,
+  14830: 50, 14831: 55, 14832: 60, 14833: 70, 14834: 75,
+
+  // Sub-quest: Daily Sign In (7 days)
+  14796: 1, 14797: 2, 14798: 3, 14799: 4, 14800: 5, 14801: 6, 14802: 7,
 
   // Daily 4X & Chained Quests (Brigand Camps, Troops, Gathering, Bosses)
   346: 1,
@@ -85,6 +102,30 @@ export const knownQuestTargets: Record<number | string, number> = {
   2413: 1
 };
 
+// Known reward packages for milestone event quests
+export const knownQuestRewards: Record<number | string, any> = {
+  // Spark of Glory - Training
+  14855: [{ type: 'gold', amount: 500000 }, { type: 'coin', id: 40208, amount: 10 }],
+  14856: [{ type: 'gold', amount: 1000000 }, { type: 'coin', id: 40208, amount: 15 }],
+  14857: [{ type: 'gold', amount: 1500000 }, { type: 'coin', id: 40208, amount: 20 }],
+  14858: [{ type: 'gold', amount: 2000000 }, { type: 'coin', id: 40208, amount: 25 }],
+  14859: [{ type: 'gold', amount: 3000000 }, { type: 'coin', id: 40208, amount: 30 }],
+  14860: [{ type: 'gold', amount: 4000000 }, { type: 'coin', id: 40208, amount: 40 }],
+  14861: [{ type: 'gold', amount: 5000000 }, { type: 'coin', id: 40208, amount: 50 }],
+  14862: [{ type: 'gold', amount: 7500000 }, { type: 'coin', id: 40208, amount: 65 }],
+  14863: [{ type: 'gold', amount: 10000000 }, { type: 'coin', id: 40208, amount: 80 }],
+  14864: [{ type: 'gold', amount: 15000000 }, { type: 'coin', id: 40208, amount: 100 }],
+
+  // Spark of Glory - Daily Sign In
+  14796: [{ type: 'starmoney', amount: 250 }, { type: 'coin', id: 40208, amount: 10 }],
+  14797: [{ type: 'starmoney', amount: 250 }, { type: 'coin', id: 40208, amount: 10 }],
+  14798: [{ type: 'starmoney', amount: 500 }, { type: 'coin', id: 40208, amount: 15 }],
+  14799: [{ type: 'starmoney', amount: 500 }, { type: 'coin', id: 40208, amount: 20 }],
+  14800: [{ type: 'starmoney', amount: 750 }, { type: 'coin', id: 40208, amount: 25 }],
+  14801: [{ type: 'starmoney', amount: 1000 }, { type: 'coin', id: 40208, amount: 30 }],
+  14802: [{ type: 'starmoney', amount: 1500 }, { type: 'coin', id: 40208, amount: 50 }],
+};
+
 // Definitions for event groups / chains
 const groupDefinitions: Record<string, GroupTierMeta> = {
   QUEST_TAB_NAME_LOGIN: {
@@ -93,7 +134,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'days',
     unitEn: 'days',
     category: 'Activities',
-    ladder: [1, 2, 3, 4, 5, 6, 7]
+    ladder: [1, 2, 3, 4, 5, 6, 7],
+    defaultReward: (idx) => [
+      { type: 'starmoney', amount: [250, 250, 500, 500, 750, 1000, 1500][idx - 1] || 250 },
+      { type: 'coin', id: 40208, amount: [10, 10, 15, 20, 25, 30, 50][idx - 1] || 10 }
+    ]
   },
   QUEST_TAB_NAME_GET_VIP: {
     task: 'Obtain VIP Points',
@@ -101,7 +146,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'VIP points',
     unitEn: 'VIP points',
     category: 'Activities',
-    ladder: [100, 300, 1000, 2500, 4500, 7000, 9000]
+    ladder: [100, 300, 1000, 2500, 4500, 7000, 9000],
+    defaultReward: (idx, target) => [
+      { type: 'starmoney', amount: Math.max(100, Math.floor(target / 2)) },
+      { type: 'coin', id: 1, amount: target }
+    ]
   },
   LIB_PSEUDO_STARMONEY: {
     task: 'Spend Emeralds',
@@ -109,7 +158,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'Emeralds',
     unitEn: 'Emeralds',
     category: 'Resources',
-    ladder: [100, 250, 500, 1000, 2500, 5000, 8000, 12000, 18000, 25000, 35000, 50000, 65000, 80000, 100000, 120000]
+    ladder: [100, 250, 500, 1000, 2500, 5000, 8000, 12000, 18000, 25000, 35000, 50000, 65000, 80000, 100000, 120000],
+    defaultReward: (idx, target) => [
+      { type: 'consumable', id: 21, amount: Math.max(5, Math.floor(target / 1000) * 5) }
+    ]
   },
   LIB_PSEUDO_STAMINA: {
     task: 'Spend Energy',
@@ -117,7 +169,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'Energy',
     unitEn: 'Energy',
     category: 'Resources',
-    ladder: [100, 300, 500, 1000, 1500, 2500, 4000, 6000, 8000, 10000, 13000, 16000]
+    ladder: [100, 300, 500, 1000, 1500, 2500, 4000, 6000, 8000, 10000, 13000, 16000],
+    defaultReward: (idx, target) => [
+      { type: 'stamina', amount: Math.min(500, Math.floor(target / 5)) },
+      { type: 'gold', amount: target * 1000 }
+    ]
   },
   UI_FEATURE_HUB_ARENA_TITLE: {
     task: 'Fight in Arena',
@@ -125,7 +181,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'battles',
     unitEn: 'battles',
     category: 'Activities',
-    ladder: [1, 3, 5, 7, 10, 15, 20, 25]
+    ladder: [1, 3, 5, 7, 10, 15, 20, 25],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 1, amount: target * 100 },
+      { type: 'gold', amount: target * 50000 }
+    ]
   },
   QUEST_TAB_NAME_HYDRA: {
     task: 'Fight Hydra Heads',
@@ -133,7 +193,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'attacks',
     unitEn: 'attacks',
     category: 'Activities',
-    ladder: [1, 3, 6, 9, 12, 15, 18]
+    ladder: [1, 3, 6, 9, 12, 15, 18],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 18, amount: target * 250 },
+      { type: 'coin', id: 7, amount: target * 100 }
+    ]
   },
   STRATEGIC_GLOBAL_MAP_RALLY_POPUP_TITLE: {
     task: 'Defeat World Map Bosses',
@@ -141,7 +205,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'bosses',
     unitEn: 'bosses',
     category: 'Activities',
-    ladder: [1, 3, 5, 7, 10, 12, 15]
+    ladder: [1, 3, 5, 7, 10, 12, 15],
+    defaultReward: (idx, target) => [
+      { type: 'consumable', id: 20, amount: target * 500 },
+      { type: 'gold', amount: target * 200000 }
+    ]
   },
   UI_DIALOG_BOSS_TITLE: {
     task: 'Defeat World Map Bosses',
@@ -149,7 +217,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'bosses',
     unitEn: 'bosses',
     category: 'Activities',
-    ladder: [1, 3, 5, 7, 10, 12, 15]
+    ladder: [1, 3, 5, 7, 10, 12, 15],
+    defaultReward: (idx, target) => [
+      { type: 'consumable', id: 20, amount: target * 500 },
+      { type: 'gold', amount: target * 200000 }
+    ]
   },
   QUEST_TAB_NAME_TOWER_CHESTS: {
     task: 'Open Tower Chests',
@@ -157,7 +229,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'chests',
     unitEn: 'chests',
     category: 'Activities',
-    ladder: [1, 3, 5, 10, 20, 35, 50]
+    ladder: [1, 3, 5, 10, 20, 35, 50],
+    defaultReward: (idx, target) => [
+      { type: 'consumable', id: 24, amount: Math.max(1, Math.floor(target / 2)) }
+    ]
   },
   UI_DIALOG_ARTIFACT_CHEST_DROP_PACK1: {
     task: 'Open Artifact Chests',
@@ -165,7 +240,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'chests',
     unitEn: 'chests',
     category: 'Activities',
-    ladder: [1, 3, 5, 10, 20, 35, 50]
+    ladder: [1, 3, 5, 10, 20, 35, 50],
+    defaultReward: (idx, target) => [
+      { type: 'consumable', id: 24, amount: Math.max(1, Math.floor(target / 2)) }
+    ]
   },
   UI_HEROIC_CHEST_MAIN_TITLE: {
     task: 'Open Heroic Chests',
@@ -173,7 +251,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'chests',
     unitEn: 'chests',
     category: 'Activities',
-    ladder: [1, 2, 5, 10, 20, 30, 50]
+    ladder: [1, 2, 5, 10, 20, 30, 50],
+    defaultReward: (idx, target) => [
+      { type: 'starmoney', amount: target * 100 }
+    ]
   },
   LIB_SPECIAL_QUEST_EVENT_NAME_143: {
     task: 'Tower Floor Progress',
@@ -181,7 +262,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'floors',
     unitEn: 'floors',
     category: 'Activities',
-    ladder: [5, 10, 15, 20, 30, 40, 50]
+    ladder: [5, 10, 15, 20, 30, 40, 50],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 3, amount: target * 200 },
+      { type: 'gold', amount: target * 100000 }
+    ]
   },
   STRATEGIC_BASE_INTERFACE_BUTTON_SPEEDUPS: {
     task: 'Use Speedups in City',
@@ -189,7 +274,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'minutes',
     unitEn: 'minutes',
     category: 'Resources',
-    ladder: [60, 180, 360, 720, 1440, 2880, 4320]
+    ladder: [60, 180, 360, 720, 1440, 2880, 4320],
+    defaultReward: (idx, target) => [
+      { type: 'gold', amount: target * 10000 }
+    ]
   },
   LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TRAIN_SPEEDUP: {
     task: 'Use Training Speedups',
@@ -197,7 +285,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'minutes',
     unitEn: 'minutes',
     category: 'Resources',
-    ladder: [60, 180, 360, 720, 1440, 2880, 4320]
+    ladder: [60, 180, 360, 720, 1440, 2880, 4320],
+    defaultReward: (idx, target) => [
+      { type: 'gold', amount: target * 10000 }
+    ]
   },
   STRATEGIC_BASE_INTERFACE_TROOPS_TRAIN: {
     task: 'Train Troops in Barracks',
@@ -205,7 +296,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'troops',
     unitEn: 'troops',
     category: 'Activities',
-    ladder: [50, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000]
+    ladder: [3000, 7500, 10000, 12500, 17500, 25000, 30000, 41000, 54000, 62000],
+    defaultReward: (idx, target) => [
+      { type: 'gold', amount: [500000, 1000000, 1500000, 2000000, 3000000, 4000000, 5000000, 7500000, 10000000, 15000000][idx - 1] || target * 100 },
+      { type: 'coin', id: 40208, amount: [10, 15, 20, 25, 30, 40, 50, 65, 80, 100][idx - 1] || Math.max(10, Math.round(target / 500)) }
+    ]
   },
   LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_TRAIN_TROOPS: {
     task: 'Train Troops in Barracks',
@@ -213,7 +308,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'troops',
     unitEn: 'troops',
     category: 'Activities',
-    ladder: [50, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000]
+    ladder: [3000, 7500, 10000, 12500, 17500, 25000, 30000, 41000, 54000, 62000],
+    defaultReward: (idx, target) => [
+      { type: 'gold', amount: [500000, 1000000, 1500000, 2000000, 3000000, 4000000, 5000000, 7500000, 10000000, 15000000][idx - 1] || target * 100 },
+      { type: 'coin', id: 40208, amount: [10, 15, 20, 25, 30, 40, 50, 65, 80, 100][idx - 1] || Math.max(10, Math.round(target / 500)) }
+    ]
   },
   UI_CLANBOSS_MENU_ALTAR: {
     task: 'Pray at Clan Altar',
@@ -221,7 +320,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'prayers',
     unitEn: 'prayers',
     category: 'Activities',
-    ladder: [1, 3, 5, 8, 12, 16, 20, 25, 30]
+    ladder: [1, 3, 5, 8, 12, 16, 20, 25, 30],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 5, amount: target * 50 }
+    ]
   },
   UI_DIALOG_RATING_TAB_CLAN: {
     task: 'Earn Guild Activity Points',
@@ -229,7 +331,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'points',
     unitEn: 'points',
     category: 'Guild',
-    ladder: [200, 400, 800, 1200, 1600, 2000, 2500, 3000, 3500, 4000, 4500]
+    ladder: [200, 400, 800, 1200, 1600, 2000, 2500, 3000, 3500, 4000, 4500],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 5, amount: Math.floor(target / 5) }
+    ]
   },
   LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_48: {
     task: 'Clan Clash Activity Points',
@@ -237,7 +342,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'points',
     unitEn: 'points',
     category: 'Guild',
-    ladder: [200, 400, 800, 1200, 1600, 2000, 2500, 3000, 3500, 4000, 4500]
+    ladder: [200, 400, 800, 1200, 1600, 2000, 2500, 3000, 3500, 4000, 4500],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 5, amount: Math.floor(target / 5) }
+    ]
   },
   LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_64: {
     task: 'Collect Titanite in Dungeon',
@@ -245,7 +353,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'Titanite',
     unitEn: 'Titanite',
     category: 'Guild',
-    ladder: [65, 130, 190, 250, 350, 450, 600, 750, 1000, 1250]
+    ladder: [65, 130, 190, 250, 350, 450, 600, 750, 1000, 1250],
+    defaultReward: (idx, target) => [
+      { type: 'consumable', id: 20, amount: target * 10 }
+    ]
   },
   LIB_SPECIAL_QUEST_EVENT_NAME_9: {
     task: 'Clash of Worlds Battles',
@@ -253,7 +364,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'battles',
     unitEn: 'battles',
     category: 'Guild',
-    ladder: [1, 3, 5, 7, 10, 15]
+    ladder: [1, 3, 5, 7, 10, 15],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 1, amount: target * 200 }
+    ]
   },
   LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_763: {
     task: 'Titan Power & Boss Attacks',
@@ -261,7 +375,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'attacks',
     unitEn: 'attacks',
     category: 'Guild',
-    ladder: [1, 3, 5, 7, 9, 12, 15, 18]
+    ladder: [1, 3, 5, 7, 9, 12, 15, 18],
+    defaultReward: (idx, target) => [
+      { type: 'consumable', id: 20, amount: target * 500 }
+    ]
   },
   LIB_COIN_NAME_18: {
     task: 'Collect Fairy Dust',
@@ -269,7 +386,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'Fairy Dust',
     unitEn: 'Fairy Dust',
     category: 'Resources',
-    ladder: [100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000]
+    ladder: [100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 18, amount: Math.floor(target / 5) }
+    ]
   },
   LIB_CONSUMABLE_NAME_20: {
     task: 'Spend Titan Potion',
@@ -277,7 +397,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'Titan Potion',
     unitEn: 'Titan Potion',
     category: 'Resources',
-    ladder: [500, 1500, 3000, 6000, 12000, 25000, 50000, 75000, 100000, 150000]
+    ladder: [500, 1500, 3000, 6000, 12000, 25000, 50000, 75000, 100000, 150000],
+    defaultReward: (idx, target) => [
+      { type: 'consumable', id: 20, amount: Math.floor(target / 5) }
+    ]
   },
   LIB_SPECIAL_QUEST_EVENT_NAME_969: {
     task: 'Upgrade Rune Stones',
@@ -285,7 +408,10 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'stones',
     unitEn: 'stones',
     category: 'Resources',
-    ladder: [100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 13000, 16000, 20000, 25000, 30000, 36000, 42000, 49000, 56000, 64000]
+    ladder: [100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 13000, 16000, 20000, 25000, 30000, 36000, 42000, 49000, 56000, 64000],
+    defaultReward: (idx, target) => [
+      { type: 'starmoney', amount: Math.min(2000, Math.floor(target / 20)) }
+    ]
   },
   EVENT_GLORY_NAME_QUEST_1: {
     task: 'Earn Glory Points',
@@ -293,7 +419,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'points',
     unitEn: 'points',
     category: 'Activities',
-    ladder: [5, 10, 15, 20, 25, 35, 50, 75, 100, 130, 170, 220, 280, 350, 430, 520, 620]
+    ladder: [10, 20, 30, 50, 70, 90, 110, 120, 130, 140, 155, 170, 185, 200, 225, 245, 270],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 40208, amount: Math.max(5, idx * 5) },
+      { type: 'starmoney', amount: Math.max(50, idx * 50) }
+    ]
   },
   EVENT_GLORY_NAME_QUEST_2: {
     task: 'Trial of Legends Battles',
@@ -301,7 +431,11 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unit: 'battles',
     unitEn: 'battles',
     category: 'Activities',
-    ladder: [5, 10, 15, 20, 25, 30, 33, 35, 40, 45, 50, 55, 60, 65, 70]
+    ladder: [5, 10, 15, 20, 25, 30, 33, 35, 40, 45, 50, 55, 60, 70, 75],
+    defaultReward: (idx, target) => [
+      { type: 'coin', id: 40207, amount: Math.max(10, idx * 10) },
+      { type: 'consumable', id: 24, amount: Math.min(10, Math.ceil(idx / 2)) }
+    ]
   },
   QUEST_TAB_NAME_ARTLEVEL: {
     task: 'Level Up Hero Artifacts',
@@ -600,7 +734,13 @@ export function resolveTierDetail(
     percent = Math.min(100, Math.max(0, Math.round((progress / target) * 100)));
   }
 
-  const rawReward = qAllEntry?.reward || quest?.reward || null;
+  const rawReward =
+    qAllEntry?.reward ||
+    quest?.reward ||
+    (quest?.id && knownQuestRewards[quest.id]) ||
+    (meta.rewardsLadder && meta.rewardsLadder[tierIndex - 1]) ||
+    (meta.defaultReward ? meta.defaultReward(tierIndex, target) : null) ||
+    null;
   const rewards = parseRewards(rawReward);
 
   const targetDisplay = `${formatNumber(target)} ${meta.unit}`;

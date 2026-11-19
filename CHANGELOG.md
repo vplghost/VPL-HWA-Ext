@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.11.118 — 2026-11-19
+
+### Fixed
+
+- **Event Milestone Tier Targets & Cumulative Progress Calibration (`src/utils/tierHelper.ts`, `src/data/questData.ts`)**:
+  - Calibrated milestone target ladders for Spark of Glory / Glory of the Chosen (View 137, Event 100382):
+    - **Training (Group 1325)**: Calibrated targets to mature server progression `[3000, 7500, 10000, 12500, 17500, 25000, 30000, 41000, 54000, 62000]` troops (replaces beginner scale `[50, 100, 250...]` that caused premature false completion states).
+    - **Rising Legend (Group 1321)**: Calibrated targets `[10, 20, 30, 50, 70, 90, 110, 120, 130, 140, 155, 170, 185, 200, 225, 245, 270]`.
+    - **Trial of Legends (Group 1322)**: Calibrated targets `[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 75]`.
+    - **Daily Sign In (Group 1320)**: Calibrated targets `[1, 2, 3, 4, 5, 6, 7]`.
+  - Identified & resolved implicit parameter behaviors:
+    - `transferProgress: true`: Game quests in dynamic event series maintain cumulative total progression across all tiers rather than resetting to 0 per tier.
+    - Server maturity scaling: Calibrated to mature server targets (`serverAge` / high server IDs).
+  - Renamed View 137 to "Spark of Glory" (in-game event branding).
+
+### Added
+
+- **Milestone Tier Rewards Visualization (`src/utils/rewardHelper.ts`, `src/utils/tierHelper.ts`, `EventDetailModal.vue`)**:
+  - Added currency and token definitions in `rewardHelper.ts`: Legend Coin (`40208`), Ascension Coin (`40207`), Ascension Crests (`40217`), Valor Coin (`40196`), Star Coin (`40211`), Pirate Coin (`100010`), Holiday Particle (`100008`), and Skin Stones (`8`, `9`, `10`).
+  - Implemented dynamic reward ladder definitions and milestone reward generators in `tierHelper.ts` for all 4 Glory event chains.
+  - Resolved tier reward display so `EventDetailModal.vue` renders actual reward badges (Gold, Legend Coins, Ascension Coins, Emeralds, Keys) across all milestone cards and active summaries instead of falling back to generic "Standard Reward".
+  - Added unit test coverage in `tests/event-detail-modal.test.mjs`.
+
 ## 0.11.117 — 2026-11-19
 
 ### Changed
