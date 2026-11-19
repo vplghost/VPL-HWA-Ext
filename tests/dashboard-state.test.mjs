@@ -218,12 +218,35 @@ test('daily activity SFC reacts to exhaustion, new attempts and day rollover', a
   assert.equal(state('hydra'), 'pending');
   view.cache.value['resource:refillable:6'] = entry({ amount: 1 });
   assert.equal(state('arena'), 'pending');
+  // Guild Versus accumulation progress towards next chest
+  view.cache.value.clanVersusStatus = entry({
+    score: 15000,
+    chestNumbers: [],
+    info: { roundNumber: 1, personalRequirementsIsSatisfied: true, guildRequirementsIsSatisfied: true },
+  });
+  const gvsCard1 = view.activities.value.find(row => row.id === 'guildVersus');
+  assert.equal(gvsCard1.progress, 60); // 15,000 / 25,000 = 60%
+  assert.equal(gvsCard1.detail, '15K / 25K pts (Chest 1) · 0/9 claimed');
+
+  // When Chest 1 is ready and accumulating towards Chest 2
+  view.cache.value.clanVersusStatus = entry({
+    score: 45000,
+    chestNumbers: [],
+    info: { roundNumber: 1, personalRequirementsIsSatisfied: true, guildRequirementsIsSatisfied: true },
+  });
+  const gvsCard2 = view.activities.value.find(row => row.id === 'guildVersus');
+  assert.equal(gvsCard2.progress, 45); // 45,000 / 100,000 = 45%
+  assert.equal(gvsCard2.detail, '1 ready · 45K / 100K pts (Chest 2)');
+
   // Guild Versus with all chests claimed
   view.cache.value.clanVersusStatus = entry({
     chestNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9],
     info: { roundNumber: 1, personalRequirementsIsSatisfied: true, guildRequirementsIsSatisfied: true },
   });
   assert.equal(state('guildVersus'), 'done');
+  const gvsCardDone = view.activities.value.find(row => row.id === 'guildVersus');
+  assert.equal(gvsCardDone.progress, 100);
+  assert.equal(gvsCardDone.detail, 'All 9 chests claimed · Round 1');
   view.clock.value += 86400000;
   for (const id of ['tower', 'arena', 'dungeon']) assert.equal(state(id), 'unknown');
 });

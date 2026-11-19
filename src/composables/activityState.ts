@@ -121,15 +121,7 @@ export function guildVersusActivityState(cache: Record<string, any>, now = Date.
   }
 
   const claimedCount = view.claimedCount ?? 0;
-  const progress = Math.min(100, Math.round((claimedCount / 9) * 100));
-
-  if (readyCount > 0) {
-    return {
-      state: 'pending' as const,
-      detail: `${readyCount} chest${readyCount > 1 ? 's' : ''} ready to claim · ${claimedCount}/9 claimed`,
-      progress,
-    };
-  }
+  const currentScore = score ?? 0;
 
   if (claimedCount >= 9) {
     return {
@@ -139,13 +131,42 @@ export function guildVersusActivityState(cache: Record<string, any>, now = Date.
     };
   }
 
-  const roundStr = view.roundNumber != null ? `Round ${view.roundNumber}` : '';
-  const scoreStr = score != null ? `${score.toLocaleString()} pts` : '';
-  const ptsDetail = [roundStr, scoreStr, `${claimedCount}/9 chests`].filter(Boolean).join(' · ');
+  // Find next locked chest that user is accumulating points towards
+  const unclaimed = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(c => !claimed.includes(c));
+  const nextLocked = unclaimed.find(c => currentScore < (clanVersusChestThresholds[c] || 0));
+
+  // If no remaining chest is locked, all unclaimed chests are ready to claim (100% progress)
+  if (!nextLocked) {
+    return {
+      state: 'pending' as const,
+      detail: `${readyCount} chest${readyCount > 1 ? 's' : ''} ready to claim · ${claimedCount}/9 claimed`,
+      progress: 100,
+    };
+  }
+
+  const nextChest = nextLocked;
+  const targetThreshold = clanVersusChestThresholds[nextChest] || 25000;
+  const progress = Math.min(100, Math.max(0, Math.round((currentScore / targetThreshold) * 100)));
+
+  const formatCompact = (val: number) => {
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (val >= 1_000) return `${(val / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+    return String(val);
+  };
+
+  const scoreDisplay = `${formatCompact(currentScore)} / ${formatCompact(targetThreshold)} pts (Chest ${nextChest})`;
+
+  if (readyCount > 0) {
+    return {
+      state: 'pending' as const,
+      detail: `${readyCount} ready · ${scoreDisplay}`,
+      progress,
+    };
+  }
 
   return {
-    state: (score != null && score > 0 ? 'info' : 'pending') as 'info' | 'pending',
-    detail: ptsDetail || `${claimedCount}/9 chests claimed`,
+    state: (currentScore > 0 ? 'info' : 'pending') as 'info' | 'pending',
+    detail: `${scoreDisplay} · ${claimedCount}/9 claimed`,
     progress,
   };
 }
