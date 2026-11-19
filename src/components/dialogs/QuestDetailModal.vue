@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { questRefreshCalls, sendQuestClaim } from '@/src/utils/dialogRpc';
+import { questRefreshCalls, sendQuestClaim, sendEventQuestClaim } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { normalizeArray } from '@/src/utils/troops';
 import { questData } from '@/src/data/questData';
 import { getItemName } from '@/src/data/nameData';
 import { questLocaleMap } from '@/src/utils/popupData';
+import { knownQuestTargets } from '@/src/utils/tierHelper';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -155,9 +156,17 @@ const allItems = computed<QuestCardItem[]>(() => {
     const title = questData?.dailyTitle?.(dq) || qAllEntry?.name || `Daily Quest #${dq.id}`;
     const reward = qAllEntry?.reward || dq.reward || null;
     const progress = Number(qAllEntry?.progress ?? dq.progress) || 0;
+    const target = Number(
+      questData?.dailyDefinition?.(dq.id)?.condition?.target ??
+      knownQuestTargets[dq.id] ??
+      dq.target ??
+      dq.condition?.target ??
+      qAllEntry?.condition?.target ??
+      qAllEntry?.target
+    ) || 0;
 
-    const isReady = qAllEntry?.state === 2 || dq.state === 2;
-    const isDone = dq.state === 'completed' || dq.state === 3 || qAllEntry?.state === 3;
+    const isDone = dq.state === 'completed' || dq.state === 3 || qAllEntry?.state === 3 || (Number(dq.completionCount) || 0) > 0;
+    const isReady = !isDone && (qAllEntry?.state === 2 || dq.state === 2 || dq.state === 'ready' || (target > 0 && progress >= target));
     const isTowerChest = isTowerChestQuest(dq.id, title);
     const isUnavailable = !isReady && !isDone && isTowerChest && isTowerCleared;
     const state = isReady ? 'ready' : isDone ? 'done' : isUnavailable ? 'cannotPerform' : 'inProgress';
@@ -170,7 +179,7 @@ const allItems = computed<QuestCardItem[]>(() => {
       state,
       isUnavailable,
       progress,
-      target: questData?.dailyDefinition?.(dq.id)?.condition?.target,
+      target: target > 0 ? target : questData?.dailyDefinition?.(dq.id)?.condition?.target,
       reward,
       subtitle: isUnavailable ? '🔒 Tower cleared today • Cannot perform' : resetText,
     });
@@ -188,8 +197,8 @@ const allItems = computed<QuestCardItem[]>(() => {
       const groupQuests = Array.isArray(group.quests) ? group.quests : [];
       if (groupQuests.length === 0) continue;
 
-      const activeQ = groupQuests.find((q: any) => q.state === 'inProgress' || q.state === 2);
-      const completedCount = groupQuests.filter((q: any) => q.state === 'completed' || q.state === 3).length;
+      const activeQ = groupQuests.find((q: any) => q.state === 'inProgress' || q.state === 2 || q.state === 'ready');
+      const completedCount = groupQuests.filter((q: any) => q.state === 'completed' || q.state === 3 || (Number(q.completionCount) || 0) > 0).length;
       const currentQ = activeQ || groupQuests[groupQuests.length - 1];
 
       const qIdStr = String(currentQ.id);
@@ -209,14 +218,22 @@ const allItems = computed<QuestCardItem[]>(() => {
             .replace(/\b\w/g, (c: string) => c.toUpperCase())
         : 'Special Quest';
 
-      const isReady = currentQ.state === 2 || qAllEntry?.state === 2;
+      const groupProgress = Number(currentQ.progress ?? qAllEntry?.progress) || 0;
+      const groupTarget = Number(
+        currentQ?.condition?.target ??
+        currentQ?.target ??
+        knownQuestTargets[currentQ.id] ??
+        qAllEntry?.condition?.target ??
+        qAllEntry?.target
+      ) || 0;
+
       const isDone = !activeQ && completedCount === groupQuests.length;
+      const isReady = !isDone && (currentQ.state === 2 || currentQ.state === 'ready' || qAllEntry?.state === 2 || (groupTarget > 0 && groupProgress >= groupTarget));
       const isTowerChest = isTowerChestQuest(currentQ.id, groupTitle);
       const isUnavailable = !isReady && !isDone && isTowerChest && isTowerCleared;
       const state = isReady ? 'ready' : isDone ? 'done' : isUnavailable ? 'cannotPerform' : 'inProgress';
 
       const tierText = `Tier ${completedCount + (activeQ ? 1 : 0)} of ${groupQuests.length}`;
-      const progress = Number(currentQ.progress ?? qAllEntry?.progress) || 0;
       const reward = currentQ.reward || qAllEntry?.reward || null;
 
       items.push({
@@ -228,7 +245,8 @@ const allItems = computed<QuestCardItem[]>(() => {
         tierInfo: tierText,
         state,
         isUnavailable,
-        progress,
+        progress: groupProgress,
+        target: groupTarget > 0 ? groupTarget : undefined,
         reward,
         subtitle: isUnavailable
           ? '🔒 Tower cleared today • Cannot perform'
@@ -330,7 +348,18 @@ async function claimQuest(qId: string | number) {
   if (isClaiming.value) return;
   isClaiming.value = true;
   try {
-    const result = await sendQuestClaim(qId);
+    const item = allItems.value.find((i) => String(i.id) === String(qId));
+    const isSpecialOrDaily =
+      item?.category === 'event' ||
+      item?.category === 'daily' ||
+      Boolean(questData?.dailyDefinition?.(qId)) ||
+      Boolean(cache.value?.['getDailyQuests:quest']?.data?.quests?.[String(qId)]) ||
+      Boolean(cache.value?.dailyQuests?.data?.quests?.[String(qId)]);
+
+    const result = isSpecialOrDaily
+      ? await sendEventQuestClaim(qId)
+      : await sendQuestClaim(qId);
+
     claimMessage.value = result.ok
       ? result.queued ? 'Reward claim queued for the next game RPC.' : 'Reward claim sent. Waiting for game sync.'
       : result.error || 'Reward claim failed.';

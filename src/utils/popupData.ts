@@ -8,6 +8,7 @@ import {
   clanVersusChallengeSteps,
 } from '../data/clanVersusData.ts';
 import { questData } from '../data/questData.ts';
+import { knownQuestTargets } from './tierHelper.ts';
 import {
   resolveClaimableEventQuests,
   resolveClaimableBattlePassRewards,
@@ -854,6 +855,7 @@ export interface PendingClaimsResult {
   letterIds: Array<string | number>;
   hasReports: boolean;
   questIds: Array<string | number>;
+  dailyQuestIds: Array<string | number>;
   eventQuests: ClaimableQuestItem[];
   battlePassRewards: ClaimableBattlePassItem[];
   attentionBonusIds: number[];
@@ -871,6 +873,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
       letterIds: [],
       hasReports: false,
       questIds: [],
+      dailyQuestIds: [],
       eventQuests: [],
       battlePassRewards: [],
       attentionBonusIds: [],
@@ -917,6 +920,26 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     : [];
   const readyQuests = quests.filter((q: any) => q && q.state === 2);
   const questIds = readyQuests.map((q: any) => q.id).filter((id: any) => id != null);
+
+  // Daily 4X and Chained Quests (e.g. Brigand Camps 362-364, Bosses 368-370, Gathering 365-367)
+  const dqList = questData?.dailyQuests?.(cache, now) || [];
+  const dailyQuestIds: Array<string | number> = [];
+  for (const dq of dqList) {
+    if (!dq || dq.id == null) continue;
+    const isDone = dq.state === 'completed' || dq.state === 3 || (Number(dq.completionCount) || 0) > 0;
+    if (isDone) continue;
+    const target = Number(
+      questData?.dailyDefinition?.(dq.id)?.condition?.target ??
+      knownQuestTargets[dq.id] ??
+      dq.target ??
+      dq.condition?.target
+    ) || 0;
+    const progress = Number(dq.progress) || 0;
+    const isReady = dq.state === 'ready' || dq.state === 2 || (target > 0 && progress >= target);
+    if (isReady) {
+      dailyQuestIds.push(dq.id);
+    }
+  }
 
   // Attention bonus free chests
   const bonuses = cache.attentionBonusStatus?.data?.bonuses;
@@ -994,6 +1017,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     letterIds.length +
     (hasReports ? 1 : 0) +
     questIds.length +
+    dailyQuestIds.length +
     attentionBonusIds.length +
     videoBoxNums.length +
     (hasAlchemySpin ? 1 : 0) +
@@ -1005,6 +1029,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     letterIds,
     hasReports,
     questIds,
+    dailyQuestIds,
     eventQuests,
     battlePassRewards,
     attentionBonusIds,
@@ -1046,6 +1071,16 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
       name: 'quest_multiFarm',
       args: { questIds: pending.questIds },
     });
+  }
+
+  if (opt.quests && pending.dailyQuestIds?.length > 0) {
+    for (const dqId of pending.dailyQuestIds) {
+      calls.push({
+        name: 'completeQuest',
+        args: { questId: Number(dqId) },
+        feature: 'quest',
+      });
+    }
   }
 
   if (opt.eventQuests && pending.eventQuests.length > 0) {
@@ -1144,7 +1179,8 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
     }
     if (
       (opt.eventQuests && pending.eventQuests.length > 0) ||
-      (opt.battlePass && pending.battlePassRewards.length > 0)
+      (opt.battlePass && pending.battlePassRewards.length > 0) ||
+      (opt.quests && pending.dailyQuestIds?.length > 0)
     ) {
       calls.push(
         { name: 'getDailyQuests', feature: 'quest', args: {} },

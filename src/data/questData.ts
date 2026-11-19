@@ -198,13 +198,14 @@ import type { DailyQuestDefinition, DailyQuestItem, LocaleTitleInfo, SpecialQues
   };
 
   function dailyQuests(cache: any, now: number = Date.now()): DailyQuestItem[] | null {
-    const entry = cache?.['getDailyQuests:quest'];
-    if (!Array.isArray(entry?.data?.quests)) return null;
+    const entry = cache?.['getDailyQuests:quest'] || cache?.dailyQuests;
+    const questsRaw = entry?.data?.quests ?? entry?.quests;
+    if (!questsRaw) return null;
     const observedAt = Date.parse(entry.updatedAt);
     const resetAt = nextReset(cache, now);
     if (!Number.isFinite(observedAt) || (resetAt != null
       ? observedAt < resetAt - 86400000 : new Date(observedAt).toDateString() !== new Date(now).toDateString())) return null;
-    return entry.data.quests;
+    return Array.isArray(questsRaw) ? questsRaw : Object.values(questsRaw);
   }
 
   function visibleGroups(event: any): SpecialQuestGroup[] {

@@ -68,7 +68,21 @@ export const knownQuestTargets: Record<number | string, number> = {
 
   // Event 100382 (viewId 137): Trial of Legends & Arena Glory
   14820: 5, 14821: 10, 14822: 15, 14823: 20, 14824: 25, 14825: 30, 14826: 33,
-  14827: 35, 14828: 40, 14829: 45, 14830: 50, 14831: 55, 14832: 60, 14833: 65, 14834: 70
+  14827: 35, 14828: 40, 14829: 45, 14830: 50, 14831: 55, 14832: 60, 14833: 65, 14834: 70,
+
+  // Daily 4X & Chained Quests (Brigand Camps, Troops, Gathering, Bosses)
+  346: 1,
+  348: 10, 351: 30,
+  349: 10, 352: 30,
+  350: 10, 353: 30,
+  354: 50000, 358: 250000,
+  355: 50000, 359: 250000,
+  356: 10000, 360: 50000,
+  357: 3000, 361: 15000,
+  362: 1, 363: 5, 364: 10,
+  365: 1, 366: 2, 367: 4,
+  368: 1, 369: 2, 370: 3,
+  2413: 1
 };
 
 // Definitions for event groups / chains
@@ -408,6 +422,86 @@ const groupDefinitions: Record<string, GroupTierMeta> = {
     unitEn: 'milestones',
     category: 'Activities',
     ladder: [1, 2, 3, 5, 7, 10, 12]
+  },
+  LIB_QUEST_TRANSLATE_GLOBALMAPCAMPVICTORIES: {
+    task: 'Clear Brigand Camp',
+    taskEn: 'Clear Brigand Camp',
+    unit: 'camps',
+    unitEn: 'camps',
+    category: 'Activities',
+    ladder: [1, 5, 10]
+  },
+  QUEST_CHAIN_135: {
+    task: 'Clear Brigand Camp',
+    taskEn: 'Clear Brigand Camp',
+    unit: 'camps',
+    unitEn: 'camps',
+    category: 'Activities',
+    ladder: [1, 5, 10]
+  },
+  LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCEGATHERINGCOUNT: {
+    task: 'Gather Resources on Map',
+    taskEn: 'Gather Resources on Map',
+    unit: 'times',
+    unitEn: 'times',
+    category: 'Activities',
+    ladder: [1, 2, 4]
+  },
+  QUEST_CHAIN_136: {
+    task: 'Gather Resources on Map',
+    taskEn: 'Gather Resources on Map',
+    unit: 'times',
+    unitEn: 'times',
+    category: 'Activities',
+    ladder: [1, 2, 4]
+  },
+  LIB_QUEST_TRANSLATE_GLOBALMAPMOBRALLYKILLS: {
+    task: 'Defeat World Map Boss',
+    taskEn: 'Defeat World Map Boss',
+    unit: 'bosses',
+    unitEn: 'bosses',
+    category: 'Activities',
+    ladder: [1, 2, 3]
+  },
+  QUEST_CHAIN_137: {
+    task: 'Defeat World Map Boss',
+    taskEn: 'Defeat World Map Boss',
+    unit: 'bosses',
+    unitEn: 'bosses',
+    category: 'Activities',
+    ladder: [1, 2, 3]
+  },
+  LIB_QUEST_TRANSLATE_GLOBALMAPRESOURCETYPEGATHERED: {
+    task: 'Collect Resources on Map',
+    taskEn: 'Collect Resources on Map',
+    unit: 'units',
+    unitEn: 'units',
+    category: 'Resources',
+    ladder: [10000, 50000, 250000]
+  },
+  LIB_QUEST_TRANSLATE_UNITSTRAINED: {
+    task: 'Train Troops in Barracks',
+    taskEn: 'Train Troops in Barracks',
+    unit: 'troops',
+    unitEn: 'troops',
+    category: 'Activities',
+    ladder: [10, 30]
+  },
+  LIB_QUEST_TRANSLATE_BUILDINGLEVELANY: {
+    task: 'Upgrade Building',
+    taskEn: 'Upgrade Building',
+    unit: 'buildings',
+    unitEn: 'buildings',
+    category: 'Activities',
+    ladder: [1]
+  },
+  LIB_QUEST_TRANSLATE_PERSONALRESEARCHSTARTANY: {
+    task: 'Start Research',
+    taskEn: 'Start Research',
+    unit: 'researches',
+    unitEn: 'researches',
+    category: 'Activities',
+    ladder: [1]
   }
 };
 
@@ -479,12 +573,18 @@ export function resolveTierDetail(
   const progress = Number(qAllEntry?.progress ?? quest?.progress) || 0;
 
   // Determine completion state
-  const isReady = quest?.state === 2 || quest?.state === 'ready' || qAllEntry?.state === 2;
   const isCompleted =
     quest?.state === 'completed' ||
     quest?.state === 3 ||
     qAllEntry?.state === 3 ||
-    (quest?.completionCount && quest.completionCount > 0);
+    (Number(quest?.completionCount) || 0) > 0;
+
+  const isReady =
+    !isCompleted &&
+    (quest?.state === 2 ||
+      quest?.state === 'ready' ||
+      qAllEntry?.state === 2 ||
+      (target > 0 && progress >= target));
 
   const state: 'completed' | 'ready' | 'inProgress' = isReady
     ? 'ready'
