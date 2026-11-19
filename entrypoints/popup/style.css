@@ -31,9 +31,9 @@ select option {
 .hero-hover-card {
   position: fixed;
   z-index: 99999;
-  width: 19rem;
+  width: 19.5rem;
   max-width: calc(100vw - 1.5rem);
-  padding: 0.75rem;
+  padding: 0.625rem;
   border-radius: 0.75rem;
   background: #0f172a;
   color: #ffffff;

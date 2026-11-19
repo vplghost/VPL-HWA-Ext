@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.11.129 — 2026-11-20
+
+### Added
+
+- **Hero Hover Card Layout Redesign & Gear Thumbnails (`HeroHoverCard.vue`, `metadata.ts`, `style.css`)**:
+  - **Skills Threshold Highlight & Space Optimization**:
+    - Removed redundant `S1`, `S2`, `S3`, `S4` prefixes, displaying clean level values (`40`, `50`, `60`, etc.).
+    - Unified the `Skills` label and skill pills onto a single horizontal row (`flex items-center justify-between`) to save significant vertical height.
+    - Added max threshold highlight: skills that reach their maximum level cap for the hero's level are highlighted with distinct amber background and border styling (`bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-2xs font-bold ring-1 ring-amber-500/30`).
+  - **Unified Equipment Rank & Gear Slots Frame**:
+    - Merged Equipment Rank and the 6 Gear Slots into a single integrated container since the two pieces of information are directly correlated.
+    - Displays equipment rank label with its tier glow color in the frame header.
+    - Replaced generic circular dot buttons with miniature gear item icons (`img`) for each slot.
+    - Added gear rarity border colors dynamically computed from lowest rank tiers (`border-slate-400`, `border-emerald-400`, `border-sky-400`, `border-purple-400`, `border-amber-400`, `border-rose-400`).
+    - Differentiated equipped vs unequipped gear with high-contrast opacity (`opacity-100` with subtle corner dot vs `opacity-35 grayscale`).
+  - **Scrollbar Elimination & Responsive Sizing**:
+    - Realigned Skins, Glyphs, and Artifacts into compact inline flex rows.
+    - Adjusted hover card padding to `p-2.5` (`0.625rem`) and width to `19.5rem` (`312px`), completely eliminating internal scrollbar overflow even when heroes have comprehensive data.
+    - Added unit test suite in `tests/hero-hover-card.test.mjs`.
+
 ## 0.11.127 — 2026-11-20
 
 ### Added

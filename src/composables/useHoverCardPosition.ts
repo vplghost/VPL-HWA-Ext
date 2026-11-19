@@ -9,7 +9,7 @@ export function useHoverCardPosition() {
   function updatePosition() {
     if (!triggerEl || typeof window === 'undefined') return;
     const rect = triggerEl.getBoundingClientRect();
-    const cardWidth = 304; // 19rem standard card width
+    const cardWidth = 312; // 19.5rem standard card width
     const winW = window.innerWidth;
     const winH = window.innerHeight;
 
@@ -31,12 +31,12 @@ export function useHoverCardPosition() {
 
     // If space below is less than 340px and space above has more space, flip ABOVE the trigger!
     if (spaceBelow < 340 && spaceAbove > spaceBelow) {
-      const maxHeight = Math.max(180, Math.min(500, spaceAbove - 16));
+      const maxHeight = Math.max(200, Math.min(580, spaceAbove - 16));
       styleObj.bottom = `${Math.round(winH - rect.top + 6)}px`;
       styleObj.top = 'auto';
       styleObj.maxHeight = `${Math.round(maxHeight)}px`;
     } else {
-      const maxHeight = Math.max(180, Math.min(500, spaceBelow - 16));
+      const maxHeight = Math.max(200, Math.min(580, spaceBelow - 16));
       styleObj.top = `${Math.round(rect.bottom + 6)}px`;
       styleObj.bottom = 'auto';
       styleObj.maxHeight = `${Math.round(maxHeight)}px`;

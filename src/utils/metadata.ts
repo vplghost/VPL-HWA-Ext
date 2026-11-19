@@ -143,6 +143,31 @@ export function getGearCraftData(gearId: number | string) {
   return gearCraftData?.[String(gearId)] ?? null;
 }
 
+// Map each gear item to the lowest hero rank it appears in to classify its rarity tier
+export const GEAR_MIN_RANK_MAP: Record<number, number> = {};
+for (const h of Object.values(heroMetadata || {})) {
+  if (!h?.equipment) continue;
+  for (const [rankStr, gears] of Object.entries(h.equipment)) {
+    const r = Number(rankStr);
+    for (const g of gears) {
+      if (!GEAR_MIN_RANK_MAP[g] || r < GEAR_MIN_RANK_MAP[g]) {
+        GEAR_MIN_RANK_MAP[g] = r;
+      }
+    }
+  }
+}
+
+export function getGearBorderClass(gearId: number | string | null | undefined, heroRank: number = 1): string {
+  const numId = gearId ? Number(gearId) : null;
+  const rank = numId ? (GEAR_MIN_RANK_MAP[numId] ?? heroRank) : heroRank;
+  if (rank <= 1) return 'border-slate-400/80'; // White / Gray
+  if (rank <= 3) return 'border-emerald-400'; // Green
+  if (rank <= 6) return 'border-sky-400'; // Blue
+  if (rank <= 10) return 'border-purple-400'; // Purple / Violet
+  if (rank <= 15) return 'border-amber-400'; // Orange
+  return 'border-rose-400'; // Red
+}
+
 export function getBuildingName(id: number | string): string {
   return typedGetBuildingName(id) || (id ? `Building #${id}` : 'Building');
 }

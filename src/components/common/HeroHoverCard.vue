@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import UnitStars from '@/src/components/common/UnitStars.vue';
 import { computed } from 'vue';
-import { getHeroMetadata, getHeroEquipmentRank, getHeroSoulProgress, starGlowClass } from '@/src/utils/metadata';
-import { skinStats, getHeroGlyphs, getHeroName } from '@/src/data/heroMetadata';
+import {
+  getHeroMetadata,
+  getHeroEquipmentRank,
+  getHeroSoulProgress,
+  getItemName,
+  getGearBorderClass,
+  starGlowClass,
+} from '@/src/utils/metadata';
+import { skinStats, getHeroGlyphs, getHeroName, heroMetadata } from '@/src/data/heroMetadata';
 import { getHeroArtifactTierStyle } from '@/src/utils/popupData';
+import { getItemIcon } from '@/src/utils/itemResources';
 import { formatNumber } from '@/src/utils/formatters';
 import { useHoverCardPosition } from '@/src/composables/useHoverCardPosition';
 
@@ -33,6 +41,14 @@ const avatarUrl = computed(() => {
   return file;
 });
 
+function resolveItemIcon(path: string | null): string {
+  if (!path) return '';
+  if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+    return chrome.runtime.getURL(path);
+  }
+  return path;
+}
+
 const FACTION_THEMES: Record<string, { dot: string; gradient: string }> = {
   'Way of Eternity': { dot: 'bg-purple-400', gradient: 'from-purple-600 to-indigo-800' },
   'Way of Nature': { dot: 'bg-emerald-400', gradient: 'from-emerald-600 to-teal-800' },
@@ -61,14 +77,68 @@ const soulProgress = computed(() => {
   return { owned, needed, canEvolve, percent };
 });
 
+// Equipment slots (1..6) status with gear image, rarity border, and equipped opacity
+const equipmentSlots = computed(() => {
+  const heroColor = Number(props.hero?.color) || 1;
+  const gearIds = meta.value?.equipment?.[String(heroColor)] || [];
+  const slots = props.hero?.slots;
+
+  const result = [];
+  for (let i = 0; i < 6; i++) {
+    let isEquipped = false;
+    if (slots) {
+      if (Array.isArray(slots)) {
+        isEquipped = i < slots.length && slots[i] !== undefined && slots[i] !== null;
+      } else if (typeof slots === 'object') {
+        isEquipped = Object.hasOwn(slots, String(i)) || Object.hasOwn(slots, i);
+      }
+    }
+
+    const gearId = gearIds[i] ? Number(gearIds[i]) : null;
+    const itemName = gearId ? (getItemName('gear', gearId) || `Gear #${gearId}`) : `Slot ${i + 1}`;
+    const iconPath = gearId ? getItemIcon('gear', gearId) : null;
+    const iconUrl = resolveItemIcon(iconPath);
+    const borderClass = getGearBorderClass(gearId, heroColor);
+
+    result.push({
+      id: i + 1,
+      gearId,
+      itemName,
+      iconUrl,
+      borderClass,
+      isEquipped,
+    });
+  }
+  return result;
+});
+
+// Skills deltas and threshold calculation (Skill 1: 0, Skill 2: 0, Skill 3: 20, Skill 4: 40)
+const SKILL_DELTAS = [0, 0, 20, 40];
+
 const skillsList = computed(() => {
   const skills = props.hero?.skills;
   if (!skills || typeof skills !== 'object') return [];
+  const heroLevel = Number(props.hero?.level) || 1;
   const sortedKeys = Object.keys(skills).sort((a, b) => Number(a) - Number(b));
-  return sortedKeys.map((k, idx) => ({
-    label: `S${idx + 1}`,
-    level: skills[k],
-  }));
+
+  return sortedKeys.map((k, idx) => {
+    const rawLvl = Number(skills[k]) || 0;
+    const delta = SKILL_DELTAS[idx] ?? 0;
+    // Display level adjusts by delta offset (e.g. Skill 3 -20, Skill 4 -40)
+    const displayLvl = rawLvl > delta ? rawLvl - delta : rawLvl;
+    const maxLvl = Math.max(0, heroLevel - delta);
+    // Reached threshold if displayLvl reaches maxLvl or rawLvl reaches heroLevel
+    const isThreshold = maxLvl > 0 && (displayLvl >= maxLvl || rawLvl >= heroLevel);
+
+    return {
+      slot: idx + 1,
+      level: displayLvl,
+      rawLevel: rawLvl,
+      maxLevel: maxLvl,
+      isThreshold,
+      title: `Skill ${idx + 1}: Lv. ${displayLvl} / ${maxLvl}${isThreshold ? ' (MAX)' : ''}`,
+    };
+  });
 });
 
 const skinsList = computed(() => {
@@ -126,27 +196,6 @@ const artifactsList = computed(() => {
     };
   });
 });
-
-// Equipment slots (1..6) status
-const equipmentSlots = computed(() => {
-  const slots = props.hero?.slots;
-  const result: Array<{ id: number; isEquipped: boolean }> = [];
-  for (let i = 0; i < 6; i++) {
-    let isEquipped = false;
-    if (slots) {
-      if (Array.isArray(slots)) {
-        isEquipped = i < slots.length && slots[i] !== undefined && slots[i] !== null;
-      } else if (typeof slots === 'object') {
-        isEquipped = Object.hasOwn(slots, String(i)) || Object.hasOwn(slots, i);
-      }
-    }
-    result.push({
-      id: i + 1,
-      isEquipped,
-    });
-  }
-  return result;
-});
 </script>
 
 <template>
@@ -158,183 +207,207 @@ const equipmentSlots = computed(() => {
       :style="cardPositionStyle"
     >
       <!-- Header: Avatar + Identity + Star + Power -->
-    <div class="flex items-center gap-3">
-      <!-- Big Avatar with Star Glow -->
-      <div class="relative size-14 shrink-0 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center" :class="largeGlow">
-        <img
-          v-if="avatarUrl"
-          :src="avatarUrl"
-          :alt="heroName"
-          class="size-full object-cover"
-        />
-        <div
-          v-else
-          class="size-full flex items-center justify-center font-bold text-xl text-white bg-gradient-to-br"
-          :class="factionTheme.gradient"
-        >
-          {{ heroName.charAt(0).toUpperCase() }}
-        </div>
-      </div>
-
-      <!-- Info Column -->
-      <div class="min-w-0 flex-1 space-y-1">
-        <div class="flex items-center justify-between gap-1">
-          <div class="font-bold text-sm text-white truncate" :title="heroName">
-            {{ heroName }}
-          </div>
-          <span class="text-[10px] font-mono px-1 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">
-            #{{ heroId }}
-          </span>
-        </div>
-
-        <!-- Stars Display -->
-        <div class="flex items-center gap-1 text-xs">
-          <UnitStars :count="starCount" />
-        </div>
-
-        <!-- Power -->
-        <div class="text-xs text-amber-300 font-semibold tabular-nums flex items-center gap-1">
-          <span>⚡ Power:</span>
-          <span>{{ formatNumber(hero?.power || 0) }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Divider -->
-    <div class="border-t border-slate-700/80 my-2.5"></div>
-
-    <!-- Metadata Grid -->
-    <div class="grid grid-cols-2 gap-2 text-[11px]">
-      <!-- Role Box -->
-      <div class="rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Role</span>
-        <span class="font-medium text-slate-200 block truncate">
-          {{ meta?.class || 'Other' }} <template v-if="meta?.role">({{ meta.role }})</template>
-        </span>
-      </div>
-
-      <!-- Faction Box -->
-      <div class="rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Faction</span>
-        <span class="font-medium text-slate-200 flex items-center gap-1.5 truncate">
-          <span class="size-1.5 rounded-full shrink-0" :class="factionTheme.dot"></span>
-          <span class="truncate">{{ (meta?.faction || 'Unknown').replace('Way of ', '') }}</span>
-        </span>
-      </div>
-
-      <!-- Equipment Rank Box -->
-      <div v-if="equipmentRank" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between">
-        <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Equipment rank</span>
-        <span
-          class="font-bold text-xs"
-          :style="{ color: equipmentRank.color, textShadow: equipmentRank.textShadow }"
-        >
-          {{ equipmentRank.label }}
-        </span>
-      </div>
-
-      <!-- Equipment Slots Miniature Indicator -->
-      <div class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between">
-        <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Gear Slots</span>
-        <div class="flex items-center gap-1.5">
-          <span
-            v-for="s in equipmentSlots"
-            :key="s.id"
-            class="size-2 rounded-full ring-1 ring-slate-600"
-            :class="s.isEquipped ? 'bg-emerald-400 ring-emerald-500' : 'bg-slate-700'"
-            :title="`Slot ${s.id}: ${s.isEquipped ? 'Equipped' : 'Empty'}`"
-          ></span>
-        </div>
-      </div>
-
-      <!-- Soul Stones Progress -->
-      <div class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1.5 ring-1 ring-slate-700/60 space-y-1">
-        <div class="flex items-center justify-between text-[10px]">
-          <span class="text-slate-400 uppercase tracking-wider font-semibold">Soul Stones</span>
-          <span
-            class="font-mono font-semibold"
-            :class="soulProgress.canEvolve ? 'text-emerald-400' : 'text-slate-300'"
-          >
-            {{ formatNumber(soulProgress.owned) }} / {{ typeof soulProgress.needed === 'number' ? formatNumber(soulProgress.needed) : soulProgress.needed }}
-            <span v-if="soulProgress.canEvolve" class="ml-1 text-emerald-400 font-bold">✨ Ready</span>
-          </span>
-        </div>
-        <div v-if="typeof soulProgress.needed === 'number'" class="h-1.5 w-full rounded-full bg-slate-700 overflow-hidden">
+      <div class="flex items-center gap-2.5">
+        <!-- Big Avatar with Star Glow -->
+        <div class="relative size-12 shrink-0 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center" :class="largeGlow">
+          <img
+            v-if="avatarUrl"
+            :src="avatarUrl"
+            :alt="heroName"
+            class="size-full object-cover"
+          />
           <div
-            class="h-full rounded-full transition-all"
-            :class="soulProgress.canEvolve ? 'bg-emerald-400' : 'bg-blue-500'"
-            :style="{ width: `${soulProgress.percent}%` }"
-          ></div>
+            v-else
+            class="size-full flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br"
+            :class="factionTheme.gradient"
+          >
+            {{ heroName.charAt(0).toUpperCase() }}
+          </div>
+        </div>
+
+        <!-- Info Column -->
+        <div class="min-w-0 flex-1 space-y-0.5">
+          <div class="flex items-center justify-between gap-1">
+            <div class="font-bold text-xs text-white truncate" :title="heroName">
+              {{ heroName }}
+            </div>
+            <span class="text-[9px] font-mono px-1 py-0.2 rounded bg-slate-800 text-slate-400 shrink-0">
+              #{{ heroId }}
+            </span>
+          </div>
+
+          <!-- Stars Display -->
+          <div class="flex items-center gap-1 text-[11px]">
+            <UnitStars :count="starCount" />
+          </div>
+
+          <!-- Power -->
+          <div class="text-[11px] text-amber-300 font-semibold tabular-nums flex items-center gap-1">
+            <span>⚡ Power:</span>
+            <span>{{ formatNumber(hero?.power || 0) }}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Spark of Power -->
-      <div v-if="hero?.titanGiftLevel" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between">
-        <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Spark of Power</span>
-        <span class="font-semibold text-purple-300 text-xs tabular-nums">
-          Lv. {{ hero.titanGiftLevel }} / 30
-        </span>
-      </div>
+      <!-- Divider -->
+      <div class="border-t border-slate-700/80 my-2"></div>
 
-      <!-- Skills -->
-      <div v-if="skillsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Skills</span>
-        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span
-            v-for="sk in skillsList"
-            :key="sk.label"
-            class="rounded bg-slate-700/80 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300 tabular-nums"
-          >
-            {{ sk.label }}: {{ sk.level }}
+      <!-- Metadata Grid -->
+      <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+        <!-- Role Box -->
+        <div class="rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
+          <span class="text-slate-400 block text-[9px] uppercase tracking-wider font-semibold">Role</span>
+          <span class="font-medium text-slate-200 block truncate text-[11px]">
+            {{ meta?.class || 'Other' }} <template v-if="meta?.role">({{ meta.role }})</template>
           </span>
         </div>
-      </div>
 
-      <!-- Skins -->
-      <div v-if="skinsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Skins</span>
-        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span
-            v-for="(sk, idx) in skinsList"
-            :key="idx"
-            class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
-            :class="sk.isCurrent ? 'bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/50' : 'bg-slate-700/80 text-amber-300'"
-          >
-            {{ sk.stat }}: {{ sk.level }}
+        <!-- Faction Box -->
+        <div class="rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
+          <span class="text-slate-400 block text-[9px] uppercase tracking-wider font-semibold">Faction</span>
+          <span class="font-medium text-slate-200 flex items-center gap-1.5 truncate text-[11px]">
+            <span class="size-1.5 rounded-full shrink-0" :class="factionTheme.dot"></span>
+            <span class="truncate">{{ (meta?.faction || 'Unknown').replace('Way of ', '') }}</span>
           </span>
         </div>
-      </div>
 
-      <!-- Glyphs -->
-      <div v-if="glyphsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Glyphs</span>
-        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span
-            v-for="g in glyphsList"
-            :key="g.stat"
-            class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
-            :class="g.level > 0 ? 'bg-slate-700/80 text-emerald-300' : 'bg-slate-800 text-slate-500'"
-          >
-            {{ g.stat }}: {{ g.level }}
+        <!-- Unified Equipment Rank & Gear Slots Box -->
+        <div class="col-span-2 rounded-md bg-slate-800/80 px-2.5 py-1.5 ring-1 ring-slate-700/60 space-y-1.5">
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="text-slate-400 uppercase tracking-wider font-semibold">Equipment</span>
+            <span
+              v-if="equipmentRank"
+              class="font-bold text-xs"
+              :style="{ color: equipmentRank.color, textShadow: equipmentRank.textShadow }"
+            >
+              {{ equipmentRank.label }}
+            </span>
+          </div>
+
+          <!-- 6 Gear Slot Thumbnails -->
+          <div class="grid grid-cols-6 gap-1 pt-0.5">
+            <div
+              v-for="s in equipmentSlots"
+              :key="s.id"
+              class="relative aspect-square rounded-md bg-slate-900/90 flex items-center justify-center overflow-hidden border transition-all"
+              :class="[
+                s.borderClass,
+                s.isEquipped ? 'opacity-100 shadow-2xs' : 'opacity-35 grayscale',
+              ]"
+              :title="`Slot ${s.id}: ${s.itemName} (${s.isEquipped ? 'Equipped' : 'Not equipped'})`"
+            >
+              <img
+                v-if="s.iconUrl"
+                :src="s.iconUrl"
+                :alt="s.itemName"
+                class="size-full object-contain p-0.5"
+                loading="lazy"
+              />
+              <span v-else class="text-[9px] font-bold text-slate-400">
+                {{ s.id }}
+              </span>
+              <span
+                v-if="s.isEquipped"
+                class="absolute bottom-0.5 right-0.5 size-1 rounded-full bg-emerald-400 shadow-xs"
+              ></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Soul Stones Progress -->
+        <div class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 space-y-1">
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="text-slate-400 uppercase tracking-wider font-semibold">Soul Stones</span>
+            <span
+              class="font-mono font-semibold"
+              :class="soulProgress.canEvolve ? 'text-emerald-400' : 'text-slate-300'"
+            >
+              {{ formatNumber(soulProgress.owned) }} / {{ typeof soulProgress.needed === 'number' ? formatNumber(soulProgress.needed) : soulProgress.needed }}
+              <span v-if="soulProgress.canEvolve" class="ml-1 text-emerald-400 font-bold">✨ Ready</span>
+            </span>
+          </div>
+          <div v-if="typeof soulProgress.needed === 'number'" class="h-1.5 w-full rounded-full bg-slate-700 overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all"
+              :class="soulProgress.canEvolve ? 'bg-emerald-400' : 'bg-blue-500'"
+              :style="{ width: `${soulProgress.percent}%` }"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Spark of Power -->
+        <div v-if="hero?.titanGiftLevel" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between text-[10px]">
+          <span class="text-slate-400 uppercase tracking-wider font-semibold">Spark of Power</span>
+          <span class="font-semibold text-purple-300 text-xs tabular-nums">
+            Lv. {{ hero.titanGiftLevel }} / 30
           </span>
         </div>
-      </div>
 
-      <!-- Artifacts -->
-      <div v-if="artifactsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 mt-0.5">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Artifacts</span>
-        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span
-            v-for="art in artifactsList"
-            :key="art.name"
-            class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
-            :class="art.badgeClass"
-          >
-            {{ art.name }}: {{ art.star }}★ Lv.{{ art.level }}
-          </span>
+        <!-- Skills: No S1/S2/S3/S4, 1-line layout, threshold highlighted -->
+        <div v-if="skillsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Skills</span>
+          <div class="flex items-center gap-1 flex-wrap justify-end">
+            <span
+              v-for="sk in skillsList"
+              :key="sk.slot"
+              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums border transition-colors"
+              :class="
+                sk.isThreshold
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-2xs font-bold ring-1 ring-amber-500/30'
+                  : 'bg-slate-700/80 text-sky-300 border-slate-600/50'
+              "
+              :title="sk.title"
+            >
+              {{ sk.level }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Skins: inline compact layout -->
+        <div v-if="skinsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Skins</span>
+          <div class="flex items-center gap-1 flex-wrap justify-end">
+            <span
+              v-for="(sk, idx) in skinsList"
+              :key="idx"
+              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              :class="sk.isCurrent ? 'bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/50' : 'bg-slate-700/80 text-amber-300'"
+            >
+              {{ sk.stat }}: {{ sk.level }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Glyphs: inline compact layout -->
+        <div v-if="glyphsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Glyphs</span>
+          <div class="flex items-center gap-1 flex-wrap justify-end">
+            <span
+              v-for="g in glyphsList"
+              :key="g.stat"
+              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              :class="g.level > 0 ? 'bg-slate-700/80 text-emerald-300' : 'bg-slate-800 text-slate-500'"
+            >
+              {{ g.stat }}: {{ g.level }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Artifacts: inline compact layout -->
+        <div v-if="artifactsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Artifacts</span>
+          <div class="flex items-center gap-1 flex-wrap justify-end">
+            <span
+              v-for="art in artifactsList"
+              :key="art.name"
+              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              :class="art.badgeClass"
+            >
+              {{ art.name }}: {{ art.star }}★ Lv.{{ art.level }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</Teleport>
+  </Teleport>
 </template>
