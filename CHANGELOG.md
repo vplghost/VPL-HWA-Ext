@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.117 — 2026-11-19
+
+### Changed
+
+- **Battle Pass Ladder Contrast & Multi-Column Track Layout (`BattlePassModal.vue`)**:
+  - Replaced invalid `dark:bg-slate-850` background with theme-harmonized `dark:bg-slate-900/60` and `dark:border-slate-800/80` for completed milestone cards to eliminate glare and restore dark theme contrast.
+  - Refactored milestone tier ladder into a clean responsive 3-column layout (`md:grid-cols-12`):
+    - **Col 1 (Milestone & Status)**: Level badge, target points, progress status, and dedicated one-click claim action button.
+    - **Col 2 (Free Tier)**: Dedicated sub-card with free track rewards, status badge (Claimed, Ready, or Locked), and reward badges.
+    - **Col 3 (Gold Tier)**: Dedicated sub-card with golden track rewards, status badge (Claimed, Ready, Pass Required, or Locked), and reward badges.
+  - Added desktop header row separating `Milestone & Status`, `Free: Rewards Track`, and `Golden: Pass Rewards`.
+
 ## 0.11.116 — 2026-11-19
 
 ### Fixed

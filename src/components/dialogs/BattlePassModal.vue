@@ -619,25 +619,38 @@ async function copyCurrentPassData() {
 
       <!-- 4. Milestone Tiers Ladder -->
       <div class="space-y-2">
+        <!-- Desktop Column Headers -->
+        <div class="hidden md:grid grid-cols-12 gap-3 px-3 py-1.5 text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-100/70 dark:bg-slate-800/50 rounded-lg border border-slate-200/60 dark:border-slate-700/50">
+          <div class="col-span-3">Milestone & Status</div>
+          <div class="col-span-4 flex items-center gap-1">
+            <span>🆓</span>
+            <span>Free: Rewards Track</span>
+          </div>
+          <div class="col-span-5 flex items-center gap-1">
+            <span>⭐</span>
+            <span>Golden: Pass Rewards</span>
+          </div>
+        </div>
+
         <div
           v-for="tier in filteredTiers"
           :key="tier.levelId"
-          class="rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors"
+          class="rounded-xl border p-3 grid grid-cols-1 md:grid-cols-12 gap-3 items-center text-xs transition-colors"
           :class="
             tier.status === 'completed'
-              ? 'bg-slate-50/80 dark:bg-slate-850/60 border-slate-200 dark:border-slate-700/80'
+              ? 'bg-slate-50/70 border-slate-200/90 dark:bg-slate-900/60 dark:border-slate-800/80'
               : tier.status === 'ready'
-              ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 shadow-xs'
-              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+              ? 'bg-amber-50/80 border-amber-300 dark:bg-amber-950/30 dark:border-amber-700/80 shadow-xs ring-1 ring-amber-400/30'
+              : 'bg-white border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/70'
           "
         >
-          <!-- Level & Points requirement -->
-          <div class="flex items-center gap-3 min-w-0">
+          <!-- Col 1: Level, Requirement & Status -->
+          <div class="flex items-start gap-2.5 min-w-0 md:col-span-3">
             <span
               class="size-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border"
               :class="
                 tier.status === 'completed'
-                  ? 'bg-emerald-100 border-emerald-300 dark:bg-emerald-900/60 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200'
+                  ? 'bg-emerald-100 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
                   : tier.status === 'ready'
                   ? 'bg-amber-500 border-amber-500 text-white font-extrabold animate-pulse'
                   : 'bg-slate-100 border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-300'
@@ -646,104 +659,149 @@ async function copyCurrentPassData() {
               {{ tier.status === 'completed' ? '✓' : `#${tier.level}` }}
             </span>
 
-            <div class="space-y-0.5 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
+            <div class="space-y-1 min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="font-bold text-slate-900 dark:text-slate-100 text-xs">
                   Level {{ tier.level }}
                 </span>
                 <span class="rounded px-1.5 py-0.2 text-3xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
-                  🎯 Target: {{ formatNumber(tier.points) }} EXP
-                </span>
-                <span
-                  v-if="tier.status === 'ready'"
-                  class="rounded-full bg-emerald-500 text-white px-2 py-0.2 text-3xs font-bold animate-pulse"
-                >
-                  🎉 Unlocked!
-                </span>
-                <span
-                  v-else-if="!tier.isUnlocked"
-                  class="text-3xs text-slate-400 dark:text-slate-500"
-                >
-                  Need {{ formatNumber(tier.points - (currentPass?.points || 0)) }} more EXP
+                  🎯 {{ formatNumber(tier.points) }} EXP
                 </span>
               </div>
 
               <!-- Unlocked Status Info -->
-              <div class="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <div class="text-2xs text-slate-500 dark:text-slate-400">
                 <span v-if="tier.status === 'completed'" class="text-emerald-600 dark:text-emerald-400 font-medium">
-                  ✓ All rewards claimed
+                  ✓ All claimed
                 </span>
-                <span v-else-if="tier.status === 'ready'" class="text-amber-700 dark:text-amber-300 font-semibold">
-                  🎁 Ready to claim: {{ [tier.freeReady ? 'Free Reward' : null, tier.goldenReady ? 'Golden Reward' : null].filter(Boolean).join(' & ') }}
+                <span v-else-if="tier.status === 'ready'" class="text-amber-600 dark:text-amber-400 font-semibold animate-pulse">
+                  🎉 Ready to claim
                 </span>
-                <span v-else class="text-slate-400 dark:text-slate-400">
-                  🔒 Locked until {{ formatNumber(tier.points) }} EXP
+                <span v-else-if="tier.isUnlocked" class="text-blue-600 dark:text-blue-400">
+                  Unlocked
                 </span>
+                <span v-else class="text-slate-400 dark:text-slate-500">
+                  Need {{ formatNumber(tier.points - (currentPass?.points || 0)) }} EXP
+                </span>
+              </div>
+
+              <!-- Single Claim Button -->
+              <div v-if="tier.status === 'ready'" class="pt-0.5">
+                <button
+                  type="button"
+                  class="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-2xs cursor-pointer shadow-xs transition-colors flex items-center gap-1 animate-pulse"
+                  :disabled="isClaiming"
+                  @click="claimTierReward(tier)"
+                >
+                  <span>🎁</span>
+                  <span>Claim</span>
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- Rewards Breakdown & Action -->
-          <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
-            <!-- Free Track Reward -->
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-3xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Free:
+          <!-- Col 2: Free Tier Rewards -->
+          <div
+            class="rounded-lg p-2.5 border transition-colors flex flex-col justify-between gap-1.5 min-w-0 self-stretch md:col-span-4"
+            :class="
+              tier.freeReady
+                ? 'bg-emerald-50/70 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800/80 ring-1 ring-emerald-400/40'
+                : tier.freeClaimed
+                ? 'bg-slate-100/50 border-slate-200/80 dark:bg-slate-900/40 dark:border-slate-800/70'
+                : 'bg-slate-50/50 border-slate-200/60 dark:bg-slate-900/30 dark:border-slate-800/50'
+            "
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-3xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                <span>🆓</span>
+                <span>Free:</span>
               </span>
-              <div v-if="tier.freeReward.length > 0" class="flex items-center gap-1 flex-wrap">
-                <span
-                  v-for="(r, idx) in tier.freeReward"
-                  :key="idx"
-                  class="rounded px-1.5 py-0.5 text-2xs font-semibold"
-                  :class="r.badgeClass"
-                >
-                  {{ r.amount.toLocaleString() }} × {{ r.label }}
-                </span>
-              </div>
-              <span v-else class="text-2xs text-slate-400 italic">None</span>
-              <span v-if="tier.freeClaimed" class="text-3xs text-emerald-600 dark:text-emerald-400 font-bold">
-                ✓
+              <span
+                v-if="tier.freeClaimed"
+                class="text-3xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/60"
+              >
+                ✓ Claimed
+              </span>
+              <span
+                v-else-if="tier.freeReady"
+                class="text-3xs font-bold text-amber-700 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-950/80 px-1.5 py-0.2 rounded border border-amber-300 dark:border-amber-800 animate-pulse"
+              >
+                Ready
+              </span>
+              <span v-else class="text-3xs text-slate-400 dark:text-slate-500">
+                Locked
               </span>
             </div>
 
-            <!-- Golden / Premium Track Reward -->
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-3xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                ⭐ Golden:
+            <!-- Free Rewards list -->
+            <div v-if="tier.freeReward.length > 0" class="flex items-center gap-1 flex-wrap">
+              <span
+                v-for="(r, idx) in tier.freeReward"
+                :key="idx"
+                class="rounded px-1.5 py-0.5 text-2xs font-semibold"
+                :class="r.badgeClass"
+              >
+                {{ r.amount.toLocaleString() }} × {{ r.label }}
               </span>
-              <div v-if="tier.goldenReward.length > 0" class="flex items-center gap-1 flex-wrap">
-                <span
-                  v-for="(r, idx) in tier.goldenReward"
-                  :key="idx"
-                  class="rounded px-1.5 py-0.5 text-2xs font-semibold border"
-                  :class="
-                    currentPass?.hasGoldenPass
-                      ? r.badgeClass
-                      : 'bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-600 opacity-60'
-                  "
-                >
-                  {{ r.amount.toLocaleString() }} × {{ r.label }}
-                </span>
-              </div>
-              <span v-else class="text-2xs text-slate-400 italic">None</span>
-              <span v-if="tier.goldenClaimed" class="text-3xs text-emerald-600 dark:text-emerald-400 font-bold">
-                ✓
+            </div>
+            <span v-else class="text-2xs text-slate-400 dark:text-slate-500 italic">None</span>
+          </div>
+
+          <!-- Col 3: Golden Tier Rewards -->
+          <div
+            class="rounded-lg p-2.5 border transition-colors flex flex-col justify-between gap-1.5 min-w-0 self-stretch md:col-span-5"
+            :class="
+              tier.goldenReady
+                ? 'bg-amber-100/70 border-amber-400 dark:bg-amber-950/40 dark:border-amber-700 ring-1 ring-amber-400/50'
+                : tier.goldenClaimed
+                ? 'bg-slate-100/50 border-slate-200/80 dark:bg-slate-900/40 dark:border-slate-800/70'
+                : 'bg-amber-50/40 border-amber-200/50 dark:bg-amber-950/20 dark:border-amber-900/40'
+            "
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-3xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                <span>⭐</span>
+                <span>Golden:</span>
               </span>
-              <span v-else-if="!currentPass?.hasGoldenPass && tier.goldenReward.length > 0" class="text-3xs text-slate-400">
+              <span
+                v-if="tier.goldenClaimed"
+                class="text-3xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/60"
+              >
+                ✓ Claimed
+              </span>
+              <span
+                v-else-if="tier.goldenReady"
+                class="text-3xs font-bold text-amber-600 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-950/80 px-1.5 py-0.2 rounded border border-amber-300 dark:border-amber-800 animate-pulse"
+              >
+                Ready
+              </span>
+              <span
+                v-else-if="!currentPass?.hasGoldenPass && tier.goldenReward.length > 0"
+                class="text-3xs font-medium text-amber-700/80 dark:text-amber-400/80 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.2 rounded border border-amber-200/70 dark:border-amber-900/50"
+              >
                 (Pass req)
               </span>
+              <span v-else class="text-3xs text-slate-400 dark:text-slate-500">
+                Locked
+              </span>
             </div>
 
-            <!-- Single Claim Button -->
-            <button
-              v-if="tier.status === 'ready'"
-              type="button"
-              class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-2xs cursor-pointer shadow-xs transition-colors shrink-0 animate-pulse"
-              :disabled="isClaiming"
-              @click="claimTierReward(tier)"
-            >
-              Claim
-            </button>
+            <!-- Golden Rewards list -->
+            <div v-if="tier.goldenReward.length > 0" class="flex items-center gap-1 flex-wrap">
+              <span
+                v-for="(r, idx) in tier.goldenReward"
+                :key="idx"
+                class="rounded px-1.5 py-0.5 text-2xs font-semibold border"
+                :class="
+                  currentPass?.hasGoldenPass
+                    ? r.badgeClass
+                    : 'bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-600 opacity-60'
+                "
+              >
+                {{ r.amount.toLocaleString() }} × {{ r.label }}
+              </span>
+            </div>
+            <span v-else class="text-2xs text-slate-400 dark:text-slate-500 italic">None</span>
           </div>
         </div>
 
