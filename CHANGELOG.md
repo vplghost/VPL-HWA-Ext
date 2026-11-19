@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.116 — 2026-11-19
+
+### Fixed
+
+- **Guild Versus Chest Ribbon Border Clipping & Z-Index Stacking (`GuildVersusModal.vue`)**:
+  - Resolved border clipping on Quick Jump Ribbon buttons ("№ 1", "№ 2", etc.) caused by `overflow-x-auto` without vertical padding.
+  - Added vertical padding `py-1.5 px-1` to the ribbon container so button outline rings (`ring-2`) and focus indicators render cleanly without getting cut off at the container bounds.
+  - Set explicit stacking contexts with `relative z-10` on the ribbon container and elevated `z-20` on active buttons to prevent visual tucking underneath the Target progress banner above.
+  - Added clear active ring states distinguishing the active chest selection and current target chest.
+
 ## 0.11.114 — 2026-11-19
 
 ### Added

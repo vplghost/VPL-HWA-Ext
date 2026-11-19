@@ -316,7 +316,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Target progress banner -->
-            <div class="rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60">
+            <div class="rounded-lg bg-slate-50 p-2.5 text-xs space-y-1.5 border border-slate-100 dark:bg-slate-800/70 dark:border-slate-700/60 relative z-0">
               <div class="flex justify-between font-medium text-slate-700 dark:text-slate-300">
                 <span>Target: <strong class="text-amber-800 dark:text-amber-300">Chest {{ targetChestNum || '—' }}</strong> ({{ displayMetric(thresholds[targetChestNum]) }} pts)</span>
                 <span class="font-bold text-slate-900 dark:text-slate-100">
@@ -333,22 +333,22 @@ onUnmounted(() => {
             </div>
 
             <!-- Quick Jump Ribbon -->
-            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+            <div class="flex items-center gap-1.5 overflow-x-auto py-1.5 px-1 scrollbar-thin relative z-10">
               <button
                 v-for="c in 9"
                 :key="`ribbon-${c}`"
                 type="button"
-                class="px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer"
+                class="relative px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer"
                 :class="
                   activeChestNum === c && isStackMode
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100' + (c === targetChestNum ? ' ring-2 ring-amber-400' : '')
+                    ? 'z-20 bg-slate-900 text-white border-slate-900 shadow-sm dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 ring-2 ' + (c === targetChestNum ? 'ring-amber-400 dark:ring-amber-400' : 'ring-slate-900/40 dark:ring-slate-400/50')
                     : claimedChests.includes(c)
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                    ? 'z-0 bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
                     : chestReady(c)
-                    ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
+                    ? 'z-0 bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
                     : c === targetChestNum
-                    ? 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-2 ring-amber-400 font-bold hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800/60'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 dark:bg-slate-800/70 dark:text-slate-300 dark:border-slate-700'
+                    ? 'z-10 bg-indigo-50 text-indigo-900 border-indigo-300 ring-2 ring-amber-400 font-bold hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800/60'
+                    : 'z-0 bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 dark:bg-slate-800/70 dark:text-slate-300 dark:border-slate-700'
                 "
                 :title="`Chest ${c} (${displayMetric(thresholds[c])} pts)${c === targetChestNum ? ' - Target' : ''}`"
                 @click="activeChestNum = c"
