@@ -31,6 +31,7 @@ import TowerModal from '@/src/components/dialogs/TowerModal.vue';
 import DungeonModal from '@/src/components/dialogs/DungeonModal.vue';
 import QuestDetailModal from '@/src/components/dialogs/QuestDetailModal.vue';
 import EventDetailModal from '@/src/components/dialogs/EventDetailModal.vue';
+import BattlePassModal from '@/src/components/dialogs/BattlePassModal.vue';
 import GuildVersusModal from '@/src/components/dialogs/GuildVersusModal.vue';
 import GuildChatPanel from '@/src/components/common/GuildChatPanel.vue';
 
@@ -86,6 +87,7 @@ const { modalState, modalContext } = useModals();
       <MailModal v-model="modalState.mail" />
       <QuestDetailModal v-model="modalState.questDetail" :initial-filter="modalContext.selectedQuestFilter" />
       <EventDetailModal v-model="modalState.eventDetail" :initial-event-id="modalContext.selectedEventId" />
+      <BattlePassModal v-model="modalState.battlePass" :initial-pass-id="modalContext.selectedBattlePassId" />
       <GuildVersusModal v-model="modalState.guildVersus" />
       <GuildChatPanel v-model="modalState.guildChat" />
       <LogModal v-model="modalState.log" />
