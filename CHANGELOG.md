@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.11.125 — 2026-11-20
+
+### Added
+
+- **Loading States & Anti-Double-Click Visual Feedback (`HeroDetailModal.vue`)**:
+  - Implemented synchronous click locking and dedicated action tracking (`upgradingSkillAction`, `upgradingArtifactAction`, `isUpgradingAllSkills`) to prevent double-clicking and provide immediate tactile feedback.
+  - Skill Upgrade Buttons:
+    - Single skill `+1` button (`btn-upgrade-skill`) now features an animated spinner (`↻`) and active highlight ring when upgrading, disabling immediate re-clicks.
+    - Skill `+Max` button (`btn-upgrade-skill-max`) displays animated spinner (`↻`) and disable lock during execution.
+    - Max All skills button (`btn-upgrade-all-skills-max`) activates animated spinner (`↻`) and temporary lock across all skills.
+    - Video bonus claim button (`btn-claim-free-skill-points`) displays animated spinner (`↻`) and click lock.
+  - Artifact Level Up Buttons:
+    - Independent action tracking distinguishes whether `+1` single level or `+##` milestone upgrade was clicked, displaying animated spinner (`↻`) on the active button while temporarily locking both buttons with `pointer-events-none`.
+  - Equipment Slot Buttons:
+    - Craft, Equip, and Promote buttons now show animated spinners with synchronous `pointer-events-none` state to prevent duplicate RPC dispatches.
+  - Added unit test assertions in `tests/hero-skill-upgrade-max.test.mjs` and `tests/artifact-level-up.test.mjs`.
+
 ## 0.11.124 — 2026-11-20
 
 ### Added

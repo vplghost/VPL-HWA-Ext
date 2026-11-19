@@ -223,7 +223,9 @@ function getSkillProgressPercent(s: SkillSlotConfig): number {
 }
 
 const upgradingSkills = ref<Record<number, boolean>>({});
+const upgradingSkillAction = ref<Record<number, 'single' | 'max' | null>>({});
 const isUpgradingSkills = ref(false);
+const isUpgradingAllSkills = ref(false);
 
 // Available skill points and gold
 const skillPoints = computed(() => {
@@ -304,11 +306,12 @@ async function claimFreeSkillPoints() {
 }
 
 async function upgradeSkill(s: SkillSlotConfig) {
-  if (!activeHero.value || isUpgradingSkills.value) return;
+  if (!activeHero.value || isUpgradingSkills.value || upgradingSkills.value[s.slot]) return;
   const numId = Number(currentHeroId.value);
   if (skillPoints.value <= 0 || isSkillMax(s)) return;
-  upgradingSkills.value[s.slot] = true;
   isUpgradingSkills.value = true;
+  upgradingSkills.value[s.slot] = true;
+  upgradingSkillAction.value[s.slot] = 'single';
 
   // Display only server-observed skill levels, including queued/rejected RPCs.
   try {
@@ -323,18 +326,20 @@ async function upgradeSkill(s: SkillSlotConfig) {
     ]);
   } finally {
     upgradingSkills.value[s.slot] = false;
+    upgradingSkillAction.value[s.slot] = null;
     isUpgradingSkills.value = false;
   }
 }
 
 async function upgradeSkillMax(s: SkillSlotConfig) {
-  if (!activeHero.value || isUpgradingSkills.value) return;
+  if (!activeHero.value || isUpgradingSkills.value || upgradingSkills.value[s.slot]) return;
   const numId = Number(currentHeroId.value);
   const count = getSkillMaxAddable(s);
   if (count <= 0) return;
 
-  upgradingSkills.value[s.slot] = true;
   isUpgradingSkills.value = true;
+  upgradingSkills.value[s.slot] = true;
+  upgradingSkillAction.value[s.slot] = 'max';
 
   try {
     const calls: Array<{ name: string; args?: any; feature?: string }> = [];
@@ -351,12 +356,13 @@ async function upgradeSkillMax(s: SkillSlotConfig) {
     await dispatchRpc(calls);
   } finally {
     upgradingSkills.value[s.slot] = false;
+    upgradingSkillAction.value[s.slot] = null;
     isUpgradingSkills.value = false;
   }
 }
 
 async function upgradeAllSkillsMax() {
-  if (!activeHero.value || isUpgradingSkills.value) return;
+  if (!activeHero.value || isUpgradingSkills.value || isUpgradingAllSkills.value) return;
   const numId = Number(currentHeroId.value);
   let available = skillPoints.value;
   if (available <= 0) return;
@@ -380,6 +386,7 @@ async function upgradeAllSkillsMax() {
   if (calls.length === 0) return;
 
   isUpgradingSkills.value = true;
+  isUpgradingAllSkills.value = true;
   try {
     calls.push({ name: 'heroGetAll' });
     calls.push({ name: 'inventoryGet' });
@@ -387,6 +394,7 @@ async function upgradeAllSkillsMax() {
 
     await dispatchRpc(calls);
   } finally {
+    isUpgradingAllSkills.value = false;
     isUpgradingSkills.value = false;
   }
 }
@@ -398,6 +406,7 @@ const heroArtifacts = computed(() => {
 
 const isUpgradingArtifact = ref(false);
 const upgradingArtifactSlot = ref<number | null>(null);
+const upgradingArtifactAction = ref<'single' | 'milestone' | null>(null);
 
 const inventoryConsumables = computed<Record<string | number, number>>(() => {
   return cache.value?.inventoryGet?.data?.consumable || {};
@@ -441,8 +450,9 @@ async function upgradeArtifactSingle(slotId: number) {
   const artInfo = detailedArtifacts.value.find((a) => a.slotId === slotId);
   if (!artInfo || !artInfo.plan.canUpgradeOne) return;
 
-  upgradingArtifactSlot.value = slotId;
   isUpgradingArtifact.value = true;
+  upgradingArtifactSlot.value = slotId;
+  upgradingArtifactAction.value = 'single';
   try {
     const calls: Array<{ name: string; args?: any; feature?: string }> = [
       {
@@ -456,6 +466,7 @@ async function upgradeArtifactSingle(slotId: number) {
     await dispatchRpc(calls);
   } finally {
     upgradingArtifactSlot.value = null;
+    upgradingArtifactAction.value = null;
     isUpgradingArtifact.value = false;
   }
 }
@@ -471,8 +482,9 @@ async function upgradeArtifactToMilestone(slotId: number) {
   const toAdd = Math.min(artInfo.plan.levelsDelta, artInfo.plan.affordableLevels);
   if (toAdd <= 0) return;
 
-  upgradingArtifactSlot.value = slotId;
   isUpgradingArtifact.value = true;
+  upgradingArtifactSlot.value = slotId;
+  upgradingArtifactAction.value = 'milestone';
   try {
     const calls: Array<{ name: string; args?: any; feature?: string }> = [];
     for (let i = 0; i < toAdd; i++) {
@@ -488,6 +500,7 @@ async function upgradeArtifactToMilestone(slotId: number) {
     await dispatchRpc(calls);
   } finally {
     upgradingArtifactSlot.value = null;
+    upgradingArtifactAction.value = null;
     isUpgradingArtifact.value = false;
   }
 }
@@ -914,12 +927,13 @@ function handleHeroFarmAll() {
                   type="button"
                   id="claim-free-skill-points-btn"
                   :disabled="isClaimingFreeSkillPoints || isUpgradingSkills || skillPoints >= 10"
-                  class="btn-claim-free-skill-points inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="
+                  class="btn-claim-free-skill-points inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed select-none"
+                  :class="[
                     skillPoints < 10 && !isClaimingFreeSkillPoints && !isUpgradingSkills
                       ? 'bg-amber-400 hover:bg-amber-300 text-amber-950 ring-1 ring-amber-500/50 animate-pulse hover:animate-none'
-                      : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
-                  "
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400',
+                    isClaimingFreeSkillPoints || isUpgradingSkills ? 'pointer-events-none' : ''
+                  ]"
                   :title="
                     skillPoints >= 10
                       ? 'Skill points are full (10/10). Spend points before claiming.'
@@ -928,7 +942,7 @@ function handleHeroFarmAll() {
                   aria-label="Claim free skill points"
                   @click="claimFreeSkillPoints"
                 >
-                  <span v-if="isClaimingFreeSkillPoints" class="text-3xs">⏳</span>
+                  <span v-if="isClaimingFreeSkillPoints" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
                   <span v-else>🎬</span>
                   <span>+10 Free</span>
                 </button>
@@ -936,12 +950,14 @@ function handleHeroFarmAll() {
                   type="button"
                   id="upgrade-all-skills-max-btn"
                   :disabled="isUpgradingSkills || totalSkillMaxAddable <= 0"
-                  class="btn-upgrade-all-skills-max inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                  :class="
+                  class="btn-upgrade-all-skills-max inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed select-none"
+                  :class="[
                     totalSkillMaxAddable > 0 && !isUpgradingSkills
                       ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
-                  "
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500',
+                    isUpgradingSkills ? 'pointer-events-none' : '',
+                    isUpgradingAllSkills ? 'ring-2 ring-emerald-400' : ''
+                  ]"
                   :title="
                     totalSkillPointsNeeded <= 0
                       ? 'All unlocked skills are at max level'
@@ -951,7 +967,7 @@ function handleHeroFarmAll() {
                   "
                   @click="upgradeAllSkillsMax"
                 >
-                  <span v-if="isUpgradingSkills" class="text-3xs">⏳</span>
+                  <span v-if="isUpgradingAllSkills" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
                   <span v-else>⚡</span>
                   <span>Max All</span>
                   <span
@@ -1014,8 +1030,12 @@ function handleHeroFarmAll() {
                     <template v-else>
                       <button
                         type="button"
-                        :disabled="isUpgradingSkills || getSkillMaxAddable(s) <= 0"
-                        class="btn-upgrade-skill-max inline-flex items-center justify-center px-1.5 h-6 rounded-md text-2xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-300 dark:ring-emerald-700/60 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                        :disabled="isUpgradingSkills || upgradingSkills[s.slot] || getSkillMaxAddable(s) <= 0"
+                        class="btn-upgrade-skill-max inline-flex items-center justify-center px-1.5 h-6 rounded-md text-2xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-300 dark:ring-emerald-700/60 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed select-none"
+                        :class="{
+                          'pointer-events-none': isUpgradingSkills || upgradingSkills[s.slot],
+                          'ring-2 ring-emerald-500 dark:ring-emerald-400': upgradingSkills[s.slot] && upgradingSkillAction[s.slot] === 'max'
+                        }"
                         :title="
                           getSkillMaxAddable(s) <= 0
                             ? 'No skill points available'
@@ -1024,13 +1044,17 @@ function handleHeroFarmAll() {
                         :aria-label="`Max upgrade ${meta?.skills?.[s.slot - 1] || s.label}`"
                         @click="upgradeSkillMax(s)"
                       >
-                        <span v-if="upgradingSkills[s.slot]" class="text-3xs">⏳</span>
+                        <span v-if="upgradingSkills[s.slot] && upgradingSkillAction[s.slot] === 'max'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
                         <span v-else>+{{ getSkillMaxAddable(s) > 1 ? getSkillMaxAddable(s) : 'Max' }}</span>
                       </button>
                       <button
                         type="button"
-                        :disabled="isUpgradingSkills || skillPoints <= 0"
-                        class="btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="isUpgradingSkills || upgradingSkills[s.slot] || skillPoints <= 0"
+                        class="btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed select-none"
+                        :class="{
+                          'pointer-events-none': isUpgradingSkills || upgradingSkills[s.slot],
+                          'ring-2 ring-emerald-300 dark:ring-emerald-500': upgradingSkills[s.slot] && upgradingSkillAction[s.slot] === 'single'
+                        }"
                         :title="
                           skillPoints <= 0
                             ? 'No skill points available'
@@ -1039,7 +1063,8 @@ function handleHeroFarmAll() {
                         :aria-label="`Upgrade ${meta?.skills?.[s.slot - 1] || s.label}`"
                         @click="upgradeSkill(s)"
                       >
-                        <svg class="size-3.5 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <span v-if="upgradingSkills[s.slot] && upgradingSkillAction[s.slot] === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                        <svg v-else class="size-3.5 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <path d="M12 5v14M5 12h14" />
                         </svg>
                       </button>
@@ -1166,16 +1191,18 @@ function handleHeroFarmAll() {
                   <button
                     type="button"
                     :disabled="isUpgradingArtifact || !art.plan.canUpgradeOne"
-                    class="py-1 px-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
-                    :class="
+                    class="py-1 px-1.5 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95"
+                    :class="[
                       art.plan.canUpgradeOne
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700 dark:border-emerald-500'
-                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'
-                    "
+                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700',
+                      isUpgradingArtifact ? 'pointer-events-none' : '',
+                      upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'single' ? 'ring-2 ring-emerald-400 opacity-90' : ''
+                    ]"
                     :title="`Upgrade +1 Level. Cost: ${art.plan.costForNextOne} ${art.plan.shortName} (Owned: ${art.plan.ownedAmount})`"
                     @click="upgradeArtifactSingle(art.slotId)"
                   >
-                    <span v-if="upgradingArtifactSlot === art.slotId && isUpgradingArtifact" class="animate-spin text-3xs">↻</span>
+                    <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
                     <span v-else>+1</span>
                     <span class="text-3xs font-normal opacity-85">({{ art.plan.costForNextOne }})</span>
                   </button>
@@ -1184,16 +1211,18 @@ function handleHeroFarmAll() {
                   <button
                     type="button"
                     :disabled="isUpgradingArtifact || !art.plan.canUpgradeMilestone"
-                    class="py-1 px-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
-                    :class="
+                    class="py-1 px-1.5 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95"
+                    :class="[
                       art.plan.canUpgradeMilestone
                         ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-700 dark:border-amber-500'
-                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'
-                    "
+                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700',
+                      isUpgradingArtifact ? 'pointer-events-none' : '',
+                      upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'milestone' ? 'ring-2 ring-amber-400 opacity-90' : ''
+                    ]"
                     :title="`Upgrade to Lv. ${art.plan.targetLevel} (${art.plan.levelsDelta > 1 ? '+' + art.plan.levelsDelta : '+1'} levels). Cost: ${art.plan.totalCost} ${art.plan.shortName} (Affordable: +${art.plan.affordableLevels})`"
                     @click="upgradeArtifactToMilestone(art.slotId)"
                   >
-                    <span v-if="upgradingArtifactSlot === art.slotId && isUpgradingArtifact" class="animate-spin text-3xs">↻</span>
+                    <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'milestone'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
                     <span v-else>+{{ art.plan.levelsDelta }}</span>
                     <span class="text-3xs font-normal opacity-85">({{ art.plan.totalCost }})</span>
                   </button>
@@ -1224,11 +1253,15 @@ function handleHeroFarmAll() {
                   id="hero-promote-btn"
                   type="button"
                   :disabled="isPromoting"
-                  class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5 animate-pulse disabled:opacity-50"
+                  class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 select-none active:scale-95"
+                  :class="[
+                    isPromoting ? 'pointer-events-none' : 'animate-pulse'
+                  ]"
                   :title="`All 6 equipment slots equipped! Promote to ${nextRank?.name || 'Next Rank'}`"
                   @click="handlePromote"
                 >
-                  <span>⬆️</span>
+                  <span v-if="isPromoting" class="animate-spin text-xs inline-block">↻</span>
+                  <span v-else>⬆️</span>
                   <span>{{ isPromoting ? 'Promoting...' : `Promote to ${nextRank?.name || 'Next Rank'}` }}</span>
                 </button>
                 <button
@@ -1263,10 +1296,12 @@ function handleHeroFarmAll() {
               <button
                 type="button"
                 :disabled="isPromoting"
-                class="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all disabled:opacity-50 shrink-0"
+                class="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shadow-xs transition-all disabled:opacity-50 shrink-0 select-none active:scale-95 flex items-center gap-1"
+                :class="{ 'pointer-events-none': isPromoting }"
                 @click="handlePromote"
               >
-                {{ isPromoting ? 'Promoting...' : 'Promote Now' }}
+                <span v-if="isPromoting" class="animate-spin text-xs inline-block">↻</span>
+                <span>{{ isPromoting ? 'Promoting...' : 'Promote Now' }}</span>
               </button>
             </div>
 
@@ -1351,19 +1386,23 @@ function handleHeroFarmAll() {
                     v-if="slot.canCraftNow"
                     type="button"
                     :disabled="isCrafting[slot.slotNum]"
-                    class="px-2 py-0.5 rounded text-3xs font-bold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer shadow-xs shrink-0 disabled:opacity-50"
+                    class="px-2 py-0.5 rounded text-3xs font-bold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer shadow-xs shrink-0 disabled:opacity-50 select-none flex items-center gap-1 active:scale-95"
+                    :class="{ 'pointer-events-none': isCrafting[slot.slotNum] }"
                     @click.stop="handleCraft(slot)"
                   >
-                    {{ isCrafting[slot.slotNum] ? '...' : 'Craft' }}
+                    <span v-if="isCrafting[slot.slotNum]" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                    <span>{{ isCrafting[slot.slotNum] ? 'Crafting' : 'Craft' }}</span>
                   </button>
                   <button
                     v-else-if="slot.statusKind === 'inventory'"
                     type="button"
                     :disabled="isEquipping[slot.slotNum]"
-                    class="px-2 py-0.5 rounded text-3xs font-bold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer shadow-xs shrink-0 disabled:opacity-50"
+                    class="px-2 py-0.5 rounded text-3xs font-bold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer shadow-xs shrink-0 disabled:opacity-50 select-none flex items-center gap-1 active:scale-95"
+                    :class="{ 'pointer-events-none': isEquipping[slot.slotNum] }"
                     @click.stop="handleEquip(slot)"
                   >
-                    {{ isEquipping[slot.slotNum] ? '...' : 'Equip' }}
+                    <span v-if="isEquipping[slot.slotNum]" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                    <span>{{ isEquipping[slot.slotNum] ? 'Equipping' : 'Equip' }}</span>
                   </button>
                 </div>
               </div>

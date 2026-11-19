@@ -16,7 +16,10 @@ test('HeroDetailModal.vue implements Max All and per-skill Max upgrade with batc
 
   // Verify UI blocking flag to prevent duplicate calls
   assert.ok(modalContent.includes('isUpgradingSkills'), 'HeroDetailModal must track isUpgradingSkills');
+  assert.ok(modalContent.includes('upgradingSkillAction'), 'HeroDetailModal must track upgradingSkillAction');
+  assert.ok(modalContent.includes('isUpgradingAllSkills'), 'HeroDetailModal must track isUpgradingAllSkills');
   assert.ok(modalContent.includes(':disabled="isUpgradingSkills'), 'Upgrade buttons must be disabled when isUpgradingSkills is true');
+  assert.ok(modalContent.includes('pointer-events-none'), 'Upgrade buttons must disable pointer events while pending to prevent double-click');
 
   // Verify batch RPC construction
   assert.ok(modalContent.includes("name: 'heroUpgradeSkill'"), 'Must call heroUpgradeSkill');

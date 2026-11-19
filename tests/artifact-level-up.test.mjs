@@ -194,9 +194,11 @@ test('HeroDetailModal template includes artifact leveling buttons (+1 and +##)',
   assert.match(content, /detailedArtifacts/, 'Must compute detailedArtifacts');
   assert.match(content, /upgradeArtifactSingle/, 'Must define upgradeArtifactSingle');
   assert.match(content, /upgradeArtifactToMilestone/, 'Must define upgradeArtifactToMilestone');
+  assert.match(content, /upgradingArtifactAction/, 'Must track upgradingArtifactAction');
   assert.match(content, /artifact_levelUp/, 'Must dispatch artifact_levelUp RPC');
   assert.match(content, /\+1<\/span>/, 'Must display +1 button');
   assert.match(content, /\+\{\{\s*art\.plan\.levelsDelta\s*\}\}<\/span>/, 'Must display +## button to milestone');
   assert.match(content, /art\.plan\.costForNextOne/, 'Must display cost for +1 in button text');
   assert.match(content, /art\.plan\.totalCost/, 'Must display total cost for milestone in button text');
+  assert.match(content, /pointer-events-none/, 'Must disable pointer events during artifact upgrade to prevent double-click');
 });
