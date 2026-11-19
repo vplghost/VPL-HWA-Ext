@@ -81,30 +81,6 @@ const autoSettings = ref<AutoGatherSettings>({
   optimizeTeam: false,
 });
 
-watch(
-  [() => autoSettings.value.mineType, () => autoSettings.value.mineLevel, () => foundMines.value],
-  ([type, level, mines]) => {
-    const normType = type === 'rotate' ? 'food' : type;
-    const normLevel = level === 'nearest' ? 10 : Number(level) || 10;
-    const firstMine = Array.isArray(mines) && mines.length > 0 ? mines[0] : null;
-    const remaining =
-      firstMine?.resourceAmount ??
-      firstMine?.resourcesAmount ??
-      firstMine?.amount ??
-      cache.value.mineMap?.[firstMine?.mineId]?.resourceAmount ??
-      cache.value.mineMap?.[firstMine?.mineId]?.resourcesAmount;
-
-    setGatherContext({
-      mineType: normType,
-      mineLevel: normLevel,
-      resourceAmount: remaining,
-      resourcesAmount: remaining,
-      targetMine: firstMine,
-    });
-  },
-  { immediate: true }
-);
-
 // Manual search
 const manualMineType = ref<'food' | 'wood' | 'stone' | 'iron'>('food');
 const manualMineLevel = ref<number>(10);
@@ -240,6 +216,30 @@ const foundMines = computed(() => {
   if (expectedConfig && search.mineConfigId !== expectedConfig) return [];
   return search.mines;
 });
+
+watch(
+  [() => autoSettings.value.mineType, () => autoSettings.value.mineLevel, () => foundMines.value],
+  ([type, level, mines]) => {
+    const normType = type === 'rotate' ? 'food' : type;
+    const normLevel = level === 'nearest' ? 10 : Number(level) || 10;
+    const firstMine = Array.isArray(mines) && mines.length > 0 ? mines[0] : null;
+    const remaining =
+      firstMine?.resourceAmount ??
+      firstMine?.resourcesAmount ??
+      firstMine?.amount ??
+      cache.value.mineMap?.[firstMine?.mineId]?.resourceAmount ??
+      cache.value.mineMap?.[firstMine?.mineId]?.resourcesAmount;
+
+    setGatherContext({
+      mineType: normType,
+      mineLevel: normLevel,
+      resourceAmount: remaining,
+      resourcesAmount: remaining,
+      targetMine: firstMine,
+    });
+  },
+  { immediate: true }
+);
 
 async function handleManualSearch() {
   await ensureRpcEnabled();

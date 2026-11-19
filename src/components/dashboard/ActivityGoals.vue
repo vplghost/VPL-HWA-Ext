@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { expeditionActivity } from '@/src/utils/expeditions';
 import { useNow } from '@/src/composables/useNow';
 import '@/src/utils/metadata';
-import { towerActivityState, arenaActivityState, dungeonActivityState, observedToday, readyQuestCount } from '@/src/composables/activityState';
+import { towerActivityState, arenaActivityState, dungeonActivityState, guildVersusActivityState, observedToday, readyQuestCount } from '@/src/composables/activityState';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import { dailyQuests } from '@/src/data/questData';
@@ -59,6 +59,15 @@ const activities = computed<ActivityRow[]>(() => {
     detail: !knownTries ? unknown : `${hydra.tries ?? 0} regular · ${hydra.superTries ?? 0} super tries left`,
   });
 
+  // Guild Versus
+  rows.push({
+    id: 'guildVersus',
+    title: 'Guild Versus',
+    icon: '🏆',
+    ...guildVersusActivityState(cache.value, now.value),
+    isInteractive: true,
+  });
+
   // Daily Quests
   const questEntry = cache.value.questGetAll ?? cache.value.quest_getAll;
   const questsKnown = observedToday(questEntry, now.value, cache.value.questResetStatus?.data?.nextDayAt);
@@ -83,6 +92,7 @@ function handleActivityClick(act: ActivityRow) {
   else if (act.id === 'dungeon') openModal('dungeon');
   else if (act.id === 'expeditions') openModal('expeditions');
   else if (act.id === 'quests') openModal('questDetail');
+  else if (act.id === 'guildVersus') openModal('guildVersus');
 }
 </script>
 

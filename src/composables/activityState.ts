@@ -1,6 +1,8 @@
 import { TOWER_FLOOR_COUNT } from '../utils/towerRules.ts';
 import { normalizeArray } from '../utils/troops.ts';
 import { titanMetadata } from '../data/titanMetadata.ts';
+import { guildVersusView } from '../utils/guildVersusView.ts';
+import { clanVersusChestThresholds } from '../data/clanVersusData.ts';
 
 export function observedToday(entry: any, now = Date.now(), nextReset?: number): boolean {
   const time = new Date(entry?.updatedAt).getTime();
@@ -89,4 +91,61 @@ export function dungeonActivityState(cache: Record<string, any>, now = Date.now(
 export function readyQuestCount(cache: Record<string, any>) {
   const quests = cache.questGetAll?.data ?? cache.quest_getAll?.data;
   return quests && typeof quests === 'object' ? Object.values(quests).filter((quest: any) => Number(quest?.state) === 2).length : 0;
+}
+
+export function guildVersusActivityState(cache: Record<string, any>, now = Date.now()) {
+  const entry = cache.clanVersusStatus;
+  if (!entry || !entry.data) {
+    return { state: 'unknown' as const, detail: 'Waiting for game data' };
+  }
+  const view = guildVersusView(cache, now);
+  if (view.stale) {
+    return {
+      state: 'info' as const,
+      detail: view.league && view.league !== '—' ? `${view.league} League · Awaiting next round` : 'Awaiting next round',
+    };
+  }
+
+  const score = view.personalRoundPoints;
+  const claimed = view.claimed;
+  const isEligible = view.personalEligible === true && view.guildEligible === true;
+
+  let readyCount = 0;
+  for (let c = 1; c <= 9; c++) {
+    if (!claimed.includes(c)) {
+      const target = clanVersusChestThresholds[c];
+      if (view.claimsKnown && isEligible && score != null && target != null && score >= target) {
+        readyCount++;
+      }
+    }
+  }
+
+  const claimedCount = view.claimedCount ?? 0;
+  const progress = Math.min(100, Math.round((claimedCount / 9) * 100));
+
+  if (readyCount > 0) {
+    return {
+      state: 'pending' as const,
+      detail: `${readyCount} chest${readyCount > 1 ? 's' : ''} ready to claim · ${claimedCount}/9 claimed`,
+      progress,
+    };
+  }
+
+  if (claimedCount >= 9) {
+    return {
+      state: 'done' as const,
+      detail: `All 9 chests claimed · Round ${view.roundNumber ?? 1}`,
+      progress: 100,
+    };
+  }
+
+  const roundStr = view.roundNumber != null ? `Round ${view.roundNumber}` : '';
+  const scoreStr = score != null ? `${score.toLocaleString()} pts` : '';
+  const ptsDetail = [roundStr, scoreStr, `${claimedCount}/9 chests`].filter(Boolean).join(' · ');
+
+  return {
+    state: (score != null && score > 0 ? 'info' : 'pending') as 'info' | 'pending',
+    detail: ptsDetail || `${claimedCount}/9 chests claimed`,
+    progress,
+  };
 }

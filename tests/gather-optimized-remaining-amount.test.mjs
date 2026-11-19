@@ -160,3 +160,16 @@ test('resumePlan preserves probed resourceAmount on resume target mine', () => {
   assert.equal(plan.mine.resourceAmount, 185000);
   assert.equal(plan.mine.resourcesAmount, 185000);
 });
+
+test('GatheringModal declares foundMines before immediate watcher to prevent TDZ ReferenceError', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const path = (await import('node:path')).resolve('src/components/dialogs/GatheringModal.vue');
+  const code = await readFile(path, 'utf8');
+
+  const declIdx = code.indexOf('const foundMines = computed');
+  const watchIdx = code.indexOf('watch(\n  [() => autoSettings.value.mineType, () => autoSettings.value.mineLevel, () => foundMines.value]');
+
+  assert.ok(declIdx > -1, 'foundMines declaration must exist');
+  assert.ok(watchIdx > -1, 'foundMines watcher must exist');
+  assert.ok(declIdx < watchIdx, 'foundMines must be declared before watcher to prevent ReferenceError TDZ');
+});
