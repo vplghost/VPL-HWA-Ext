@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.123 — 2026-11-20
+
+### Fixed
+
+- **Fix Hero Artifact SlotId Indexing & Level Up Cache Reduction (`HeroDetailModal.vue`, `artifactHelper.ts`, `rpcCache.ts`)**:
+  - Corrected artifact slot indexing in game RPC protocol to 0-based (`slotId: 0` for Weapon, `slotId: 1` for Book, `slotId: 2` for Ring).
+  - Fixed `HeroDetailModal.vue` which previously sent 1-based `slotId` causing Weapon upgrades to request Book resources (`consumable #34`) and fail with `NotEnough`.
+  - Updated `rpcCache.ts` reducer to directly access artifact slots using 0-based `slotId` and correctly deduce consumable essences/scrolls/metals.
+  - Added unit test validation against live game tracking record `hwa-game-record-202611200026_hero_weapon_raise.json`.
+
 ## 0.11.122 — 2026-11-20
 
 ### Added

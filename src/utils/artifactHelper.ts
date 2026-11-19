@@ -1,7 +1,7 @@
 /**
  * Helper utilities for Hero Artifacts leveling, costs, and resource milestones.
  * In Hero Wars Alliance:
- * - 3 artifact slots: Slot 1 (Weapon), Slot 2 (Book), Slot 3 (Ring).
+ * - 3 artifact slots (0-indexed in game RPC): Slot 0 (Weapon), Slot 1 (Book), Slot 2 (Ring).
  * - Maximum Level: 100.
  * - Resource Tiers & Transitions (milestones):
  *   - Lvl 1 - 25: White tier (Milestone 25)
@@ -51,16 +51,16 @@ export interface ArtifactUpgradePlan {
 export const ARTIFACT_MILESTONES = [25, 50, 70, 85, 100] as const;
 
 export function getArtifactSlotId(slotOrType: number | string): number {
-  if (slotOrType === 1 || slotOrType === '1' || slotOrType === 'weapon') return 1;
-  if (slotOrType === 2 || slotOrType === '2' || slotOrType === 'book') return 2;
-  if (slotOrType === 3 || slotOrType === '3' || slotOrType === 'ring') return 3;
-  return 1;
+  if (slotOrType === 0 || slotOrType === '0' || slotOrType === 'weapon') return 0;
+  if (slotOrType === 1 || slotOrType === '1' || slotOrType === 'book') return 1;
+  if (slotOrType === 2 || slotOrType === '2' || slotOrType === 'ring' || slotOrType === 3 || slotOrType === '3') return 2;
+  return 0;
 }
 
 export function getArtifactSlotType(slotOrType: number | string): ArtifactSlotType {
   const id = getArtifactSlotId(slotOrType);
-  if (id === 1) return 'weapon';
-  if (id === 2) return 'book';
+  if (id === 0) return 'weapon';
+  if (id === 1) return 'book';
   return 'ring';
 }
 

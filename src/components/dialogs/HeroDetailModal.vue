@@ -415,8 +415,8 @@ export interface ArtifactSlotInfo {
 const detailedArtifacts = computed<ArtifactSlotInfo[]>(() => {
   const list = heroArtifacts.value;
   return list.map((art: any, idx: number) => {
-    const slotId = idx + 1;
-    const type = art.artifactType || (slotId === 1 ? 'weapon' : slotId === 2 ? 'book' : 'ring');
+    const slotId = idx;
+    const type = art.artifactType || (slotId === 0 ? 'weapon' : slotId === 1 ? 'book' : 'ring');
     const level = Number(art.level) || 1;
     const star = Number(art.star) || 1;
     const plan = getArtifactUpgradePlan(type, level, inventoryConsumables.value);
@@ -1109,7 +1109,7 @@ function handleHeroFarmAll() {
                 <div>
                   <div class="flex items-center justify-between gap-1.5 mb-1">
                     <span class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 text-xs">
-                      <span>{{ art.slotId === 1 ? '⚔️' : art.slotId === 2 ? '📖' : '💍' }}</span>
+                      <span>{{ art.slotId === 0 ? '⚔️' : art.slotId === 1 ? '📖' : '💍' }}</span>
                       <span>{{ art.name }}</span>
                     </span>
                     <span class="text-3xs text-amber-500 tracking-tighter">

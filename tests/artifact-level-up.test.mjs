@@ -17,13 +17,13 @@ import { rpcCacheService } from '../src/core/cache/index.ts';
 const root = resolve(import.meta.dirname, '..');
 
 test('artifactHelper calculates correct milestones, resource transitions, and costs', () => {
-  // 1. Slot mapping
-  assert.equal(getArtifactSlotId('weapon'), 1);
-  assert.equal(getArtifactSlotId('book'), 2);
-  assert.equal(getArtifactSlotId('ring'), 3);
-  assert.equal(getArtifactSlotType(1), 'weapon');
-  assert.equal(getArtifactSlotType(2), 'book');
-  assert.equal(getArtifactSlotType(3), 'ring');
+  // 1. Slot mapping (0-indexed in game RPC: 0: weapon, 1: book, 2: ring)
+  assert.equal(getArtifactSlotId('weapon'), 0);
+  assert.equal(getArtifactSlotId('book'), 1);
+  assert.equal(getArtifactSlotId('ring'), 2);
+  assert.equal(getArtifactSlotType(0), 'weapon');
+  assert.equal(getArtifactSlotType(1), 'book');
+  assert.equal(getArtifactSlotType(2), 'ring');
 
   // 2. Next Milestone thresholds
   assert.equal(getArtifactNextMilestone(1), 25);
@@ -137,19 +137,54 @@ test('rpcCache accurately extracts and merges artifact_levelUp from game trackin
   const merged = rpcCacheService.merge(initialCache, rpcRecords);
   const cache = merged.cache;
 
-  // Hero 501 had 6 weapon level-ups (13 -> 19) and 3 book level-ups (17 -> 20)
+  // In hwa-game-record-202611192352:
+  // slotId: 1 (book) upgraded 6 times (17 -> 23)
+  // slotId: 2 (ring) upgraded 3 times (18 -> 21)
+  // slotId: 0 (weapon) was not upgraded in that file
   const hero501 = cache.heroGetAll.data['501'];
   assert.ok(hero501, 'Hero 501 must exist in cache');
-  assert.equal(hero501.artifacts[0].level, 19, 'Weapon level should be 19 (13 + 6)');
-  assert.equal(hero501.artifacts[1].level, 20, 'Book level should be 20 (17 + 3)');
-  assert.equal(hero501.artifacts[2].level, 18, 'Ring level should remain 18');
+  assert.equal(hero501.artifacts[0].level, 13, 'Weapon level should remain 13');
+  assert.equal(hero501.artifacts[1].level, 23, 'Book level should be 23 (17 + 6)');
+  assert.equal(hero501.artifacts[2].level, 21, 'Ring level should be 21 (18 + 3)');
 
-  // Verify consumable resources were deducted
-  // Weapon 13->19: costs for 14(27), 15(29), 16(31), 17(33), 18(35), 19(37) = 192 total
-  assert.equal(cache.inventoryGet.data.consumable[29], 300 - 192);
+  // Verify consumable resources were deducted:
+  // Book 17->23: costs for 18(35), 19(37), 20(39), 21(41), 22(43), 23(45) = 240 total item 34
+  assert.equal(cache.inventoryGet.data.consumable[34], 300 - 240);
 
-  // Book 17->20: costs for 18(35), 19(37), 20(39) = 111 total
-  assert.equal(cache.inventoryGet.data.consumable[34], 300 - 111);
+  // Now test weapon level up with slotId: 0 from hwa-game-record-202611200026_hero_weapon_raise.json
+  const weaponRecordPath = join(root, 'temp/tracking-data/hwa-game-record-202611200026_hero_weapon_raise.json');
+  const weaponRaw = await readFile(weaponRecordPath, 'utf8');
+  const weaponRecordData = JSON.parse(weaponRaw);
+  const weaponRpcRecords = (weaponRecordData.timeline || []).filter(item => item.transport === 'fetch' && item.endpoint.includes('/api/rpc'));
+
+  const weaponInitialCache = {
+    heroGetAll: {
+      data: {
+        502: {
+          id: 502,
+          artifacts: [
+            { artifactType: 'weapon', level: 1, star: 1 },
+            { artifactType: 'book', level: 1, star: 1 },
+            { artifactType: 'ring', level: 1, star: 1 }
+          ]
+        }
+      }
+    },
+    inventoryGet: {
+      data: {
+        consumable: {
+          29: 50
+        }
+      }
+    }
+  };
+
+  const weaponMerged = rpcCacheService.merge(weaponInitialCache, weaponRpcRecords);
+  const hero502 = weaponMerged.cache.heroGetAll.data['502'];
+  assert.ok(hero502, 'Hero 502 must exist in cache');
+  assert.equal(hero502.artifacts[0].level, 2, 'Weapon (slotId: 0) should level up from 1 to 2');
+  // Cost 1->2 is 2 * 2 - 1 = 3
+  assert.equal(weaponMerged.cache.inventoryGet.data.consumable[29], 50 - 3);
 });
 
 test('HeroDetailModal template includes artifact leveling buttons (+1 and +##)', async () => {

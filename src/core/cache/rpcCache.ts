@@ -4178,18 +4178,18 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           const seen = next.resourceActionHistory?.data || {};
           if (seen[entry.data.token] || !entry.data.heroId) continue;
           const heroId = String(entry.data.heroId);
-          const slotId = Number(entry.data.slotId || 1);
+          const slotId = Number(entry.data.slotId ?? 0);
           const heroSnap = next.heroGetAll?.data?.[heroId];
           if (heroSnap && Array.isArray(heroSnap.artifacts)) {
             const artifacts = heroSnap.artifacts.map((a: any, idx: number) => {
-              if (idx === slotId - 1) {
+              if (idx === slotId) {
                 return { ...a, level: (Number(a.level) || 1) + 1 };
               }
               return { ...a };
             });
 
-            const currentLvl = Number(heroSnap.artifacts[slotId - 1]?.level) || 1;
-            const artType = heroSnap.artifacts[slotId - 1]?.artifactType || (slotId === 1 ? 'weapon' : slotId === 2 ? 'book' : 'ring');
+            const currentLvl = Number(heroSnap.artifacts[slotId]?.level) || 1;
+            const artType = heroSnap.artifacts[slotId]?.artifactType || (slotId === 0 ? 'weapon' : slotId === 1 ? 'book' : 'ring');
             const resInfo = getArtifactResourceInfo(artType, currentLvl);
             const cost = getArtifactLevelUpCost(currentLvl);
 
