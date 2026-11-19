@@ -66,7 +66,7 @@ export const INCOME_SOURCES: Record<string, IncomeSourceMeta> = {
     key: 'tower',
     label: 'Tower',
     icon: '🗼',
-    description: 'Tower floor clears and reward chests',
+    description: 'Tower floor clears, battles, and reward chests',
   },
   dungeon: {
     key: 'dungeon',
@@ -406,21 +406,83 @@ export function aggregateIncomeByDate(cache: Record<string, any> = {}, now: numb
     }
   }
 
-  // 8. Tower (magicTower_openChest and towerAction rewards)
-  const towerEntries = [
-    cache?.towerAction,
-    ...(Array.isArray(cache?.towerHistory?.data) ? cache.towerHistory.data : []),
-  ];
+  // 8. Tower (magicTower_openChest, magicTower_endBattle, towerSession history, towerAction rewards)
+  const towerEntries: any[] = [];
+  const seenTowerKeys = new Set<string>();
+
+  const addTowerEntry = (entry: any, defaultAction = 'towerAction') => {
+    if (!entry) return;
+    const timeVal = entry.updatedAt || entry.at;
+    const reward = entry.data?.reward ?? entry.reward;
+    if (!timeVal || !reward || typeof reward !== 'object') return;
+
+    const token = entry.token || entry.data?.token;
+    const floor = entry.floor ?? entry.floorNumber ?? entry.data?.floorNumber ?? '';
+    const room = entry.room ?? entry.roomNumber ?? entry.data?.roomNumber ?? '';
+    const action = entry.action || entry.data?.action || defaultAction;
+    const key = token ? `tok:${token}` : `t:${timeVal}:${floor}:${room}:${action}`;
+
+    if (seenTowerKeys.has(key)) return;
+    seenTowerKeys.add(key);
+    towerEntries.push(entry);
+  };
+
+  const sessionHistory = cache?.towerSession?.data?.history || cache?.towerSession?.history;
+  if (Array.isArray(sessionHistory)) {
+    for (const ev of sessionHistory) {
+      if (ev && ev.reward) {
+        addTowerEntry(ev, ev.action || 'historyEvent');
+      }
+    }
+  }
+
+  const sessionCompletion = cache?.towerSession?.data?.completion || cache?.towerSession?.completion;
+  if (sessionCompletion) {
+    const compReward = sessionCompletion.reward || sessionCompletion;
+    if (compReward && typeof compReward === 'object') {
+      const compAt = cache?.towerSession?.data?.updatedAt || cache?.towerSession?.updatedAt;
+      addTowerEntry({ reward: compReward, at: compAt, action: 'completion' }, 'completion');
+    }
+  }
+
+  if (Array.isArray(cache?.towerHistory?.data)) {
+    for (const ev of cache.towerHistory.data) {
+      addTowerEntry(ev, 'towerHistory');
+    }
+  }
+
+  if (cache?.towerAction) {
+    addTowerEntry(cache.towerAction, cache.towerAction?.data?.action || 'towerAction');
+    const actComp = cache.towerAction.data?.completion;
+    if (actComp) {
+      const compReward = actComp.reward || actComp;
+      if (compReward && typeof compReward === 'object') {
+        addTowerEntry({ reward: compReward, at: cache.towerAction.updatedAt, action: 'completion' }, 'completion');
+      }
+    }
+  }
+
   const towerByDay = new Map<string, { gold: number; emerald: number }>();
   for (const tEntry of towerEntries) {
-    if (!tEntry) continue;
     const timeVal = tEntry.updatedAt || tEntry.at;
     const dateStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
     const reward = tEntry.data?.reward ?? tEntry.reward;
     if (!dateStr || !reward || typeof reward !== 'object') continue;
 
-    const tGold = Number(reward.gold ?? reward['resource:gold'] ?? 0);
-    const tEmerald = Number(reward.starMoney ?? reward['resource:starMoney'] ?? reward.diamond ?? 0);
+    let tGold = Number(reward.gold ?? reward['resource:gold'] ?? 0);
+    let tEmerald = Number(reward.starMoney ?? reward.starmoney ?? reward['resource:starMoney'] ?? reward.diamond ?? 0);
+
+    const arrRewards = Array.isArray(reward.reward) ? reward.reward :
+      (Array.isArray(reward.rewards) ? reward.rewards :
+      (Array.isArray(reward.claimedRewards) ? reward.claimedRewards : null));
+    if (arrRewards) {
+      for (const r of arrRewards) {
+        const amt = Number(r?.amount ?? r?.count ?? r?.quantity ?? 0);
+        if (r?.type === 'gold' || r?.key === 'resource:gold') tGold += amt;
+        if (r?.type === 'starMoney' || r?.type === 'diamond' || r?.key === 'resource:starMoney') tEmerald += amt;
+      }
+    }
+
     if (tGold > 0 || tEmerald > 0) {
       const cur = towerByDay.get(dateStr) || { gold: 0, emerald: 0 };
       cur.gold += tGold;

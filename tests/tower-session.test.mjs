@@ -97,3 +97,28 @@ test('Tower cache retains floor choices and marks final boss completion', () => 
   assert.equal(restarted.towerSession.data.history.length, 0);
   assert.equal(restarted.towerStatus.data.isCleared, false);
 });
+
+test('Tower combat and chest rewards update resourceIncomeHistory and towerHistory', () => {
+  const records = [
+    rpc('enterNextFloor', {}, { response: { floorNumber: 1, currentRoomNumber: 0,
+      rooms: { 1: { roomNumber: 1, type: 'hero_battle' } } } }, 1),
+    rpc('endBattle', { result: { win: true, stars: 3 } },
+      { response: { currentRoomNumber: 2, reward: { gold: 6400 } } }, 2),
+    rpc('enterNextFloor', {}, { response: { floorNumber: 2, currentRoomNumber: 1 } }, 3),
+    rpc('openChest', { number: 1 }, { response: { rewardIndex: 0, reward: { gold: 50000, starMoney: 20 } } }, 4),
+  ];
+  const { cache: resCache } = cache.merge({}, records);
+
+  // towerHistory should retain both reward events
+  assert.ok(resCache.towerHistory?.data?.length >= 2);
+  const battleHistory = resCache.towerHistory.data.find(e => e.action === 'endBattle');
+  assert.ok(battleHistory);
+  assert.equal(battleHistory.reward.gold, 6400);
+
+  // resourceIncomeHistory should track both battle and chest gold under 'tower'
+  const incomeDays = resCache.resourceIncomeHistory?.data || {};
+  const day20261103 = incomeDays['2026-11-03'];
+  assert.ok(day20261103);
+  assert.equal(day20261103.goldBySource.tower, 56400); // 6400 + 50000
+  assert.equal(day20261103.emeraldBySource.tower, 20);
+});

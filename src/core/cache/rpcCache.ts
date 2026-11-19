@@ -1639,7 +1639,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           const action = call.name.slice('magicTower_'.length);
           if (['enterNextFloor', 'enterRoom', 'startBattle', 'endBattle', 'activateBuff', 'openChest'].includes(action)) {
             const response = result.response || {};
-            return [{
+            const actions = [{
               key: 'towerAction', method: call.name, feature: null, group: 'internal',
               data: {
                 token: call.ident, action,
@@ -1653,11 +1653,19 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                 rooms: response.rooms || null,
                 reward: response.reward || null,
                 rewardIndex: response.rewardIndex ?? null,
-                completion: result.magicTower_completion || null,
+                completion: result.magicTower_completion || result.response?.magicTower_completion || null,
                 briefInfo: result.magicTower_briefInfo || null
               }, updatedAt: record.timestamp
             }];
-
+            if (response.reward) {
+              actions.push(...extractRewardActions(record, call, response.reward, `tower:${action}`));
+            }
+            const compReward = (result.magicTower_completion || result.response?.magicTower_completion)?.reward ||
+              result.magicTower_completion || result.response?.magicTower_completion;
+            if (compReward && typeof compReward === 'object' && (compReward.gold || compReward.starMoney || compReward.starmoney || compReward.reward || compReward.rewards)) {
+              actions.push(...extractRewardActions(record, call, compReward, 'tower:completion'));
+            }
+            return actions;
           }
         }
         if ((call.name === 'magicTower_briefInfo' || call.name === 'magicTower_getAll') && result?.response) {
@@ -4843,7 +4851,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           };
           const floor = session.floorNumber;
           const room = session.rooms?.[session.roomNumber];
-          const event = { action: action.action, floor, room: session.roomNumber, at: entry.updatedAt };
+          const event = { token: action.token, action: action.action, floor, room: session.roomNumber, at: entry.updatedAt };
           if (action.action === 'enterNextFloor') {
             if (action.floorNumber) session.floorNumber = action.floorNumber;
             session.roomNumber = action.roomNumber || 0;
@@ -4896,6 +4904,27 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           };
           next.towerSession = { key: 'towerSession', method: entry.method, feature: null,
             group: 'other', data: session, updatedAt: entry.updatedAt };
+          if (action.reward || action.completion) {
+            const seenHistory = Array.isArray(next.towerHistory?.data) ? next.towerHistory.data : [];
+            const historyToken = action.token || `${entry.updatedAt}:${action.floorNumber}:${action.roomNumber}:${action.action}`;
+            if (!seenHistory.some((h: any) => h.token === historyToken)) {
+              next.towerHistory = {
+                key: 'towerHistory',
+                method: entry.method,
+                feature: null,
+                group: 'internal',
+                data: [...seenHistory, {
+                  token: historyToken,
+                  action: action.action,
+                  floor: session.floorNumber,
+                  room: session.roomNumber,
+                  reward: action.reward || action.completion?.reward || action.completion,
+                  at: entry.updatedAt
+                }].slice(-200),
+                updatedAt: entry.updatedAt
+              };
+            }
+          }
           changed = true;
           continue;
         }

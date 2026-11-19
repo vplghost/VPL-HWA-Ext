@@ -268,3 +268,91 @@ test('aggregateIncomeByDate merges persistent resourceIncomeHistory without doub
   assert.equal(today.emerald, 100);
   assert.equal(today.emeraldBySource.quests, 100);
 });
+
+test('aggregateIncomeByDate includes tower combat (endBattle) rewards from towerSession history', () => {
+  const fixedNow = Date.parse('2026-11-15T12:00:00.000Z');
+  const mockCache = {
+    towerSession: {
+      updatedAt: '2026-11-15T10:00:00.000Z',
+      data: {
+        floorNumber: 5,
+        history: [
+          // Tower battle won on floor 1
+          {
+            token: 'tok-battle-1',
+            action: 'endBattle',
+            floor: 1,
+            win: true,
+            reward: { gold: 25000 },
+            at: '2026-11-15T09:10:00.000Z',
+          },
+          // Tower chest opened on floor 2
+          {
+            token: 'tok-chest-2',
+            action: 'openChest',
+            floor: 2,
+            reward: { gold: 35000, starMoney: 10 },
+            at: '2026-11-15T09:20:00.000Z',
+          },
+          // Tower battle won on floor 3
+          {
+            token: 'tok-battle-3',
+            action: 'endBattle',
+            floor: 3,
+            win: true,
+            reward: {
+              rewards: [{ type: 'gold', amount: 40000 }],
+            },
+            at: '2026-11-15T09:30:00.000Z',
+          },
+        ],
+      },
+    },
+  };
+
+  const today = getTodayIncome(mockCache, fixedNow);
+  assert.equal(today.date, '2026-11-15');
+  // Tower gold: 25,000 (battle 1) + 35,000 (chest 2) + 40,000 (battle 3) = 100,000
+  assert.equal(today.goldBySource.tower, 100000);
+  assert.equal(today.emeraldBySource.tower, 10);
+  assert.equal(today.gold, 100000);
+  assert.equal(today.emerald, 10);
+});
+
+test('aggregateIncomeByDate deduplicates tower combat rewards between towerSession and towerAction', () => {
+  const fixedNow = Date.parse('2026-11-15T12:00:00.000Z');
+  const mockCache = {
+    towerSession: {
+      updatedAt: '2026-11-15T09:30:00.000Z',
+      data: {
+        floorNumber: 3,
+        history: [
+          {
+            token: 'tok-battle-3',
+            action: 'endBattle',
+            floor: 3,
+            win: true,
+            reward: { gold: 40000 },
+            at: '2026-11-15T09:30:00.000Z',
+          },
+        ],
+      },
+    },
+    // towerAction holding the exact same endBattle event
+    towerAction: {
+      updatedAt: '2026-11-15T09:30:00.000Z',
+      data: {
+        token: 'tok-battle-3',
+        action: 'endBattle',
+        floorNumber: 3,
+        win: true,
+        reward: { gold: 40000 },
+      },
+    },
+  };
+
+  const today = getTodayIncome(mockCache, fixedNow);
+  // Must NOT double count 40,000 + 40,000!
+  assert.equal(today.goldBySource.tower, 40000);
+  assert.equal(today.gold, 40000);
+});
