@@ -6,8 +6,20 @@ import { getItemIcon, isInactiveResource } from '@/src/utils/itemResources';
 import { formatNumber } from '@/src/utils/formatters';
 import { popupDataHelper } from '@/src/utils/popupData';
 import { isItemResourceKey, CHEST_REFILLABLES } from '@/src/utils/resourceData';
+import { useModals } from '@/src/composables/useModals';
+import { isOpenableChest } from '@/src/utils/chestHelper';
 
 const { cache, dispatchRpc } = useRpcCache();
+const modalHelper = typeof useModals === 'function' ? useModals() : null;
+const openModal = (name: any, ctx?: any) => modalHelper?.openModal(name, ctx);
+const checkIsOpenableChest = (item: any) => (typeof isOpenableChest === 'function' ? isOpenableChest(item) : false);
+
+function handleOpenChest(item: InventoryEntry) {
+  openModal('chest', {
+    selectedChestId: item.id,
+    selectedChestCategory: item.rawCategory || item.category,
+  });
+}
 
 const search = ref('');
 const selectedCategory = ref('All');
@@ -348,6 +360,18 @@ function exportItemsJson() {
             </button>
           </div>
 
+          <!-- Open Chests button -->
+          <button
+            id="btn-toolbar-open-chests"
+            type="button"
+            class="cursor-pointer rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors shadow-2xs flex items-center gap-1.5"
+            title="Open Chests & Choice Caskets"
+            @click="openModal('chest')"
+          >
+            <span>🎁</span>
+            <span>Open Chests</span>
+          </button>
+
           <!-- Export JSON button -->
           <button
             id="btn-toolbar-export-items"
@@ -408,7 +432,9 @@ function exportItemsJson() {
             v-for="item in sec.items"
             :key="`${item.category}-${item.id}`"
             class="relative aspect-square rounded-xl bg-slate-50 dark:bg-slate-800/80 flex items-center justify-center p-1.5 border border-slate-200 dark:border-slate-700/60 hover:border-blue-400 dark:hover:border-blue-500 transition-all select-none group"
-            :title="`${item.name}\nCategory: ${item.category}\nID: ${item.id}\nQuantity: ${formatNumber(item.amount)}`"
+            :class="{ 'cursor-pointer hover:ring-2 hover:ring-amber-400/60': checkIsOpenableChest(item) }"
+            :title="`${item.name}\nCategory: ${item.category}\nID: ${item.id}\nQuantity: ${formatNumber(item.amount)}${checkIsOpenableChest(item) ? '\nClick to open chest' : ''}`"
+            @click="checkIsOpenableChest(item) ? handleOpenChest(item) : undefined"
           >
             <img
               v-if="getItemImgSrc(item)"
@@ -421,6 +447,18 @@ function exportItemsJson() {
             <span v-else class="text-xl">
               {{ getCategoryIcon(item.category) }}
             </span>
+
+            <!-- Open Badge on Chests -->
+            <button
+              v-if="checkIsOpenableChest(item)"
+              type="button"
+              class="absolute top-1 left-1 bg-amber-500 hover:bg-amber-400 text-amber-950 text-[9px] font-bold px-1 py-0.2 rounded shadow-xs cursor-pointer opacity-90 group-hover:opacity-100 transition-opacity flex items-center gap-0.5"
+              title="Open chest dialog"
+              @click.stop="handleOpenChest(item)"
+            >
+              <span>🎁</span>
+              <span class="hidden sm:inline">Open</span>
+            </button>
 
             <!-- Quantity Pill -->
             <span class="absolute bottom-1 right-1 bg-slate-900/85 text-white text-[10px] font-mono px-1 rounded-sm tabular-nums shadow-xs">
@@ -469,7 +507,19 @@ function exportItemsJson() {
                   #{{ item.id }}
                 </td>
                 <td class="p-2 text-right font-bold text-slate-700 dark:text-slate-200 tabular-nums">
-                  {{ formatNumber(item.amount) }}
+                  <div class="flex items-center justify-end gap-2">
+                    <span>{{ formatNumber(item.amount) }}</span>
+                    <button
+                      v-if="checkIsOpenableChest(item)"
+                      type="button"
+                      class="px-2 py-0.5 rounded text-3xs font-bold bg-amber-500 hover:bg-amber-400 text-amber-950 cursor-pointer shadow-xs transition-colors shrink-0 flex items-center gap-1 active:scale-95"
+                      title="Open chest dialog"
+                      @click.stop="handleOpenChest(item)"
+                    >
+                      <span>🎁</span>
+                      <span>Open</span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>

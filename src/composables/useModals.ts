@@ -18,7 +18,8 @@ export type ModalName =
   | 'eventDetail'
   | 'battlePass'
   | 'guildChat'
-  | 'log';
+  | 'log'
+  | 'chest';
 
 const modalState = reactive<Record<ModalName, boolean>>({
   building: false,
@@ -39,6 +40,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   battlePass: false,
   guildChat: false,
   log: false,
+  chest: false,
 });
 
 const modalContext = reactive<{
@@ -48,6 +50,8 @@ const modalContext = reactive<{
   selectedBattlePassId?: number | string | null;
   selectedCampaignGearId?: number | string | null;
   selectedCampaignHeroId?: number | string | null;
+  selectedChestId?: number | string | null;
+  selectedChestCategory?: string | null;
 }>({});
 
 const modalStack = reactive<string[]>([]);
@@ -104,6 +108,8 @@ export function useModals() {
     selectedBattlePassId?: number | string | null;
     selectedCampaignGearId?: number | string | null;
     selectedCampaignHeroId?: number | string | null;
+    selectedChestId?: number | string | null;
+    selectedChestCategory?: string | null;
   }) {
     if (context) {
       if (context.selectedHero !== undefined) modalContext.selectedHero = context.selectedHero;
@@ -112,6 +118,8 @@ export function useModals() {
       if (context.selectedBattlePassId !== undefined) modalContext.selectedBattlePassId = context.selectedBattlePassId;
       if (context.selectedCampaignGearId !== undefined) modalContext.selectedCampaignGearId = context.selectedCampaignGearId;
       if (context.selectedCampaignHeroId !== undefined) modalContext.selectedCampaignHeroId = context.selectedCampaignHeroId;
+      if (context.selectedChestId !== undefined) modalContext.selectedChestId = context.selectedChestId;
+      if (context.selectedChestCategory !== undefined) modalContext.selectedChestCategory = context.selectedChestCategory;
     }
     registerModalOpen(name);
     modalState[name] = true;

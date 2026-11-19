@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.126 — 2026-11-20
+
+### Added
+
+- **Open Chest Dialog & Choice Caskets (`ChestModal.vue`, `ItemsTab.vue`, `chestHelper.ts`)**:
+  - Implemented `ChestModal.vue` dialog enabling players to open any inventory chest, casket, or choice container directly from the extension.
+  - Implemented `chestHelper.ts` containing `isOpenableChest`, `isChoiceChest`, `getChestChoices`, and drop aggregation logic:
+    - Supports Choice Chests (Artifact Essence Chest #62, Artifact Scroll Chest #63, Artifact Metal Chest #64, Skin Stone Chests #51 & #65, Titan Chests #47, #48, #49, #50) with interactive reward selection preview.
+    - Supports Random / Chance Chests (Bronze casket #15, Epic Chest #102, Legendary Chest #28, troves, gifts) sending `choice: -1`.
+    - Drop aggregation dynamically groups multiple opened drops into concise received reward summaries.
+  - Added "🎁 Open Chests" quick action to `ItemsTab.vue` toolbar, and interactive "Open" buttons / click actions on openable chest cards in both Grid and Table views.
+  - Registered `'chest'` modal in `useModals.ts` and mounted in `entrypoints/popup/App.vue`.
+  - Added unit test suite in `tests/chest-opening.test.mjs` verifying live game tracking parity with `temp/tracking-data/hwa-game-record-202611200058_chest_opening.json`.
+
 ## 0.11.125 — 2026-11-20
 
 ### Added
