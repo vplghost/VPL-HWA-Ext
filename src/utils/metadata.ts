@@ -38,6 +38,7 @@ export interface TitanMeta {
   hasAvatar?: boolean;
   avatarFile?: string;
   artifacts?: number[];
+  skills?: string[];
 }
 
 export function getHeroMetadata(heroId: number | string): HeroMeta | undefined {

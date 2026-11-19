@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.132 — 2026-11-20
+
+### Added
+
+- **Titans Tab: Full Card Hover Area & Skill Names/Icons Display (`TitansTab.vue`, `TitanHoverCard.vue`, `titanMetadata.ts`)**:
+  - **Full Card Hover Trigger**:
+    - Expanded hover card activation in Grid view to the entire card container by applying `hero-hover-trigger` to the outer card element in `TitansTab.vue` (matching `HeroesTab.vue`), rather than restricting hover interactions to the avatar/name inner element.
+  - **Skill Names and Icons Display**:
+    - Replaced redundant skill level numbers (`Lv. 130`, `130`) with skill names and icons in `TitanHoverCard.vue` since titan skill levels auto-scale with titan level and are inherently always maxed.
+    - Added official titan skill definitions across all 28 titans in `titanMetadata.ts` (e.g. Sigurd: "Song of Valhalla", Nova: "North Wind", Hyperion: "Frost Needles" & "Compassion", Araji: "Incinerating Ray" & "Blastwave", Angus: "Earthquake", Eden: "Creeping Thorns" & "Underground Prison").
+    - Displayed skills using compact inline badges featuring skill type icons (`⚡` / `✨`) and skill names.
+  - Added unit test coverage in `tests/hero-hover-card.test.mjs`.
+
 ## 0.11.131 — 2026-11-20
 
 ### Fixed

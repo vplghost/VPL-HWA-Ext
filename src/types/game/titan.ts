@@ -8,6 +8,7 @@ export interface TitanMetadataItem {
   hasAvatar?: boolean;
   avatarFile?: string;
   artifacts?: number[];
+  skills?: string[];
   [key: string]: any;
 }
 

@@ -58,22 +58,27 @@ const soulProgress = computed(() => {
 });
 
 const skillsList = computed(() => {
+  const metaSkills = meta.value?.skills;
+  if (Array.isArray(metaSkills) && metaSkills.length > 0) {
+    return metaSkills.map((name: string, idx: number) => ({
+      slot: idx + 1,
+      name,
+      icon: idx === 0 ? '⚡' : '✨',
+      title: `${titanName.value} - Skill ${idx + 1}: ${name}`,
+    }));
+  }
+
+  // Fallback to titan.skills if metadata has no skills
   const skills = props.titan?.skills;
   if (!skills || typeof skills !== 'object') return [];
-  const titanLevel = Number(props.titan?.level) || 1;
   const sortedKeys = Object.keys(skills).sort((a, b) => Number(a) - Number(b));
 
-  return sortedKeys.map((k, idx) => {
-    const lvl = Number(skills[k]) || 0;
-    const isThreshold = titanLevel > 0 && lvl >= titanLevel;
-
-    return {
-      slot: idx + 1,
-      level: lvl,
-      isThreshold,
-      title: `Skill ${idx + 1}: Lv. ${lvl} / ${titanLevel}${isThreshold ? ' (MAX)' : ''}`,
-    };
-  });
+  return sortedKeys.map((k, idx) => ({
+    slot: idx + 1,
+    name: `Skill ${idx + 1}`,
+    icon: idx === 0 ? '⚡' : '✨',
+    title: `Skill ${idx + 1}`,
+  }));
 });
 
 const skinsList = computed(() => {
@@ -208,22 +213,18 @@ const artifactsList = computed(() => {
           </div>
         </div>
 
-        <!-- Skills: 1-line flex layout, threshold highlight, no S1/S2 labels -->
+        <!-- Skills: 1-line flex layout displaying skill name and icon -->
         <div v-if="skillsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
           <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Skills</span>
           <div class="flex items-center gap-1 flex-wrap justify-end">
             <span
               v-for="s in skillsList"
               :key="s.slot"
-              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums border transition-colors"
-              :class="
-                s.isThreshold
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-2xs font-bold ring-1 ring-amber-500/30'
-                  : 'bg-slate-700/80 text-sky-300 border-slate-600/50'
-              "
+              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold border transition-colors bg-slate-700/80 text-amber-300 border-amber-500/30"
               :title="s.title"
             >
-              {{ s.level }}
+              <span class="text-[9px]">{{ s.icon }}</span>
+              <span class="truncate max-w-[130px]">{{ s.name }}</span>
             </span>
           </div>
         </div>

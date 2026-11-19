@@ -419,7 +419,7 @@ function exportTitansJson() {
       <div
         v-for="t in filteredTitans"
         :key="t.id"
-        class="group relative rounded-xl border p-2.5 space-y-2 shadow-2xs transition-all select-none"
+        class="hero-hover-trigger group relative rounded-xl border p-2.5 space-y-2 shadow-2xs transition-all select-none bg-white dark:bg-slate-900"
         :class="[
           getElementStyle(t.element).cardBorder,
           t.isFav ? 'ring-1 ring-amber-400/60 dark:ring-amber-500/50' : '',
@@ -428,8 +428,8 @@ function exportTitansJson() {
       >
         <!-- Top Row: Avatar with Star Glow + Favorite Star Button -->
         <div class="flex items-start justify-between gap-1.5">
-          <!-- Avatar with Hover Trigger -->
-          <div class="hero-hover-trigger flex items-center gap-2 min-w-0 flex-1">
+          <!-- Avatar and Identity Column -->
+          <div class="flex items-center gap-2 min-w-0 flex-1">
             <div
               class="relative size-11 shrink-0 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center border"
               :class="t.smallGlow"
@@ -462,13 +462,6 @@ function exportTitansJson() {
                 Role: {{ t.role }}
               </div>
             </div>
-
-            <!-- Hover Card Popover -->
-            <TitanHoverCard
-              :titan-id="t.id"
-              :titan="t.raw"
-              :inventory="cache.inventoryGet?.data"
-            />
           </div>
 
           <!-- Favorite Toggle Button -->
@@ -515,6 +508,13 @@ function exportTitansJson() {
             ⚡ {{ formatNumber(t.power) }}
           </div>
         </div>
+
+        <!-- Hover Card Popover -->
+        <TitanHoverCard
+          :titan-id="t.id"
+          :titan="t.raw"
+          :inventory="cache.inventoryGet?.data"
+        />
       </div>
     </div>
 

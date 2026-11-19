@@ -42,16 +42,23 @@ test('HeroHoverCard component implements unified equipment frame, gear thumbnail
   assert.match(content, /flex items-center justify-between gap-1\.5/, 'Must use 1-line flex layouts for skills, skins, glyphs, and artifacts');
 });
 
-test('TitanHoverCard component implements compact 1-line layouts and threshold skill highlights', async () => {
+test('TitanHoverCard displays skill names and icons, and TitansTab expands hover area to entire card', async () => {
   const cardPath = join(root, 'src/components/common/TitanHoverCard.vue');
   const content = await readFile(cardPath, 'utf8');
 
-  // 1. Skills threshold and compact 1-line layout
-  assert.match(content, /isThreshold/, 'Must calculate skill threshold reached');
-  assert.match(content, /bg-amber-500\/20 text-amber-300 border-amber-500\/50/, 'Must highlight threshold skills with amber border/bg');
+  // 1. Skill names and icons rather than meaningless level numbers
+  assert.match(content, /s\.name/, 'Must display skill name');
+  assert.match(content, /s\.icon/, 'Must display skill icon');
+  assert.match(content, /text-amber-300 border-amber-500\/30/, 'Must style skill badges with amber theme');
   assert.doesNotMatch(content, /label:\s*`S\$\{idx \+ 1\}`/, 'Must not generate S1, S2 labels');
+  assert.doesNotMatch(content, /skillsList[\s\S]*?s\.level[\s\S]*?skinsList/, 'Must not display skill levels for titans in skillsList');
 
   // 2. Compact 1-line flex layouts
   assert.match(content, /flex items-center justify-between gap-1\.5/, 'Must use 1-line flex layouts for skills, skins, and artifacts');
   assert.match(content, /Lv\.\s*\{\{\s*titan(?:\?\.|\.)level\s*\}\}/, 'Must display titan level in header');
+
+  // 3. TitansTab grid card hover area encompasses entire card
+  const tabPath = join(root, 'src/components/tabs/TitansTab.vue');
+  const tabContent = await readFile(tabPath, 'utf8');
+  assert.match(tabContent, /class="hero-hover-trigger group relative rounded-xl border p-2\.5/, 'Grid card must have hero-hover-trigger on outer card div');
 });
