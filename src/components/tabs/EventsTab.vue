@@ -5,6 +5,8 @@ import { useModals } from '@/src/composables/useModals';
 import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import { questData } from '@/src/data/questData';
+import { getBattlePassName } from '@/src/data/battlepassCatalog';
+import { cleanLocaleTitle } from '@/src/services/eventCatalogService';
 import {
   resolveClaimableEventQuests,
   resolveClaimableBattlePassRewards,
@@ -16,6 +18,15 @@ const { openModal } = useModals();
 const search = ref('');
 const isRefreshing = ref(false);
 const isClaiming = ref(false);
+const dynamicCatalog = ref<any>(null);
+
+if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+  chrome.storage.local.get(['dynamicEventCatalog']).then((stored) => {
+    if (stored?.dynamicEventCatalog) {
+      dynamicCatalog.value = stored.dynamicEventCatalog;
+    }
+  }).catch(() => {});
+}
 
 const claimableQuests = computed(() => resolveClaimableEventQuests(cache.value));
 const claimableBattlePass = computed(() => resolveClaimableBattlePassRewards(cache.value));
@@ -181,7 +192,8 @@ const eventCards = computed<EventCard[]>(() => {
           ADVENTURE_HERO62_TITLE_EVENT_UPGRADE: 'Soleil Upgrade Event',
           DAEMONSKIN22_UI_TITLE: 'Demon Skin Festival',
         };
-        const title = titleMap[qe.name_localeKey] || qe.name_localeKey?.replace(/_/g, ' ') || `Special Event #${qe.id}`;
+        const rawTitle = qe.name_localeKey || qe.nameLocaleKey;
+        const title = titleMap[rawTitle] || (rawTitle ? cleanLocaleTitle(rawTitle) : null) || `Special Event #${qe.id}`;
         cards.push({
           id: `questEvent:${qe.id}`,
           type: 'special_event',
@@ -246,21 +258,21 @@ const eventCards = computed<EventCard[]>(() => {
     seenBpIds.add(id);
     const claimable =
       claimableBattlePass.value.find((b) => b.battlepassId === id)?.count || 0;
-    const isHeroWay = id === 1017;
-    const title = isHeroWay ? `Hero's Way (#${id})` : `Battle Pass (#${id})`;
+    const title = getBattlePassName(bp, dynamicCatalog.value);
     cards.push({
       id: `battlePass:${id}`,
       type: 'battle_pass',
       title: `🎖️ ${title}`,
-      searchStr: `battle pass hero's way ${id}`.toLowerCase(),
+      searchStr: `battle pass ${title} ${id}`.toLowerCase(),
       data: {
         id,
+        title,
         exp: formatNumber(bp.points || 0),
         claimableCount: claimable,
         hasGoldenPass: (bp.activatedTrackIds || []).length > 1,
         endDate: bp.expiresAt ? new Date(bp.expiresAt).toLocaleString() : 'Active',
       },
-      action: () => openModal('eventDetail', { selectedEventId: `bp:${id}` }),
+      action: () => openModal('battlePass', { selectedBattlePassId: id }),
     });
   }
 
@@ -270,13 +282,15 @@ const eventCards = computed<EventCard[]>(() => {
     if (seenBpIds.has(bp.id)) continue;
     if (bp.exp > 0 || bp.farmedNormal > 0) {
       seenBpIds.add(bp.id);
+      const title = getBattlePassName(bp, dynamicCatalog.value);
       cards.push({
         id: `battlePass:${bp.id}`,
         type: 'battle_pass',
-        title: `🎖️ ${bp.type === 'draft' ? 'Draft Pass' : 'Season Pass'} (#${bp.id})`,
-        searchStr: `battle pass season draft ${bp.id}`.toLowerCase(),
+        title: `🎖️ ${title}`,
+        searchStr: `battle pass season draft ${title} ${bp.id}`.toLowerCase(),
         data: {
           id: bp.id,
+          title,
           type: bp.type,
           exp: formatNumber(bp.exp),
           farmedNormal: bp.farmedNormal,
@@ -284,7 +298,7 @@ const eventCards = computed<EventCard[]>(() => {
           hasGoldenPass: bp.hasGoldenPass,
           endDate: bp.endTime ? new Date(bp.endTime * 1000).toLocaleString() : 'Active'
         },
-        action: () => openModal('eventDetail', { selectedEventId: `bp:${bp.id}` }),
+        action: () => openModal('battlePass', { selectedBattlePassId: bp.id }),
       });
     }
   }

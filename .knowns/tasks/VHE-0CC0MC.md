@@ -1,12 +1,14 @@
 ---
 id: VHE-0CC0MC
 title: Integrate EventsTab and popup cards to open dedicated event and battle pass dialogs
-status: todo
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-19T12:44:22.522Z'
-updatedAt: '2026-11-19T12:44:22.522Z'
+updatedAt: '2026-11-19T12:53:44.820Z'
+completedAt: '2026-11-19T12:53:44.820Z'
 timeSpent: 0
+assignee: '@me'
 ---
 # Integrate EventsTab and popup cards to open dedicated event and battle pass dialogs
 
@@ -18,9 +20,9 @@ Update EventsTab event and battle pass cards with proper titles, and route card 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Event cards display human-readable titles from catalog mapping
-- [ ] #2 Special quest cards trigger openModal eventDetail
-- [ ] #3 Battle pass cards trigger openModal battlePass with selected pass id
-- [ ] #4 Claimable badges and actions sync with modal state
+- [x] #1 Event cards display human-readable titles from catalog mapping
+- [x] #2 Special quest cards trigger openModal eventDetail
+- [x] #3 Battle pass cards trigger openModal battlePass with selected pass id
+- [x] #4 Claimable badges and actions sync with modal state
 <!-- AC:END -->
 

@@ -64,12 +64,13 @@ test('EventDetailModal component defines eventDetail modal, milestones, chains, 
   assert.match(content, /Current Objective/, 'Must render Current Objective banner');
 });
 
-test('EventsTab integrates with EventDetailModal for specialQuest and battlePass cards', async () => {
+test('EventsTab integrates with EventDetailModal for specialQuest and BattlePassModal for battlePass cards', async () => {
   const eventsTabPath = join(root, 'src/components/tabs/EventsTab.vue');
   const content = await readFile(eventsTabPath, 'utf8');
 
   assert.match(content, /openModal\('eventDetail',\s*\{\s*selectedEventId:\s*event\.id\s*\}\)/, 'Must open eventDetail for specialQuest');
-  assert.match(content, /openModal\('eventDetail',\s*\{\s*selectedEventId:\s*`bp:\$\{bp\.id\}`\s*\}\)/, 'Must open eventDetail for battlePass');
+  assert.match(content, /openModal\('battlePass',\s*\{\s*selectedBattlePassId:\s*id\s*\}\)/, 'Must open battlePass for liveOps battlePass');
+  assert.match(content, /openModal\('battlePass',\s*\{\s*selectedBattlePassId:\s*bp\.id\s*\}\)/, 'Must open battlePass for legacy battlePass');
 });
 
 test('resolveTierDetail accurately resolves task, unit, tier target, and progress', () => {
