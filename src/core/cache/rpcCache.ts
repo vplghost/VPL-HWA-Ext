@@ -2938,23 +2938,20 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
         if (entry.key === 'offerFarmAction') {
           const offerId = Number(entry.data?.offerId);
           if (Number.isFinite(offerId)) {
-            if (next.billingGetAll?.data) {
-              const bgData = next.billingGetAll.data;
-              const offers = Array.isArray(bgData.offers)
-                ? bgData.offers
-                : (Array.isArray(bgData) ? bgData : []);
-              for (const o of offers) {
-                if (o && (Number(o.id) === offerId || Number(o.offerId) === offerId)) {
-                  o.freeRewardObtained = true;
-                }
-              }
-            }
-            if (next.specialOffers?.data) {
-              const soData = next.specialOffers.data;
-              const offers = Array.isArray(soData) ? soData : (Array.isArray(soData.offers) ? soData.offers : []);
-              for (const o of offers) {
-                if (o && (Number(o.id) === offerId || Number(o.offerId) === offerId)) {
-                  o.freeRewardObtained = true;
+            const containers = [
+              next.offerGetAll?.data,
+              Array.isArray(next.offerGetAll) ? next.offerGetAll : null,
+              next.billingGetAll?.data?.offers,
+              Array.isArray(next.billingGetAll?.data) ? next.billingGetAll.data : null,
+              next.specialOffers?.data,
+              Array.isArray(next.specialOffers?.data?.offers) ? next.specialOffers.data.offers : null
+            ];
+            for (const container of containers) {
+              if (Array.isArray(container)) {
+                for (const o of container) {
+                  if (o && (Number(o.id) === offerId || Number(o.offerId) === offerId)) {
+                    o.freeRewardObtained = true;
+                  }
                 }
               }
             }
@@ -5187,9 +5184,9 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
         }
         if (['mailGetAll', 'getPage:report'].includes(entry.key) && next.mailAccountEpoch?.updatedAt > entry.updatedAt) continue;
         if (entry.key === 'mailClaimAction') {
-          const helper = getMailService(), accountId = next.accountStatus?.data?.id;
+          const helper = getMailService(), accountId = next.accountStatus?.data?.id ?? next.userGetInfo?.data?.id ?? next.mailStatus?.data?.accountId ?? 'default';
           const seen = normalizeArrayData(next.mailClaimReceipts?.data), data = entry.data;
-          if (!helper || accountId == null || next.mailAccountEpoch?.updatedAt > entry.updatedAt || seen.some(row => row.token === data.token)) continue;
+          if (!helper || next.mailAccountEpoch?.updatedAt > entry.updatedAt || seen.some(row => row.token === data.token)) continue;
           const receipt = { ...data, accountId: String(accountId), at: entry.updatedAt };
           next.mailClaimReceipts = { key: 'mailClaimReceipts', group: 'internal', data: [...seen, receipt].slice(-200), updatedAt: entry.updatedAt };
           if (!next.mailClaimStatus || next.mailClaimStatus.updatedAt <= entry.updatedAt) next.mailClaimStatus = { key: 'mailClaimStatus', method: entry.method, group: 'internal', data: receipt, updatedAt: entry.updatedAt };

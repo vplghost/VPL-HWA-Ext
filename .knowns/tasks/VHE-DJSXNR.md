@@ -1,11 +1,12 @@
 ---
 id: VHE-DJSXNR
 title: Add comprehensive unit tests for in-game claim packets synchronization
-status: todo
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-19T13:03:38.809Z'
-updatedAt: '2026-11-19T13:03:38.809Z'
+updatedAt: '2026-11-19T13:17:07.854Z'
+completedAt: '2026-11-19T13:17:07.854Z'
 timeSpent: 0
 assignee: '@me'
 ---
