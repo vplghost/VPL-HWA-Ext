@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.124 — 2026-11-20
+
+### Added
+
+- **Multi-Call Campaign Raid Batching Loop (`CampaignRaidModal.vue`, `rpcCache.ts`)**:
+  - Re-engineered raid loop in `CampaignRaidModal.vue` to dispatch batched multi-calls with `batchSize = min(itemsNeeded, raidsPossible)` per RPC request.
+  - Ensures 1 RPC request executes multiple individual `times: 1` raids simultaneously without overshooting required item count or wasting player energy.
+  - Automatic stopping conditions immediately break loop once target requirement is fulfilled.
+  - Enhanced `rpcCache.ts` to aggregate multiple `missionRaid` drops, execution times, and tries spent within the same response batch without dropping subsequent calls.
+  - Added unit test suite in `tests/campaign-raid-batching.test.mjs`.
+
 ## 0.11.123 — 2026-11-20
 
 ### Fixed

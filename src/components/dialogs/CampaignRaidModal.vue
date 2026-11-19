@@ -307,8 +307,11 @@ const maxEnergy = computed(() => {
 });
 
 const missionCost = computed(() => {
-  const pair = getMissionCosts(missionId.value);
-  return pair ? (Number(pair[0]) + Number(pair[1])) : 6;
+  if (typeof getMissionCosts === 'function') {
+    const pair = getMissionCosts(missionId.value);
+    return pair ? (Number(pair[0]) + Number(pair[1])) : 6;
+  }
+  return 6;
 });
 
 const maxPossibleTimes = computed(() => {
@@ -510,15 +513,22 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
   const prevUpdatedAt = cache.value?.lastCampaignRaidResult?.updatedAt;
 
   // Primary: Direct RPC with game parity calls
+  // Sends multiple calls with times: 1 in one RPC request
   try {
-    const resp: any = await dispatchRpc([
-      {
+    const numCalls = Math.max(1, Math.min(100, Number(times) || 1));
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+    for (let k = 0; k < numCalls; k++) {
+      calls.push({
         name: 'missionRaid',
-        args: { id: Number(missionId.value), times: Number(times) },
-      },
-      { name: 'playable_getAvailable' },
-      { name: 'worldStars_getAvailable' },
-    ]);
+        args: { id: Number(missionId.value), times: 1 },
+      });
+    }
+    calls.push({ name: 'playable_getAvailable' });
+    calls.push({ name: 'worldStars_getAvailable' });
+    calls.push({ name: 'inventoryGet' });
+    calls.push({ name: 'userGetInfo' });
+
+    const resp: any = await dispatchRpc(calls);
     if (resp && resp.ok === false) {
       disableMissionToday(missionId.value);
       return { ok: false, error: resp.error || 'Raid RPC rejected' };
@@ -592,7 +602,7 @@ async function executeSequentialLoop(totalTimes: number) {
   };
 
   try {
-    for (let i = 1; i <= totalTimes; i++) {
+    while (completed < totalTimes) {
       if (abortCampaignRaidLoop.value) {
         loopStatusMsg.value = `Raid loop stopped by user at ${completed}/${totalTimes}`;
         break;
@@ -606,21 +616,65 @@ async function executeSequentialLoop(totalTimes: number) {
       }
 
       const curEnergy = Number(currentEnergy.value);
-      if (Number.isFinite(curEnergy) && curEnergy < missionCost.value) {
-        loopStatusMsg.value = `Out of Energy (${curEnergy}/${missionCost.value}) at raid ${completed}/${totalTimes}`;
+      const cost = Number(missionCost.value) || 6;
+      if (Number.isFinite(curEnergy) && curEnergy < cost) {
+        loopStatusMsg.value = `Out of Energy (${curEnergy}/${cost}) at raid ${completed}/${totalTimes}`;
         break;
       }
 
-      loopStatusMsg.value = `Raiding ${i}/${totalTimes}...`;
+      // 1. Calculate how many items are still needed
+      let itemsNeeded = Infinity;
+      if (farmMode.value === 'hero' && selectedLeafResource.value) {
+        const targetLeaf = selectedLeafResource.value;
+        const freshStock = Number(cache.value?.inventoryGet?.data?.[targetLeaf.category]?.[targetLeaf.id] || 0);
+        itemsNeeded = Math.max(0, targetLeaf.requiredCount - freshStock);
+        if (itemsNeeded <= 0) {
+          loopStatusMsg.value = `Target requirement reached (${targetLeaf.name}: ${freshStock}/${targetLeaf.requiredCount})! Stopped automatically at ${completed}/${totalTimes}.`;
+          break;
+        }
+      } else if (targetId && !wasInitiallyFulfilled && selectedGearId.value) {
+        const freshTree = buildGearRecipeTree(selectedGearId.value, cache.value);
+        const freshNode = findNodeInTree(freshTree, targetId);
+        if (freshNode && isNodeRequirementMet(freshNode)) {
+          loopStatusMsg.value = `Target requirement reached (${freshNode.name})! Stopped automatically at ${completed}/${totalTimes}.`;
+          break;
+        }
+        if (freshNode) {
+          const isFrag = Boolean(freshNode.fragment);
+          const owned = isFrag ? Number(freshNode.fragment.owned) : Number(freshNode.owned);
+          const required = isFrag ? Number(freshNode.fragment.required) : Number(freshNode.requiredCount ?? 1);
+          itemsNeeded = Math.max(0, required - owned);
+        }
+      }
 
-      const res = await executeRaidCall(1);
+      // 2. Calculate raids possible in this step based on energy, tries, and remaining count
+      const remainingTimes = totalTimes - completed;
+      const energyPossible = Number.isFinite(curEnergy) && cost > 0 ? Math.floor(curEnergy / cost) : remainingTimes;
+      const triesPossible = tries.isHeroic ? tries.triesLeft : remainingTimes;
+      const raidsPossible = Math.min(remainingTimes, energyPossible, triesPossible);
+
+      if (raidsPossible <= 0) break;
+
+      // 3. Batch size = min(items needed, raids possible)
+      // Guarantees 1 RPC call raids multiple times without overshooting items needed
+      const batchSize = Number.isFinite(itemsNeeded) && itemsNeeded > 0
+        ? Math.min(itemsNeeded, raidsPossible)
+        : Math.min(10, raidsPossible);
+
+      if (batchSize <= 0) break;
+
+      loopStatusMsg.value = batchSize > 1
+        ? `Raiding ${completed + 1}..${completed + batchSize}/${totalTimes} (batch of ${batchSize})...`
+        : `Raiding ${completed + 1}/${totalTimes}...`;
+
+      const res = await executeRaidCall(batchSize);
       if (!res.ok) {
-        loopStatusMsg.value = `❌ Raid stopped at ${i}/${totalTimes}: ${res.error}`;
+        loopStatusMsg.value = `❌ Raid stopped at ${completed}/${totalTimes}: ${res.error}`;
         if (!res.pending) disableMissionToday(missionId.value);
         break;
       }
 
-      completed++;
+      completed += batchSize;
 
       if (res.drops) {
         mergeDropsIntoAccumulator(accumulatedDrops, res.drops);
@@ -631,25 +685,25 @@ async function executeSequentialLoop(totalTimes: number) {
         };
       }
 
-      // Check auto-stop condition for target item:
+      // 4. Check auto-stop condition again after fresh cache updates:
       if (farmMode.value === 'hero' && selectedLeafResource.value) {
         const targetLeaf = selectedLeafResource.value;
         const freshStock = Number(cache.value?.inventoryGet?.data?.[targetLeaf.category]?.[targetLeaf.id] || 0);
         if (freshStock >= targetLeaf.requiredCount) {
-          loopStatusMsg.value = `Target requirement reached (${targetLeaf.name}: ${freshStock}/${targetLeaf.requiredCount})! Stopped raid loop automatically at ${completed}/${totalTimes}.`;
+          loopStatusMsg.value = `Target requirement reached (${targetLeaf.name}: ${freshStock}/${targetLeaf.requiredCount})! Stopped automatically at ${completed}/${totalTimes}.`;
           break;
         }
       } else if (targetId && !wasInitiallyFulfilled && selectedGearId.value) {
         const freshTree = buildGearRecipeTree(selectedGearId.value, cache.value);
         const freshNode = findNodeInTree(freshTree, targetId);
         if (freshNode && isNodeRequirementMet(freshNode)) {
-          loopStatusMsg.value = `Target requirement reached (${freshNode.name})! Stopped raid loop automatically at ${completed}/${totalTimes}.`;
+          loopStatusMsg.value = `Target requirement reached (${freshNode.name})! Stopped automatically at ${completed}/${totalTimes}.`;
           break;
         }
       }
 
-      if (i < totalTimes && !abortCampaignRaidLoop.value) {
-        await new Promise((r) => setTimeout(r, 650));
+      if (completed < totalTimes && !abortCampaignRaidLoop.value) {
+        await new Promise((r) => setTimeout(r, 450));
       }
     }
   } finally {
@@ -681,36 +735,7 @@ async function startRaid(times: number) {
     return;
   }
 
-  if (campaignRaidSequential.value && effectiveTimes > 1) {
-    await executeSequentialLoop(effectiveTimes);
-  } else {
-    isRaidRunning.value = true;
-    try {
-      const res = await executeRaidCall(effectiveTimes);
-      if (res.ok) {
-        if (res.drops) {
-          localRaidResult.value = {
-            missionId: missionId.value,
-            times: effectiveTimes,
-            drops: res.drops,
-          };
-        }
-      } else {
-        const errLower = String(res.error || '').toLowerCase();
-        if (errLower.includes('vip') || errLower.includes('notenough')) {
-          loopStatusMsg.value = 'VIP limit detected, switching to sequential loop...';
-          toggleSequential(true);
-          await executeSequentialLoop(effectiveTimes);
-          return;
-        }
-        loopStatusMsg.value = res.error || 'Raid failed';
-        if (!res.pending) disableMissionToday(missionId.value);
-      }
-    } finally {
-      isRaidRunning.value = false;
-      dispatchRpc([{ name: 'inventoryGet' }]).catch(() => {});
-    }
-  }
+  await executeSequentialLoop(effectiveTimes);
 }
 
 const latestRaidResult = computed(() => {

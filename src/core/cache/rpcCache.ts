@@ -1451,7 +1451,8 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                   times,
                   drops,
                   currentDrops: drops,
-                  raw: resp
+                  raw: resp,
+                  ident: call.ident || `${record.timestamp}:${i}:missionRaid`
                 },
                 updatedAt: record.timestamp
               });
@@ -5583,7 +5584,9 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
             JSON.stringify(next[entry.key].data) === JSON.stringify(entry.data)) continue;
         if (entry.key === 'lastCampaignRaidResult') {
           const prev = next.lastCampaignRaidResult;
-          if (prev && prev.updatedAt >= entry.updatedAt) continue;
+          if (prev && prev.updatedAt > entry.updatedAt) continue;
+          if (prev && prev.updatedAt === entry.updatedAt && prev.data?.ident && entry.data?.ident &&
+              String(prev.data.ident).includes(String(entry.data.ident))) continue;
 
           if (entry.data?.failed) {
             next.lastCampaignRaidResult = entry;
@@ -5609,7 +5612,8 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
 
           // Merge newly dropped items directly into inventoryGet ONLY if inventoryGet was not updated in this same response
           const currentDrops = entry.data?.currentDrops || entry.data?.drops;
-          if (next.inventoryGet?.data && currentDrops && next.inventoryGet.updatedAt !== entry.updatedAt) {
+          const isServerInventoryFromSameRecord = next.inventoryGet?.updatedAt === entry.updatedAt && !(next.inventoryGet as any)?._fromRaidMerge;
+          if (next.inventoryGet?.data && currentDrops && !isServerInventoryFromSameRecord) {
             const inv = { ...next.inventoryGet.data };
             if (currentDrops.fragmentGear) {
               inv.fragmentGear = { ...(inv.fragmentGear || {}) };
@@ -5644,13 +5648,14 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
             next.inventoryGet = {
               ...next.inventoryGet,
               data: inv,
-              updatedAt: entry.updatedAt || new Date().toISOString()
-            };
+              updatedAt: entry.updatedAt || new Date().toISOString(),
+              _fromRaidMerge: true
+            } as any;
           }
 
           const prevTime = prev?.updatedAt ? Date.parse(prev.updatedAt) : 0;
           const currTime = entry.updatedAt ? Date.parse(entry.updatedAt) : 0;
-          if (prev && !prev.data?.failed && prev.data?.missionId === entry.data?.missionId && currTime - prevTime < 15000 && currTime > prevTime) {
+          if (prev && !prev.data?.failed && prev.data?.missionId === entry.data?.missionId && (prev.updatedAt === entry.updatedAt || (currTime - prevTime < 15000 && currTime > prevTime))) {
             const combinedDrops = {
               fragmentGear: { ...(prev.data?.drops?.fragmentGear || {}) },
               fragmentScroll: { ...(prev.data?.drops?.fragmentScroll || {}) },
@@ -5689,7 +5694,8 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
               ...entry.data,
               times: (prev.data?.times || 0) + (entry.data?.times || 1),
               drops: combinedDrops,
-              currentDrops: entry.data?.currentDrops || entry.data?.drops
+              currentDrops: prev.updatedAt === entry.updatedAt ? combinedDrops : (entry.data?.currentDrops || entry.data?.drops),
+              ident: prev.data?.ident ? `${prev.data.ident},${entry.data?.ident || ''}` : entry.data?.ident
             };
           }
           next.lastCampaignRaidResult = entry;
