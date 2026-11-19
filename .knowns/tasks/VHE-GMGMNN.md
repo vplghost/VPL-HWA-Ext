@@ -1,12 +1,14 @@
 ---
 id: VHE-GMGMNN
 title: Refactor EventDetailModal to dedicated Special Event Viewer with rich milestones and rewards
-status: todo
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-19T12:44:12.926Z'
-updatedAt: '2026-11-19T12:44:12.926Z'
+updatedAt: '2026-11-19T12:49:28.602Z'
+completedAt: '2026-11-19T12:49:28.602Z'
 timeSpent: 0
+assignee: '@me'
 ---
 # Refactor EventDetailModal to dedicated Special Event Viewer with rich milestones and rewards
 
@@ -18,9 +20,9 @@ Decouple EventDetailModal from battle pass stubs and polish dedicated special qu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 EventDetailModal focuses purely on dynamic special quest events
-- [ ] #2 Displays accurate event title, remaining countdown, and overall milestone progress
-- [ ] #3 Renders milestone tiers ladder with target, progress, rewards, and claim actions
-- [ ] #4 Supports chain filter tabs and search
+- [x] #1 EventDetailModal focuses purely on dynamic special quest events
+- [x] #2 Displays accurate event title, remaining countdown, and overall milestone progress
+- [x] #3 Renders milestone tiers ladder with target, progress, rewards, and claim actions
+- [x] #4 Supports chain filter tabs and search
 <!-- AC:END -->
 

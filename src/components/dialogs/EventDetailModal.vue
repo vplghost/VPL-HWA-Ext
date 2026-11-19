@@ -3,6 +3,8 @@ import { ref, computed, watch } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { questData } from '@/src/data/questData';
+import { getBattlePassName } from '@/src/data/battlepassCatalog';
+import { useModals } from '@/src/composables/useModals';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
 import { parseRewards } from '@/src/utils/rewardHelper';
@@ -19,6 +21,7 @@ const emit = defineEmits<{
 }>();
 
 const { cache, dispatchRpc } = useRpcCache();
+const { openModal } = useModals();
 
 const selectedEventId = ref<number | string | null>(null);
 const currentFilter = ref<'all' | 'daily' | 'single' | 'inProgress' | 'completed'>('all');
@@ -76,7 +79,7 @@ const battlePasses = computed(() => {
     id: `bp:${bp.id}`,
     bpId: bp.id,
     type: bp.type,
-    title: bp.type === 'draft' ? 'Draft Pass' : 'Season Pass',
+    title: getBattlePassName(bp),
     exp: bp.exp,
     endTime: bp.endTime,
     farmedNormal: bp.farmedNormal,
@@ -84,6 +87,12 @@ const battlePasses = computed(() => {
     hasGoldenPass: bp.hasGoldenPass,
   }));
 });
+
+function openDedicatedBattlePass() {
+  const bpId = currentBattlePass.value?.bpId || currentBattlePass.value?.id;
+  emit('update:modelValue', false);
+  openModal('battlePass', { selectedBattlePassId: bpId });
+}
 
 // Ensure selectedEventId points to a valid event
 watch(
@@ -420,6 +429,19 @@ async function claimAllReady() {
             <div class="text-2xs text-slate-500 dark:text-slate-400">Golden Rewards Farmed</div>
             <div class="text-amber-700 dark:text-amber-300 font-bold text-sm">{{ currentBattlePass.farmedGold }} Milestones</div>
           </div>
+        </div>
+
+        <div class="mt-3 flex items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-100/70 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700/60">
+          <div class="text-xs text-amber-900 dark:text-amber-200">
+            View full Battle Pass milestones, free & golden rewards ladder, and claim rewards in the dedicated Battle Pass dialog.
+          </div>
+          <button
+            type="button"
+            class="shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
+            @click="openDedicatedBattlePass"
+          >
+            <span>🎖️ Open Battle Pass View</span>
+          </button>
         </div>
       </div>
 
