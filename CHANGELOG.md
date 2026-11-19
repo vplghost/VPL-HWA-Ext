@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.11.130 — 2026-11-20
+
+### Added
+
+- **Titan Hover Card Layout Alignment & Threshold Skills (`TitanHoverCard.vue`)**:
+  - **Skills Threshold Highlight & Space Optimization**:
+    - Removed redundant `S1`, `S2` prefixes, displaying clean level numbers.
+    - Unified the `Skills` label and skill pills onto a single horizontal row (`flex items-center justify-between`) to save vertical space.
+    - Added max threshold highlight: skills that reach the titan's level cap (`level >= titanLevel`) are highlighted with distinct amber background and border styling (`bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-2xs font-bold ring-1 ring-amber-500/30`).
+  - **Compact Header & Metadata**:
+    - Displayed titan level badge (`Lv. {{ titan.level }}`) alongside star counts in the header.
+    - Realigned Skins and Artifacts into compact 1-line flex layouts with pills right-aligned (`justify-end flex-wrap gap-1`).
+    - Standardized card internal grid spacing (`gap-1.5`) and padding to ensure consistent vertical compact styling across all unit hover cards.
+  - Added unit test coverage in `tests/hero-hover-card.test.mjs`.
+
 ## 0.11.129 — 2026-11-20
 
 ### Added

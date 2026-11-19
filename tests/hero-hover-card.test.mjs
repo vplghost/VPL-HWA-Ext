@@ -41,3 +41,17 @@ test('HeroHoverCard component implements unified equipment frame, gear thumbnail
   // 3. Compact inline sections for scrollbar prevention
   assert.match(content, /flex items-center justify-between gap-1\.5/, 'Must use 1-line flex layouts for skills, skins, glyphs, and artifacts');
 });
+
+test('TitanHoverCard component implements compact 1-line layouts and threshold skill highlights', async () => {
+  const cardPath = join(root, 'src/components/common/TitanHoverCard.vue');
+  const content = await readFile(cardPath, 'utf8');
+
+  // 1. Skills threshold and compact 1-line layout
+  assert.match(content, /isThreshold/, 'Must calculate skill threshold reached');
+  assert.match(content, /bg-amber-500\/20 text-amber-300 border-amber-500\/50/, 'Must highlight threshold skills with amber border/bg');
+  assert.doesNotMatch(content, /label:\s*`S\$\{idx \+ 1\}`/, 'Must not generate S1, S2 labels');
+
+  // 2. Compact 1-line flex layouts
+  assert.match(content, /flex items-center justify-between gap-1\.5/, 'Must use 1-line flex layouts for skills, skins, and artifacts');
+  assert.match(content, /Lv\.\s*\{\{\s*titan(?:\?\.|\.)level\s*\}\}/, 'Must display titan level in header');
+});

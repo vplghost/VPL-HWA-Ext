@@ -60,11 +60,20 @@ const soulProgress = computed(() => {
 const skillsList = computed(() => {
   const skills = props.titan?.skills;
   if (!skills || typeof skills !== 'object') return [];
+  const titanLevel = Number(props.titan?.level) || 1;
   const sortedKeys = Object.keys(skills).sort((a, b) => Number(a) - Number(b));
-  return sortedKeys.map((k, idx) => ({
-    label: `S${idx + 1}`,
-    level: skills[k],
-  }));
+
+  return sortedKeys.map((k, idx) => {
+    const lvl = Number(skills[k]) || 0;
+    const isThreshold = titanLevel > 0 && lvl >= titanLevel;
+
+    return {
+      slot: idx + 1,
+      level: lvl,
+      isThreshold,
+      title: `Skill ${idx + 1}: Lv. ${lvl} / ${titanLevel}${isThreshold ? ' (MAX)' : ''}`,
+    };
+  });
 });
 
 const skinsList = computed(() => {
@@ -111,136 +120,145 @@ const artifactsList = computed(() => {
       :style="cardPositionStyle"
     >
       <!-- Header: Avatar + Identity + Star + Power -->
-    <div class="flex items-center gap-3">
-      <!-- Big Avatar with Star Glow -->
-      <div class="relative size-14 shrink-0 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center" :class="largeGlow">
-        <img
-          v-if="avatarUrl"
-          :src="avatarUrl"
-          :alt="titanName"
-          class="size-full object-cover"
-        />
-        <div
-          v-else
-          class="size-full flex items-center justify-center font-bold text-xl text-white bg-gradient-to-br"
-          :class="elementTheme.gradient"
-        >
-          {{ titanName.charAt(0).toUpperCase() }}
-        </div>
-      </div>
-
-      <!-- Info Column -->
-      <div class="min-w-0 flex-1 space-y-1">
-        <div class="flex items-center justify-between gap-1">
-          <div class="font-bold text-sm text-white truncate" :title="titanName">
-            {{ titanName }}
-          </div>
-          <span class="text-[10px] font-mono px-1 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">
-            #{{ titanId }}
-          </span>
-        </div>
-
-        <!-- Stars Display -->
-        <div class="flex items-center gap-1 text-xs">
-          <UnitStars :count="starCount" />
-        </div>
-
-        <!-- Power -->
-        <div class="text-xs text-amber-300 font-semibold tabular-nums flex items-center gap-1">
-          <span>⚡ Power:</span>
-          <span>{{ formatNumber(titan?.power || 0) }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Divider -->
-    <div class="border-t border-slate-700/80 my-2.5"></div>
-
-    <!-- Metadata Grid -->
-    <div class="grid grid-cols-2 gap-2 text-[11px]">
-      <!-- Role Box -->
-      <div class="rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Role</span>
-        <span class="font-medium text-slate-200 block truncate">
-          {{ meta?.role || 'Titan' }}
-        </span>
-      </div>
-
-      <!-- Element Box -->
-      <div class="rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Element</span>
-        <span class="font-medium text-slate-200 flex items-center gap-1.5 truncate">
-          <span class="size-1.5 rounded-full shrink-0" :class="elementTheme.dot"></span>
-          <span class="truncate">{{ meta?.element || 'Unknown' }}</span>
-        </span>
-      </div>
-
-      <!-- Soul Stones Progress -->
-      <div class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1.5 ring-1 ring-slate-700/60 space-y-1">
-        <div class="flex items-center justify-between text-[10px]">
-          <span class="text-slate-400 uppercase tracking-wider font-semibold">Soul Stones</span>
-          <span
-            class="font-mono font-semibold"
-            :class="soulProgress.canEvolve ? 'text-emerald-400' : 'text-slate-300'"
-          >
-            {{ formatNumber(soulProgress.owned) }} / {{ typeof soulProgress.needed === 'number' ? formatNumber(soulProgress.needed) : soulProgress.needed }}
-            <span v-if="soulProgress.canEvolve" class="ml-1 text-[9px] font-bold text-emerald-400">⚡ READY</span>
-          </span>
-        </div>
-        <div class="h-1.5 w-full bg-slate-700/70 rounded-full overflow-hidden">
+      <div class="flex items-center gap-2.5">
+        <!-- Big Avatar with Star Glow -->
+        <div class="relative size-12 shrink-0 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center" :class="largeGlow">
+          <img
+            v-if="avatarUrl"
+            :src="avatarUrl"
+            :alt="titanName"
+            class="size-full object-cover"
+          />
           <div
-            class="h-full rounded-full transition-all"
-            :class="soulProgress.canEvolve ? 'bg-emerald-400' : 'bg-blue-500'"
-            :style="{ width: `${soulProgress.percent}%` }"
-          ></div>
+            v-else
+            class="size-full flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br"
+            :class="elementTheme.gradient"
+          >
+            {{ titanName.charAt(0).toUpperCase() }}
+          </div>
+        </div>
+
+        <!-- Info Column -->
+        <div class="min-w-0 flex-1 space-y-0.5">
+          <div class="flex items-center justify-between gap-1">
+            <div class="font-bold text-xs text-white truncate" :title="titanName">
+              {{ titanName }}
+            </div>
+            <span class="text-[9px] font-mono px-1 py-0.2 rounded bg-slate-800 text-slate-400 shrink-0">
+              #{{ titanId }}
+            </span>
+          </div>
+
+          <!-- Stars & Level Display -->
+          <div class="flex items-center gap-1.5 text-[11px]">
+            <UnitStars :count="starCount" />
+            <span v-if="titan?.level" class="font-bold text-slate-300 text-3xs">
+              Lv. {{ titan.level }}
+            </span>
+          </div>
+
+          <!-- Power -->
+          <div class="text-[11px] text-amber-300 font-semibold tabular-nums flex items-center gap-1">
+            <span>⚡ Power:</span>
+            <span>{{ formatNumber(titan?.power || 0) }}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Skills Box -->
-      <div v-if="skillsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Skills</span>
-        <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span
-            v-for="s in skillsList"
-            :key="s.label"
-            class="rounded bg-slate-700/80 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300 tabular-nums"
-          >
-            {{ s.label }}: {{ s.level }}
+      <!-- Divider -->
+      <div class="border-t border-slate-700/80 my-2"></div>
+
+      <!-- Metadata Grid -->
+      <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+        <!-- Role Box -->
+        <div class="rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
+          <span class="text-slate-400 block text-[9px] uppercase tracking-wider font-semibold">Role</span>
+          <span class="font-medium text-slate-200 block truncate text-[11px]">
+            {{ meta?.role || 'Titan' }}
           </span>
         </div>
-      </div>
 
-      <!-- Skins Box -->
-      <div v-if="skinsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Skins</span>
-        <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span
-            v-for="s in skinsList"
-            :key="s.stat"
-            class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
-            :class="s.isCurrent ? 'bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/50' : 'bg-slate-700/80 text-amber-300'"
-          >
-            {{ s.stat }}: {{ s.level }}
+        <!-- Element Box -->
+        <div class="rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
+          <span class="text-slate-400 block text-[9px] uppercase tracking-wider font-semibold">Element</span>
+          <span class="font-medium text-slate-200 flex items-center gap-1.5 truncate text-[11px]">
+            <span class="size-1.5 rounded-full shrink-0" :class="elementTheme.dot"></span>
+            <span class="truncate">{{ meta?.element || 'Unknown' }}</span>
           </span>
         </div>
-      </div>
 
-      <!-- Artifacts Box -->
-      <div v-if="artifactsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60">
-        <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Artifacts</span>
-        <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span
-            v-for="a in artifactsList"
-            :key="a.type"
-            class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
-            :class="a.isUpgradable ? 'bg-emerald-900/60 text-emerald-300 ring-1 ring-emerald-500/50' : 'bg-slate-700/80 text-violet-300'"
-            :title="a.isUpgradable ? 'Artifact ready to upgrade' : ''"
-          >
-            {{ a.type }}: {{ a.star }}★ Lv.{{ a.level }}
-          </span>
+        <!-- Soul Stones Progress -->
+        <div class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 space-y-1">
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="text-slate-400 uppercase tracking-wider font-semibold">Soul Stones</span>
+            <span
+              class="font-mono font-semibold"
+              :class="soulProgress.canEvolve ? 'text-emerald-400' : 'text-slate-300'"
+            >
+              {{ formatNumber(soulProgress.owned) }} / {{ typeof soulProgress.needed === 'number' ? formatNumber(soulProgress.needed) : soulProgress.needed }}
+              <span v-if="soulProgress.canEvolve" class="ml-1 text-[9px] font-bold text-emerald-400">⚡ READY</span>
+            </span>
+          </div>
+          <div class="h-1.5 w-full bg-slate-700/70 rounded-full overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all"
+              :class="soulProgress.canEvolve ? 'bg-emerald-400' : 'bg-blue-500'"
+              :style="{ width: `${soulProgress.percent}%` }"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Skills: 1-line flex layout, threshold highlight, no S1/S2 labels -->
+        <div v-if="skillsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Skills</span>
+          <div class="flex items-center gap-1 flex-wrap justify-end">
+            <span
+              v-for="s in skillsList"
+              :key="s.slot"
+              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums border transition-colors"
+              :class="
+                s.isThreshold
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-2xs font-bold ring-1 ring-amber-500/30'
+                  : 'bg-slate-700/80 text-sky-300 border-slate-600/50'
+              "
+              :title="s.title"
+            >
+              {{ s.level }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Skins: 1-line flex layout -->
+        <div v-if="skinsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Skins</span>
+          <div class="flex items-center gap-1 flex-wrap justify-end">
+            <span
+              v-for="s in skinsList"
+              :key="s.stat"
+              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              :class="s.isCurrent ? 'bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/50' : 'bg-slate-700/80 text-amber-300'"
+            >
+              {{ s.stat }}: {{ s.level }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Artifacts: 1-line flex layout -->
+        <div v-if="artifactsList.length > 0" class="col-span-2 rounded-md bg-slate-800/80 px-2 py-1 ring-1 ring-slate-700/60 flex items-center justify-between gap-1.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold shrink-0">Artifacts</span>
+          <div class="flex items-center gap-1 flex-wrap justify-end">
+            <span
+              v-for="a in artifactsList"
+              :key="a.type"
+              class="rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              :class="a.isUpgradable ? 'bg-emerald-900/60 text-emerald-300 ring-1 ring-emerald-500/50' : 'bg-slate-700/80 text-violet-300'"
+              :title="a.isUpgradable ? 'Artifact ready to upgrade' : ''"
+            >
+              {{ a.type }}: {{ a.star }}★ Lv.{{ a.level }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</Teleport>
+  </Teleport>
 </template>
