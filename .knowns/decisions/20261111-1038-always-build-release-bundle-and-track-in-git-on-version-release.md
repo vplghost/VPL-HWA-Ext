@@ -1,9 +1,10 @@
 ---
 id: 20261111-1038-always-build-release-bundle-and-track-in-git-on-version-release
 title: Always build release bundle and track in git on version release
-status: accepted
+status: superseded
 supersedes: []
-supersededBy: []
+supersededBy:
+  - 20261119-2059-always-build-production-extension-and-update-changelog-before-git-push-for-immediate-deployment
 tags:
   - release
   - build
@@ -22,7 +23,7 @@ verification:
   - 'task:@task-VHE-DNMYZY:done'
 verifiedAt: '2026-11-11T03:39:21.894Z'
 createdAt: '2026-11-11T03:38:40.392Z'
-updatedAt: '2026-11-11T03:39:21.894Z'
+updatedAt: '2026-11-19T14:01:59.583Z'
 ---
 
 ## Context

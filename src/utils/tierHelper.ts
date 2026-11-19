@@ -538,18 +538,18 @@ export function resolveTierTarget(quest: any, group: any, tierIndex: number, qAl
   }
 
   // 2. Known CDN quest target
-  if (quest?.id && knownQuestTargets[quest.id]) {
-    return knownQuestTargets[quest.id];
+  if (quest?.id && knownQuestTargets[quest.id] != null) {
+    return knownQuestTargets[quest.id]!;
   }
 
   // 3. Chain definition ladder
   const meta = getGroupMeta(group?.localeKey, group?.title);
   if (meta.ladder && Array.isArray(meta.ladder) && meta.ladder.length > 0) {
     const idx = tierIndex - 1;
-    if (idx < meta.ladder.length) {
-      return meta.ladder[idx];
+    if (idx < meta.ladder.length && meta.ladder[idx] != null) {
+      return meta.ladder[idx]!;
     }
-    const last = meta.ladder[meta.ladder.length - 1];
+    const last = meta.ladder[meta.ladder.length - 1] ?? 1;
     const prev = meta.ladder[meta.ladder.length - 2] || 0;
     const step = Math.max(1, last - prev);
     return last + step * (idx - meta.ladder.length + 1);

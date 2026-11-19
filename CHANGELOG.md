@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.11.114 — 2026-11-19
+
+### Added
+
+- **Captured Event Data Export for Offline Analysis (`src/utils/eventExport.ts`)**:
+  - Implemented structured JSON export bundling live event states, battle passes, clan versus, daily quests, and dynamic event catalog.
+  - Added "📥 Export" and "📋 Copy" buttons to `EventsTab.vue` toolbar, `EventDetailModal.vue`, and `BattlePassModal.vue`.
+  - Added unit test coverage in `tests/events-export.test.mjs`.
+
+- **Enforced Production Build and Changelog Policy**:
+  - Formally recorded and accepted System Decision `20261119-2059-always-build-production-extension-and-update-changelog-before-git-push-for-immediate-deployment`.
+  - Compiled and packaged production artifacts directly into tracked `dist/` directory.
+
+## 0.11.113 — 2026-11-19
+
+### Fixed
+
+- **Partial & Tier Claiming for Chained Daily Quests (`QuestDetailModal.vue`, `src/utils/tierHelper.ts`, `src/utils/popupData.ts`)**:
+  - Resolved intermediate tier claimability for sequential chained quests (such as Clear Brigand Camp `#362`-`#364`, Map Gathering `#365`-`#367`, Defeat Boss `#368`-`#370`, and Barracks Troop Training).
+  - Fixed quest state evaluation: automatically marks quest tier as `ready` (100%) when `progress >= target` and `!isCompleted`, displaying the active Claim button.
+  - Dispatched dedicated `completeQuest` RPC (`feature: 'quest'`) instead of `quest_multiFarm` for daily 4X quests.
+  - Added daily quest claim detection into `getPendingClaims` and automated claiming via `buildAutoClaimCalls`.
+  - Added unit test coverage in `tests/chained-quest-claim.test.mjs`.
+
+## 0.11.112 — 2026-11-19
+
+### Added
+
+- **In-Game Claim Synchronization into Extension Cache**:
+  - Synchronized in-game quest completions (`completeQuest`, `questFarm`, `quest_multiFarm`, `dailyQuestFarm`) into `questGetAll`, `dailyQuests`, and `specialQuestStatus`.
+  - Synchronized in-game mail claims and deletions (`mailFarm`, `readAndClaimAll`, `deleteAllRead`) into `mailStatus` and `mailGetAll`.
+  - Synchronized in-game freebie claims (`zeppelinGiftFarm`, `offerFarmReward`, `cinemaGiveReward`, `attentionBonus_collectReward`).
+  - Added 9 end-to-end sync test cases in `tests/ingame-claim-sync.test.mjs`.
+
+## 0.11.108 — 2026-11-19
+
+### Added
+
+- **Dedicated BattlePassModal & EventDetailModal View Parity**:
+  - Implemented dedicated `BattlePassModal.vue` with levels ladder, milestone reward previews, free vs golden track activations, and bulk claim action.
+  - Refactored `EventDetailModal.vue` into rich Special Event Viewer with milestone progress, ladder targets, and reward previews.
+  - Implemented dynamic event title mapping via `eventCatalogService.ts` and `battlepassCatalog.ts`.
+
 ## 0.11.90 — 2026-11-18
 
 ### Changed

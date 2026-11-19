@@ -926,7 +926,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
   const dailyQuestIds: Array<string | number> = [];
   for (const dq of dqList) {
     if (!dq || dq.id == null) continue;
-    const isDone = dq.state === 'completed' || dq.state === 3 || (Number(dq.completionCount) || 0) > 0;
+    const isDone = dq.state === 'completed' || (dq.state as any) === 3 || (Number(dq.completionCount) || 0) > 0;
     if (isDone) continue;
     const target = Number(
       questData?.dailyDefinition?.(dq.id)?.condition?.target ??
@@ -935,7 +935,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
       dq.condition?.target
     ) || 0;
     const progress = Number(dq.progress) || 0;
-    const isReady = dq.state === 'ready' || dq.state === 2 || (target > 0 && progress >= target);
+    const isReady = dq.state === 'ready' || (dq.state as any) === 2 || (target > 0 && progress >= target);
     if (isReady) {
       dailyQuestIds.push(dq.id);
     }

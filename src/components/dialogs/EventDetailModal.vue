@@ -301,24 +301,6 @@ async function claimAllReady() {
     }, 3000);
   }
 }
-
-function exportCurrentEventData() {
-  exportEventsAsJson(cache.value, null, {
-    selectedEventId: selectedEventId.value,
-    selectedEvent: currentEvent.value || currentBattlePass.value,
-  }, `hwa-event-${selectedEventId.value || 'detail'}`);
-  claimStatus.value = 'Exported JSON!';
-  setTimeout(() => { claimStatus.value = ''; }, 3000);
-}
-
-async function copyCurrentEventData() {
-  const ok = await copyEventsToClipboard(cache.value, null, {
-    selectedEventId: selectedEventId.value,
-    selectedEvent: currentEvent.value || currentBattlePass.value,
-  });
-  claimStatus.value = ok ? 'Copied JSON to clipboard!' : 'Failed to copy';
-  setTimeout(() => { claimStatus.value = ''; }, 3000);
-}
 </script>
 
 <template>
