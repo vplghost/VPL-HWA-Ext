@@ -75,9 +75,11 @@ test('artifactHelper calculates correct milestones, resource transitions, and co
   assert.equal(ringRes70.tierColor, 'purple');
 });
 
-test('getArtifactUpgradePlan generates complete plan for +1 and milestone delta', () => {
+test('getArtifactUpgradePlan generates complete plan for +1, milestone delta, and chest bridge', () => {
   // Hero 501 weapon at level 13 with 63 gray essence (item 29)
-  const plan = getArtifactUpgradePlan('weapon', 13, { 29: 63 });
+  // Consumable inventory has 63 item 29, and 100 chests (item 62)
+  const inventory = { 29: 63, 62: 100 };
+  const plan = getArtifactUpgradePlan('weapon', 13, inventory);
 
   assert.equal(plan.currentLevel, 13);
   assert.equal(plan.targetLevel, 25);
@@ -85,21 +87,47 @@ test('getArtifactUpgradePlan generates complete plan for +1 and milestone delta'
   assert.equal(plan.costForNextOne, 27);
   assert.equal(plan.canUpgradeOne, true); // 63 >= 27
   assert.equal(plan.totalCost, 456); // Sum of levels 14..25
-  assert.equal(plan.canUpgradeMilestone, true); // can afford at least 2 levels (27 + 29 = 56 <= 63)
   assert.equal(plan.affordableLevels, 2);
   assert.equal(plan.affordableCost, 56);
+  assert.equal(plan.milestoneLevels, 2); // min(12, 2)
+  assert.equal(plan.milestoneCost, 56);
   assert.equal(plan.consumableId, 29);
 
-  // Plan when abundant resources are available
-  const richPlan = getArtifactUpgradePlan('weapon', 13, { 29: 1000 });
+  // Chest plan verification:
+  // Target milestone is 25 (delta: 12).
+  // Total cost for 12 levels = 456.
+  // Owned essence = 63. Deficit = 456 - 63 = 393.
+  // Weapon gray chest yield = 12 essence per chest (chest 62 choice index 0).
+  // Ceil(393 / 12) = 33 chests.
+  // Player has 100 chests, so player can afford all 12 levels with chests.
+  assert.ok(plan.chestPlan);
+  assert.equal(plan.chestPlan.hasChests, true);
+  assert.equal(plan.chestPlan.canUpgradeWithChests, true);
+  assert.equal(plan.chestPlan.levelsDeltaWithChests, 12);
+  assert.equal(plan.chestPlan.chestsToOpen, 33);
+  assert.equal(plan.chestPlan.chestId, 62);
+  assert.equal(plan.chestPlan.choiceIndex, 0);
+
+  // Plan when abundant resources are available directly
+  const richPlan = getArtifactUpgradePlan('weapon', 13, { 29: 1000, 62: 10 });
   assert.equal(richPlan.affordableLevels, 12);
   assert.equal(richPlan.affordableCost, 456);
+  assert.equal(richPlan.milestoneLevels, 12);
+  assert.equal(richPlan.milestoneCost, 456);
+  // Deficit is 0, so chestsToOpen is 0 and canUpgradeWithChests is false
+  assert.equal(richPlan.chestPlan?.canUpgradeWithChests, false);
+
+  // Plan when 0 chests owned
+  const noChestsPlan = getArtifactUpgradePlan('weapon', 13, { 29: 63, 62: 0 });
+  assert.equal(noChestsPlan.chestPlan?.hasChests, false);
+  assert.equal(noChestsPlan.chestPlan?.canUpgradeWithChests, false);
 
   // Plan when max level
   const maxPlan = getArtifactUpgradePlan('weapon', 100, { 33: 500 });
   assert.equal(maxPlan.isMax, true);
   assert.equal(maxPlan.canUpgradeOne, false);
   assert.equal(maxPlan.canUpgradeMilestone, false);
+  assert.equal(maxPlan.chestPlan?.canUpgradeWithChests, false);
 });
 
 test('rpcCache accurately extracts and merges artifact_levelUp from game tracking data', async () => {
@@ -187,18 +215,22 @@ test('rpcCache accurately extracts and merges artifact_levelUp from game trackin
   assert.equal(weaponMerged.cache.inventoryGet.data.consumable[29], 50 - 3);
 });
 
-test('HeroDetailModal template includes artifact leveling buttons (+1 and +##)', async () => {
+test('HeroDetailModal template includes artifact leveling buttons (+1, +#1 milestone, and +#2 chest bridge)', async () => {
   const modalPath = join(root, 'src/components/dialogs/HeroDetailModal.vue');
   const content = await readFile(modalPath, 'utf8');
 
   assert.match(content, /detailedArtifacts/, 'Must compute detailedArtifacts');
   assert.match(content, /upgradeArtifactSingle/, 'Must define upgradeArtifactSingle');
   assert.match(content, /upgradeArtifactToMilestone/, 'Must define upgradeArtifactToMilestone');
+  assert.match(content, /upgradeArtifactWithChests/, 'Must define upgradeArtifactWithChests');
   assert.match(content, /upgradingArtifactAction/, 'Must track upgradingArtifactAction');
   assert.match(content, /artifact_levelUp/, 'Must dispatch artifact_levelUp RPC');
+  assert.match(content, /inventory_use/, 'Must dispatch inventory_use for chests');
   assert.match(content, /\+1<\/span>/, 'Must display +1 button');
-  assert.match(content, /\+\{\{\s*art\.plan\.levelsDelta\s*\}\}<\/span>/, 'Must display +## button to milestone');
+  assert.match(content, /\+\{\{\s*art\.plan\.milestoneLevels/, 'Must display +#1 button to milestone');
+  assert.match(content, /\+\{\{\s*art\.plan\.chestPlan\.levelsDeltaWithChests\s*\}\}<\/span>/, 'Must display +#2 button with chest bridge');
   assert.match(content, /art\.plan\.costForNextOne/, 'Must display cost for +1 in button text');
-  assert.match(content, /art\.plan\.totalCost/, 'Must display total cost for milestone in button text');
+  assert.match(content, /art\.plan\.milestoneCost/, 'Must display milestoneCost for milestone in button text');
+  assert.match(content, /art\.plan\.chestPlan\.chestsToOpen/, 'Must display chestsToOpen on chest bridge button');
   assert.match(content, /pointer-events-none/, 'Must disable pointer events during artifact upgrade to prevent double-click');
 });

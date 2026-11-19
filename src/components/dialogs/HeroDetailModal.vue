@@ -406,7 +406,7 @@ const heroArtifacts = computed(() => {
 
 const isUpgradingArtifact = ref(false);
 const upgradingArtifactSlot = ref<number | null>(null);
-const upgradingArtifactAction = ref<'single' | 'milestone' | null>(null);
+const upgradingArtifactAction = ref<'single' | 'milestone' | 'chest' | null>(null);
 
 const inventoryConsumables = computed<Record<string | number, number>>(() => {
   return cache.value?.inventoryGet?.data?.consumable || {};
@@ -479,7 +479,7 @@ async function upgradeArtifactToMilestone(slotId: number) {
   const artInfo = detailedArtifacts.value.find((a) => a.slotId === slotId);
   if (!artInfo) return;
 
-  const toAdd = Math.min(artInfo.plan.levelsDelta, artInfo.plan.affordableLevels);
+  const toAdd = artInfo.plan.milestoneLevels;
   if (toAdd <= 0) return;
 
   isUpgradingArtifact.value = true;
@@ -493,6 +493,56 @@ async function upgradeArtifactToMilestone(slotId: number) {
         args: { heroId: numHeroId, slotId },
       });
     }
+    calls.push({ name: 'heroGetAll' });
+    calls.push({ name: 'inventoryGet' });
+    calls.push({ name: 'userGetInfo' });
+
+    await dispatchRpc(calls);
+  } finally {
+    upgradingArtifactSlot.value = null;
+    upgradingArtifactAction.value = null;
+    isUpgradingArtifact.value = false;
+  }
+}
+
+async function upgradeArtifactWithChests(slotId: number) {
+  if (isUpgradingArtifact.value || !activeHero.value) return;
+  const numHeroId = Number(currentHeroId.value);
+  if (!numHeroId) return;
+
+  const artInfo = detailedArtifacts.value.find((a) => a.slotId === slotId);
+  if (!artInfo || !artInfo.plan.chestPlan.canUpgradeWithChests) return;
+
+  const { chestId, choiceIndex, chestsToOpen, levelsDeltaWithChests } = artInfo.plan.chestPlan;
+  if (levelsDeltaWithChests <= 0) return;
+
+  isUpgradingArtifact.value = true;
+  upgradingArtifactSlot.value = slotId;
+  upgradingArtifactAction.value = 'chest';
+  try {
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+
+    // 1. Open chests if needed
+    if (chestsToOpen > 0) {
+      calls.push({
+        name: 'inventory_use',
+        args: {
+          libId: chestId,
+          amount: chestsToOpen,
+          params: { choice: choiceIndex }
+        }
+      });
+    }
+
+    // 2. Perform artifact level ups
+    for (let i = 0; i < levelsDeltaWithChests; i++) {
+      calls.push({
+        name: 'artifact_levelUp',
+        args: { heroId: numHeroId, slotId }
+      });
+    }
+
+    // 3. Sync state
     calls.push({ name: 'heroGetAll' });
     calls.push({ name: 'inventoryGet' });
     calls.push({ name: 'userGetInfo' });
@@ -1186,12 +1236,16 @@ function handleHeroFarmAll() {
                 </div>
 
                 <!-- Bottom: Action Buttons -->
-                <div v-if="!art.plan.isMax" class="grid grid-cols-2 gap-1.5 pt-1">
+                <div
+                  v-if="!art.plan.isMax"
+                  class="grid gap-1 pt-1"
+                  :class="art.plan.chestPlan.hasChests && art.plan.chestPlan.canUpgradeWithChests ? 'grid-cols-3' : 'grid-cols-2'"
+                >
                   <!-- Button +1 -->
                   <button
                     type="button"
                     :disabled="isUpgradingArtifact || !art.plan.canUpgradeOne"
-                    class="py-1 px-1.5 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95"
+                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
                     :class="[
                       art.plan.canUpgradeOne
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700 dark:border-emerald-500'
@@ -1202,29 +1256,56 @@ function handleHeroFarmAll() {
                     :title="`Upgrade +1 Level. Cost: ${art.plan.costForNextOne} ${art.plan.shortName} (Owned: ${art.plan.ownedAmount})`"
                     @click="upgradeArtifactSingle(art.slotId)"
                   >
-                    <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                    <span v-else>+1</span>
+                    <div class="flex items-center gap-0.5">
+                      <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                      <span v-else>+1</span>
+                    </div>
                     <span class="text-3xs font-normal opacity-85">({{ art.plan.costForNextOne }})</span>
                   </button>
 
-                  <!-- Button +## (to next resource milestone) -->
+                  <!-- Button +{#1} (up to milestone with owned resources) -->
                   <button
                     type="button"
-                    :disabled="isUpgradingArtifact || !art.plan.canUpgradeMilestone"
-                    class="py-1 px-1.5 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95"
+                    :disabled="isUpgradingArtifact || !art.plan.canUpgradeMilestone || art.plan.milestoneLevels <= 0"
+                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
                     :class="[
-                      art.plan.canUpgradeMilestone
+                      art.plan.canUpgradeMilestone && art.plan.milestoneLevels > 0
                         ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-700 dark:border-amber-500'
                         : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700',
                       isUpgradingArtifact ? 'pointer-events-none' : '',
                       upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'milestone' ? 'ring-2 ring-amber-400 opacity-90' : ''
                     ]"
-                    :title="`Upgrade to Lv. ${art.plan.targetLevel} (${art.plan.levelsDelta > 1 ? '+' + art.plan.levelsDelta : '+1'} levels). Cost: ${art.plan.totalCost} ${art.plan.shortName} (Affordable: +${art.plan.affordableLevels})`"
+                    :title="`Upgrade to Lv. ${art.plan.currentLevel + (art.plan.milestoneLevels > 0 ? art.plan.milestoneLevels : art.plan.levelsDelta)} (+${art.plan.milestoneLevels > 0 ? art.plan.milestoneLevels : art.plan.levelsDelta} levels). Cost: ${art.plan.milestoneLevels > 0 ? art.plan.milestoneCost : art.plan.totalCost} ${art.plan.shortName}`"
                     @click="upgradeArtifactToMilestone(art.slotId)"
                   >
-                    <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'milestone'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                    <span v-else>+{{ art.plan.levelsDelta }}</span>
-                    <span class="text-3xs font-normal opacity-85">({{ art.plan.totalCost }})</span>
+                    <div class="flex items-center gap-0.5">
+                      <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'milestone'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                      <span v-else>+{{ art.plan.milestoneLevels > 0 ? art.plan.milestoneLevels : art.plan.levelsDelta }}</span>
+                    </div>
+                    <span class="text-3xs font-normal opacity-85">({{ art.plan.milestoneLevels > 0 ? art.plan.milestoneCost : art.plan.totalCost }})</span>
+                  </button>
+
+                  <!-- Button +{#2} (with corresponding chest opening) -->
+                  <button
+                    v-if="art.plan.chestPlan.hasChests && art.plan.chestPlan.canUpgradeWithChests"
+                    type="button"
+                    :disabled="isUpgradingArtifact || !art.plan.chestPlan.canUpgradeWithChests"
+                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    :class="[
+                      art.plan.chestPlan.canUpgradeWithChests
+                        ? 'bg-purple-600 hover:bg-purple-500 text-white border-purple-700 dark:border-purple-500'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700',
+                      isUpgradingArtifact ? 'pointer-events-none' : '',
+                      upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'chest' ? 'ring-2 ring-purple-400 opacity-90' : ''
+                    ]"
+                    :title="`Upgrade +${art.plan.chestPlan.levelsDeltaWithChests} levels (opens ${art.plan.chestPlan.chestsToOpen} ${art.plan.chestPlan.chestName} for +${art.plan.chestPlan.chestsToOpen * art.plan.chestPlan.resourcePerChest} ${art.plan.shortName}). Total cost: ${art.plan.chestPlan.totalCostWithChests} ${art.plan.shortName}`"
+                    @click="upgradeArtifactWithChests(art.slotId)"
+                  >
+                    <div class="flex items-center gap-0.5">
+                      <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'chest'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                      <span v-else>+{{ art.plan.chestPlan.levelsDeltaWithChests }}</span>
+                    </div>
+                    <span class="text-3xs font-normal opacity-90">({{ art.plan.chestPlan.chestsToOpen }} 🎁)</span>
                   </button>
                 </div>
 

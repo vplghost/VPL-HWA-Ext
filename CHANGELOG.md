@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.11.127 — 2026-11-20
+
+### Added
+
+- **Hero Dialog: Restructured Artifact Level Up Buttons (+1, +#1 Milestone, and +#2 Chest Bridge)** (`HeroDetailModal.vue`, `artifactHelper.ts`):
+  - Re-architected artifact upgrade button layout into 3 organized action paths:
+    - **Button 1 (`+1`)**: Upgrades 1 level using currently owned resources (`costForNextOne`).
+    - **Button 2 (`+{#1}`)**: Upgrades `#1 = min(levelsDelta, affordableLevels)` levels to milestone using only currently owned resources (`milestoneCost`).
+    - **Button 3 (`+{#2}`)**: Upgrades `#2 = min(levelsDelta, affordableLevelsWithChests)` levels to milestone by automatically calculating resource deficit and opening the exact number of matching choice chests (`chestsToOpen = ceil(deficit / yield)`).
+  - Chest Bridge Mechanics:
+    - Integrated artifact chest mappings (Weapon: Chest #62, Book: Chest #63, Ring: Chest #64) and tier yield multipliers (Gray: 12, Green: 7, Blue: 4, Violet: 2, Orange: 1).
+    - When clicked, executes single batched RPC flow: dispatches `inventory_use` with exact choice index and count, followed by `#2` `artifact_levelUp` calls, followed by cache sync (`heroGetAll`, `inventoryGet`, `userGetInfo`).
+    - Button `#2` is automatically hidden when player has 0 matching chests or when owned resources already cover the entire milestone.
+  - Provided tactile loading spinners (`↻`) and synchronous `pointer-events-none` protection during execution.
+  - Added unit test suite in `tests/artifact-level-up.test.mjs` verifying milestone calculations, chest bridge planning, and button template structure.
+
 ## 0.11.126 — 2026-11-20
 
 ### Added

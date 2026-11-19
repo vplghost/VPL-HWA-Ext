@@ -28,6 +28,19 @@ export interface ArtifactResourceInfo {
   icon: string;
 }
 
+export interface ArtifactChestUpgradeInfo {
+  chestId: number;
+  chestName: string;
+  ownedChests: number;
+  choiceIndex: number;
+  resourcePerChest: number;
+  hasChests: boolean;
+  levelsDeltaWithChests: number; // #2
+  chestsToOpen: number;
+  totalCostWithChests: number;
+  canUpgradeWithChests: boolean;
+}
+
 export interface ArtifactUpgradePlan {
   slotId: number;
   artifactType: ArtifactSlotType;
@@ -40,6 +53,9 @@ export interface ArtifactUpgradePlan {
   canUpgradeMilestone: boolean;
   affordableLevels: number;
   affordableCost: number;
+  milestoneLevels: number; // #1: min(levelsDelta, affordableLevels)
+  milestoneCost: number;
+  chestPlan: ArtifactChestUpgradeInfo;
   consumableId: number;
   resourceName: string;
   shortName: string;
@@ -47,6 +63,49 @@ export interface ArtifactUpgradePlan {
   tierColor: ArtifactTierColor;
   isMax: boolean;
 }
+
+export const ARTIFACT_CHEST_MAP: Record<
+  ArtifactSlotType,
+  {
+    chestId: number;
+    chestName: string;
+    resourcePerChest: Record<ArtifactTierColor, { choice: number; amount: number }>;
+  }
+> = {
+  weapon: {
+    chestId: 62,
+    chestName: 'Artifact Essence Chest',
+    resourcePerChest: {
+      white: { choice: 0, amount: 12 },
+      green: { choice: 1, amount: 7 },
+      blue: { choice: 2, amount: 4 },
+      purple: { choice: 3, amount: 2 },
+      orange: { choice: 4, amount: 1 }
+    }
+  },
+  book: {
+    chestId: 63,
+    chestName: 'Artifact Scroll Chest',
+    resourcePerChest: {
+      white: { choice: 0, amount: 12 },
+      green: { choice: 1, amount: 7 },
+      blue: { choice: 2, amount: 4 },
+      purple: { choice: 3, amount: 2 },
+      orange: { choice: 4, amount: 1 }
+    }
+  },
+  ring: {
+    chestId: 64,
+    chestName: 'Artifact Metal Chest',
+    resourcePerChest: {
+      white: { choice: 0, amount: 12 },
+      green: { choice: 1, amount: 7 },
+      blue: { choice: 2, amount: 4 },
+      purple: { choice: 3, amount: 2 },
+      orange: { choice: 4, amount: 1 }
+    }
+  }
+};
 
 export const ARTIFACT_MILESTONES = [25, 50, 70, 85, 100] as const;
 
@@ -174,6 +233,11 @@ export function getArtifactUpgradePlan(
   const resInfo = getArtifactResourceInfo(artifactType, lvl);
   const ownedAmount = Number(inventoryConsumables[resInfo.consumableId]) || 0;
 
+  const chestCfg = ARTIFACT_CHEST_MAP[artifactType];
+  const ownedChests = Number(inventoryConsumables[chestCfg.chestId]) || 0;
+  const tierYield = chestCfg.resourcePerChest[resInfo.tierColor] || { choice: 0, amount: 1 };
+  const hasChests = ownedChests > 0;
+
   if (isMax) {
     return {
       slotId,
@@ -187,6 +251,20 @@ export function getArtifactUpgradePlan(
       canUpgradeMilestone: false,
       affordableLevels: 0,
       affordableCost: 0,
+      milestoneLevels: 0,
+      milestoneCost: 0,
+      chestPlan: {
+        chestId: chestCfg.chestId,
+        chestName: chestCfg.chestName,
+        ownedChests,
+        choiceIndex: tierYield.choice,
+        resourcePerChest: tierYield.amount,
+        hasChests: false,
+        levelsDeltaWithChests: 0,
+        chestsToOpen: 0,
+        totalCostWithChests: 0,
+        canUpgradeWithChests: false
+      },
       consumableId: resInfo.consumableId,
       resourceName: resInfo.resourceName,
       shortName: resInfo.shortName,
@@ -205,7 +283,7 @@ export function getArtifactUpgradePlan(
     totalCost += getArtifactLevelUpCost(l);
   }
 
-  // Calculate how many levels can be afforded within this milestone
+  // Calculate how many levels can be afforded within this milestone (#1)
   let affordableLevels = 0;
   let affordableCost = 0;
   let runningCost = 0;
@@ -221,8 +299,54 @@ export function getArtifactUpgradePlan(
     }
   }
 
+  // #1: min(levelsDelta, affordableLevels)
+  const milestoneLevels = Math.min(levelsDelta, affordableLevels);
+  const milestoneCost = affordableCost;
+
+  // #2: min(levelsDelta, affordableLevelsWithChests)
+  let levelsDeltaWithChests = 0;
+  let chestsToOpen = 0;
+  let totalCostWithChests = 0;
+  let canUpgradeWithChests = false;
+
+  if (hasChests) {
+    const maxResourceWithChests = ownedAmount + ownedChests * tierYield.amount;
+    let runningWithChests = 0;
+
+    for (let l = lvl; l < targetLevel; l++) {
+      const nextCost = getArtifactLevelUpCost(l);
+      if (runningWithChests + nextCost <= maxResourceWithChests) {
+        runningWithChests += nextCost;
+        levelsDeltaWithChests++;
+        totalCostWithChests = runningWithChests;
+      } else {
+        break;
+      }
+    }
+
+    levelsDeltaWithChests = Math.min(levelsDelta, levelsDeltaWithChests);
+    if (levelsDeltaWithChests > 0) {
+      const deficit = Math.max(0, totalCostWithChests - ownedAmount);
+      chestsToOpen = deficit > 0 ? Math.min(ownedChests, Math.ceil(deficit / tierYield.amount)) : 0;
+      canUpgradeWithChests = levelsDeltaWithChests > 0 && chestsToOpen > 0;
+    }
+  }
+
   const canUpgradeOne = ownedAmount >= costForNextOne;
   const canUpgradeMilestone = affordableLevels > 0;
+
+  const chestPlan: ArtifactChestUpgradeInfo = {
+    chestId: chestCfg.chestId,
+    chestName: chestCfg.chestName,
+    ownedChests,
+    choiceIndex: tierYield.choice,
+    resourcePerChest: tierYield.amount,
+    hasChests,
+    levelsDeltaWithChests,
+    chestsToOpen,
+    totalCostWithChests,
+    canUpgradeWithChests
+  };
 
   return {
     slotId,
@@ -236,6 +360,9 @@ export function getArtifactUpgradePlan(
     canUpgradeMilestone,
     affordableLevels,
     affordableCost,
+    milestoneLevels,
+    milestoneCost,
+    chestPlan,
     consumableId: resInfo.consumableId,
     resourceName: resInfo.resourceName,
     shortName: resInfo.shortName,
