@@ -12,6 +12,7 @@ import { speedupData as typedSpeedupData } from '../../data/speedupData.ts';
 import { heroMetadata as typedHeroMetadata, gearCraftData as typedGearCraftData, scrollCraftData as typedScrollCraftData } from '../../data/heroMetadata.ts';
 import { getTeamLevelExpDelta as typedGetTeamLevelExpDelta } from '../../data/teamLevelData.ts';
 import { guildRole as typedGuildRole } from '../../utils/guildData.ts';
+import { getArtifactResourceInfo, getArtifactLevelUpCost } from '../../utils/artifactHelper.ts';
 
 const getNameMap = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperNameMap) || typedNameMap;
 const getMineTypes = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMineTypes) || typedMineTypes;
@@ -1024,6 +1025,24 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
               });
             }
             return actions;
+          }
+          if (call.name === 'artifact_levelUp') {
+            const numHeroId = Number(call.args?.heroId);
+            const numSlotId = Number(call.args?.slotId);
+            if (Number.isFinite(numHeroId) && Number.isFinite(numSlotId)) {
+              return [{
+                key: 'artifactLevelUpAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  heroId: numHeroId,
+                  slotId: numSlotId,
+                  token: `${call.ident || record.timestamp}:${numHeroId}:${numSlotId}:artifactLevelUp`
+                },
+                updatedAt: record.timestamp
+              }];
+            }
           }
           if (call.name === 'dungeonStartBattle') {
             return [{
@@ -4152,6 +4171,68 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
               };
               changed = true;
             }
+          }
+          continue;
+        }
+        if (entry.key === 'artifactLevelUpAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.heroId) continue;
+          const heroId = String(entry.data.heroId);
+          const slotId = Number(entry.data.slotId || 1);
+          const heroSnap = next.heroGetAll?.data?.[heroId];
+          if (heroSnap && Array.isArray(heroSnap.artifacts)) {
+            const artifacts = heroSnap.artifacts.map((a: any, idx: number) => {
+              if (idx === slotId - 1) {
+                return { ...a, level: (Number(a.level) || 1) + 1 };
+              }
+              return { ...a };
+            });
+
+            const currentLvl = Number(heroSnap.artifacts[slotId - 1]?.level) || 1;
+            const artType = heroSnap.artifacts[slotId - 1]?.artifactType || (slotId === 1 ? 'weapon' : slotId === 2 ? 'book' : 'ring');
+            const resInfo = getArtifactResourceInfo(artType, currentLvl);
+            const cost = getArtifactLevelUpCost(currentLvl);
+
+            next.heroGetAll = {
+              ...next.heroGetAll,
+              data: {
+                ...next.heroGetAll.data,
+                [heroId]: {
+                  ...heroSnap,
+                  artifacts
+                }
+              }
+            };
+
+            if (resInfo && cost > 0 && next.inventoryGet?.data?.consumable) {
+              const cId = String(resInfo.consumableId);
+              const curAmount = Number(next.inventoryGet.data.consumable[cId]) || 0;
+              next.inventoryGet = {
+                ...next.inventoryGet,
+                data: {
+                  ...next.inventoryGet.data,
+                  consumable: {
+                    ...next.inventoryGet.data.consumable,
+                    [cId]: Math.max(0, curAmount - cost)
+                  }
+                },
+                updatedAt: entry.updatedAt
+              };
+            }
+
+            const history = { ...seen, [entry.data.token]: entry.updatedAt };
+            const tokens = Object.keys(history).sort((a, b) =>
+              history[b].localeCompare(history[a]));
+            for (const token of tokens.slice(500)) delete history[token];
+            next.resourceActionHistory = {
+              key: 'resourceActionHistory',
+              method: entry.method,
+              feature: null,
+              group: 'internal',
+              data: history,
+              updatedAt: entry.updatedAt
+            };
+            changed = true;
           }
           continue;
         }

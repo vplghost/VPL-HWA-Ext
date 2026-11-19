@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.122 — 2026-11-20
+
+### Added
+
+- **Hero Artifact Leveling & Milestone Upgrades (`HeroDetailModal.vue`, `artifactHelper.ts`, `rpcCache.ts`)**:
+  - Implemented `artifactHelper.ts` calculating exact upgrade costs, resource types (Essence for Weapon, Scroll for Book, Metal for Ring), and quality tier milestones (Lvl 25, 50, 70, 85, 100).
+  - Added artifact leveling buttons to `HeroDetailModal.vue`: single level (`+1`) and jump-to-next-milestone (`+##`) with resource cost badge rendered in smaller font size inside each button.
+  - Added optimistic cache handling in `rpcCache.ts` for `artifact_levelUp` RPC actions: automatically increments hero artifact levels and deducts consumed consumable items from inventory cache.
+  - Added batch dispatch queue with user notification for multi-level milestone upgrades.
+  - Added comprehensive test coverage in `tests/artifact-level-up.test.mjs`.
+
 ## 0.11.121 — 2026-11-19
 
 ### Changed

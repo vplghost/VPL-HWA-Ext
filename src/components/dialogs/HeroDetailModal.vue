@@ -19,6 +19,10 @@ import {
   starGlowClass,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import {
+  getArtifactUpgradePlan,
+  type ArtifactUpgradePlan,
+} from '@/src/utils/artifactHelper';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -391,6 +395,102 @@ async function upgradeAllSkillsMax() {
 const heroArtifacts = computed(() => {
   return Array.isArray(activeHero.value?.artifacts) ? activeHero.value.artifacts : [];
 });
+
+const isUpgradingArtifact = ref(false);
+const upgradingArtifactSlot = ref<number | null>(null);
+
+const inventoryConsumables = computed<Record<string | number, number>>(() => {
+  return cache.value?.inventoryGet?.data?.consumable || {};
+});
+
+export interface ArtifactSlotInfo {
+  slotId: number;
+  artifactType: string;
+  name: string;
+  level: number;
+  star: number;
+  plan: ArtifactUpgradePlan;
+}
+
+const detailedArtifacts = computed<ArtifactSlotInfo[]>(() => {
+  const list = heroArtifacts.value;
+  return list.map((art: any, idx: number) => {
+    const slotId = idx + 1;
+    const type = art.artifactType || (slotId === 1 ? 'weapon' : slotId === 2 ? 'book' : 'ring');
+    const level = Number(art.level) || 1;
+    const star = Number(art.star) || 1;
+    const plan = getArtifactUpgradePlan(type, level, inventoryConsumables.value);
+    const typeName = type.charAt(0).toUpperCase() + type.slice(1);
+
+    return {
+      slotId,
+      artifactType: type,
+      name: typeName,
+      level,
+      star,
+      plan,
+    };
+  });
+});
+
+async function upgradeArtifactSingle(slotId: number) {
+  if (isUpgradingArtifact.value || !activeHero.value) return;
+  const numHeroId = Number(currentHeroId.value);
+  if (!numHeroId) return;
+
+  const artInfo = detailedArtifacts.value.find((a) => a.slotId === slotId);
+  if (!artInfo || !artInfo.plan.canUpgradeOne) return;
+
+  upgradingArtifactSlot.value = slotId;
+  isUpgradingArtifact.value = true;
+  try {
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [
+      {
+        name: 'artifact_levelUp',
+        args: { heroId: numHeroId, slotId },
+      },
+      { name: 'heroGetAll' },
+      { name: 'inventoryGet' },
+      { name: 'userGetInfo' },
+    ];
+    await dispatchRpc(calls);
+  } finally {
+    upgradingArtifactSlot.value = null;
+    isUpgradingArtifact.value = false;
+  }
+}
+
+async function upgradeArtifactToMilestone(slotId: number) {
+  if (isUpgradingArtifact.value || !activeHero.value) return;
+  const numHeroId = Number(currentHeroId.value);
+  if (!numHeroId) return;
+
+  const artInfo = detailedArtifacts.value.find((a) => a.slotId === slotId);
+  if (!artInfo) return;
+
+  const toAdd = Math.min(artInfo.plan.levelsDelta, artInfo.plan.affordableLevels);
+  if (toAdd <= 0) return;
+
+  upgradingArtifactSlot.value = slotId;
+  isUpgradingArtifact.value = true;
+  try {
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+    for (let i = 0; i < toAdd; i++) {
+      calls.push({
+        name: 'artifact_levelUp',
+        args: { heroId: numHeroId, slotId },
+      });
+    }
+    calls.push({ name: 'heroGetAll' });
+    calls.push({ name: 'inventoryGet' });
+    calls.push({ name: 'userGetInfo' });
+
+    await dispatchRpc(calls);
+  } finally {
+    upgradingArtifactSlot.value = null;
+    isUpgradingArtifact.value = false;
+  }
+}
 
 // Equipment Slots
 const heroColorStr = computed(() => String(activeHero.value?.color || 1));
@@ -978,28 +1078,129 @@ function handleHeroFarmAll() {
             </div>
           </div>
 
-          <!-- 3. Artifacts Section (if any) -->
+          <!-- 3. Artifacts Section -->
           <div
-            v-if="heroArtifacts.length > 0"
-            class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-2"
+            v-if="detailedArtifacts.length > 0"
+            class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3"
           >
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <span>🛡️</span> Artifacts
-            </h4>
-            <div class="grid grid-cols-3 gap-2 text-center text-xs">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <span>🛡️</span> Artifacts
+              </h4>
+              <div class="text-3xs text-slate-400 dark:text-slate-500">
+                Milestones: Lv. 25, 50, 70, 85, 100
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
               <div
-                v-for="(art, aIdx) in heroArtifacts"
-                :key="aIdx"
-                class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700"
+                v-for="art in detailedArtifacts"
+                :key="art.slotId"
+                class="p-2.5 rounded-lg border transition-all flex flex-col justify-between gap-2"
+                :class="
+                  art.plan.isMax
+                    ? 'bg-slate-50/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700/60'
+                    : art.plan.canUpgradeOne
+                    ? 'bg-white dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 hover:border-amber-400/60 dark:hover:border-amber-600/60 shadow-2xs'
+                    : 'bg-slate-50/40 dark:bg-slate-900/30 border-slate-200/80 dark:border-slate-800/70 opacity-90'
+                "
               >
-                <div class="text-2xs text-slate-400 capitalize">
-                  {{ art.artifactType ? art.artifactType.charAt(0).toUpperCase() + art.artifactType.slice(1) : 'Artifact' }}
+                <!-- Top: Type, Stars, Level & Resource badge -->
+                <div>
+                  <div class="flex items-center justify-between gap-1.5 mb-1">
+                    <span class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 text-xs">
+                      <span>{{ art.slotId === 1 ? '⚔️' : art.slotId === 2 ? '📖' : '💍' }}</span>
+                      <span>{{ art.name }}</span>
+                    </span>
+                    <span class="text-3xs text-amber-500 tracking-tighter">
+                      {{ '★'.repeat(art.star) }}
+                    </span>
+                  </div>
+
+                  <div class="flex items-center justify-between gap-1 text-2xs mb-1.5">
+                    <span class="font-extrabold text-slate-900 dark:text-slate-100">
+                      Lv. {{ art.level }}
+                      <span class="text-3xs font-normal text-slate-400 dark:text-slate-500">/ 100</span>
+                    </span>
+
+                    <!-- Tier indicator & next milestone -->
+                    <span
+                      class="text-3xs px-1.5 py-0.2 rounded font-semibold border"
+                      :class="
+                        art.plan.tierColor === 'white'
+                          ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600'
+                          : art.plan.tierColor === 'green'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-700'
+                          : art.plan.tierColor === 'blue'
+                          ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-700'
+                          : art.plan.tierColor === 'purple'
+                          ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-700'
+                          : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-700'
+                      "
+                    >
+                      {{ art.plan.isMax ? 'MAX' : `Goal: Lv. ${art.plan.targetLevel}` }}
+                    </span>
+                  </div>
+
+                  <!-- Resource owned status -->
+                  <div class="text-3xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 bg-slate-100/60 dark:bg-slate-900/50 px-2 py-1 rounded">
+                    <span class="truncate" :title="art.plan.resourceName">
+                      {{ art.plan.shortName }}
+                    </span>
+                    <span
+                      class="font-bold"
+                      :class="
+                        art.plan.ownedAmount >= art.plan.costForNextOne
+                          ? 'text-slate-800 dark:text-slate-200'
+                          : 'text-rose-500 dark:text-rose-400'
+                      "
+                    >
+                      {{ art.plan.ownedAmount.toLocaleString() }}
+                    </span>
+                  </div>
                 </div>
-                <div class="font-bold text-slate-800 dark:text-slate-200">
-                  Lv. {{ art.level || 1 }}
+
+                <!-- Bottom: Action Buttons -->
+                <div v-if="!art.plan.isMax" class="grid grid-cols-2 gap-1.5 pt-1">
+                  <!-- Button +1 -->
+                  <button
+                    type="button"
+                    :disabled="isUpgradingArtifact || !art.plan.canUpgradeOne"
+                    class="py-1 px-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    :class="
+                      art.plan.canUpgradeOne
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700 dark:border-emerald-500'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'
+                    "
+                    :title="`Upgrade +1 Level. Cost: ${art.plan.costForNextOne} ${art.plan.shortName} (Owned: ${art.plan.ownedAmount})`"
+                    @click="upgradeArtifactSingle(art.slotId)"
+                  >
+                    <span v-if="upgradingArtifactSlot === art.slotId && isUpgradingArtifact" class="animate-spin text-3xs">↻</span>
+                    <span v-else>+1</span>
+                    <span class="text-3xs font-normal opacity-85">({{ art.plan.costForNextOne }})</span>
+                  </button>
+
+                  <!-- Button +## (to next resource milestone) -->
+                  <button
+                    type="button"
+                    :disabled="isUpgradingArtifact || !art.plan.canUpgradeMilestone"
+                    class="py-1 px-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    :class="
+                      art.plan.canUpgradeMilestone
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-700 dark:border-amber-500'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'
+                    "
+                    :title="`Upgrade to Lv. ${art.plan.targetLevel} (${art.plan.levelsDelta > 1 ? '+' + art.plan.levelsDelta : '+1'} levels). Cost: ${art.plan.totalCost} ${art.plan.shortName} (Affordable: +${art.plan.affordableLevels})`"
+                    @click="upgradeArtifactToMilestone(art.slotId)"
+                  >
+                    <span v-if="upgradingArtifactSlot === art.slotId && isUpgradingArtifact" class="animate-spin text-3xs">↻</span>
+                    <span v-else>+{{ art.plan.levelsDelta }}</span>
+                    <span class="text-3xs font-normal opacity-85">({{ art.plan.totalCost }})</span>
+                  </button>
                 </div>
-                <div class="text-2xs text-amber-500">
-                  {{ '★'.repeat(art.star || 1) }}
+
+                <div v-else class="text-center py-1 text-3xs font-bold text-amber-500">
+                  ★ MAX LEVEL ★
                 </div>
               </div>
             </div>
