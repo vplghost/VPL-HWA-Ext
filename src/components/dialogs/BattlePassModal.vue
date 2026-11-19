@@ -6,6 +6,7 @@ import { questData } from '@/src/data/questData';
 import { formatNumber } from '@/src/utils/formatters';
 import { parseRewards, type FormattedReward } from '@/src/utils/rewardHelper';
 import { defaultBattlepassLevels, getBattlePassName } from '@/src/data/battlepassCatalog';
+import { exportEventsAsJson, copyEventsToClipboard } from '@/src/utils/eventExport';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -426,6 +427,24 @@ async function refreshData() {
     isRefreshing.value = false;
   }
 }
+
+function exportCurrentPassData() {
+  exportEventsAsJson(cache.value, dynamicCatalog.value, {
+    selectedPassId: selectedPassId.value,
+    currentPass: currentPass.value,
+  }, `hwa-battlepass-${selectedPassId.value || 'data'}`);
+  claimStatus.value = 'Exported JSON!';
+  setTimeout(() => { claimStatus.value = ''; }, 3000);
+}
+
+async function copyCurrentPassData() {
+  const ok = await copyEventsToClipboard(cache.value, dynamicCatalog.value, {
+    selectedPassId: selectedPassId.value,
+    currentPass: currentPass.value,
+  });
+  claimStatus.value = ok ? 'Copied JSON to clipboard!' : 'Failed to copy';
+  setTimeout(() => { claimStatus.value = ''; }, 3000);
+}
 </script>
 
 <template>
@@ -574,8 +593,27 @@ async function refreshData() {
             v-model="searchQuery"
             type="text"
             placeholder="Search level or reward..."
-            class="px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-amber-500 w-40 sm:w-52"
+            class="px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-amber-500 w-36 sm:w-48"
           />
+          <button
+            id="bp-export-json"
+            type="button"
+            class="px-2 py-1 rounded text-2xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-1 shadow-2xs shrink-0"
+            title="Export Battle Pass data as JSON"
+            @click="exportCurrentPassData"
+          >
+            <span>📥</span>
+            <span>Export</span>
+          </button>
+          <button
+            id="bp-copy-json"
+            type="button"
+            class="px-1.5 py-1 rounded text-2xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-1 shadow-2xs shrink-0"
+            title="Copy Battle Pass JSON to clipboard"
+            @click="copyCurrentPassData"
+          >
+            <span>📋</span>
+          </button>
         </div>
       </div>
 

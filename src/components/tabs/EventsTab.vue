@@ -11,6 +11,7 @@ import {
   resolveClaimableEventQuests,
   resolveClaimableBattlePassRewards,
 } from '@/src/utils/eventClaimHelper';
+import { exportEventsAsJson, copyEventsToClipboard } from '@/src/utils/eventExport';
 
 const { cache, dispatchRpc } = useRpcCache();
 const { openModal } = useModals();
@@ -402,6 +403,26 @@ async function refreshEvents() {
     isRefreshing.value = false;
   }
 }
+
+const exportStatus = ref('');
+
+function triggerExport() {
+  exportEventsAsJson(cache.value, dynamicCatalog.value, {
+    activeCardsCount: eventCards.value.length,
+    claimableCount: claimableCount.value
+  });
+  exportStatus.value = 'Saved JSON!';
+  setTimeout(() => { exportStatus.value = ''; }, 3000);
+}
+
+async function triggerCopy() {
+  const ok = await copyEventsToClipboard(cache.value, dynamicCatalog.value, {
+    activeCardsCount: eventCards.value.length,
+    claimableCount: claimableCount.value
+  });
+  exportStatus.value = ok ? 'Copied to clipboard!' : 'Failed to copy';
+  setTimeout(() => { exportStatus.value = ''; }, 3000);
+}
 </script>
 
 <template>
@@ -465,6 +486,33 @@ async function refreshEvents() {
           <span :class="{ 'inline-block animate-spin': isRefreshing }">↻</span>
           <span>Refresh</span>
         </button>
+
+        <div class="flex items-center gap-1 shrink-0">
+          <button
+            id="events-export-json"
+            type="button"
+            class="cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1 transition-colors shadow-2xs"
+            title="Download all captured event and battle pass data as JSON for offline analysis"
+            @click="triggerExport"
+          >
+            <span>📥</span>
+            <span class="hidden sm:inline">Export</span>
+          </button>
+
+          <button
+            id="events-copy-json"
+            type="button"
+            class="cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1 transition-colors shadow-2xs"
+            title="Copy captured event JSON to clipboard"
+            @click="triggerCopy"
+          >
+            <span>📋</span>
+          </button>
+
+          <span v-if="exportStatus" class="text-3xs text-emerald-600 dark:text-emerald-400 font-semibold animate-pulse ml-1">
+            {{ exportStatus }}
+          </span>
+        </div>
       </div>
     </div>
 

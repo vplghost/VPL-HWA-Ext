@@ -10,6 +10,7 @@ import { formatNumber } from '@/src/utils/formatters';
 import { parseRewards } from '@/src/utils/rewardHelper';
 import { resolveTierDetail } from '@/src/utils/tierHelper';
 import { questRefreshCalls, sendQuestClaim, sendEventQuestClaim } from '@/src/utils/dialogRpc';
+import { exportEventsAsJson, copyEventsToClipboard } from '@/src/utils/eventExport';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -253,6 +254,24 @@ async function claimSingleQuest(questId: number | string) {
   }
 }
 
+function exportCurrentEventData() {
+  exportEventsAsJson(cache.value, null, {
+    selectedEventId: selectedEventId.value,
+    selectedEvent: currentEvent.value || currentBattlePass.value,
+  }, `hwa-event-${selectedEventId.value || 'detail'}`);
+  claimStatus.value = 'Exported JSON!';
+  setTimeout(() => { claimStatus.value = ''; }, 3000);
+}
+
+async function copyCurrentEventData() {
+  const ok = await copyEventsToClipboard(cache.value, null, {
+    selectedEventId: selectedEventId.value,
+    selectedEvent: currentEvent.value || currentBattlePass.value,
+  });
+  claimStatus.value = ok ? 'Copied JSON to clipboard!' : 'Failed to copy';
+  setTimeout(() => { claimStatus.value = ''; }, 3000);
+}
+
 async function claimAllReady() {
   if (isClaiming.value || readyToClaimCount.value === 0) return;
   isClaiming.value = true;
@@ -281,6 +300,24 @@ async function claimAllReady() {
       claimStatus.value = '';
     }, 3000);
   }
+}
+
+function exportCurrentEventData() {
+  exportEventsAsJson(cache.value, null, {
+    selectedEventId: selectedEventId.value,
+    selectedEvent: currentEvent.value || currentBattlePass.value,
+  }, `hwa-event-${selectedEventId.value || 'detail'}`);
+  claimStatus.value = 'Exported JSON!';
+  setTimeout(() => { claimStatus.value = ''; }, 3000);
+}
+
+async function copyCurrentEventData() {
+  const ok = await copyEventsToClipboard(cache.value, null, {
+    selectedEventId: selectedEventId.value,
+    selectedEvent: currentEvent.value || currentBattlePass.value,
+  });
+  claimStatus.value = ok ? 'Copied JSON to clipboard!' : 'Failed to copy';
+  setTimeout(() => { claimStatus.value = ''; }, 3000);
 }
 </script>
 
@@ -531,6 +568,24 @@ async function claimAllReady() {
             @click="collapseAll"
           >
             Collapse All
+          </button>
+          <span class="text-slate-300 dark:text-slate-600">|</span>
+          <button
+            type="button"
+            class="px-2 py-1 rounded text-2xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-1 shadow-2xs"
+            title="Export event data as JSON for analysis"
+            @click="exportCurrentEventData"
+          >
+            <span>📥</span>
+            <span>Export</span>
+          </button>
+          <button
+            type="button"
+            class="px-1.5 py-1 rounded text-2xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-1 shadow-2xs"
+            title="Copy event JSON to clipboard"
+            @click="copyCurrentEventData"
+          >
+            <span>📋</span>
           </button>
         </div>
       </div>
