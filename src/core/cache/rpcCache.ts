@@ -105,6 +105,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
     'getPage:report': 'header',
     'readAndClaimAll:report': 'header',
     'claimReward:report': 'header',
+    'deleteAllRead:report': 'header',
     mailGetAll: 'header',
     mailFarm: 'header',
     quest_multiFarm: 'other',
@@ -1448,33 +1449,57 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
               feature: call.feature || null,
               group: 'header',
               data: {
-                action: 'claimAll'
+                action: 'claimAll',
+                types: call.args?.types,
+                readReports: Array.isArray(result?.response?.readReports) ? result.response.readReports : null
               },
               updatedAt: record.timestamp
             });
             return actions;
           }
-          if (call.name === 'mailFarm' && result?.response && typeof result.response === 'object') {
+          if (call.name === 'mailFarm' && !result?.error) {
             const actions = [];
-            const letterIds = Object.keys(result.response);
-            for (const letterId of letterIds) {
-              const letterReward = result.response[letterId];
-              if (letterReward && typeof letterReward === 'object') {
-                actions.push(...extractRewardActions(record, call, letterReward, `mail:${letterId}`));
+            const response = result?.response;
+            if (response && typeof response === 'object') {
+              for (const letterId of Object.keys(response)) {
+                const letterReward = response[letterId];
+                if (letterReward && typeof letterReward === 'object') {
+                  actions.push(...extractRewardActions(record, call, letterReward, `mail:${letterId}`));
+                }
               }
             }
-            actions.push({
+            const letterIds = Array.from(new Set([
+              ...(Array.isArray(call.args?.letterIds) ? call.args.letterIds.map(String) : []),
+              ...(response && typeof response === 'object' ? Object.keys(response) : [])
+            ]));
+            if (letterIds.length > 0) {
+              actions.push({
+                key: 'mailStatus',
+                method: call.name,
+                feature: call.feature || null,
+                group: 'header',
+                data: {
+                  action: 'claimMail',
+                  letterIds
+                },
+                updatedAt: record.timestamp
+              });
+            }
+            return actions;
+          }
+          if (call.name === 'deleteAllRead' && call.feature === 'report') {
+            return [{
               key: 'mailStatus',
               method: call.name,
-              feature: call.feature || null,
+              feature: call.feature,
               group: 'header',
               data: {
-                action: 'claimMail',
-                letterIds
+                action: 'deleteReports',
+                deletedReportIds: Array.isArray(result?.response?.deletedReportIds) ? result.response.deletedReportIds : [],
+                types: call.args?.types
               },
               updatedAt: record.timestamp
-            });
-            return actions;
+            }];
           }
           if (call.name === 'claimReward' && call.feature === 'report') {
             const actions = [];
@@ -5120,7 +5145,17 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           const existingLetters = normalizeArrayData(existing.letters);
           if (entry.data?.action === 'claimAll') {
             const isReportOnly = entry.feature === 'report';
-            const unclaimedReportsCount = 0;
+            const readReportIds = Array.isArray(entry.data?.readReports) && entry.data.readReports.length > 0
+              ? new Set(entry.data.readReports.map(String))
+              : null;
+            const updatedReports = existingReports.map((r) => {
+              if (!readReportIds || readReportIds.has(String(r.id))) {
+                return { ...r, claimedReward: true, read: true };
+              }
+              return r;
+            });
+            const remainingReports = updatedReports.filter((r) => r && r.claimedReward === false);
+            const unclaimedReportsCount = remainingReports.length;
             const unclaimedLettersCount = isReportOnly ? (existing.unclaimedLettersCount || 0) : 0;
             const totalUnclaimed = unclaimedReportsCount + unclaimedLettersCount;
             next.mailStatus = {
@@ -5131,7 +5166,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                 unclaimedLettersCount,
                 totalUnclaimed,
                 hasUnclaimed: totalUnclaimed > 0,
-                reports: existingReports.map((r) => ({ ...r, claimedReward: true })),
+                reports: updatedReports,
                 letters: isReportOnly ? existingLetters : existingLetters.map((l) => ({ ...l, claimed: true }))
               }
             };
@@ -5161,13 +5196,52 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                 hasUnclaimed: totalUnclaimed > 0
               }
             };
+            if (next.mailGetAll?.data) {
+              const rawLetters = Array.isArray(next.mailGetAll.data)
+                ? next.mailGetAll.data
+                : (Array.isArray(next.mailGetAll.data.letters) ? next.mailGetAll.data.letters : []);
+              const updatedAllLetters = rawLetters.map((l: any) => {
+                if (claimedIds.has(String(l.id)) || claimedIds.has(String(l.letterId))) {
+                  return { ...l, claimed: true, rewardReceived: true, rewardClaimed: true };
+                }
+                return l;
+              });
+              next.mailGetAll = {
+                ...next.mailGetAll,
+                data: Array.isArray(next.mailGetAll.data) ? updatedAllLetters : { ...next.mailGetAll.data, letters: updatedAllLetters },
+                updatedAt: entry.updatedAt
+              };
+            }
           } else if (entry.data?.action === 'claimReport') {
             const reportId = String(entry.data.reportId);
             const updatedReports = existingReports.map((r) => {
               if (String(r.id) === reportId) {
-                return { ...r, claimedReward: true };
+                return { ...r, claimedReward: true, read: true };
               }
               return r;
+            });
+            const remainingReports = updatedReports.filter((r) => r && r.claimedReward === false);
+            const unclaimedReportsCount = remainingReports.length;
+            const unclaimedLettersCount = existing.unclaimedLettersCount || 0;
+            const totalUnclaimed = unclaimedReportsCount + unclaimedLettersCount;
+            next.mailStatus = {
+              ...entry,
+              data: {
+                ...existing,
+                reports: updatedReports,
+                unclaimedReportsCount,
+                unclaimedLettersCount,
+                totalUnclaimed,
+                hasUnclaimed: totalUnclaimed > 0
+              }
+            };
+          } else if (entry.data?.action === 'deleteReports') {
+            const delIds = new Set(normalizeArrayData(entry.data.deletedReportIds).map(String));
+            const delTypes = Array.isArray(entry.data.types) ? new Set(entry.data.types) : null;
+            const updatedReports = existingReports.filter((r) => {
+              if (delIds.size > 0 && delIds.has(String(r.id))) return false;
+              if (delIds.size === 0 && delTypes && delTypes.has(r.type) && (r.read || r.claimedReward)) return false;
+              return true;
             });
             const remainingReports = updatedReports.filter((r) => r && r.claimedReward === false);
             const unclaimedReportsCount = remainingReports.length;

@@ -1,11 +1,12 @@
 ---
 id: VHE-TYC38Q
 title: Synchronize in-game mail and battle report claims (mailFarm, readAndClaimAll, deleteAllRead) into cache
-status: todo
+status: done
 priority: high
 labels: []
 createdAt: '2026-11-19T13:03:31.864Z'
-updatedAt: '2026-11-19T13:03:31.864Z'
+updatedAt: '2026-11-19T13:07:34.293Z'
+completedAt: '2026-11-19T13:07:34.293Z'
 timeSpent: 0
 assignee: '@me'
 ---
