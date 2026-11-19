@@ -10,6 +10,7 @@ import {
   isChoiceChest,
   getChestChoices,
   aggregateChestRewards,
+  NON_CHEST_CATEGORIES,
   type ChestChoiceOption,
   type AggregatedReward
 } from '@/src/utils/chestHelper';
@@ -49,6 +50,9 @@ const openableChests = computed<OpenableChestItem[]>(() => {
   const list: OpenableChestItem[] = [];
 
   for (const [cat, subMap] of Object.entries(inv)) {
+    // Strictly skip non-chest categories (gear, relics shards, artifacts, etc.)
+    if (NON_CHEST_CATEGORIES.has(cat)) continue;
+
     if (typeof subMap === 'object' && subMap !== null) {
       for (const [id, amt] of Object.entries(subMap as Record<string, any>)) {
         const count = Number(amt) || 0;
@@ -69,16 +73,21 @@ const openableChests = computed<OpenableChestItem[]>(() => {
 });
 
 const selectedChestId = ref<string | number | null>(null);
+const selectedChestCategory = ref<string | null>(props.initialCategory || null);
 
 // Sync with initialChestId or fallback to first available
 watch(
   () => props.modelValue,
   (val) => {
     if (val) {
+      if (props.initialCategory) {
+        selectedChestCategory.value = props.initialCategory;
+      }
       if (props.initialChestId) {
         selectedChestId.value = String(props.initialChestId);
       } else if (!selectedChestId.value && openableChests.value.length > 0) {
         selectedChestId.value = openableChests.value[0].id;
+        selectedChestCategory.value = openableChests.value[0].rawCategory || openableChests.value[0].category;
       }
       lastOpenedRewards.value = [];
       lastOpenNotice.value = '';
@@ -96,18 +105,38 @@ watch(
   }
 );
 
+watch(
+  () => props.initialCategory,
+  (newCat) => {
+    if (newCat) {
+      selectedChestCategory.value = newCat;
+    }
+  }
+);
+
 // If selected chest runs out of stock, retain selection if in openable or switch to first available
 watch(openableChests, (chests) => {
   if (chests.length > 0 && selectedChestId.value != null) {
     const exists = chests.some((c) => String(c.id) === String(selectedChestId.value));
     if (!exists && chests[0]) {
       selectedChestId.value = chests[0].id;
+      selectedChestCategory.value = chests[0].rawCategory || chests[0].category;
     }
   }
 });
 
 const activeChest = computed<OpenableChestItem | null>(() => {
   if (!selectedChestId.value) return openableChests.value[0] || null;
+
+  // First try to match both ID and category if category was specified
+  if (selectedChestCategory.value) {
+    const match = openableChests.value.find(
+      (c) => String(c.id) === String(selectedChestId.value) &&
+             (c.rawCategory === selectedChestCategory.value || c.category === selectedChestCategory.value)
+    );
+    if (match) return match;
+  }
+
   return openableChests.value.find((c) => String(c.id) === String(selectedChestId.value)) || null;
 });
 
@@ -168,11 +197,16 @@ function getChestImg(chest: OpenableChestItem | null): string {
     : path || '';
 }
 
-function getRewardImg(reward: AggregatedReward | { type: string; id: string | number }): string {
-  const path = getItemIcon(reward.type, reward.id);
+function getRewardImg(reward: AggregatedReward | { type: string; id: string | number; icon?: string | null }): string {
+  const path = ('icon' in reward && reward.icon) ? reward.icon : getItemIcon(reward.type, reward.id);
   return path && typeof chrome !== 'undefined' && chrome.runtime?.getURL
     ? chrome.runtime.getURL(path)
     : path || '';
+}
+
+function selectChest(c: OpenableChestItem) {
+  selectedChestId.value = c.id;
+  selectedChestCategory.value = c.rawCategory || c.category;
 }
 
 async function handleOpenChest() {
@@ -313,15 +347,15 @@ onUnmounted(() => {
             <div class="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
               <button
                 v-for="c in openableChests"
-                :key="c.id"
+                :key="`${c.rawCategory || c.category}-${c.id}`"
                 type="button"
                 class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold shrink-0 transition-all cursor-pointer select-none"
                 :class="
-                  String(selectedChestId) === String(c.id)
+                  String(selectedChestId) === String(c.id) && (!selectedChestCategory || selectedChestCategory === (c.rawCategory || c.category))
                     ? 'border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/60 dark:text-blue-200 shadow-2xs font-bold ring-2 ring-blue-400/40'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-850 dark:text-slate-300'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                 "
-                @click="selectedChestId = c.id"
+                @click="selectChest(c)"
               >
                 <img
                   v-if="getChestImg(c)"
@@ -331,7 +365,7 @@ onUnmounted(() => {
                 />
                 <span v-else>🎁</span>
                 <span class="truncate max-w-[140px]">{{ c.name }}</span>
-                <span class="px-1.5 py-0.2 rounded-full text-3xs font-mono font-bold bg-slate-200/80 dark:bg-slate-750 text-slate-700 dark:text-slate-300">
+                <span class="px-1.5 py-0.2 rounded-full text-3xs font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
                   {{ formatNumber(c.amount) }}
                 </span>
               </button>
@@ -399,14 +433,14 @@ onUnmounted(() => {
                   :class="
                     selectedChoiceIndex === opt.choiceIndex
                       ? 'border-emerald-500 bg-emerald-50/70 dark:border-emerald-500 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 ring-2 ring-emerald-400/50 shadow-2xs font-semibold'
-                      : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60 dark:border-slate-700 dark:bg-slate-850 dark:text-slate-300'
+                      : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:text-slate-300'
                   "
                   @click="selectedChoiceIndex = opt.choiceIndex"
                 >
                   <div class="flex items-center gap-2 min-w-0 flex-1">
-                    <div class="size-8 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center p-1 shrink-0 border border-slate-200 dark:border-slate-700">
+                    <div class="size-8 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center p-1 shrink-0 border border-slate-200 dark:border-slate-600">
                       <img
-                        v-if="opt.reward.icon"
+                        v-if="getRewardImg(opt.reward)"
                         :src="getRewardImg(opt.reward)"
                         :alt="opt.reward.name"
                         class="size-full object-contain"
@@ -414,7 +448,7 @@ onUnmounted(() => {
                       <span v-else class="text-xs">✨</span>
                     </div>
                     <div class="min-w-0 flex-1">
-                      <div class="text-xs font-bold truncate" :title="opt.reward.name">
+                      <div class="text-xs font-bold truncate text-slate-900 dark:text-slate-100" :title="opt.reward.name">
                         {{ opt.reward.name }}
                       </div>
                       <div class="text-2xs text-slate-500 dark:text-slate-400">
@@ -496,7 +530,7 @@ onUnmounted(() => {
                 <button
                   type="button"
                   :disabled="isOpening"
-                  class="px-2 py-1 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors cursor-pointer disabled:opacity-40"
+                  class="px-2 py-1 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer disabled:opacity-40"
                   @click="setAmount(1)"
                 >
                   1
@@ -505,7 +539,7 @@ onUnmounted(() => {
                   v-if="maxAmount >= 5"
                   type="button"
                   :disabled="isOpening"
-                  class="px-2 py-1 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors cursor-pointer disabled:opacity-40"
+                  class="px-2 py-1 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer disabled:opacity-40"
                   @click="setAmount(5)"
                 >
                   5
@@ -514,7 +548,7 @@ onUnmounted(() => {
                   v-if="maxAmount >= 10"
                   type="button"
                   :disabled="isOpening"
-                  class="px-2 py-1 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors cursor-pointer disabled:opacity-40"
+                  class="px-2 py-1 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer disabled:opacity-40"
                   @click="setAmount(10)"
                 >
                   10
@@ -522,7 +556,7 @@ onUnmounted(() => {
                 <button
                   type="button"
                   :disabled="isOpening"
-                  class="px-2.5 py-1 rounded-md text-xs font-bold border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors cursor-pointer disabled:opacity-40"
+                  class="px-2.5 py-1 rounded-md text-xs font-bold border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer disabled:opacity-40"
                   @click="setMaxAmount"
                 >
                   Max ({{ formatNumber(maxAmount) }})
@@ -587,7 +621,7 @@ onUnmounted(() => {
               >
                 <div class="size-9 rounded-lg bg-slate-50 dark:bg-slate-700/60 flex items-center justify-center p-1 shrink-0 border border-slate-200 dark:border-slate-600">
                   <img
-                    v-if="rew.icon"
+                    v-if="getRewardImg(rew)"
                     :src="getRewardImg(rew)"
                     :alt="rew.name"
                     class="size-full object-contain"

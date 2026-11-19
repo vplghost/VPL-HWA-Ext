@@ -301,7 +301,7 @@ function exportItemsJson() {
             v-model="search"
             type="search"
             placeholder="Search items by name or ID..."
-            class="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-blue-500"
+            class="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
           />
           <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
         </div>
@@ -313,7 +313,7 @@ function exportItemsJson() {
             aria-label="Filter by category"
             class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
           >
-            <option v-for="c in categories" :key="c" :value="c">
+            <option v-for="c in categories" :key="c" :value="c" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
               {{ c === 'All' ? 'All Categories' : (categoryLabels[c]?.label || c) }}
             </option>
           </select>
@@ -388,7 +388,7 @@ function exportItemsJson() {
             id="btn-toolbar-refresh-items"
             type="button"
             :disabled="isRefreshing"
-            class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors disabled:opacity-50"
+            class="cursor-pointer rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50"
             title="Refresh inventory via RPC"
             @click="refreshInventory"
           >
@@ -400,7 +400,7 @@ function exportItemsJson() {
     </div>
 
     <!-- Empty State -->
-    <div v-if="filteredItems.length === 0" class="p-8 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+    <div v-if="filteredItems.length === 0" class="p-8 text-center text-xs text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
       No items found matching your search and filter criteria.
     </div>
 
@@ -416,11 +416,11 @@ function exportItemsJson() {
           <h3 class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
             <span>{{ sec.icon }}</span>
             <span>{{ sec.label }}</span>
-            <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+            <span class="rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50 px-2 py-0.2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
               {{ sec.items.length }}
             </span>
           </h3>
-          <span class="text-[11px] font-mono text-slate-400">{{ sec.category }}</span>
+          <span class="text-[11px] font-mono text-slate-400 dark:text-slate-500">{{ sec.category }}</span>
         </div>
 
         <!-- 1. Grid Mode -->
@@ -432,7 +432,7 @@ function exportItemsJson() {
             v-for="item in sec.items"
             :key="`${item.category}-${item.id}`"
             class="relative aspect-square rounded-xl bg-slate-50 dark:bg-slate-800/80 flex items-center justify-center p-1.5 border border-slate-200 dark:border-slate-700/60 hover:border-blue-400 dark:hover:border-blue-500 transition-all select-none group"
-            :class="{ 'cursor-pointer hover:ring-2 hover:ring-amber-400/60': checkIsOpenableChest(item) }"
+            :class="{ 'cursor-pointer hover:ring-2 hover:ring-amber-400/60 dark:hover:ring-amber-500/60': checkIsOpenableChest(item) }"
             :title="`${item.name}\nCategory: ${item.category}\nID: ${item.id}\nQuantity: ${formatNumber(item.amount)}${checkIsOpenableChest(item) ? '\nClick to open chest' : ''}`"
             @click="checkIsOpenableChest(item) ? handleOpenChest(item) : undefined"
           >
@@ -452,7 +452,7 @@ function exportItemsJson() {
             <button
               v-if="checkIsOpenableChest(item)"
               type="button"
-              class="absolute top-1 left-1 bg-amber-500 hover:bg-amber-400 text-amber-950 text-[9px] font-bold px-1 py-0.2 rounded shadow-xs cursor-pointer opacity-90 group-hover:opacity-100 transition-opacity flex items-center gap-0.5"
+              class="absolute top-1 left-1 bg-amber-500 hover:bg-amber-400 text-amber-950 text-[9px] font-bold px-1 py-0.2 rounded shadow-xs cursor-pointer opacity-90 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 border border-amber-600/30"
               title="Open chest dialog"
               @click.stop="handleOpenChest(item)"
             >
@@ -485,10 +485,10 @@ function exportItemsJson() {
               <tr
                 v-for="item in sec.items"
                 :key="`${item.category}-${item.id}`"
-                class="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors"
+                class="hover:bg-slate-50/70 dark:hover:bg-slate-800/60 transition-colors"
               >
                 <td class="p-2 text-center">
-                  <div class="size-7 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto">
+                  <div class="size-7 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 flex items-center justify-center mx-auto">
                     <img
                       v-if="getItemImgSrc(item)"
                       :src="getItemImgSrc(item)"
@@ -503,7 +503,7 @@ function exportItemsJson() {
                 <td class="p-2 font-medium text-slate-800 dark:text-slate-200">
                   {{ item.name }}
                 </td>
-                <td class="p-2 font-mono text-slate-400 text-[11px]">
+                <td class="p-2 font-mono text-slate-400 dark:text-slate-500 text-[11px]">
                   #{{ item.id }}
                 </td>
                 <td class="p-2 text-right font-bold text-slate-700 dark:text-slate-200 tabular-nums">
@@ -512,7 +512,7 @@ function exportItemsJson() {
                     <button
                       v-if="checkIsOpenableChest(item)"
                       type="button"
-                      class="px-2 py-0.5 rounded text-3xs font-bold bg-amber-500 hover:bg-amber-400 text-amber-950 cursor-pointer shadow-xs transition-colors shrink-0 flex items-center gap-1 active:scale-95"
+                      class="px-2 py-0.5 rounded text-3xs font-bold bg-amber-500 hover:bg-amber-400 text-amber-950 cursor-pointer shadow-xs transition-colors shrink-0 flex items-center gap-1 active:scale-95 border border-amber-600/30"
                       title="Open chest dialog"
                       @click.stop="handleOpenChest(item)"
                     >

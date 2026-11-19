@@ -8,7 +8,9 @@ import {
   getChestChoices,
   aggregateChestRewards,
   CHOICE_CHEST_DEFINITIONS,
-  KNOWN_CHEST_IDS
+  KNOWN_CHEST_IDS,
+  NON_CHEST_CATEGORIES,
+  VALID_CHEST_CATEGORIES
 } from '../src/utils/chestHelper.ts';
 import { rpcCacheService } from '../src/core/cache/index.ts';
 
@@ -19,9 +21,25 @@ test('chestHelper accurately detects openable chests, choice options, and aggreg
   assert.equal(isOpenableChest({ id: 62, category: 'consumable', name: 'Artifact Essence Chest' }), true);
   assert.equal(isOpenableChest({ id: 28, category: 'consumable', name: 'Legendary Chest' }), true);
   assert.equal(isOpenableChest({ id: 15, category: 'consumable', name: 'Bronze casket' }), true);
+  assert.equal(isOpenableChest({ id: 18, category: 'consumable', name: 'Silver casket' }), true);
+  assert.equal(isOpenableChest({ id: 21, category: 'consumable', name: 'Golden casket' }), true);
   assert.equal(isOpenableChest({ id: 51, category: 'consumable', name: 'Skin Stone Chest' }), true);
   assert.equal(isOpenableChest({ id: '999', category: 'lootboxChanced', name: 'Special Mystery Box' }), true);
   assert.equal(isOpenableChest({ id: 9, category: 'consumable', name: 'Smaller EXP potion' }), false);
+
+  // 1b. Non-chest items with colliding IDs MUST NOT be detected as openable chests
+  assert.equal(isOpenableChest({ id: 18, category: 'gear', name: 'Orcish Hammer' }), false, 'Gear #18 must not be openable');
+  assert.equal(isOpenableChest({ id: 62, category: 'gear', name: 'Orcish Plate' }), false, 'Gear #62 must not be openable');
+  assert.equal(isOpenableChest({ id: 15, category: 'gear', name: 'Heavy Belt' }), false, 'Gear #15 must not be openable');
+  assert.equal(isOpenableChest({ id: 21, category: 'patron', name: 'Relic Shard #21' }), false, 'Relic shard #21 must not be openable');
+  assert.equal(isOpenableChest({ id: 62, rawCategory: 'gear' }), false, 'rawCategory gear #62 must not be openable');
+  assert.equal(isOpenableChest({ id: 18, category: 'fragmentGear' }), false, 'fragmentGear #18 must not be openable');
+  assert.equal(isOpenableChest({ id: 22, category: 'artifact' }), false, 'artifact #22 must not be openable');
+  assert.equal(isOpenableChest({ id: 19, category: 'scroll' }), false, 'scroll #19 must not be openable');
+  assert.equal(isOpenableChest({ id: 47, category: 'fragmentTitan' }), false, 'fragmentTitan #47 must not be openable');
+  assert.equal(isOpenableChest({ id: 51, category: 'coin' }), false, 'coin #51 must not be openable');
+  assert.ok(NON_CHEST_CATEGORIES.has('gear'), 'NON_CHEST_CATEGORIES must contain gear');
+  assert.ok(NON_CHEST_CATEGORIES.has('patron'), 'NON_CHEST_CATEGORIES must contain patron');
 
   // 2. Choice Chest identification
   assert.equal(isChoiceChest(62), true, 'Chest 62 must be recognized as Choice Chest');
@@ -36,8 +54,10 @@ test('chestHelper accurately detects openable chests, choice options, and aggreg
   assert.equal(choices62.length, 5, 'Artifact Essence Chest has 5 quality tiers (White to Orange)');
   assert.equal(choices62[0].reward.id, 29);
   assert.equal(choices62[0].reward.amount, 12);
+  assert.equal(choices62[0].reward.icon, 'assets/items/consumable/29.png', 'Choices must have resolved icon path');
   assert.equal(choices62[1].reward.id, 30);
   assert.equal(choices62[1].reward.amount, 7);
+  assert.equal(choices62[1].reward.icon, 'assets/items/consumable/30.png');
   assert.equal(choices62[2].reward.id, 31);
   assert.equal(choices62[2].reward.amount, 4);
   assert.equal(choices62[3].reward.id, 32);
@@ -122,6 +142,10 @@ test('ChestModal and ItemsTab integrate Open Chest dialog and actions', async ()
   assert.ok(modalContent.includes('inventory_use'), 'ChestModal must dispatch inventory_use');
   assert.ok(modalContent.includes('isOpening'), 'ChestModal must track opening state for anti-double-click');
   assert.ok(modalContent.includes('pointer-events-none'), 'Must block clicks during opening');
+  assert.equal(modalContent.includes('dark:bg-slate-850'), false, 'Must not have invalid dark:bg-slate-850 class');
+  assert.equal(modalContent.includes('dark:bg-slate-750'), false, 'Must not have invalid dark:bg-slate-750 class');
+  assert.equal(modalContent.includes('dark:hover:bg-slate-750'), false, 'Must not have invalid dark:hover:bg-slate-750 class');
+  assert.ok(modalContent.includes('NON_CHEST_CATEGORIES'), 'ChestModal must filter out non-chest categories');
 
   // Verify ItemsTab integration
   const itemsTabPath = join(root, 'src/components/tabs/ItemsTab.vue');

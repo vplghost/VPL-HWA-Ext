@@ -219,6 +219,39 @@ export const CHOICE_CHEST_DEFINITIONS: Record<number | string, ChestChoiceOption
   ]
 };
 
+// Categories that must NEVER be treated as openable chests
+export const NON_CHEST_CATEGORIES = new Set<string>([
+  'gear',
+  'fragmentGear',
+  'artifact',
+  'fragmentArtifact',
+  'scroll',
+  'fragmentScroll',
+  'coin',
+  'fragmentHero',
+  'fragmentTitan',
+  'fragmentSkin',
+  'patron',
+  'speedUp',
+  'speedUpBuilding',
+  'speedUpResearch',
+  'teleporter',
+  'material',
+  'energy',
+  'stamina',
+  'experience',
+  'gold',
+  'starmoney'
+]);
+
+// Categories that can legitimately contain openable chests / caskets / boxes
+export const VALID_CHEST_CATEGORIES = new Set<string>([
+  'consumable',
+  'lootboxChanced',
+  'lootboxChoiced',
+  'refillable'
+]);
+
 // Known IDs of openable chests / caskets / boxes
 export const KNOWN_CHEST_IDS = new Set<string | number>([
   15, 18, 19, 21, 22, 23, 26, 27, 28, 47, 48, 49, 50, 51, 56, 57, 60, 62, 63, 64, 65, 78,
@@ -239,6 +272,17 @@ export function isOpenableChest(item: {
   name?: string;
 }): boolean {
   if (!item || item.id == null) return false;
+
+  const cat = item.rawCategory || item.category;
+  if (cat) {
+    if (NON_CHEST_CATEGORIES.has(cat) || (item.category && NON_CHEST_CATEGORIES.has(item.category))) {
+      return false;
+    }
+    if (!VALID_CHEST_CATEGORIES.has(cat) && (!item.category || !VALID_CHEST_CATEGORIES.has(item.category))) {
+      return false;
+    }
+  }
+
   const strId = String(item.id);
 
   if (item.category === 'lootboxChanced' || item.rawCategory === 'lootboxChanced') return true;

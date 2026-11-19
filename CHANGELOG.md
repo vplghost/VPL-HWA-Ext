@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.11.131 — 2026-11-20
+
+### Fixed
+
+- **Items Tab & Chest Opening: Non-Chest Collision Guard, Image Accuracy & Dark Theme UI (`chestHelper.ts`, `ChestModal.vue`, `ItemsTab.vue`)**:
+  - **Non-Chest ID Collision Prevention**:
+    - Added `NON_CHEST_CATEGORIES` (`gear`, `patron`, `artifact`, `scroll`, `coin`, `fragmentGear`, `fragmentTitan`, `fragmentHero`, `fragmentSkin`, `speedUp`, `teleporter`, `material`, etc.) to `src/utils/chestHelper.ts`.
+    - Guarded `isOpenableChest` to immediately return `false` for any non-chest category item, preventing items like Orcish Hammer (Gear #18), Gear #62, and Relic Shards (Patron #21) from incorrectly displaying the "Open" button in `ItemsTab.vue`.
+  - **Chest Modal Image Accuracy**:
+    - Filtered `openableChests` in `ChestModal.vue` against `NON_CHEST_CATEGORIES`, preventing non-chest items with colliding IDs from populating the chest list.
+    - Updated active chest selection to cross-reference `selectedChestCategory` alongside `selectedChestId`.
+    - Resolved chest choice reward icons dynamically via `getRewardImg` fallback to `getItemIcon(reward.type, reward.id)`, ensuring all reward previews display accurate graphical icons.
+  - **Dark Theme Compatibility & Tailwind Standardization**:
+    - Replaced all non-standard Tailwind classes (`dark:bg-slate-850`, `dark:bg-slate-750`, `dark:hover:bg-slate-750`) in `ChestModal.vue` with standard utilities (`dark:bg-slate-800`, `dark:bg-slate-700`, `dark:hover:bg-slate-700`).
+    - Enhanced contrast in dark theme across `ItemsTab.vue` for search inputs, category select options, toolbar buttons, section headers, grid cards, and table snapshot view.
+  - Added unit test coverage in `tests/chest-opening.test.mjs`.
+
 ## 0.11.130 — 2026-11-20
 
 ### Added
