@@ -20,8 +20,10 @@ test('BattlePassModal component defines battlePass modal, levels ladder, and rew
   assert.match(content, /claimAllReady/, 'Must define batch claimAllReady');
   assert.match(content, /claimBattlepassRewardAll/, 'Must dispatch claimBattlepassRewardAll RPC');
   assert.match(content, /parseRewards/, 'Must parse tier rewards');
-  assert.match(content, /Free:/, 'Must render Free track label');
-  assert.match(content, /Golden:/, 'Must render Golden track label');
+  assert.match(content, /Free: Rewards Track/, 'Must render Free track column header');
+  assert.match(content, /Golden: Pass Rewards/, 'Must render Golden track column header');
+  assert.doesNotMatch(content, /<span>Free:<\/span>/, 'Redundant Free label must be removed from level cards');
+  assert.doesNotMatch(content, /<span>Golden:<\/span>/, 'Redundant Golden label must be removed from level cards');
 });
 
 test('useModals and App.vue integrate BattlePassModal dialog state and mounting', async () => {

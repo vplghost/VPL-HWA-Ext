@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.121 — 2026-11-19
+
+### Changed
+
+- **Compact Battle Pass Milestone Tier Card Layout (`BattlePassModal.vue`)**:
+  - Removed repetitive "Free:" and "Golden:" text labels from individual milestone tier cards, eliminating visual noise and reclaiming horizontal/vertical space.
+  - Reorganized Free and Golden track sub-cards into a streamlined single-row layout (`flex items-center justify-between`) uniting reward badges and status indicators on the same line.
+  - Replaced multi-row stacking in Milestone & Status column with a tight inline layout, integrating the single-tier claim button directly alongside requirement and status indicators.
+  - Added mobile icon indicators (`🆓` / `⭐`) to retain instant track identification on small screens while desktop headers (`Free: Rewards Track` & `Golden: Pass Rewards`) remain clear.
+  - Significantly reduced tier card height by ~40% for denser ladder visibility and reduced scrolling.
+  - Updated test coverage in `tests/battlepass-modal.test.mjs`.
+
 ## 0.11.120 — 2026-11-19
 
 ### Added
