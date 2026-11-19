@@ -68,6 +68,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
     dailyBonusGetInfo: 'other',
     zeppelinGiftGet: 'other',
     zeppelinGiftFarm: 'other',
+    offerFarmReward: 'other',
     subscriptionFarm: 'other',
     subscriptionGetInfo: 'other',
     missionGetAll: 'other',
@@ -1904,7 +1905,54 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
               data: { bonuses: bonusList },
               updatedAt: record.timestamp
             });
+          } else if (!error && call.args?.id != null) {
+            const nowSec = Math.floor(new Date(record.timestamp).getTime() / 1000);
+            actions.push({
+              key: 'attentionBonusStatus',
+              method: call.name,
+              group: 'other',
+              data: { bonuses: [{ id: call.args.id, collected: true, refreshTime: nowSec + 86400 }] },
+              updatedAt: record.timestamp
+            });
           }
+          return actions;
+        }
+        if (call.name === 'zeppelinGiftFarm' && !result?.error) {
+          const actions: any[] = [{
+            key: 'zeppelinGiftFarm',
+            method: call.name,
+            feature: null,
+            group: 'other',
+            data: {
+              success: true,
+              reward: result?.response?.reward || result?.response || null
+            },
+            updatedAt: record.timestamp
+          }];
+          const reward = result?.response?.reward || result?.response;
+          if (reward && typeof reward === 'object') {
+            actions.push(...extractRewardActions(record, call, reward, 'zeppelinGift'));
+          }
+          return actions;
+        }
+        if (call.name === 'offerFarmReward' && !result?.error) {
+          const actions: any[] = [];
+          const response = result?.response;
+          if (response && typeof response === 'object') {
+            actions.push(...extractRewardActions(record, call, response, 'offerReward'));
+          }
+          actions.push({
+            key: 'offerFarmAction',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: {
+              offerId: call.args?.offerId,
+              token: call.ident,
+              reward: response || null
+            },
+            updatedAt: record.timestamp
+          });
           return actions;
         }
         if (Array.isArray(result?.liveOps_UPDATE_ATTENTION_BONUS) && result.liveOps_UPDATE_ATTENTION_BONUS.length > 0) {
@@ -2812,6 +2860,11 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
             if (Number.isFinite(counters.placementAvailable) && counters.placementAvailable > 0) {
               counters.placementAvailable -= 1;
             }
+            const prevRewards = Array.isArray(counters.placementRewards) ? [...counters.placementRewards] : [];
+            if (entry.data.boxNum != null && !prevRewards.some((r: any) => Number(r?.boxNum) === Number(entry.data.boxNum))) {
+              prevRewards.push({ boxNum: entry.data.boxNum });
+            }
+            counters.placementRewards = prevRewards;
             next.cinemaGetCounters = {
               ...next.cinemaGetCounters,
               data: counters,
@@ -2868,17 +2921,46 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           continue;
         }
         if (entry.key === 'zeppelinGiftFarm') {
-          if (next.zeppelinGiftGet?.data) {
-            next.zeppelinGiftGet = {
-              ...next.zeppelinGiftGet,
-              data: {
-                ...next.zeppelinGiftGet.data,
-                available: false,
-              },
-              updatedAt: entry.updatedAt,
-            };
-            changed = true;
+          next.zeppelinGiftGet = {
+            key: 'zeppelinGiftGet',
+            method: 'zeppelinGiftGet',
+            feature: null,
+            group: 'other',
+            data: {
+              ...(next.zeppelinGiftGet?.data || {}),
+              available: false,
+            },
+            updatedAt: entry.updatedAt,
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'offerFarmAction') {
+          const offerId = Number(entry.data?.offerId);
+          if (Number.isFinite(offerId)) {
+            if (next.billingGetAll?.data) {
+              const bgData = next.billingGetAll.data;
+              const offers = Array.isArray(bgData.offers)
+                ? bgData.offers
+                : (Array.isArray(bgData) ? bgData : []);
+              for (const o of offers) {
+                if (o && (Number(o.id) === offerId || Number(o.offerId) === offerId)) {
+                  o.freeRewardObtained = true;
+                }
+              }
+            }
+            if (next.specialOffers?.data) {
+              const soData = next.specialOffers.data;
+              const offers = Array.isArray(soData) ? soData : (Array.isArray(soData.offers) ? soData.offers : []);
+              for (const o of offers) {
+                if (o && (Number(o.id) === offerId || Number(o.offerId) === offerId)) {
+                  o.freeRewardObtained = true;
+                }
+              }
+            }
           }
+          changed = true;
+          continue;
         }
         if (entry.key === 'clanClashClaimAction') {
           const claims = normalizeArrayData(next.clanClashClaimStatus?.data?.claims);
