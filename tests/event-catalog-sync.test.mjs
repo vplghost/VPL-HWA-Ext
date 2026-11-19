@@ -7,10 +7,19 @@ import {
   cleanLocaleTitle,
   parseSpecialQuestEventViews,
   parseQuestChains,
+  parseQuestChainTransferProgress,
+  parseQuests,
   syncRemoteEventCatalog,
   getBattlePassName,
   eventCatalogService
 } from '../src/services/eventCatalogService.ts';
+import {
+  runtimeQuestTargets,
+  runtimeQuestRewards,
+  registerRuntimeTierData,
+  resolveTierTarget,
+  resolveTierDetail
+} from '../src/utils/tierHelper.ts';
 
 test('eventCatalogService parses raw remote configs into clean titles', () => {
   // 1. cleanLocaleTitle tests
@@ -57,14 +66,49 @@ test('eventCatalogService parses raw remote configs into clean titles', () => {
     'Cosmic Glory Pass'
   );
 
-  // 4. parseQuestChains
+  // 4. parseQuestChains & parseQuestChainTransferProgress
   const rawChains = {
-    1301: { id: 1301, name: 'LIB_TEST_BP_DAILY_QUESTS' },
-    1304: { id: 1304, label: 'QUEST_TAB_NAME_LOGIN' }
+    1301: { id: 1301, name: 'LIB_TEST_BP_DAILY_QUESTS', transferProgress: false },
+    1304: { id: 1304, label: 'QUEST_TAB_NAME_LOGIN', transferProgress: true }
   };
   const parsedChains = parseQuestChains(rawChains);
   assert.equal(parsedChains[1301], 'Battle Pass Daily Quests');
   assert.equal(parsedChains[1304], 'Daily Sign In');
+
+  const parsedTransfer = parseQuestChainTransferProgress(rawChains);
+  assert.equal(parsedTransfer[1301], false);
+  assert.equal(parsedTransfer[1304], true);
+
+  // 5. parseQuests parses targets, rewards, and chain mapping
+  const rawQuests = {
+    14855: {
+      id: 14855,
+      chainId: 1325,
+      condition: { name: 'barracksTrainTroops', target: 3000 },
+      reward: [{ type: 'gold', amount: 500000 }, { type: 'coin', id: 40208, amount: 10 }]
+    },
+    14856: {
+      id: 14856,
+      chainId: 1325,
+      condition: { name: 'barracksTrainTroops', target: 7500 },
+      reward: [{ type: 'gold', amount: 1000000 }, { type: 'coin', id: 40208, amount: 15 }]
+    },
+    99001: {
+      id: 99001,
+      chainId: 9900,
+      target: 50,
+      reward: [{ type: 'starmoney', amount: 500 }]
+    }
+  };
+  const { targets, rewards, chains } = parseQuests(rawQuests);
+  assert.equal(targets[14855], 3000);
+  assert.equal(targets[14856], 7500);
+  assert.equal(targets[99001], 50);
+  assert.equal(rewards[14855].length, 2);
+  assert.equal(rewards[14855][0].amount, 500000);
+  assert.equal(rewards[99001][0].type, 'starmoney');
+  assert.equal(chains[14855], 1325);
+  assert.equal(chains[99001], 9900);
 });
 
 test('syncRemoteEventCatalog updates storage and runtime definitions when URLs change', async () => {
@@ -82,7 +126,8 @@ test('syncRemoteEventCatalog updates storage and runtime definitions when URLs c
 
   const configData = {
     specialQuestEventViewUrl: 'https://example.com/view.json',
-    questChainUrl: 'https://example.com/chain.json'
+    questChainUrl: 'https://example.com/chain.json',
+    questUrl: 'https://example.com/quest.json'
   };
 
   // Mock global fetch
@@ -101,7 +146,20 @@ test('syncRemoteEventCatalog updates storage and runtime definitions when URLs c
       return {
         ok: true,
         json: async () => ({
-          1301: { id: 1301, name: 'Season Daily Quests' }
+          1301: { id: 1301, name: 'Season Daily Quests', transferProgress: true }
+        })
+      };
+    }
+    if (url.includes('quest.json')) {
+      return {
+        ok: true,
+        json: async () => ({
+          88001: {
+            id: 88001,
+            chainId: 1301,
+            condition: { name: 'winArena', target: 25 },
+            reward: [{ type: 'starmoney', amount: 300 }]
+          }
         })
       };
     }
@@ -114,16 +172,72 @@ test('syncRemoteEventCatalog updates storage and runtime definitions when URLs c
     assert.equal(result.catalog.viewTitles[134], 'Hero’s Way / Season Quests');
     assert.equal(result.catalog.viewTitles[135], 'Elemental Synergy & Titan Power');
     assert.equal(result.catalog.chainTitles[1301], 'Season Daily Quests');
+    assert.equal(result.catalog.chainTransferProgress[1301], true);
+    assert.equal(result.catalog.questTargets[88001], 25);
+    assert.equal(result.catalog.questRewards[88001][0].type, 'starmoney');
 
     // Calling again with same URLs should skip fetching
     const secondResult = await syncRemoteEventCatalog(configData, mockStorage);
     assert.equal(secondResult.updated, false);
 
+    // Calling with force=true should force re-fetch
+    const forceResult = await syncRemoteEventCatalog(configData, mockStorage, true);
+    assert.equal(forceResult.updated, true);
+
     // questData runtime definitions should have been updated
     assert.equal(questData.title({ viewId: 134 }), 'Hero’s Way / Season Quests');
+
+    // tierHelper runtime targets should have been populated
+    assert.equal(resolveTierTarget({ id: 88001 }, { localeKey: 'UNKNOWN' }, 1), 25);
+    const detail = resolveTierDetail({ id: 88001, progress: 10 }, { localeKey: 'UNKNOWN' }, 1);
+    assert.equal(detail.target, 25);
+    assert.equal(detail.rewards.length, 1);
+    assert.equal(detail.rewards[0].label, 'Emeralds');
+    assert.equal(detail.rewards[0].amount, 300);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('tierHelper dynamically resolves targets and rewards for un-hardcoded new events using runtime catalog', () => {
+  const newQuestId = 999555;
+  const newChainId = 888111;
+
+  // Before runtime registration, resolveTierTarget falls back to step (e.g. 10 * tierIndex)
+  const fallbackTarget = resolveTierTarget({ id: newQuestId }, { localeKey: 'UNKNOWN_NEW_EVENT' }, 1);
+  assert.equal(fallbackTarget, 1); // 1 * defaultStep(1)
+
+  // Register runtime definitions from remote CDN
+  registerRuntimeTierData({
+    questTargets: { [newQuestId]: 45000 },
+    questRewards: {
+      [newQuestId]: [
+        { type: 'coin', id: 40208, amount: 80 },
+        { type: 'gold', amount: 10000000 }
+      ]
+    },
+    chainTransferProgress: { [newChainId]: true }
+  });
+
+  // Now resolveTierTarget resolves the dynamic 45,000 target
+  const dynamicTarget = resolveTierTarget({ id: newQuestId }, { localeKey: 'UNKNOWN_NEW_EVENT' }, 1);
+  assert.equal(dynamicTarget, 45000);
+
+  // resolveTierDetail resolves the exact dynamic rewards (Legend Coin + Gold)
+  const detail = resolveTierDetail(
+    { id: newQuestId, progress: 20000, completionCount: 0, chainId: newChainId },
+    { localeKey: 'UNKNOWN_NEW_EVENT', id: newChainId },
+    1
+  );
+  assert.equal(detail.target, 45000);
+  assert.equal(detail.progress, 20000);
+  assert.equal(detail.percent, 44);
+  assert.equal(detail.state, 'inProgress');
+  assert.equal(detail.rewards.length, 2);
+  assert.equal(detail.rewards[0].label, 'Legend Coin');
+  assert.equal(detail.rewards[0].amount, 80);
+  assert.equal(detail.rewards[1].label, 'Gold');
+  assert.equal(detail.rewards[1].amount, 10000000);
 });
 
 test('questData.getMilestoneSummary accurately calculates event progress and groups breakdown', () => {

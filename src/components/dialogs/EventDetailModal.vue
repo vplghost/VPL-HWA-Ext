@@ -9,6 +9,7 @@ import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
 import { parseRewards } from '@/src/utils/rewardHelper';
 import { resolveTierDetail } from '@/src/utils/tierHelper';
+import { eventCatalogService } from '@/src/services/eventCatalogService';
 import { questRefreshCalls, sendQuestClaim, sendEventQuestClaim } from '@/src/utils/dialogRpc';
 import { exportEventsAsJson, copyEventsToClipboard } from '@/src/utils/eventExport';
 
@@ -227,6 +228,10 @@ async function refreshData() {
   isRefreshing.value = true;
   try {
     await dispatchRpc(questRefreshCalls());
+    const configData = cache.value?.remoteConfigStatus?.data;
+    if (configData && typeof chrome !== 'undefined' && chrome.storage?.local) {
+      await eventCatalogService.syncRemoteEventCatalog(configData, chrome.storage.local).catch(() => {});
+    }
   } finally {
     isRefreshing.value = false;
   }

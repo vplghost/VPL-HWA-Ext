@@ -41,6 +41,57 @@ export interface TierResolution {
   raw: any;
 }
 
+// Dynamic runtime targets & rewards synced from CDN configs
+export const runtimeQuestTargets: Record<number | string, number> = {};
+export const runtimeQuestRewards: Record<number | string, any> = {};
+export const runtimeTransferProgress: Record<number | string, boolean> = {};
+
+export function registerRuntimeTierData(data?: {
+  questTargets?: Record<string | number, number>;
+  questRewards?: Record<string | number, any>;
+  chainTransferProgress?: Record<string | number, boolean>;
+}) {
+  if (!data || typeof data !== 'object') return;
+  if (data.questTargets) {
+    for (const [k, v] of Object.entries(data.questTargets)) {
+      if (v != null && Number.isFinite(Number(v))) {
+        runtimeQuestTargets[k] = Number(v);
+      }
+    }
+  }
+  if (data.questRewards) {
+    for (const [k, v] of Object.entries(data.questRewards)) {
+      if (v != null) {
+        runtimeQuestRewards[k] = v;
+      }
+    }
+  }
+  if (data.chainTransferProgress) {
+    for (const [k, v] of Object.entries(data.chainTransferProgress)) {
+      runtimeTransferProgress[k] = v === true;
+    }
+  }
+}
+
+// Auto-load runtime overrides from storage & live dynamic catalog
+try {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    chrome.storage.local.get(['dynamicEventCatalog']).then((stored) => {
+      if (stored?.dynamicEventCatalog) {
+        registerRuntimeTierData(stored.dynamicEventCatalog);
+      }
+    }).catch(() => {});
+
+    if (chrome.storage?.onChanged) {
+      chrome.storage.onChanged.addListener((changes: any, area: string) => {
+        if (area === 'local' && changes.dynamicEventCatalog?.newValue) {
+          registerRuntimeTierData(changes.dynamicEventCatalog.newValue);
+        }
+      });
+    }
+  }
+} catch (_) {}
+
 // Known targets from CDN game configurations
 export const knownQuestTargets: Record<number | string, number> = {
   // Event 100275 (viewId 65): Clan Clash Event
@@ -671,7 +722,12 @@ export function resolveTierTarget(quest: any, group: any, tierIndex: number, qAl
     return explicit;
   }
 
-  // 2. Known CDN quest target
+  // 2. Dynamic runtime quest target from CDN configs
+  if (quest?.id && runtimeQuestTargets[quest.id] != null) {
+    return runtimeQuestTargets[quest.id]!;
+  }
+
+  // 3. Known CDN quest target
   if (quest?.id && knownQuestTargets[quest.id] != null) {
     return knownQuestTargets[quest.id]!;
   }
@@ -737,6 +793,7 @@ export function resolveTierDetail(
   const rawReward =
     qAllEntry?.reward ||
     quest?.reward ||
+    (quest?.id && runtimeQuestRewards[quest.id]) ||
     (quest?.id && knownQuestRewards[quest.id]) ||
     (meta.rewardsLadder && meta.rewardsLadder[tierIndex - 1]) ||
     (meta.defaultReward ? meta.defaultReward(tierIndex, target) : null) ||

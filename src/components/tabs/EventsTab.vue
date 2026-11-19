@@ -6,7 +6,7 @@ import { formatNumber } from '@/src/utils/formatters';
 import { normalizeArray } from '@/src/utils/troops';
 import { questData } from '@/src/data/questData';
 import { getBattlePassName } from '@/src/data/battlepassCatalog';
-import { cleanLocaleTitle } from '@/src/services/eventCatalogService';
+import { cleanLocaleTitle, eventCatalogService } from '@/src/services/eventCatalogService';
 import {
   resolveClaimableEventQuests,
   resolveClaimableBattlePassRewards,
@@ -405,6 +405,32 @@ async function refreshEvents() {
 }
 
 const exportStatus = ref('');
+const isSyncing = ref(false);
+
+async function triggerSync() {
+  if (isSyncing.value) return;
+  isSyncing.value = true;
+  exportStatus.value = 'Syncing CDN...';
+  try {
+    const configData = cache.value?.remoteConfigStatus?.data;
+    if (configData && typeof chrome !== 'undefined' && chrome.storage?.local) {
+      const res = await eventCatalogService.syncRemoteEventCatalog(configData, chrome.storage.local, true);
+      if (res.updated) {
+        dynamicCatalog.value = res.catalog;
+        exportStatus.value = 'Synced CDN!';
+      } else {
+        exportStatus.value = 'Up to date';
+      }
+    } else {
+      exportStatus.value = 'No config to sync';
+    }
+  } catch (_) {
+    exportStatus.value = 'Sync error';
+  } finally {
+    isSyncing.value = false;
+    setTimeout(() => { exportStatus.value = ''; }, 3000);
+  }
+}
 
 function triggerExport() {
   exportEventsAsJson(cache.value, dynamicCatalog.value, {
@@ -488,6 +514,18 @@ async function triggerCopy() {
         </button>
 
         <div class="flex items-center gap-1 shrink-0">
+          <button
+            id="events-sync-catalog"
+            type="button"
+            :disabled="isSyncing"
+            class="cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50"
+            title="Sync latest remote event catalog (targets & rewards) from CDN"
+            @click="triggerSync"
+          >
+            <span :class="{ 'inline-block animate-spin': isSyncing }">🔄</span>
+            <span class="hidden sm:inline">Sync</span>
+          </button>
+
           <button
             id="events-export-json"
             type="button"

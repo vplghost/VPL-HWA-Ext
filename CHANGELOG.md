@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.120 — 2026-11-19
+
+### Added
+
+- **Full Runtime Synchronization for Event Milestones, Targets & Rewards (`eventCatalogService.ts`, `tierHelper.ts`)**:
+  - Implemented `parseQuests` in `eventCatalogService.ts`: downloads and parses `questUrl` configs from Nexters CDN, extracting dynamic requirement thresholds (`condition.target`) and reward packages (`reward: [{ type, id, amount }]`) for all quests.
+  - Implemented `parseQuestChainTransferProgress`: dynamically extracts `transferProgress: boolean` per quest chain directly from `questChainUrl` CDN configs.
+  - Connected `tierHelper.ts` to `chrome.storage.local.dynamicEventCatalog` with reactive `registerRuntimeTierData` and storage change listeners.
+  - Prioritized dynamic runtime CDN targets and rewards in `resolveTierTarget` and `resolveTierDetail` before falling back to static dictionaries.
+  - Added "🔄 Sync" button in `EventsTab.vue` toolbar to trigger on-demand CDN synchronization with real-time status feedback.
+  - Integrated automatic CDN catalog synchronization into `EventDetailModal.vue` refresh workflow.
+  - Added comprehensive test coverage in `tests/event-catalog-sync.test.mjs`.
+
 ## 0.11.118 — 2026-11-19
 
 ### Fixed

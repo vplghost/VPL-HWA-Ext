@@ -4,10 +4,14 @@
  * when new event versions are detected without requiring an extension rebuild.
  */
 import { questData } from '../data/questData.ts';
+import { registerRuntimeTierData } from '../utils/tierHelper.ts';
 
 export interface DynamicEventCatalog {
   viewTitles: Record<string | number, string>;
   chainTitles: Record<string | number, string>;
+  questTargets?: Record<string | number, number>;
+  questRewards?: Record<string | number, any[]>;
+  chainTransferProgress?: Record<string | number, boolean>;
   battlepass?: {
     tracks?: any[];
     levels?: any[];
@@ -34,7 +38,7 @@ export interface RemoteConfigIndexData {
 
 export function cleanLocaleTitle(key?: string | null): string {
   if (!key || typeof key !== 'string') return 'Special Event';
-  if (questData.localeTitles[key]?.title) return questData.localeTitles[key].title;
+  if (questData.localeTitles?.[key]?.title) return questData.localeTitles[key]!.title;
 
   // If contains Cyrillic characters
   if (/[\u0400-\u04FF]/.test(key)) {
@@ -110,7 +114,7 @@ export function parseSpecialQuestEventViews(rawJson: any): Record<string | numbe
 
     // Preserve known hardcoded view titles if CDN config provides no specific title
     if ((!title || title === 'Special Event') && questData.viewTitles[Number(id)]) {
-      title = questData.viewTitles[Number(id)];
+      title = questData.viewTitles[Number(id)] || '';
     }
 
     if (title && title !== 'Special Event') {
@@ -137,6 +141,57 @@ export function parseQuestChains(rawJson: any): Record<string | number, string> 
   return result;
 }
 
+export function parseQuestChainTransferProgress(rawJson: any): Record<string | number, boolean> {
+  const result: Record<string | number, boolean> = {};
+  if (!rawJson || typeof rawJson !== 'object') return result;
+
+  const entries = Array.isArray(rawJson) ? rawJson : Object.entries(rawJson);
+  for (const item of entries) {
+    const val = Array.isArray(rawJson) ? item : item[1];
+    const id = val?.id ?? (Array.isArray(rawJson) ? null : item[0]);
+    if (id == null) continue;
+    if (val?.transferProgress != null) {
+      result[Number(id)] = val.transferProgress === true;
+    }
+  }
+  return result;
+}
+
+export function parseQuests(rawJson: any): {
+  targets: Record<number, number>;
+  rewards: Record<number, any[]>;
+  chains: Record<number, number>;
+} {
+  const targets: Record<number, number> = {};
+  const rewards: Record<number, any[]> = {};
+  const chains: Record<number, number> = {};
+
+  if (!rawJson || typeof rawJson !== 'object') return { targets, rewards, chains };
+
+  const entries = Array.isArray(rawJson) ? rawJson : Object.entries(rawJson);
+  for (const item of entries) {
+    const val = Array.isArray(rawJson) ? item : item[1];
+    const id = val?.id ?? (Array.isArray(rawJson) ? null : item[0]);
+    if (id == null) continue;
+    const numId = Number(id);
+    if (!Number.isFinite(numId)) continue;
+
+    const target = val?.condition?.target ?? val?.target;
+    if (target != null && Number.isFinite(Number(target))) {
+      targets[numId] = Number(target);
+    }
+
+    if (Array.isArray(val?.reward) && val.reward.length > 0) {
+      rewards[numId] = val.reward;
+    }
+
+    if (val?.chainId != null) {
+      chains[numId] = Number(val.chainId);
+    }
+  }
+  return { targets, rewards, chains };
+}
+
 export async function fetchJsonSafely(url: string, timeoutMs: number = 8000): Promise<any | null> {
   if (!url || typeof url !== 'string' || !url.startsWith('https://')) return null;
   try {
@@ -156,7 +211,8 @@ export async function fetchJsonSafely(url: string, timeoutMs: number = 8000): Pr
 
 export async function syncRemoteEventCatalog(
   configData: RemoteConfigIndexData,
-  storage: { get: (keys: string[]) => Promise<any>; set: (items: Record<string, any>) => Promise<any> }
+  storage: { get: (keys: string[]) => Promise<any>; set: (items: Record<string, any>) => Promise<any> },
+  force: boolean = false
 ): Promise<{ updated: boolean; catalog: DynamicEventCatalog }> {
   const stored = await storage.get(['dynamicEventCatalog']);
   const existingCatalog: DynamicEventCatalog = stored?.dynamicEventCatalog || {
@@ -168,6 +224,7 @@ export async function syncRemoteEventCatalog(
   const currentUrls = {
     viewUrl: configData?.specialQuestEventViewUrl || '',
     chainUrl: configData?.questChainUrl || '',
+    questUrl: configData?.questUrl || '',
     bpTrackUrl: configData?.battlepassTrackUrl || '',
     bpRewardUrl: configData?.battlepassRewardUrl || '',
     bpLevelUrl: configData?.battlepassLevelUrl || ''
@@ -182,11 +239,12 @@ export async function syncRemoteEventCatalog(
     !existingCatalog.sourceUrls ||
     existingCatalog.sourceUrls.viewUrl !== currentUrls.viewUrl ||
     existingCatalog.sourceUrls.chainUrl !== currentUrls.chainUrl ||
+    existingCatalog.sourceUrls.questUrl !== currentUrls.questUrl ||
     existingCatalog.sourceUrls.bpLevelUrl !== currentUrls.bpLevelUrl ||
     existingCatalog.sourceUrls.bpTrackUrl !== currentUrls.bpTrackUrl ||
     existingCatalog.sourceUrls.bpRewardUrl !== currentUrls.bpRewardUrl;
 
-  if (!urlsChanged && !hasStaleSpecialEventTitles && Object.keys(existingCatalog.viewTitles || {}).length > 0) {
+  if (!force && !urlsChanged && !hasStaleSpecialEventTitles && Object.keys(existingCatalog.viewTitles || {}).length > 0) {
     return { updated: false, catalog: existingCatalog };
   }
 
@@ -200,6 +258,9 @@ export async function syncRemoteEventCatalog(
   }
 
   const newChainTitles: Record<string | number, string> = { ...existingCatalog.chainTitles };
+  const newQuestTargets: Record<string | number, number> = { ...(existingCatalog.questTargets || {}) };
+  const newQuestRewards: Record<string | number, any[]> = { ...(existingCatalog.questRewards || {}) };
+  const newChainTransferProgress: Record<string | number, boolean> = { ...(existingCatalog.chainTransferProgress || {}) };
   let bpLevels = existingCatalog.battlepass?.levels || [];
   let bpTracks = existingCatalog.battlepass?.tracks || [];
   let bpRewards = existingCatalog.battlepass?.rewards || [];
@@ -213,12 +274,24 @@ export async function syncRemoteEventCatalog(
     }
   }
 
-  // Fetch chain titles
+  // Fetch chain titles & transferProgress
   if (currentUrls.chainUrl) {
     const chainData = await fetchJsonSafely(currentUrls.chainUrl);
     if (chainData) {
-      const parsed = parseQuestChains(chainData);
-      Object.assign(newChainTitles, parsed);
+      const parsedTitles = parseQuestChains(chainData);
+      Object.assign(newChainTitles, parsedTitles);
+      const parsedTransfer = parseQuestChainTransferProgress(chainData);
+      Object.assign(newChainTransferProgress, parsedTransfer);
+    }
+  }
+
+  // Fetch quests (targets & rewards)
+  if (currentUrls.questUrl) {
+    const questsData = await fetchJsonSafely(currentUrls.questUrl);
+    if (questsData) {
+      const { targets, rewards } = parseQuests(questsData);
+      Object.assign(newQuestTargets, targets);
+      Object.assign(newQuestRewards, rewards);
     }
   }
 
@@ -249,6 +322,9 @@ export async function syncRemoteEventCatalog(
   const updatedCatalog: DynamicEventCatalog = {
     viewTitles: newViewTitles,
     chainTitles: newChainTitles,
+    questTargets: newQuestTargets,
+    questRewards: newQuestRewards,
+    chainTransferProgress: newChainTransferProgress,
     battlepass: {
       levels: bpLevels,
       tracks: bpTracks,
@@ -262,6 +338,7 @@ export async function syncRemoteEventCatalog(
   questData.registerRuntimeDefinitions({
     viewTitles: newViewTitles
   });
+  registerRuntimeTierData(updatedCatalog);
 
   return { updated: true, catalog: updatedCatalog };
 }
@@ -272,6 +349,8 @@ export const eventCatalogService = {
   cleanLocaleTitle,
   parseSpecialQuestEventViews,
   parseQuestChains,
+  parseQuestChainTransferProgress,
+  parseQuests,
   fetchJsonSafely,
   syncRemoteEventCatalog
 };
