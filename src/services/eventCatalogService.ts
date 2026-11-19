@@ -34,8 +34,17 @@ export interface RemoteConfigIndexData {
 
 export function cleanLocaleTitle(key?: string | null): string {
   if (!key || typeof key !== 'string') return 'Special Event';
-  if (/[\u0400-\u04FF]/.test(key)) return 'Special Event';
   if (questData.localeTitles[key]?.title) return questData.localeTitles[key].title;
+
+  // If contains Cyrillic characters
+  if (/[\u0400-\u04FF]/.test(key)) {
+    const stripped = key.replace(/[\u0400-\u04FF]/g, '').trim();
+    if (stripped.length >= 3 && /[a-zA-Z]/.test(stripped)) {
+      key = stripped;
+    } else {
+      return 'Special Event';
+    }
+  }
 
   // If already mixed-case and has spaces without underscores, preserve it
   if (/[a-z]/.test(key) && /\s/.test(key) && !key.includes('_')) {
@@ -43,11 +52,20 @@ export function cleanLocaleTitle(key?: string | null): string {
   }
 
   const clean = key
-    .replace(/^(LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_|LIB_SPECIAL_QUEST_EVENT_NAME_|LIB_SEASONAL_EVENT_NAME_|LIB_TEST_BP_|LIB_|QUEST_TAB_NAME_|QUEST_TAB_|UI_DIALOG_|UI_FEATURE_HUB_|UI_|STRATEGIC_BASE_INTERFACE_|STRATEGIC_GLOBAL_MAP_)/, '')
+    .replace(/^(LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_|LIB_SPECIAL_QUEST_EVENT_NAME_|LIB_SEASONAL_EVENT_NAME_|LIB_TEST_BP_|LIB_|QUEST_TAB_NAME_|QUEST_TAB_|UI_DIALOG_|UI_FEATURE_HUB_|UI_|STRATEGIC_BASE_INTERFACE_|STRATEGIC_GLOBAL_MAP_|EVENT_GLORY_NAME_QUEST_|EVENT_GLORY_NAME_|BATTLEPASS_UNIVERSAL_|BATTLEPASS_)/, '')
     .replace(/_/g, ' ')
     .trim();
   if (!clean) return 'Special Event';
-  if (/^\d+$/.test(clean)) return `Event #${clean}`;
+
+  // If numeric, check if questData has the full key defined
+  if (/^\d+$/.test(clean)) {
+    const fullKey = 'LIB_SPECIAL_QUEST_EVENT_NAME_' + clean;
+    if (questData.localeTitles[fullKey]?.title) {
+      return questData.localeTitles[fullKey].title;
+    }
+    return `Event #${clean}`;
+  }
+
   return clean
     .toLowerCase()
     .replace(/(?:^|\s|[-/])\w/g, c => c.toUpperCase());
@@ -63,9 +81,41 @@ export function parseSpecialQuestEventViews(rawJson: any): Record<string | numbe
     const id = val?.id ?? (Array.isArray(rawJson) ? null : item[0]);
     if (id == null) continue;
 
-    const rawTitle = val?.title || val?.name_localeKey || val?.localeKey || val?.name;
-    const title = cleanLocaleTitle(rawTitle);
-    result[Number(id)] = title;
+    const rawKey = val?.nameLocaleKey || val?.name_localeKey || val?.localeKey || val?.name || val?.title;
+    let title = '';
+    if (rawKey && rawKey !== 'empty') {
+      title = cleanLocaleTitle(rawKey);
+    }
+
+    // If title is missing or generic fallback, inspect descriptive label
+    if (!title || title === 'Special Event' || title.startsWith('Event #')) {
+      const label = val?.label;
+      if (label && typeof label === 'string') {
+        if (/[a-zA-Z]{3,}/.test(label) && !/[\u0400-\u04FF]/.test(label)) {
+          title = label
+            .replace(/\(pp\d+\)/gi, '')
+            .replace(/\s*Event View\s*$/i, '')
+            .replace(/\s*View\s*$/i, '')
+            .replace(/\. /g, ': ')
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/[\s.:-]+$/g, '')
+            .trim();
+        } else if (label.includes('ClanClash')) {
+          title = 'Clan Clash Event';
+        } else if (label.includes('Водрин') || label.toLowerCase().includes('hero78')) {
+          title = 'Wodryn Adventure Event';
+        }
+      }
+    }
+
+    // Preserve known hardcoded view titles if CDN config provides no specific title
+    if ((!title || title === 'Special Event') && questData.viewTitles[Number(id)]) {
+      title = questData.viewTitles[Number(id)];
+    }
+
+    if (title && title !== 'Special Event') {
+      result[Number(id)] = title;
+    }
   }
   return result;
 }
@@ -123,22 +173,36 @@ export async function syncRemoteEventCatalog(
     bpLevelUrl: configData?.battlepassLevelUrl || ''
   };
 
-  // Check if URLs have changed
+  // Check if URLs have changed or if existing catalog contains stale generic Special Event titles
+  const hasStaleSpecialEventTitles = Object.values(existingCatalog.viewTitles || {}).some(
+    v => v === 'Special Event'
+  );
+
   const urlsChanged =
     !existingCatalog.sourceUrls ||
     existingCatalog.sourceUrls.viewUrl !== currentUrls.viewUrl ||
     existingCatalog.sourceUrls.chainUrl !== currentUrls.chainUrl ||
     existingCatalog.sourceUrls.bpLevelUrl !== currentUrls.bpLevelUrl ||
-    existingCatalog.sourceUrls.bpTrackUrl !== currentUrls.bpTrackUrl;
+    existingCatalog.sourceUrls.bpTrackUrl !== currentUrls.bpTrackUrl ||
+    existingCatalog.sourceUrls.bpRewardUrl !== currentUrls.bpRewardUrl;
 
-  if (!urlsChanged && Object.keys(existingCatalog.viewTitles || {}).length > 0) {
+  if (!urlsChanged && !hasStaleSpecialEventTitles && Object.keys(existingCatalog.viewTitles || {}).length > 0) {
     return { updated: false, catalog: existingCatalog };
   }
 
-  const newViewTitles: Record<string | number, string> = { ...existingCatalog.viewTitles };
+  // Initialize with clean base titles from questData and valid non-generic stored titles
+  const newViewTitles: Record<string | number, string> = {};
+  for (const [k, v] of Object.entries(questData.viewTitles || {})) {
+    if (v && v !== 'Special Event') newViewTitles[k] = v;
+  }
+  for (const [k, v] of Object.entries(existingCatalog.viewTitles || {})) {
+    if (v && v !== 'Special Event') newViewTitles[k] = v;
+  }
+
   const newChainTitles: Record<string | number, string> = { ...existingCatalog.chainTitles };
   let bpLevels = existingCatalog.battlepass?.levels || [];
   let bpTracks = existingCatalog.battlepass?.tracks || [];
+  let bpRewards = existingCatalog.battlepass?.rewards || [];
 
   // Fetch view titles
   if (currentUrls.viewUrl) {
@@ -174,12 +238,21 @@ export async function syncRemoteEventCatalog(
     }
   }
 
+  // Fetch battlepass rewards
+  if (currentUrls.bpRewardUrl) {
+    const rewardData = await fetchJsonSafely(currentUrls.bpRewardUrl);
+    if (rewardData) {
+      bpRewards = Array.isArray(rewardData) ? rewardData : Object.values(rewardData);
+    }
+  }
+
   const updatedCatalog: DynamicEventCatalog = {
     viewTitles: newViewTitles,
     chainTitles: newChainTitles,
     battlepass: {
       levels: bpLevels,
-      tracks: bpTracks
+      tracks: bpTracks,
+      rewards: bpRewards,
     },
     sourceUrls: currentUrls,
     lastSyncedAt: new Date().toISOString()
@@ -192,6 +265,8 @@ export async function syncRemoteEventCatalog(
 
   return { updated: true, catalog: updatedCatalog };
 }
+
+export { getBattlePassName, knownBattlePassNames } from '../data/battlepassCatalog.ts';
 
 export const eventCatalogService = {
   cleanLocaleTitle,

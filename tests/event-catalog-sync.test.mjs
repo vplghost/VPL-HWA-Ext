@@ -8,6 +8,7 @@ import {
   parseSpecialQuestEventViews,
   parseQuestChains,
   syncRemoteEventCatalog,
+  getBattlePassName,
   eventCatalogService
 } from '../src/services/eventCatalogService.ts';
 
@@ -17,20 +18,46 @@ test('eventCatalogService parses raw remote configs into clean titles', () => {
   assert.equal(cleanLocaleTitle('LIB_TEST_BP_DAILY_QUESTS'), 'Battle Pass Daily Quests');
   assert.equal(cleanLocaleTitle('STRATEGIC_BASE_INTERFACE_TROOPS_TRAIN'), 'Train Troops in Barracks');
   assert.equal(cleanLocaleTitle('EVENT_GLORY_NAME_QUEST_1'), 'Rising Legend');
+  assert.equal(cleanLocaleTitle('EVENT_GLORY_NAME_QUEST_2'), 'Trial of Legends');
+  assert.equal(cleanLocaleTitle('EVENT_GLORY_NAME_QUEST_3'), 'Glory of the Chosen');
+  assert.equal(cleanLocaleTitle('LIB_SPECIAL_QUEST_EVENT_NAME_90934'), 'Clan Clash Event');
+  assert.equal(cleanLocaleTitle('UI_HERO78_TITLE'), 'Wodryn Hero Quests');
   assert.equal(cleanLocaleTitle('LIB_SPECIAL_QUEST_EVENT_CHAIN_NAME_99'), 'Event #99');
 
-  // 2. parseSpecialQuestEventViews
+  // 2. parseSpecialQuestEventViews supports snake_case, camelCase, and descriptive labels
   const rawViews = {
+    12: { id: 12, label: 'Outland Splendor season 25', nameLocaleKey: 'LIB_SPECIAL_QUEST_EVENT_NAME_229' },
+    94: { id: 94, label: 'КИ на прокачку Водрина - адвенчура 31 сезон', nameLocaleKey: 'UI_HERO78_TITLE' },
+    99: { id: 99, label: "Hero's Way S31", nameLocaleKey: 'empty' },
     134: { id: 134, name_localeKey: 'LIB_SEASON_PASS_TITLE' },
     135: { id: 135, name_localeKey: 'LIB_SPECIAL_QUEST_EVENT_NAME_143' },
-    136: { id: 136, name_localeKey: 'UI_DIALOG_RATING_TAB_CLAN' }
+    136: { id: 136, name_localeKey: 'UI_DIALOG_RATING_TAB_CLAN' },
+    146: { id: 146, label: 'ProgressivePlan. TeamLevel. Event View (pp166951)', nameLocaleKey: 'empty' }
   };
   const parsedViews = parseSpecialQuestEventViews(rawViews);
+  assert.equal(parsedViews[12], 'Outland Splendor');
+  assert.equal(parsedViews[94], 'Wodryn Hero Quests');
+  assert.equal(parsedViews[99], "Hero's Way S31");
   assert.equal(parsedViews[134], 'Season Pass Title');
   assert.equal(parsedViews[135], 'Tower Floor Progress');
   assert.equal(parsedViews[136], 'Guild Activity Points');
+  assert.equal(parsedViews[146], 'Progressive Plan: Team Level');
 
-  // 3. parseQuestChains
+  // 3. getBattlePassName tests
+  assert.equal(getBattlePassName(1017), "Hero's Way S31");
+  assert.equal(getBattlePassName(1016), 'Season Pass S31');
+  assert.equal(getBattlePassName(1036), 'Wodryn Relic Pass S31');
+  assert.equal(getBattlePassName(1037), 'Glory Pass S31');
+  assert.equal(getBattlePassName(1051), 'Team Level Progressive Plan');
+  assert.equal(getBattlePassName({ type: 'draft', id: 186 }), 'Draft Pass');
+  assert.equal(
+    getBattlePassName(9999, {
+      battlepass: { tracks: [{ battlepassId: 9999, label: 'Cosmic Glory Pass Free' }] }
+    }),
+    'Cosmic Glory Pass'
+  );
+
+  // 4. parseQuestChains
   const rawChains = {
     1301: { id: 1301, name: 'LIB_TEST_BP_DAILY_QUESTS' },
     1304: { id: 1304, label: 'QUEST_TAB_NAME_LOGIN' }
