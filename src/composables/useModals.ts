@@ -52,6 +52,7 @@ const modalContext = reactive<{
   selectedCampaignHeroId?: number | string | null;
   selectedChestId?: number | string | null;
   selectedChestCategory?: string | null;
+  campaignFarmMode?: 'gear' | 'hero' | 'soul';
 }>({});
 
 const modalStack = reactive<string[]>([]);
@@ -108,8 +109,10 @@ export function useModals() {
     selectedBattlePassId?: number | string | null;
     selectedCampaignGearId?: number | string | null;
     selectedCampaignHeroId?: number | string | null;
+    selectedCampaignSoulHeroId?: number | string | null;
     selectedChestId?: number | string | null;
     selectedChestCategory?: string | null;
+    campaignFarmMode?: 'gear' | 'hero' | 'soul';
   }) {
     if (context) {
       if (context.selectedHero !== undefined) modalContext.selectedHero = context.selectedHero;
@@ -118,8 +121,13 @@ export function useModals() {
       if (context.selectedBattlePassId !== undefined) modalContext.selectedBattlePassId = context.selectedBattlePassId;
       if (context.selectedCampaignGearId !== undefined) modalContext.selectedCampaignGearId = context.selectedCampaignGearId;
       if (context.selectedCampaignHeroId !== undefined) modalContext.selectedCampaignHeroId = context.selectedCampaignHeroId;
+      if (context.selectedCampaignSoulHeroId !== undefined) {
+        modalContext.selectedCampaignHeroId = context.selectedCampaignSoulHeroId;
+        modalContext.campaignFarmMode = 'soul';
+      }
       if (context.selectedChestId !== undefined) modalContext.selectedChestId = context.selectedChestId;
       if (context.selectedChestCategory !== undefined) modalContext.selectedChestCategory = context.selectedChestCategory;
+      if (context.campaignFarmMode !== undefined) modalContext.campaignFarmMode = context.campaignFarmMode;
     }
     registerModalOpen(name);
     modalState[name] = true;

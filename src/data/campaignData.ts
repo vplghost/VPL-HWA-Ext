@@ -4100,6 +4100,49 @@ export function getMissionsForItem(itemId: number | string): CampaignMission[] {
   return ids.map((id) => campaignMissions[String(id)]).filter((m): m is CampaignMission => Boolean(m));
 }
 
+export const heroSoulMissionDrops: Record<string, number[]> = {
+  "1": [25, 61, 116],
+  "2": [16, 57, 100],
+  "3": [31, 50, 86],
+  "4": [11, 20, 65, 91],
+  "6": [26, 106, 166],
+  "7": [1, 55, 95],
+  "8": [80, 101, 125],
+  "9": [41, 76, 131],
+  "14": [35, 72, 130],
+  "15": [5, 46, 140],
+  "17": [10, 40, 70, 85, 115],
+  "20": [110, 151],
+  "22": [121, 136, 181],
+  "32": [145, 160, 175, 190],
+  "33": [146, 161, 177],
+  "34": [155, 170, 185],
+};
+
+export function getHeroSoulMissions(
+  heroId: number | string,
+  pickerMissions?: Record<string, any>
+): CampaignMission[] {
+  const strId = String(heroId);
+  const idsFromMap = heroSoulMissionDrops[strId] || [];
+  let missionIds = [...idsFromMap];
+  if (pickerMissions && typeof pickerMissions === 'object') {
+    const fromPicker: number[] = [];
+    for (const [mId, m] of Object.entries(pickerMissions)) {
+      if (m?.drops?.some((d: any) => d.category === 'fragmentHero' && String(d.id) === strId)) {
+        fromPicker.push(Number(mId));
+      }
+    }
+    if (fromPicker.length > 0) {
+      missionIds = Array.from(new Set([...missionIds, ...fromPicker]));
+    }
+  }
+  return missionIds
+    .map((id) => campaignMissions[String(id)])
+    .filter((m): m is CampaignMission => Boolean(m))
+    .sort((a, b) => a.id - b.id);
+}
+
 export function getMissionProgress(missionId: number | string, missionProgressMap: any): MissionProgress | null {
   if (!missionProgressMap) return null;
   const numId = Number(missionId);

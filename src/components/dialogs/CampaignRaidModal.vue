@@ -26,10 +26,18 @@ import {
   buildGearRecipeTree,
   findFirstUnfulfilledNode,
   getItemName,
+  getHeroSoulProgress,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { getMissionCosts } from '@/src/data/missionCostData';
-import { campaignMissions, getHighestRaidableMission, getMissionTries } from '@/src/data/campaignData';
+import {
+  campaignMissions,
+  getHighestRaidableMission,
+  getMissionTries,
+  getHeroSoulMissions,
+  isMissionRaidable,
+} from '@/src/data/campaignData';
+import { heroMetadata } from '@/src/data/heroMetadata';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -70,8 +78,62 @@ function missionName(id: number) {
 const selectedGearId = ref<number | string | null>(null);
 const selectedRecipeNodeId = ref<string | null>(null);
 const selectedHeroId = ref<string | null>(null);
-const farmMode = ref<'gear' | 'hero'>('gear');
+const farmMode = ref<'gear' | 'hero' | 'soul'>('gear');
 const selectedLeafKey = ref<string | null>(null);
+
+const heroSoulMissions = computed(() => {
+  if (!selectedHeroId.value) return [];
+  return getHeroSoulMissions(selectedHeroId.value, pickerData?.missions);
+});
+
+const heroSoulProgress = computed(() => {
+  if (!selectedHeroId.value) return null;
+  const hero =
+    cache.value?.heroes?.data?.[selectedHeroId.value] ||
+    cache.value?.userGetInfo?.data?.heroes?.[selectedHeroId.value];
+  return getHeroSoulProgress(selectedHeroId.value, hero, cache.value?.inventoryGet?.data);
+});
+
+const heroSoulName = computed(() => {
+  if (!selectedHeroId.value) return '';
+  return (
+    heroLeafSummary.value?.heroName ||
+    heroMetadata[selectedHeroId.value]?.name ||
+    getItemName('fragmentHero', selectedHeroId.value)?.replace(/ fragment$/i, '') ||
+    `Hero #${selectedHeroId.value}`
+  );
+});
+
+const raidableSoulMissions = computed(() => {
+  return heroSoulMissions.value.filter((m) => {
+    return isMissionRaidable(m.id, cache.value?.missionGetAll?.data, {
+      disabledIds: disabledMissionsToday.value,
+    });
+  });
+});
+
+const totalRaidableSoulTries = computed(() => {
+  let count = 0;
+  for (const m of raidableSoulMissions.value) {
+    const tries = getTriesInfo(m.id);
+    if (!tries.isExhausted) {
+      count += tries.isHeroic ? tries.triesLeft : 3;
+    }
+  }
+  return count;
+});
+
+const canEvolveSoul = computed(() => {
+  const p = heroSoulProgress.value;
+  if (!p || p.needed === 'Max' || p.needed == null || p.owned == null) return false;
+  return Number(p.owned) >= Number(p.needed);
+});
+
+const remainingNeededSoul = computed(() => {
+  const p = heroSoulProgress.value;
+  if (!p || p.needed === 'Max' || p.needed == null || p.owned == null) return 0;
+  return Math.max(0, Number(p.needed) - Number(p.owned));
+});
 
 const heroLeafSummary = computed<HeroLeafEquipmentSummary | null>(() => {
   const hId = selectedHeroId.value;
@@ -130,9 +192,21 @@ function viewGearRecipeTree(gearId: number | string) {
   selectHeroGear(gearId);
 }
 
-function switchFarmMode(mode: 'gear' | 'hero') {
+function switchFarmMode(mode: 'gear' | 'hero' | 'soul') {
   farmMode.value = mode;
-  if (mode === 'hero') {
+  if (mode === 'soul') {
+    const soulCandidates = heroSoulMissions.value;
+    const lowestRaidable = soulCandidates.find((m) =>
+      isMissionRaidable(m.id, cache.value?.missionGetAll?.data, {
+        disabledIds: disabledMissionsToday.value,
+      })
+    );
+    if (lowestRaidable) {
+      missionId.value = lowestRaidable.id;
+    } else if (soulCandidates.length > 0) {
+      missionId.value = soulCandidates[0].id;
+    }
+  } else if (mode === 'hero') {
     if (selectedLeafResource.value) {
       selectLeafResource(selectedLeafResource.value);
     } else if (heroLeafResources.value.length > 0) {
@@ -257,7 +331,12 @@ function toggleSequential(val: boolean) {
 }
 
 watch(
-  [() => modalContext.selectedCampaignGearId, () => modalContext.selectedCampaignHeroId, () => props.modelValue],
+  [
+    () => modalContext.selectedCampaignGearId,
+    () => modalContext.selectedCampaignHeroId,
+    () => modalContext.campaignFarmMode,
+    () => props.modelValue,
+  ],
   () => {
     if (props.modelValue) {
       loadDisabledMissions();
@@ -284,10 +363,25 @@ watch(
     } else if (modalContext.selectedCampaignHeroId != null) {
       selectedHeroId.value = String(modalContext.selectedCampaignHeroId);
       selectedGearId.value = null;
-      farmMode.value = 'hero';
-      selectedLeafKey.value = null;
-      if (selectedLeafResource.value) {
-        selectLeafResource(selectedLeafResource.value);
+      if (modalContext.campaignFarmMode === 'soul') {
+        farmMode.value = 'soul';
+        const soulCandidates = heroSoulMissions.value;
+        const lowestRaidable = soulCandidates.find((m) =>
+          isMissionRaidable(m.id, cache.value?.missionGetAll?.data, {
+            disabledIds: disabledMissionsToday.value,
+          })
+        );
+        if (lowestRaidable) {
+          missionId.value = lowestRaidable.id;
+        } else if (soulCandidates.length > 0) {
+          missionId.value = soulCandidates[0].id;
+        }
+      } else {
+        farmMode.value = 'hero';
+        selectedLeafKey.value = null;
+        if (selectedLeafResource.value) {
+          selectLeafResource(selectedLeafResource.value);
+        }
       }
     } else {
       farmMode.value = 'gear';
@@ -387,8 +481,11 @@ const recipeTree = computed(() => {
 const selectedRecipeNode = computed(() => selectedRecipeNodeId.value
   ? findRecipeNode(recipeTree.value, selectedRecipeNodeId.value) : recipeTree.value);
 
-// Candidate missions for selected recipe node or selected hero leaf resource
+// Candidate missions for selected recipe node, selected hero leaf resource, or soul stones
 const candidateMissions = computed(() => {
+  if (farmMode.value === 'soul') {
+    return heroSoulMissions.value;
+  }
   if (farmMode.value === 'hero') {
     return selectedLeafResource.value?.missions || [];
   }
@@ -396,6 +493,9 @@ const candidateMissions = computed(() => {
 });
 
 const canFarmSelectedTarget = computed(() => {
+  if (farmMode.value === 'soul') {
+    return heroSoulMissions.value.some((m) => Number(m.id) === Number(missionId.value));
+  }
   if (farmMode.value === 'hero') {
     if (!selectedLeafResource.value) return true;
     return candidateMissions.value.some((mission: any) => Number(mission.id) === Number(missionId.value));
@@ -467,7 +567,7 @@ function mergeDropsIntoAccumulator(acc: any, drops: any) {
   if (!drops) return;
   acc.gold = (acc.gold || 0) + (drops.gold || 0);
   acc.experience = (acc.experience || 0) + (drops.experience || 0);
-  for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable']) {
+  for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable', 'fragmentHero']) {
     if (drops[cat]) {
       acc[cat] = acc[cat] || {};
       for (const [id, count] of Object.entries(drops[cat])) {
@@ -482,7 +582,7 @@ function mergeDropsToInventory(drops: any) {
   updateCacheLocally((draft) => {
     if (!draft.inventoryGet?.data) return;
     const inv = draft.inventoryGet.data;
-    for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable']) {
+    for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable', 'fragmentHero']) {
       if (drops[cat]) {
         inv[cat] = { ...(inv[cat] || {}) };
         for (const [id, count] of Object.entries(drops[cat])) {
@@ -738,6 +838,103 @@ async function startRaid(times: number) {
   await executeSequentialLoop(effectiveTimes);
 }
 
+async function executeRaidAllSoulMissions() {
+  if (isRaidRunning.value || isCrafting.value) return;
+  loopStatusMsg.value = '';
+
+  const missions = heroSoulMissions.value;
+  if (!missions.length) {
+    loopStatusMsg.value = 'No campaign missions available for this hero\'s soul stones.';
+    return;
+  }
+
+  isRaidRunning.value = true;
+  abortCampaignRaidLoop.value = false;
+
+  const accumulatedDrops: any = {
+    fragmentGear: {},
+    fragmentScroll: {},
+    gear: {},
+    scroll: {},
+    consumable: {},
+    fragmentHero: {},
+    gold: 0,
+    experience: 0,
+  };
+
+  let totalRaidsDone = 0;
+  let missionsRaidedCount = 0;
+
+  try {
+    for (const m of missions) {
+      if (abortCampaignRaidLoop.value) {
+        loopStatusMsg.value = `Raid loop stopped by user. Completed ${totalRaidsDone} raids across ${missionsRaidedCount} missions.`;
+        break;
+      }
+
+      const raidable = isMissionRaidable(m.id, cache.value?.missionGetAll?.data, {
+        disabledIds: disabledMissionsToday.value,
+      });
+      if (!raidable) continue;
+
+      const tries = getTriesInfo(m.id);
+      if (tries.isExhausted || (tries.isHeroic && tries.triesLeft <= 0)) continue;
+
+      const curEnergy = Number(currentEnergy.value);
+      const missionPair = getMissionCosts(m.id);
+      const cost = missionPair ? (Number(missionPair[0]) + Number(missionPair[1])) : (m.cost || 6);
+
+      if (!Number.isFinite(curEnergy) || curEnergy < cost) {
+        loopStatusMsg.value = `Out of Energy (${curEnergy} < ${cost}) while preparing Mission #${m.id}. Completed ${totalRaidsDone} raids.`;
+        break;
+      }
+
+      const maxTriesForThisMission = tries.isHeroic ? tries.triesLeft : 3;
+      const energyPossible = Math.floor(curEnergy / cost);
+      const raidsPossible = Math.min(maxTriesForThisMission, energyPossible);
+
+      if (raidsPossible <= 0) continue;
+
+      missionId.value = m.id;
+      loopStatusMsg.value = `Raiding Mission #${m.id} (${missionName(m.id)}) x${raidsPossible}...`;
+
+      const res = await executeRaidCall(raidsPossible);
+      if (!res.ok) {
+        loopStatusMsg.value = `❌ Raid stopped at Mission #${m.id}: ${res.error}`;
+        if (!res.pending) disableMissionToday(m.id);
+        break;
+      }
+
+      totalRaidsDone += raidsPossible;
+      missionsRaidedCount++;
+
+      if (res.drops) {
+        mergeDropsIntoAccumulator(accumulatedDrops, res.drops);
+        mergeDropsToInventory(res.drops);
+        localRaidResult.value = {
+          missionId: m.id,
+          times: totalRaidsDone,
+          drops: accumulatedDrops,
+        };
+      }
+
+      if (!abortCampaignRaidLoop.value) {
+        await new Promise((r) => setTimeout(r, 450));
+      }
+    }
+
+    if (!abortCampaignRaidLoop.value && totalRaidsDone > 0) {
+      loopStatusMsg.value = `✅ Finished raiding soul stone missions! Completed ${totalRaidsDone} raids across ${missionsRaidedCount} missions.`;
+    } else if (totalRaidsDone === 0 && !abortCampaignRaidLoop.value) {
+      loopStatusMsg.value = `No raidable missions found (daily limit reached, lack of energy, or 3★ required).`;
+    }
+  } finally {
+    isRaidRunning.value = false;
+    abortCampaignRaidLoop.value = false;
+    dispatchRpc([{ name: 'inventoryGet' }]).catch(() => {});
+  }
+}
+
 const latestRaidResult = computed(() => {
   return localRaidResult.value || cache.value?.lastCampaignRaidResult?.data || null;
 });
@@ -776,7 +973,8 @@ const hasDropItems = computed(() => {
     (d.fragmentScroll && Object.keys(d.fragmentScroll).length > 0) ||
     (d.gear && Object.keys(d.gear).length > 0) ||
     (d.scroll && Object.keys(d.scroll).length > 0) ||
-    (d.consumable && Object.keys(d.consumable).length > 0)
+    (d.consumable && Object.keys(d.consumable).length > 0) ||
+    (d.fragmentHero && Object.keys(d.fragmentHero).length > 0)
   );
 });
 </script>
@@ -863,6 +1061,15 @@ const hasDropItems = computed(() => {
             <div class="flex items-center gap-1.5 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold">
               <button
                 type="button"
+                id="tab-mode-soul"
+                class="px-3 py-1.5 rounded-md cursor-pointer transition-all flex items-center gap-1.5"
+                :class="farmMode === 'soul' ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
+                @click="switchFarmMode('soul')"
+              >
+                <span>✨</span> Soul Stones
+              </button>
+              <button
+                type="button"
                 id="tab-mode-hero"
                 class="px-3 py-1.5 rounded-md cursor-pointer transition-all flex items-center gap-1.5"
                 :class="farmMode === 'hero' ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
@@ -879,6 +1086,92 @@ const hasDropItems = computed(() => {
               >
                 <span>🛠️</span> Equipment Recipe Tree
               </button>
+            </div>
+          </div>
+
+          <!-- Hero Soul Stone Farm Section -->
+          <div v-if="farmMode === 'soul'" class="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/30 dark:bg-amber-950/20 p-3.5 space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="space-y-0.5">
+                <div class="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  <span>✨</span>
+                  <span>Soul Stones for: <strong class="text-amber-600 dark:text-amber-400">{{ heroSoulName }}</strong></span>
+                </div>
+                <div v-if="heroSoulProgress" class="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <span>Current: <strong>{{ heroSoulProgress.owned ?? 0 }}</strong> / {{ heroSoulProgress.needed ?? '—' }}</span>
+                  <span v-if="canEvolveSoul" class="text-emerald-600 dark:text-emerald-400 font-bold">✨ Ready to Evolve</span>
+                  <span v-else-if="heroSoulProgress.needed !== 'Max' && remainingNeededSoul > 0">• Need {{ remainingNeededSoul }} more</span>
+                </div>
+              </div>
+
+              <!-- Raid All Soul Missions Button -->
+              <button
+                type="button"
+                id="btn-raid-all-soul-missions"
+                :disabled="isRaidRunning || !raidableSoulMissions.length || (typeof currentEnergy === 'number' && currentEnergy < 5)"
+                class="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs shadow-xs transition-colors"
+                title="Raid all missions dropping this hero's soul stone from lowest to highest ID"
+                @click="executeRaidAllSoulMissions"
+              >
+                <span>⚡</span>
+                <span>{{ isRaidRunning ? 'Raiding in progress...' : `Raid All Soul Missions (${totalRaidableSoulTries} raids)` }}</span>
+              </button>
+            </div>
+
+            <!-- Progress Bar -->
+            <div v-if="heroSoulProgress" class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+              <div
+                class="h-full rounded-full transition-all"
+                :class="heroSoulProgress.needed === 'Max' ? 'bg-amber-400' : canEvolveSoul ? 'bg-emerald-500' : 'bg-amber-500'"
+                :style="{
+                  width: `${heroSoulProgress.needed === 'Max' ? 100 : Math.min(100, Math.round(((Number(heroSoulProgress.owned) || 0) / (Number(heroSoulProgress.needed) || 1)) * 100))}%`
+                }"
+              ></div>
+            </div>
+
+            <!-- Soul Missions List (Sorted Ascending) -->
+            <div v-if="heroSoulMissions.length" class="space-y-1.5">
+              <div class="text-2xs font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Story Campaign Missions with Soul Stones (Ascending Priority):</span>
+                <span>{{ raidableSoulMissions.length }} / {{ heroSoulMissions.length }} raidable</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
+                <div
+                  v-for="m in heroSoulMissions"
+                  :key="m.id"
+                  class="flex items-center justify-between p-2 rounded-lg border text-2xs cursor-pointer transition-all"
+                  :class="[
+                    missionId === m.id
+                      ? 'border-amber-500 bg-amber-100/70 dark:bg-amber-900/40 ring-1 ring-amber-500 shadow-xs'
+                      : isMissionRaidable(m.id, cache?.missionGetAll?.data, { disabledIds: disabledMissionsToday })
+                      ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 hover:border-amber-400'
+                      : 'border-slate-200/60 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/40 opacity-60'
+                  ]"
+                  @click="missionId = m.id"
+                >
+                  <div class="min-w-0 pr-2">
+                    <div class="font-bold truncate text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                      <span>🦸</span>
+                      <span class="truncate">{{ missionName(m.id) }}</span>
+                    </div>
+                    <div class="text-3xs text-slate-400 dark:text-slate-500">
+                      ⚡ {{ getMissionCosts(m.id)?.[0] ?? m.cost ?? 6 }} energy
+                    </div>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <span
+                      class="px-1.5 py-0.5 rounded text-3xs font-bold"
+                      :class="getTriesInfo(m.id).isExhausted ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'"
+                    >
+                      {{ getTriesBadge(m.id) || `${getTriesInfo(m.id).triesLeft} left` }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="p-3 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/50 dark:bg-slate-800/50 rounded-lg border border-dashed border-amber-200 dark:border-amber-900/40">
+              No campaign story missions drop soul stones for this hero.
             </div>
           </div>
 
@@ -1218,6 +1511,16 @@ const hasDropItems = computed(() => {
               >
                 <span>📦 {{ getItemName('consumable', cId) || `Item #${cId}` }}</span>
                 <span class="bg-slate-100 text-slate-700 px-1 rounded text-2xs dark:bg-slate-700 dark:text-slate-300">+{{ count }}</span>
+              </span>
+
+              <!-- Hero Soul Stones -->
+              <span
+                v-for="(count, hId) in (latestRaidResult.drops?.fragmentHero || {})"
+                :key="`fh-${hId}`"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-amber-700 border border-amber-200 shadow-2xs dark:bg-slate-800 dark:text-amber-300 dark:border-amber-800"
+              >
+                <span>✨ {{ getItemName('fragmentHero', hId) || `Hero #${hId} Soul Stone` }}</span>
+                <span class="bg-amber-100 text-amber-800 px-1 rounded text-2xs dark:bg-amber-900 dark:text-amber-200">+{{ count }}</span>
               </span>
             </div>
           </div>

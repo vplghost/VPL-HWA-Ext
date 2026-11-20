@@ -34,6 +34,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
   (e: 'openCampaign', gearId: number | string | null): void;
   (e: 'openCampaignHero', heroId: number | string | null): void;
+  (e: 'openCampaignSoul', heroId: number | string | null): void;
 }>();
 
 const { cache, dispatchRpc } = useRpcCache();
@@ -758,6 +759,17 @@ function handleHeroFarmAll() {
   openModal('campaign', { selectedCampaignHeroId: numId, selectedCampaignGearId: null });
 }
 
+function handleSoulStoneFarm() {
+  if (!activeHero.value?.id) return;
+  const numId = Number(activeHero.value.id);
+  emit('openCampaignSoul', numId);
+  openModal('campaign', {
+    selectedCampaignHeroId: numId,
+    selectedCampaignGearId: null,
+    campaignFarmMode: 'soul',
+  });
+}
+
 </script>
 
 <template>
@@ -911,20 +923,32 @@ function handleHeroFarmAll() {
                 <div v-if="soulProgress" class="pt-1">
                   <div class="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
                     <span>Soul Stones:</span>
-                    <span
-                      class="font-medium"
-                      :class="{
-                        'text-emerald-600 font-bold':
-                          soulProgress.needed !== 'Max' &&
-                          Number(soulProgress.owned) >= Number(soulProgress.needed),
-                      }"
-                    >
-                      {{
-                        starCount >= 6 || soulProgress.needed === 'Max'
-                          ? 'Maximum Evolution'
-                          : `${soulProgress.owned} / ${soulProgress.needed}`
-                      }}
-                    </span>
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        id="btn-farm-soul-stone"
+                        class="cursor-pointer inline-flex items-center justify-center w-4 h-4 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-900/60 dark:hover:bg-amber-800 dark:text-amber-200 text-3xs font-bold transition-colors shadow-2xs"
+                        title="Farm Soul Stones in Campaign"
+                        aria-label="Farm Soul Stones in Campaign"
+                        @click="handleSoulStoneFarm"
+                      >
+                        ➕
+                      </button>
+                      <span
+                        class="font-medium"
+                        :class="{
+                          'text-emerald-600 font-bold':
+                            soulProgress.needed !== 'Max' &&
+                            Number(soulProgress.owned) >= Number(soulProgress.needed),
+                        }"
+                      >
+                        {{
+                          starCount >= 6 || soulProgress.needed === 'Max'
+                            ? 'Maximum Evolution'
+                            : `${soulProgress.owned} / ${soulProgress.needed}`
+                        }}
+                      </span>
+                    </div>
                   </div>
                   <div class="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                     <div
