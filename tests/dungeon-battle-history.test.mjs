@@ -226,7 +226,7 @@ test('findMatchingEncounter matches enemy lineups and ensures player titans are 
   assert.equal(match3, null);
 });
 
-test('buildSimulatedEndBattleArgs produces valid dungeonEndBattle args with metrics', () => {
+test('buildSimulatedEndBattleArgs produces valid dungeonEndBattle args with metrics and tuning options', () => {
   const record = {
     playerTeam: [4000, 4001],
     stars: 3,
@@ -236,7 +236,7 @@ test('buildSimulatedEndBattleArgs produces valid dungeonEndBattle args with metr
       4001: { hp: 800000, energy: 600 },
     },
     postBattleStats: {
-      4000: { hp: 900000, energy: 850, isDead: false },
+      4000: { hp: 900000, energy: 800, isDead: false },
       4001: { hp: 800000, energy: 750, isDead: false },
     },
   };
@@ -249,15 +249,28 @@ test('buildSimulatedEndBattleArgs produces valid dungeonEndBattle args with metr
     },
   };
 
-  const endArgs = buildSimulatedEndBattleArgs(record, startResponse);
+  // Standard (0% bonus)
+  const endArgsStandard = buildSimulatedEndBattleArgs(record, startResponse);
+  assert.equal(endArgsStandard.result.win, true);
+  assert.equal(endArgsStandard.result.stars, 3);
+  assert.equal(endArgsStandard.progress[0].seed, 987654321);
+  assert.ok(endArgsStandard.progress[0].duration >= 8);
+  assert.equal(endArgsStandard.progress[0].attackers.heroes['4000'].isDead, false);
+  // curHp 1.1M - 100k lost = 1.0M
+  assert.equal(endArgsStandard.progress[0].attackers.heroes['4000'].hp, 1000000);
+  assert.equal(endArgsStandard.progress[0].attackers.heroes['4000'].energy, 800);
 
-  assert.equal(endArgs.result.win, true);
-  assert.equal(endArgs.result.stars, 3);
-  assert.equal(endArgs.progress[0].seed, 987654321);
-  assert.ok(endArgs.progress[0].duration >= 8);
-  assert.equal(endArgs.progress[0].attackers.heroes['4000'].isDead, false);
-  assert.ok(endArgs.progress[0].attackers.heroes['4000'].hp > 0);
-  assert.equal(endArgs.progress[0].attackers.heroes['4000'].energy, 850);
+  // Tuned (+20% HP bonus, +20% Energy bonus)
+  // HP lost is reduced by 20%: 100k * 0.8 = 80k. Final HP = 1.1M - 80k = 1.02M
+  // Energy 800 * 1.2 = 960
+  const endArgsTuned = buildSimulatedEndBattleArgs(record, startResponse, {
+    hpBonusPercent: 20,
+    energyBonusPercent: 20,
+  });
+  assert.equal(endArgsTuned.progress[0].attackers.heroes['4000'].hp, 1020000);
+  assert.equal(endArgsTuned.progress[0].attackers.heroes['4000'].energy, 960);
+  // Titan 4001: energy 750 * 1.2 = 900
+  assert.equal(endArgsTuned.progress[0].attackers.heroes['4001'].energy, 900);
 });
 
 test('rpcCacheService updates battleHistory on dungeonStartBattle and dungeonEndBattle cycle', () => {
@@ -360,9 +373,20 @@ test('rpcCacheService updates battleHistory on dungeonStartBattle and dungeonEnd
   assert.equal(history[expectedKey][0].duration, 19.8);
 });
 
-test('DungeonModal.vue includes #dungeon-export-btn next to refresh button', async () => {
+test('DungeonModal.vue includes #dungeon-export-btn, sim settings tuning UI, and sequential save progress', async () => {
   const source = await readFile(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
   assert.match(source, /id="dungeon-export-btn"/);
   assert.match(source, /handleExportHistory/);
   assert.match(source, /dungeon-simulate-attack-btn/);
+
+  // Simulation settings tuning UI
+  assert.match(source, /btn-toggle-dungeon-sim-settings/);
+  assert.match(source, /dungeon-sim-settings-panel/);
+  assert.match(source, /input-sim-hp-bonus/);
+  assert.match(source, /input-sim-energy-bonus/);
+  assert.match(source, /btn-reset-dungeon-sim-settings/);
+
+  // Verification that dungeonSaveProgress is dispatched separately, not in the same batch with dungeonEndBattle
+  assert.match(source, /await dispatchRpc\(\[\{\s*name:\s*['"]dungeonEndBattle['"]/);
+  assert.match(source, /await dispatchRpc\(\[\{\s*name:\s*['"]dungeonSaveProgress['"]/);
 });

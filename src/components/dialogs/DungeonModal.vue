@@ -140,6 +140,51 @@ const storedBattleHistory = ref<Record<string, any>>({});
 const isSimulatingBattle = ref(false);
 const simulatingDoorIdx = ref<number | null>(null);
 
+const DUNGEON_SIM_SETTINGS_KEY = 'dungeonSimSettings';
+const simHpBonusPercent = ref(0);
+const simEnergyBonusPercent = ref(0);
+const showSimSettings = ref(false);
+
+async function loadSimSettings() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const res = await chrome.storage.local.get(DUNGEON_SIM_SETTINGS_KEY);
+      const s = res?.[DUNGEON_SIM_SETTINGS_KEY];
+      if (s) {
+        if (typeof s.hpBonusPercent === 'number') simHpBonusPercent.value = Math.max(0, Math.min(50, s.hpBonusPercent));
+        if (typeof s.energyBonusPercent === 'number') simEnergyBonusPercent.value = Math.max(0, Math.min(50, s.energyBonusPercent));
+      }
+    } catch (_) {}
+  }
+}
+
+async function saveSimSettings() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    try {
+      await chrome.storage.local.set({
+        [DUNGEON_SIM_SETTINGS_KEY]: {
+          hpBonusPercent: Number(simHpBonusPercent.value) || 0,
+          energyBonusPercent: Number(simEnergyBonusPercent.value) || 0,
+        },
+      });
+    } catch (_) {}
+  }
+}
+
+function resetSimSettings() {
+  simHpBonusPercent.value = 0;
+  simEnergyBonusPercent.value = 0;
+}
+
+function applyPreset(hp: number, energy: number) {
+  simHpBonusPercent.value = hp;
+  simEnergyBonusPercent.value = energy;
+}
+
+watch([simHpBonusPercent, simEnergyBonusPercent], () => {
+  saveSimSettings();
+});
+
 const mergedBattleHistory = computed(() => {
   const cacheHistory = dungeonData.value.battleHistory || {};
   return { ...storedBattleHistory.value, ...cacheHistory };
@@ -175,24 +220,33 @@ async function handleSimulateAttack(door: any, doorIdx: number, record: any) {
         heroes: record.playerTeam,
       },
     };
-    await dispatchRpc([startCall]);
+    const startRpcRes = await dispatchRpc([startCall]);
 
     let seed = record.startResponse?.seed || 0;
     let attackers = record.startResponse?.attackers || {};
-    const waitDeadline = Date.now() + 2000;
-    while (Date.now() < waitDeadline) {
-      const active = cache.value.dungeonStatus?.data?.activeBattle;
-      if (active?.seed) {
-        seed = active.seed;
-        if (active.attackers) attackers = active.attackers;
-        break;
+    const resPayload = startRpcRes?.results?.[0]?.result?.response || startRpcRes?.results?.[0]?.response;
+    if (resPayload?.seed) {
+      seed = resPayload.seed;
+      if (resPayload.attackers) attackers = resPayload.attackers;
+    } else {
+      const waitDeadline = Date.now() + 2000;
+      while (Date.now() < waitDeadline) {
+        const active = cache.value.dungeonStatus?.data?.activeBattle;
+        if (active?.seed) {
+          seed = active.seed;
+          if (active.attackers) attackers = active.attackers;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 200));
       }
-      await new Promise((r) => setTimeout(r, 200));
     }
 
     const endArgs =
       typeof buildSimulatedEndBattleArgs === 'function'
-        ? buildSimulatedEndBattleArgs(record, { seed, attackers })
+        ? buildSimulatedEndBattleArgs(record, { seed, attackers }, {
+            hpBonusPercent: simHpBonusPercent.value,
+            energyBonusPercent: simEnergyBonusPercent.value,
+          })
         : {
             result: { win: true, stars: record.stars || 3 },
             progress: [
@@ -213,16 +267,21 @@ async function handleSimulateAttack(door: any, doorIdx: number, record: any) {
             ],
           };
 
-    const endCalls: any[] = [{ name: 'dungeonEndBattle', args: endArgs }];
+    // Step 1: Conclude battle first
+    await dispatchRpc([{ name: 'dungeonEndBattle', args: endArgs }]);
+    await new Promise((r) => setTimeout(r, 250));
+
+    // Step 2: Milestone checkpoint (saveProgress must be dispatched separately after battle is finalized)
     const curFloor = floorNumber.value;
     const respawn = Number(dungeonData.value.respawnFloor) || 0;
     if (curFloor > respawn && curFloor % 10 === 0) {
-      endCalls.push({ name: 'dungeonSaveProgress', args: {} });
+      await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
+      await new Promise((r) => setTimeout(r, 150));
     }
-    endCalls.push({ name: 'dungeonGetInfo', args: {} });
 
-    await dispatchRpc(endCalls);
-    await new Promise((r) => setTimeout(r, 400));
+    // Step 3: Refresh dungeon status
+    await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+    await new Promise((r) => setTimeout(r, 350));
     await refreshDungeon();
   } catch (err) {
     console.error('Failed to simulate dungeon attack:', err);
@@ -256,6 +315,7 @@ watch(
   (open) => {
     if (open) {
       loadHistory();
+      loadSimSettings();
       registerModalOpen('dungeon');
       document.addEventListener('keydown', handleKeydown);
     } else {
@@ -267,6 +327,7 @@ watch(
 
 onMounted(() => {
   loadHistory();
+  loadSimSettings();
   if (props.modelValue) {
     registerModalOpen('dungeon');
     document.addEventListener('keydown', handleKeydown);
@@ -583,11 +644,146 @@ function handleImgError(e: Event) {
 
           <!-- SECTION 4: CURRENT FLOOR DOORS -->
           <div v-if="doors.length > 0" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs dark:border-slate-800 dark:bg-slate-800/60">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                🚪 Floor {{ floorNumber }} Doors
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <span>🚪</span>
+                <span>Floor {{ floorNumber }} Doors</span>
               </h3>
-              <span class="text-xs text-slate-500 dark:text-slate-400">{{ doors.length }} battle choices</span>
+
+              <div class="flex items-center gap-2">
+                <button
+                  id="btn-toggle-dungeon-sim-settings"
+                  type="button"
+                  class="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
+                  :class="showSimSettings || simHpBonusPercent > 0 || simEnergyBonusPercent > 0
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300'
+                    : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'"
+                  @click="showSimSettings = !showSimSettings"
+                >
+                  <span>⚙️ Tuning</span>
+                  <span
+                    v-if="simHpBonusPercent > 0 || simEnergyBonusPercent > 0"
+                    class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-600 text-white"
+                  >
+                    +{{ simHpBonusPercent }}% HP / +{{ simEnergyBonusPercent }}% E
+                  </span>
+                </button>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ doors.length }} choices</span>
+              </div>
+            </div>
+
+            <!-- Simulation Tuning Settings Panel -->
+            <div
+              v-if="showSimSettings"
+              id="dungeon-sim-settings-panel"
+              class="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-3 animate-in fade-in duration-150"
+            >
+              <div class="flex items-center justify-between">
+                <div class="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                  <span>⚙️</span>
+                  <span>Auto-Clear Outcome Tuning (Tùy chỉnh kết quả dự đoán)</span>
+                </div>
+                <button
+                  id="btn-reset-dungeon-sim-settings"
+                  type="button"
+                  class="cursor-pointer text-xs text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-semibold"
+                  @click="resetSimSettings"
+                >
+                  Reset (0%)
+                </button>
+              </div>
+              <p class="text-2xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Tùy chỉnh tỷ lệ % HP và Energy giữ lại sau trận so với kết quả ghi nhận mẫu. Người chơi có thể thử nghiệm từng mức để tìm ngưỡng chấp nhận an toàn của server.
+              </p>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <!-- HP Retained Bonus Slider -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <span>❤️</span>
+                      <span>HP Retained Bonus:</span>
+                    </span>
+                    <span id="label-sim-hp-bonus" class="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      +{{ simHpBonusPercent }}%
+                    </span>
+                  </div>
+                  <input
+                    id="input-sim-hp-bonus"
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="5"
+                    v-model.number="simHpBonusPercent"
+                    class="w-full accent-emerald-600 cursor-pointer"
+                  />
+                  <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>0% (Standard)</span>
+                    <span>+25%</span>
+                    <span>+50% (Max)</span>
+                  </div>
+                </div>
+
+                <!-- Energy Retained Bonus Slider -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <span>⚡</span>
+                      <span>Energy Retained Bonus:</span>
+                    </span>
+                    <span id="label-sim-energy-bonus" class="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                      +{{ simEnergyBonusPercent }}%
+                    </span>
+                  </div>
+                  <input
+                    id="input-sim-energy-bonus"
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="5"
+                    v-model.number="simEnergyBonusPercent"
+                    class="w-full accent-indigo-600 cursor-pointer"
+                  />
+                  <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>0% (Standard)</span>
+                    <span>+25%</span>
+                    <span>+50% (Max)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="flex items-center gap-2 flex-wrap pt-1 text-2xs">
+                <span class="text-slate-400">Nhanh:</span>
+                <button
+                  type="button"
+                  class="cursor-pointer px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-medium"
+                  @click="applyPreset(0, 0)"
+                >
+                  Standard (0%)
+                </button>
+                <button
+                  type="button"
+                  class="cursor-pointer px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-medium"
+                  @click="applyPreset(10, 15)"
+                >
+                  Light (+10% / +15%)
+                </button>
+                <button
+                  type="button"
+                  class="cursor-pointer px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-medium"
+                  @click="applyPreset(20, 25)"
+                >
+                  Moderate (+20% / +25%)
+                </button>
+                <button
+                  type="button"
+                  class="cursor-pointer px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-medium"
+                  @click="applyPreset(35, 40)"
+                >
+                  Aggressive (+35% / +40%)
+                </button>
+              </div>
             </div>
 
             <div id="dungeon-doors-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -370,12 +370,18 @@ export function findMatchingEncounter(
   return bestMatch;
 }
 
+export interface DungeonSimulationOptions {
+  hpBonusPercent?: number; // 0 to 50
+  energyBonusPercent?: number; // 0 to 50
+}
+
 /**
  * Build simulated dungeonEndBattle arguments from matched historical record and fresh start response.
  */
 export function buildSimulatedEndBattleArgs(
   record: DungeonEncounterRecord,
-  startResponse: any
+  startResponse: any,
+  options?: DungeonSimulationOptions
 ): any {
   const heroMap: Record<string, any> = {};
   const seed =
@@ -387,6 +393,9 @@ export function buildSimulatedEndBattleArgs(
     startResponse?.attackers ??
     startResponse?.response?.attackers ??
     {};
+
+  const hpBonus = Math.max(0, Math.min(100, Number(options?.hpBonusPercent) || 0));
+  const energyBonus = Math.max(0, Math.min(100, Number(options?.energyBonusPercent) || 0));
 
   for (const hId of record.playerTeam) {
     const curA = currentAttackers[hId] || currentAttackers[String(hId)];
@@ -406,18 +415,33 @@ export function buildSimulatedEndBattleArgs(
 
     if (recPost && typeof recPost.hp === 'number') {
       if (recPre && typeof recPre.hp === 'number' && recPre.hp > 0) {
-        const hpLost = Math.max(0, recPre.hp - recPost.hp);
+        let hpLost = Math.max(0, recPre.hp - recPost.hp);
+        if (hpBonus > 0) {
+          hpLost = Math.max(0, Math.round(hpLost * (1 - hpBonus / 100)));
+        }
         finalHp = Math.max(1, Math.min(curHp, Math.round(curHp - hpLost)));
       } else {
-        finalHp = Math.max(1, Math.min(curHp, Math.round(recPost.hp)));
+        let baseHp = recPost.hp;
+        if (hpBonus > 0) {
+          baseHp = Math.round(baseHp * (1 + hpBonus / 100));
+        }
+        finalHp = Math.max(1, Math.min(curHp, Math.round(baseHp)));
+      }
+
+      let baseEnergy = typeof recPost.energy === 'number' ? recPost.energy : curEnergy;
+      if (energyBonus > 0) {
+        baseEnergy = Math.round(baseEnergy * (1 + energyBonus / 100));
       }
       finalEnergy = Math.max(
         0,
-        Math.min(1000, typeof recPost.energy === 'number' ? recPost.energy : curEnergy)
+        Math.min(1000, baseEnergy)
       );
     } else {
       finalHp = curHp;
-      finalEnergy = curEnergy;
+      finalEnergy = Math.max(
+        0,
+        Math.min(1000, curEnergy + Math.round(curEnergy * (energyBonus / 100)))
+      );
     }
 
     heroMap[String(hId)] = {
