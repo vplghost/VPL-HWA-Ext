@@ -11,6 +11,7 @@ import {
 import { getTitanMetadata } from '@/src/utils/metadata';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
+import { findMatchingEncounter, buildSimulatedEndBattleArgs, exportDungeonBattleHistory, loadDungeonBattleHistory } from '@/src/utils/dungeonBattleHistory';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -86,9 +87,8 @@ const casualtiesList = computed<any[]>(() => {
 
 const doors = computed<any[]>(() => {
   return normalizeArray(dungeonData.value.currentFloorDoors).filter((door: any) => door && typeof door === 'object')
-    .map((door: any) => ({
-      ...door,
-      enemies: normalizeArray(door.team ?? door.enemies).map((unit: any) => {
+    .map((door: any) => {
+      const enemies = normalizeArray(door.team ?? door.enemies).map((unit: any) => {
         const rawId = unit && typeof unit === 'object' ? unit.id : unit;
         const id = typeof rawId === 'number' || typeof rawId === 'string' ? Number(rawId) : NaN;
         if (!Number.isInteger(id) || id <= 0) return null;
@@ -99,8 +99,14 @@ const doors = computed<any[]>(() => {
           ? Number(unit.star) : null;
         return { id, name: meta?.name || `Titan ${id}`, element: meta?.element || '',
           avatar: meta?.hasAvatar ? meta.avatarFile || `assets/titans/${id}.png` : null, level, star };
-      }).filter(Boolean),
-    }));
+      }).filter(Boolean);
+
+      return {
+        ...door,
+        match: getDoorMatch({ ...door, enemies }),
+        enemies,
+      };
+    });
 });
 
 const titanEntries = computed(() => {
@@ -130,6 +136,108 @@ const titanEntries = computed(() => {
 
 const stackLevel = computed(() => getModalStackLevel('dungeon'));
 
+const storedBattleHistory = ref<Record<string, any>>({});
+const isSimulatingBattle = ref(false);
+const simulatingDoorIdx = ref<number | null>(null);
+
+const mergedBattleHistory = computed(() => {
+  const cacheHistory = dungeonData.value.battleHistory || {};
+  return { ...storedBattleHistory.value, ...cacheHistory };
+});
+
+async function loadHistory() {
+  if (typeof loadDungeonBattleHistory === 'function') {
+    try {
+      const data = await loadDungeonBattleHistory();
+      if (data && typeof data === 'object') {
+        storedBattleHistory.value = data;
+      }
+    } catch (_) {}
+  }
+}
+
+function getDoorMatch(door: any) {
+  if (typeof findMatchingEncounter !== 'function') return null;
+  const titanStates = dungeonData.value.states?.titans || {};
+  return findMatchingEncounter(door.enemies || door.team || [], titanStates, mergedBattleHistory.value);
+}
+
+async function handleSimulateAttack(door: any, doorIdx: number, record: any) {
+  if (isSimulatingBattle.value) return;
+  isSimulatingBattle.value = true;
+  simulatingDoorIdx.value = doorIdx;
+
+  try {
+    const startCall = {
+      name: 'dungeonStartBattle',
+      args: {
+        teamNum: doorIdx,
+        heroes: record.playerTeam,
+      },
+    };
+    await dispatchRpc([startCall]);
+
+    let seed = record.startResponse?.seed || 0;
+    let attackers = record.startResponse?.attackers || {};
+    const waitDeadline = Date.now() + 2000;
+    while (Date.now() < waitDeadline) {
+      const active = cache.value.dungeonStatus?.data?.activeBattle;
+      if (active?.seed) {
+        seed = active.seed;
+        if (active.attackers) attackers = active.attackers;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    const endArgs =
+      typeof buildSimulatedEndBattleArgs === 'function'
+        ? buildSimulatedEndBattleArgs(record, { seed, attackers })
+        : {
+            result: { win: true, stars: record.stars || 3 },
+            progress: [
+              {
+                defenders: { heroes: {}, input: [] },
+                attackers: {
+                  heroes: Object.fromEntries(
+                    record.playerTeam.map((id: number) => [
+                      String(id),
+                      { isDead: false, hp: 1000000, energy: 800 },
+                    ])
+                  ),
+                  input: [],
+                },
+                duration: Number(record.duration) || 20,
+                seed,
+              },
+            ],
+          };
+
+    const endCalls: any[] = [{ name: 'dungeonEndBattle', args: endArgs }];
+    const curFloor = floorNumber.value;
+    const respawn = Number(dungeonData.value.respawnFloor) || 0;
+    if (curFloor > respawn && curFloor % 10 === 0) {
+      endCalls.push({ name: 'dungeonSaveProgress', args: {} });
+    }
+    endCalls.push({ name: 'dungeonGetInfo', args: {} });
+
+    await dispatchRpc(endCalls);
+    await new Promise((r) => setTimeout(r, 400));
+    await refreshDungeon();
+  } catch (err) {
+    console.error('Failed to simulate dungeon attack:', err);
+  } finally {
+    isSimulatingBattle.value = false;
+    simulatingDoorIdx.value = null;
+  }
+}
+
+function handleExportHistory() {
+  if (typeof exportDungeonBattleHistory === 'function') {
+    exportDungeonBattleHistory(mergedBattleHistory.value);
+  }
+}
+
 function close() {
   emit('update:modelValue', false);
 }
@@ -147,6 +255,7 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      loadHistory();
       registerModalOpen('dungeon');
       document.addEventListener('keydown', handleKeydown);
     } else {
@@ -157,6 +266,7 @@ watch(
 );
 
 onMounted(() => {
+  loadHistory();
   if (props.modelValue) {
     registerModalOpen('dungeon');
     document.addEventListener('keydown', handleKeydown);
@@ -263,6 +373,30 @@ function handleImgError(e: Event) {
                 <path d="M16 21h5v-5" />
               </svg>
               <span class="dungeon-refresh-label">{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
+            </button>
+
+            <!-- Export Battle History Button -->
+            <button
+              id="dungeon-export-btn"
+              type="button"
+              class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80 shadow-2xs"
+              title="Export battle encounter history (JSON)"
+              @click="handleExportHistory"
+            >
+              <svg
+                class="size-3.5 text-slate-500 dark:text-slate-400 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span class="dungeon-export-label">Export</span>
             </button>
 
             <!-- Close Button -->
@@ -505,6 +639,62 @@ function handleImgError(e: Event) {
                     </li>
                   </ul>
                   <p v-else class="text-[11px] text-slate-400 dark:text-slate-500">Enemy Titan data unavailable.</p>
+                </div>
+
+                <!-- Simulated Attack Action (when matching encounter exists) -->
+                <div
+                  v-if="door.match"
+                  class="pt-2 border-t border-slate-200 dark:border-slate-700/60 space-y-2"
+                >
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <span>⚡</span>
+                      <span>Matching team recorded</span>
+                    </span>
+                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                      {{ door.match.record.stars }}★ · {{ Math.round(door.match.record.duration || 15) }}s
+                    </span>
+                  </div>
+
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1 overflow-hidden" title="Deployed team">
+                      <span
+                        v-for="hId in door.match.record.playerTeam"
+                        :key="hId"
+                        class="inline-block relative"
+                      >
+                        <img
+                          :src="`assets/titans/${hId}.png`"
+                          class="size-5 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                          :title="`Titan #${hId}`"
+                          alt=""
+                          @error="handleImgError"
+                        />
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="dungeon-simulate-attack-btn cursor-pointer inline-flex items-center gap-1 rounded-lg border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      :disabled="isSimulatingBattle"
+                      :title="`Simulate attack for Door ${Number(idx) + 1} with recorded metrics`"
+                      @click="handleSimulateAttack(door, idx, door.match.record)"
+                    >
+                      <svg
+                        v-if="isSimulatingBattle && simulatingDoorIdx === idx"
+                        class="size-3 animate-spin shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
+                        <path d="M12 2a10 10 0 0 1 10 10" />
+                      </svg>
+                      <span v-else>⚔️</span>
+                      <span>{{ isSimulatingBattle && simulatingDoorIdx === idx ? 'Clearing...' : 'Auto Clear' }}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

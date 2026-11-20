@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.11.133 — 2026-11-20
+
+### Added
+
+- **Titan Dungeon: Semi-Automatic Clearance, Encounter Recording & Export (`dungeonBattleHistory.ts`, `DungeonModal.vue`, `rpcCache.ts`, `backgroundRuntime.ts`)**:
+  - **Encounter Recording System**:
+    - Built `src/utils/dungeonBattleHistory.ts` to passively record all dungeon encounters during gameplay.
+    - Keys encounters using normalized enemy vs player team signatures (`e:${sortedEnemyIds}_vs_p:${sortedPlayerIds}`) with encounter records stored as an array under each key.
+    - Captures total powers of both teams (`enemyPower`, `playerPower`), pre- and post-battle HP & energy stats, battle duration, stars, victory outcome, and exact RPC calls and responses (`dungeonStartBattle` and `dungeonEndBattle`).
+    - Integrated with `rpcCache.ts` and `backgroundRuntime.ts` to seamlessly record from network traffic and persist across sessions via `chrome.storage.local`.
+  - **Semi-Automatic Simulated Clearance**:
+    - In `DungeonModal.vue`, checks each floor door against recorded encounters using `findMatchingEncounter`.
+    - Matches doors where enemy lineups correspond to past victories and all player titans required for the winning lineup remain alive (`hp > 0` and `isDead !== true`).
+    - Renders an "Auto Clear" (⚔️) button on matched door cards with deployed titan avatar previews, recorded stars, and duration.
+    - Simulates the clearance through `dungeonStartBattle`, extracts live seed and attackers, constructs `dungeonEndBattle` with recorded metrics, and dispatches progress save and state refresh.
+    - Includes interactive loading spinner and disabled state to prevent duplicate dispatches.
+  - **Encounter History Export**:
+    - Added an Export button (`#dungeon-export-btn`) to the dialog header right of the Refresh button.
+    - Exports the complete encounter map and battle statistics into a downloadable JSON file (`hwa-dungeon-battle-history-YYYYMMDD.json`) for offline analysis.
+  - Added unit test coverage in `tests/dungeon-battle-history.test.mjs` (7 new tests).
+
 ## 0.11.132 — 2026-11-20
 
 ### Added

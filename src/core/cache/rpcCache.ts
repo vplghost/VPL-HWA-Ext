@@ -13,6 +13,7 @@ import { heroMetadata as typedHeroMetadata, gearCraftData as typedGearCraftData,
 import { getTeamLevelExpDelta as typedGetTeamLevelExpDelta } from '../../data/teamLevelData.ts';
 import { guildRole as typedGuildRole } from '../../utils/guildData.ts';
 import { getArtifactResourceInfo, getArtifactLevelUpCost } from '../../utils/artifactHelper.ts';
+import { extractEncounterFromBattleRpc, getEncounterKey } from '../../utils/dungeonBattleHistory.ts';
 
 const getNameMap = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperNameMap) || typedNameMap;
 const getMineTypes = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMineTypes) || typedMineTypes;
@@ -1054,7 +1055,12 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                 activeBattle: {
                   teamNum: call.args?.teamNum ?? 0,
                   heroes: Array.isArray(call.args?.heroes) ? call.args.heroes : [],
-                  startTime: record.timestamp || Date.now()
+                  startTime: record.timestamp || Date.now(),
+                  startCall: call,
+                  startResponse: result?.response || null,
+                  seed: result?.response?.seed ?? null,
+                  attackers: result?.response?.attackers ?? null,
+                  defenders: result?.response?.defenders ?? null
                 }
               },
               updatedAt: record.timestamp
@@ -1140,7 +1146,10 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                   stars: Number(call.args?.result?.stars) || 3,
                   reward: rep.reward || null,
                   casualties,
-                  deployed: Object.keys(progressAttackers).map(Number)
+                  deployed: Object.keys(progressAttackers).map(Number),
+                  duration: Number(call.args?.progress?.[0]?.duration) || null,
+                  endCall: call,
+                  endResponse: rep
                 }
               },
               updatedAt: record.timestamp
@@ -4947,6 +4956,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
             };
           }
 
+          let battleHistory = previous.battleHistory ? { ...previous.battleHistory } : {};
           if (entry.method === 'dungeonEndBattle' && entry.data.lastBattleResult) {
             const res = entry.data.lastBattleResult;
             dailyCombatLog.totalBattles = (dailyCombatLog.totalBattles || 0) + 1;
@@ -4973,6 +4983,28 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                 dailyCombatLog.casualtyBattles = dailyCombatLog.casualtyBattles.slice(0, 50);
               }
             }
+
+            if (previous.activeBattle && res.endCall && res.endResponse) {
+              const encounter = extractEncounterFromBattleRpc(
+                previous.activeBattle,
+                res.endCall,
+                res.endResponse,
+                {
+                  floorNumber: entry.data.floorNumber || previous.floorNumber,
+                  timestamp: entry.updatedAt,
+                  doors: previous.currentFloorDoors
+                }
+              );
+              if (encounter) {
+                const encKey = getEncounterKey(encounter.enemyTeam.map((e: any) => e.id), encounter.playerTeam);
+                const list = Array.isArray(battleHistory[encKey]) ? [...battleHistory[encKey]] : [];
+                if (!list.some((item: any) => item.id === encounter.id)) {
+                  list.push(encounter);
+                  if (list.length > 50) list.splice(0, list.length - 50);
+                  battleHistory[encKey] = list;
+                }
+              }
+            }
           }
 
           next.dungeonStatus = {
@@ -4985,6 +5017,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
               ...entry.data,
               todayTitanite: dailyCombatLog.todayTitanite,
               dailyCombatLog,
+              battleHistory,
               states: {
                 ...previous.states,
                 ...entry.data.states,

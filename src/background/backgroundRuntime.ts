@@ -3444,6 +3444,32 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id, cr);
       if (sender.tab?.id) await updateTowerRun(record, sender.tab.id, cr);
       if (sender.tab?.id) await updateDungeonRun(record, sender.tab.id, cr);
+      if (cacheResult.changed && cacheResult.cache?.dungeonStatus?.data?.battleHistory && cr?.storage?.local) {
+        const history = cacheResult.cache.dungeonStatus.data.battleHistory;
+        const storedHist = (await cr.storage.local.get('dungeonBattleHistory').catch(() => ({}))) as any;
+        const existing = storedHist?.dungeonBattleHistory || {};
+        let merged = { ...existing };
+        let hasNew = false;
+        for (const [k, v] of Object.entries(history)) {
+          if (!merged[k]) {
+            merged[k] = v;
+            hasNew = true;
+          } else if (Array.isArray(v)) {
+            const list = [...merged[k]];
+            for (const item of (v as any[])) {
+              if (!list.some((existingItem: any) => existingItem.id === item.id)) {
+                list.push(item);
+                hasNew = true;
+              }
+            }
+            if (list.length > 50) list.splice(0, list.length - 50);
+            merged[k] = list;
+          }
+        }
+        if (hasNew) {
+          await cr.storage.local.set({ dungeonBattleHistory: merged }).catch(() => {});
+        }
+      }
       if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id, record, cr);
       if (sender.tab?.id) await advanceResearchQueue(sender.tab.id, record, cr);
       Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue']));
