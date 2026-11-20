@@ -12,6 +12,11 @@ import {
   buildSimulatedEndBattleArgs,
   exportDungeonBattleHistory,
   clearDungeonBattleHistory,
+  hasHealingTitan,
+  hasMajorHealingTitan,
+  HEALING_TITAN_IDS,
+  MAJOR_HEALING_TITAN_IDS,
+  MINOR_HEALING_TITAN_IDS,
 } from '../src/utils/dungeonBattleHistory.ts';
 import { rpcCacheService } from '../src/core/cache/index.ts';
 
@@ -373,6 +378,132 @@ test('rpcCacheService updates battleHistory on dungeonStartBattle and dungeonEnd
   assert.equal(history[expectedKey][0].duration, 19.8);
 });
 
+test('hasHealingTitan and hasMajorHealingTitan accurately identify healer titans', () => {
+  assert.equal(hasMajorHealingTitan([4020, 4021, 4022, 4023, 4024]), false); // Earth has no major healer
+  assert.equal(hasHealingTitan([4020, 4021, 4022, 4023, 4024]), true); // Avalon/Verdoc minor heal
+  assert.equal(hasHealingTitan([4010, 4011, 4012, 4013, 4014]), false); // Fire team has 0 healers
+  assert.equal(hasMajorHealingTitan([4010, 4011, 4012, 4013, 4014]), false);
+  assert.equal(hasMajorHealingTitan([4000, 4001, 4002, 4003, 4004]), true); // Hyperion & Tydus in Water
+  assert.equal(hasMajorHealingTitan([4004]), true); // Tydus (Deep Current 30% max HP team heal + Child of Water)
+  assert.equal(hasMajorHealingTitan([4040, 4041, 4042]), true); // Iyari in Light
+  assert.equal(hasMajorHealingTitan([4043]), true); // Solaris
+  assert.equal(hasMajorHealingTitan([4052]), false); // Orm is minor support, not major team healer
+  assert.ok(MAJOR_HEALING_TITAN_IDS.has(4003));
+  assert.ok(MAJOR_HEALING_TITAN_IDS.has(4004));
+  assert.ok(MAJOR_HEALING_TITAN_IDS.has(4042));
+  assert.ok(MINOR_HEALING_TITAN_IDS.has(4022));
+  assert.ok(MINOR_HEALING_TITAN_IDS.has(4024));
+  assert.ok(MINOR_HEALING_TITAN_IDS.has(4052));
+});
+
+test('buildSimulatedEndBattleArgs respects pre-battle HP correlation and caps non-healer team HP', () => {
+  // Pure Fire team with 0 healers
+  const fireRecord = {
+    playerTeam: [4010, 4011],
+    stars: 3,
+    duration: 15,
+    preBattleStats: {
+      4010: { hp: 1500000, energy: 500 },
+      4011: { hp: 800000, energy: 500 },
+    },
+    postBattleStats: {
+      4010: { hp: 1400000, energy: 700, isDead: false }, // took 100k
+      4011: { hp: 800000, energy: 700, isDead: false },
+    },
+  };
+
+  // Injured Fire team enters: 4010 has 500k HP, 4011 has 600k HP
+  const startResponse = {
+    seed: 11223344,
+    attackers: {
+      4010: { hp: 1900000, state: { hp: 500000, energy: 500 } },
+      4011: { hp: 800000, state: { hp: 600000, energy: 500 } },
+    },
+  };
+
+  // 1. Non-healer team: 4011 suffered 0 damage in record, but cannot jump to 800k (capped at curHp 600k)
+  const fireArgs = buildSimulatedEndBattleArgs(fireRecord, startResponse, {
+    hpBonusPercent: 50,
+  });
+  assert.equal(fireArgs.progress[0].attackers.heroes['4011'].hp, 600000); // capped at curHp!
+  // 4010 took 100k lost, with 50% bonus = 50k lost. 500k - 50k = 450k <= curHp
+  assert.equal(fireArgs.progress[0].attackers.heroes['4010'].hp, 450000);
+
+  // 2. Healer team (Hyperion 4003 + Sigurd 4000)
+  const waterRecord = {
+    playerTeam: [4000, 4003],
+    stars: 3,
+    duration: 16,
+    preBattleStats: {
+      4000: { hp: 800000, energy: 500 },
+      4003: { hp: 1000000, energy: 500 },
+    },
+    postBattleStats: {
+      4000: { hp: 1100000, energy: 800, isDead: false }, // healed +300k
+      4003: { hp: 1000000, energy: 800, isDead: false },
+    },
+  };
+
+  const waterStart = {
+    seed: 556677,
+    attackers: {
+      4000: { hp: 1200000, state: { hp: 700000, energy: 500 } },
+      4003: { hp: 1000000, state: { hp: 1000000, energy: 500 } },
+    },
+  };
+
+  const waterArgs = buildSimulatedEndBattleArgs(waterRecord, waterStart);
+  // Healer active: 4000 can recover +300k from curHp 700k up to 1.0M (<= maxHp 1.2M)
+  assert.equal(waterArgs.progress[0].attackers.heroes['4000'].hp, 1000000);
+});
+
+test('buildSimulatedEndBattleArgs auto-detects fatal damage on frontline titan and adjusts stars/spillover', () => {
+  const record = {
+    playerTeam: [4020, 4022, 4021],
+    stars: 3,
+    duration: 12.8,
+    enemyPower: 40000,
+    preBattleStats: {
+      4020: { hp: 914132, energy: 512 },
+      4022: { hp: 880343, energy: 500 },
+      4021: { hp: 796742, energy: 500 },
+    },
+    postBattleStats: {
+      4020: { hp: 641879, energy: 500, isDead: false }, // took 272k
+      4022: { hp: 880343, energy: 500, isDead: false },
+      4021: { hp: 796742, energy: 500, isDead: false },
+    },
+  };
+
+  // Angus 4020 enters with only 250k HP (cannot survive 272k + energy deficit damage)
+  const startResponse = {
+    seed: 2767138561,
+    attackers: {
+      4020: { hp: 1937434, state: { hp: 250000, energy: 200 } }, // 200 energy vs 512 in record
+      4022: { hp: 880343, state: { hp: 836745, energy: 200 } },
+      4021: { hp: 796742, state: { hp: 796742, energy: 800 } },
+    },
+  };
+
+  const endArgs = buildSimulatedEndBattleArgs(record, startResponse, {
+    hpBonusPercent: 0,
+    energyBonusPercent: 0,
+    autoDetectDeath: true,
+  });
+
+  // Angus suffered fatal damage: omitted from attackers.heroes
+  assert.equal(endArgs.progress[0].attackers.heroes['4020'], undefined);
+  // Surviving titans: 4022, 4021
+  assert.ok(endArgs.progress[0].attackers.heroes['4022']);
+  assert.ok(endArgs.progress[0].attackers.heroes['4021']);
+  // 1 titan died -> stars is 2
+  assert.equal(endArgs.result.stars, 2);
+  // Duration padded because frontline fell
+  assert.ok(endArgs.progress[0].duration > 20);
+  // Next titan 4022 took spillover damage
+  assert.ok(endArgs.progress[0].attackers.heroes['4022'].hp < 836745);
+});
+
 test('DungeonModal.vue includes #dungeon-export-btn, sim settings tuning UI, and sequential save progress', async () => {
   const source = await readFile(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
   assert.match(source, /id="dungeon-export-btn"/);
@@ -384,6 +515,9 @@ test('DungeonModal.vue includes #dungeon-export-btn, sim settings tuning UI, and
   assert.match(source, /dungeon-sim-settings-panel/);
   assert.match(source, /input-sim-hp-bonus/);
   assert.match(source, /input-sim-energy-bonus/);
+  assert.match(source, /checkbox-sim-enforce-healer/);
+  assert.match(source, /checkbox-sim-auto-death/);
+  assert.match(source, /dungeon-battle-error-banner/);
   assert.match(source, /btn-reset-dungeon-sim-settings/);
 
   // Verification that dungeonSaveProgress is dispatched separately, not in the same batch with dungeonEndBattle

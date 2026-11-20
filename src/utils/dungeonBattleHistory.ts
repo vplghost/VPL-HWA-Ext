@@ -370,9 +370,37 @@ export function findMatchingEncounter(
   return bestMatch;
 }
 
+export const MAJOR_HEALING_TITAN_IDS = new Set<number>([
+  4003, // Hyperion (Water Supertitan - Compassion heal lowest HP ally)
+  4004, // Tydus (Water Summoner - Deep Current 30% max HP team heal with water synergy + Child of Water life-steal)
+  4042, // Iyari (Light Support - Beacon of Light heal)
+  4043, // Solaris (Light Supertitan - Solar Embrace heal/shield)
+]);
+
+export const MINOR_HEALING_TITAN_IDS = new Set<number>([
+  4022, // Avalon (Earth Support - Overgrowth nature shield/minor heal)
+  4024, // Verdoc (Earth Summoner - Verdant Guard minor heal)
+  4052, // Orm (Spirit Support)
+]);
+
+export const HEALING_TITAN_IDS = new Set<number>([
+  ...MAJOR_HEALING_TITAN_IDS,
+  ...MINOR_HEALING_TITAN_IDS,
+]);
+
+export function hasMajorHealingTitan(playerTeam: Array<number | string>): boolean {
+  return (playerTeam || []).some((id) => MAJOR_HEALING_TITAN_IDS.has(Number(id)));
+}
+
+export function hasHealingTitan(playerTeam: Array<number | string>): boolean {
+  return (playerTeam || []).some((id) => HEALING_TITAN_IDS.has(Number(id)));
+}
+
 export interface DungeonSimulationOptions {
   hpBonusPercent?: number; // 0 to 50
   energyBonusPercent?: number; // 0 to 50
+  allowNonHealerRecovery?: boolean; // default false: non-healer team HP cannot exceed pre-battle HP
+  autoDetectDeath?: boolean; // default true: auto detect fatal damage, omit dead titans and adjust stars/duration
 }
 
 /**
@@ -396,11 +424,26 @@ export function buildSimulatedEndBattleArgs(
 
   const hpBonus = Math.max(0, Math.min(100, Number(options?.hpBonusPercent) || 0));
   const energyBonus = Math.max(0, Math.min(100, Number(options?.energyBonusPercent) || 0));
+  const hasMajor = hasMajorHealingTitan(record.playerTeam);
+  const hasMinor = hasHealingTitan(record.playerTeam);
+  const allowNonHealerRecovery = options?.allowNonHealerRecovery === true;
+  const autoDetectDeath = options?.autoDetectDeath !== false;
 
-  for (const hId of record.playerTeam) {
+  let deadCount = 0;
+  let spilloverDamage = 0;
+
+  for (let idx = 0; idx < record.playerTeam.length; idx++) {
+    const hId = record.playerTeam[idx];
     const curA = currentAttackers[hId] || currentAttackers[String(hId)];
     const curHp = Number(curA?.state?.hp ?? curA?.hp ?? 1000000);
+    const maxHp = Number(curA?.hp ?? curHp);
     const curEnergy = Number(curA?.state?.energy ?? curA?.energy ?? 800);
+    const isAlreadyDead = curA?.state?.isDead === true || (curHp <= 0 && curA?.state?.hp != null);
+
+    if (isAlreadyDead) {
+      deadCount++;
+      continue;
+    }
 
     const recPost =
       record.postBattleStats?.[hId] ||
@@ -414,34 +457,105 @@ export function buildSimulatedEndBattleArgs(
     let finalEnergy: number;
 
     if (recPost && typeof recPost.hp === 'number') {
-      if (recPre && typeof recPre.hp === 'number' && recPre.hp > 0) {
-        let hpLost = Math.max(0, recPre.hp - recPost.hp);
-        if (hpBonus > 0) {
-          hpLost = Math.max(0, Math.round(hpLost * (1 - hpBonus / 100)));
+      const recPreHp = typeof recPre?.hp === 'number' && recPre.hp > 0 ? recPre.hp : maxHp;
+      const recPostHp = recPost.hp;
+
+      if (recPostHp < recPreHp) {
+        // Historical damage taken
+        let rawHpLost = recPreHp - recPostHp;
+
+        // Energy deficit adjustment: low starting energy delays skill/ult casting, leading to prolonged enemy assault
+        const recPreEnergy = typeof recPre?.energy === 'number' ? recPre.energy : 500;
+        const energyDeficit = Math.max(0, recPreEnergy - curEnergy);
+        if (energyDeficit > 150) {
+          const enemyPwr = Number(record.enemyPower) || 40000;
+          const energyPenalty = Math.round((energyDeficit / 1000) * (enemyPwr * 15));
+          rawHpLost += energyPenalty;
         }
-        finalHp = Math.max(1, Math.min(curHp, Math.round(curHp - hpLost)));
+
+        // Frontline vulnerability: position 0 tank bearing full brunt without major healing dies if severely wounded (< 35% HP)
+        if (idx === 0 && !hasMajor && curHp <= maxHp * 0.35 && energyDeficit > 100) {
+          rawHpLost = Math.max(rawHpLost, Math.round(curHp * 1.05));
+        }
+
+        // Apply spillover damage from preceding dead frontline tank
+        if (spilloverDamage > 0) {
+          rawHpLost += spilloverDamage;
+          spilloverDamage = 0;
+        }
+
+        // Outcome tuning: hpBonus reduces damage taken
+        let effectiveHpLost = rawHpLost;
+        if (hpBonus > 0) {
+          effectiveHpLost = Math.max(0, Math.round(effectiveHpLost * (1 - hpBonus / 100)));
+        }
+
+        // Check if damage is fatal
+        if (autoDetectDeath && effectiveHpLost >= curHp) {
+          deadCount++;
+          spilloverDamage = Math.max(60000, Math.round((effectiveHpLost - curHp) * 0.5));
+          continue; // Dead titan omitted from attackers.heroes (server omission standard)
+        }
+
+        finalHp = Math.max(1, Math.min(curHp, Math.round(curHp - effectiveHpLost)));
+      } else if (recPostHp > recPreHp) {
+        // Historical heal occurred
+        if (!hasMinor && !allowNonHealerRecovery) {
+          // Team has no healer: HP CANNOT exceed pre-battle HP!
+          let effectiveHp = curHp;
+          if (spilloverDamage > 0) {
+            effectiveHp = Math.max(1, curHp - spilloverDamage);
+            spilloverDamage = 0;
+          }
+          finalHp = effectiveHp;
+        } else {
+          // Team has healer: can recover towards maxHp
+          let rawHeal = recPostHp - recPreHp;
+          if (spilloverDamage > 0) {
+            rawHeal -= spilloverDamage;
+            spilloverDamage = 0;
+          }
+          if (hpBonus > 0) {
+            rawHeal = Math.round(rawHeal * (1 + hpBonus / 100));
+          }
+          if (!hasMajor && !allowNonHealerRecovery) {
+            // Minor healer only (Avalon/Verdoc): small recovery, capped at 25,000 HP
+            rawHeal = Math.min(25000, rawHeal);
+          }
+          finalHp = Math.max(1, Math.min(maxHp, curHp + rawHeal));
+        }
       } else {
-        let baseHp = recPost.hp;
-        if (hpBonus > 0) {
-          baseHp = Math.round(baseHp * (1 + hpBonus / 100));
+        // recPostHp === recPreHp (e.g. backline titan unharmed in record)
+        if (spilloverDamage > 0) {
+          let effSpill = spilloverDamage;
+          if (hpBonus > 0) {
+            effSpill = Math.max(0, Math.round(effSpill * (1 - hpBonus / 100)));
+          }
+          finalHp = Math.max(1, Math.min(curHp, curHp - effSpill));
+          spilloverDamage = 0;
+        } else if (!hasMinor && !allowNonHealerRecovery) {
+          finalHp = curHp;
+        } else {
+          let extraHeal = 0;
+          if (hpBonus > 0 && curHp < maxHp) {
+            let boost = Math.round((maxHp - curHp) * (hpBonus / 100));
+            if (!hasMajor && !allowNonHealerRecovery) {
+              boost = Math.min(25000, boost);
+            }
+            extraHeal = boost;
+          }
+          finalHp = Math.min(maxHp, curHp + extraHeal);
         }
-        finalHp = Math.max(1, Math.min(curHp, Math.round(baseHp)));
       }
 
       let baseEnergy = typeof recPost.energy === 'number' ? recPost.energy : curEnergy;
       if (energyBonus > 0) {
         baseEnergy = Math.round(baseEnergy * (1 + energyBonus / 100));
       }
-      finalEnergy = Math.max(
-        0,
-        Math.min(1000, baseEnergy)
-      );
+      finalEnergy = Math.max(0, Math.min(1000, baseEnergy));
     } else {
       finalHp = curHp;
-      finalEnergy = Math.max(
-        0,
-        Math.min(1000, curEnergy + Math.round(curEnergy * (energyBonus / 100)))
-      );
+      finalEnergy = Math.max(0, Math.min(1000, curEnergy + Math.round(curEnergy * (energyBonus / 100))));
     }
 
     heroMap[String(hId)] = {
@@ -451,15 +565,23 @@ export function buildSimulatedEndBattleArgs(
     };
   }
 
+  // Adjust stars based on surviving titans
+  let stars = record.stars || 3;
+  if (deadCount > 0) {
+    stars = Math.max(1, 3 - deadCount);
+  }
+
   const baseDuration =
     typeof record.duration === 'number' && record.duration > 5
       ? record.duration
       : 20;
+  // If titans died, battle took longer (e.g. 24s vs 13s)
+  const durationPadding = deadCount > 0 ? (deadCount * 11) : 0;
   const jitter = Number(((Math.random() * 1.2) - 0.6).toFixed(4));
-  const duration = Number(Math.max(8, baseDuration + jitter).toFixed(4));
+  const duration = Number(Math.max(8, baseDuration + durationPadding + jitter).toFixed(4));
 
   return {
-    result: { win: true, stars: record.stars || 3 },
+    result: { win: true, stars },
     progress: [
       {
         defenders: { heroes: {}, input: [] },

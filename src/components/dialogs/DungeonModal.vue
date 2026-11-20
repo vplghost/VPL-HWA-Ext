@@ -11,7 +11,14 @@ import {
 import { getTitanMetadata } from '@/src/utils/metadata';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
-import { findMatchingEncounter, buildSimulatedEndBattleArgs, exportDungeonBattleHistory, loadDungeonBattleHistory } from '@/src/utils/dungeonBattleHistory';
+import {
+  findMatchingEncounter,
+  buildSimulatedEndBattleArgs,
+  exportDungeonBattleHistory,
+  loadDungeonBattleHistory,
+  hasHealingTitan,
+  HEALING_TITAN_IDS,
+} from '@/src/utils/dungeonBattleHistory';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -143,7 +150,10 @@ const simulatingDoorIdx = ref<number | null>(null);
 const DUNGEON_SIM_SETTINGS_KEY = 'dungeonSimSettings';
 const simHpBonusPercent = ref(0);
 const simEnergyBonusPercent = ref(0);
+const simEnforceHealerRule = ref(true);
+const simAutoDetectDeath = ref(true);
 const showSimSettings = ref(false);
+const battleErrorBanner = ref<string | null>(null);
 
 async function loadSimSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
@@ -153,6 +163,8 @@ async function loadSimSettings() {
       if (s) {
         if (typeof s.hpBonusPercent === 'number') simHpBonusPercent.value = Math.max(0, Math.min(50, s.hpBonusPercent));
         if (typeof s.energyBonusPercent === 'number') simEnergyBonusPercent.value = Math.max(0, Math.min(50, s.energyBonusPercent));
+        if (typeof s.enforceHealerRule === 'boolean') simEnforceHealerRule.value = s.enforceHealerRule;
+        if (typeof s.autoDetectDeath === 'boolean') simAutoDetectDeath.value = s.autoDetectDeath;
       }
     } catch (_) {}
   }
@@ -165,6 +177,8 @@ async function saveSimSettings() {
         [DUNGEON_SIM_SETTINGS_KEY]: {
           hpBonusPercent: Number(simHpBonusPercent.value) || 0,
           energyBonusPercent: Number(simEnergyBonusPercent.value) || 0,
+          enforceHealerRule: simEnforceHealerRule.value,
+          autoDetectDeath: simAutoDetectDeath.value,
         },
       });
     } catch (_) {}
@@ -174,6 +188,8 @@ async function saveSimSettings() {
 function resetSimSettings() {
   simHpBonusPercent.value = 0;
   simEnergyBonusPercent.value = 0;
+  simEnforceHealerRule.value = true;
+  simAutoDetectDeath.value = true;
 }
 
 function applyPreset(hp: number, energy: number) {
@@ -181,7 +197,7 @@ function applyPreset(hp: number, energy: number) {
   simEnergyBonusPercent.value = energy;
 }
 
-watch([simHpBonusPercent, simEnergyBonusPercent], () => {
+watch([simHpBonusPercent, simEnergyBonusPercent, simEnforceHealerRule, simAutoDetectDeath], () => {
   saveSimSettings();
 });
 
@@ -211,6 +227,7 @@ async function handleSimulateAttack(door: any, doorIdx: number, record: any) {
   if (isSimulatingBattle.value) return;
   isSimulatingBattle.value = true;
   simulatingDoorIdx.value = doorIdx;
+  battleErrorBanner.value = null;
 
   try {
     const startCall = {
@@ -246,6 +263,8 @@ async function handleSimulateAttack(door: any, doorIdx: number, record: any) {
         ? buildSimulatedEndBattleArgs(record, { seed, attackers }, {
             hpBonusPercent: simHpBonusPercent.value,
             energyBonusPercent: simEnergyBonusPercent.value,
+            allowNonHealerRecovery: !simEnforceHealerRule.value,
+            autoDetectDeath: simAutoDetectDeath.value,
           })
         : {
             result: { win: true, stars: record.stars || 3 },
@@ -268,7 +287,14 @@ async function handleSimulateAttack(door: any, doorIdx: number, record: any) {
           };
 
     // Step 1: Conclude battle first
-    await dispatchRpc([{ name: 'dungeonEndBattle', args: endArgs }]);
+    const endRpcRes = await dispatchRpc([{ name: 'dungeonEndBattle', args: endArgs }]);
+    const firstEndRes = endRpcRes?.results?.[0];
+    if (firstEndRes?.result?.response?.error || firstEndRes?.error) {
+      const errMsg = firstEndRes?.result?.response?.error || firstEndRes?.error?.description || 'Server rejected battle';
+      battleErrorBanner.value = `Battle Rejected by Server: "${errMsg}". Pre-battle HP correlation or threshold violated. Adjust settings or attack manually.`;
+      await refreshDungeon();
+      return;
+    }
     await new Promise((r) => setTimeout(r, 250));
 
     // Step 2: Milestone checkpoint (saveProgress must be dispatched separately after battle is finalized)
@@ -551,6 +577,28 @@ function handleImgError(e: Event) {
             </div>
           </div>
 
+          <!-- Battle Error Banner -->
+          <div
+            v-if="battleErrorBanner"
+            id="dungeon-battle-error-banner"
+            class="rounded-xl border border-rose-300 bg-rose-50/90 p-3.5 text-rose-900 shadow-2xs dark:border-rose-800 dark:bg-rose-950/70 dark:text-rose-200 flex items-start justify-between gap-3 text-xs"
+          >
+            <div class="flex items-start gap-2.5">
+              <span class="text-base leading-none">⚠️</span>
+              <div>
+                <div class="font-bold">Battle Rejected by Server</div>
+                <div class="mt-0.5 text-rose-700 dark:text-rose-300">{{ battleErrorBanner }}</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold px-1"
+              @click="battleErrorBanner = null"
+            >
+              ✕
+            </button>
+          </div>
+
           <!-- SECTION 1: OVERVIEW STATS -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <div class="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xs dark:border-slate-800 dark:bg-slate-800/70">
@@ -783,6 +831,39 @@ function handleImgError(e: Event) {
                 >
                   Aggressive (+35% / +40%)
                 </button>
+              </div>
+
+              <!-- Realism & Death Toggles -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-slate-200/70 dark:border-slate-700/70 text-xs">
+                <label class="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    id="checkbox-sim-enforce-healer"
+                    type="checkbox"
+                    v-model="simEnforceHealerRule"
+                    class="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-700 dark:focus:ring-offset-slate-800"
+                  />
+                  <div>
+                    <span class="font-semibold text-slate-800 dark:text-slate-200">Healer-Only HP Recovery</span>
+                    <p class="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Giới hạn HP sau trận ≤ HP trước trận đối với team không có Titan hồi máu (Hyperion, Iyari...).
+                    </p>
+                  </div>
+                </label>
+
+                <label class="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    id="checkbox-sim-auto-death"
+                    type="checkbox"
+                    v-model="simAutoDetectDeath"
+                    class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700 dark:focus:ring-offset-slate-800"
+                  />
+                  <div>
+                    <span class="font-semibold text-slate-800 dark:text-slate-200">Auto-Detect Fatal Damage</span>
+                    <p class="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Tự động loại bỏ Titan tử trận và hạ xuống 2⭐/1⭐ khi HP trước trận không đủ gánh đòn, dồn sát thương dư sang hàng sau.
+                    </p>
+                  </div>
+                </label>
               </div>
             </div>
 
