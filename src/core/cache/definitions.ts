@@ -63,6 +63,8 @@ export const RPC_CACHE_DEFINITIONS: Record<string, string> = {
   brawl_getAll: 'events',
   heroEvolve: 'heroes',
   titanEvolve: 'titans',
+  artifact_LevelUpCost: 'titans',
+  artifact_evolve: 'titans',
   'attackMine:mine': 'header',
   'stopMineGathering:mine': 'header',
   'searchMine:mine': 'other',

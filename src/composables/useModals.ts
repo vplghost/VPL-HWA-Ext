@@ -9,6 +9,7 @@ export type ModalName =
   | 'brigand'
   | 'campaign'
   | 'hero'
+  | 'titan'
   | 'tower'
   | 'dungeon'
   | 'expeditions'
@@ -30,6 +31,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   brigand: false,
   campaign: false,
   hero: false,
+  titan: false,
   tower: false,
   dungeon: false,
   expeditions: false,
@@ -45,6 +47,8 @@ const modalState = reactive<Record<ModalName, boolean>>({
 
 const modalContext = reactive<{
   selectedHero?: any;
+  selectedTitan?: any;
+  selectedTitanId?: number | string | null;
   selectedQuestFilter?: string;
   selectedEventId?: number | string | null;
   selectedBattlePassId?: number | string | null;
@@ -104,6 +108,8 @@ if (typeof globalThis !== 'undefined') {
 export function useModals() {
   function openModal(name: ModalName, context?: {
     selectedHero?: any;
+    selectedTitan?: any;
+    selectedTitanId?: number | string | null;
     selectedQuestFilter?: string;
     selectedEventId?: number | string | null;
     selectedBattlePassId?: number | string | null;
@@ -116,6 +122,8 @@ export function useModals() {
   }) {
     if (context) {
       if (context.selectedHero !== undefined) modalContext.selectedHero = context.selectedHero;
+      if (context.selectedTitan !== undefined) modalContext.selectedTitan = context.selectedTitan;
+      if (context.selectedTitanId !== undefined) modalContext.selectedTitanId = context.selectedTitanId;
       if (context.selectedQuestFilter !== undefined) modalContext.selectedQuestFilter = context.selectedQuestFilter;
       if (context.selectedEventId !== undefined) modalContext.selectedEventId = context.selectedEventId;
       if (context.selectedBattlePassId !== undefined) modalContext.selectedBattlePassId = context.selectedBattlePassId;

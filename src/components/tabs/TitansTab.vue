@@ -12,6 +12,7 @@ import {
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 import TitanHoverCard from '@/src/components/common/TitanHoverCard.vue';
+import TitanDetailModal from '@/src/components/dialogs/TitanDetailModal.vue';
 import { isTitanArtifactUpgradable, popupDataHelper } from '@/src/utils/popupData';
 
 const { cache, dispatchRpc } = useRpcCache();
@@ -22,6 +23,16 @@ const filterFavsOnly = ref(false);
 const filterEvolveOnly = ref(false);
 const viewMode = ref<'grid' | 'table'>('grid');
 const isRefreshing = ref(false);
+
+const showTitanModal = ref(false);
+const selectedTitan = ref<any>(null);
+const selectedTitanId = ref<number | string | null>(null);
+
+function openTitanModal(t: any) {
+  selectedTitan.value = t.raw || t;
+  selectedTitanId.value = t.id;
+  showTitanModal.value = true;
+}
 
 // Sorting
 type SortColumn = 'fav' | 'id' | 'name' | 'level' | 'star' | 'soul' | 'power';
@@ -419,12 +430,13 @@ function exportTitansJson() {
       <div
         v-for="t in filteredTitans"
         :key="t.id"
-        class="hero-hover-trigger group relative rounded-xl border p-2.5 space-y-2 shadow-2xs transition-all select-none bg-white dark:bg-slate-900"
+        class="hero-hover-trigger group relative rounded-xl border p-2.5 space-y-2 shadow-2xs transition-all select-none bg-white dark:bg-slate-900 cursor-pointer"
         :class="[
           getElementStyle(t.element).cardBorder,
           t.isFav ? 'ring-1 ring-amber-400/60 dark:ring-amber-500/50' : '',
           t.canEvolve ? 'ring-2 ring-emerald-500/80 bg-emerald-50/10' : ''
         ]"
+        @click="openTitanModal(t)"
       >
         <!-- Top Row: Avatar with Star Glow + Favorite Star Button -->
         <div class="flex items-start justify-between gap-1.5">
@@ -625,11 +637,12 @@ function exportTitansJson() {
           <tr
             v-for="t in filteredTitans"
             :key="t.id"
-            class="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors"
+            class="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
             :class="[
               t.canEvolve ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : '',
               t.isFav ? 'bg-amber-50/20 dark:bg-amber-950/10' : ''
             ]"
+            @click="openTitanModal(t)"
           >
             <!-- Favorite button cell -->
             <td class="px-2.5 py-2 text-center" @click.stop="toggleFavorite(t.id)">
@@ -750,5 +763,12 @@ function exportTitansJson() {
         </tbody>
       </table>
     </div>
+
+    <!-- Titan Detail Modal -->
+    <TitanDetailModal
+      v-model="showTitanModal"
+      :titan="selectedTitan"
+      :titan-id="selectedTitanId"
+    />
   </div>
 </template>

@@ -14,6 +14,12 @@ import { getTeamLevelExpDelta as typedGetTeamLevelExpDelta } from '../../data/te
 import { guildRole as typedGuildRole } from '../../utils/guildData.ts';
 import { getArtifactResourceInfo, getArtifactLevelUpCost } from '../../utils/artifactHelper.ts';
 import { extractEncounterFromBattleRpc, getEncounterKey } from '../../utils/dungeonBattleHistory.ts';
+import {
+  titanMetadata as typedTitanMetadata,
+  titanArtifactEvolveCost as typedTitanArtifactEvolveCost,
+  titanArtifactLevelCosts as typedTitanArtifactLevelCosts,
+} from '../../data/titanMetadata.ts';
+import { getTitanLevelFromExp as typedGetTitanLevelFromExp } from '../../data/titanLevelData.ts';
 
 const getNameMap = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperNameMap) || typedNameMap;
 const getMineTypes = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMineTypes) || typedMineTypes;
@@ -31,6 +37,10 @@ const getScrollCraftData = (): any => (typeof globalThis !== 'undefined' && (glo
 const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGearCraftData) || typedGearCraftData;
 const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGetTeamLevelExpDelta) || typedGetTeamLevelExpDelta;
 const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGuildRole) || typedGuildRole;
+const getTitanMetadata = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanMetadata) || typedTitanMetadata;
+const getTitanArtifactEvolveCost = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanArtifactEvolveCost) || typedTitanArtifactEvolveCost;
+const getTitanArtifactLevelCosts = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanArtifactLevelCosts) || typedTitanArtifactLevelCosts;
+const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
 
   const definitions = {
     heroGetAll: 'heroes',
@@ -100,6 +110,8 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
     brawl_getAll: 'events',
     heroEvolve: 'heroes',
     titanEvolve: 'titans',
+    artifact_LevelUpCost: 'titans',
+    artifact_evolve: 'titans',
     'attackMine:mine': 'header',
     'stopMineGathering:mine': 'header',
     'searchMine:mine': 'other',
@@ -1041,6 +1053,36 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                   heroId: numHeroId,
                   slotId: numSlotId,
                   token: `${call.ident || record.timestamp}:${numHeroId}:${numSlotId}:artifactLevelUp`
+                },
+                updatedAt: record.timestamp
+              }];
+            }
+          }
+          if (call.name === 'artifact_LevelUpCost' && Number.isInteger(call.args?.unitId) && Number.isInteger(call.args?.artifactId)) {
+            return [{
+              key: 'titanArtifactLevelUpAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                unitId: call.args.unitId,
+                artifactId: call.args.artifactId,
+                token: `${call.ident || record.timestamp}:titanArtifactLevelUp:${call.args.unitId}:${call.args.artifactId}`
+              },
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'artifact_evolve' && Number.isInteger(call.args?.heroId) && Number.isInteger(call.args?.slotId)) {
+            if (call.args.heroId >= 4000) {
+              return [{
+                key: 'titanArtifactEvolveAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  titanId: call.args.heroId,
+                  slotId: call.args.slotId,
+                  token: `${call.ident || record.timestamp}:titanArtifactEvolve:${call.args.heroId}:${call.args.slotId}`
                 },
                 updatedAt: record.timestamp
               }];
@@ -3957,6 +3999,24 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
                 [heroId]: { ...heroSnap, skins: { ...heroSnap.skins,
                   [skinId]: level + 1 } } } };
           }
+          const titanSnap = next.titanGetAll?.data?.[heroId];
+          const titanSkinLevel = Number(titanSnap?.skins?.[skinId]);
+          if (Number.isInteger(titanSkinLevel) && (next.titanGetAll.updatedAt || 0) <= entry.updatedAt) {
+            next.titanGetAll = {
+              ...next.titanGetAll,
+              updatedAt: entry.updatedAt,
+              data: {
+                ...next.titanGetAll.data,
+                [heroId]: {
+                  ...titanSnap,
+                  skins: {
+                    ...titanSnap.skins,
+                    [skinId]: titanSkinLevel + 1
+                  }
+                }
+              }
+            };
+          }
           const history = { ...seen, [entry.data.token]: entry.updatedAt };
           const tokens = Object.keys(history).sort((a, b) =>
             history[b].localeCompare(history[a]));
@@ -4268,6 +4328,181 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
             const history = { ...seen, [entry.data.token]: entry.updatedAt };
             const tokens = Object.keys(history).sort((a, b) =>
               history[b].localeCompare(history[a]));
+            for (const token of tokens.slice(500)) delete history[token];
+            next.resourceActionHistory = {
+              key: 'resourceActionHistory',
+              method: entry.method,
+              feature: null,
+              group: 'internal',
+              data: history,
+              updatedAt: entry.updatedAt
+            };
+            changed = true;
+          }
+          continue;
+        }
+        if (entry.key === 'titanArtifactLevelUpAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.unitId) continue;
+          const titanId = String(entry.data.unitId);
+          const artId = Number(entry.data.artifactId);
+          const titanSnap = next.titanGetAll?.data?.[titanId];
+          if (titanSnap && Array.isArray(titanSnap.artifacts)) {
+            const meta = getTitanMetadata()?.[titanId];
+            let slotId = Array.isArray(meta?.artifacts) ? meta.artifacts.indexOf(artId) : -1;
+            if (slotId === -1) {
+              if (artId >= 11000 && artId < 12000) slotId = 0;
+              else if (artId >= 12000 && artId < 13000) slotId = 1;
+              else if (artId >= 13000 && artId < 14000) slotId = 2;
+              else slotId = 0;
+            }
+
+            const curArt = titanSnap.artifacts[slotId] || { level: 1, star: 1 };
+            const curLvl = Number(curArt.level) || 1;
+            const titanLvl = Number(titanSnap.level) || 120;
+            const nextLvl = Math.min(titanLvl, curLvl + 1);
+
+            const costTable = getTitanArtifactLevelCosts();
+            const cost = Array.isArray(costTable?.[nextLvl]) ? costTable[nextLvl] : [0, 0];
+            const fairyDustCost = cost[0] || 0;
+            const goldCost = cost[1] || 0;
+
+            const updatedArtifacts = titanSnap.artifacts.map((a: any, idx: number) => {
+              if (idx === slotId) {
+                return { ...a, level: nextLvl };
+              }
+              return { ...a };
+            });
+
+            next.titanGetAll = {
+              ...next.titanGetAll,
+              updatedAt: entry.updatedAt,
+              data: {
+                ...next.titanGetAll.data,
+                [titanId]: {
+                  ...titanSnap,
+                  artifacts: updatedArtifacts
+                }
+              }
+            };
+
+            if (fairyDustCost > 0) {
+              if (next.inventoryGet?.data?.coin) {
+                const cur = next.inventoryGet.data.coin['18'] ?? 0;
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    coin: { ...next.inventoryGet.data.coin, '18': Math.max(0, cur - fairyDustCost) }
+                  }
+                };
+              }
+              const resKey = 'resource:coin:18';
+              if (next[resKey]?.data) {
+                next[resKey] = {
+                  ...next[resKey],
+                  data: { ...next[resKey].data, amount: Math.max(0, (next[resKey].data.amount ?? 0) - fairyDustCost) },
+                  updatedAt: entry.updatedAt
+                };
+              }
+            }
+
+            if (goldCost > 0) {
+              if (next['resource:gold']?.data) {
+                next['resource:gold'] = {
+                  ...next['resource:gold'],
+                  data: { ...next['resource:gold'].data, amount: Math.max(0, (next['resource:gold'].data.amount ?? 0) - goldCost) },
+                  updatedAt: entry.updatedAt
+                };
+              }
+              if (next.userGetInfo?.data?.gold !== undefined) {
+                next.userGetInfo = {
+                  ...next.userGetInfo,
+                  data: { ...next.userGetInfo.data, gold: Math.max(0, (next.userGetInfo.data.gold ?? 0) - goldCost) }
+                };
+              }
+            }
+
+            const history = { ...seen, [entry.data.token]: entry.updatedAt };
+            const tokens = Object.keys(history).sort((a, b) => history[b].localeCompare(history[a]));
+            for (const token of tokens.slice(500)) delete history[token];
+            next.resourceActionHistory = {
+              key: 'resourceActionHistory',
+              method: entry.method,
+              feature: null,
+              group: 'internal',
+              data: history,
+              updatedAt: entry.updatedAt
+            };
+            changed = true;
+          }
+          continue;
+        }
+        if (entry.key === 'titanArtifactEvolveAction') {
+          const seen = next.resourceActionHistory?.data || {};
+          if (seen[entry.data.token] || !entry.data.titanId) continue;
+          const titanId = String(entry.data.titanId);
+          const slotId = Number(entry.data.slotId ?? 0);
+          const titanSnap = next.titanGetAll?.data?.[titanId];
+          if (titanSnap && Array.isArray(titanSnap.artifacts)) {
+            const meta = getTitanMetadata()?.[titanId];
+            const artId = meta?.artifacts?.[slotId];
+            const curArt = titanSnap.artifacts[slotId] || { level: 1, star: 1 };
+            const curStar = Number(curArt.star) || 1;
+            const nextStar = Math.min(6, curStar + 1);
+
+            const evolveCostMap = getTitanArtifactEvolveCost();
+            const evolveCost = (evolveCostMap && evolveCostMap[nextStar]) || 0;
+
+            const updatedArtifacts = titanSnap.artifacts.map((a: any, idx: number) => {
+              if (idx === slotId) {
+                return { ...a, star: nextStar };
+              }
+              return { ...a };
+            });
+
+            next.titanGetAll = {
+              ...next.titanGetAll,
+              updatedAt: entry.updatedAt,
+              data: {
+                ...next.titanGetAll.data,
+                [titanId]: {
+                  ...titanSnap,
+                  artifacts: updatedArtifacts
+                }
+              }
+            };
+
+            if (artId && evolveCost > 0) {
+              const strArtId = String(artId);
+              if (next.inventoryGet?.data?.fragmentArtifact) {
+                const cur = next.inventoryGet.data.fragmentArtifact[strArtId] ?? 0;
+                next.inventoryGet = {
+                  ...next.inventoryGet,
+                  data: {
+                    ...next.inventoryGet.data,
+                    fragmentArtifact: {
+                      ...next.inventoryGet.data.fragmentArtifact,
+                      [strArtId]: Math.max(0, cur - evolveCost)
+                    }
+                  }
+                };
+              }
+              const resKey = `resource:fragmentArtifact:${strArtId}`;
+              if (next[resKey]?.data) {
+                next[resKey] = {
+                  ...next[resKey],
+                  data: {
+                    ...next[resKey].data,
+                    amount: Math.max(0, (next[resKey].data.amount ?? 0) - evolveCost)
+                  },
+                  updatedAt: entry.updatedAt
+                };
+              }
+            }
+
+            const history = { ...seen, [entry.data.token]: entry.updatedAt };
+            const tokens = Object.keys(history).sort((a, b) => history[b].localeCompare(history[a]));
             for (const token of tokens.slice(500)) delete history[token];
             next.resourceActionHistory = {
               key: 'resourceActionHistory',
@@ -4923,13 +5158,23 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
             if (unitId && next.titanGetAll?.data?.[unitId]) {
               const titan = next.titanGetAll.data[unitId];
               const curXp = Number(titan.xp) || 0;
+              const newXp = curXp + amount;
+              const lvlInfo = getTitanLevelFromExp()(newXp);
+              const newLevel = lvlInfo.level;
+              const updatedSkills = { ...(titan.skills || {}) };
+              for (const [skId] of Object.entries(updatedSkills)) {
+                updatedSkills[skId] = newLevel;
+              }
               next.titanGetAll = {
                 ...next.titanGetAll,
+                updatedAt: entry.updatedAt,
                 data: {
                   ...next.titanGetAll.data,
                   [unitId]: {
                     ...titan,
-                    xp: curXp + amount
+                    xp: newXp,
+                    level: newLevel,
+                    skills: updatedSkills
                   }
                 }
               };
