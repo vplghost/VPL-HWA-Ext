@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { installInterceptor } from '../src/content/interceptor.ts';
+import { installInterceptor, isInternalZipUrl, EMPTY_ZIP_BYTES } from '../src/content/interceptor.ts';
 
 function setup(fetchImplementation, enable = true, extraContext = {}) {
   const messages = [];
@@ -1371,3 +1371,76 @@ test("window.__hwaRequestIdState allows inspecting and updating sequence offset"
   assert.equal(window.__hwaRequestIdState.get(), 200);
 });
 
+
+test("isInternalZipUrl correctly identifies missing StreamingAssets zip endpoints", () => {
+  assert.equal(isInternalZipUrl("https://cdn.hero-wars-alliance.com/build/release/83d4310c-dded-4bd3-a443-55f22b534671/StreamingAssets/internal.zip"), true);
+  assert.equal(isInternalZipUrl("https://cdn.hero-wars-alliance.com/build/release/abc-123/StreamingAssets/internal.zip?v=1"), true);
+  assert.equal(isInternalZipUrl("https://cdn.hero-wars-alliance.com/build/release/abc-123/StreamingAssets/StreamingAssets.zip"), true);
+  assert.equal(isInternalZipUrl("https://api.hero-wars-alliance.com/api/rpc"), false);
+  assert.equal(isInternalZipUrl("https://cdn.hero-wars-alliance.com/build/release/StreamingAssets/build-info.js"), false);
+});
+
+test("fetch for StreamingAssets/internal.zip returns synthetic 200 OK empty zip without hitting network", async () => {
+  let networkHit = false;
+  const { window } = setup(async () => {
+    networkHit = true;
+    return new Response("failed 403", { status: 403 });
+  }, true, { Response, Headers });
+
+  const res = await window.fetch("https://cdn.hero-wars-alliance.com/build/release/83d4310c-dded-4bd3-a443-55f22b534671/StreamingAssets/internal.zip");
+  assert.equal(networkHit, false, "Network fetch must not be invoked for internal.zip");
+  assert.equal(res.status, 200);
+  assert.equal(res.statusText, "OK");
+  const buffer = await res.arrayBuffer();
+  assert.equal(buffer.byteLength, 22);
+  const bytes = new Uint8Array(buffer);
+  assert.deepEqual(bytes, EMPTY_ZIP_BYTES);
+});
+
+test("XMLHttpRequest for StreamingAssets/internal.zip returns synthetic 200 OK empty zip without hitting network", async () => {
+  let originalSendCalled = false;
+  class CustomFakeXHR {
+    listeners = new Map();
+    status = 0;
+    response = null;
+    responseText = "";
+    responseType = "arraybuffer";
+    readyState = 0;
+    addEventListener(name, handler) {
+      const handlers = this.listeners.get(name) ?? [];
+      handlers.push(handler);
+      this.listeners.set(name, handlers);
+    }
+    open(method, url) { this.method = method; this.url = url; this.readyState = 1; }
+    setRequestHeader(name, value) { this[name] = value; }
+    send() {
+      originalSendCalled = true;
+    }
+    emit(name) { for (const handler of this.listeners.get(name) ?? []) handler(); }
+  }
+
+  const { window } = setup(async () => new Response("ok"), true, {
+    extraContext: {
+      window: { XMLHttpRequest: CustomFakeXHR }
+    }
+  });
+
+  const xhr = new window.XMLHttpRequest();
+  xhr.responseType = "arraybuffer";
+  xhr.open("GET", "https://cdn.hero-wars-alliance.com/build/release/83d4310c-dded-4bd3-a443-55f22b534671/StreamingAssets/internal.zip");
+
+  let loadFired = false;
+  xhr.addEventListener("load", () => {
+    loadFired = true;
+  });
+
+  xhr.send();
+  assert.equal(originalSendCalled, false, "Original XHR.send must not be invoked for internal.zip");
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(xhr.status, 200);
+  assert.equal(xhr.readyState, 4);
+  assert.equal(loadFired, true);
+  assert.equal(xhr.response?.byteLength, 22);
+  assert.deepEqual(new Uint8Array(xhr.response), EMPTY_ZIP_BYTES);
+});

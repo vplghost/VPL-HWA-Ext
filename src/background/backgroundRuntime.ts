@@ -481,7 +481,11 @@ export async function runCityQueue(type: string, tabId?: number, record?: any, c
   }
   const feature = type === 'building' ? 'building' : 'personalResearch';
   const status = stored.rpcCache?.[type + 'Status'];
-  const summaryTime = status?.method === 'getSummary' ? Date.parse(status.updatedAt) : NaN;
+  const validMethods = ['getSummary', 'startResearch', 'completeResearch', 'startConstruction', 'completeConstruction'];
+  const summaryTime =
+    status?.updatedAt && (validMethods.includes(status?.method) || status?.data?.action)
+      ? Date.parse(status.updatedAt)
+      : NaN;
   const fresh = Number.isFinite(summaryTime) && summaryTime <= now + 5000 && now - summaryTime <= 60000;
   const save = async () => {
     queue.updatedAt = Math.max(Date.now(), (Number(queue.updatedAt) || 0) + 1);
@@ -506,7 +510,13 @@ export async function runCityQueue(type: string, tabId?: number, record?: any, c
   const observed: any[] = Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {});
 
   const remainingTargets = fresh ? helper.planNextStep(queue, stored.rpcCache, now).remainingItemsAfterSkip : queue.items;
-  const ends = observed.map((item: any) => helper.getQueueEnd(item, now)).filter((end: number) => end > 0);
+  const ends = observed
+    .map((item: any) => {
+      const dur = Number.isFinite(item.durationMs) ? item.durationMs : Number.isFinite(item.duration) ? item.duration : 0;
+      if (dur === 0 && Number.isFinite(summaryTime)) return summaryTime;
+      return helper.getQueueEnd(item, now);
+    })
+    .filter((end: number) => end > 0);
   if (!remainingTargets.length || ends.some((end: number) => end > now)) {
     if (queue.stalledRefresh) {
       queue.stalledRefresh = null;

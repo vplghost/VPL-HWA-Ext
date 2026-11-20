@@ -37,6 +37,18 @@ export function isMqttUrl(url: string | URL): boolean {
   return str.includes('emqx-hwmb-wss.nextersglobal.com/mqtt') || str.includes('/mqtt');
 }
 
+export const EMPTY_ZIP_BYTES = new Uint8Array([
+  0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+]);
+
+export function isInternalZipUrl(url: string | URL | Request): boolean {
+  if (!url) return false;
+  const str = typeof url === 'string' ? url : (url as any).url || url.toString();
+  return /StreamingAssets\/(?:internal|StreamingAssets)\.zip(?:\?.*)?$/i.test(str);
+}
+
 export function createApiRecordMessage(record: InterceptRecord): {
   source: 'hwa-helper-api';
   kind: 'api-record';
@@ -1123,6 +1135,25 @@ export function installInterceptor(customWindow?: any): void {
       const url = typeof input === 'string' || input instanceof URL ? input : input?.url;
       const urlStr = String(url || '');
 
+      if (isInternalZipUrl(urlStr)) {
+        if (typeof Response === 'function') {
+          const isHead = String(options?.method || input?.method || 'GET').toUpperCase() === 'HEAD';
+          const headers = typeof Headers === 'function' ? new Headers() : ({} as any);
+          if (typeof headers.set === 'function') {
+            headers.set('Content-Type', 'application/zip');
+            headers.set('Content-Length', String(EMPTY_ZIP_BYTES.byteLength));
+            headers.set('Access-Control-Allow-Origin', '*');
+          }
+          const res = new Response(isHead ? null : EMPTY_ZIP_BYTES.buffer.slice(0), {
+            status: 200,
+            statusText: 'OK',
+            headers: typeof headers.set === 'function' ? headers : { 'Content-Type': 'application/zip', 'Content-Length': '22', 'Access-Control-Allow-Origin': '*' }
+          });
+          try { Object.defineProperty(res, 'url', { value: urlStr }); } catch (_) {}
+          return Promise.resolve(res);
+        }
+      }
+
       if (urlStr.includes('/api/rpc')) {
         lastRpcUrl = urlStr;
         try {
@@ -1427,6 +1458,10 @@ export function installInterceptor(customWindow?: any): void {
           if (s) s.setItem('hwa_last_rpc_url', urlStr);
         } catch (_) {}
       }
+      if (isInternalZipUrl(urlStr)) {
+        requestInfo.set(this, { method, url: urlStr, isMockInternalZip: true });
+        return originalOpen.call(this, method, url, ...rest);
+      }
       const result = originalOpen.call(this, method, url, ...rest);
       if (!captureEnabled || isTrackingUrl(urlStr, loc.href)) requestInfo.delete(this);
       else requestInfo.set(this, { method, url, outcome: 'completed' });
@@ -1434,6 +1469,73 @@ export function installInterceptor(customWindow?: any): void {
     };
 
     xhrProto.send = function (this: any, ...args: any[]) {
+      const internalInfo = requestInfo.get(this);
+      if (internalInfo?.isMockInternalZip) {
+        const urlStr = internalInfo.url;
+        const self = this;
+        const setProp = (prop: string, val: any) => {
+          try {
+            Object.defineProperty(self, prop, { value: val, writable: true, configurable: true });
+          } catch (_) {
+            self[prop] = val;
+          }
+        };
+
+        const buf = EMPTY_ZIP_BYTES.buffer.slice(0);
+        let respData: any = buf;
+        const respType = (self.responseType || '').toLowerCase();
+        if (respType === 'blob' && typeof Blob !== 'undefined') {
+          respData = new Blob([buf], { type: 'application/zip' });
+        } else if (respType === 'text' || respType === '') {
+          respData = typeof TextDecoder !== 'undefined' ? new TextDecoder('latin1').decode(EMPTY_ZIP_BYTES) : '';
+        } else if (respType === 'json') {
+          respData = null;
+        }
+
+        setProp('status', 200);
+        setProp('statusText', 'OK');
+        setProp('responseURL', urlStr);
+        setProp('response', respData);
+        setProp('responseText', typeof respData === 'string' ? respData : '');
+
+        self.getResponseHeader = function (name: string) {
+          const n = (name || '').toLowerCase();
+          if (n === 'content-type') return 'application/zip';
+          if (n === 'content-length') return String(EMPTY_ZIP_BYTES.byteLength);
+          if (n === 'access-control-allow-origin') return '*';
+          return null;
+        };
+        self.getAllResponseHeaders = function () {
+          return 'content-type: application/zip\r\ncontent-length: 22\r\naccess-control-allow-origin: *\r\n';
+        };
+
+        const fire = (type: string) => {
+          try {
+            const evt = typeof Event === 'function' ? new Event(type) : { type, target: self, currentTarget: self };
+            if (typeof self['on' + type] === 'function') {
+              self['on' + type](evt);
+            }
+            if (typeof self.dispatchEvent === 'function') {
+              self.dispatchEvent(evt);
+            }
+            if (typeof self.emit === 'function') {
+              self.emit(type);
+            }
+          } catch (_) {}
+        };
+
+        setTimer(() => {
+          setProp('readyState', 2);
+          fire('readystatechange');
+          setProp('readyState', 3);
+          fire('readystatechange');
+          setProp('readyState', 4);
+          fire('readystatechange');
+          fire('load');
+          fire('loadend');
+        }, 0);
+        return;
+      }
       try {
         const urlStr = xhrUrls.get(this) || '';
         if (urlStr.includes('/api/rpc')) {

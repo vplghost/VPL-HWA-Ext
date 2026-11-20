@@ -2795,9 +2795,9 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             const previous = next[statusKey];
             const snapshotInBatch = entries.some(item => item !== entry && item.key === statusKey && !item.data?.action && item.updatedAt >= entry.updatedAt);
             if (previous && previous.updatedAt <= entry.updatedAt && !snapshotInBatch) {
-              const eligible = row => Number.isFinite(row?.startDate) && row.startDate <= Date.parse(entry.updatedAt) &&
-                Number.isFinite(row.durationMs ?? row.duration) && (data.kind === 'healing' || row[def.id] === args[def.id] && (row.level ?? row.nextLevel) === args.nextLevel);
-              const shorten = row => {
+              const eligible = (row: any) => Number.isFinite(row?.startDate) && row.startDate <= Date.parse(entry.updatedAt) + 10000 &&
+                Number.isFinite(row.durationMs ?? row.duration) && (data.kind === 'healing' || (Number(row[def.id]) === Number(args[def.id]) && Number(row.level ?? row.nextLevel) === Number(args.nextLevel)));
+              const shorten = (row: any) => {
                 if (!eligible(row)) return row;
                 appliedTimer = true;
                 const ms = Math.max(0, (row.durationMs ?? row.duration) - data.totalMs);
@@ -2805,7 +2805,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               };
               const updated = data.kind === 'healing' ? { ...previous.data, healing: shorten(previous.data.healing) }
                 : { ...previous.data, queues: normalizeArrayData(previous.data.queues).map(shorten) };
-              if (appliedTimer) next[statusKey] = { ...previous, data: updated, updatedAt: entry.updatedAt };
+              if (appliedTimer) next[statusKey] = { ...previous, method: previous?.method || 'getSummary', data: updated, updatedAt: entry.updatedAt };
             }
             const inventorySnapshot = entries.some(item => item.key === 'speedupInventoryAction' && item.updatedAt >= entry.updatedAt);
             const inventory = next.speedupInventory;
