@@ -2986,35 +2986,6 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.catch(() => {});
       return true;
     }
-    if (message?.kind === 'mqtt-telemetry-update' && isGameUrl(sender.url)) {
-      pending = pending.then(async () => {
-        const stored = (await cr.storage?.local?.get('rpcMqttTelemetry')) || {};
-        const telemetry = stored.rpcMqttTelemetry || {
-          fastCarrierCount: 0,
-          fallbackCarrierCount: 0,
-          lastCarrier: null
-        };
-        if (message.status?.state === 'carrier-attached') {
-          const isFast = typeof message.status.carrierDelayMs === 'number' && message.status.carrierDelayMs <= 3000;
-          if (isFast) telemetry.fastCarrierCount = (telemetry.fastCarrierCount || 0) + 1;
-          else telemetry.fallbackCarrierCount = (telemetry.fallbackCarrierCount || 0) + 1;
-          telemetry.lastCarrier = {
-            source: message.status.carrierSource || (isFast ? 'fast-map-carrier' : 'periodic-fallback'),
-            method: message.status.carrierMethod || 'unknown',
-            delayMs: message.status.carrierDelayMs ?? null,
-            nudgeType: message.status.nudgeType || null,
-            timestamp: message.status.updatedAt || new Date().toISOString()
-          };
-          await cr.storage?.local?.set({ rpcMqttTelemetry: telemetry });
-        }
-      });
-      pending.then(
-        () => sendResponse({ ok: true }),
-        () => sendResponse({ ok: false })
-      );
-      pending = pending.catch(() => {});
-      return true;
-    }
     const isAllowedOrigin = sender.url?.startsWith(`chrome-extension://${cr.runtime.id}/`) || isGameUrl(sender.url);
     const recordKinds = ['record-start', 'record-stop', 'record-clear', 'start-recording', 'stop-recording'];
     if (recordKinds.includes(message?.kind) && isAllowedOrigin) {

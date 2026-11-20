@@ -28,7 +28,7 @@ async function pingEngine() {
   finally { enginePingPending.value = false; }
 }
 
-const dispatchMode = ref<'piggyback' | 'direct' | 'mqtt-piggyback'>('direct');
+const dispatchMode = ref<'piggyback' | 'direct'>('direct');
 const popupRpcEnabled = ref(true);
 const interceptEnabled = ref(true);
 const mqttCaptureEnabled = ref(true);
@@ -66,13 +66,8 @@ onMounted(async () => {
         'captureSettings',
         'tabConfig',
       ]);
-      if (stored.socketRefreshMode) {
-        dispatchMode.value = stored.socketRefreshMode;
-      } else if (stored.dispatchMode) {
-        dispatchMode.value = stored.dispatchMode;
-      } else {
-        dispatchMode.value = 'direct';
-      }
+      const rawMode = stored.socketRefreshMode || stored.dispatchMode;
+      dispatchMode.value = rawMode === 'piggyback' ? 'piggyback' : 'direct';
       popupRpcEnabled.value = stored.popupRpcEnabled !== false;
       if (stored.captureSettings?.interceptEnabled !== undefined) {
         interceptEnabled.value = stored.captureSettings.interceptEnabled !== false;
@@ -144,7 +139,7 @@ function handleThemeChange(event: Event) {
 
 async function handleModeChange(event: Event) {
   const target = event.target as HTMLSelectElement;
-  const newMode = target.value as 'piggyback' | 'direct' | 'mqtt-piggyback';
+  const newMode = target.value as 'piggyback' | 'direct';
   dispatchMode.value = newMode;
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     const updates: Record<string, any> = {
@@ -326,7 +321,6 @@ async function toggleRecording() {
         >
           <option value="direct">⚡ Direct (Fast RPC)</option>
           <option value="piggyback">🛡️ Piggyback (Safe Stealth)</option>
-          <option value="mqtt-piggyback">📡 MQTT-Assisted Piggyback</option>
         </select>
       </div>
 

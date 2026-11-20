@@ -90,7 +90,7 @@ test('opt-in/shared RPC gates and mismatched game-account bridge prevent automat
 });
 
 test('queued mode respects policy; disabling auto cancels its queue without pretending the mutation failed', async () => {
-  const e = await environment(); e.local.socketRefreshMode = 'mqtt-piggyback';
+  const e = await environment(); e.local.socketRefreshMode = 'piggyback';
   await e.ctx.run(); e.quota(1); await e.ctx.run();
   assert.equal(e.spins()[0].kind, 'queue-rpc');
   e.local.autoFreeSpinEnabled = false; await e.ctx.run();

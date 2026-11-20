@@ -484,7 +484,7 @@ test('energy auto raid consumes exact natural crossing once, respects policy and
 });
 
 test('managed raid queue uses shared policy, pins one game tab and waits for return across popup closure', async () => {
-  for (const mode of ['piggyback', 'mqtt-piggyback', 'direct']) {
+  for (const mode of ['piggyback', 'direct']) {
     const env = setup();
     const { local, tabsList, forwardedMessages, listener } = env;
     local.popupRpcEnabled = true; local.socketRefreshMode = mode;
@@ -757,7 +757,7 @@ test('api-record safely handles object-shaped questClaimStatus claims without Ty
 });
 
 test('confirmed healing completion refreshes authoritative troop state in each shared dispatch mode', async () => {
-  for (const mode of ['direct', 'piggyback', 'mqtt-piggyback']) {
+  for (const mode of ['direct', 'piggyback']) {
     const { local, send, forwardedMessages } = setup();
     const completeDate = 1794552240233;
     local.popupRpcEnabled = true;
@@ -840,7 +840,7 @@ test('experimental actions require popup RPC and reach one game tab', async () =
 });
 
 test('manual refresh and Experimental inherit both global dispatch modes', async () => {
-  for (const mode of ['piggyback', 'direct', 'mqtt-piggyback']) {
+  for (const mode of ['piggyback', 'direct']) {
     const { local, listener, tabsList, forwardedMessages, send } = setup();
     tabsList.push({ id: 1, url: gameSender.url }, { id: 2, url: gameSender.url });
     local.popupRpcEnabled = true;

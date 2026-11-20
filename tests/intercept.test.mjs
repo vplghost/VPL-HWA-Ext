@@ -65,7 +65,7 @@ async function waitForMessage(messages) {
 }
 
 test('Smart gathering mine probes and incoming reads cross the actual queued carrier with feature bounds', async () => {
-  for (const mode of ['piggyback', 'mqtt-piggyback']) {
+  for (const mode of ['piggyback']) {
     const batches = [];
     const env = setup(async (_url, options) => {
       const calls = JSON.parse(options.body).calls; batches.push(calls);
@@ -107,8 +107,8 @@ test('raid cancellation expires before departure and stopping a group preserves 
   await carrier(); assert.deepEqual(sent[3], ['userGetInfo'], 'mutation must never retry');
 });
 
-test('monster attack joins one native RPC and MQTT-assisted mode nudges after queue acceptance', async () => {
-  for (const mode of ['piggyback', 'mqtt-piggyback']) {
+test('monster attack joins one native RPC after queue acceptance', async () => {
+  for (const mode of ['piggyback']) {
     const batches = [];
     const { window, queueCounts } = setup(async (_url, options) => {
       const calls = JSON.parse(options.body).calls;
@@ -130,7 +130,7 @@ test('monster attack joins one native RPC and MQTT-assisted mode nudges after qu
         squad: { heroes: [{ heroId: 1 }], units: [{ unitId: 7, count: 100 }] } } }] },
     'https://www.hero-wars-alliance.com');
     assert.equal(queueCounts.at(-1), 1);
-    assert.equal(nudges, mode === 'mqtt-piggyback' ? 1 : 0);
+    assert.equal(nudges, 0);
     const carrier = () => window.fetch('https://api.hero-wars-alliance.com/api/rpc', {
       method: 'POST', body: JSON.stringify({ calls: [{ name: 'userGetInfo', ident: 'native' }] })
     });
@@ -153,7 +153,7 @@ test('migrated refresh reads use bounded feature pairs in both piggyback modes',
     { name: 'dungeonGetInfo' },
     { name: 'chatGetAll', args: { chatType: 'clan' } },
   ];
-  for (const mode of ['piggyback', 'mqtt-piggyback']) {
+  for (const mode of ['piggyback']) {
     const batches = [];
     const { window, messages, queueCounts } = setup(async (_url, options) => {
       const request = JSON.parse(options.body);
@@ -615,7 +615,7 @@ test('legacy direct messages and queued calls piggyback by default with action r
 });
 
 test('camp discovery is a feature-scoped Piggyback read with native results preserved', async () => {
-  for (const mode of ['piggyback', 'mqtt-piggyback']) {
+  for (const mode of ['piggyback']) {
     const batches = [];
     const { window } = setup(async (_url, options) => {
       const request = JSON.parse(options.body); batches.push(request.calls);

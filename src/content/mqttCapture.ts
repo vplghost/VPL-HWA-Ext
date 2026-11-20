@@ -1,13 +1,13 @@
 /**
- * MQTT WebSocket frame capture and nudge injection.
+ * MQTT WebSocket frame capture.
  * Operates in the game page MAIN world.
+ * Pure passive telemetry for game events, chat, rallies, and recording.
  */
 
 export function installMqttCapture(customWindow?: any): void {
   const win = customWindow || (typeof window !== 'undefined' ? window : null);
   if (!win) return;
   const loc = win.location || (typeof location !== 'undefined' ? location : { origin: 'https://www.hero-wars-alliance.com', href: 'https://www.hero-wars-alliance.com/' });
-  const getNow = () => (typeof win.Date?.now === 'function' ? win.Date.now() : Date.now());
   const flag = Symbol.for('hwa-helper-mqtt-capture-installed');
   if ((win as any)[flag] || typeof win.WebSocket !== 'function') return;
   (win as any)[flag] = true;
@@ -17,40 +17,12 @@ export function installMqttCapture(customWindow?: any): void {
   const MAX_FRAME_BYTES = 1024 * 1024;
   const MAX_PAYLOAD_BYTES = 128 * 1024;
   let captureEnabled = true;
-  let popupRpcEnabled = false;
-  let assistedMode = false;
-  let recordingActive = false;
-  let triggerTemplate: any = null;
-  let userPushTemplate: any = null;
-  let viewedChunks: any = null;
-  let lastTriggerAt = -Infinity;
-  const syntheticEvents = new WeakSet();
-
-  const reportTrigger = (state: string, details: Record<string, any> = {}) =>
-    win.postMessage(
-      { source: 'hwa-helper-api', kind: 'mqtt-rpc-nudge-status', state, ...details },
-      loc.origin
-    );
+  let activeSocketState: any = null;
 
   win.addEventListener('message', (event: any) => {
     if (event.source !== win || event.origin !== loc.origin) return;
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled !== false;
-      popupRpcEnabled = event.data.popupRpcEnabled === true;
-      assistedMode = event.data.socketRefreshMode === 'mqtt-piggyback';
-      recordingActive = event.data.recordingActive === true;
-      if (!captureEnabled || !popupRpcEnabled) {
-        triggerTemplate = null;
-        userPushTemplate = null;
-      }
-      return;
-    }
-    if (event.data?.source === 'hwa-helper-api' && event.data.kind === 'api-record') {
-      rememberViewedChunks(event.data.record);
-      return;
-    }
-    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'mqtt-rpc-nudge') {
-      triggerGameRefresh(event.data.trackId, event.data.requestedAt);
       return;
     }
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'mqtt-send-upstream') {
@@ -60,8 +32,7 @@ export function installMqttCapture(customWindow?: any): void {
   });
 
   function sendUpstreamMqttPacket(payload: any, trackId?: string) {
-    const sample = triggerTemplate || userPushTemplate;
-    if (!sample || sample.state.closed || sample.state.socket.readyState !== 1) {
+    if (!activeSocketState || activeSocketState.closed || activeSocketState.socket.readyState !== 1) {
       console.warn('[HWA-TRACK][MQTT_UPSTREAM_FAILED]', {
         trackId,
         time: new Date().toISOString(),
@@ -76,252 +47,9 @@ export function installMqttCapture(customWindow?: any): void {
         mechanism: 'WebSocket.send to remote MQTT broker (upstream: client -> server)',
         payloadType: typeof payload
       });
-      sample.state.socket.send(payload);
+      activeSocketState.socket.send(payload);
     } catch (err) {
       console.error('[HWA-TRACK][MQTT_UPSTREAM_ERROR]', { trackId, error: String(err) });
-    }
-  }
-
-  function rememberViewedChunks(record: any) {
-    if (
-      record?.transport !== 'fetch' ||
-      record.method !== 'POST' ||
-      record.endpoint !== 'https://api.hero-wars-alliance.com/api/rpc' ||
-      record.requestBodyTruncated ||
-      typeof record.requestBody !== 'string' ||
-      record.requestBody.length > MAX_PAYLOAD_BYTES
-    )
-      return;
-    try {
-      const calls = JSON.parse(record.requestBody)?.calls;
-      const native = calls?.find(
-        (call: any) =>
-          call.name === 'getChunks' &&
-          call.feature === 'globalMap' &&
-          typeof call.args?.mapId === 'string' &&
-          Array.isArray(call.args?.chunkCoordinates)
-      );
-      if (!native) return;
-      const coordinates = native.args.chunkCoordinates
-        .filter((item: any) => Number.isInteger(item?.x) && Number.isInteger(item?.y))
-        .slice(-32)
-        .map(({ x, y }: any) => ({ x, y }));
-      if (coordinates.length)
-        viewedChunks = {
-          mapId: native.args.mapId,
-          observedAt: getNow(),
-          coordinates
-        };
-    } catch (_) {}
-  }
-
-  function rememberTrigger(packet: any, state: any) {
-    if (packet.payload.length > MAX_PAYLOAD_BYTES || packet.topic.length > 512) return;
-    try {
-      const message = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(packet.payload));
-
-      if (packet.topic.startsWith('hwm/user/') || packet.topic.includes('/user/')) {
-        const type = message?.result?.type || message?.method || 'user-push';
-        userPushTemplate = {
-          state,
-          topic: packet.topic,
-          type,
-          rawJson: message,
-          observedAt: getNow()
-        };
-      }
-
-      const chunks = message?.result?.body?.chunks;
-      if (
-        message?.method !== 'msg' ||
-        message?.result?.type !== 'mapChunksUpdated' ||
-        !Array.isArray(chunks) ||
-        !chunks.length ||
-        chunks.length > 32 ||
-        chunks.some(
-          (chunk: any) =>
-            !Number.isInteger(chunk?.x) ||
-            !Number.isInteger(chunk?.y) ||
-            !Number.isFinite(chunk?.updatedAt)
-        )
-      )
-        return;
-      const observedAt = getNow();
-      const previous =
-        triggerTemplate?.state === state && triggerTemplate.topic === packet.topic
-          ? triggerTemplate.chunks.filter((chunk: any) => observedAt - chunk.observedAt <= 60000)
-          : [];
-      const byCoordinate = new Map(previous.map((chunk: any) => [`${chunk.x}:${chunk.y}`, chunk]));
-      for (const { x, y, updatedAt } of chunks) {
-        const key = `${x}:${y}`;
-        byCoordinate.delete(key);
-        byCoordinate.set(key, { x, y, updatedAt, observedAt });
-      }
-      triggerTemplate = {
-        state,
-        topic: packet.topic,
-        observedAt,
-        chunks: [...byCoordinate.values()].slice(-32)
-      };
-    } catch (_) {}
-  }
-
-  function buildQoS0PublishPacket(topicStr: string, payloadStr: string, version = 4): Uint8Array {
-    const encoder = new TextEncoder();
-    const topic = encoder.encode(topicStr);
-    const payload = encoder.encode(payloadStr);
-    const body = new Uint8Array(2 + topic.length + (version === 5 ? 1 : 0) + payload.length);
-    body[0] = topic.length >> 8;
-    body[1] = topic.length & 255;
-    body.set(topic, 2);
-    body.set(payload, 2 + topic.length + (version === 5 ? 1 : 0));
-    const length: number[] = [];
-    let remaining = body.length;
-    do {
-      let byte = remaining % 128;
-      remaining = Math.floor(remaining / 128);
-      if (remaining) byte |= 128;
-      length.push(byte);
-    } while (remaining);
-    const packet = new Uint8Array(1 + length.length + body.length);
-    packet[0] = 0x30;
-    packet.set(length, 1);
-    packet.set(body, 1 + length.length);
-    return packet;
-  }
-
-  function triggerGameRefresh(trackId: string | null = null, _requestedAt: any = null) {
-    if (!captureEnabled || !popupRpcEnabled || !assistedMode) return reportTrigger('disabled');
-    const mapSample = triggerTemplate;
-    const userSample = userPushTemplate;
-    const sample = mapSample || userSample;
-
-    console.log('[HWA-TRACK][5a/6 MQTT_NUDGE_CHECK]', {
-      trackId,
-      time: new Date().toISOString(),
-      assistedMode,
-      captureEnabled,
-      popupRpcEnabled,
-      hasMapTemplate: Boolean(mapSample),
-      hasUserTemplate: Boolean(userSample),
-      mapTemplateAgeMs: mapSample ? getNow() - mapSample.observedAt : null,
-      userTemplateAgeMs: userSample ? getNow() - userSample.observedAt : null,
-      viewedChunks: viewedChunks
-        ? {
-            mapId: viewedChunks.mapId,
-            count: viewedChunks.coordinates.length,
-            ageMs: getNow() - viewedChunks.observedAt
-          }
-        : null
-    });
-
-    if (!sample) return reportTrigger('waiting-template');
-
-    const mapFresh = Boolean(mapSample && getNow() - mapSample.observedAt <= 60000);
-    const userFresh = Boolean(userSample && getNow() - userSample.observedAt <= 120000);
-    if (!mapFresh && !userFresh) return reportTrigger('expired-template');
-
-    const mapReady = Boolean(mapFresh && !mapSample.state.closed && mapSample.state.socket.readyState === 1);
-    const userReady = Boolean(userFresh && !userSample.state.closed && userSample.state.socket.readyState === 1);
-    if (!mapReady && !userReady) return reportTrigger('socket-closed');
-
-    if (getNow() - lastTriggerAt < 5000) return reportTrigger('cooldown');
-    if (typeof MessageEvent !== 'function') return reportTrigger('error');
-
-    try {
-      let nudgeType = 'none';
-      const isMapActive = viewedChunks && getNow() - viewedChunks.observedAt <= 60000;
-      let mapEvent: MessageEvent | null = null;
-      let userEvent: MessageEvent | null = null;
-
-      if (mapReady) {
-        if (typeof mapSample.state.socket.dispatchEvent !== 'function') return reportTrigger('error');
-        const chunks = new Map(mapSample.chunks.map((chunk: any) => [`${chunk.x}:${chunk.y}`, chunk]));
-        if (isMapActive && mapSample.topic.endsWith(`/${viewedChunks.mapId}`)) {
-          const latestTimestamp = Math.max(...mapSample.chunks.map((chunk: any) => chunk.updatedAt));
-          for (const { x, y } of viewedChunks.coordinates) {
-            const key = `${x}:${y}`;
-            const chunk = chunks.get(key);
-            chunks.delete(key);
-            chunks.set(key, chunk || { x, y, updatedAt: latestTimestamp });
-          }
-        }
-        const payloadStr = JSON.stringify({
-          method: 'msg',
-          result: {
-            type: 'mapChunksUpdated',
-            body: {
-              chunks: [...chunks.values()].slice(-32).map(({ x, y, updatedAt }: any) => ({
-                x,
-                y,
-                updatedAt: Math.max(getNow(), updatedAt + 1)
-              }))
-            }
-          }
-        });
-        const packet = buildQoS0PublishPacket(mapSample.topic, payloadStr, mapSample.state.version);
-        const data =
-          mapSample.state.socket.binaryType === 'blob'
-            ? new Blob([packet.buffer as ArrayBuffer])
-            : packet.buffer;
-        mapEvent = new MessageEvent('message', {
-          data,
-          origin: new URL(mapSample.state.socket.url).origin
-        });
-        syntheticEvents.add(mapEvent);
-        nudgeType = 'map';
-      }
-
-      if (userReady && (!mapReady || !isMapActive)) {
-        if (typeof userSample.state.socket.dispatchEvent !== 'function') return reportTrigger('error');
-        const payloadStr = JSON.stringify(
-          userSample.rawJson || { method: 'msg', result: { type: userSample.type, body: {} } }
-        );
-        const packet = buildQoS0PublishPacket(userSample.topic, payloadStr, userSample.state.version);
-        const data =
-          userSample.state.socket.binaryType === 'blob'
-            ? new Blob([packet.buffer as ArrayBuffer])
-            : packet.buffer;
-        userEvent = new MessageEvent('message', {
-          data,
-          origin: new URL(userSample.state.socket.url).origin
-        });
-        syntheticEvents.add(userEvent);
-        nudgeType = mapReady ? 'multi' : 'user';
-      }
-
-      lastTriggerAt = getNow();
-      reportTrigger('triggered', { nudgeType, trackId });
-
-      if (mapEvent) mapSample.state.socket.dispatchEvent(mapEvent);
-      if (userEvent) userSample.state.socket.dispatchEvent(userEvent);
-
-      console.log('[HWA-TRACK][5b/6 MQTT_DISPATCH_DOWNSTREAM_ENGINE]', {
-        trackId,
-        time: new Date().toISOString(),
-        mechanism: 'synthetic MessageEvent dispatched locally to socket (downstream: server -> local engine)',
-        nudgeType,
-        mapTopic: mapReady ? mapSample.topic : null,
-        userTopic: userReady ? userSample.topic : null
-      });
-
-      if (recordingActive)
-        win.postMessage(
-          {
-            source: 'hwa-helper-api',
-            kind: 'interaction-record',
-            entry: {
-              category: 'rpc',
-              action: 'mqtt-nudge',
-              target: nudgeType === 'user' ? userSample?.type || 'userPush' : 'mapChunksUpdated',
-              nudgeType,
-              timestamp: new Date().toISOString()
-            }
-          },
-          loc.origin
-        );
-    } catch (_) {
-      reportTrigger('error');
     }
   }
 
@@ -447,7 +175,6 @@ export function installMqttCapture(customWindow?: any): void {
         state.version = parsed.version;
         if (!captureAtArrival || !captureEnabled) return;
         for (const packet of parsed.packets) {
-          if (direction === 'received') rememberTrigger(packet, state);
           if (
             packet.topic.includes('map') ||
             packet.topic.includes('chunks') ||
@@ -505,11 +232,13 @@ export function installMqttCapture(customWindow?: any): void {
         (url && url.hostname.includes('emqx'));
       if (!isMqtt) return socket;
       const state = { version: 4, pending: Promise.resolve(), socket, closed: false };
+      activeSocketState = state;
       socket.addEventListener('close', () => {
         state.closed = true;
+        if (activeSocketState === state) activeSocketState = null;
       });
       socket.addEventListener('message', (event: MessageEvent) => {
-        if (!syntheticEvents.has(event)) observe(event.data, 'received', state);
+        observe(event.data, 'received', state);
       });
       const nativeSend = socket.send;
       socket.send = function (data: any) {

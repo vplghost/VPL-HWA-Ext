@@ -214,54 +214,6 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
 
     if (event.data.kind === 'ready') return sendControl();
 
-    if (event.data.kind === 'mqtt-rpc-nudge-status') {
-      const allowed = [
-        'triggered',
-        'carrier-attached',
-        'waiting-template',
-        'expired-template',
-        'socket-closed',
-        'cooldown',
-        'disabled',
-        'error'
-      ];
-      if (allowed.includes(event.data.state)) {
-        try {
-          const payload: any = {
-            state: event.data.state,
-            updatedAt: new Date().toISOString(),
-            ...(event.data.nudgeType ? { nudgeType: event.data.nudgeType } : {}),
-            ...(event.data.carrierSource ? { carrierSource: event.data.carrierSource } : {}),
-            ...(typeof event.data.carrierDelayMs === 'number' ? { carrierDelayMs: event.data.carrierDelayMs } : {}),
-            ...(event.data.carrierMethod ? { carrierMethod: event.data.carrierMethod } : {}),
-            ...(event.data.trackId ? { trackId: event.data.trackId } : {})
-          };
-          win.chrome?.storage?.local?.set?.({ rpcMqttTriggerStatus: payload })?.catch?.(() => {});
-          if (event.data.state === 'carrier-attached') {
-            win.chrome?.storage?.local?.get?.(['rpcMqttTelemetry'], (res: any) => {
-              const telemetry = res?.rpcMqttTelemetry || {
-                fastCarrierCount: 0,
-                fallbackCarrierCount: 0,
-                lastCarrier: null
-              };
-              const isFast = typeof payload.carrierDelayMs === 'number' && payload.carrierDelayMs <= 3000;
-              if (isFast) telemetry.fastCarrierCount = (telemetry.fastCarrierCount || 0) + 1;
-              else telemetry.fallbackCarrierCount = (telemetry.fallbackCarrierCount || 0) + 1;
-              telemetry.lastCarrier = {
-                source: payload.carrierSource || (isFast ? 'fast-map-carrier' : 'periodic-fallback'),
-                method: payload.carrierMethod || 'unknown',
-                delayMs: payload.carrierDelayMs ?? null,
-                nudgeType: payload.nudgeType || null,
-                timestamp: payload.updatedAt
-              };
-              win.chrome?.storage?.local?.set?.({ rpcMqttTelemetry: telemetry })?.catch?.(() => {});
-            });
-          }
-        } catch (_) {}
-      }
-      return;
-    }
-
     if (event.data.kind === 'rpc-queue-status') {
       if (Number.isInteger(event.data.count) && event.data.count >= 0 && event.data.count <= 64) {
         sendBridgeMessage({ kind: 'rpc-queue-status', count: event.data.count });
@@ -627,7 +579,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
 
     if (stored?.captureSettings) currentSettings = { ...currentSettings, ...stored.captureSettings };
     if (stored?.popupRpcEnabled !== undefined) popupRpcEnabled = Boolean(stored.popupRpcEnabled);
-    if (stored?.socketRefreshMode) socketRefreshMode = ['piggyback', 'mqtt-piggyback'].includes(stored.socketRefreshMode) ? stored.socketRefreshMode : 'direct';
+    if (stored?.socketRefreshMode) socketRefreshMode = stored.socketRefreshMode === 'piggyback' ? 'piggyback' : 'direct';
     const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
     if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
     sendControl();
@@ -682,7 +634,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         configChanged = true;
       }
       if ('socketRefreshMode' in changes) {
-        socketRefreshMode = ['piggyback', 'mqtt-piggyback'].includes(changes.socketRefreshMode.newValue) ? changes.socketRefreshMode.newValue : 'direct';
+        socketRefreshMode = changes.socketRefreshMode.newValue === 'piggyback' ? 'piggyback' : 'direct';
         configChanged = true;
       }
       if (configChanged) sendControl();

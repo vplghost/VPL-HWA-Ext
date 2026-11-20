@@ -120,22 +120,10 @@
       <label class="block rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700">RPC dispatch method
         <select id="socket-refresh-mode" class="mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800">
           <option value="piggyback">Piggyback on next game RPC (default)</option>
-          <option value="mqtt-piggyback">MQTT-assisted Piggyback (experimental)</option>
           <option value="direct">Send a separate RPC immediately</option>
         </select>
       </label>
       <p class="text-xs text-slate-500">Applies to all extension RPC calls, including Experimental, Draft, refresh and rewards. Piggyback requires Monitor API and waits for the next game fetch RPC; Direct sends immediately.</p>
-      <div id="mqtt-trigger-panel" hidden class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700 space-y-1.5">
-        <div class="flex items-center justify-between">
-          <span class="font-medium text-slate-800">MQTT Assisted Status</span>
-          <span id="mqtt-trigger-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-slate-200 text-slate-700">Idle</span>
-        </div>
-        <p id="mqtt-trigger-status" role="status" class="text-xs text-slate-600">MQTT-assisted mode replays recent game updates locally so the engine can create a carrier RPC.</p>
-        <div id="mqtt-telemetry-wrap" class="pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-2xs text-slate-500">
-          <span id="mqtt-telemetry-last">Last carrier: None</span>
-          <span id="mqtt-telemetry-stats">Fast: 0 · Fallback: 0</span>
-        </div>
-      </div>
     </div>
     <div class="mt-5 border-t border-slate-200 pt-4">
       <h3 class="text-sm font-semibold text-slate-800">Troop capacity defaults</h3>

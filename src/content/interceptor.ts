@@ -99,9 +99,6 @@ export function installInterceptor(customWindow?: any): void {
   let popupRpcEnabled = false;
   let rpcDispatchMode = 'direct';
   let recordingActive = false;
-  let lastNudgeAt = -Infinity;
-  let lastNudgeTrackId: string | null = null;
-  let lastNudgeType: string | null = null;
   const queuedRpcCalls = new Map<string, any>();
   const queuedClaimKeys = new Set<string>();
   const queuedActionExpiry = new Map<string, number>();
@@ -662,7 +659,7 @@ export function installInterceptor(customWindow?: any): void {
     if (event.data?.source === 'hwa-helper-config' && event.data.kind === 'control') {
       captureEnabled = event.data.interceptEnabled !== false;
       popupRpcEnabled = event.data.popupRpcEnabled === true;
-      rpcDispatchMode = ['direct', 'mqtt-piggyback'].includes(event.data.socketRefreshMode) ? event.data.socketRefreshMode : 'piggyback';
+      rpcDispatchMode = event.data.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
       recordingActive = event.data.recordingActive === true;
       if (!captureEnabled || !popupRpcEnabled || event.data.socketRefreshMode === 'direct') {
         if (queuedClaimKeys.size) reportClaimResult(false, 'Queued claims were cancelled by Settings.');
@@ -731,25 +728,6 @@ export function installInterceptor(customWindow?: any): void {
       }
       tracePiggyback('piggyback-queued', `${isClaim ? 'claim' : 'refresh'}:${event.data.calls.length}`);
       reportQueueStatus();
-      if (rpcDispatchMode === 'mqtt-piggyback' && queuedRpcCalls.size) {
-        lastNudgeAt = getNow();
-        lastNudgeTrackId = event.data?.trackId || null;
-        win.postMessage({
-          source: 'hwa-helper-control',
-          kind: 'mqtt-rpc-nudge',
-          trackId: event.data?.trackId,
-          requestedAt: event.data?.requestedAt
-        }, loc.origin);
-      }
-      return;
-    }
-
-    if (event.data?.source === 'hwa-helper-api' && event.data.kind === 'mqtt-rpc-nudge-status') {
-      if (event.data.state === 'triggered') {
-        lastNudgeAt = getNow();
-        if (event.data.nudgeType) lastNudgeType = event.data.nudgeType;
-        if (event.data.trackId) lastNudgeTrackId = event.data.trackId;
-      }
       return;
     }
 
@@ -1068,35 +1046,6 @@ export function installInterceptor(customWindow?: any): void {
         consumed.push(key);
       }
 
-      const now = getNow();
-      const delayMs = Number.isFinite(lastNudgeAt) && lastNudgeAt > 0 ? Math.max(0, now - lastNudgeAt) : null;
-      const nativeNames = request.calls.map((c: any) => c.name);
-      let carrierSource = 'native-traffic';
-      if (rpcDispatchMode === 'mqtt-piggyback') {
-        if (delayMs !== null && delayMs <= 3000) {
-          carrierSource = nativeNames.includes('getChunks') ? 'fast-map-carrier' : 'fast-user-carrier';
-        } else if (delayMs !== null && delayMs <= 15000) {
-          carrierSource = 'periodic-fallback';
-        } else {
-          carrierSource = 'passive-carrier';
-        }
-      }
-
-      const notifyCarrierAttached = () => {
-        if (rpcDispatchMode === 'mqtt-piggyback') {
-          win.postMessage({
-            source: 'hwa-helper-api',
-            kind: 'mqtt-rpc-nudge-status',
-            state: 'carrier-attached',
-            carrierSource,
-            carrierDelayMs: delayMs,
-            carrierMethod: nativeNames[0] || 'unknown',
-            nudgeType: lastNudgeType,
-            trackId: lastNudgeTrackId
-          }, loc.origin);
-        }
-      };
-
       if (!appended.length) {
         for (const key of consumed) {
           queuedRpcCalls.delete(key);
@@ -1109,7 +1058,6 @@ export function installInterceptor(customWindow?: any): void {
         }
         if (claimIds.length) tracePiggyback('piggyback-covered', source);
         reportQueueStatus();
-        notifyCarrierAttached();
         return claimIds.length ? { appended, claimIds, options } : null;
       }
 
@@ -1142,7 +1090,6 @@ export function installInterceptor(customWindow?: any): void {
       }
       tracePiggyback('piggyback-attached', `${source}:${appended.length}`);
       reportQueueStatus();
-      notifyCarrierAttached();
       return prepared;
     } catch (_) {
       return null;
