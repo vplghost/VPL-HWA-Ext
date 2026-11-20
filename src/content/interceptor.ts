@@ -756,7 +756,8 @@ export function installInterceptor(customWindow?: any): void {
     if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'refresh-rpc') {
       if (!popupRpcEnabled) return;
       if (Number.isFinite(event.data.expiresAt) && getNow() >= event.data.expiresAt) return;
-      if (rpcDispatchMode !== 'direct') {
+      const isDirectAction = event.data.direct === true || event.data.userAction === true;
+      if (rpcDispatchMode !== 'direct' && !isDirectAction) {
         win.postMessage({ ...event.data, kind: 'queue-rpc' }, loc.origin);
         return;
       }
@@ -765,8 +766,18 @@ export function installInterceptor(customWindow?: any): void {
       const storedUrl = s ? s.getItem('hwa_last_rpc_url') : null;
       const rawUrl = (lastRpcUrl && lastRpcUrl.includes('/api/rpc')) ? lastRpcUrl : ((storedUrl && storedUrl.includes('/api/rpc')) ? storedUrl : null);
       const url = rawUrl || 'https://api.hero-wars-alliance.com/api/rpc';
-      if (!url || !Array.isArray(calls) || calls.length === 0) return;
-      if (calls.some((call: any) => (['refillable_alchemyUseVideo', 'refillable_skillpointsUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) || /^speedUp.*WithResources$/.test(call?.name)) && !isHelperAction(call))) return;
+      if (!url || !Array.isArray(calls) || calls.length === 0) {
+        if (event.data.requestId) {
+          win.postMessage({ source: 'hwa-helper-api', kind: 'refresh-rpc-result', requestId: event.data.requestId, ok: false, error: 'Empty calls or invalid RPC URL.' }, loc.origin);
+        }
+        return;
+      }
+      if (calls.some((call: any) => (['refillable_alchemyUseVideo', 'refillable_skillpointsUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) || /^speedUp.*WithResources$/.test(call?.name)) && !isHelperAction(call))) {
+        if (event.data.requestId) {
+          win.postMessage({ source: 'hwa-helper-api', kind: 'refresh-rpc-result', requestId: event.data.requestId, ok: false, error: 'Blocked restricted call in refresh-rpc.' }, loc.origin);
+        }
+        return;
+      }
 
       let headersToUse = lastRpcHeaders;
       if (!headersToUse && s) {
@@ -794,7 +805,9 @@ export function installInterceptor(customWindow?: any): void {
         }).then(async (res: any) => {
           let responseText: string | null = null;
           try { responseText = await res.clone().text(); } catch (_) {}
+          let responseJson: any = null;
           if (responseText) {
+            try { responseJson = JSON.parse(responseText); } catch (_) {}
             try {
               const u = new URL(String(url), loc.href);
               win.postMessage({
@@ -814,12 +827,32 @@ export function installInterceptor(customWindow?: any): void {
               }, loc.origin);
             } catch (_) {}
           }
-          win.postMessage({ source: 'hwa-helper-api', kind: 'refresh-rpc-result', ok: res.ok, status: res.status }, loc.origin);
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'refresh-rpc-result',
+            requestId: event.data.requestId || null,
+            ok: res.ok,
+            status: res.status,
+            results: responseJson?.results || null,
+            data: responseJson || null
+          }, loc.origin);
         }).catch((err: any) => {
-          win.postMessage({ source: 'hwa-helper-api', kind: 'refresh-rpc-result', ok: false, error: err?.message || String(err) }, loc.origin);
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'refresh-rpc-result',
+            requestId: event.data.requestId || null,
+            ok: false,
+            error: err?.message || String(err)
+          }, loc.origin);
         });
       } catch (err: any) {
-        win.postMessage({ source: 'hwa-helper-api', kind: 'refresh-rpc-result', ok: false, error: err?.message || String(err) }, loc.origin);
+        win.postMessage({
+          source: 'hwa-helper-api',
+          kind: 'refresh-rpc-result',
+          requestId: event.data.requestId || null,
+          ok: false,
+          error: err?.message || String(err)
+        }, loc.origin);
       }
       return;
     }

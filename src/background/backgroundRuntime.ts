@@ -193,7 +193,8 @@ export function normalizeInteraction(entry: any): any {
 
 export function rpcMessageForSettings(stored: any, calls: any[], claim = false, extra: Record<string, any> = {}): any {
   if (stored?.popupRpcEnabled !== true) return null;
-  const queued = stored.socketRefreshMode !== 'direct';
+  const isDirect = extra.direct === true || extra.userAction === true;
+  const queued = isDirect ? false : stored.socketRefreshMode !== 'direct';
   if (queued && stored.captureSettings?.interceptEnabled === false) return null;
   return { kind: queued ? (claim ? 'queue-claim' : 'queue-rpc') : 'refresh-rpc', calls, ...extra };
 }
@@ -3167,46 +3168,71 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     ) {
       const forward = (forwardedMessage = message, queued = false) =>
         cr.tabs?.query({ url: GAME_ORIGINS.map((o) => `${o}/*`) }, async (tabs: any[]) => {
-          let forwarded = false;
+          let targetTab: any = null;
           for (const tab of tabs || []) {
             if (tab.id) {
-              if (queued && !forwarded && message.kind === 'claim-rewards')
-                await cr.storage?.local
-                  ?.set({
-                    claimRpcStatus: {
-                      state: 'queued',
-                      updatedAt: new Date().toISOString()
-                    }
-                  })
-                  .catch(() => {});
-              cr.tabs.sendMessage(tab.id, forwardedMessage).catch(() => {});
-              forwarded = true;
+              targetTab = tab;
               break;
             }
           }
-          if (!forwarded) {
-            cr.tabs?.query({}, async (allTabs: any[]) => {
-              for (const tab of allTabs || []) {
-                if (tab.id && isGameUrl(tab.url)) {
-                  if (queued && !forwarded && message.kind === 'claim-rewards')
-                    await cr.storage?.local
-                      ?.set({
-                        claimRpcStatus: {
-                          state: 'queued',
-                          updatedAt: new Date().toISOString()
-                        }
-                      })
-                      .catch(() => {});
-                  cr.tabs.sendMessage(tab.id, forwardedMessage).catch(() => {});
-                  forwarded = true;
-                  break;
-                }
+          if (!targetTab) {
+            const allTabs = await new Promise<any[]>((resolve) => cr.tabs?.query({}, (all: any[]) => resolve(all || [])));
+            for (const tab of allTabs) {
+              if (tab.id && isGameUrl(tab.url)) {
+                targetTab = tab;
+                break;
               }
-              sendResponse({ ok: forwarded, queued: forwarded && queued, error: forwarded ? null : 'No active Hero Wars tab found.' });
-            });
+            }
+          }
+          if (!targetTab) {
+            sendResponse({ ok: false, queued: false, error: 'No active Hero Wars tab found.' });
             return;
           }
-          sendResponse({ ok: forwarded, queued: forwarded && queued, error: null });
+
+          if (queued && message.kind === 'claim-rewards') {
+            await cr.storage?.local
+              ?.set({
+                claimRpcStatus: {
+                  state: 'queued',
+                  updatedAt: new Date().toISOString()
+                }
+              })
+              .catch(() => {});
+          }
+
+          if (!queued && forwardedMessage.kind === 'refresh-rpc') {
+            try {
+              let settled = false;
+              const onDone = (resp: any) => {
+                if (settled) return;
+                settled = true;
+                const err = cr.runtime?.lastError;
+                if (err) {
+                  sendResponse({ ok: false, queued: false, error: err.message || 'Tab communication failed.' });
+                } else {
+                  sendResponse(resp || { ok: true, queued: false });
+                }
+              };
+              const maybePromise = cr.tabs.sendMessage(targetTab.id, forwardedMessage, onDone);
+              if (maybePromise && typeof maybePromise.then === 'function') {
+                maybePromise.then(
+                  (resp: any) => onDone(resp),
+                  (err: any) => {
+                    if (settled) return;
+                    settled = true;
+                    sendResponse({ ok: false, queued: false, error: err?.message || 'Tab communication failed.' });
+                  }
+                );
+              }
+              return;
+            } catch (e: any) {
+              sendResponse({ ok: false, queued: false, error: e?.message || 'Tab communication failed.' });
+              return;
+            }
+          }
+
+          cr.tabs.sendMessage(targetTab.id, forwardedMessage).catch(() => {});
+          sendResponse({ ok: true, queued, error: null });
         });
       if (message.kind === 'engine-ping') forward();
       else
@@ -3338,6 +3364,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                 const extra: Record<string, any> = {};
                 if (message.trackId) extra.trackId = message.trackId;
                 if (message.requestedAt) extra.requestedAt = message.requestedAt;
+                if (message.direct !== undefined) extra.direct = message.direct;
+                if (message.userAction !== undefined) extra.userAction = message.userAction;
                 const dispatch = rpcMessageForSettings(stored, calls, false, extra);
                 if (!dispatch) sendResponse({ ok: false, error: 'Enable Monitor API for Piggyback RPC.' });
                 else forward(dispatch, dispatch.kind === 'queue-rpc');

@@ -12,7 +12,7 @@ import { BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls, cam
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
-const { cache, dispatchRpc } = useRpcCache();
+const { cache, dispatchRpc, updateCacheLocally } = useRpcCache();
 const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const { customTeams } = useAccountTeams(accountId);
 const rememberedTeam = useDialogTeamSelection('brigand', accountId);
@@ -80,6 +80,38 @@ async function searchCamps() {
     searchMessage.value = '';
     searchError.value = response?.error || 'Camp search could not be sent.';
     return;
+  }
+  // Fast-path: Handle authoritative response directly if returned by RPC transport
+  if (Array.isArray(response.results)) {
+    const summaryRes = response.results.find((r: any) =>
+      r?.result?.response?.camps || r?.result?.response?.nextRespawnDt || r?.error || r?.result?.error
+    ) || response.results[0];
+    const err = summaryRes?.error || summaryRes?.result?.error;
+    if (err) {
+      clearTimeout(searchTimer);
+      searchPending.value = null;
+      searchMessage.value = '';
+      searchError.value = typeof err === 'string' ? err : err.message || 'Camp search failed.';
+      return;
+    }
+    const data = summaryRes?.result?.response;
+    if (data && (Array.isArray(data.camps) || data.nextRespawnDt)) {
+      clearTimeout(searchTimer);
+      searchPending.value = null;
+      searchError.value = '';
+      searchMessage.value = 'Camp list updated.';
+      void updateCacheLocally((draft) => {
+        draft.brigandCampSummary = {
+          updatedAt: new Date().toISOString(),
+          data
+        };
+        draft.brigandCampSearchStatus = {
+          updatedAt: new Date().toISOString(),
+          data: { success: true, count: data.camps?.length || 0 }
+        };
+      });
+      return;
+    }
   }
   searchMessage.value = response.queued ? 'Search queued. Waiting for game traffic.' : 'Waiting for camp list…';
   searchTimer = setTimeout(() => {
@@ -159,6 +191,7 @@ async function sync() {
       { name: 'refillableGetAll', feature: 'refillable' },
     ]);
     if (!response?.ok) error.value = response?.error || 'Sync could not be sent.';
+    else if (Array.isArray(response.results) && response.results.length > 0) message.value = 'Sync completed.';
     else message.value = response.queued ? 'Sync queued. Waiting for game traffic.' : 'Sync requested.';
   } finally { refreshing.value = false; }
 }
@@ -176,6 +209,51 @@ async function attack() {
     error.value = response?.error || 'Camp attack could not be sent.';
     message.value = '';
     return;
+  }
+  // Fast-path: Handle authoritative response directly if returned by RPC transport
+  if (Array.isArray(response.results)) {
+    const battleRes = response.results.find((r: any) =>
+      r?.result?.response?.reward ||
+      r?.result?.response?.progress ||
+      r?.result?.response?.camps ||
+      r?.result?.error ||
+      r?.error
+    ) || response.results[0];
+
+    const err = battleRes?.error || battleRes?.result?.error;
+    if (err) {
+      clearTimeout(timer);
+      pending.value = null;
+      message.value = '';
+      error.value = typeof err === 'string' ? err : err.message || 'Camp attack was rejected.';
+      return;
+    }
+    const data = battleRes?.result?.response;
+    if (data || battleRes?.result) {
+      clearTimeout(timer);
+      pending.value = null;
+      error.value = '';
+      message.value = 'Camp defeated. World Energy and rewards updated.';
+      void updateCacheLocally((draft) => {
+        draft.brigandCampStatus = {
+          updatedAt: new Date().toISOString(),
+          data: {
+            success: true,
+            campId: request.campId,
+            ...(typeof data === 'object' ? data : {})
+          }
+        };
+        if (draft.refillableGetAll?.data) {
+          const worldEnergyItem = Object.values(draft.refillableGetAll.data).find(
+            (item: any) => item?.id === 13 || item?.type === 'worldEnergy'
+          );
+          if (worldEnergyItem && typeof (worldEnergyItem as any).amount === 'number') {
+            (worldEnergyItem as any).amount = Math.max(0, (worldEnergyItem as any).amount - BRIGAND_ENERGY_COST);
+          }
+        }
+      });
+      return;
+    }
   }
   message.value = response.queued ? 'Attack queued. Waiting for game traffic and server confirmation.' : 'Waiting for server confirmation…';
   timer = setTimeout(() => {

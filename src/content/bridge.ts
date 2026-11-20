@@ -97,12 +97,17 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   const doc = win.document;
   const timeoutManager = createBridgeTimeoutManager(win);
   let bridgeContextInvalidated = false;
+  const pendingRpcRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
   const getNow = () => (typeof win.Date?.now === 'function' ? win.Date.now() : Date.now());
 
   function handleContextInvalidated(err: any, notifyUser = true) {
     if (err?.message?.includes('Extension context invalidated') || String(err).includes('Extension context invalidated')) {
       bridgeContextInvalidated = true;
       timeoutManager.invalidate();
+      for (const req of pendingRpcRequests.values()) {
+        try { clearTimeout(req.timeout); req.resolve({ ok: false, error: 'Extension context invalidated.' }); } catch (_) {}
+      }
+      pendingRpcRequests.clear();
       if (!notifyUser) return;
       const notify = typeof win.alert === 'function' ? win.alert : console.warn;
       notify('HWA Helper extension was updated or reloaded. Please refresh this game page to reconnect.');
@@ -285,6 +290,19 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
           }
         });
       } catch (_) {}
+      const reqId = event.data.requestId;
+      if (reqId && pendingRpcRequests.has(reqId)) {
+        const pending = pendingRpcRequests.get(reqId);
+        pendingRpcRequests.delete(reqId);
+        if (pending?.timeout) clearTimeout(pending.timeout);
+        pending?.resolve?.({
+          ok: event.data.ok === true,
+          status: event.data.status || null,
+          results: event.data.results || null,
+          data: event.data.data || null,
+          error: event.data.error || null
+        });
+      }
       return;
     }
 
@@ -350,7 +368,30 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         sendResponse?.({ ok: true });
         return true;
       }
-      if (message?.kind === 'refresh-rpc' || message?.kind === 'queue-rpc' || message?.kind === 'queue-claim') {
+      if (message?.kind === 'refresh-rpc') {
+        const requestId = message.requestId || ('req_' + Math.random().toString(36).slice(2) + Date.now().toString(36));
+        const timeout = setTimeout(() => {
+          if (pendingRpcRequests.has(requestId)) {
+            pendingRpcRequests.delete(requestId);
+            sendResponse?.({ ok: false, error: 'RPC request timed out in content bridge.' });
+          }
+        }, 15000);
+        pendingRpcRequests.set(requestId, { resolve: sendResponse, timeout });
+        win.postMessage({
+          source: 'hwa-helper-control',
+          kind: message.kind,
+          calls: message.calls,
+          group: message.group,
+          expiresAt: message.expiresAt,
+          trackId: message.trackId,
+          requestedAt: message.requestedAt,
+          direct: message.direct,
+          userAction: message.userAction,
+          requestId
+        }, win.location.origin);
+        return true;
+      }
+      if (message?.kind === 'queue-rpc' || message?.kind === 'queue-claim') {
         win.postMessage({
           source: 'hwa-helper-control',
           kind: message.kind,
@@ -360,7 +401,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
           trackId: message.trackId,
           requestedAt: message.requestedAt
         }, win.location.origin);
-        sendResponse?.({ ok: true });
+        sendResponse?.({ ok: true, queued: true });
         return true;
       }
       if (message?.kind === 'engine-ping') {

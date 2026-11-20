@@ -637,6 +637,30 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
       loopStatusMsg.value = 'Notice: RPC queued in piggyback mode. Switch to Direct mode for instant execution.';
     }
 
+    // Fast-path: Check if direct RPC response contains raid results
+    if (Array.isArray(resp?.results)) {
+      const missionResult = resp.results.find((r: any) =>
+        r?.result?.response?.reward || r?.result?.response?.drop || r?.result?.response?.items || r?.error || r?.result?.error
+      ) || resp.results[0];
+      const err = missionResult?.error || missionResult?.result?.error;
+      if (err) {
+        disableMissionToday(missionId.value);
+        return { ok: false, error: typeof err === 'string' ? err : err.message || 'Raid rejected by server' };
+      }
+      const data = missionResult?.result?.response;
+      if (data) {
+        await missionHistory.record(raidMission, raidAccount);
+        const drops = data.reward || data.drop || data.items || [];
+        void updateCacheLocally((draft) => {
+          draft.lastCampaignRaidResult = {
+            updatedAt: new Date().toISOString(),
+            data: { missionId: raidMission, times, drops, currentDrops: drops }
+          };
+        });
+        return { ok: true, drops };
+      }
+    }
+
     const raidRes = await waitForRaidResult(prevUpdatedAt);
     if (!raidRes.ok) {
       if (!raidRes.pending) disableMissionToday(missionId.value);

@@ -31,7 +31,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { cache, dispatchRpc } = useRpcCache();
+const { cache, dispatchRpc, updateCacheLocally } = useRpcCache();
 const { isTopModal, getModalStackLevel, closeModal } = useModals();
 
 const stackLevel = computed(() => getModalStackLevel('chest', 70));
@@ -234,16 +234,23 @@ async function handleOpenChest() {
       { name: 'userGetInfo' }
     ];
 
-    const results = await dispatchRpc(calls);
-    const useResult = Array.isArray(results)
-      ? results.find((r: any) => r?.result?.response) || results[0]
-      : results;
+    const resp = await dispatchRpc(calls);
+    const rpcResults = Array.isArray(resp) ? resp : (resp?.results || []);
+    const useResult = rpcResults.find((r: any) => r?.result?.response) || rpcResults[0] || resp;
 
     const rawResponse = useResult?.result?.response;
     if (rawResponse) {
       const rewards = aggregateChestRewards(rawResponse);
       lastOpenedRewards.value = rewards;
       lastOpenNotice.value = `Successfully opened ${count}x ${activeChest.value.name}!`;
+      void updateCacheLocally((draft) => {
+        const inv = draft.inventoryGet?.data;
+        const cat = activeChest.value?.rawCategory || activeChest.value?.category;
+        const id = String(activeChest.value?.id);
+        if (inv && cat && inv[cat] && inv[cat][id] != null) {
+          inv[cat][id] = Math.max(0, (Number(inv[cat][id]) || 0) - count);
+        }
+      });
     } else {
       lastOpenNotice.value = `Opened ${count}x ${activeChest.value.name}!`;
     }
