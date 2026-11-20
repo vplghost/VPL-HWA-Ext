@@ -68,6 +68,7 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
     arenaGetAll: 'other',
     expeditionGet: 'other',
     dailyBonusGetInfo: 'other',
+    dailyBonusFarm: 'other',
     zeppelinGiftGet: 'other',
     zeppelinGiftFarm: 'other',
     offerFarmReward: 'other',
@@ -1964,6 +1965,24 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
           }
           return actions;
         }
+        if (call.name === 'dailyBonusFarm' && !result?.error) {
+          const actions: any[] = [{
+            key: 'dailyBonusFarm',
+            method: call.name,
+            feature: null,
+            group: 'other',
+            data: {
+              success: true,
+              reward: result?.response?.reward || result?.response || null
+            },
+            updatedAt: record.timestamp
+          }];
+          const reward = result?.response?.reward || result?.response;
+          if (reward && typeof reward === 'object') {
+            actions.push(...extractRewardActions(record, call, reward, 'dailyBonus'));
+          }
+          return actions;
+        }
         if (call.name === 'offerFarmReward' && !result?.error) {
           const actions: any[] = [];
           const response = result?.response;
@@ -2958,6 +2977,22 @@ const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThi
             data: {
               ...(next.zeppelinGiftGet?.data || {}),
               available: false,
+            },
+            updatedAt: entry.updatedAt,
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'dailyBonusFarm') {
+          next.dailyBonusGetInfo = {
+            key: 'dailyBonusGetInfo',
+            method: 'dailyBonusGetInfo',
+            feature: null,
+            group: 'other',
+            data: {
+              ...(next.dailyBonusGetInfo?.data || {}),
+              availableToday: false,
+              availableVip: false,
             },
             updatedAt: entry.updatedAt,
           };

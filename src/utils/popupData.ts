@@ -1144,9 +1144,10 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
   }
 
   if (opt.dailyBonus && pending.hasDailyBonus) {
+    const dailyBonusArgs = cache?.dailyBonusGetInfo?.data?.availableVip ? { vip: 1 } : {};
     calls.push({
-      name: 'dailyBonus_claim',
-      args: {},
+      name: 'dailyBonusFarm',
+      args: dailyBonusArgs,
     });
   }
 
@@ -1194,6 +1195,9 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
         { name: 'zeppelinGiftGet', args: {} },
         { name: 'subscriptionGetInfo', args: {} }
       );
+    }
+    if (opt.dailyBonus && pending.hasDailyBonus) {
+      calls.push({ name: 'dailyBonusGetInfo', args: {} });
     }
     if (
       (opt.attentionBonuses && pending.attentionBonusIds.length > 0) ||

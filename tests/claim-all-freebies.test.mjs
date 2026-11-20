@@ -179,13 +179,17 @@ test('buildAutoClaimCalls generates calls for enabled freebie channels and syncs
   assert.ok(callNames.includes('cinemaGiveReward'));
   assert.ok(callNames.includes('refillable_alchemyUseVideo'));
   assert.ok(callNames.includes('zeppelinGiftGet'));
-  assert.ok(callNames.includes('dailyBonus_claim'));
+  assert.ok(callNames.includes('dailyBonusFarm'));
+  assert.ok(callNames.includes('dailyBonusGetInfo'));
   assert.ok(callNames.includes('offerFarmReward'));
   assert.ok(callNames.includes('userGetInfo'));
   assert.ok(callNames.includes('refillableGetAll'));
   assert.ok(callNames.includes('inventoryGet'));
   assert.ok(callNames.includes('cinemaGetCounters'));
   assert.ok(callNames.includes('offerGetAll'));
+
+  const dailyBonusCall = calls.find((c) => c.name === 'dailyBonusFarm');
+  assert.deepEqual(dailyBonusCall.args, {});
 
   const offerFarmCall = calls.find((c) => c.name === 'offerFarmReward');
   assert.deepEqual(offerFarmCall.args, { offerId: 1000016955 });
@@ -217,6 +221,20 @@ test('buildAutoClaimCalls respects disabled options', () => {
   assert.equal(callNames.includes('attentionBonus_collectReward'), false);
   assert.equal(callNames.includes('zeppelinGiftGet'), false);
   assert.equal(callNames.includes('cinemaGiveReward'), true);
+});
+
+test('buildAutoClaimCalls sets vip arg when availableVip is true', () => {
+  const now = 1794736960000;
+  const sampleCache = {
+    dailyBonusGetInfo: {
+      data: { availableToday: true, availableVip: true },
+    },
+  };
+
+  const { calls } = buildAutoClaimCalls(sampleCache, { dailyBonus: true }, now);
+  const dailyBonusCall = calls.find((c) => c.name === 'dailyBonusFarm');
+  assert.ok(dailyBonusCall);
+  assert.deepEqual(dailyBonusCall.args, { vip: 1 });
 });
 
 test('backgroundRuntime accepts all freebie claims in claim-rewards envelope', async () => {
@@ -253,6 +271,8 @@ test('backgroundRuntime accepts all freebie claims in claim-rewards envelope', a
       { name: 'cinemaGiveReward', args: { type: 'firstPlacement', boxNum: 4 } },
       { name: 'refillable_alchemyUseVideo', args: { type: 'alchemy' } },
       { name: 'zeppelinGiftGet', args: {} },
+      { name: 'dailyBonusFarm', args: { vip: 1 } },
+      { name: 'dailyBonusGetInfo', args: {} },
       { name: 'dailyBonus_claim', args: {} },
       { name: 'offerFarmReward', args: { offerId: 1000016955 } },
       { name: 'userGetInfo', args: {} },

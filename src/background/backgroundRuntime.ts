@@ -3219,6 +3219,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                   'zeppelinGiftFarm',
                   'subscriptionFarm',
                   'subscriptionGetInfo',
+                  'dailyBonusFarm',
+                  'dailyBonusGetInfo',
                   'dailyBonus_claim',
                   'offerFarmReward',
                   'userGetInfo',
@@ -3246,6 +3248,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                   'zeppelinGiftGet',
                   'zeppelinGiftFarm',
                   'subscriptionFarm',
+                  'dailyBonusFarm',
                   'dailyBonus_claim',
                   'offerFarmReward',
                 ]);

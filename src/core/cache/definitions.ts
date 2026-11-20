@@ -37,6 +37,7 @@ export const RPC_CACHE_DEFINITIONS: Record<string, string> = {
   arenaGetAll: 'other',
   expeditionGet: 'other',
   dailyBonusGetInfo: 'other',
+  dailyBonusFarm: 'other',
   zeppelinGiftGet: 'other',
   zeppelinGiftFarm: 'other',
   subscriptionFarm: 'other',

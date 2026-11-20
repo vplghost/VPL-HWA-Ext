@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.134 — 2026-11-20
+
+### Fixed
+
+- **Dashboard Freebie Claiming: Correct Daily Bonus RPC Method to `dailyBonusFarm` (`popupData.ts`, `backgroundRuntime.ts`, `rpcCache.ts`, `definitions.ts`)**:
+  - Replaced undefined server call name `dailyBonus_claim` with the authoritative Nexters RPC method `dailyBonusFarm`.
+  - Added support for VIP claim arguments (`{ vip: 1 }` when `availableVip` is true in `dailyBonusGetInfo`, else `{}`).
+  - Added post-claim state refresh for `dailyBonusGetInfo`.
+  - Updated background runtime allowlists (`allowed` and `claimNames`) to authorize `dailyBonusFarm` and `dailyBonusGetInfo`, while maintaining backwards compatibility for `dailyBonus_claim`.
+  - Updated RPC cache definitions and cache extraction to immediately update `dailyBonusGetInfo` (`availableToday: false, availableVip: false`) and merge extracted rewards upon receiving a successful `dailyBonusFarm` response.
+  - Added and updated unit test coverage in `tests/claim-all-freebies.test.mjs` and `tests/rpc-cache.test.mjs`.
+
 ## 0.11.133 — 2026-11-20
 
 ### Added

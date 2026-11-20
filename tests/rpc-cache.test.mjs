@@ -46,6 +46,28 @@ test('dashboard sources are retained from passive RPC responses', () => {
   }
 });
 
+test('dailyBonusFarm extracts reward and marks dailyBonusGetInfo unavailable', () => {
+  const initial = {
+    dailyBonusGetInfo: {
+      key: 'dailyBonusGetInfo',
+      method: 'dailyBonusGetInfo',
+      group: 'other',
+      data: { availableToday: true, availableVip: true },
+      updatedAt: '2026-11-20T00:00:00Z',
+    },
+  };
+  const snapshot = record(
+    [{ name: 'dailyBonusFarm', ident: 'claim', args: { vip: 1 } }],
+    [{ ident: 'claim', result: { response: { reward: { gold: 50000 } } } }],
+    '2026-11-20T10:00:00Z'
+  );
+  const state = cache.merge(initial, [snapshot]).cache;
+  assert.equal(state.dailyBonusGetInfo?.data?.availableToday, false);
+  assert.equal(state.dailyBonusGetInfo?.data?.availableVip, false);
+  assert.equal(state.dailyBonusGetInfo?.updatedAt, '2026-11-20T10:00:00Z');
+  assert.equal(state['resource:gold']?.data?.amount, 50000);
+});
+
 test('capacity evidence learns only successful own rally, auto-join and gathering squads and keeps max load per profile', () => {
   const heroes = Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, { level: 30, star: 2, power: id }]));
   const initial = { accountStatus: { data: { id: 10 } }, heroGetAll: { data: heroes } };
