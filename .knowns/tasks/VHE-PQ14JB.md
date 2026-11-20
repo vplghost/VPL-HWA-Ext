@@ -5,7 +5,7 @@ status: done
 priority: high
 labels: []
 createdAt: '2026-11-20T12:24:16.960Z'
-updatedAt: '2026-11-20T12:29:30.997Z'
+updatedAt: '2026-11-20T13:05:14.755Z'
 completedAt: '2026-11-20T12:29:30.997Z'
 timeSpent: 0
 assignee: '-l'
@@ -25,4 +25,10 @@ assignee: '-l'
 - [x] #4 Add UI toggles for Healer Rule and Auto Death Detection, and show server rejection error banner
 - [x] #5 Pass all unit tests and verify build
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Documented in @doc/architecture/dungeon-battle-simulation-and-healer-mechanics.
+<!-- SECTION:NOTES:END -->
 

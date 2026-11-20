@@ -6,7 +6,7 @@ priority: high
 labels:
   - dungeon,semi-auto,settings
 createdAt: '2026-11-20T11:43:34.645Z'
-updatedAt: '2026-11-20T11:53:36.172Z'
+updatedAt: '2026-11-20T13:05:22.432Z'
 completedAt: '2026-11-20T11:53:36.172Z'
 timeSpent: 0
 assignee: '@me'
@@ -26,4 +26,10 @@ assignee: '@me'
 - [x] #4 Add simulation tuning settings UI on DungeonModal with persistent storage
 - [x] #5 Add unit tests and verify build
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Documented in @doc/architecture/dungeon-battle-simulation-and-healer-mechanics.
+<!-- SECTION:NOTES:END -->
 
