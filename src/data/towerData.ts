@@ -48,10 +48,10 @@ export const towerRules: TowerRulesData = {
   finalFloor: 23,
   finalTemplateId: 12,
   source: {
-    staticVersion: "1.293.0",
-    url: "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0049/d973530195826f1575a002f97a3f30e9/lib/splitlib.json.zip",
-    md5: "46e298e9f4305c4264057cbeb7fbf6bd",
-    size: 5572457,
+    staticVersion: "1.294.0",
+    url: "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.294.0/v0069/1e8af4ed49f75d2f461962f885ffbaac/lib/splitlib.json.zip",
+    md5: "1bb97cbf947cf3692eb2bb95136bdd77",
+    size: 6031315,
     files: {
       "magicTower.pb": {
         size: 649,

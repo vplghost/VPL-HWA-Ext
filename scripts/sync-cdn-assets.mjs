@@ -2,13 +2,60 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { inflateRawSync, gunzipSync, crc32 } from 'node:zlib';
+import https from 'node:https';
+import dns from 'node:dns';
 import { heroMetadata } from '../src/data/heroMetadata.ts';
 import { titanMetadata } from '../src/data/titanMetadata.ts';
 import vm from 'node:vm';
 import { convertImgBuffer } from './convert-img-asset.mjs';
 
 export const CDN_ORIGIN = 'https://heroesmobile-a-cdn.nextersglobal.com';
-export const DEFAULT_VERSION = '1.293.0';
+export const DEFAULT_VERSION = '1.294.0';
+
+export async function resilientFetch(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = https.request({
+      protocol: parsed.protocol,
+      hostname: parsed.hostname,
+      servername: parsed.hostname,
+      port: parsed.port || 443,
+      path: parsed.pathname + parsed.search,
+      method: options.method || 'GET',
+      headers: {
+        'Host': parsed.hostname,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        ...(options.headers || {})
+      },
+      lookup: (hostname, opts, cb) => {
+        if (typeof opts === 'function') { cb = opts; opts = {}; }
+        if (hostname.includes('nextersglobal.com')) {
+          if (opts?.all) cb(null, [{ address: '23.215.35.90', family: 4 }]);
+          else cb(null, '23.215.35.90', 4);
+        } else {
+          dns.lookup(hostname, opts, cb);
+        }
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks);
+        resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          statusText: res.statusMessage,
+          headers: res.headers,
+          arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
+          text: async () => body.toString('utf8'),
+          json: async () => JSON.parse(body.toString('utf8'))
+        });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
 const root = resolve(import.meta.dirname, '..');
 export const hash = (buffer, algorithm = 'sha256') => createHash(algorithm).update(buffer).digest('hex');
 export function summarizeManifest(manifest) {
@@ -78,7 +125,7 @@ export function readZip(buffer) {
   return entries;
 }
 
-export async function download(url, { fetcher = fetch, attempts = 3 } = {}) {
+export async function download(url, { fetcher = resilientFetch, attempts = 3 } = {}) {
   if (new URL(url).origin !== CDN_ORIGIN) throw Error('Unexpected CDN origin');
   let error;
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -139,7 +186,7 @@ export function manifestCandidates(base, candidates, manifest) {
   return [...matches.values()];
 }
 
-export async function syncIcon({ base, category, id, metadata, manifest, outputDir, fetcher, converter = convertImgBuffer }) {
+export async function syncIcon({ base, category, id, metadata, manifest, outputDir, fetcher = resilientFetch, converter = convertImgBuffer }) {
   if (!['heroes', 'titans', 'items/consumable', 'items/gear', 'items/scroll'].includes(category) || !/^\d+$/.test(id)) {
     throw Error('Unexpected local asset path');
   }
@@ -167,7 +214,7 @@ export async function syncIcon({ base, category, id, metadata, manifest, outputD
       requestedTextures: candidates.map((url) => url.split('/').at(-1)) } : {}) };
 }
 
-export async function runSync({ version = DEFAULT_VERSION, indexPath, only, concurrency = 4 } = {}) {
+export async function runSync({ version = DEFAULT_VERSION, indexPath, only, concurrency = 4, fetcher = resilientFetch } = {}) {
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16 ||
       (only && !['heroes', 'titans', 'items', 'items/consumable', 'items/gear', 'items/scroll'].includes(only))) throw Error('Invalid asset sync scope or concurrency');
   const base = versionBase(version), outputDir = join(root, 'extension/assets');
@@ -184,7 +231,7 @@ export async function runSync({ version = DEFAULT_VERSION, indexPath, only, conc
     const index = findIndex(JSON.parse(await readFile(indexPath, 'utf8')), version);
     const manifestUrl = new URL(index.currentVersionIndex);
     if (!manifestUrl.href.startsWith(base) || !/^[a-f0-9]{32}$/.test(manifestUrl.searchParams.get('hash'))) throw Error('Unexpected currentVersionIndex');
-    const compressedManifest = await download(manifestUrl.href);
+    const compressedManifest = await download(manifestUrl.href, { fetcher });
     if (!compressedManifest || hash(compressedManifest, 'md5') !== manifestUrl.searchParams.get('hash')) throw Error('Manifest MD5 mismatch');
     manifest = JSON.parse(gunzipSync(compressedManifest));
     source.manifest = { url: manifestUrl.href, size: compressedManifest.length, md5: hash(compressedManifest, 'md5'),
@@ -193,7 +240,7 @@ export async function runSync({ version = DEFAULT_VERSION, indexPath, only, conc
     await atomicWrite(join(root, 'temp/live-full-index.json'), JSON.stringify(manifest));
     const entry = index.lib?.['splitlib.json.zip'];
     if (!entry) throw Error('Missing splitlib.json.zip in indexGet');
-    const url = assetUrl(index, 'splitlib.json.zip', entry), zip = await download(url);
+    const url = assetUrl(index, 'splitlib.json.zip', entry), zip = await download(url, { fetcher });
     if (!zip) throw Error('Current splitlib unavailable');
     verifyAsset(zip, entry);
     const files = readZip(zip);
@@ -231,7 +278,7 @@ export async function runSync({ version = DEFAULT_VERSION, indexPath, only, conc
     if (only && !category.startsWith(only)) continue;
     const existing = await readdir(join(outputDir, category));
     const ids = [...new Set([...Object.keys(catalog), ...existing.filter((name) => /^\d+\.(png|webp)$/.test(name)).map((name) => name.split('.')[0])])].sort((a, b) => Number(a) - Number(b));
-    for (const id of ids) tasks.push({ base, category, id, metadata: catalog[id], manifest, outputDir });
+    for (const id of ids) tasks.push({ base, category, id, metadata: catalog[id], manifest, outputDir, fetcher });
   }
   const results = []; let cursor = 0;
   await Promise.all(Array.from({ length: concurrency }, async () => {

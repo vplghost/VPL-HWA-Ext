@@ -1,6 +1,6 @@
 import type { BasicResourceType, MineTypesMap, RallyTargetsMap, RouteSpeedsMap } from '../types/game/march';
 
-// Hero Wars: Alliance 1.293.0 (client 1.293.1010) remote config:
+// Hero Wars: Alliance 1.294.0 (client 1.294.1020) remote config:
 // globalMapMine 8e714674, globalMapMobRally 4a3a6b4b, globalMapRouteSpeed 5d86c2e8.
 
 export const mineTypes: MineTypesMap = {

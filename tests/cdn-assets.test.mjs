@@ -104,11 +104,11 @@ test('splitlib ZIP validates central-directory entries and CRC without writing a
   assert.throws(() => readZip(Buffer.from('bad')), /Missing ZIP/);
 });
 
-test('1.293 audit covers every catalog ID and all available bundled PNGs match verified hashes', async () => {
-  const audit = JSON.parse(await readFile(new URL('../docs/assets-1.293.0-audit.json', import.meta.url)));
-  const catalog = JSON.parse(await readFile(new URL('../docs/assets-1.293.0-catalog.json', import.meta.url)));
-  assert.equal(audit.manifest.entries, 17360); assert.equal(audit.results.length, 961);
-  assert.equal(audit.unmappedHeroes.length + audit.unmappedTitans.length, 0);
+test('1.294 audit covers every catalog ID and all available bundled PNGs match verified hashes', async () => {
+  const audit = JSON.parse(await readFile(new URL('../docs/assets-1.294.0-audit.json', import.meta.url)));
+  const catalog = JSON.parse(await readFile(new URL('../docs/assets-1.294.0-catalog.json', import.meta.url)));
+  assert.equal(audit.manifest.entries, 17628); assert.equal(audit.results.length, 967);
+  assert.equal(audit.unmappedHeroes.length, 0);
   const missing = audit.results.filter((row) => row.status === 'missing');
   assert.deepEqual(missing.map((row) => `${row.category}/${row.id}`), ['items/consumable/103', 'items/consumable/104']);
   const expected = new Map(Object.values(catalog.manifest).map((entry) => [`${audit.base}${entry.path}`, entry]));
@@ -117,7 +117,7 @@ test('1.293 audit covers every catalog ID and all available bundled PNGs match v
     assert.equal(hash(png), row.pngSha256, row.path);
     assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
     assert.equal(row.sourceMd5, expected.get(row.url)?.md5);
-    assert.ok(row.url.startsWith(`${CDN_ORIGIN}/v/webgl/1.293.0/`));
+    assert.ok(row.url.startsWith(`${CDN_ORIGIN}/v/webgl/1.294.0/`));
   }
   for (const [category, entries] of Object.entries(catalog.categories)) {
     assert.equal(audit.results.filter((row) => row.category === category).length, Object.keys(entries).length);

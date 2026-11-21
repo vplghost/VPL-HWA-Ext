@@ -1,5 +1,11 @@
 # Asset CDN và bảng tên hiển thị
 
+## Cập nhật 1.294 ngày 2026-11-21
+
+Log gamestart `temp/tracking-data/hwa-game-record-202611211122.json` xác nhận client `1.294.1020`, static CDN `1.294.0`. Manifest hiện tại có **17.628 entry**; gói splitlib (6.031.315 byte, MD5 `1bb97cbf947cf3692eb2bb95136bdd77`) và từng member được đối chiếu size/MD5. Đã rà 967 ID thuộc các nhóm asset, đóng gói 965 icon xác minh; bổ sung 6 texture mới bao gồm Titan Valdur (4054), consumable 40248/40251/40253, gear 327, scroll 334. Consumable 103/104 tiếp tục không có texture độc lập trong manifest upstream.
+
+Xem [báo cáo đồng bộ 1.294](sync-game-version-1.294.1020.md), [báo cáo từng asset](assets-1.294.0-audit.json) và [catalog theo phiên bản](assets-1.294.0-catalog.json). Lệnh chính: `npm run assets:sync -- --version 1.294.0 --index <log-gamestart.json>`.
+
 ## Cập nhật 1.293 ngày 2026-11-06
 
 Log gamestart mới xác nhận client `1.293.101`, static CDN `1.293.0`. Manifest hiện tại có 17.360 entry; gói splitlib và từng member được đối chiếu size/MD5. Đã rà 961 ID thuộc các nhóm asset đang lưu trong extension và đóng gói 959 icon xác minh; consumable 103/104 không có texture độc lập trong manifest. Locale tiếng Anh và bảng tên/Tower buffs đã tái tạo từ nguồn 1.293.

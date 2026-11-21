@@ -79,7 +79,7 @@ test('heroMetadata exports complete typed data and helpers with 100% parity', ()
 });
 
 test('titanMetadata exports complete typed data and helpers with 100% parity', () => {
-  assert.equal(Object.keys(titanMetadata).length, 29, 'Should contain 29 titans');
+  assert.equal(Object.keys(titanMetadata).length, 30, 'Should contain 30 titans');
   assert.equal(Object.keys(titanArtifactEvolveCost).length, 6, 'Should contain 6 evolve cost tiers');
   assert.equal(titanArtifactLevelCosts.length, 121, 'Should contain 121 level cost tiers');
 

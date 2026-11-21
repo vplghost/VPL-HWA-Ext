@@ -1,6 +1,6 @@
 /**
  * Hero Wars Alliance - Team Level Progression Data
- * Sourced from game client assets (splitlib/level_teamDelta.json, client 1.293.1010 / 1.293.0)
+ * Sourced from game client assets (splitlib/level_teamDelta.json, client 1.294.1020 / 1.294.0)
  *
  * Each level maps to the experience required (delta) to progress to the next level.
  * Level 120 is the current max level in HWA, having a delta of 0.

@@ -2531,21 +2531,21 @@ export const itemResources: ItemResourcesData = {
     }
   },
   "source": {
-    "clientVersion": "1.293.1010",
+    "clientVersion": "1.294.1020",
     "library": {
-      "md5": "1357804ab5ab599e3522f8cbdeb75802",
-      "size": 5582751,
-      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0054/d973530195826f1575a002f97a3f30e9/lib/splitlib.json.zip"
+      "md5": "1bb97cbf947cf3692eb2bb95136bdd77",
+      "size": 6031315,
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.294.0/v0069/1e8af4ed49f75d2f461962f885ffbaac/lib/splitlib.json.zip"
     },
-    "limitation": "Latest manifest URL no longer matches captured dffc6e1e901230a6e303f6dcf03c8254. Textures use the cached MD5-verified 1.293.0 manifest snapshot; unsupported/newer mappings remain unresolved.",
+    "limitation": "Latest manifest URL no longer matches captured dffc6e1e901230a6e303f6dcf03c8254. Textures use the cached MD5-verified 1.294.0 manifest snapshot; unsupported/newer mappings remain unresolved.",
     "locale": {
-      "md5": "def7ae37ac67df119f41eae76690c092",
-      "size": 683124,
-      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0054/d973530195826f1575a002f97a3f30e9/locale/en.json.gz"
+      "md5": "00b495cbfd75c22a93b508612c41cc1f",
+      "size": 688687,
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.294.0/v0067/1e8af4ed49f75d2f461962f885ffbaac/locale/en.json.gz"
     },
     "manifest": {
-      "entries": 17360,
-      "iconEntries": 7746,
+      "entries": 17628,
+      "iconEntries": 7816,
       "inventory": {
         "embedded_library": {
           "bytes": 67250976,
@@ -2724,11 +2724,11 @@ export const itemResources: ItemResourcesData = {
           "entries": 2118
         }
       },
-      "md5": "c40122f2b0fb79fc5e133f9b9f9d5ee3",
-      "size": 612695,
-      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/d973530195826f1575a002f97a3f30e9/index.latest.json.gz?hash=c40122f2b0fb79fc5e133f9b9f9d5ee3"
+      "md5": "d5d8b4c5cc66458bb7f952894e258e5d",
+      "size": 622658,
+      "url": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.294.0/1e8af4ed49f75d2f461962f885ffbaac/index.latest.json.gz?hash=d5d8b4c5cc66458bb7f952894e258e5d"
     },
-    "staticVersion": "1.293.0"
+    "staticVersion": "1.294.0"
   }
 };
 

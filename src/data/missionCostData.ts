@@ -1,6 +1,6 @@
 import type { MissionCostPair, MissionCostsMap } from '../types/game/campaign';
 
-// Hero Wars: Alliance WebGL 1.293.0 (client 1.293.1010) splitlib/mission.json.
+// Hero Wars: Alliance WebGL 1.294.0 (client 1.294.1020) splitlib/mission.json.
 // [start cost, total win cost]
 export const missionCosts: MissionCostsMap = {
   '1': [1, 5],

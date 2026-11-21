@@ -385,6 +385,19 @@ export const titanMetadata: TitanMetadataDict = {
       12006,
       13006
     ]
+  },
+  "4054": {
+    "name": "Valdur",
+    "role": "Summoner",
+    "element": "Spirit",
+    "hasAvatar": true,
+    "avatarFile": "assets/titans/4054.png",
+    "skills": ["Child of Elarite", "Elarite Resonance"],
+    "artifacts": [
+      11030,
+      12006,
+      13008
+    ]
   }
 };
 export const titanArtifactEvolveCost: TitanArtifactEvolveCostDict = {

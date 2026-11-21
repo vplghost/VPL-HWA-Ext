@@ -1,84 +1,91 @@
-# Titan, đội hình và các nhóm dữ liệu khác
+# Titans, Teams, and Other Data Catalog
 
-Nguồn: `temp/tracking-data/hwa-api-2026-11-01_latest.json`. Đây là snapshot của một tài khoản, lấy từ response RPC; tên hiển thị lấy từ locale CDN đã đóng gói; nơi thiếu tên giữ ID. Không chép token, tên người chơi, chat hoặc mail.
+Source: `temp/tracking-data/hwa-game-record-202611211122.json`. This is a single-account snapshot extracted from RPC responses; display names are resolved using the bundled CDN locale; missing names retain the ID. Tokens, player names, chat, and mail are omitted.
 
 ## Titans
 
-RPC `titanGetAll`; cập nhật lúc `2026-11-01T09:18:28.248Z`.
+RPC `titanGetAll`; updated at `2026-11-21T04:12:34.291Z`.
 
-| Titan ID | Tên | Level | Star | Power | Current skin ID |
+| Titan ID | Name | Level | Star | Power | Current skin ID |
 | ---: | --- | ---: | ---: | ---: | ---: |
-| 4000 | Sigurd | 45 | 3 | 7,358 | 10,001 |
-| 4001 | Nova | 45 | 4 | 8,874 | 10,002 |
-| 4002 | Mairi | 40 | 4 | 7,410 | 10,003 |
-| 4004 | Tydus | 40 | 2 | 3,670 | 10,044 |
-| 4010 | Moloch | 45 | 3 | 7,336 | 10,005 |
-| 4011 | Vulcan | 44 | 3 | 6,368 | 10,006 |
-| 4012 | Ignis | 40 | 3 | 5,689 | 10,007 |
-| 4013 | Araji | 45 | 3 | 6,963 | 10,008 |
-| 4020 | Angus | 45 | 3 | 6,797 | 10,009 |
-| 4021 | Sylva | 35 | 3 | 4,453 | 10,010 |
-| 4022 | Avalon | 45 | 3 | 6,930 | 10,011 |
-| 4023 | Eden | 45 | 3 | 7,088 | 10,012 |
-| 4030 | Brustar | 1 | 1 | 178 | 0 |
-| 4031 | Keros | 1 | 2 | 220 | 0 |
-| 4040 | Rigel | 35 | 2 | 4,012 | 10,031 |
-| 4041 | Amon | 1 | 2 | 219 | 0 |
-| 4042 | Iyari | 31 | 2 | 3,394 | 10,018 |
-| 4050 | Pallant | 43 | 3 | 6,205 | 10,062 |
-| 4052 | Orm | 34 | 2 | 3,248 | 10,060 |
-| 4053 | Metida | 45 | 5 | 12,539 | 10,064 |
+| 4000 | Sigurd | 60 | 4 | 15,797 | 10,001 |
+| 4001 | Nova | 50 | 5 | 12,816 | 10,002 |
+| 4002 | Mairi | 50 | 5 | 12,578 | 10,003 |
+| 4004 | Tydus | 55 | 3 | 7,341 | 10,044 |
+| 4010 | Moloch | 60 | 3 | 11,200 | 10,005 |
+| 4011 | Vulcan | 50 | 3 | 7,631 | 10,006 |
+| 4012 | Ignis | 50 | 3 | 7,742 | 10,007 |
+| 4013 | Araji | 60 | 3 | 10,987 | 10,008 |
+| 4014 | Asherona | 50 | 3 | 5,923 | 10,043 |
+| 4020 | Angus | 60 | 4 | 13,955 | 10,009 |
+| 4021 | Sylva | 50 | 3 | 7,631 | 10,010 |
+| 4022 | Avalon | 50 | 3 | 8,341 | 10,011 |
+| 4023 | Eden | 60 | 3 | 11,005 | 10,012 |
+| 4024 | Verdoc | 50 | 3 | 6,233 | 10,040 |
+| 4030 | Brustar | 2 | 3 | 230 | 0 |
+| 4031 | Keros | 1 | 3 | 227 | 0 |
+| 4032 | Mort | 1 | 3 | 195 | 0 |
+| 4034 | Umbra | 1 | 3 | 144 | 0 |
+| 4040 | Rigel | 35 | 3 | 5,262 | 10,031 |
+| 4041 | Amon | 1 | 3 | 225 | 0 |
+| 4042 | Iyari | 31 | 3 | 4,446 | 10,018 |
+| 4044 | Lumira | 1 | 3 | 145 | 0 |
+| 4050 | Pallant | 60 | 3 | 10,435 | 10,062 |
+| 4052 | Orm | 40 | 2 | 4,104 | 10,060 |
+| 4053 | Metida | 60 | 5 | 19,750 | 10,064 |
 
-## Đội hình
+## Teams
 
-RPC `teamGetAll`; cập nhật lúc `2026-11-01T09:18:28.248Z`. Mỗi đội lồng nhau có một dòng riêng. Tên tra theo ID từ locale đã đóng gói; ID thiếu tên hiện dưới dạng `#ID`.
+RPC `teamGetAll`; updated at `2026-11-21T04:12:34.291Z`. Each nested squad has its own row. Names resolved by ID from bundled locale; missing names shown as `#ID`.
 
-| Chế độ | Đội | Số thành viên | Tên heroes/titans |
+| Mode | Team | Members | Hero/Titan names |
 | --- | ---: | ---: | --- |
-| `mission` | — | 5 | Leonel, Byrna, Dante, Somna, Octavia |
-| `arena` | — | 5 | Astaroth, Leonel, Byrna, Dante, Octavia |
+| `mission` | — | 5 | Leonel, Byrna, Dante, Iris, Octavia |
+| `arena` | — | 5 | Leonel, Byrna, Dante, Iris, Octavia |
 | `boss_fight` | — | 5 | Aurora, Galahad, Folio, Ginger, Thea |
-| `magicTower` | — | 5 | Astaroth, Leonel, Byrna, Dante, Octavia |
-| `clanDefence_heroes` | — | 5 | Leonel, Byrna, Dante, Somna, Octavia |
+| `magicTower` | — | 5 | Dante, Octavia, Leonel, Iris, Byrna |
+| `clanDefence_heroes` | — | 5 | Leonel, Byrna, Dante, Iris, Octavia |
 | `clanDefence_titans` | — | 5 | Sigurd, Nova, Tydus, Mairi, Metida |
 | `dungeon_water` | — | 5 | Sigurd, Nova, Orm, Tydus, Mairi |
 | `dungeon_neutral` | — | 5 | Sigurd, Nova, Tydus, Mairi, Metida |
-| `adventure_battle` | — | 5 | Somna, Byrna, Leonel, Dante, Octavia |
-| `dungeon_fire` | — | 4 | Moloch, Vulcan, Araji, Ignis |
-| `clan_boss` | 1 | 5 | Astaroth, Leonel, Polaris, Cornelius, Thea |
-| `clan_boss` | 2 | 5 | Electra von Grave, Byrna, Dante, Xe'Sha, Octavia |
-| `clan_boss` | 3 | 5 | Julius, Galahad, Alvanor, Maya, Jhu |
-| `brawl` | — | 5 | Cleaver, Tristan, Byrna, Kai, Miu |
-| `dungeon_earth` | — | 1 | Sylva |
-| `grand` | 1 | 5 | Thea, Polaris, Xe'Sha, Astaroth, Electra von Grave |
-| `grand` | 2 | 5 | Octavia, Somna, Dante, Byrna, Leonel |
-| `grand` | 3 | 5 | Kai, Maya, Alvanor, Galahad, Julius |
-| `champClanDefence_heroes` | 1 | 5 | Astaroth, Leonel, Byrna, Dante, Octavia |
-| `champClanDefence_heroes` | 2 | 5 | Aurora, Galahad, Keira, Somna, Thea |
-| `champClanDefence_heroes` | 3 | 5 | Electra von Grave, Maya, Xe'Sha, Kai, Cornelius |
+| `adventure_battle` | — | 5 | Dante, Byrna, Leonel, Octavia, Iris |
+| `dungeon_fire` | — | 5 | Moloch, Vulcan, Araji, Asherona, Ignis |
+| `clan_boss` | 1 | 5 | Mushy and Shroom, Alvanor, Maya, Iris, Xe'Sha |
+| `clan_boss` | 2 | 5 | Julius, Astaroth, Jhu, Mojo, Thea |
+| `clan_boss` | 3 | 5 | Corvus, Leonel, Byrna, Dante, Octavia |
+| `brawl` | — | 5 | Corvus, Dante, Morrigan, Iris, Octavia |
+| `dungeon_earth` | — | 3 | Verdoc, Eden, Sylva |
+| `grand` | 1 | 5 | Maya, Byrna, Alvanor, Leonel, Mushy and Shroom |
+| `grand` | 2 | 5 | Dorian, Polaris, Somna, Xe'Sha, Electra von Grave |
+| `grand` | 3 | 5 | Octavia, Iris, Morrigan, Dante, Corvus |
+| `champClanDefence_heroes` | 1 | 5 | Leonel, Byrna, Dante, Iris, Octavia |
+| `champClanDefence_heroes` | 2 | 5 | Astaroth, Galahad, Alvanor, Somna, Thea |
+| `champClanDefence_heroes` | 3 | 5 | Electra von Grave, Maya, Xe'Sha, Polaris, Cornelius |
 | `champClanDefence_titans` | — | 5 | Sigurd, Nova, Tydus, Mairi, Metida |
-| `clan_pvp_hero` | — | 5 | Octavia, Somna, Dante, Byrna, Leonel |
+| `clan_pvp_hero` | — | 5 | Octavia, Iris, Dante, Byrna, Leonel |
 | `clan_pvp_titan` | — | 5 | Metida, Mairi, Tydus, Nova, Sigurd |
+| `global_clan_pvp_hero` | — | 5 | Leonel, Byrna, Dante, Iris, Octavia |
+| `global_clan_pvp_titan` | — | 5 | Sigurd, Nova, Tydus, Mairi, Metida |
 
-## Các snapshot khác
+## Other Snapshots
 
-| RPC | Nhóm | Hình dạng dữ liệu quan sát | Cập nhật UTC |
+| RPC | Group | Observed Data Shape | Updated UTC |
 | --- | --- | --- | --- |
-| `questGetAll` | Nhiệm vụ | mảng 38 quest | 2026-11-01T09:18:28.248Z |
-| `missionGetAll` | Màn chơi | mảng 194 mission | 2026-11-01T09:18:28.248Z |
-| `shopGetMany` | Shop | 15 shop | 2026-11-01T09:18:36.817Z |
-| `offerGetAll` | Ưu đãi | mảng 72 offer | 2026-11-01T09:18:36.817Z |
-| `artifact_getAll` | Artifact | 79 entry | 2026-11-01T09:18:36.817Z |
-| `skin_getAll` | Skin | 79 entry | 2026-11-01T09:18:36.817Z |
-| `getInventory:inventory` | Inventory phân hệ khác | inventory | 2026-11-01T09:18:36.817Z |
-| `clanBoss_getAll` | Clan boss | headsBestResults, heads, tries, superTries, endDay | 2026-11-01T09:18:36.817Z |
-| `clanWarGetBriefInfo` | Clan war | nextWarTime, tries, hasActiveWar, nearestWarEndTime, arePointsMax | 2026-11-01T09:18:28.248Z |
+| `questGetAll` | Quests | array of 42 quests | 2026-11-21T04:20:15.000Z |
+| `missionGetAll` | Missions | array of 221 missions | 2026-11-21T04:12:34.291Z |
+| `shopGetMany` | Shop | 17 shops | 2026-11-21T04:19:21.340Z |
+| `offerGetAll` | Offers | array of 78 offers | 2026-11-21T04:19:16.757Z |
+| `artifact_getAll` | Artifacts | 94 entries | 2026-11-21T04:19:16.757Z |
+| `skin_getAll` | Skins | 94 entries | 2026-11-21T04:19:16.757Z |
+| `getInventory:inventory` | Inventory (other subsystem) | inventory | 2026-11-21T04:19:16.757Z |
+| `clanBoss_getAll` | Clan boss | headsBestResults, heads, tries, superTries, endDay | 2026-11-21T04:19:16.757Z |
+| `clanWarGetBriefInfo` | Clan war | nextWarTime, tries, hasActiveWar, nearestWarEndTime, arePointsMax | 2026-11-21T04:12:34.291Z |
 
-## Phương pháp lấy và cập nhật dữ liệu
+## Data Collection & Update Methodology
 
-1. Extension quan sát `POST https://api.hero-wars-alliance.com/api/rpc`, không tự gửi RPC. Request chứa `calls[{name, feature?, args, ident}]`; response chứa `results[{ident, result.response}]`. Ghép call/result bằng `ident`.
-2. Chỉ lấy response hoàn chỉnh (HTTP 200, body JSON đọc được và không bị cắt). Mỗi phương thức giữ snapshot mới nhất theo thời điểm. Các bảng heroes/items/titans/teams là trạng thái tại một thời điểm, không phải danh mục tên chính thức.
-3. Trong extension, cache tự cập nhật khi game phát sinh RPC phù hợp. Khi cache rỗng, popup tự nạp lại một lần từ log cục bộ đã lưu. Extension chỉ cập nhật cache từ RPC do game tự phát sinh; không gửi RPC theo lịch, không gọi API game để làm mới dữ liệu và không tải lại trang.
-4. Để làm mới tài liệu, xuất log JSON rồi chạy `npm run docs:data -- <đường-dẫn-log.json>`. Chỉ các trường đã chọn được ghi vào tài liệu; kiểm tra bảng trước khi commit vì đây là dữ liệu của tài khoản cá nhân.
+1. The extension observes `POST https://api.hero-wars-alliance.com/api/rpc`, without sending its own RPC requests. Requests contain `calls[{name, feature?, args, ident}]`; responses contain `results[{ident, result.response}]`. Calls and results are matched by `ident`.
+2. Only complete responses are captured (HTTP 200, readable and untruncated JSON body). Each method retains the latest snapshot by timestamp. Tables are point-in-time snapshots, not canonical dictionaries.
+3. In the extension, cache auto-updates when the game issues matching RPCs. When empty, popup reloads once from saved session logs. The extension only updates cache from passive RPC events; no scheduled requests, polling, or page reloading.
+4. To refresh docs, export JSON log and run `npm run docs:data -- <path-to-log.json>`. Only selected fields are documented; review tables before committing.
 
-Giới hạn: log hiện chưa chứa response body cho GET như `api.aghanim.com/sdk/v1/items`; dữ liệu GET đó không thể tạo thành bảng từ mẫu này.
+Limitation: log currently does not capture response body for GET endpoints like `api.aghanim.com/sdk/v1/items`.

@@ -2,7 +2,13 @@
 
 This document records the discovery, file format specifications, conversion process, and inventory results for hero and titan avatar assets in **Hero Wars: Alliance**.
 
-## Current audit: client 1.293.101 / CDN 1.293.0
+## Current audit: client 1.294.1020 / CDN 1.294.0
+
+The 2026-11-21 refresh uses startup `indexGet` log `temp/tracking-data/hwa-game-record-202611211122.json` and splitlib catalog v0069 (`1bb97cbf947cf3692eb2bb95136bdd77`). It checks **17,628** manifest entries and maps all 967 IDs across the extension's categories: 83 heroes, 30 titans, 480 consumables, 240 gear and 134 scrolls. **965 icons are available and verified**; 6 new textures were added (Titan Valdur 4054, consumables 40248/40251/40253, gear 327, scroll 334). Consumables 103 and 104 have no standalone texture in upstream manifest.
+
+Machine-readable results: [audit 1.294](assets-1.294.0-audit.json), [catalog 1.294](assets-1.294.0-catalog.json), [sync report](sync-game-version-1.294.1020.md). Run `npm run assets:sync -- --version 1.294.0` to repeat using the saved verified catalog.
+
+## Prior audit: client 1.293.101 / CDN 1.293.0
 
 The 2026-11-06 refresh uses the startup `indexGet` manifest and splitlib catalog. It checks 17,360 manifest entries and maps all 961 IDs in the extension's asset categories: 83 heroes, 29 titans, 477 consumables, 239 gear and 133 scrolls. **959 icons are available and converted**; consumables 103 (`Robbers4_box`) and 104 (`BFbox`) have no standalone texture in the current manifest. All 83 heroes now use verified PNGs, including Wodryn (78); obsolete WebP mirrors were removed after successful conversion.
 

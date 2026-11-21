@@ -1,6 +1,10 @@
 # Nguồn tên heroes và items
 
-## Nguồn hiện tại: 1.293
+## Nguồn hiện tại: 1.294 (Client 1.294.1020, CDN 1.294.0)
+
+Log `temp/tracking-data/hwa-game-record-202611211122.json` cung cấp locale tại `1.294.0/v0067/1e8af4ed49f75d2f461962f885ffbaac/locale/en.json.gz` trên CDN Nexters. File khớp **688.687 byte**, MD5 `00b495cbfd75c22a93b508612c41cc1f`. Nguồn này đã sinh ra `src/data/nameData.ts` cho bản game 1.294.1020, bổ sung Titan Valdur (4054), Hand of Rebirth (317), Zorval's Call (11030), Chthonic Summon Seal (13008), các consumable mới và nghiên cứu mới. Xem [báo cáo đồng bộ 1.294](sync-game-version-1.294.1020.md) và [báo cáo asset 1.294](assets-1.294.0-audit.json).
+
+## Nguồn trước đó: 1.293
 
 Log `temp/tracking-data/hwa-game-record-202611061625_gamestart.json` cung cấp locale tại `1.293.0/v0034/d973530195826f1575a002f97a3f30e9/locale/en.json.gz` trên CDN đã xác định bên dưới. File khớp **682.754 byte**, MD5 `588f2ad19d2ebdb65118dd56c05c362a`. Đây là nguồn hiện tại của `data-names.js`; URL, size và MD5 đều được lưu trong dữ liệu sinh ra và kiểm tra lại khi tạo Tower buffs. Script đọc được cả log mảng RPC cũ và game timeline mới. Xem [báo cáo asset 1.293](assets-1.293.0-audit.json) và [quy trình đồng bộ](ASSET-EXTRACTION.md).
 

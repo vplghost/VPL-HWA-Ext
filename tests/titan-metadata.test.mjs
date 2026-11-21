@@ -7,9 +7,9 @@ import {
   titanArtifactLevelCosts,
 } from '../src/data/titanMetadata.ts';
 
-test('titan metadata includes all 29 playable titans with role, element, and avatar', () => {
+test('titan metadata includes all 30 playable titans with role, element, and avatar', () => {
   assert.ok(metadata);
-  assert.equal(Object.keys(metadata).length, 29);
+  assert.equal(Object.keys(metadata).length, 30);
 
   const allowedRoles = new Set(['Tank', 'Marksman', 'Support', 'Supertitan', 'Summoner']);
   const allowedElements = new Set(['Water', 'Fire', 'Earth', 'Darkness', 'Light', 'Spirit']);
@@ -23,7 +23,7 @@ test('titan metadata includes all 29 playable titans with role, element, and ava
   }
 });
 
-test('all 29 titan avatar PNGs exist on disk and are non-empty', async () => {
+test('all 30 titan avatar PNGs exist on disk and are non-empty', async () => {
   for (const [id, titan] of Object.entries(metadata)) {
     const imgUrl = new URL(`../extension/${titan.avatarFile}`, import.meta.url);
     const fileStat = await stat(imgUrl);

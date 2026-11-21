@@ -154,6 +154,7 @@ const englishCorrections = {
   }
 };
 for (const [group, corrections] of Object.entries(englishCorrections)) {
+  names[group] ||= {};
   Object.assign(names[group], corrections);
 }
 const payload = {

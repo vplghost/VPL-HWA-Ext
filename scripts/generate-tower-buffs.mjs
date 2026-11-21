@@ -2,13 +2,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { nameData } from '../src/data/nameData.ts';
+import { resilientFetch } from './sync-cdn-assets.mjs';
 
 const { assetUrl, assetMd5, assetSize } = nameData;
 if (!assetUrl || new URL(assetUrl).hostname !== 'heroesmobile-a-cdn.nextersglobal.com') {
   throw new Error('Missing trusted English locale URL in data-names.js');
 }
 
-const response = await fetch(assetUrl);
+const response = await resilientFetch(assetUrl);
 if (!response.ok) throw new Error(`Locale download failed: HTTP ${response.status}`);
 const bytes = Buffer.from(await response.arrayBuffer());
 if (bytes.length !== assetSize || createHash('md5').update(bytes).digest('hex') !== assetMd5) {

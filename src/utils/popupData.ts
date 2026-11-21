@@ -21,7 +21,7 @@ import {
 import { getAttentionBonusAvailability } from './freeChestHelper.ts';
 import { freeAlchemyAvailability } from '../services/freeAlchemy.ts';
 
-// enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.293.0 (client 1.293.1010) splitlib asset.
+// enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.294.0 (client 1.294.1020) splitlib asset.
 // Each value is the cost to evolve TO that star, not the current star.
 export const evolveFragmentCost: Record<number, number> = { 2: 20, 3: 50, 4: 100, 5: 150, 6: 300 };
 export const evolveTitanFragmentCost: Record<number, number> = { 2: 50, 3: 150, 4: 500, 5: 900, 6: 1500 };

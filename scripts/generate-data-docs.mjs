@@ -5,7 +5,8 @@ import { popupDataHelper as popupData } from '../src/utils/popupData.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const input = resolve(process.argv[2] ?? join(root, 'temp/tracking-data/hwa-api-2026-11-01_latest.json'));
-const records = JSON.parse(await readFile(input, 'utf8'));
+const raw = JSON.parse(await readFile(input, 'utf8'));
+const records = Array.isArray(raw) ? raw : (raw.timeline || raw.records);
 if (!Array.isArray(records)) throw new Error('Expected a JSON array of API records');
 
 const snapshots = new Map();

@@ -1,13 +1,13 @@
-// Generated from https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0065/7a886a37bdee83b15b8997d89d028015/locale/en.json.gz
+// Generated from https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.294.0/v0067/1e8af4ed49f75d2f461962f885ffbaac/locale/en.json.gz
 import type { NameDataGroup } from '../types/game/item.ts';
 import { itemResources } from './itemData.ts';
 
 export const nameData: NameDataGroup = {
-  "assetUrl": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.293.0/v0065/7a886a37bdee83b15b8997d89d028015/locale/en.json.gz",
-  "assetMd5": "f640f200f4d58044949d6f982978ff47",
-  "assetSize": 683621,
-  "clientVersion": "1.293.1010",
-  "indexCapturedAt": "2026-11-14T17:55:08.620Z",
+  "assetUrl": "https://heroesmobile-a-cdn.nextersglobal.com/v/webgl/1.294.0/v0067/1e8af4ed49f75d2f461962f885ffbaac/locale/en.json.gz",
+  "assetMd5": "00b495cbfd75c22a93b508612c41cc1f",
+  "assetSize": 688687,
+  "clientVersion": "1.294.1020",
+  "indexCapturedAt": "2026-11-21T04:12:26.197Z",
   "names": {
     "hero": {
       "0": "Not available",
@@ -177,6 +177,7 @@ export const nameData: NameDataGroup = {
       "4051": "Alecto",
       "4052": "Orm",
       "4053": "Metida",
+      "4054": "Valdur",
       "5000": "Ogre",
       "5001": "Fierce Ent",
       "5002": "King Raven",
@@ -610,6 +611,8 @@ export const nameData: NameDataGroup = {
       "10103": "Centaur the Legionnaire",
       "10104": "Fairy",
       "10105": "Kai",
+      "10106": "Ogre (boss)",
+      "10107": "Valdur",
       "32767": "Test Dummy"
     },
     "consumable": {
@@ -1022,7 +1025,8 @@ export const nameData: NameDataGroup = {
       "40248": "Sweet Treat",
       "40249": "Red Recipe Box",
       "40251": "Holiday Chest",
-      "40252": "Witch’s Gift"
+      "40252": "Witch’s Gift",
+      "40253": "Red Recipe Box"
     },
     "gear": {
       "1": "Orcish Knuckles",
@@ -1291,6 +1295,7 @@ export const nameData: NameDataGroup = {
       "292": "Paladin Gloves",
       "293": "Inquisitor's Gauntlets",
       "308": "Ripper Gauntlet",
+      "317": "Hand of Rebirth",
       "319": "Mallard Gloves",
       "324": "Harmony Gloves",
       "325": "Cat Scientist Gloves",
@@ -1443,6 +1448,7 @@ export const nameData: NameDataGroup = {
       "299": "Paladin Gloves — Recipe",
       "300": "Inquisitor's Gauntlets – Recipe",
       "315": "Ripper Gauntlet – Recipe",
+      "324": "Hand of Rebirth – Recipe",
       "326": "Mallard Gloves – Recipe",
       "331": "Harmony Gloves – Recipe",
       "332": "Cat Scientist Gloves — Recipe",
@@ -1872,6 +1878,7 @@ export const nameData: NameDataGroup = {
       "11027": "Zorval's Rite",
       "11028": "Zorval's Grimoire",
       "11029": "Zorval's Amulet",
+      "11030": "Zorval’s Call",
       "12001": "Fire Crown",
       "12002": "Earth Crown",
       "12003": "Water Crown",
@@ -1884,7 +1891,8 @@ export const nameData: NameDataGroup = {
       "13004": "Summon Seal",
       "13005": "Chthonic Attack Seal",
       "13006": "Chthonic Balance Seal",
-      "13007": "Chthonic Defense Seal"
+      "13007": "Chthonic Defense Seal",
+      "13008": "Chthonic Summon Seal"
     },
     "skin": {
       "1": "Test Skin",
@@ -2332,10 +2340,10 @@ export const nameData: NameDataGroup = {
       "522": "Deadly Precision II",
       "523": "Arcane Precision II",
       "524": "Deadly Strikes II",
-      "525": "Advanced Weaponry II",
-      "526": "Combat Mastery II",
-      "527": "Armor-Piercing Arrows II",
-      "528": "Barrier Breaker II",
+      "525": "Combat Mastery II",
+      "526": "Armor-Piercing Arrows II",
+      "527": "Barrier Breaker II",
+      "528": "Advanced Weaponry II",
       "529": "Endurance Reserves II",
       "530": "Crushing Magic II",
       "531": "Relentless Assault II",
@@ -2747,3 +2755,8 @@ export const nameMap = {
   research: getResearchName,
   artifact: getArtifactName
 };
+
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).hwaHelperNameData = nameData;
+  (globalThis as any).hwaHelperNameMap = nameMap;
+}

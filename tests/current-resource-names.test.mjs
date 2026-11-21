@@ -44,12 +44,12 @@ test('strategic name extraction uses exact category/ID keys and rejects unresolv
   assert.equal(result.teleporter[1], 'Advanced Teleport');
 });
 
-test('bundled names identify client1.293.1010 and the verified current locale revision', () => {
+test('bundled names identify client1.294.1020 and the verified current locale revision', () => {
   const data = nameData;
-  assert.equal(data.clientVersion, '1.293.1010');
-  assert.equal(data.assetMd5, 'f640f200f4d58044949d6f982978ff47');
-  assert.equal(data.assetSize, 683621);
-  assert.match(data.assetUrl, /\/1\.293\.0\/v0065\//);
+  assert.equal(data.clientVersion, '1.294.1020');
+  assert.equal(data.assetMd5, '00b495cbfd75c22a93b508612c41cc1f');
+  assert.equal(data.assetSize, 688687);
+  assert.match(data.assetUrl, /\/1\.294\.0\/v0067\//);
   for (const [category, count] of Object.entries({ lootboxChanced: 30, lootboxChoiced: 3,
     material: 10, speedUpConstruction: 5, speedUpResearch: 5, speedUpUniversal: 5,
     speedUpUnitTraining: 5, speedUpUnitHealing: 5, teleporter: 3, patron: 35, talisman: 163 })) {
