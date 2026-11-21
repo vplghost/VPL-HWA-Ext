@@ -968,6 +968,17 @@ export function setupQueueAlarms(customChrome?: any) {
         cr.alarms.create('hwa-queue-watch', { periodInMinutes: 1 });
       }
     });
+    cr.alarms.get('hwa-auto-frontier-rewards', (alarm: any) => {
+      if (!alarm) {
+        cr.storage?.local?.get(['autoFrontierRewardsEnabled', 'autoFrontierRewardsState']).then((st: any) => {
+          if (st?.autoFrontierRewardsEnabled === true) {
+            const next = st.autoFrontierRewardsState?.nextWakeAt;
+            const when = Number.isFinite(next) && next > Date.now() ? next : Date.now() + 60 * 60 * 1000;
+            cr.alarms.create('hwa-auto-frontier-rewards', { when });
+          }
+        }).catch(() => {});
+      }
+    });
   } catch (_) {}
 }
 
@@ -1944,6 +1955,69 @@ export async function runFreeSpin(manual = false, _record: any = null, sourceTab
   return { ok: true, queued: state.pending.queued };
 }
 
+export async function runFrontierRewardsClaim(manual = false, customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  const stored =
+    (await cr?.storage?.local?.get([
+      'autoFrontierRewardsEnabled',
+      'autoFrontierRewardsState',
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings'
+    ])) || {};
+  const cache = stored.rpcCache || {};
+  const accountId = cache.accountStatus?.data?.id ?? cache.userGetInfo?.data?.id;
+  const now = Date.now();
+  let state = stored.autoFrontierRewardsState ? structuredClone(stored.autoFrontierRewardsState) : null;
+  if (!manual && !stored.autoFrontierRewardsEnabled) return { ok: false, error: 'Auto frontier rewards is disabled.' };
+  if (stored.popupRpcEnabled === false) return { ok: false, error: 'Popup RPC is disabled.' };
+  if (accountId == null) return { ok: false, error: 'Waiting for current game account.' };
+
+  if (state && String(state.accountId) !== String(accountId)) {
+    state = null;
+  }
+  state = state || { accountId, lastClaimAt: 0 };
+
+  const ONE_HOUR = 60 * 60 * 1000;
+  if (!manual && state.lastClaimAt && (now - state.lastClaimAt) < (ONE_HOUR - 5000)) {
+    const nextWake = state.lastClaimAt + ONE_HOUR;
+    state.nextWakeAt = nextWake;
+    state.status = `Next claim scheduled at ${new Date(nextWake).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoFrontierRewardsState: state });
+    cr?.alarms?.create?.('hwa-auto-frontier-rewards', { when: Math.max(now + 1000, nextWake) });
+    return { ok: true, scheduled: true, nextWakeAt: nextWake };
+  }
+
+  const tab = await findActiveGameTab(cr);
+  if (!tab?.id) {
+    state.status = 'No active game tab found. Retrying later.';
+    await cr?.storage?.local?.set({ autoFrontierRewardsState: state });
+    return { ok: false, error: 'No active game tab found.' };
+  }
+
+  const calls = [
+    { name: 'eternalStory_collectChest', args: {} },
+    { name: 'eternalStory_getChest', args: {} }
+  ];
+  const dispatch = rpcMessageForSettings(stored, calls);
+  if (!dispatch) return { ok: false, error: 'Could not prepare RPC message for current settings.' };
+
+  try {
+    await cr?.tabs?.sendMessage?.(tab.id, dispatch);
+    state.lastClaimAt = now;
+    state.nextWakeAt = now + ONE_HOUR;
+    state.status = `Claimed at ${new Date(now).toLocaleTimeString()}`;
+    await cr?.storage?.local?.set({ autoFrontierRewardsState: state });
+    cr?.alarms?.create?.('hwa-auto-frontier-rewards', { when: now + ONE_HOUR });
+    return { ok: true, claimed: true, nextWakeAt: now + ONE_HOUR, queued: dispatch.kind === 'queue-rpc' };
+  } catch (err: any) {
+    state.status = `Claim dispatch failed: ${err?.message || err}`;
+    await cr?.storage?.local?.set({ autoFrontierRewardsState: state });
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
 let lastAutoGatherSearchAt = 0;
 let lastAutoGatherPendingType: any = null;
 let lastAutoGatherPendingLevel: any = null;
@@ -2515,6 +2589,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       pending = pending.then(() => runFreeSpin(false, null, null, cr)).catch(() => {});
       await pending;
     }
+    if (alarm.name === 'hwa-auto-frontier-rewards') {
+      pending = pending.then(() => runFrontierRewardsClaim(false, cr)).catch(() => {});
+      await pending;
+    }
     if (alarm.name === 'hwa-mine-defense') await tickAutoGather(false, cr);
     if (alarm.name === 'hwa-queue-watch') {
       const tab = await findActiveGameTab(cr);
@@ -2638,6 +2716,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         (!freeManual && isGameUrl(sender.url) && sender.tab?.id))
     ) {
       pending = pending.then(() => runFreeSpin(freeManual, null, sender.tab?.id, cr));
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      message?.kind === 'frontier-rewards-tick' &&
+      (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
+        (isGameUrl(sender.url) && sender.tab?.id))
+    ) {
+      pending = pending.then(() => runFrontierRewardsClaim(Boolean(message.manual), cr));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -3358,6 +3446,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                   'getSpecialQuestState',
                   'getBattlepassState',
                   'user_getNextDayTime',
+                  'eternalStory_collectChest',
+                  'eternalStory_getChest',
                 ]);
                 const claimNames = new Set([
                   'mailFarm',
@@ -3375,6 +3465,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                   'dailyBonusFarm',
                   'dailyBonus_claim',
                   'offerFarmReward',
+                  'eternalStory_collectChest',
                 ]);
                 if (
                   !Array.isArray(message.calls) ||
@@ -3803,6 +3894,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         ]);
         if (dispatch) cr.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
       }
+      const isEternalStoryClaim = rpcCacheService.extract(record).some((e: any) => e.key === 'eternalStoryCollectChestAction');
+      if (stored.popupRpcEnabled === true && cacheResult.changed && isEternalStoryClaim && sender.tab?.id) {
+        const dispatch = rpcMessageForSettings(stored, [
+          { name: 'userGetInfo' },
+          { name: 'inventoryGet' },
+          { name: 'refillableGetAll', feature: 'refillable' },
+          { name: 'questGetAll' }
+        ]);
+        if (dispatch) cr.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
+      }
       const isBattlepassClaim = rpcCacheService.extract(record).some((e: any) => e.key === 'battlepassClaimAction');
       if (stored.popupRpcEnabled === true && cacheResult.changed && isBattlepassClaim && sender.tab?.id) {
         const dispatch = rpcMessageForSettings(stored, [
@@ -3891,6 +3992,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     findAllGameTabs: () => findAllGameTabs(cr),
     findActiveGameTab: () => findActiveGameTab(cr),
     runFreeSpin: (manual?: boolean, record?: any, sourceTabId?: any) => runFreeSpin(manual, record, sourceTabId, cr),
+    runFrontierRewardsClaim: (manual?: boolean) => runFrontierRewardsClaim(manual, cr),
     reconcileSpeedup: (cache: any) => reconcileSpeedup(cache, cr),
     useConfirmedSpeedup: (msg: any) => useConfirmedSpeedup(msg, cr),
     reconcileMailClaim: (cache: any) => reconcileMailClaim(cache, cr),

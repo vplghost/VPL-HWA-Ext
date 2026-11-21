@@ -51,7 +51,8 @@ export function usePopupAutomation(
       (s.alchemySpin && p?.hasAlchemySpin ? 1 : 0) +
       (s.airshipGift && p?.hasAirshipGift ? 1 : 0) +
       (s.dailyBonus && p?.hasDailyBonus ? 1 : 0) +
-      (s.freeOffers ? (p?.freeOfferIds?.length || 0) : 0);
+      (s.freeOffers ? (p?.freeOfferIds?.length || 0) : 0) +
+      (s.frontierRewards && p?.hasFrontierRewards ? 1 : 0);
   });
   const teams = computed<any[]>(() => {
     const c = cache.value;

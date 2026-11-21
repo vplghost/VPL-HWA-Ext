@@ -66,6 +66,7 @@ test('automation normalization preserves opt-out defaults and clamps rally level
     airshipGift: true,
     dailyBonus: true,
     freeOffers: true,
+    frontierRewards: true,
     onOpen: false,
   });
   assert.equal(normalizeAutoClaim({ mail: false }).mail, false);

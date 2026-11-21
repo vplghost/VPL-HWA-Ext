@@ -7,6 +7,7 @@ import { useGameConnection } from '@/src/composables/useGameConnection';
 import '@/src/utils/metadata';
 import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
+import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import type { ThemeMode } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
@@ -17,6 +18,7 @@ const engine = computed(() => engineDiagnostics(gameEngineStatus.value));
 const enginePingMessage = ref('');
 const enginePingPending = ref(false);
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
+const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
 async function pingEngine() {
   enginePingPending.value = true;
   try {
@@ -386,6 +388,13 @@ async function toggleRecording() {
       <p role="status" class="text-xs text-slate-500">{{ autoFreeSpinStatus }}</p>
     </section>
 
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <h3 class="text-sm font-bold">Auto Frontier Rewards</h3>
+      <label class="flex items-center gap-2"><input id="setting-auto-frontier-rewards" v-model="autoFrontierEnabled" type="checkbox" @change="saveAutoFrontier" />Auto claim Frontier chest hourly (every 60 minutes)</label>
+      <p class="text-xs text-slate-500">Collects accumulated Frontier (Eternal Story) chest rewards every hour while the game is open. Uses shared RPC settings.</p>
+      <p role="status" class="text-xs text-slate-500">{{ autoFrontierStatus }}</p>
+    </section>
+
     <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
       <div class="flex items-center justify-between">
         <div>
@@ -504,6 +513,18 @@ async function toggleRecording() {
               <span v-if="pendingClaims.freeOfferIds?.length" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ pendingClaims.freeOfferIds.length }} ready</span>
             </div>
             <div class="text-slate-500 dark:text-slate-400 mt-0.5">Claim free tiers from progressive bundle ladders and event offers</div>
+          </div>
+        </label>
+
+        <!-- 10. Frontier Rewards (Eternal Story Chest) -->
+        <label for="autoclaim-opt-frontier-rewards" class="flex items-start gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+          <input id="autoclaim-opt-frontier-rewards" v-model="autoClaimSettings.frontierRewards" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
+          <div class="flex-1 text-xs">
+            <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
+              <span>🏰 Frontier Chest</span>
+              <span v-if="pendingClaims.hasFrontierRewards" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Ready</span>
+            </div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Collect accumulated Eternal Story chest rewards</div>
           </div>
         </label>
       </div>

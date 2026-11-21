@@ -105,6 +105,9 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
     'getEventInfo:fortress': 'events',
     clanClash_getCurrentState: 'events',
     clanClash_claimReward: 'events',
+    eternalStory_getState: 'events',
+    eternalStory_getChest: 'events',
+    eternalStory_collectChest: 'events',
     refillable_alchemyUseVideo: 'header',
     refillable_skillpointsUseVideo: 'heroes',
     brawl_getAll: 'events',
@@ -2077,6 +2080,46 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             updatedAt: record.timestamp
           }];
         }
+        if (call.name === 'eternalStory_getState' && result?.response) {
+          return [{
+            key: 'eternalStoryStatus',
+            method: call.name,
+            feature: null,
+            group: 'events',
+            data: result.response,
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'eternalStory_getChest' && result?.response) {
+          return [{
+            key: 'eternalStoryChestStatus',
+            method: call.name,
+            feature: null,
+            group: 'events',
+            data: result.response,
+            updatedAt: record.timestamp
+          }];
+        }
+        if (call.name === 'eternalStory_collectChest') {
+          const response = result?.response;
+          if (!call.ident || result?.error || !response || typeof response !== 'object' ||
+              Array.isArray(response) || response.error) return [];
+          const reward = response.reward && typeof response.reward === 'object' && !Array.isArray(response.reward)
+            ? response.reward : null;
+          return [{
+            key: 'eternalStoryCollectChestAction',
+            method: call.name,
+            feature: null,
+            group: 'internal',
+            data: {
+              token: call.ident,
+              reward,
+              collectedTo: response.collected_to,
+              quests: Array.isArray(result?.quests) ? result.quests : []
+            },
+            updatedAt: record.timestamp
+          }];
+        }
         if (call.name === 'brawl_getAll' && Array.isArray(result?.response)) {
           return [{
             key: 'brawlStatus',
@@ -3078,6 +3121,49 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               token: entry.data.token, eventId: entry.data.eventId,
               claimedTypes: entry.data.claimedTypes, needsSync: true, at: entry.updatedAt,
             }].slice(-100) }, updatedAt: entry.updatedAt };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'eternalStoryCollectChestAction') {
+          const previous = next.eternalStoryClaimStatus?.data || { claims: [] };
+          const previousClaims = normalizeArrayData(previous.claims);
+          if (previousClaims.some((claim: any) => claim?.token === entry.data.token)) continue;
+
+          if (entry.data.reward) {
+            const rewardActions = extractRewardActions(record,
+              { name: entry.method, ident: entry.data.token }, entry.data.reward, 'eternalStoryChest');
+            entries.push(...rewardActions.filter(action => !entries.some(snapshot =>
+              snapshot.key === action.data.resourceKey && snapshot.updatedAt >= entry.updatedAt)));
+          }
+
+          next.eternalStoryClaimStatus = {
+            key: 'eternalStoryClaimStatus',
+            method: entry.method,
+            feature: null,
+            group: 'internal',
+            data: {
+              claims: [...previousClaims, {
+                token: entry.data.token,
+                at: entry.updatedAt,
+                needsSync: true,
+                collectedTo: entry.data.collectedTo
+              }].slice(-100)
+            },
+            updatedAt: entry.updatedAt
+          };
+
+          if (next.eternalStoryChestStatus?.data) {
+            next.eternalStoryChestStatus = {
+              ...next.eternalStoryChestStatus,
+              data: {
+                ...next.eternalStoryChestStatus.data,
+                reward: {},
+                filled_in_percents: 0,
+                collected_at: entry.data.collectedTo || Math.floor(Date.parse(entry.updatedAt) / 1000)
+              },
+              updatedAt: entry.updatedAt
+            };
+          }
           changed = true;
           continue;
         }

@@ -832,6 +832,7 @@ export interface AutoClaimSettings {
   airshipGift: boolean;
   dailyBonus: boolean;
   freeOffers: boolean;
+  frontierRewards: boolean;
   onOpen: boolean;
 }
 
@@ -847,6 +848,7 @@ export function normalizeAutoClaim(value: any = {}): AutoClaimSettings {
     airshipGift: value.airshipGift !== false,
     dailyBonus: value.dailyBonus !== false,
     freeOffers: value.freeOffers !== false,
+    frontierRewards: value.frontierRewards !== false,
     onOpen: value.onOpen === true,
   };
 }
@@ -864,6 +866,7 @@ export interface PendingClaimsResult {
   hasAirshipGift: boolean;
   hasDailyBonus: boolean;
   freeOfferIds: number[];
+  hasFrontierRewards: boolean;
   totalCount: number;
 }
 
@@ -882,6 +885,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
       hasAirshipGift: false,
       hasDailyBonus: false,
       freeOfferIds: [],
+      hasFrontierRewards: false,
       totalCount: 0,
     };
   }
@@ -1007,6 +1011,13 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     }
   }
 
+  // Frontier rewards chest (Eternal Story)
+  const chestData = cache.eternalStoryChestStatus?.data;
+  const hasFrontierRewards = Boolean(
+    (chestData?.reward && Object.keys(chestData.reward).length > 0) ||
+    Number(chestData?.filled_in_percents) > 0
+  );
+
   // Event Quests & Battle Pass Claims
   const eventQuests = resolveClaimableEventQuests(cache);
   const battlePassRewards = resolveClaimableBattlePassRewards(cache, dynamicCatalog);
@@ -1023,7 +1034,8 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     (hasAlchemySpin ? 1 : 0) +
     (hasAirshipGift ? 1 : 0) +
     (hasDailyBonus ? 1 : 0) +
-    freeOfferIds.length;
+    freeOfferIds.length +
+    (hasFrontierRewards ? 1 : 0);
 
   return {
     letterIds,
@@ -1038,6 +1050,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     hasAirshipGift,
     hasDailyBonus,
     freeOfferIds,
+    hasFrontierRewards,
     totalCount,
   };
 }
@@ -1198,6 +1211,13 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
     }
   }
 
+  if (opt.frontierRewards && pending.hasFrontierRewards) {
+    calls.push({
+      name: 'eternalStory_collectChest',
+      args: {},
+    });
+  }
+
   if (calls.length > 0) {
     calls.push({ name: 'mailGetAll', args: {} }, { name: 'questGetAll', args: {} });
     if (
@@ -1207,6 +1227,7 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
       (opt.airshipGift && pending.hasAirshipGift) ||
       (opt.dailyBonus && pending.hasDailyBonus) ||
       (opt.freeOffers && pending.freeOfferIds.length > 0) ||
+      (opt.frontierRewards && pending.hasFrontierRewards) ||
       (opt.eventQuests && pending.eventQuests.length > 0) ||
       (opt.battlePass && pending.battlePassRewards.length > 0)
     ) {
@@ -1215,6 +1236,9 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
         { name: 'refillableGetAll', args: { getAt: now }, feature: 'refillable' },
         { name: 'inventoryGet', args: {} }
       );
+    }
+    if (opt.frontierRewards && pending.hasFrontierRewards) {
+      calls.push({ name: 'eternalStory_getChest', args: {} });
     }
     if (
       (opt.eventQuests && pending.eventQuests.length > 0) ||

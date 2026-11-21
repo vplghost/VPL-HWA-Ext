@@ -158,7 +158,9 @@ export function installInterceptor(customWindow?: any): void {
     'clan_getSummary',
     'getSummary',
     'playable_getAvailable',
-    'worldStars_getAvailable'
+    'worldStars_getAvailable',
+    'eternalStory_getState',
+    'eternalStory_getChest'
   ]);
 
   const migratedReadFeatures = new Map([
@@ -216,7 +218,8 @@ export function installInterceptor(customWindow?: any): void {
     'inventoryCraftRecipe',
     'cinemaGiveReward',
     'cinemaGetCounters',
-    'refillable_skillpointsUseVideo'
+    'refillable_skillpointsUseVideo',
+    'eternalStory_collectChest'
   ]);
 
   function isHelperAction(call: any): boolean {
@@ -253,7 +256,7 @@ export function installInterceptor(customWindow?: any): void {
   }
 
   const trackedMail = (call: any) => Boolean(mailService.validateClaim(call) && /^[a-f0-9]{32}$/.test(call?.ident || ''));
-  const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm']);
+  const claimActionMethods = new Set(['mailFarm', 'readAndClaimAll', 'quest_multiFarm', 'eternalStory_collectChest']);
   const claimQueueMethods = new Set([...claimActionMethods, 'mailGetAll', 'questGetAll']);
   const reportClaimResult = (ok: boolean, error: any = null) =>
     win.postMessage({ source: 'hwa-helper-api', kind: 'claim-rpc-result', ok, error }, loc.origin);
