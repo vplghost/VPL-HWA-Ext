@@ -8,6 +8,18 @@ import { expeditionRows, expeditionPlan, expeditionRefreshCalls } from '@/src/ut
 import { formatDuration, formatFinishTime } from '@/src/utils/formatters';
 import { getHeroMetadata } from '@/src/utils/metadata';
 
+interface PendingAction {
+  action: 'start' | 'collect';
+  expeditionIds: number[];
+  slotIds: number[];
+  expeditionId?: number;
+  slotId?: number;
+  heroes?: number[];
+  startedAt: number;
+  count: number;
+  previous?: string;
+}
+
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
 const { cache, dispatchRpc } = useRpcCache();
@@ -16,25 +28,29 @@ const now = useNow();
 const accountId = computed(() => cache.value.accountStatus?.data?.id ?? cache.value.userGetInfo?.data?.id);
 const rows = computed(() => expeditionRows(cache.value, now.value));
 const plan = computed(() => expeditionPlan(cache.value, now.value));
+const readyRows = computed(() => rows.value.filter(row => row.state === 'ready' && Number.isInteger(row.id)));
 const autoRunning = ref(false);
 const refreshing = ref(false);
 const message = ref('');
-const pending = shallowRef<{ action: 'start' | 'collect'; expeditionId: number; slotId?: number; heroes: number[]; startedAt: number; previous?: string } | null>(null);
+const pending = shallowRef<PendingAction | null>(null);
 const transitioningSlots = ref<number[]>([]);
 let timer: ReturnType<typeof setTimeout> | undefined;
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 const names = (ids: number[]) => ids.map(id => getHeroMetadata(id)?.name || `Hero #${id}`).join(', ');
 const teamFor = (slotId: number) => plan.value.find(item => item.slotId === slotId);
 
+const isAnyBusy = computed(() => !!pending.value || refreshing.value);
+
 function isSlotBusy(slotId: number, expeditionId?: number): boolean {
-  if (pending.value && (pending.value.slotId === slotId || pending.value.expeditionId === expeditionId)) {
-    return true;
+  if (pending.value) {
+    if (pending.value.slotIds.includes(slotId)) return true;
+    if (expeditionId != null && pending.value.expeditionIds.includes(expeditionId)) return true;
   }
   return transitioningSlots.value.includes(slotId);
 }
 
 function getSlotBusyText(slotId: number, expeditionId?: number): string {
-  if (pending.value && (pending.value.slotId === slotId || pending.value.expeditionId === expeditionId)) {
+  if (pending.value && (pending.value.slotIds.includes(slotId) || (expeditionId != null && pending.value.expeditionIds.includes(expeditionId)))) {
     return pending.value.action === 'collect' ? 'Collecting rewards…' : 'Starting expedition…';
   }
   return 'Loading next expedition…';
@@ -69,69 +85,232 @@ async function settle(success: boolean, error?: string) {
   if (!request) return;
   pending.value = null;
   clearTimeout(timer);
-  if (success && request.action === 'collect' && request.slotId != null) {
-    if (!transitioningSlots.value.includes(request.slotId)) {
-      transitioningSlots.value.push(request.slotId);
+  if (success && request.action === 'collect') {
+    for (const slotId of request.slotIds) {
+      if (!transitioningSlots.value.includes(slotId)) {
+        transitioningSlots.value.push(slotId);
+      }
     }
   }
-  message.value = success ? (request.action === 'collect' ? 'Expedition rewards collected.' : 'Expedition started.')
-    : error || (request.action === 'collect' ? 'Expedition collection was rejected.' : 'Expedition start was rejected.');
-  if (!success) autoRunning.value = false;
-  await nextTick();
-  if (autoRunning.value && props.modelValue) void startNext();
+  if (success) {
+    if (request.action === 'collect') {
+      message.value = request.count > 1
+        ? `Collected rewards from ${request.count} expeditions.`
+        : 'Expedition rewards collected.';
+    } else {
+      message.value = request.count > 1
+        ? `Started ${request.count} expeditions.`
+        : 'Expedition started.';
+    }
+  } else {
+    message.value = error || (request.action === 'collect' ? 'Expedition collection was rejected.' : 'Expedition start was rejected.');
+    autoRunning.value = false;
+  }
 }
 
 watch(() => cache.value.expeditionStartStatus, entry => {
   const request = pending.value;
   if (!request || request.action !== 'start' || !entry || entry.data?.token === request.previous ||
-      entry.data?.expeditionId !== request.expeditionId || String(entry.data.accountId) !== String(accountId.value) ||
+      String(entry.data.accountId) !== String(accountId.value) ||
       Date.parse(entry.updatedAt) < request.startedAt) return;
-  void settle(entry.data.success === true, entry.data.error);
+  if (request.count === 1 && entry.data?.expeditionId === request.expeditionId) {
+    void settle(entry.data.success === true, entry.data.error);
+  }
 });
 watch(() => cache.value.expeditionCollectStatus, entry => {
   const request = pending.value;
   if (!request || request.action !== 'collect' || !entry || entry.data?.token === request.previous ||
-      entry.data?.expeditionId !== request.expeditionId || String(entry.data.accountId) !== String(accountId.value) ||
+      String(entry.data.accountId) !== String(accountId.value) ||
       Date.parse(entry.updatedAt) < request.startedAt) return;
-  void settle(entry.data.success === true, entry.data.error);
+  if (request.count === 1 && entry.data?.expeditionId === request.expeditionId) {
+    void settle(entry.data.success === true, entry.data.error);
+  }
 });
 watch(() => cache.value.expeditionStatus, entry => {
   const request = pending.value;
   if (!request || !entry || String(entry.data?.accountId) !== String(accountId.value) || Date.parse(entry.updatedAt) < request.startedAt) return;
-  const row = entry.data.rows?.find((row: any) => row.id === request.expeditionId);
+  const entryRows = entry.data.rows || [];
   if (request.action === 'collect') {
-    const replacement = entry.data.rows?.find((row: any) => row.slotId === request.slotId);
-    if (row?.status === 3 || replacement && replacement.id !== request.expeditionId) void settle(true);
+    const allSettled = request.expeditionIds.every((id, idx) => {
+      const row = entryRows.find((r: any) => r.id === id);
+      const reqSlot = request.slotIds[idx];
+      const replacement = entryRows.find((r: any) => r.slotId === reqSlot);
+      return row?.status === 3 || (replacement && replacement.id !== id);
+    });
+    if (allSettled) void settle(true);
     return;
   }
-  if (row?.status === 2 && Array.isArray(row.heroes) && row.heroes.length === request.heroes.length &&
-      row.heroes.every((id: number) => request.heroes.includes(id))) void settle(true);
+  if (request.action === 'start') {
+    const allStarted = request.expeditionIds.every(id => {
+      const row = entryRows.find((r: any) => r.id === id);
+      return row?.status === 2;
+    });
+    if (allStarted) void settle(true);
+  }
 });
 
-async function startNext(slotId?: number) {
+async function startAvailable() {
   if (pending.value || !props.modelValue || !hasGameTab.value) return;
-  const next = expeditionPlan(cache.value, Date.now()).find(item => slotId == null || item.slotId === slotId);
-  if (!next) { autoRunning.value = false; message.value = 'No more expeditions can start with the available heroes.'; return; }
-  const request = { action: 'start' as const, expeditionId: next.expeditionId, slotId: next.slotId, heroes: [...next.heroes], startedAt: Date.now(),
-    previous: cache.value.expeditionStartStatus?.data?.token };
+  const currentPlan = expeditionPlan(cache.value, Date.now());
+  if (!currentPlan.length) {
+    autoRunning.value = false;
+    message.value = 'No more expeditions can start with the available heroes.';
+    return;
+  }
+  const expeditionIds = currentPlan.map(p => p.expeditionId);
+  const slotIds = currentPlan.map(p => p.slotId);
+  const request: PendingAction = {
+    action: 'start',
+    expeditionIds,
+    slotIds,
+    expeditionId: expeditionIds[0],
+    slotId: slotIds[0],
+    heroes: [...currentPlan[0].heroes],
+    startedAt: Date.now(),
+    count: currentPlan.length,
+    previous: cache.value.expeditionStartStatus?.data?.token
+  };
+  pending.value = request;
+  message.value = currentPlan.length > 1
+    ? `Starting ${currentPlan.length} expeditions…`
+    : 'Starting expedition…';
+
+  const calls = currentPlan.map(item => ({
+    name: 'artifact_expeditionStart',
+    args: { expeditionId: item.expeditionId, heroes: [...item.heroes] }
+  }));
+
+  try {
+    const response = await dispatchRpc(calls);
+    if (pending.value !== request) return;
+    if (!response?.ok) {
+      void settle(false, response?.error || 'Expedition start could not be sent.');
+      return;
+    }
+    message.value = response.queued
+      ? 'Start queued. Waiting for game traffic.'
+      : 'Waiting for expedition confirmation…';
+    timer = setTimeout(() => {
+      if (pending.value === request) {
+        autoRunning.value = false;
+        message.value = 'Still awaiting confirmation. Refresh game data before continuing.';
+      }
+    }, 30000);
+  } catch (error) {
+    if (pending.value === request) void settle(false, String(error));
+  }
+}
+
+async function startNext(slotId?: number) {
+  if (slotId == null) {
+    return startAvailable();
+  }
+  if (pending.value || !props.modelValue || !hasGameTab.value) return;
+  const next = expeditionPlan(cache.value, Date.now()).find(item => item.slotId === slotId);
+  if (!next) {
+    message.value = 'No more expeditions can start with the available heroes.';
+    return;
+  }
+  const request: PendingAction = {
+    action: 'start',
+    expeditionIds: [next.expeditionId],
+    slotIds: [next.slotId],
+    expeditionId: next.expeditionId,
+    slotId: next.slotId,
+    heroes: [...next.heroes],
+    startedAt: Date.now(),
+    count: 1,
+    previous: cache.value.expeditionStartStatus?.data?.token
+  };
   pending.value = request;
   message.value = 'Starting expedition…';
+
   try {
-    const response = await dispatchRpc([{ name: 'artifact_expeditionStart', args: { expeditionId: next.expeditionId, heroes: [...next.heroes] } }]);
+    const response = await dispatchRpc([{
+      name: 'artifact_expeditionStart',
+      args: { expeditionId: next.expeditionId, heroes: [...next.heroes] }
+    }]);
     if (pending.value !== request) return;
-    if (!response?.ok) { void settle(false, response?.error || 'Expedition start could not be sent.'); return; }
-    message.value = response.queued ? 'Start queued. Waiting for game traffic.' : 'Waiting for expedition confirmation…';
+    if (!response?.ok) {
+      void settle(false, response?.error || 'Expedition start could not be sent.');
+      return;
+    }
+    message.value = response.queued
+      ? 'Start queued. Waiting for game traffic.'
+      : 'Waiting for expedition confirmation…';
     timer = setTimeout(() => {
-      if (pending.value === request) { autoRunning.value = false; message.value = 'Still awaiting confirmation. Refresh game data before continuing.'; }
+      if (pending.value === request) {
+        autoRunning.value = false;
+        message.value = 'Still awaiting confirmation. Refresh game data before continuing.';
+      }
     }, 30000);
-  } catch (error) { if (pending.value === request) void settle(false, String(error)); }
+  } catch (error) {
+    if (pending.value === request) void settle(false, String(error));
+  }
 }
+
+async function collectAll() {
+  if (pending.value || !props.modelValue || !hasGameTab.value) return;
+  const ready = readyRows.value;
+  if (!ready.length) return;
+
+  const expeditionIds = ready.map(r => r.id);
+  const slotIds = ready.map(r => r.slotId);
+  const request: PendingAction = {
+    action: 'collect',
+    expeditionIds,
+    slotIds,
+    expeditionId: expeditionIds[0],
+    slotId: slotIds[0],
+    startedAt: Date.now(),
+    count: ready.length,
+    previous: cache.value.expeditionCollectStatus?.data?.token
+  };
+  pending.value = request;
+  message.value = ready.length > 1
+    ? `Collecting rewards from ${ready.length} expeditions…`
+    : 'Collecting expedition rewards…';
+
+  const calls = ready.map(r => ({
+    name: 'expeditionFarm',
+    args: { expeditionId: r.id }
+  }));
+
+  try {
+    const response = await dispatchRpc(calls);
+    if (pending.value !== request) return;
+    if (!response?.ok) {
+      void settle(false, response?.error || 'Collection could not be sent.');
+      return;
+    }
+    message.value = response.queued
+      ? 'Collection queued. Waiting for game traffic.'
+      : 'Waiting for collection confirmation…';
+    timer = setTimeout(() => {
+      if (pending.value === request) {
+        message.value = 'Still awaiting collection confirmation. Refresh game data before continuing.';
+      }
+    }, 30000);
+  } catch (error) {
+    if (pending.value === request) void settle(false, String(error));
+  }
+}
+
 async function collect(slotId: number) {
-  if (pending.value || autoRunning.value || !props.modelValue || !hasGameTab.value) return;
+  if (pending.value || !props.modelValue || !hasGameTab.value) return;
   const row = expeditionRows(cache.value, Date.now()).find(row => row.slotId === slotId && row.state === 'ready');
   if (!row || !Number.isInteger(row.id)) return;
-  const request = { action: 'collect' as const, expeditionId: row.id, slotId,
-    heroes: [...row.heroes], startedAt: Date.now(), previous: cache.value.expeditionCollectStatus?.data?.token };
+  const request: PendingAction = {
+    action: 'collect',
+    expeditionIds: [row.id],
+    slotIds: [slotId],
+    expeditionId: row.id,
+    slotId,
+    heroes: [...row.heroes],
+    startedAt: Date.now(),
+    count: 1,
+    previous: cache.value.expeditionCollectStatus?.data?.token
+  };
   pending.value = request;
   message.value = 'Collecting expedition rewards…';
   try {
@@ -144,7 +323,7 @@ async function collect(slotId: number) {
     }, 30000);
   } catch (error) { if (pending.value === request) void settle(false, String(error)); }
 }
-function startAvailable() { if (!pending.value) { autoRunning.value = true; void startNext(); } }
+
 watch(() => props.modelValue, open => { if (open) void refresh(); else autoRunning.value = false; });
 watch(accountId, () => { autoRunning.value = false; pending.value = null; message.value = ''; transitioningSlots.value = []; clearTimeout(timer); clearTimeout(refreshTimer); });
 onUnmounted(() => { clearTimeout(timer); clearTimeout(refreshTimer); });
@@ -155,12 +334,32 @@ onUnmounted(() => { clearTimeout(timer); clearTimeout(refreshTimer); });
     <div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <p class="text-xs text-slate-500">Hero expeditions require 5 available heroes and enough power. Video Expedition requires no heroes.</p>
-        <div class="flex gap-2">
-          <button type="button" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50" :disabled="refreshing || !hasGameTab" @click="refresh">
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isAnyBusy || !hasGameTab"
+            @click="refresh"
+          >
             {{ refreshing ? 'Refreshing…' : 'Refresh' }}
           </button>
-          <button v-if="autoRunning" type="button" class="rounded-lg border border-amber-400 px-3 py-1.5 text-xs cursor-pointer" @click="autoRunning = false">Stop after current</button>
-          <button v-else type="button" class="rounded-lg bg-violet-600 px-3 py-1.5 text-xs text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" :disabled="!!pending || refreshing || !hasGameTab || !plan.length" @click="startAvailable">Start available ({{ plan.length }})</button>
+          <button
+            v-if="readyRows.length"
+            type="button"
+            class="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-colors"
+            :disabled="isAnyBusy || !hasGameTab"
+            @click="collectAll"
+          >
+            {{ pending?.action === 'collect' && pending.count > 1 ? `Claiming (${pending.count})…` : `Claim all (${readyRows.length})` }}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-violet-600 hover:bg-violet-700 px-3 py-1.5 text-xs text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-colors"
+            :disabled="isAnyBusy || !hasGameTab || !plan.length"
+            @click="startAvailable"
+          >
+            {{ pending?.action === 'start' && pending.count > 1 ? `Starting (${pending.count})…` : `Start available (${plan.length})` }}
+          </button>
         </div>
       </div>
       <p v-if="message" class="text-xs text-slate-600 dark:text-slate-300" role="status">{{ message }}</p>
@@ -242,19 +441,19 @@ onUnmounted(() => { clearTimeout(timer); clearTimeout(refreshTimer); });
                 v-if="row.state === 'ready'"
                 type="button"
                 class="w-full sm:w-auto rounded-lg bg-emerald-600 px-3 py-1.5 text-xs text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-colors"
-                :disabled="!!pending || autoRunning || refreshing || isSlotBusy(row.slotId, row.id) || !hasGameTab"
+                :disabled="isAnyBusy || isSlotBusy(row.slotId, row.id) || !hasGameTab"
                 @click="collect(row.slotId)"
               >
-                {{ pending?.action === 'collect' && (pending.expeditionId === row.id || pending.slotId === row.slotId) ? 'Awaiting confirmation…' : 'Collect' }}
+                {{ pending?.action === 'collect' && pending.slotIds.includes(row.slotId) ? 'Awaiting confirmation…' : 'Collect' }}
               </button>
               <button
                 v-if="row.state === 'idle'"
                 type="button"
                 class="w-full sm:w-auto rounded-lg border border-violet-300 dark:border-violet-800 px-3 py-1 text-xs text-violet-600 dark:text-violet-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
-                :disabled="!!pending || autoRunning || refreshing || isSlotBusy(row.slotId, row.id) || !hasGameTab || !teamFor(row.slotId)"
+                :disabled="isAnyBusy || isSlotBusy(row.slotId, row.id) || !hasGameTab || !teamFor(row.slotId)"
                 @click="startNext(row.slotId)"
               >
-                {{ pending?.expeditionId === row.id ? 'Awaiting confirmation…' : 'Auto select & start' }}
+                {{ pending?.action === 'start' && pending.slotIds.includes(row.slotId) ? 'Awaiting confirmation…' : 'Auto select & start' }}
               </button>
             </div>
           </article>

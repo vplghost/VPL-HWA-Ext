@@ -148,32 +148,89 @@ async function view(t) {
     useRpcCache: () => ({ cache, dispatchRpc: batch => { calls.push(batch); return new Promise(resolve => callbacks.push(resolve)); } }),
     expeditionRows, expeditionPlan, expeditionRefreshCalls,
     setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {}, getHeroMetadata: id => ({ name: `Hero ${id}` }) };
-  vm.runInNewContext(js + '\nglobalThis.ui = { startAvailable, startNext, collect, refresh, refreshing, isSlotBusy, getSlotBusyText, transitioningSlots, pending, autoRunning, message, rows, plan };', boundary);
+  vm.runInNewContext(js + '\nglobalThis.ui = { startAvailable, startNext, collect, collectAll, readyRows, refresh, refreshing, isSlotBusy, getSlotBusyText, transitioningSlots, pending, autoRunning, message, rows, plan };', boundary);
   t.after(() => stops.forEach(stop => stop()));
   return { ...boundary.ui, cache, clock, props, calls, callbacks, timers };
 }
 const flush = async () => { await nextTick(); await nextTick(); };
 
-test('real dialog waits through queued ack and confirms each auto start before sending the next', async t => {
-  const v = await view(t); v.startAvailable();
-  assert.equal(v.calls.length, 1); assert.ok(v.pending.value);
-  v.callbacks.shift()({ ok: true, queued: true }); await flush();
+test('real dialog batches all available expeditions in a single RPC call, locks all participating slots, and settles on confirmation', async t => {
+  const v = await view(t);
+  assert.equal(v.plan.value.length, 6);
+  v.startAvailable();
   assert.equal(v.calls.length, 1);
-  const first = v.calls[0][0];
-  assert.equal(first.args.heroes.length, 5);
-  v.clock.value = at + 1001;
-  v.cache.value = reducer.merge(v.cache.value, [rpc(first.name, { endTime: (at + 361000) / 1000 }, first.args, at + 1001, 'accepted')]).cache;
+  assert.ok(v.pending.value);
+  assert.equal(v.calls[0].length, 6, 'Must batch all planned expeditions in 1 call array');
+  assert.ok(v.calls[0].every(call => call.name === 'artifact_expeditionStart'));
+
+  // UI lock verification: all participating slots must be locked with busy state
+  for (const item of v.plan.value) {
+    assert.equal(v.isSlotBusy(item.slotId, item.expeditionId), true, `Slot ${item.slotId} must be busy during batch start`);
+    assert.match(v.getSlotBusyText(item.slotId, item.expeditionId), /Starting expedition/);
+  }
+
+  const allHeroes = v.calls[0].flatMap(call => call.args.heroes);
+  assert.equal(new Set(allHeroes).size, allHeroes.length);
+
+  v.callbacks.shift()({ ok: true, queued: true });
   await flush();
-  assert.equal(v.calls.length, 2);
-  assert.ok(v.calls.every(batch => batch[0].name === 'artifact_expeditionStart'));
-  const all = v.calls.flatMap(batch => batch[0].args.heroes);
-  assert.equal(new Set(all).size, all.length);
-  v.autoRunning.value = false; // Stop after current: pending confirmation is retained.
-  v.callbacks.shift()({ ok: true, queued: true }); await flush();
-  const second = v.calls[1][0];
-  v.clock.value = at + 1002;
-  v.cache.value = reducer.merge(v.cache.value, [rpc(second.name, { endTime: (at + 400000) / 1000 }, second.args, at + 1002, 'second')]).cache;
-  await flush(); assert.equal(v.calls.length, 2); assert.equal(v.pending.value, null);
+  assert.equal(v.calls.length, 1, 'No additional calls dispatched while awaiting confirmation');
+
+  // All starts confirmed in cache
+  v.clock.value = at + 1001;
+  const startRecords = v.calls[0].map((call, idx) =>
+    rpc(call.name, { endTime: (at + 360000 + idx * 1000) / 1000 }, call.args, at + 1001, `batch-start-${idx}`)
+  );
+  v.cache.value = reducer.merge(v.cache.value, startRecords).cache;
+  await flush();
+
+  assert.equal(v.pending.value, null, 'Pending action must clear once all batched starts are confirmed');
+  assert.match(v.message.value, /Started 6 expeditions/);
+});
+
+test('real dialog collectAll batches all ready expeditions into a single RPC call with UI lock', async t => {
+  const v = await view(t);
+  // Prepare cache with 2 completed/ready expeditions (id: 1, 4)
+  v.cache.value = {
+    ...state(rows.map(row => [1, 4].includes(row.id)
+      ? { ...row, status: 2, endTime: at / 1000 - 1, heroes: [1], attemptsLeft: 0 }
+      : row
+    )),
+    heroGetAll: entry(owned)
+  };
+  await flush();
+
+  assert.equal(v.readyRows.value.length, 2);
+  const readyIds = v.readyRows.value.map(r => r.id);
+  const readySlotIds = v.readyRows.value.map(r => r.slotId);
+
+  // Trigger batch collectAll
+  v.collectAll();
+  assert.equal(v.calls.length, 1, 'Must dispatch exactly 1 batched RPC request');
+  assert.equal(v.calls[0].length, 2, 'Batched request must contain all ready expeditions');
+  assert.ok(v.calls[0].every(c => c.name === 'expeditionFarm'));
+  assert.deepEqual(v.calls[0].map(c => c.args.expeditionId), readyIds);
+
+  // Verify UI lock across all ready slots
+  for (let i = 0; i < readyIds.length; i++) {
+    assert.equal(v.isSlotBusy(readySlotIds[i], readyIds[i]), true, `Slot ${readySlotIds[i]} must be busy during collectAll`);
+    assert.match(v.getSlotBusyText(readySlotIds[i], readyIds[i]), /Collecting rewards/);
+  }
+
+  // Acknowledge transport
+  v.callbacks.shift()({ ok: true, queued: true });
+  await flush();
+
+  // Simulate cache updates for all collected expeditions
+  v.clock.value = at + 1001;
+  const collectRecords = readyIds.map((id, idx) =>
+    rpc('expeditionFarm', { reward: { consumable: { 35: 5 } }, newExpedition: null }, { expeditionId: id }, at + 1001, `collect-batch-${idx}`)
+  );
+  v.cache.value = reducer.merge(v.cache.value, collectRecords).cache;
+  await flush();
+
+  assert.equal(v.pending.value, null, 'Pending action must settle after all batched collections are confirmed');
+  assert.match(v.message.value, /Collected rewards from 2 expeditions/);
 });
 
 test('real dialog stops on rejection/timeout, never retries uncertain starts, and resets on account change', async t => {
