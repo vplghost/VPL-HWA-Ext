@@ -10,6 +10,7 @@ import { parse, compileScript } from '@vue/compiler-sfc';
 import ts from 'typescript';
 import { buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory } from '../src/utils/recipeTree.ts';
 import { campaignMissions, getHighestRaidableMission, getMissionTries } from '../src/data/campaignData.ts';
+import { getEnergy } from '../src/utils/resourceData.ts';
 
 const require = createRequire(import.meta.url);
 import { nameData } from '../src/data/nameData.ts';
@@ -105,6 +106,7 @@ test('actual dialog targets nested fragments, computes progress and blocks unrel
   const source = text.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
   const data = ref({ ...cache(), missionGetAll: { data: Object.fromEntries(Object.keys(campaignMissions).map(id => [id, { stars: 3 }])) } });
   const context = { ref, computed, watch() {}, onMounted() {}, onUnmounted() {},
+    getEnergy,
     defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     useRpcCache: () => ({ cache: data, dispatchRpc: async () => ({ ok: false }) }), useModals: () => ({ modalContext: {} }),
     buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory,

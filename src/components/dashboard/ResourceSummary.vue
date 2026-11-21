@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
-import { formatResourceAmount, getAmountAt, getNextRefillSeconds } from '@/src/utils/resourceData';
+import { formatResourceAmount, getNextRefillSeconds, getGold, getStarMoney, getEnergy, getWorldEnergy } from '@/src/utils/resourceData';
 import { formatDuration } from '@/src/utils/formatters';
 
 const { cache } = useRpcCache();
@@ -23,26 +23,19 @@ const worldEnergyEntry = computed(() => cache.value['resource:world-energy']);
 const goldEntry = computed(() => cache.value['resource:gold']);
 const starMoneyEntry = computed(() => cache.value['resource:starMoney'] || cache.value['resource:diamond']);
 
-const energyVal = computed(() => getAmountAt(energyEntry.value, now.value) ?? cache.value.energyStatus?.data?.energy ?? 0);
+const energyVal = computed(() => getEnergy(cache.value, now.value) ?? 0);
 const energyCap = computed(() => energyEntry.value?.data?.cap ?? 0);
 const energyRefillSec = computed(() => getNextRefillSeconds(energyEntry.value, now.value));
 
-const worldEnergyVal = computed(() => getAmountAt(worldEnergyEntry.value, now.value) ?? cache.value.worldEnergyStatus?.data?.energy ?? 0);
+const worldEnergyVal = computed(() => getWorldEnergy(cache.value, now.value) ?? 0);
 const worldEnergyCap = computed(() => worldEnergyEntry.value?.data?.cap ?? 200);
 const worldEnergyRefillSec = computed(() => getNextRefillSeconds(worldEnergyEntry.value, now.value));
 
-const goldVal = computed(
-  () =>
-    goldEntry.value?.data?.amount ??
-    cache.value.userGetInfo?.data?.user?.gold ??
-    cache.value.userGetInfo?.data?.gold ??
-    0
-);
+const goldVal = computed(() => getGold(cache.value));
 const diamondVal = computed(
   () =>
-    starMoneyEntry.value?.data?.amount ??
+    getStarMoney(cache.value) ??
     cache.value.userGetInfo?.data?.user?.starMoney ??
-    cache.value.userGetInfo?.data?.starMoney ??
     0
 );
 

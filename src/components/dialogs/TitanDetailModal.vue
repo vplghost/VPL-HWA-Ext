@@ -15,6 +15,7 @@ import {
   type TitanMeta,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import { getGold } from '@/src/utils/resourceData';
 import { getItemIcon } from '@/src/utils/itemResources';
 import {
   titanEvolutionCosts,
@@ -190,10 +191,8 @@ const elementStyle = computed(() => {
   return ELEMENT_STYLES[el] || ELEMENT_STYLES.Water;
 });
 
-// Resources
-const gold = computed(() => {
-  return Number(cache.value?.userGetInfo?.data?.gold ?? cache.value?.['resource:gold']?.data?.amount ?? 0);
-});
+// Resources (canonical single source of truth for gold)
+const gold = computed(() => getGold(cache.value));
 
 const fairyDust = computed(() => {
   return Number(cache.value?.inventoryGet?.data?.coin?.['18'] ?? cache.value?.['resource:coin:18']?.data?.amount ?? 0);

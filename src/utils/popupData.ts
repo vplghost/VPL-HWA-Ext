@@ -20,6 +20,7 @@ import {
 } from './eventClaimHelper.ts';
 import { getAttentionBonusAvailability } from './freeChestHelper.ts';
 import { freeAlchemyAvailability } from '../services/freeAlchemy.ts';
+import { getGold, getStarMoney, getEnergy } from './resourceData.ts';
 
 // enum_evolutionStar.json and enum_titanEvolutionStar.json from verified 1.294.0 (client 1.294.1020) splitlib asset.
 // Each value is the cost to evolve TO that star, not the current star.
@@ -260,12 +261,7 @@ export function isTitanArtifactUpgradable(titanId: number | string, slotIndex: n
     if (cost) {
       const [dustNeeded, goldNeeded] = cost;
       const fairyDust = Number(cache?.inventoryGet?.data?.coin?.['18'] ?? 0);
-      const userGold = Number(
-        cache?.['resource:gold']?.value ??
-        cache?.userGetInfo?.data?.gold ??
-        cache?.inventoryGet?.data?.coin?.['1'] ??
-        Infinity
-      );
+      const userGold = getGold(cache);
       if (fairyDust >= dustNeeded && userGold >= goldNeeded) {
         canLevelUp = true;
       }
@@ -329,7 +325,7 @@ export function getChallengeResourceStock(cache: any, target: string | number): 
   if (tId === 51 || tStr.includes('rune stone')) return getCoin('40077') || getCoin('1051');
   if (tId === 56 || tStr.includes('mastery crystal')) return getCoin('40067');
   if (tId === 49 || (tStr.includes('spend') && tStr.includes('energy'))) {
-    return cache['resource:energy']?.data?.amount ?? cache.energyStatus?.data?.energy ?? 0;
+    return getEnergy(cache);
   }
   if (tId === 47 || tStr.includes('hero soul stone')) {
     return Object.values(fragments).reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
@@ -338,7 +334,7 @@ export function getChallengeResourceStock(cache: any, target: string | number): 
   if (tId === 92 || tStr.includes('honor mark')) return cache['resource:material:12']?.data?.amount ?? 0;
   if (tId === 114 || tStr.includes('outland chest')) return getCoin('2');
   if (tStr.includes('emerald') || tStr.includes('starmoney')) {
-    return cache['resource:starMoney']?.data?.amount ?? cache.userGetInfo?.data?.user?.starMoney ?? null;
+    return getStarMoney(cache);
   }
   return null;
 }

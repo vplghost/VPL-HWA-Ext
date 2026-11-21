@@ -2311,7 +2311,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           }
           return entries;
         }
-        if (key === 'refillableGetAll:refillable' && Array.isArray(result?.response?.refillables)) {
+        if ((key === 'refillableGetAll:refillable' || call.name === 'refillableGetAll') && Array.isArray(result?.response?.refillables)) {
           return result.response.refillables.flatMap((item) => {
             const cacheKey = item.refillableId === 1 ? 'energyStatus' :
               item.refillableId === 2 ? 'worldEnergyStatus' : null;
@@ -3935,16 +3935,6 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 ...next.userGetInfo.data,
                 refillable: next.userGetInfo.data.refillable.map((r: any) =>
                   r?.id === 1 ? { ...r, amount: data.amount } : r
-                )
-              }
-            };
-          } else if (rawResKey === 'world-energy' && Array.isArray(next.userGetInfo?.data?.refillable)) {
-            next.userGetInfo = {
-              ...next.userGetInfo,
-              data: {
-                ...next.userGetInfo.data,
-                refillable: next.userGetInfo.data.refillable.map((r: any) =>
-                  r?.id === 2 ? { ...r, amount: data.amount } : r
                 )
               }
             };

@@ -4,13 +4,14 @@ import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 import { ref, computed } from 'vue';
-import { getAmountAt, getNextRefillSeconds, formatResourceAmount } from '../src/utils/resourceData.ts';
+import { getAmountAt, getNextRefillSeconds, formatResourceAmount, getEnergy, getWorldEnergy, getGold, getStarMoney } from '../src/utils/resourceData.ts';
 
 async function setup(name, exports, extra) {
   const source = await readFile(new URL('../src/components/dashboard/' + name, import.meta.url), 'utf8');
   const script = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import .*;\r?$/gm, '');
   const js = ts.transpileModule(script, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
   const context = { ref, computed, onMounted() {}, onUnmounted() {},
+    getEnergy, getWorldEnergy, getGold, getStarMoney,
     useModals: () => ({ openModal() {} }), useGameConnection: () => ({ hasGameTab: ref(true) }), ...extra };
   vm.runInNewContext(js + '\nglobalThis.api = {' + exports + '};', context);
   return context.api;

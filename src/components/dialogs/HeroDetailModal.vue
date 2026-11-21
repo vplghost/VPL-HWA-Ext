@@ -19,6 +19,7 @@ import {
   starGlowClass,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import { getSkillPoints, getGold } from '@/src/utils/resourceData';
 import {
   getArtifactUpgradePlan,
   type ArtifactUpgradePlan,
@@ -73,20 +74,35 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+const now = ref(Date.now());
+let nowTimer: any = null;
+
 watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      now.value = Date.now();
+      if (!nowTimer) {
+        nowTimer = setInterval(() => {
+          now.value = Date.now();
+        }, 1000);
+      }
       registerModalOpen('hero');
       document.addEventListener('keydown', handleKeydown);
     } else {
+      if (nowTimer) {
+        clearInterval(nowTimer);
+        nowTimer = null;
+      }
       registerModalClose('hero');
       document.removeEventListener('keydown', handleKeydown);
     }
-  }
+  },
+  { immediate: true }
 );
 
 onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer);
   registerModalClose('hero');
   document.removeEventListener('keydown', handleKeydown);
 });
@@ -228,23 +244,9 @@ const upgradingSkillAction = ref<Record<number, 'single' | 'max' | null>>({});
 const isUpgradingSkills = ref(false);
 const isUpgradingAllSkills = ref(false);
 
-// Available skill points and gold
-const skillPoints = computed(() => {
-  const entry = cache.value?.['resource:refillable:2'];
-  if (entry?.data && Number.isFinite(entry.data.amount)) return Math.max(0, entry.data.amount);
-  const fromUser = cache.value?.userGetInfo?.data?.refillable?.find((r: any) => r?.id === 2);
-  if (fromUser && Number.isFinite(fromUser.amount)) return Math.max(0, fromUser.amount);
-  return 0;
-});
-
-const currentGold = computed(() => {
-  const entry = cache.value?.['resource:gold'];
-  if (entry?.data && Number.isFinite(entry.data.amount)) return Math.max(0, entry.data.amount);
-  if (cache.value?.userGetInfo?.data && Number.isFinite(cache.value.userGetInfo.data.gold)) {
-    return Math.max(0, cache.value.userGetInfo.data.gold);
-  }
-  return 0;
-});
+// Available skill points and gold (canonical single source of truth)
+const skillPoints = computed(() => getSkillPoints(cache.value, now.value));
+const currentGold = computed(() => getGold(cache.value));
 
 function getSkillPointsNeeded(s: SkillSlotConfig): number {
   if (!activeHero.value) return 0;

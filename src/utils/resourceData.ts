@@ -457,7 +457,109 @@ export function refillDescription(entry: ResourceEntry | undefined, now = Date.n
     'Full; refill resumes after spending' : 'Next refill time unavailable';
 }
 
+/**
+ * Single source of truth for Skill Points.
+ * Prioritizes resource:refillable:2 with live time-based refill calculation,
+ * with fallback to userGetInfo.data.refillable (id: 2).
+ */
+export function getSkillPoints(cache: any, now = Date.now()): number {
+  if (!cache) return 0;
+  const entry = cache['resource:refillable:2'];
+  if (entry) {
+    const val = getAmountAt(entry, now);
+    if (Number.isFinite(val)) return Math.max(0, val!);
+    if (Number.isFinite(entry.data?.amount)) return Math.max(0, entry.data.amount);
+  }
+  const fromUser = cache.userGetInfo?.data?.refillable?.find((r: any) => r?.id === 2);
+  if (fromUser && Number.isFinite(fromUser.amount)) {
+    if (Number.isFinite(fromUser.lastRefill)) {
+      const syntheticEntry = {
+        data: {
+          amount: fromUser.amount,
+          lastRefillAt: fromUser.lastRefill * 1000,
+          refillEveryMs: 300000,
+          refillAmount: 1,
+          cap: 10,
+          renewable: true
+        }
+      };
+      const val = getAmountAt(syntheticEntry, now);
+      if (Number.isFinite(val)) return Math.max(0, val!);
+    }
+    return Math.max(0, fromUser.amount);
+  }
+  return 0;
+}
+
+/**
+ * Single source of truth for Gold.
+ * Prioritizes resource:gold which is updated in real-time by actions,
+ * with fallback to userGetInfo.
+ */
+export function getGold(cache: any): number {
+  if (!cache) return 0;
+  const entry = cache['resource:gold'];
+  if (Number.isFinite(entry?.data?.amount)) return Math.max(0, entry.data.amount);
+  if (Number.isFinite(entry?.value)) return Math.max(0, entry.value);
+  const userGold = cache.userGetInfo?.data?.user?.gold ?? cache.userGetInfo?.data?.gold;
+  if (Number.isFinite(userGold)) return Math.max(0, userGold);
+  const coinGold = cache.inventoryGet?.data?.coin?.['1'];
+  if (Number.isFinite(coinGold)) return Math.max(0, coinGold);
+  return 0;
+}
+
+/**
+ * Single source of truth for Emeralds / StarMoney.
+ */
+export function getStarMoney(cache: any): number {
+  if (!cache) return 0;
+  const entry = cache['resource:starMoney'] || cache['resource:diamond'];
+  if (Number.isFinite(entry?.data?.amount)) return Math.max(0, entry.data.amount);
+  const userStar = cache.userGetInfo?.data?.user?.starMoney ?? cache.userGetInfo?.data?.starMoney;
+  if (Number.isFinite(userStar)) return Math.max(0, userStar);
+  return 0;
+}
+
+/**
+ * Single source of truth for Campaign Energy.
+ */
+export function getEnergy(cache: any, now = Date.now()): number | null {
+  if (!cache) return null;
+  const entry = cache['resource:energy'];
+  if (entry) {
+    const val = getAmountAt(entry, now);
+    if (Number.isFinite(val)) return Math.max(0, val!);
+    if (Number.isFinite(entry.data?.amount)) return Math.max(0, entry.data.amount);
+  }
+  const fromStatus = cache.energyStatus?.data?.energy;
+  if (Number.isFinite(fromStatus)) return Math.max(0, fromStatus);
+  const fromUser = cache.userGetInfo?.data?.refillable?.find((r: any) => r?.id === 1);
+  if (Number.isFinite(fromUser?.amount)) return Math.max(0, fromUser.amount);
+  return null;
+}
+
+/**
+ * Single source of truth for World Energy.
+ */
+export function getWorldEnergy(cache: any, now = Date.now()): number | null {
+  if (!cache) return null;
+  const entry = cache['resource:world-energy'];
+  if (entry) {
+    const val = getAmountAt(entry, now);
+    if (Number.isFinite(val)) return Math.max(0, val!);
+    if (Number.isFinite(entry.data?.amount)) return Math.max(0, entry.data.amount);
+  }
+  const fromStatus = cache.worldEnergyStatus?.data?.energy;
+  if (Number.isFinite(fromStatus)) return Math.max(0, fromStatus);
+  return null;
+}
+
 export const resourceDataHelper = {
+  getSkillPoints,
+  getGold,
+  getStarMoney,
+  getEnergy,
+  getWorldEnergy,
   amountAt,
   nextRefillSeconds,
   remainingMinutes,

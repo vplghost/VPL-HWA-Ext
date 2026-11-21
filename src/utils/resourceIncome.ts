@@ -1,3 +1,4 @@
+import { getStarMoney } from './resourceData.ts';
 export {
   getTodayActivityStats,
   getActivityStatsForDay,
@@ -613,12 +614,7 @@ export function formatCompactNumber(amount: number): string {
  * Get current emerald amount from cache slices.
  */
 export function getCurrentEmeraldAmount(cache: Record<string, any> = {}): number | null {
-  const val =
-    cache?.['resource:starMoney']?.data?.amount ??
-    cache?.['resource:diamond']?.data?.amount ??
-    cache?.userGetInfo?.data?.user?.starMoney ??
-    cache?.userGetInfo?.data?.starMoney;
-  const num = Number(val);
+  const num = getStarMoney(cache);
   return Number.isFinite(num) && num >= 0 ? num : null;
 }
 

@@ -29,6 +29,7 @@ import {
   getHeroSoulProgress,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
+import { getEnergy } from '@/src/utils/resourceData';
 import { getMissionCosts } from '@/src/data/missionCostData';
 import {
   campaignMissions,
@@ -392,7 +393,7 @@ watch(
 
 const energyStatus = computed(() => cache.value?.energyStatus?.data || {});
 const currentEnergy = computed(() => {
-  const e = energyStatus.value.energy ?? cache.value?.['resource:energy']?.data?.amount;
+  const e = getEnergy(cache.value, now.value);
   return Number.isFinite(e) ? Number(e) : '—';
 });
 const maxEnergy = computed(() => {
@@ -452,14 +453,27 @@ async function switchToDirectMode() {
   }
 }
 
+const now = ref(Date.now());
+let nowTimer: any = null;
+
 watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      now.value = Date.now();
+      if (!nowTimer) {
+        nowTimer = setInterval(() => {
+          now.value = Date.now();
+        }, 1000);
+      }
       registerModalOpen('campaign');
       document.addEventListener('keydown', handleKeydown);
       ensureRpcEnabled();
     } else {
+      if (nowTimer) {
+        clearInterval(nowTimer);
+        nowTimer = null;
+      }
       registerModalClose('campaign');
       document.removeEventListener('keydown', handleKeydown);
     }
@@ -468,6 +482,7 @@ watch(
 );
 
 onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer);
   registerModalClose('campaign');
   document.removeEventListener('keydown', handleKeydown);
 });

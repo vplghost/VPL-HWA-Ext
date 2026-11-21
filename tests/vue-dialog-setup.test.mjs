@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { ref, computed } from 'vue';
+import { getSkillPoints, getGold } from '../src/utils/resourceData.ts';
 
 // Execute the actual SFC setup handlers with Chrome/composable boundaries mocked.
 // Template rendering and live Chrome behavior remain browser acceptance work.
@@ -15,6 +16,7 @@ async function setup(file, exposed, cacheData = {}) {
   const cache = ref(cacheData);
   const api = { cache, dispatchRpc: async calls => { sent.push(calls); return { ok: false, error: 'disabled' }; } };
   const context = vm.createContext({ ref, computed, console, Date, Map, Set, Number, Object, Array,
+    getSkillPoints, getGold,
     defineProps: () => ({ modelValue: false, hero: { id: 1 } }), defineEmits: () => () => {},
     onMounted: fn => mounted.push(fn), onUnmounted() {}, watch() {},
     useRpcCache: () => api, useModals: () => ({ openModal() {} }),
