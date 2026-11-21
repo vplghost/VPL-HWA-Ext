@@ -46,25 +46,45 @@ export function useRecorder() {
   async function reload() {
     const current = ++revision;
     try {
-      const stored = await chrome.storage.session.get(null);
-      if (current === revision) logs.value = recorderEntries(stored);
+      if (typeof chrome !== 'undefined' && chrome.storage?.session?.get) {
+        const stored = await chrome.storage.session.get(null).catch(() => ({}));
+        const entries = recorderEntries(stored);
+        if (entries.length > 0) {
+          if (current === revision) logs.value = entries;
+          return;
+        }
+      }
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        const res = await chrome.runtime.sendMessage({ kind: 'record-list' }).catch(() => null);
+        if (res?.records && Array.isArray(res.records)) {
+          if (current === revision) logs.value = res.records;
+          return;
+        }
+      }
+      if (current === revision) logs.value = [];
     } catch (cause) { error.value = String(cause); }
   }
   function onChanged(changes: Record<string, chrome.storage.StorageChange>, area: string) {
-    if (area === 'session' && Object.keys(changes).some((key) => key.startsWith('record:'))) void reload();
+    if (area === 'local' && ('gameRecordingActive' in changes || 'recordingState' in changes)) {
+      void reload();
+    } else if (area === 'session' && Object.keys(changes).some((key) => key.startsWith('record:') || key === 'recordingState')) {
+      void reload();
+    }
   }
   onMounted(() => {
-    chrome.storage.onChanged.addListener(onChanged);
+    chrome.storage?.onChanged?.addListener?.(onChanged);
     void reload();
   });
-  onUnmounted(() => { ++revision; chrome.storage.onChanged.removeListener(onChanged); });
+  onUnmounted(() => { ++revision; chrome.storage?.onChanged?.removeListener?.(onChanged); });
   async function control(kind: 'record-clear' | 'record-export') {
     busy.value = true;
     error.value = '';
     try {
       const response = await chrome.runtime.sendMessage({ kind });
       if (!response || response.error) throw new Error(response?.error || 'Recorder is unavailable.');
-      if (kind === 'record-clear') await reload();
+      if (kind === 'record-clear') {
+        logs.value = [];
+      }
       return response;
     } catch (cause) { error.value = String(cause); }
     finally { busy.value = false; }

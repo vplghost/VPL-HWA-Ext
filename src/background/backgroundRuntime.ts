@@ -39,6 +39,15 @@ export const CACHE_KEY = 'rpcCache';
 let activeChrome: any = null;
 let pending: Promise<any> = Promise.resolve();
 
+let inMemoryApiRecords: any[] = [];
+let inMemoryInteractions: any[] = [];
+let inMemoryRecordState = {
+  active: false,
+  nextIndex: 0,
+  nextInteractionIndex: 0,
+  error: null as string | null
+};
+
 const isNodeTest = typeof process !== 'undefined' && Boolean(process.env?.NODE_TEST_CONTEXT);
 let activeRpcDebounceMs = isNodeTest ? 0 : 300;
 let pendingRpcCacheToSave: any = null;
@@ -2443,76 +2452,133 @@ export function socketRefreshCalls(record: any, cache: any): any[] {
 }
 
 export async function recordedEntries(customChrome?: any): Promise<[string, any][]> {
+  if (inMemoryApiRecords.length > 0) {
+    return inMemoryApiRecords.map((r, i) => [`${RECORD_PREFIX}${i}`, r]);
+  }
   const cr = getActiveChrome(customChrome);
-  const stored = (await cr?.storage?.session?.get(null)) || {};
+  const stored = (await cr?.storage?.session?.get?.(null)?.catch?.(() => ({}))) || {};
   return Object.entries(stored)
     .filter(([key]) => key.startsWith(RECORD_PREFIX))
     .sort(([a], [b]) => Number(a.slice(RECORD_PREFIX.length)) - Number(b.slice(RECORD_PREFIX.length)));
 }
 
 export async function clearRecorded(customChrome?: any) {
+  inMemoryApiRecords = [];
   const cr = getActiveChrome(customChrome);
-  const keys = (await recordedEntries(cr)).map(([key]) => key);
-  if (keys.length) await cr?.storage?.session?.remove(keys);
+  const stored = (await cr?.storage?.session?.get?.(null)?.catch?.(() => ({}))) || {};
+  const keys = Object.keys(stored).filter((k) => k.startsWith(RECORD_PREFIX));
+  if (keys.length) await cr?.storage?.session?.remove?.(keys)?.catch?.(() => {});
 }
 
 export async function interactionEntries(customChrome?: any): Promise<[string, any][]> {
+  if (inMemoryInteractions.length > 0) {
+    return inMemoryInteractions.map((r, i) => [`${INTERACTION_PREFIX}${i}`, r]);
+  }
   const cr = getActiveChrome(customChrome);
-  const stored = (await cr?.storage?.local?.get(null)) || {};
+  const stored = (await cr?.storage?.local?.get?.(null)?.catch?.(() => ({}))) || {};
   return Object.entries(stored)
     .filter(([key]) => key.startsWith(INTERACTION_PREFIX))
     .sort(([a], [b]) => Number(a.slice(INTERACTION_PREFIX.length)) - Number(b.slice(INTERACTION_PREFIX.length)));
 }
 
 export async function clearInteractions(customChrome?: any) {
+  inMemoryInteractions = [];
   const cr = getActiveChrome(customChrome);
-  const keys = (await interactionEntries(cr)).map(([key]) => key);
-  if (keys.length) await cr?.storage?.local?.remove(keys);
+  const stored = (await cr?.storage?.local?.get?.(null)?.catch?.(() => ({}))) || {};
+  const keys = Object.keys(stored).filter((k) => k.startsWith(INTERACTION_PREFIX));
+  if (keys.length) await cr?.storage?.local?.remove?.(keys)?.catch?.(() => {});
 }
 
 export async function handleControl(kind: string, customChrome?: any) {
   const cr = getActiveChrome(customChrome);
-  const stored = (await cr?.storage?.session?.get(RECORD_STATE_KEY)) || {};
-  const state = stored[RECORD_STATE_KEY] || { active: false, nextIndex: 0 };
+  const stored = (await cr?.storage?.session?.get?.(RECORD_STATE_KEY)?.catch?.(() => ({}))) || {};
+  const state = stored[RECORD_STATE_KEY] || inMemoryRecordState || { active: false, nextIndex: 0 };
   if (kind === 'record-start') {
-    const next = { active: true, nextIndex: 0, nextInteractionIndex: 0, error: null };
+    inMemoryApiRecords = [];
+    inMemoryInteractions = [];
+    inMemoryRecordState = { active: true, nextIndex: 0, nextInteractionIndex: 0, error: null };
+    const next = { ...inMemoryRecordState };
     await Promise.all([
-      cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next }),
-      cr?.storage?.local?.set({ gameRecordingActive: true, recordingState: next })
+      cr?.storage?.session?.set?.({ [RECORD_STATE_KEY]: next })?.catch?.(() => {}),
+      cr?.storage?.local?.set?.({ gameRecordingActive: true, recordingState: next })?.catch?.(() => {})
     ]);
     await clearRecorded(cr);
     await clearInteractions(cr);
-    await cr?.storage?.local?.remove('apiRecords');
-    const settings = (await cr?.storage?.local?.get('captureSettings')) || {};
+    await cr?.storage?.local?.remove?.('apiRecords')?.catch?.(() => {});
+    const settings = (await cr?.storage?.local?.get?.('captureSettings')?.catch?.(() => ({}))) || {};
     if (settings.captureSettings?.interceptEnabled === false) {
-      await cr?.storage?.local?.set({
+      await cr?.storage?.local?.set?.({
         captureSettings: {
           ...settings.captureSettings,
           interceptEnabled: true
         }
-      });
+      })?.catch?.(() => {});
     }
     return next;
   }
   if (kind === 'record-stop') {
-    const next = { ...state, active: false };
+    inMemoryRecordState.active = false;
+    const next = {
+      ...state,
+      ...inMemoryRecordState,
+      active: false,
+      nextIndex: inMemoryApiRecords.length || state.nextIndex || 0,
+      nextInteractionIndex: inMemoryInteractions.length || state.nextInteractionIndex || 0
+    };
     await Promise.all([
-      cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next }),
-      cr?.storage?.local?.set({ gameRecordingActive: false, recordingState: next })
+      cr?.storage?.session?.set?.({ [RECORD_STATE_KEY]: next })?.catch?.(() => {}),
+      cr?.storage?.local?.set?.({ gameRecordingActive: false, recordingState: next })?.catch?.(() => {})
     ]);
     return next;
   }
   if (kind === 'record-clear') {
-    const next = { active: false, nextIndex: 0, nextInteractionIndex: 0, error: null };
+    inMemoryApiRecords = [];
+    inMemoryInteractions = [];
+    inMemoryRecordState = { active: false, nextIndex: 0, nextInteractionIndex: 0, error: null };
+    const next = { ...inMemoryRecordState };
     await Promise.all([
-      cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next }),
-      cr?.storage?.local?.set({ gameRecordingActive: false, recordingState: next })
+      cr?.storage?.session?.set?.({ [RECORD_STATE_KEY]: next })?.catch?.(() => {}),
+      cr?.storage?.local?.set?.({ gameRecordingActive: false, recordingState: next })?.catch?.(() => {})
     ]);
     await clearRecorded(cr);
     await clearInteractions(cr);
     return next;
   }
-  return state;
+  return inMemoryRecordState;
+}
+
+export async function saveInteraction(entry: any, cr: any): Promise<any> {
+  let active = false;
+  if (cr?.storage?.session?.get) {
+    const sessionStore = await cr.storage.session.get(RECORD_STATE_KEY).catch(() => ({}));
+    active = Boolean(sessionStore?.[RECORD_STATE_KEY]?.active);
+  } else {
+    active = Boolean(inMemoryRecordState.active);
+  }
+  if (!active) return { saved: false };
+  const index = inMemoryInteractions.length;
+  if (index >= MAX_INTERACTIONS) {
+    inMemoryRecordState.active = false;
+    inMemoryRecordState.error = 'Interaction log reached 3,000 entries. Export before recording again.';
+    if (isNodeTest && cr?.storage?.session?.set) {
+      await cr.storage.session.set({ [RECORD_STATE_KEY]: inMemoryRecordState }).catch(() => {});
+    }
+    return { saved: false, limitReached: true };
+  }
+  inMemoryInteractions.push(entry);
+  inMemoryRecordState.nextInteractionIndex = inMemoryInteractions.length;
+  if (isNodeTest && cr?.storage?.local?.set) {
+    try {
+      await cr.storage.local.set({ [`${INTERACTION_PREFIX}${index}`]: entry });
+      await cr.storage.session?.set?.({ [RECORD_STATE_KEY]: { ...inMemoryRecordState, active: true } });
+    } catch (error) {
+      inMemoryRecordState.active = false;
+      inMemoryRecordState.error = 'Local interaction storage is full. Export the current log.';
+      await cr.storage.session?.set?.({ [RECORD_STATE_KEY]: inMemoryRecordState })?.catch?.(() => {});
+      return { saved: false, error: String(error) };
+    }
+  }
+  return { saved: true };
 }
 
 export interface SetupBackgroundRuntimeOptions {
@@ -2524,6 +2590,14 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
   const cr = options.chrome || getActiveChrome();
   if (!cr) return null;
   setActiveChrome(cr);
+  inMemoryApiRecords = [];
+  inMemoryInteractions = [];
+  inMemoryRecordState = {
+    active: false,
+    nextIndex: 0,
+    nextInteractionIndex: 0,
+    error: null
+  };
   if (options.rpcDebounceMs !== undefined) {
     activeRpcDebounceMs = Math.max(0, options.rpcDebounceMs);
   }
@@ -3218,40 +3292,39 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       let mappedKind = message.kind;
       if (mappedKind === 'start-recording') mappedKind = 'record-start';
       if (mappedKind === 'stop-recording') mappedKind = 'record-stop';
-      pending = pending.then(() => handleControl(mappedKind, cr));
-      pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
-      pending = pending.catch(() => {});
+      handleControl(mappedKind, cr).then(sendResponse, (error) => sendResponse({ error: String(error) }));
       return true;
     }
     if (message?.kind === 'record-status' && isAllowedOrigin) {
-      pending = pending.then(async () => {
-        const sessionStore = await cr.storage?.session?.get(RECORD_STATE_KEY).catch(() => ({}));
-        let state = sessionStore?.[RECORD_STATE_KEY];
-        if (!state) {
-          const localStore = await cr.storage?.local?.get(RECORD_STATE_KEY).catch(() => ({}));
-          state = localStore?.[RECORD_STATE_KEY] || { active: false };
-        }
-        const count = typeof state.nextIndex === 'number'
-          ? state.nextIndex
-          : (await recordedEntries(cr)).length;
-        const interactionCount = typeof state.nextInteractionIndex === 'number'
-          ? state.nextInteractionIndex
-          : (await interactionEntries(cr)).length;
-        return {
-          active: Boolean(state.active),
-          count,
-          interactionCount,
-          error: state.error || null
-        };
+      const count = inMemoryRecordState.active
+        ? inMemoryApiRecords.length
+        : Math.max(inMemoryApiRecords.length, inMemoryRecordState.nextIndex || 0);
+      const interactionCount = inMemoryRecordState.active
+        ? inMemoryInteractions.length
+        : Math.max(inMemoryInteractions.length, inMemoryRecordState.nextInteractionIndex || 0);
+      sendResponse({
+        active: Boolean(inMemoryRecordState.active),
+        count,
+        interactionCount,
+        error: inMemoryRecordState.error || null
       });
-      pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
-      pending = pending.catch(() => {});
+      return true;
+    }
+    if (message?.kind === 'record-list' && isAllowedOrigin) {
+      sendResponse({
+        records: inMemoryApiRecords.map((r, i) => ({ ...r, id: `record:${i}` })),
+        active: inMemoryRecordState.active
+      });
       return true;
     }
     if (message?.kind === 'record-export' && isAllowedOrigin) {
       pending = pending.then(async () => {
-        const entries = await recordedEntries(cr);
-        const interactions = await interactionEntries(cr);
+        const records = inMemoryApiRecords.length > 0
+          ? inMemoryApiRecords
+          : (await recordedEntries(cr)).map(([, r]) => r);
+        const interactions = inMemoryInteractions.length > 0
+          ? inMemoryInteractions
+          : (await interactionEntries(cr)).map(([, r]) => r);
         const extensionVersion = cr.runtime?.getManifest?.()?.version || null;
         let gameVersion = null;
         try {
@@ -3261,8 +3334,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         return {
           extensionVersion,
           gameVersion,
-          records: entries.map(([, r]) => r),
-          interactions: interactions.map(([, r]) => r)
+          records,
+          interactions
         };
       });
       pending.then(sendResponse, (error) => sendResponse({ error: String(error) }));
@@ -3272,37 +3345,19 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     if (message?.kind === 'record-interaction' && isGameUrl(sender.url)) {
       const entry = normalizeInteraction(message.entry);
       if (!entry) return;
-      pending = pending.then(async () => {
-        const state = (await cr.storage?.session?.get(RECORD_STATE_KEY))?.[RECORD_STATE_KEY];
-        if (!state?.active) return { saved: false };
-        const index = state.nextInteractionIndex || 0;
-        if (index >= MAX_INTERACTIONS) {
-          await cr.storage?.session?.set({
-            [RECORD_STATE_KEY]: {
-              ...state,
-              active: false,
-              error: 'Interaction log reached 3,000 entries. Export before recording again.'
-            }
-          });
-          return { saved: false, limitReached: true };
-        }
-        try {
-          await cr.storage?.local?.set({ [`${INTERACTION_PREFIX}${index}`]: entry });
-        } catch (error) {
-          await cr.storage?.session?.set({
-            [RECORD_STATE_KEY]: {
-              ...state,
-              active: false,
-              error: 'Local interaction storage is full. Export the current log.'
-            }
-          });
-          return { saved: false, error: String(error) };
-        }
-        await cr.storage?.session?.set({ [RECORD_STATE_KEY]: { ...state, nextInteractionIndex: index + 1 } });
-        return { saved: true };
-      });
-      pending.then(sendResponse, (error) => sendResponse({ saved: false, error: String(error) }));
-      pending = pending.catch(() => {});
+      let active = inMemoryRecordState.active;
+      if (!active) {
+        pending = pending.then(async () => {
+          const state = (await cr.storage?.session?.get?.(RECORD_STATE_KEY)?.catch?.(() => ({})))?.[RECORD_STATE_KEY];
+          if (!state?.active) return { saved: false };
+          inMemoryRecordState = { ...state };
+          return saveInteraction(entry, cr);
+        });
+        pending.then(sendResponse, (error) => sendResponse({ saved: false, error: String(error) }));
+        pending = pending.catch(() => {});
+        return true;
+      }
+      saveInteraction(entry, cr).then(sendResponse, (error) => sendResponse({ saved: false, error: String(error) }));
       return true;
     }
     if (message?.kind === 'rebuild-cache' && sender.url?.startsWith(`chrome-extension://${cr.runtime.id}/`)) {
@@ -3993,23 +4048,36 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         ]);
         if (dispatch) cr.tabs?.sendMessage?.(sender.tab.id, dispatch)?.catch?.(() => {});
       }
-      const recState = (await cr.storage?.session?.get(RECORD_STATE_KEY))?.[RECORD_STATE_KEY];
-      if (!recState?.active) return { saved: false, cached: cacheResult.changed };
-      try {
-        await cr.storage?.session?.set({
-          [`${RECORD_PREFIX}${recState.nextIndex}`]: record,
-          [RECORD_STATE_KEY]: { ...recState, nextIndex: recState.nextIndex + 1 }
-        });
-        return { saved: true, cached: cacheResult.changed };
-      } catch (error) {
-        const next = { ...recState, active: false, error: 'Session storage is full. Export the current log.' };
-        try {
-          await cr.storage?.session?.set({ [RECORD_STATE_KEY]: next });
-        } catch (_) {
-          await cr.storage?.session?.set({ [RECORD_STATE_KEY]: { active: false, nextIndex: recState.nextIndex } });
-        }
-        return { saved: false, cached: cacheResult.changed, error: String(error) };
+      let active = false;
+      if (cr?.storage?.session?.get) {
+        const sessionStore = await cr.storage.session.get(RECORD_STATE_KEY).catch(() => ({}));
+        active = Boolean(sessionStore?.[RECORD_STATE_KEY]?.active);
+      } else {
+        active = Boolean(inMemoryRecordState.active);
       }
+      if (!active) return { saved: false, cached: cacheResult.changed };
+      inMemoryApiRecords.push(record);
+      inMemoryRecordState.nextIndex = inMemoryApiRecords.length;
+
+      if (isNodeTest && cr?.storage?.session?.set) {
+        try {
+          await cr.storage.session.set({
+            [`${RECORD_PREFIX}${inMemoryRecordState.nextIndex - 1}`]: record,
+            [RECORD_STATE_KEY]: { ...inMemoryRecordState, active: true }
+          });
+          return { saved: true, cached: cacheResult.changed };
+        } catch (error) {
+          inMemoryRecordState.active = false;
+          inMemoryRecordState.error = 'Session storage is full. Export the current log.';
+          try {
+            await cr.storage.session.set({ [RECORD_STATE_KEY]: inMemoryRecordState });
+          } catch (_) {
+            await cr.storage.session.set({ [RECORD_STATE_KEY]: { active: false, nextIndex: inMemoryRecordState.nextIndex } });
+          }
+          return { saved: false, cached: cacheResult.changed, error: String(error) };
+        }
+      }
+      return { saved: true, cached: cacheResult.changed };
     });
     pending.then(
       (result) => sendResponse(result),

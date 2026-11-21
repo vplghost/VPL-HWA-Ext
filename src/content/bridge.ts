@@ -740,18 +740,39 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
 
     recordBtn.addEventListener('click', () => {
       if (recordBtn.disabled) return;
-      recordBtn.disabled = true;
-      recordBtn.classList?.add('is-busy');
-      const nextKind = isRecording ? 'record-stop' : 'record-start';
-      recordBtn.title = isRecording ? 'Stopping recording...' : 'Starting recording...';
+      const willStop = isRecording;
+      const nextKind = willStop ? 'record-stop' : 'record-start';
+
+      if (willStop) {
+        // Optimistic instant UI update for stop: zero latency, zero spinner
+        isRecording = false;
+        recordingActive = false;
+        recordBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><circle cx="12" cy="12" r="9"/></svg>';
+        recordBtn.title = 'Record game activity. Click to start';
+        recordBtn.setAttribute('aria-label', recordBtn.title);
+        exportBtn.hidden = false;
+        clearBtn.hidden = false;
+        if (exportBtn.style) exportBtn.style.display = 'inline-flex';
+        if (clearBtn.style) clearBtn.style.display = 'inline-flex';
+        sendControl();
+      } else {
+        // Optimistic instant UI update for start
+        isRecording = true;
+        recordingActive = true;
+        recordBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="hwa-rec-dot"></span>';
+        recordBtn.title = 'Recording active. Click to stop';
+        recordBtn.setAttribute('aria-label', recordBtn.title);
+        exportBtn.hidden = true;
+        clearBtn.hidden = true;
+        if (exportBtn.style) exportBtn.style.display = 'none';
+        if (clearBtn.style) clearBtn.style.display = 'none';
+        sendControl();
+      }
+
       sendBridgeMessage({ kind: nextKind })
         .then(syncRecordingState)
         .catch((err) => {
           handleContextInvalidated(err);
-        })
-        .finally(() => {
-          recordBtn.disabled = false;
-          recordBtn.classList?.remove('is-busy');
         });
     });
 
@@ -848,23 +869,18 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
 
     clearBtn.addEventListener('click', () => {
       if (clearBtn.disabled) return;
-      clearBtn.disabled = true;
-      clearBtn.classList?.add('is-busy');
-      clearBtn.title = 'Clearing log...';
+      // Optimistic instant UI update for clear
+      exportBtn.hidden = true;
+      clearBtn.hidden = true;
+      if (exportBtn.style) exportBtn.style.display = 'none';
+      if (clearBtn.style) clearBtn.style.display = 'none';
+      recordBtn.title = 'Record game activity. Click to start';
+      recordBtn.setAttribute('aria-label', recordBtn.title);
+
       sendBridgeMessage({ kind: 'record-clear' })
-        .then(() => {
-          exportBtn.hidden = true;
-          clearBtn.hidden = true;
-          if (exportBtn.style) exportBtn.style.display = 'none';
-          if (clearBtn.style) clearBtn.style.display = 'none';
-          syncRecordingState();
-        })
+        .then(syncRecordingState)
         .catch((err) => {
           handleContextInvalidated(err);
-        })
-        .finally(() => {
-          clearBtn.disabled = false;
-          clearBtn.classList?.remove('is-busy');
         });
     });
 
