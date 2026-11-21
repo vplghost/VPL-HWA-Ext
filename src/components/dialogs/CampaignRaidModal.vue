@@ -10,6 +10,7 @@ import {
   recipeMissions,
   recipeFarmCategory,
   aggregateHeroLeafEquipment,
+  extractDropsFromRaidResponse,
   type HeroLeafResource,
   type HeroLeafEquipmentSummary
 } from '@/src/utils/recipeTree';
@@ -578,8 +579,9 @@ function isNodeRequirementMet(node: any): boolean {
   return Number(node.owned) >= Number(node.requiredCount ?? 1);
 }
 
-function mergeDropsIntoAccumulator(acc: any, drops: any) {
-  if (!drops) return;
+function mergeDropsIntoAccumulator(acc: any, rawDrops: any) {
+  if (!rawDrops) return;
+  const drops = extractDropsFromRaidResponse(rawDrops);
   acc.gold = (acc.gold || 0) + (drops.gold || 0);
   acc.experience = (acc.experience || 0) + (drops.experience || 0);
   for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable', 'fragmentHero']) {
@@ -592,20 +594,23 @@ function mergeDropsIntoAccumulator(acc: any, drops: any) {
   }
 }
 
-function mergeDropsToInventory(drops: any) {
-  if (!drops) return;
-  updateCacheLocally((draft) => {
-    if (!draft.inventoryGet?.data) return;
-    const inv = draft.inventoryGet.data;
-    for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable', 'fragmentHero']) {
-      if (drops[cat]) {
-        inv[cat] = { ...(inv[cat] || {}) };
-        for (const [id, count] of Object.entries(drops[cat])) {
-          inv[cat][id] = (Number(inv[cat][id]) || 0) + Number(count);
+function mergeDropsToInventory(rawDrops: any) {
+  if (!rawDrops) return;
+  const drops = extractDropsFromRaidResponse(rawDrops);
+  if (typeof updateCacheLocally === 'function') {
+    updateCacheLocally((draft) => {
+      if (!draft.inventoryGet?.data) return;
+      const inv = draft.inventoryGet.data;
+      for (const cat of ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable', 'fragmentHero']) {
+        if (drops[cat]) {
+          inv[cat] = { ...(inv[cat] || {}) };
+          for (const [id, count] of Object.entries(drops[cat])) {
+            inv[cat][id] = (Number(inv[cat][id]) || 0) + Number(count);
+          }
         }
       }
-    }
-  });
+    });
+  }
 }
 
 async function waitForRaidResult(prevUpdatedAt?: string, timeoutMs = 3500) {
@@ -654,24 +659,28 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
 
     // Fast-path: Check if direct RPC response contains raid results
     if (Array.isArray(resp?.results)) {
-      const missionResult = resp.results.find((r: any) =>
-        r?.result?.response?.reward || r?.result?.response?.drop || r?.result?.response?.items || r?.error || r?.result?.error
-      ) || resp.results[0];
-      const err = missionResult?.error || missionResult?.result?.error;
+      const errResult = resp.results.find((r: any) => r?.error || r?.result?.error);
+      const err = errResult?.error || errResult?.result?.error;
       if (err) {
         disableMissionToday(missionId.value);
         return { ok: false, error: typeof err === 'string' ? err : err.message || 'Raid rejected by server' };
       }
-      const data = missionResult?.result?.response;
-      if (data) {
+
+      const missionResponses = resp.results
+        .filter((r: any) => r?.result?.response)
+        .map((r: any) => r.result.response);
+
+      if (missionResponses.length > 0) {
         await missionHistory.record(raidMission, raidAccount);
-        const drops = data.reward || data.drop || data.items || [];
-        void updateCacheLocally((draft) => {
-          draft.lastCampaignRaidResult = {
-            updatedAt: new Date().toISOString(),
-            data: { missionId: raidMission, times, drops, currentDrops: drops }
-          };
-        });
+        const drops = extractDropsFromRaidResponse(missionResponses);
+        if (typeof updateCacheLocally === 'function') {
+          void updateCacheLocally((draft) => {
+            draft.lastCampaignRaidResult = {
+              updatedAt: new Date().toISOString(),
+              data: { missionId: raidMission, times, drops, currentDrops: drops }
+            };
+          });
+        }
         return { ok: true, drops };
       }
     }
@@ -682,7 +691,8 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
       return { ok: false, pending: raidRes.pending, error: raidRes.error || 'Raid rejected by server' };
     }
     await missionHistory.record(raidMission, raidAccount);
-    return { ok: true, drops: raidRes.drops };
+    const drops = extractDropsFromRaidResponse(raidRes.drops);
+    return { ok: true, drops };
   } catch (err: any) {
     // Secondary fallback via background message
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -705,7 +715,8 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
           return { ok: false, error: raidRes.error };
         }
         await missionHistory.record(raidMission, raidAccount);
-        return { ok: true, drops: raidRes.drops };
+        const drops = extractDropsFromRaidResponse(raidRes.drops);
+        return { ok: true, drops };
       }
       if (res?.error) {
         disableMissionToday(missionId.value);
@@ -817,6 +828,7 @@ async function executeSequentialLoop(totalTimes: number) {
 
       if (res.drops) {
         mergeDropsIntoAccumulator(accumulatedDrops, res.drops);
+        mergeDropsToInventory(res.drops);
         localRaidResult.value = {
           missionId: missionId.value,
           times: completed,

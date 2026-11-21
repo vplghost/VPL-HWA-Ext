@@ -292,3 +292,114 @@ export function aggregateHeroLeafEquipment(
     leafResources
   };
 }
+
+export interface CampaignDropsAccumulator {
+  gold: number;
+  experience: number;
+  fragmentGear: Record<string, number>;
+  fragmentScroll: Record<string, number>;
+  gear: Record<string, number>;
+  scroll: Record<string, number>;
+  consumable: Record<string, number>;
+  fragmentHero: Record<string, number>;
+}
+
+/**
+ * Extracts and aggregates all item drops, gold, and experience from any campaign raid response.
+ * Handles single runs, array of runs, object of runs (keyed by '0', '1', ...), raid consumables,
+ * heroic fragmentHero, and multi-call RPC batches.
+ */
+export function extractDropsFromRaidResponse(raw: any): CampaignDropsAccumulator {
+  const drops: CampaignDropsAccumulator = {
+    gold: 0,
+    experience: 0,
+    fragmentGear: {},
+    fragmentScroll: {},
+    gear: {},
+    scroll: {},
+    consumable: {},
+    fragmentHero: {},
+  };
+
+  if (!raw) return drops;
+
+  const categories = ['fragmentGear', 'fragmentScroll', 'gear', 'scroll', 'consumable', 'fragmentHero'] as const;
+
+  const mergeRun = (run: any) => {
+    if (!run || typeof run !== 'object') return;
+
+    if (Number.isFinite(run.gold)) drops.gold += Number(run.gold);
+    if (Number.isFinite(run.experience)) drops.experience += Number(run.experience);
+
+    for (const cat of categories) {
+      if (run[cat] && typeof run[cat] === 'object') {
+        for (const [id, count] of Object.entries(run[cat])) {
+          const num = Number(count);
+          if (num > 0) {
+            drops[cat][id] = (drops[cat][id] || 0) + num;
+          }
+        }
+      }
+    }
+
+    if (run.raid?.consumable && typeof run.raid.consumable === 'object') {
+      for (const [id, count] of Object.entries(run.raid.consumable)) {
+        const num = Number(count);
+        if (num > 0) {
+          drops.consumable[id] = (drops.consumable[id] || 0) + num;
+        }
+      }
+    }
+  };
+
+  const processEntry = (item: any) => {
+    if (!item || typeof item !== 'object') return;
+
+    if (item.result && item.result.response) {
+      processEntry(item.result.response);
+      return;
+    }
+    if (item.drops) {
+      processEntry(item.drops);
+      return;
+    }
+    if (item.currentDrops) {
+      processEntry(item.currentDrops);
+      return;
+    }
+    if (item.reward) {
+      processEntry(item.reward);
+      return;
+    }
+    if (item.drop) {
+      processEntry(item.drop);
+      return;
+    }
+    if (item.items) {
+      processEntry(item.items);
+      return;
+    }
+
+    if (Array.isArray(item)) {
+      for (const sub of item) processEntry(sub);
+      return;
+    }
+
+    const keys = Object.keys(item);
+    const hasNumericKeys = keys.some((k) => /^\d+$/.test(k));
+    if (hasNumericKeys) {
+      for (const k of keys) {
+        if (/^\d+$/.test(k)) {
+          mergeRun(item[k]);
+        } else if (k === 'raid') {
+          mergeRun({ raid: item.raid });
+        }
+      }
+    } else {
+      mergeRun(item);
+    }
+  };
+
+  processEntry(raw);
+  return drops;
+}

@@ -8,7 +8,7 @@ import { renderToString } from '@vue/server-renderer';
 import { createSSRApp } from 'vue';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import ts from 'typescript';
-import { buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory } from '../src/utils/recipeTree.ts';
+import { buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory, extractDropsFromRaidResponse } from '../src/utils/recipeTree.ts';
 import { campaignMissions, getHighestRaidableMission, getMissionTries } from '../src/data/campaignData.ts';
 import { getEnergy } from '../src/utils/resourceData.ts';
 
@@ -107,8 +107,9 @@ test('actual dialog targets nested fragments, computes progress and blocks unrel
   const data = ref({ ...cache(), missionGetAll: { data: Object.fromEntries(Object.keys(campaignMissions).map(id => [id, { stars: 3 }])) } });
   const context = { ref, computed, watch() {}, onMounted() {}, onUnmounted() {},
     getEnergy,
+    extractDropsFromRaidResponse,
     defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
-    useRpcCache: () => ({ cache: data, dispatchRpc: async () => ({ ok: false }) }), useModals: () => ({ modalContext: {} }),
+    useRpcCache: () => ({ cache: data, dispatchRpc: async () => ({ ok: false }), updateCacheLocally: async (fn) => fn(data.value) }), useModals: () => ({ modalContext: {} }),
     buildGearRecipeTree, findFirstUnfulfilledNode, findRecipeNode, recipeMissions, recipeFarmCategory,
     campaignMissions, getHighestRaidableMission, getMissionTries,
     hwaHelperCampaignMissions: { missions: campaignMissions },

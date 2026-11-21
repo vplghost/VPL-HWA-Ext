@@ -1452,6 +1452,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 fragmentGear: {},
                 gear: {},
                 consumable: {},
+                fragmentHero: {},
                 gold: 0,
                 experience: 0
               };
@@ -1485,6 +1486,12 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 if (run.consumable && typeof run.consumable === 'object') {
                   for (const [cId, count] of Object.entries(run.consumable)) {
                     drops.consumable[cId] = (drops.consumable[cId] || 0) + Number(count);
+                  }
+                }
+                if (run.fragmentHero && typeof run.fragmentHero === 'object') {
+                  if (!drops.fragmentHero) drops.fragmentHero = {};
+                  for (const [hId, count] of Object.entries(run.fragmentHero)) {
+                    drops.fragmentHero[hId] = (drops.fragmentHero[hId] || 0) + Number(count);
                   }
                 }
               }
