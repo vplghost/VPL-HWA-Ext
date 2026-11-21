@@ -3671,7 +3671,9 @@ function renderDashboardTroops(cache, container, now = Date.now()) {
       if (info && count > 0) {
         troopStats[info.type].healingActiveCount += count;
         troopStats[info.type].healingEndsAt = endsAt;
-        troopStats[info.type].hospitalCount += count;
+        if (troopStats[info.type].hospitalCount < troopStats[info.type].healingActiveCount) {
+          troopStats[info.type].hospitalCount = troopStats[info.type].healingActiveCount;
+        }
       }
     }
   }

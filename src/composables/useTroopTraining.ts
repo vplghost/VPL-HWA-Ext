@@ -150,10 +150,14 @@ export function useTroopTraining() {
       const info = getTroopType(item?.unitId);
       const count = Number(item?.count) || 0;
       if (info && count > 0) {
-        stats[info.type].hospitalCount += count;
         stats[info.type].healingActiveCount += count;
         if (endsAt) {
           stats[info.type].healingEndsAt = endsAt;
+        }
+        // injuredUnits already includes all wounded troops in infirmary (both waiting and healing).
+        // If hospitalCount is somehow less than active healing troops, clamp to healingActiveCount.
+        if (stats[info.type].hospitalCount < stats[info.type].healingActiveCount) {
+          stats[info.type].hospitalCount = stats[info.type].healingActiveCount;
         }
       }
     }

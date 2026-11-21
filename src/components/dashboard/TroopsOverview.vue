@@ -195,7 +195,7 @@ const troopCards = computed(() => {
               <div class="text-[10px] text-slate-400 uppercase tracking-wider">Hospital</div>
               <div
                 class="font-bold text-rose-600 dark:text-rose-400 tabular-nums"
-                :title="t.healingActiveCount > 0 && t.hospitalCount !== t.healingActiveCount ? `Total in Hospital: ${formatNumber(t.hospitalCount)} (${formatNumber(t.hospitalCount - t.healingActiveCount)} waiting + ${formatNumber(t.healingActiveCount)} healing)` : undefined"
+                :title="t.healingActiveCount > 0 && t.hospitalCount > t.healingActiveCount ? `Total in Hospital: ${formatNumber(t.hospitalCount)} (${formatNumber(t.healingActiveCount)} healing + ${formatNumber(t.hospitalCount - t.healingActiveCount)} waiting)` : undefined"
               >
                 {{ formatNumber(t.hospitalCount) }}
               </div>
