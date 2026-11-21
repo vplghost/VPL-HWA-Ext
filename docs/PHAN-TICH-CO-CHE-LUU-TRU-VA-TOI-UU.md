@@ -309,19 +309,19 @@ export function useWorldStore() {
 - [x] Triển khai Optimistic UI và nạp trực tiếp kết quả `chatGetAll` trong `GuildChatPanel.vue`.
 - [x] Tự động làm mới chat khi mở modal nếu dữ liệu cũ hơn 60 giây.
 
-### Bước 2: Tách biệt triệt để Dungeon Battle History ra khỏi `rpcCache`
-- [ ] Trong `rpcCache.ts`, dừng việc lưu mảng dồn `battleHistory` vào `dungeonStatus.data`.
-- [ ] Chỉ lưu trữ `lastEncounter` (trận đánh vừa diễn ra) để background cập nhật vào key riêng `dungeonBattleHistory`.
-- [ ] `DungeonModal.vue` tiếp tục sử dụng hàm `loadDungeonBattleHistory()` để đọc độc lập khi người dùng xem chiến báo.
+### Bước 2: Tách biệt triệt để Dungeon Battle History ra khỏi `rpcCache` (Đã hoàn thành)
+- [x] Trong `rpcCache.ts`, dừng việc lưu mảng dồn `battleHistory` vào `dungeonStatus.data`.
+- [x] Chỉ lưu trữ `lastEncounter` (trận đánh vừa diễn ra) để background cập nhật vào key riêng `dungeonBattleHistory`.
+- [x] `DungeonModal.vue` tiếp tục sử dụng hàm `loadDungeonBattleHistory()` để đọc độc lập khi người dùng xem chiến báo.
 
 ### Bước 3: Phân vùng Domain Keys cho `rpcCache`
 - [ ] Tách `marchStatus`, `mineMap` thành domain key `cache:world`.
 - [ ] Tách `heroGetAll`, `titanGetAll`, `inventoryGet` thành domain key `cache:roster`.
 - [ ] Cập nhật `useRpcCache.ts` để đọc và kết hợp các domain keys này một cách trong suốt.
 
-### Bước 4: Áp dụng Debounced Write Coalescing trong `backgroundRuntime.ts`
-- [ ] Tạo cơ chế gom cụm ghi đĩa 300ms cho các gói tin MQTT có tần suất cao.
-- [ ] Giữ quyền ghi tức thì (`flushImmediate`) cho các thao tác người dùng.
+### Bước 4: Áp dụng Debounced Write Coalescing trong `backgroundRuntime.ts` (Đã hoàn thành)
+- [x] Tạo cơ chế gom cụm ghi đĩa 300ms cho các gói tin MQTT có tần suất cao.
+- [x] Giữ quyền ghi tức thì (`flushImmediate`) cho các thao tác người dùng.
 
 ---
 
