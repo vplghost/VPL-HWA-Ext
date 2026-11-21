@@ -88,5 +88,24 @@ export function pruneCache(cache: RpcCacheState, now = Date.now()): PruneResult 
     changed = true;
   }
 
+  // 4. Prune legacy accumulated battleHistory from dungeonStatus (now stored in dedicated dungeonBattleHistory)
+  if (next.dungeonStatus?.data?.battleHistory) {
+    const keys = Object.keys(next.dungeonStatus.data.battleHistory);
+    const totalItems = keys.reduce(
+      (acc: number, k: string) =>
+        acc + (Array.isArray(next.dungeonStatus.data.battleHistory[k]) ? next.dungeonStatus.data.battleHistory[k].length : 1),
+      0
+    );
+    if (totalItems > 1) {
+      const nextDungeonData = { ...next.dungeonStatus.data };
+      delete nextDungeonData.battleHistory;
+      next.dungeonStatus = {
+        ...next.dungeonStatus,
+        data: nextDungeonData
+      };
+      changed = true;
+    }
+  }
+
   return { cache: next, changed };
 }

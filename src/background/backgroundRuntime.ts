@@ -3460,7 +3460,15 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         if (chatChanged) {
           await cr.storage?.local?.set({ guildChat: nextChat });
         }
-        await cr.storage?.local?.set({ rpcCache: cacheResult.cache });
+        const rpcToSave: any = { ...cacheResult.cache };
+        if (rpcToSave.dungeonStatus?.data?.battleHistory) {
+          rpcToSave.dungeonStatus = {
+            ...rpcToSave.dungeonStatus,
+            data: { ...rpcToSave.dungeonStatus.data }
+          };
+          delete rpcToSave.dungeonStatus.data.battleHistory;
+        }
+        await cr.storage?.local?.set({ rpcCache: rpcToSave });
       }
       if (cacheResult.cache?.remoteConfigStatus?.data && cr.storage?.local) {
         eventCatalogService.syncRemoteEventCatalog(cacheResult.cache.remoteConfigStatus.data, cr.storage.local).catch(() => {});

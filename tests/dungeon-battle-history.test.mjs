@@ -378,6 +378,25 @@ test('rpcCacheService updates battleHistory on dungeonStartBattle and dungeonEnd
   assert.equal(history[expectedKey][0].duration, 19.8);
 });
 
+test('rpcCache does not accumulate battle history across multiple battles and pruneCache cleans legacy bulk', () => {
+  const legacyCache = {
+    dungeonStatus: {
+      key: 'dungeonStatus',
+      updatedAt: '2026-11-20T12:00:00.000Z',
+      data: {
+        floorNumber: 500,
+        battleHistory: {
+          'e:101_vs_p:201': [{ id: 'b1', win: true }],
+          'e:102_vs_p:202': [{ id: 'b2', win: false }],
+        }
+      }
+    }
+  };
+  const pruned = rpcCacheService.pruneCache(legacyCache);
+  assert.equal(pruned.changed, true);
+  assert.equal(pruned.cache.dungeonStatus.data.battleHistory, undefined);
+});
+
 test('hasHealingTitan and hasMajorHealingTitan accurately identify healer titans', () => {
   assert.equal(hasMajorHealingTitan([4020, 4021, 4022, 4023, 4024]), false); // Earth has no major healer
   assert.equal(hasHealingTitan([4020, 4021, 4022, 4023, 4024]), true); // Avalon/Verdoc minor heal

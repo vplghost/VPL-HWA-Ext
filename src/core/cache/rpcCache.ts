@@ -5236,7 +5236,8 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             };
           }
 
-          let battleHistory = previous.battleHistory ? { ...previous.battleHistory } : {};
+          let battleHistory: Record<string, any> = {};
+          let lastEncounter: any = null;
           if (entry.method === 'dungeonEndBattle' && entry.data.lastBattleResult) {
             const res = entry.data.lastBattleResult;
             dailyCombatLog.totalBattles = (dailyCombatLog.totalBattles || 0) + 1;
@@ -5276,16 +5277,15 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 }
               );
               if (encounter) {
+                lastEncounter = encounter;
                 const encKey = getEncounterKey(encounter.enemyTeam.map((e: any) => e.id), encounter.playerTeam);
-                const list = Array.isArray(battleHistory[encKey]) ? [...battleHistory[encKey]] : [];
-                if (!list.some((item: any) => item.id === encounter.id)) {
-                  list.push(encounter);
-                  if (list.length > 50) list.splice(0, list.length - 50);
-                  battleHistory[encKey] = list;
-                }
+                battleHistory[encKey] = [encounter];
               }
             }
           }
+
+          // Exclude legacy or previous battleHistory so it never accumulates across battles inside monolithic rpcCache
+          const { battleHistory: _prevHist, ...cleanPrevious } = previous;
 
           next.dungeonStatus = {
             key: 'dungeonStatus',
@@ -5293,13 +5293,14 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             feature: entry.feature,
             group: 'events',
             data: {
-              ...previous,
+              ...cleanPrevious,
               ...entry.data,
               todayTitanite: dailyCombatLog.todayTitanite,
               dailyCombatLog,
-              battleHistory,
+              ...(lastEncounter ? { lastEncounter } : {}),
+              ...(Object.keys(battleHistory).length > 0 ? { battleHistory } : {}),
               states: {
-                ...previous.states,
+                ...cleanPrevious.states,
                 ...entry.data.states,
                 titans: mergedTitans
               }
@@ -6358,6 +6359,25 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
         }
       };
       changed = true;
+    }
+
+    // 4. Prune legacy accumulated battleHistory from dungeonStatus (now stored in dedicated dungeonBattleHistory)
+    if (next.dungeonStatus?.data?.battleHistory) {
+      const keys = Object.keys(next.dungeonStatus.data.battleHistory);
+      const totalItems = keys.reduce(
+        (acc: number, k: string) =>
+          acc + (Array.isArray(next.dungeonStatus.data.battleHistory[k]) ? next.dungeonStatus.data.battleHistory[k].length : 1),
+        0
+      );
+      if (totalItems > 1) {
+        const nextDungeonData = { ...next.dungeonStatus.data };
+        delete nextDungeonData.battleHistory;
+        next.dungeonStatus = {
+          ...next.dungeonStatus,
+          data: nextDungeonData
+        };
+        changed = true;
+      }
     }
 
     return { cache: next, changed };
