@@ -1258,7 +1258,7 @@ test('Game connection monitoring, warning banner, and browser refresh button ope
   const dashboard = await readFile(join(root, 'src/components/dashboard/DashboardTab.vue'), 'utf8');
   assert.match(dashboard, /id="dashboard-game-status-alert"/, 'Dashboard must render #dashboard-game-status-alert');
   assert.match(dashboard, /id="dashboard-actions"/, 'Dashboard must have #dashboard-actions container');
-  assert.match(dashboard, /id="btn-refresh-browser"/, 'Dashboard must render #btn-refresh-browser when refresh needed');
+  assert.equal(dashboard.includes('id="btn-refresh-browser"'), false, 'Dashboard must not duplicate #btn-refresh-browser in quick actions');
   assert.match(dashboard, /reloadGameTab/, 'Dashboard must bind reloadGameTab to refresh buttons');
 
   const header = await readFile(join(root, 'src/components/common/Header.vue'), 'utf8');

@@ -15,7 +15,7 @@ import { useGameConnection } from '@/src/composables/useGameConnection';
 
 const { dispatchRpc, cache } = useRpcCache();
 const { openModal } = useModals();
-const { hasGameTab, alertMessage, needsRefresh, isRefreshing, reloadGameTab } = useGameConnection();
+const { hasGameTab, alertMessage, isRefreshing, reloadGameTab } = useGameConnection();
 
 const raidQueueState = ref<any>(null);
 const monsterQueueState = ref<any>(null);
@@ -167,25 +167,6 @@ async function refreshAllDashboard() {
         <FreeAlchemySpinButton :has-game-tab="hasGameTab" />
         <FreeBoxButton :has-game-tab="hasGameTab" />
         <FreeChestButton :has-game-tab="hasGameTab" />
-        <!-- Refresh Browser Button -->
-        <button
-          v-if="needsRefresh"
-          id="btn-refresh-browser"
-          type="button"
-          class="cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all shadow-xs inline-flex items-center gap-1.5"
-          title="Refresh the active game tab"
-          aria-label="Refresh browser"
-          :disabled="isRefreshing"
-          @click="reloadGameTab"
-        >
-          <svg class="size-4 shrink-0" :class="{ 'animate-spin': isRefreshing }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-            <path d="M3 3v5h5"/>
-            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
-            <path d="M16 21h5v-5"/>
-          </svg>
-          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh browser' }}</span>
-        </button>
         <!-- Guild Raid -->
         <button
           id="open-raid-dialog"
