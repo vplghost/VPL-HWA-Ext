@@ -2,6 +2,12 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { questRefreshCalls, sendQuestClaim, sendEventQuestClaim } from '@/src/utils/dialogRpc';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import {
+  isTopModal,
+  getModalStackLevel,
+  registerModalOpen,
+  registerModalClose,
+} from '@/src/composables/useModals';
 import { normalizeArray } from '@/src/utils/troops';
 import { questData } from '@/src/data/questData';
 import { getItemName } from '@/src/data/nameData';
@@ -37,8 +43,7 @@ watch(
   { immediate: true }
 );
 
-const getModalStackHelper = () => (typeof globalThis !== 'undefined' ? (globalThis as any).__hwaModalStack : null);
-const stackLevel = computed(() => getModalStackHelper()?.getModalStackLevel?.('questDetail') ?? 50);
+const stackLevel = computed(() => getModalStackLevel('questDetail'));
 
 function close() {
   emit('update:modelValue', false);
@@ -46,8 +51,7 @@ function close() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
-    const helper = getModalStackHelper();
-    if (helper && !helper.isTopModal?.('questDetail')) return;
+    if (!isTopModal('questDetail')) return;
     e.stopPropagation?.();
     e.stopImmediatePropagation?.();
     close();
@@ -58,17 +62,17 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      getModalStackHelper()?.registerModalOpen?.('questDetail');
+      registerModalOpen('questDetail');
       document.addEventListener('keydown', handleKeydown);
     } else {
-      getModalStackHelper()?.registerModalClose?.('questDetail');
+      registerModalClose('questDetail');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
 );
 
 onUnmounted(() => {
-  getModalStackHelper()?.registerModalClose?.('questDetail');
+  registerModalClose('questDetail');
   document.removeEventListener('keydown', handleKeydown);
 });
 

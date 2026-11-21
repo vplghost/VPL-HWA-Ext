@@ -93,10 +93,11 @@ test('planner requires a win in the configured final boss room, including future
   }
 });
 
-test('RPC snapshots use the configured final floor and require actual completion evidence', async () => {
+test('RPC snapshots use the configured final floor and require actual completion evidence', async (t) => {
   const { rpcCacheService } = await import('../src/core/cache/index.ts');
-  const runtime = { TextEncoder, hwaHelperTowerRules: { ...rules }, hwaHelperRpcCache: rpcCacheService };
-  globalThis.hwaHelperTowerRules = runtime.hwaHelperTowerRules;
+  const origFinalFloor = rules.finalFloor;
+  t.after(() => { rules.finalFloor = origFinalFloor; });
+  const runtime = { TextEncoder, hwaHelperRpcCache: rpcCacheService };
   const record = (name, response, args = {}) => ({
     method: 'POST', status: 200, endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
     timestamp: new Date().toISOString(),
@@ -109,7 +110,7 @@ test('RPC snapshots use the configured final floor and require actual completion
   for (const floorNumber of [23, 26]) {
     assert.equal(extract({ floorData: { floorNumber } }).isCleared, false);
   }
-  runtime.hwaHelperTowerRules.finalFloor = 27;
+  rules.finalFloor = 27;
   assert.equal(extract({ state: 'completed' }).floorNumber, 27);
   for (const floorNumber of [21, 27]) {
     const initial = runtime.hwaHelperRpcCache.merge({}, [record('magicTower_getAll', {

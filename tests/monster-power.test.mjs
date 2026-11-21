@@ -94,8 +94,11 @@ test('actual Monster template displays power and warning before attack and updat
   const compiled = compileScript(descriptor, { id: 'monster-power-fixture', inlineTemplate: true });
   const js = ts.transpileModule(compiled.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   const module = { exports: {} }, require = createRequire(import.meta.url);
+  const useModalsModule = await import('../src/composables/useModals.ts');
   const imports = { '@/src/composables/useRpcCache': { useRpcCache: () => ({ cache: h.cache }) },
-    '@/src/composables/useSquadTeams': { useSquadTeams: () => h.squad }, '@/src/utils/monsterPower': power,
+    '@/src/composables/useSquadTeams': { useSquadTeams: () => h.squad },
+    '@/src/composables/useModals': useModalsModule,
+    '@/src/utils/monsterPower': power,
     '@/src/utils/troops': { normalizeArray }, '@/src/utils/formatters': { formatNumber },
     '@/src/utils/experimentalData': { soloMonsterConfigIds, soloMonsterLevel },
     '@/src/components/common/HeroHoverCard.vue': { render: () => null },

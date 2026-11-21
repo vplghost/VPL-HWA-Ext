@@ -55,8 +55,10 @@ const { descriptor } = parse(await readFile(new URL('../src/components/dialogs/Q
 const compiled = compileScript(descriptor, { id: 'quest-config-fixture', inlineTemplate: true });
 const js = ts.transpileModule(compiled.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 const module = { exports: {} };
+const useModalsModule = await import('../src/composables/useModals.ts');
 const imports = {
   '@/src/composables/useRpcCache': { useRpcCache: () => ({ cache: current }) },
+  '@/src/composables/useModals': useModalsModule,
   '@/src/utils/dialogRpc': { questRefreshCalls: () => [], sendQuestClaim: () => ({ ok: false }), sendEventQuestClaim: () => ({ ok: false }) },
   '@/src/utils/troops': { normalizeArray },
   '@/src/data/questData': questDataModule,
@@ -66,14 +68,11 @@ const imports = {
 };
 new Function('require', 'module', 'exports', js)(name => imports[name] || require(name), module, module.exports);
 async function render(quests) {
-  globalThis.hwaHelperQuestData = data;
   current.value = { towerStatus: { data: { isCleared: true } }, 'getDailyQuests:quest': {
     updatedAt: new Date().toISOString(), data: { quests } } };
   const ssr = {};
-  try {
-    const html = await renderToString(Vue.createSSRApp({ render: () => Vue.h(module.exports.default, { modelValue: true }) }), ssr);
-    return html + (ssr.teleports?.body || '');
-  } finally { delete globalThis.hwaHelperQuestData; }
+  const html = await renderToString(Vue.createSSRApp({ render: () => Vue.h(module.exports.default, { modelValue: true }) }), ssr);
+  return html + (ssr.teleports?.body || '');
 }
 
 test('quest dialog displays captured phase progress 5 / 10 and truthful brigand label', async () => {

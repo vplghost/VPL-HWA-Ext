@@ -226,11 +226,6 @@ export const nameMap = {
   research: getResearchName,
   artifact: getArtifactName
 };
-
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).hwaHelperNameData = nameData;
-  (globalThis as any).hwaHelperNameMap = nameMap;
-}
 `;
 
 const tsContent = `// Generated from ${assetUrl}

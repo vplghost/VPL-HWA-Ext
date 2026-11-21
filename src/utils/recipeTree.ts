@@ -147,8 +147,7 @@ export function aggregateHeroLeafEquipment(
   }
 
   const numHeroId = Number(hero.id);
-  const meta = (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperHeroMetadata?.[numHeroId]) ||
-    heroMetadata?.[numHeroId] ||
+  const meta = heroMetadata?.[numHeroId] ||
     heroMetadata?.[String(numHeroId)];
   const colorStr = String(hero.color || 1);
   const equipment: number[] = meta?.equipment?.[colorStr] || [];

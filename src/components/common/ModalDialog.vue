@@ -23,15 +23,12 @@ const emit = defineEmits<{
 const modalId = computed(() => props.modalName || props.title || 'dialog');
 
 function checkIsTop(): boolean {
-  const fn = typeof isTopModal === 'function' ? isTopModal : (globalThis as any).__hwaModalStack?.isTopModal;
-  if (!fn) return true;
-  return fn(modalId.value);
+  return isTopModal(modalId.value);
 }
 
 const computedZIndex = computed(() => {
   if (props.stackLevel != null) return props.stackLevel;
-  const fn = typeof getModalStackLevel === 'function' ? getModalStackLevel : (globalThis as any).__hwaModalStack?.getModalStackLevel;
-  return fn ? fn(modalId.value) : 50;
+  return getModalStackLevel(modalId.value);
 });
 
 function close() {
@@ -51,20 +48,17 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      const regOpen = typeof registerModalOpen === 'function' ? registerModalOpen : (globalThis as any).__hwaModalStack?.registerModalOpen;
-      if (regOpen) regOpen(modalId.value);
+      registerModalOpen(modalId.value);
       document.addEventListener('keydown', handleKeydown, props.stackLevel != null);
     } else {
-      const regClose = typeof registerModalClose === 'function' ? registerModalClose : (globalThis as any).__hwaModalStack?.registerModalClose;
-      if (regClose) regClose(modalId.value);
+      registerModalClose(modalId.value);
       document.removeEventListener('keydown', handleKeydown, props.stackLevel != null);
     }
   }
 );
 
 onUnmounted(() => {
-  const regClose = typeof registerModalClose === 'function' ? registerModalClose : (globalThis as any).__hwaModalStack?.registerModalClose;
-  if (regClose) regClose(modalId.value);
+  registerModalClose(modalId.value);
   document.removeEventListener('keydown', handleKeydown, props.stackLevel != null);
 });
 </script>

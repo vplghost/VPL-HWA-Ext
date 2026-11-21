@@ -94,17 +94,6 @@ export function getActiveModalStack(): string[] {
   return [...modalStack];
 }
 
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).__hwaModalStack = {
-    modalStack,
-    registerModalOpen,
-    registerModalClose,
-    isTopModal,
-    getModalStackLevel,
-    getActiveModalStack,
-  };
-}
-
 export function useModals() {
   function openModal(name: ModalName, context?: {
     selectedHero?: any;

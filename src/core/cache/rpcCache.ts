@@ -21,25 +21,25 @@ import {
 } from '../../data/titanMetadata.ts';
 import { getTitanLevelFromExp as typedGetTitanLevelFromExp } from '../../data/titanLevelData.ts';
 
-const getNameMap = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperNameMap) || typedNameMap;
-const getMineTypes = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMineTypes) || typedMineTypes;
-const getRouteSpeeds = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperRouteSpeeds) || typedRouteSpeeds;
-const getRallyTargets = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperRallyTargets) || typedRallyTargets;
-const getSpeedupService = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperSpeedup) || typedSpeedupService;
-const getMailService = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMailData) || typedMailService;
-const getMissionCosts = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperMissionCosts) || typedMissionCosts;
-const getClanVersusRewards = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperClanVersusRewards) || typedClanVersusRewards;
-const getTowerRules = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTowerRules) || typedTowerRules;
-const getRefillableRules = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperRefillableRules) || typedRefillableRules;
-const getSpeedupData = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperSpeedupData) || typedSpeedupData;
-const getHeroMetadata = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperHeroMetadata) || typedHeroMetadata;
-const getScrollCraftData = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperScrollCraftData) || typedScrollCraftData;
-const getGearCraftData = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGearCraftData) || typedGearCraftData;
-const getTeamLevelExpDelta = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGetTeamLevelExpDelta) || typedGetTeamLevelExpDelta;
-const getGuildRole = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperGuildRole) || typedGuildRole;
-const getTitanMetadata = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanMetadata) || typedTitanMetadata;
-const getTitanArtifactEvolveCost = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanArtifactEvolveCost) || typedTitanArtifactEvolveCost;
-const getTitanArtifactLevelCosts = (): any => (typeof globalThis !== 'undefined' && (globalThis as any).hwaHelperTitanArtifactLevelCosts) || typedTitanArtifactLevelCosts;
+const getNameMap = (): any => typedNameMap;
+const getMineTypes = (): any => typedMineTypes;
+const getRouteSpeeds = (): any => typedRouteSpeeds;
+const getRallyTargets = (): any => typedRallyTargets;
+const getSpeedupService = (): any => typedSpeedupService;
+const getMailService = (): any => typedMailService;
+const getMissionCosts = (): any => typedMissionCosts;
+const getClanVersusRewards = (): any => typedClanVersusRewards;
+const getTowerRules = (): any => typedTowerRules;
+const getRefillableRules = (): any => typedRefillableRules;
+const getSpeedupData = (): any => typedSpeedupData;
+const getHeroMetadata = (): any => typedHeroMetadata;
+const getScrollCraftData = (): any => typedScrollCraftData;
+const getGearCraftData = (): any => typedGearCraftData;
+const getTeamLevelExpDelta = (): any => typedGetTeamLevelExpDelta;
+const getGuildRole = (): any => typedGuildRole;
+const getTitanMetadata = (): any => typedTitanMetadata;
+const getTitanArtifactEvolveCost = (): any => typedTitanArtifactEvolveCost;
+const getTitanArtifactLevelCosts = (): any => typedTitanArtifactLevelCosts;
 const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
 
   const definitions = {

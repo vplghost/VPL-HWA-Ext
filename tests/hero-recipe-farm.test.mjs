@@ -5,9 +5,6 @@ import { aggregateHeroLeafEquipment } from '../src/utils/recipeTree.ts';
 import { heroMetadata, gearCraftData, scrollCraftData } from '../src/data/heroMetadata.ts';
 import { nameData } from '../src/data/nameData.ts';
 
-globalThis.hwaHelperNameData = nameData;
-globalThis.hwaHelperHeroMetadata = heroMetadata;
-
 test('aggregateHeroLeafEquipment returns null for invalid hero', () => {
   assert.equal(aggregateHeroLeafEquipment(null, {}), null);
   assert.equal(aggregateHeroLeafEquipment(undefined, {}), null);
@@ -66,7 +63,7 @@ test('shared inventory allocates once and aggregates duplicate leaf resources ac
   };
 
   // Override hero metadata for mockHero
-  globalThis.hwaHelperHeroMetadata[999] = {
+  heroMetadata[999] = {
     name: 'Mock Hero',
     equipment: {
       '1': [910, 920]
@@ -124,6 +121,7 @@ test('shared inventory allocates once and aggregates duplicate leaf resources ac
   assert.equal(leaf910B.requiredCount, 20);
   assert.equal(leaf910B.ownedCount, 20);
   assert.equal(leaf910B.isFulfilled, true);
+  delete heroMetadata[999];
 });
 
 test('HeroDetailModal has #hero-farm-all-btn button and transfers selectedCampaignHeroId', async () => {

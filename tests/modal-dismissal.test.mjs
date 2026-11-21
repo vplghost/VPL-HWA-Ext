@@ -17,7 +17,12 @@ test('shared dialog ignores backdrop clicks and closes explicitly with button or
   globalThis.document = { addEventListener: (name, handler) => handlers.set(name, handler),
     removeEventListener: name => handlers.delete(name) };
   t.after(() => { globalThis.document = originalDocument; });
-  vm.runInNewContext(code, { exports, require: () => Vue, document: globalThis.document });
+  const useModalsModule = await import('../src/composables/useModals.ts');
+  const requireFn = (id) => {
+    if (id === '@/src/composables/useModals' || id.endsWith('useModals')) return useModalsModule;
+    return Vue;
+  };
+  vm.runInNewContext(code, { exports, require: requireFn, document: globalThis.document });
   const root = { children: [] }, body = { children: [] };
   const renderer = Vue.createRenderer({
     createElement: type => ({ type, props: {}, children: [] }), createText: text => ({ text }), createComment: () => ({}),

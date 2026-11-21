@@ -16,8 +16,10 @@ const { descriptor } = parse(await readFile(new URL('../src/components/dialogs/G
 const compiled = compileScript(descriptor, { id: 'guild-versus-fixture', inlineTemplate: true });
 const js = ts.transpileModule(compiled.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 const module = { exports: {} };
+const useModalsModule = await import('../src/composables/useModals.ts');
 const imports = {
   '@/src/composables/useRpcCache': { useRpcCache: () => ({ cache: current }) },
+  '@/src/composables/useModals': useModalsModule,
   '@/src/utils/guildVersusView': viewHelpers,
   '@/src/utils/troops': { normalizeArray },
   '@/src/data/clanVersusData': clanVersusDataModule,

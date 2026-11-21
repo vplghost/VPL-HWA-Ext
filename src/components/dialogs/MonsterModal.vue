@@ -2,6 +2,12 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useSquadTeams } from '@/src/composables/useSquadTeams';
+import {
+  isTopModal,
+  getModalStackLevel,
+  registerModalOpen,
+  registerModalClose,
+} from '@/src/composables/useModals';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import StatusAlertBanner from '@/src/components/common/StatusAlertBanner.vue';
 import { formatNumber } from '@/src/utils/formatters';
@@ -170,8 +176,7 @@ onMounted(async () => {
   }
 });
 
-const getModalStackHelper = () => (typeof globalThis !== 'undefined' ? (globalThis as any).__hwaModalStack : null);
-const stackLevel = computed(() => getModalStackHelper()?.getModalStackLevel?.('monster') ?? 50);
+const stackLevel = computed(() => getModalStackLevel('monster'));
 
 function close() {
   emit('update:modelValue', false);
@@ -179,8 +184,7 @@ function close() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
-    const helper = getModalStackHelper();
-    if (helper && !helper.isTopModal?.('monster')) return;
+    if (!isTopModal('monster')) return;
     e.stopPropagation?.();
     e.stopImmediatePropagation?.();
     close();
@@ -191,13 +195,13 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      getModalStackHelper()?.registerModalOpen?.('monster');
+      registerModalOpen('monster');
       now.value = Date.now();
       document.addEventListener('keydown', handleKeydown);
       loadSquadData();
       syncMonsterQueueState();
     } else {
-      getModalStackHelper()?.registerModalClose?.('monster');
+      registerModalClose('monster');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
@@ -205,7 +209,7 @@ watch(
 
 onUnmounted(() => {
   if (timer) clearInterval(timer);
-  getModalStackHelper()?.registerModalClose?.('monster');
+  registerModalClose('monster');
   document.removeEventListener('keydown', handleKeydown);
 });
 

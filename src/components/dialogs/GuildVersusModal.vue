@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import {
+  isTopModal,
+  getModalStackLevel,
+  registerModalOpen,
+  registerModalClose,
+} from '@/src/composables/useModals';
 import { normalizeArray } from '@/src/utils/troops';
 import { guildVersusView, displayMetric, metric, metricPercent, challengeConvertedPoints } from '@/src/utils/guildVersusView';
 import { getChallengeResourceStock } from '@/src/utils/popupData';
@@ -143,13 +149,11 @@ function close() {
   emit('update:modelValue', false);
 }
 
-const getModalStackHelper = () => (typeof globalThis !== 'undefined' ? (globalThis as any).__hwaModalStack : null);
-const stackLevel = computed(() => getModalStackHelper()?.getModalStackLevel?.('guildVersus') ?? 50);
+const stackLevel = computed(() => getModalStackLevel('guildVersus'));
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) {
-    const helper = getModalStackHelper();
-    if (helper && !helper.isTopModal?.('guildVersus')) return;
+    if (!isTopModal('guildVersus')) return;
     e.stopPropagation?.();
     e.stopImmediatePropagation?.();
     close();
@@ -160,17 +164,17 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      getModalStackHelper()?.registerModalOpen?.('guildVersus');
+      registerModalOpen('guildVersus');
       document.addEventListener('keydown', handleKeydown);
     } else {
-      getModalStackHelper()?.registerModalClose?.('guildVersus');
+      registerModalClose('guildVersus');
       document.removeEventListener('keydown', handleKeydown);
     }
   }
 );
 
 onUnmounted(() => {
-  getModalStackHelper()?.registerModalClose?.('guildVersus');
+  registerModalClose('guildVersus');
   document.removeEventListener('keydown', handleKeydown);
 });
 </script>

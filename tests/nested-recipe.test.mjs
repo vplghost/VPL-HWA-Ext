@@ -15,8 +15,6 @@ const require = createRequire(import.meta.url);
 import { nameData } from '../src/data/nameData.ts';
 import { heroMetadata } from '../src/data/heroMetadata.ts';
 
-globalThis.hwaHelperNameData = nameData;
-globalThis.hwaHelperHeroMetadata = heroMetadata;
 const cache = (inventory = {}) => ({ inventoryGet: { data: inventory } });
 const trineKey = 'gear:131/gear:127';
 const headKey = trineKey + '/gear:94';

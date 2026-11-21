@@ -62,7 +62,7 @@ test('chapter and mission actions select matching missions, retain exhausted res
   const js = ts.transpileModule(script, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
   const props = Vue.reactive({ modelValue: 135, disabled: false, isMissionDisabled: id => id === 1 });
   const updates = [], stops = [];
-  const context = { ...Vue, pickerData: data, campaignMissions, hwaHelperCampaignMissions: globalThis.hwaHelperCampaignMissions,
+  const context = { ...Vue, pickerData: data, campaignMissions,
     defineProps: () => props, defineEmits: () => (_, id) => updates.push(id),
     watch: (...args) => { const stop = Vue.watch(...args); stops.push(stop); return stop; },
   };
