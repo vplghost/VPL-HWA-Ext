@@ -46,8 +46,41 @@ test('chestHelper accurately detects openable chests, choice options, and aggreg
   assert.equal(isChoiceChest(63), true, 'Chest 63 must be recognized as Choice Chest');
   assert.equal(isChoiceChest(64), true, 'Chest 64 must be recognized as Choice Chest');
   assert.equal(isChoiceChest(51), true, 'Chest 51 must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(65), true, 'Chest 65 (Large Skin Stone Chest) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(274), true, 'Chest 274 (Fire Titan Artifact Chest) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(273), true, 'Chest 273 (Water Titan Artifact Chest) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(275), true, 'Chest 275 (Earth Titan Artifact Chest) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(276), true, 'Chest 276 (Chest of Seals) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(40228), true, 'Chest 40228 (Heroes Trove) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(40229), true, 'Chest 40229 (Rare Heroes Trove) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(40230), true, 'Chest 40230 (Titans Trove) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest(40231), true, 'Chest 40231 (Rare Titans Trove) must be recognized as Choice Chest');
+  assert.equal(isChoiceChest('custom-chest', { rawCategory: 'lootboxChoiced' }), true, 'lootboxChoiced category must be recognized as choice');
   assert.equal(isChoiceChest(15), false, 'Chest 15 (Bronze casket) is random, not choice');
   assert.equal(isChoiceChest(28), false, 'Chest 28 (Legendary Chest) is random, not choice');
+
+  // 2b. Large Skin Stone Chest (65) amount validation (150 per choice, NOT 350)
+  const choices65 = getChestChoices(65);
+  assert.equal(choices65.length, 3, 'Large Skin Stone Chest has 3 choices');
+  for (const opt of choices65) {
+    assert.equal(opt.reward.amount, 150, `Choice ${opt.label} must give exactly 150 skin stones, not 350`);
+    assert.equal(opt.reward.type, 'coin');
+  }
+
+  // 2c. Fire Titan Artifact Chest (274) choices validation
+  const choices274 = getChestChoices(274);
+  assert.equal(choices274.length, 5, 'Fire Titan Artifact Chest has 5 choices');
+  assert.ok(choices274.some((c) => c.label.includes('Ragni') || c.reward.id === 11005));
+  assert.ok(choices274.some((c) => c.label.includes('Fire Crown') || c.reward.id === 12001));
+  for (const opt of choices274) {
+    assert.equal(opt.reward.amount, 25, 'Titan artifact fragments reward amount must be 25');
+  }
+
+  // 2d. Heroes Trove (40228) and Titans Trove (40230) choices validation
+  const choices40228 = getChestChoices(40228);
+  assert.equal(choices40228.length, 6, 'Heroes Trove has 6 choices');
+  const choices40230 = getChestChoices(40230);
+  assert.equal(choices40230.length, 6, 'Titans Trove has 6 choices');
 
   // 3. Choices for 62: Artifact Essence Chest
   const choices62 = getChestChoices(62);

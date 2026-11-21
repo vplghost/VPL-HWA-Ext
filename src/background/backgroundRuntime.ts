@@ -2514,6 +2514,13 @@ export async function handleControl(kind: string, customChrome?: any) {
         }
       })?.catch?.(() => {});
     }
+    cr?.runtime?.sendMessage?.({
+      kind: 'record-tick',
+      count: 0,
+      interactionCount: 0,
+      active: true,
+      reset: true
+    })?.catch?.(() => {});
     return next;
   }
   if (kind === 'record-stop') {
@@ -2529,6 +2536,12 @@ export async function handleControl(kind: string, customChrome?: any) {
       cr?.storage?.session?.set?.({ [RECORD_STATE_KEY]: next })?.catch?.(() => {}),
       cr?.storage?.local?.set?.({ gameRecordingActive: false, recordingState: next })?.catch?.(() => {})
     ]);
+    cr?.runtime?.sendMessage?.({
+      kind: 'record-tick',
+      count: inMemoryApiRecords.length,
+      interactionCount: inMemoryInteractions.length,
+      active: false
+    })?.catch?.(() => {});
     return next;
   }
   if (kind === 'record-clear') {
@@ -2542,6 +2555,13 @@ export async function handleControl(kind: string, customChrome?: any) {
     ]);
     await clearRecorded(cr);
     await clearInteractions(cr);
+    cr?.runtime?.sendMessage?.({
+      kind: 'record-tick',
+      count: 0,
+      interactionCount: 0,
+      active: false,
+      reset: true
+    })?.catch?.(() => {});
     return next;
   }
   return inMemoryRecordState;
@@ -2578,6 +2598,12 @@ export async function saveInteraction(entry: any, cr: any): Promise<any> {
       return { saved: false, error: String(error) };
     }
   }
+  cr.runtime?.sendMessage?.({
+    kind: 'record-tick',
+    count: inMemoryApiRecords.length,
+    interactionCount: inMemoryInteractions.length,
+    active: true
+  })?.catch?.(() => {});
   return { saved: true };
 }
 
@@ -4077,6 +4103,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           return { saved: false, cached: cacheResult.changed, error: String(error) };
         }
       }
+      cr.runtime?.sendMessage?.({
+        kind: 'record-tick',
+        count: inMemoryApiRecords.length,
+        interactionCount: inMemoryInteractions.length,
+        active: true,
+        latestEntry: {
+          id: `record:${inMemoryApiRecords.length - 1}`,
+          ...record
+        }
+      })?.catch?.(() => {});
       return { saved: true, cached: cacheResult.changed };
     });
     pending.then(

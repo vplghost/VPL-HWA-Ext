@@ -142,7 +142,7 @@ const activeChest = computed<OpenableChestItem | null>(() => {
 
 const isChoice = computed(() => {
   if (!activeChest.value) return false;
-  return isChoiceChest(activeChest.value.id);
+  return isChoiceChest(activeChest.value.id, activeChest.value);
 });
 
 const choices = computed<ChestChoiceOption[]>(() => {

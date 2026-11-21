@@ -9,7 +9,7 @@ import {
   executeStoragePrune,
 } from '@/src/utils/dataBackup';
 
-const { logs, filteredLogs, search, sort, error, busy, control } = useRecorder();
+const { logs, activeCount, interactionCount, isRecording, filteredLogs, search, sort, error, busy, control } = useRecorder();
 
 async function exportLogs() {
   const payload = await control('record-export');
@@ -310,17 +310,31 @@ async function handleFileSelect(event: Event) {
     </div>
 
     <p v-if="error" role="alert" class="text-rose-600">{{ error }}</p>
-    <div class="flex items-center gap-2 text-xs text-slate-500">
-      <span>{{ filteredLogs.length }} / {{ logs.length }} entries</span>
-      <select v-model="sort" aria-label="Sort API logs" class="rounded border p-1 dark:bg-slate-900">
-        <option value="newest">Newest first</option><option value="oldest">Oldest first</option>
-        <option value="duration-desc">Slowest first</option><option value="duration-asc">Fastest first</option>
-      </select>
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <div class="flex items-center gap-2">
+        <span v-if="isRecording" class="flex items-center gap-1.5 text-rose-500 font-semibold">
+          <span class="inline-block w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+          <span>Recording: {{ logs.length || activeCount }} API, {{ interactionCount }} UI</span>
+        </span>
+        <span v-else>
+          {{ filteredLogs.length }} / {{ logs.length || activeCount }} entries {{ interactionCount > 0 ? `(${interactionCount} UI)` : '' }}
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <select v-model="sort" aria-label="Sort API logs" class="rounded border p-1 dark:bg-slate-900">
+          <option value="newest">Newest first</option><option value="oldest">Oldest first</option>
+          <option value="duration-desc">Slowest first</option><option value="duration-asc">Fastest first</option>
+        </select>
+      </div>
     </div>
 
     <!-- Logs list -->
     <div v-if="filteredLogs.length === 0" class="p-8 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-      No API logs captured yet in this session.
+      <div v-if="isRecording" class="flex flex-col items-center gap-2 text-rose-500">
+        <span class="inline-block w-3 h-3 rounded-full bg-rose-500 animate-pulse"></span>
+        <span>Recording in progress... Intercepting game actions ({{ logs.length || activeCount }} API, {{ interactionCount }} UI captured)</span>
+      </div>
+      <span v-else>No API logs captured yet in this session.</span>
     </div>
 
     <div v-else class="space-y-1.5 max-h-96 overflow-y-auto">

@@ -150,6 +150,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   let recordingStateObserved = false;
   let freeSpinAccountId: string | null = null;
   let updateButtonsRecordingState: (() => void) | null = null;
+  let onLocalRecordLogged: ((type: 'api' | 'interaction') => void) | null = null;
 
   function sendControl() {
     if (!currentSettings) return;
@@ -160,6 +161,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   }
 
   function saveInteraction(entry: any) {
+    onLocalRecordLogged?.('interaction');
     try {
       const p = win.chrome?.runtime?.sendMessage?.({ kind: 'record-interaction', entry });
       p?.catch?.(() => {});
@@ -278,6 +280,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     }
 
     if (event.data.kind !== 'api-record') return;
+    onLocalRecordLogged?.('api');
 
     try {
       const calls = JSON.parse(event.data.record?.requestBody || '{}').calls || [];
@@ -697,8 +700,48 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     clearBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>';
 
     let isRecording = false;
+    let liveApiCount = 0;
+    let liveInteractionCount = 0;
     const defaultExportSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
     const spinnerSvg = '<svg class="hwa-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+
+    function updateRecordingTooltip() {
+      const count = liveApiCount;
+      const interactionCount = liveInteractionCount;
+      const total = count + interactionCount;
+      const hasRecords = total > 0;
+
+      if (isRecording) {
+        const recTitle = `Recording active (${count} API, ${interactionCount} UI). Click to stop`;
+        recordBtn.title = recTitle;
+        recordBtn.setAttribute('aria-label', recTitle);
+      } else {
+        const recTitle = `Record game activity${hasRecords ? ` (${count} API, ${interactionCount} UI saved)` : ''}. Click to start`;
+        recordBtn.title = recTitle;
+        recordBtn.setAttribute('aria-label', recTitle);
+      }
+
+      exportBtn.hidden = !hasRecords;
+      clearBtn.hidden = !hasRecords;
+      if (exportBtn.style) exportBtn.style.display = hasRecords ? 'inline-flex' : 'none';
+      if (clearBtn.style) clearBtn.style.display = hasRecords ? 'inline-flex' : 'none';
+
+      if (hasRecords) {
+        const exportTitle = `Export game activity JSON (${count} API, ${interactionCount} UI entries)`;
+        exportBtn.title = exportTitle;
+        exportBtn.setAttribute('aria-label', exportTitle);
+        const clearTitle = `Clear recorded activity (${total} entries)`;
+        clearBtn.title = clearTitle;
+        clearBtn.setAttribute('aria-label', clearTitle);
+      }
+    }
+
+    onLocalRecordLogged = (type) => {
+      if (!isRecording) return;
+      if (type === 'api') liveApiCount++;
+      else if (type === 'interaction') liveInteractionCount++;
+      updateRecordingTooltip();
+    };
 
     async function syncRecordingState() {
       try {
@@ -709,30 +752,12 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
           recordingActive = isRecording;
           sendControl();
         }
-        const count = Number(res.count || 0);
-        const interactionCount = Number(res.interactionCount || 0);
+        liveApiCount = Number(res.count || 0);
+        liveInteractionCount = Number(res.interactionCount || 0);
         recordBtn.innerHTML = isRecording
           ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="hwa-rec-dot"></span>'
           : '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><circle cx="12" cy="12" r="9"/></svg>';
-        const hasRecords = count + interactionCount > 0;
-        const recTitle = isRecording
-          ? `Recording active (${count} API, ${interactionCount} UI). Click to stop`
-          : `Record game activity${hasRecords ? ` (${count} API, ${interactionCount} UI saved)` : ''}. Click to start`;
-        recordBtn.title = recTitle;
-        recordBtn.setAttribute('aria-label', recTitle);
-
-        exportBtn.hidden = !hasRecords;
-        clearBtn.hidden = !hasRecords;
-        if (exportBtn.style) exportBtn.style.display = hasRecords ? 'inline-flex' : 'none';
-        if (clearBtn.style) clearBtn.style.display = hasRecords ? 'inline-flex' : 'none';
-        if (hasRecords) {
-          const exportTitle = `Export game activity JSON (${count} API, ${interactionCount} UI entries)`;
-          exportBtn.title = exportTitle;
-          exportBtn.setAttribute('aria-label', exportTitle);
-          const clearTitle = `Clear recorded activity (${count + interactionCount} entries)`;
-          clearBtn.title = clearTitle;
-          clearBtn.setAttribute('aria-label', clearTitle);
-        }
+        updateRecordingTooltip();
       } catch (_) {}
     }
 
@@ -748,24 +773,16 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         isRecording = false;
         recordingActive = false;
         recordBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><circle cx="12" cy="12" r="9"/></svg>';
-        recordBtn.title = 'Record game activity. Click to start';
-        recordBtn.setAttribute('aria-label', recordBtn.title);
-        exportBtn.hidden = false;
-        clearBtn.hidden = false;
-        if (exportBtn.style) exportBtn.style.display = 'inline-flex';
-        if (clearBtn.style) clearBtn.style.display = 'inline-flex';
+        updateRecordingTooltip();
         sendControl();
       } else {
         // Optimistic instant UI update for start
         isRecording = true;
         recordingActive = true;
         recordBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="hwa-rec-dot"></span>';
-        recordBtn.title = 'Recording active. Click to stop';
-        recordBtn.setAttribute('aria-label', recordBtn.title);
-        exportBtn.hidden = true;
-        clearBtn.hidden = true;
-        if (exportBtn.style) exportBtn.style.display = 'none';
-        if (clearBtn.style) clearBtn.style.display = 'none';
+        liveApiCount = 0;
+        liveInteractionCount = 0;
+        updateRecordingTooltip();
         sendControl();
       }
 
@@ -869,13 +886,9 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
 
     clearBtn.addEventListener('click', () => {
       if (clearBtn.disabled) return;
-      // Optimistic instant UI update for clear
-      exportBtn.hidden = true;
-      clearBtn.hidden = true;
-      if (exportBtn.style) exportBtn.style.display = 'none';
-      if (clearBtn.style) clearBtn.style.display = 'none';
-      recordBtn.title = 'Record game activity. Click to start';
-      recordBtn.setAttribute('aria-label', recordBtn.title);
+      liveApiCount = 0;
+      liveInteractionCount = 0;
+      updateRecordingTooltip();
 
       sendBridgeMessage({ kind: 'record-clear' })
         .then(syncRecordingState)
