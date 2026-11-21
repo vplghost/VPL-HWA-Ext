@@ -11,7 +11,16 @@ import {
   getMissingRequirements,
   calculateEffectiveDurationMs,
   normalizeQueuedDuration,
+  STANDALONE_BUILDING_IDS,
+  BUILDING_RESEARCH_REQUIREMENTS,
+  hasCompletedResearch,
 } from '../../data/buildingData.ts';
+
+export {
+  STANDALONE_BUILDING_IDS,
+  BUILDING_RESEARCH_REQUIREMENTS,
+  hasCompletedResearch,
+};
 
 export function getSimulatedLevels(
   buildingMap: any,
@@ -19,14 +28,18 @@ export function getSimulatedLevels(
   queueItems: any = []
 ): Map<number, number> {
   const simulated = new Map<number, number>();
-  if (buildingMap && typeof buildingMap.entries === 'function') {
-    for (const [id, b] of buildingMap.entries()) {
-      simulated.set(Number(id), typeof b === 'number' ? b : (b?.level ?? 0));
-    }
-  } else if (Array.isArray(buildingMap)) {
+  if (Array.isArray(buildingMap)) {
     for (const b of buildingMap) {
       const id = Number(b?.buildingId ?? b?.id);
       if (Number.isFinite(id)) simulated.set(id, b?.level ?? 0);
+    }
+  } else if (buildingMap && typeof buildingMap.entries === 'function') {
+    for (const [id, b] of buildingMap.entries()) {
+      simulated.set(Number(id), typeof b === 'number' ? b : (b?.level ?? 0));
+    }
+  } else if (buildingMap && typeof buildingMap === 'object') {
+    for (const [id, b] of Object.entries(buildingMap)) {
+      simulated.set(Number(id), typeof b === 'number' ? b : (b?.level ?? 0));
     }
   }
   for (const q of Array.isArray(rawQueues) ? rawQueues : Object.values(rawQueues || {})) {
@@ -49,45 +62,71 @@ export const SYSTEM_LANDMARK_IDS = new Set<number>([44, 160, 161, 166, 167, 168,
 export function getEligibleCandidates(
   allBuildings: any,
   simulatedLevels: Map<number, number>,
-  bHelper: any = buildingDataHelper
+  bHelper: any = buildingDataHelper,
+  completedResearches?: Set<number> | Map<number, number> | number[] | Record<number, any>,
+  options?: { includeUnbuilt?: boolean }
 ): BuildingQueueCandidate[] {
   const simulatedHall = simulatedLevels.get(20) || 1;
   const candidates: BuildingQueueCandidate[] = [];
   const list = Array.isArray(allBuildings) ? allBuildings : Object.values(allBuildings || {});
 
-  for (const b of list) {
-    const bId = Number(b?.id);
+  const buildingList = [...list];
+  if (options?.includeUnbuilt) {
+    const presentIds = new Set<number>();
+    for (const b of list) {
+      const id = Number(b?.id ?? b?.buildingId);
+      if (Number.isFinite(id)) presentIds.add(id);
+    }
+    for (const sId of STANDALONE_BUILDING_IDS) {
+      if (!presentIds.has(sId) && !SYSTEM_LANDMARK_IDS.has(sId)) {
+        buildingList.push({ id: sId, level: 0, isBuilt: false });
+      }
+    }
+  }
+
+  for (const b of buildingList) {
+    const bId = Number(b?.id ?? b?.buildingId);
+    if (!STANDALONE_BUILDING_IDS.has(bId)) continue;
     if (SYSTEM_LANDMARK_IDS.has(bId)) continue;
-    const currentSimulated = simulatedLevels.get(b.id) ?? (b.isBuilt ? b.level : 0);
-    if (currentSimulated <= 0 && !b.isBuilt) continue;
-    const candidateNextLevel = currentSimulated > 0 || b.isBuilt ? currentSimulated + 1 : 1;
+
+    const currentSimulated = simulatedLevels.get(bId) ?? (b.isBuilt ? (b.level ?? 0) : 0);
+    const isBuiltOrQueued = Boolean(b.isBuilt || currentSimulated > 0);
+    const candidateNextLevel = isBuiltOrQueued ? currentSimulated + 1 : 1;
+
+    // Check research requirement for unbuilt buildings
+    if (!isBuiltOrQueued) {
+      const requiredTech = BUILDING_RESEARCH_REQUIREMENTS[bId];
+      if (requiredTech && !hasCompletedResearch(completedResearches, requiredTech)) {
+        continue;
+      }
+    }
 
     // Hall of Heroes limitation: non-hall buildings cannot exceed simulated Hall of Heroes level
-    if (b.id !== 20 && currentSimulated >= simulatedHall) continue;
+    if (bId !== 20 && candidateNextLevel > simulatedHall) continue;
 
     const helper = bHelper || buildingDataHelper;
     if (
       helper?.getBuildingLevelData &&
-      helper.data?.[b.id] &&
-      !helper.getBuildingLevelData(b.id, candidateNextLevel)
+      helper.data?.[bId] &&
+      !helper.getBuildingLevelData(bId, candidateNextLevel)
     ) {
       continue;
     }
 
     if (helper?.getMissingRequirements) {
-      const missing = helper.getMissingRequirements(b.id, candidateNextLevel, simulatedLevels);
+      const missing = helper.getMissingRequirements(bId, candidateNextLevel, simulatedLevels);
       if (missing && missing.length > 0) continue;
     }
 
     const durationMs = helper?.calculateEffectiveDurationMs
-      ? helper.calculateEffectiveDurationMs(b.id, candidateNextLevel)
-      : calculateEffectiveDurationMs(b.id, candidateNextLevel) || 1000;
+      ? helper.calculateEffectiveDurationMs(bId, candidateNextLevel)
+      : calculateEffectiveDurationMs(bId, candidateNextLevel) || 1000;
 
     candidates.push({
-      id: b.id,
+      id: bId,
       currentLevel: currentSimulated,
       nextLevel: candidateNextLevel,
-      isBuilt: b.isBuilt || currentSimulated > 0,
+      isBuilt: isBuiltOrQueued,
       durationMs,
     });
   }
@@ -423,6 +462,10 @@ export const buildingQueueService = {
   removeFromQueue,
   reorderQueue,
   clearQueue,
+  STANDALONE_BUILDING_IDS,
+  SYSTEM_LANDMARK_IDS,
+  BUILDING_RESEARCH_REQUIREMENTS,
+  hasCompletedResearch,
 };
 
 export default buildingQueueService;

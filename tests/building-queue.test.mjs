@@ -249,3 +249,81 @@ test('planNextStep skips already-completed buildings and starts next uncompleted
   assert.equal(step.calls[0].args.buildingId, 21);
   assert.equal(step.calls[0].args.nextLevel, 6);
 });
+
+test('getEligibleCandidates unlocks unbuilt buildings when research or building prerequisites are satisfied', () => {
+  const { hwaHelperBuildingQueue: qHelper, hwaHelperBuildingData: bHelper } = createContext();
+
+  const allBuildings = [
+    { id: 20, level: 20, isBuilt: true }, // Hall of Heroes Lv. 20
+    { id: 162, level: 10, isBuilt: true }, // Infirmary 1 Lv. 10
+    { id: 174, level: 0, isBuilt: false }, // Infirmary 2 (requires tech 633)
+    { id: 175, level: 0, isBuilt: false }, // Infirmary 3 (requires tech 634)
+    { id: 182, level: 0, isBuilt: false }, // Headquarters 1 (requires Hall 7)
+    { id: 183, level: 0, isBuilt: false }, // Headquarters 2 (requires Hall 16)
+    { id: 184, level: 0, isBuilt: false }, // Headquarters 3 (requires tech 635)
+    { id: 23, level: 0, isBuilt: false },  // Bed (sub-structure, should NEVER be eligible)
+    { id: 44, level: 0, isBuilt: false },  // Landmark (should NEVER be eligible)
+  ];
+
+  const simulated = qHelper.getSimulatedLevels(allBuildings, [], []);
+
+  // Case 1: No research completed
+  // Headquarters 1 (#182) and Headquarters 2 (#183) should be eligible because Hall is 20 (>= 7 and >= 16)
+  // Infirmary 2 (#174), Infirmary 3 (#175), Headquarters 3 (#184) require research techs 633, 634, 635 -> NOT eligible
+  const candidatesNoResearch = qHelper.getEligibleCandidates(allBuildings, simulated, bHelper, []);
+  assert.ok(candidatesNoResearch.some((c) => c.id === 182 && c.nextLevel === 1), 'Headquarters 1 should be eligible (Hall >= 7)');
+  assert.ok(candidatesNoResearch.some((c) => c.id === 183 && c.nextLevel === 1), 'Headquarters 2 should be eligible (Hall >= 16)');
+  assert.ok(!candidatesNoResearch.some((c) => c.id === 174), 'Infirmary 2 should not be eligible without tech 633');
+  assert.ok(!candidatesNoResearch.some((c) => c.id === 175), 'Infirmary 3 should not be eligible without tech 634');
+  assert.ok(!candidatesNoResearch.some((c) => c.id === 184), 'Headquarters 3 should not be eligible without tech 635');
+  assert.ok(!candidatesNoResearch.some((c) => c.id === 23), 'Bed (sub-structure) must never be eligible');
+  assert.ok(!candidatesNoResearch.some((c) => c.id === 44), 'Landmark must never be eligible');
+
+  // Case 2: Tech 634 (Additional Infirmary II) and Tech 635 (New Drill Ground I) completed
+  const completedResearches = new Map([
+    [634, 1], // Tech 634 unlocked
+    [635, 1], // Tech 635 unlocked
+  ]);
+  const candidatesWithResearch = qHelper.getEligibleCandidates(allBuildings, simulated, bHelper, completedResearches);
+  assert.ok(candidatesWithResearch.some((c) => c.id === 175 && c.nextLevel === 1), 'Infirmary 3 should be eligible when tech 634 is completed');
+  assert.ok(candidatesWithResearch.some((c) => c.id === 184 && c.nextLevel === 1), 'Headquarters 3 should be eligible when tech 635 is completed');
+  assert.ok(!candidatesWithResearch.some((c) => c.id === 174), 'Infirmary 2 remains locked since tech 633 is not completed');
+
+  // Case 3: Once an unbuilt building is queued (e.g. Infirmary 3 -> Lv. 1), projected next level becomes 2
+  const queueWithInfirmary3 = [
+    { buildingId: 175, nextLevel: 1, durationMs: 2000 }
+  ];
+  const projectedSim = qHelper.getSimulatedLevels(allBuildings, [], queueWithInfirmary3);
+  assert.equal(projectedSim.get(175), 1, 'Simulated level should reflect queued level 1');
+
+  const candidatesAfterQueued = qHelper.getEligibleCandidates(allBuildings, projectedSim, bHelper, completedResearches);
+  const nextInfirmary3 = candidatesAfterQueued.find((c) => c.id === 175);
+  assert.ok(nextInfirmary3, 'Infirmary 3 should still be eligible');
+  assert.equal(nextInfirmary3.currentLevel, 1, 'Current simulated level should be 1');
+  assert.equal(nextInfirmary3.nextLevel, 2, 'Next level should advance to 2');
+});
+
+test('getEligibleCandidates with includeUnbuilt option discovers unbuilt standalone buildings from minimal building list', () => {
+  const { hwaHelperBuildingQueue: qHelper, hwaHelperBuildingData: bHelper } = createContext();
+
+  const minimalBuilt = [
+    { id: 20, level: 25, isBuilt: true }
+  ];
+  const simulated = qHelper.getSimulatedLevels(minimalBuilt, [], []);
+  const completedResearches = new Set([633, 634, 635]);
+
+  const candidates = qHelper.getEligibleCandidates(
+    minimalBuilt,
+    simulated,
+    bHelper,
+    completedResearches,
+    { includeUnbuilt: true }
+  );
+
+  assert.ok(candidates.some((c) => c.id === 174 && c.nextLevel === 1), 'Infirmary 2 discovered as unbuilt candidate');
+  assert.ok(candidates.some((c) => c.id === 175 && c.nextLevel === 1), 'Infirmary 3 discovered as unbuilt candidate');
+  assert.ok(candidates.some((c) => c.id === 182 && c.nextLevel === 1), 'Headquarters 1 discovered as unbuilt candidate');
+  assert.ok(candidates.some((c) => c.id === 183 && c.nextLevel === 1), 'Headquarters 2 discovered as unbuilt candidate');
+  assert.ok(candidates.some((c) => c.id === 184 && c.nextLevel === 1), 'Headquarters 3 discovered as unbuilt candidate');
+  assert.ok(!candidates.some((c) => c.id === 23), 'Sub-structure Bed is never discovered');
+});

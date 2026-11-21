@@ -44,6 +44,7 @@ test('Building dialog candidates and saved queue timeline preserve Hall multi-da
     getMissingCostsTyped,
     calculateEffectiveDurationMsTyped,
     buildingLevelsDataTyped,
+    extractResearchLevels: researchQueueService.extractResearchLevels,
   };
   const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');

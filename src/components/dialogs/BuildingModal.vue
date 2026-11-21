@@ -22,6 +22,7 @@ import {
   getModalStackLevel,
 } from '@/src/composables/useModals';
 import { buildingQueueService } from '@/src/services/queues/buildingQueue';
+import { extractResearchLevels } from '@/src/services/queues/researchQueue';
 
 const bHelper = buildingDataHelper;
 const bQueueHelper = buildingQueueService;
@@ -356,17 +357,42 @@ const simulatedBuildingLevels = computed(() => {
   return sim;
 });
 
+const resolveCompletedResearchLevels = (c: any): Map<number, number> => {
+  if (typeof extractResearchLevels !== 'undefined') {
+    return extractResearchLevels(c);
+  }
+  const levels = new Map<number, number>();
+  const raw =
+    c?.researchStatus?.data?.completedResearches ||
+    c?.researchStatus?.data?.researches ||
+    c?.clan_getSummary?.data?.completedResearches ||
+    c?.clan_getSummary?.data?.researches;
+  if (Array.isArray(raw)) {
+    for (const r of raw) {
+      const id = Number(r?.researchId ?? r?.id);
+      if (Number.isFinite(id)) levels.set(id, Number(r?.level) || 0);
+    }
+  }
+  return levels;
+};
+
+const completedResearches = computed(() => {
+  return resolveCompletedResearchLevels(cache.value);
+});
+
 const SYSTEM_LANDMARK_BUILDING_IDS = new Set([44, 160, 161, 166, 167, 168, 169, 176, 177]);
 
 // Section 2: Candidate upgrades
 const upgradeCandidates = computed(() => {
   const simulatedLevels = simulatedBuildingLevels.value;
   const hallLevel = simulatedLevels.get(20) ?? Infinity;
+  const researches = completedResearches.value;
 
   return allBuildingsList.value
     .map((b: any) => {
       const curLvl = simulatedLevels.get(b.id) ?? (b.isBuilt ? b.level : 0);
-      const nextLvl = (curLvl > 0 || b.isBuilt) ? (curLvl + 1) : 1;
+      const isBuiltOrQueued = Boolean(curLvl > 0 || b.isBuilt);
+      const nextLvl = isBuiltOrQueued ? (curLvl + 1) : 1;
       const durationMs = calculateEffectiveDurationMs(b.id, nextLvl);
       return {
         ...b,
@@ -374,12 +400,22 @@ const upgradeCandidates = computed(() => {
         currentLevel: curLvl,
         level: curLvl,
         nextLevel: nextLvl,
+        isBuiltOrQueued,
         durationMs: durationMs || 1000,
       };
     })
     .filter((b: any) => {
       if (SYSTEM_LANDMARK_BUILDING_IDS.has(Number(b.id))) return false;
-      if (!b.isBuilt && (b.currentLevel ?? b.level ?? 0) <= 0) return false;
+      if (!bHelper.standaloneBuildingIds?.has(Number(b.id))) return false;
+
+      // If building is not yet built and not yet queued (level 0 -> 1):
+      if (!b.isBuiltOrQueued) {
+        const requiredTech = bHelper.researchRequirements?.[b.id];
+        if (requiredTech && !bHelper.hasCompletedResearch(researches, requiredTech)) {
+          return false;
+        }
+      }
+
       if (b.id !== 20 && b.nextLevel > hallLevel) return false;
       if (buildingLevelsData[b.id] && !getBuildingLevelData(b.id, b.nextLevel)) {
         return false;
@@ -497,6 +533,7 @@ const filteredBuildingDirectory = computed(() => {
   const query = buildingSearchQuery.value.toLowerCase().trim();
   return allBuildingsList.value
     .filter((b: any) => {
+      if (!bHelper.standaloneBuildingIds?.has(Number(b.id))) return false;
       if (!query) return b.isBuilt;
       const name = getBuildingName(b.id).toLowerCase();
       const idStr = String(b.id);
@@ -995,8 +1032,8 @@ async function refreshBuildings() {
                   <button
                     type="button"
                     class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700/80 dark:hover:bg-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-slate-600 shrink-0"
-                    :title="`Add ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel} to auto-build queue`"
-                    :aria-label="`Queue ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel}`"
+                    :title="(b.currentLevel ?? b.level ?? 0) > 0 ? `Add ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel} to auto-build queue` : `Add ${b.name || getBuildingName(b.id)} Lv. 1 to auto-build queue`"
+                    :aria-label="(b.currentLevel ?? b.level ?? 0) > 0 ? `Queue ${b.name || getBuildingName(b.id)} Lv. ${b.nextLevel}` : `Queue ${b.name || getBuildingName(b.id)} Lv. 1`"
                     :disabled="queueBusy"
                     @click="addToQueue(b)"
                   >

@@ -90,9 +90,45 @@ export function normalizeQueuedDuration<T extends Partial<BuildingQueueItem>>(it
   return { ...item, durationMs: calculateEffectiveDurationMs(item.buildingId, item.nextLevel) };
 }
 
+export const STANDALONE_BUILDING_IDS = new Set<number>([
+  20, 21, 22, 26, 29, 31, 33, 34, 35, 36, 37, 38, 39,
+  40, 41, 42, 43, 162, 163, 165, 170, 171, 172, 173, 174, 175, 182, 183, 184,
+]);
+
+export const BUILDING_RESEARCH_REQUIREMENTS: Record<number, number> = {
+  174: 633, // Infirmary 2 -> Additional Infirmary I
+  175: 634, // Infirmary 3 -> Additional Infirmary II
+  184: 635, // Headquarters 3 -> New Drill Ground I
+};
+
+export function hasCompletedResearch(
+  completed: Set<number> | Map<number, number> | number[] | Record<number, any> | undefined | null,
+  techId: number
+): boolean {
+  if (!completed) return false;
+  if (completed instanceof Set) return completed.has(techId);
+  if (completed instanceof Map) return (completed.get(techId) ?? 0) >= 1;
+  if (Array.isArray(completed)) {
+    return completed.some((r: any) => {
+      if (typeof r === 'number') return r === techId;
+      return Number(r?.researchId ?? r?.id) === techId && Number(r?.level ?? 1) >= 1;
+    });
+  }
+  if (typeof completed === 'object') {
+    const val = (completed as any)[techId];
+    if (typeof val === 'number') return val >= 1;
+    if (val && typeof val === 'object') return Number(val.level ?? 1) >= 1;
+    return Boolean(val);
+  }
+  return false;
+}
+
 export const buildingDataHelper = {
   data: buildingLevelsData,
   legacyDurations: legacyBuildingDurations,
+  standaloneBuildingIds: STANDALONE_BUILDING_IDS,
+  researchRequirements: BUILDING_RESEARCH_REQUIREMENTS,
+  hasCompletedResearch,
   getBuildingLevelData,
   getMissingRequirements,
   getMissingCosts,
