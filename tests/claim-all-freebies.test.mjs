@@ -6,6 +6,8 @@ import {
   normalizeAutoClaim,
   getPendingClaims,
   buildAutoClaimCalls,
+  getUserVipLevel,
+  canClaimDailyBonusVip,
 } from '../src/utils/popupData.ts';
 import { setupBackgroundRuntime } from '../src/background/backgroundRuntime.ts';
 
@@ -223,18 +225,63 @@ test('buildAutoClaimCalls respects disabled options', () => {
   assert.equal(callNames.includes('cinemaGiveReward'), true);
 });
 
-test('buildAutoClaimCalls sets vip arg when availableVip is true', () => {
+test('buildAutoClaimCalls sets vip arg only when user VIP level satisfies daily requirement', () => {
   const now = 1794736960000;
-  const sampleCache = {
+  // Day 21 requires VIP 13 (40,000 points)
+  const highVipCache = {
+    userGetInfo: {
+      data: { vipPoints: 50000 },
+    },
     dailyBonusGetInfo: {
-      data: { availableToday: true, availableVip: true },
+      data: { currentDay: 21, availableToday: true, availableVip: true },
     },
   };
+  const { calls: highCalls } = buildAutoClaimCalls(highVipCache, { dailyBonus: true }, now);
+  const highVipCall = highCalls.find((c) => c.name === 'dailyBonusFarm');
+  assert.ok(highVipCall);
+  assert.deepEqual(highVipCall.args, { vip: 1 });
 
-  const { calls } = buildAutoClaimCalls(sampleCache, { dailyBonus: true }, now);
-  const dailyBonusCall = calls.find((c) => c.name === 'dailyBonusFarm');
-  assert.ok(dailyBonusCall);
-  assert.deepEqual(dailyBonusCall.args, { vip: 1 });
+  // Insufficient VIP (e.g. VIP 3 with 350 points on Day 21 which requires VIP 13)
+  const lowVipCache = {
+    userGetInfo: {
+      data: { vipPoints: 350 },
+    },
+    dailyBonusGetInfo: {
+      data: { currentDay: 21, availableToday: true, availableVip: true },
+    },
+  };
+  const { calls: lowCalls } = buildAutoClaimCalls(lowVipCache, { dailyBonus: true }, now);
+  const lowVipCall = lowCalls.find((c) => c.name === 'dailyBonusFarm');
+  assert.ok(lowVipCall);
+  assert.deepEqual(lowVipCall.args, {}, 'Must safely omit vip arg when user VIP level is insufficient');
+
+  // Sufficient VIP for Day 5 (requires VIP 3, player has 350 points -> VIP 3)
+  const day5Cache = {
+    userGetInfo: {
+      data: { vipPoints: 350 },
+    },
+    dailyBonusGetInfo: {
+      data: { currentDay: 5, availableToday: true, availableVip: true },
+    },
+  };
+  const { calls: day5Calls } = buildAutoClaimCalls(day5Cache, { dailyBonus: true }, now);
+  const day5Call = day5Calls.find((c) => c.name === 'dailyBonusFarm');
+  assert.ok(day5Call);
+  assert.deepEqual(day5Call.args, { vip: 1 });
+
+  // When availableVip is false
+  const noVipCache = {
+    userGetInfo: {
+      data: { vipPoints: 50000 },
+    },
+    dailyBonusGetInfo: {
+      data: { currentDay: 21, availableToday: true, availableVip: false },
+    },
+  };
+  const { calls: noVipCalls } = buildAutoClaimCalls(noVipCache, { dailyBonus: true }, now);
+  const noVipCall = noVipCalls.find((c) => c.name === 'dailyBonusFarm');
+  assert.ok(noVipCall);
+  assert.deepEqual(noVipCall.args, {});
 });
 
 test('backgroundRuntime accepts all freebie claims in claim-rewards envelope', async () => {

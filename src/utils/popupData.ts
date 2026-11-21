@@ -1042,6 +1042,44 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
   };
 }
 
+export const VIP_POINTS_THRESHOLDS = [0, 50, 100, 300, 500, 1000, 2000, 3000, 5000, 7000, 10000, 15000, 25000, 40000, 70000, 150000];
+
+export const DAILY_BONUS_VIP_DOUBLE_REQUIREMENT: Record<number, number> = {
+  1: 1,
+  5: 3,
+  6: 4,
+  10: 6,
+  11: 7,
+  15: 9,
+  16: 10,
+  20: 12,
+  21: 13,
+  23: 1,
+  25: 15,
+  26: 15,
+  28: 15,
+  30: 15,
+  31: 1,
+};
+
+export function getUserVipLevel(cache: any): number {
+  const pointsRaw = cache?.userGetInfo?.data?.vipPoints ?? cache?.accountStatus?.data?.vipPoints;
+  const points = Number(pointsRaw);
+  if (!Number.isFinite(points) || points < 0) return 0;
+  return Math.max(0, VIP_POINTS_THRESHOLDS.filter((t) => points >= t).length - 1);
+}
+
+export function canClaimDailyBonusVip(cache: any): boolean {
+  const info = cache?.dailyBonusGetInfo?.data;
+  if (!info?.availableVip) return false;
+  const currentDay = Number(info?.currentDay);
+  if (!Number.isFinite(currentDay)) return false;
+  const requiredVip = DAILY_BONUS_VIP_DOUBLE_REQUIREMENT[currentDay];
+  if (!requiredVip) return false;
+  const userVip = getUserVipLevel(cache);
+  return userVip >= requiredVip;
+}
+
 export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.now(), dynamicCatalog?: any) {
   const opt = {
     ...normalizeAutoClaim(options),
@@ -1144,7 +1182,7 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
   }
 
   if (opt.dailyBonus && pending.hasDailyBonus) {
-    const dailyBonusArgs = cache?.dailyBonusGetInfo?.data?.availableVip ? { vip: 1 } : {};
+    const dailyBonusArgs = canClaimDailyBonusVip(cache) ? { vip: 1 } : {};
     calls.push({
       name: 'dailyBonusFarm',
       args: dailyBonusArgs,
@@ -1722,4 +1760,8 @@ export const popupDataHelper = {
   countClaimableBattlePass,
   resolveClaimableEventQuests,
   resolveClaimableBattlePassRewards,
+  VIP_POINTS_THRESHOLDS,
+  DAILY_BONUS_VIP_DOUBLE_REQUIREMENT,
+  getUserVipLevel,
+  canClaimDailyBonusVip,
 };
