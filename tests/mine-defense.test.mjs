@@ -332,3 +332,136 @@ test('intercept switches squads back after battle impact, or after 5s when enemy
   assert.equal(postImpactPlan?.action, 'switch_back');
   assert.match(postImpactPlan?.reason, /Attack resolved/);
 });
+
+test('intercept prioritizes clearing slot immediately when attack is > 2 minutes away, and swaps squad once slot opens', () => {
+  const { helper, cache, attack } = environment();
+  const attackTime = attack.impactAt;
+  const now = attackTime - 130000; // 2 minutes 10 seconds before impact
+  const isoNow = new Date(now).toISOString();
+  cache.marchStatus.updatedAt = isoNow;
+  cache['getUnitSummary:unit'].updatedAt = isoNow;
+  cache.buildingStatus.updatedAt = isoNow;
+  cache['getHealing:unit'].updatedAt = isoNow;
+  cache.customTeams = [{ id: 'combat-1', heroIds: [1, 2, 3, 4, 5] }];
+  const settings = {
+    defenseRecallEnabled: true,
+    defenseInfirmaryThreshold: 50,
+    interceptTeamId: 'combat-1',
+    maxMarches: 2, // 2 marches currently gathering -> 0 available slots
+  };
+
+  // Step 1: Immediately clears slot upon attack signal (>2m away), does NOT wait until 10s
+  const plan1 = helper.plan(cache, {}, now, settings);
+  assert.equal(plan1?.action, 'clear_slot');
+  assert.match(plan1?.reason, /Clearing march slot/i);
+  assert.equal(plan1?.intercept?.phase, 'clearing_slot');
+  assert.equal(plan1?.call?.args?.squadId, '0c64e739-6dcc-4067-889e-58ac500e95be');
+
+  // Step 2: Slot opens up (march returns home) -> swaps squads for intercept
+  settings.maxMarches = 3;
+  const laterNow = now + 20000;
+  const isoLater = new Date(laterNow).toISOString();
+  cache.marchStatus.updatedAt = isoLater;
+  cache['getUnitSummary:unit'].updatedAt = isoLater;
+  cache.buildingStatus.updatedAt = isoLater;
+  cache['getHealing:unit'].updatedAt = isoLater;
+  const plan2 = helper.plan(cache, { intercept: plan1.intercept }, laterNow, settings);
+  assert.equal(plan2?.action, 'intercept');
+  assert.match(plan2?.reason, /Intercepting mine attack/i);
+  assert.equal(plan2?.intercept?.phase, 'intercepting');
+  assert.equal(plan2?.calls?.[0]?.name, 'stopMineGathering');
+});
+
+test('intercept swaps squads immediately when attack is > 2 minutes away and a slot is already available', () => {
+  const { helper, cache, attack } = environment();
+  const now = attack.impactAt - 140000; // 2 minutes 20 seconds before impact
+  const isoNow = new Date(now).toISOString();
+  cache.marchStatus.updatedAt = isoNow;
+  cache['getUnitSummary:unit'].updatedAt = isoNow;
+  cache.buildingStatus.updatedAt = isoNow;
+  cache['getHealing:unit'].updatedAt = isoNow;
+  cache.customTeams = [{ id: 'combat-1', heroIds: [1, 2, 3, 4, 5] }];
+  const settings = {
+    defenseRecallEnabled: true,
+    defenseInfirmaryThreshold: 50,
+    interceptTeamId: 'combat-1',
+    maxMarches: 3, // 2 marches gathering < 3 max -> 1 available slot
+  };
+
+  const plan = helper.plan(cache, {}, now, settings);
+  assert.equal(plan?.action, 'intercept');
+  assert.match(plan?.reason, /Intercepting mine attack/i);
+  assert.equal(plan?.intercept?.phase, 'intercepting');
+  assert.equal(plan?.calls?.[0]?.name, 'stopMineGathering');
+});
+
+test('intercept recalls immediately when remaining time is less than travel time needed', () => {
+  const { helper, cache, attack } = environment();
+  const now = attack.impactAt - 2000; // Only 2s left before impact (< 3000ms minimum threshold)
+  cache.customTeams = [{ id: 'combat-1', heroIds: [1, 2, 3, 4, 5] }];
+  const settings = {
+    defenseRecallEnabled: true,
+    defenseInfirmaryThreshold: 50,
+    interceptTeamId: 'combat-1',
+    maxMarches: 3,
+  };
+
+  const plan = helper.plan(cache, {}, now, settings);
+  assert.equal(plan?.action, 'recall');
+  assert.match(plan?.reason, /Insufficient time/i);
+  assert.equal(plan?.call?.name, 'stopMineGathering');
+});
+
+test('evaluatePriorityAutoJoin is suppressed when incoming mine attack is active on gathering mine (>2 minutes away)', async () => {
+  const { cache, local, attack } = environment();
+  const now = attack.impactAt - 130000; // 2m 10s away
+  local.priorityAutoJoin = { enabled: true, minLevel: 10, teamId: 'highest' };
+  local.popupRpcEnabled = true;
+
+  const bg = setupBackgroundRuntime({
+    chrome: {
+      storage: {
+        local: {
+          get: async (k) => local,
+          set: async (v) => Object.assign(local, v)
+        }
+      },
+      tabs: { sendMessage: async () => {} }
+    }
+  });
+
+  const rallyRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    requestBody: JSON.stringify({ calls: [{ ident: 'c1', name: 'getRallyById', feature: 'rally' }] }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'c1',
+        result: {
+          response: {
+            rally: {
+              rallyId: 'rally-999',
+              mapId: 'map-1',
+              target: { objectConfigId: 75 },
+              membersCapacityLeft: 3,
+              plannedStartTime: now + 50000
+            }
+          }
+        }
+      }]
+    })
+  };
+
+  const origNow = Date.now;
+  Date.now = () => now;
+  try {
+    await bg.evaluatePriorityAutoJoin(rallyRecord, cache, local, 1);
+  } finally {
+    Date.now = origNow;
+  }
+
+  // priorityAutoJoinedRallies should NOT include rally-999 because auto join was suppressed by incoming mine attack
+  const autoJoins = cache.priorityAutoJoinedRallies?.data || [];
+  assert.equal(autoJoins.includes('rally-999'), false, 'Priority auto join must not join rally while mine is under attack');
+});

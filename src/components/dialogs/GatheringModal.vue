@@ -635,12 +635,11 @@ async function recallMarch(march: any) {
           </div>
 
           <p v-if="autoSettings.defenseRecallEnabled" class="text-[11px] text-slate-500 dark:text-slate-400">
-            Triggers in final 10s:
             <span v-if="autoSettings.interceptTeamId">
-              If wounded troops are within {{ autoSettings.defenseInfirmaryThreshold || 50 }}% infirmary capacity, intercept team defends the mine (clearing nearest gathering march if slots are full), switching back after battle or 5s after enemy retreats. If wounded troops exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}%, gatherers are recalled to base without intercepting to prevent troop loss.
+              ⚡ <strong>Intercept Priority:</strong> Triggers immediately on attack signal (prioritized above auto join & gathering). Clears nearest march slot if full, swaps gatherer with intercept combat team if travel time permits, and switches back after battle or retreat. If wounded troops exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}%, gatherers are recalled in final 10s without intercepting.
             </span>
             <span v-else>
-              Recalls threatened gathering squads to base when wounded troops exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}% infirmary capacity.
+              🛡️ <strong>Defensive Recall (final 10s):</strong> Recalls threatened gathering squads to base when wounded troops exceed {{ autoSettings.defenseInfirmaryThreshold || 50 }}% infirmary capacity.
             </span>
           </p>
         </div>

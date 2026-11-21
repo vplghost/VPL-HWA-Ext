@@ -16,6 +16,24 @@ function distance(a?: { x: number; y: number }, b?: { x: number; y: number }): n
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+export function estimateTravelMs(
+  mineCoords?: { x: number; y: number },
+  center?: { x: number; y: number }
+): number | null {
+  if (
+    !mineCoords ||
+    !center ||
+    !Number.isFinite(mineCoords.x) ||
+    !Number.isFinite(mineCoords.y) ||
+    !Number.isFinite(center.x) ||
+    !Number.isFinite(center.y)
+  ) {
+    return null;
+  }
+  const dist = Math.hypot(mineCoords.x - center.x, mineCoords.y - center.y);
+  return Math.ceil((dist * 10000) / 15);
+}
+
 function buildSquadCall(
   cache: Record<string, any>,
   stored: Record<string, any> | undefined,
@@ -113,6 +131,129 @@ export function plan(
   // Check if there is an active intercept underway
   const activeIntercept = state?.intercept;
   if (activeIntercept) {
+    if (activeIntercept.phase === 'clearing_slot') {
+      const isAttackActive = Boolean(
+        cache.incomingMineAttacks?.data?.attacks?.[activeIntercept.attackRouteId]
+      );
+      if (!isAttackActive && now < activeIntercept.impactAt) {
+        return {
+          action: 'wait',
+          reason: 'Enemy attack aborted while clearing slot · intercept cancelled',
+          intercept: null,
+        };
+      }
+      const currentMarches = list(cache.marchStatus?.data?.marches);
+      const maxMarches =
+        settings && Number.isInteger(settings.maxMarches)
+          ? Number(settings.maxMarches)
+          : cache.marchStatus?.data?.maxCount || 3;
+      const isSlotFree = currentMarches.length < maxMarches;
+
+      const center =
+        cache.experimentalMineSearch?.data?.center ||
+        cache.experimentalMapContext?.data?.center ||
+        smart?.context?.(cache)?.center;
+      const mineCoords = activeIntercept.coordinates || cache.mineMap?.[activeIntercept.mineId]?.coordinates;
+      const travelMs = estimateTravelMs(mineCoords, center);
+      const minTimeNeeded = travelMs != null ? travelMs + 3000 : 3000;
+      const timeLeft = activeIntercept.impactAt - now;
+
+      if (isSlotFree) {
+        if (timeLeft < minTimeNeeded) {
+          const stopCall = {
+            name: 'stopMineGathering',
+            feature: 'mine',
+            args: { squadId: activeIntercept.threatenedSquadId },
+          };
+          return {
+            action: 'recall',
+            reason: 'Insufficient time for intercept squad to arrive before impact · withdrawing threatened gatherer',
+            call: stopCall,
+            intercept: null,
+            mine: {
+              mineId: activeIntercept.mineId,
+              mapId: activeIntercept.mapId,
+              configId: activeIntercept.mineConfigId,
+              coordinates: activeIntercept.coordinates,
+              resumeAfter: activeIntercept.impactAt + 1000,
+              defense: true,
+            },
+          };
+        }
+
+        const stopCall = {
+          name: 'stopMineGathering',
+          feature: 'mine',
+          args: { squadId: activeIntercept.threatenedSquadId },
+        };
+        const rawCustom = stored?.customTeams?.[String(cache.accountStatus?.data?.id)] ?? stored?.customTeams ?? cache?.customTeams ?? [];
+        const customTeams = Array.isArray(rawCustom) ? rawCustom : typeof rawCustom === 'object' ? Object.values(rawCustom).flat() : [];
+        const team = customTeams.find((t: any) => String(t?.id) === String(interceptTeamId));
+        const interceptHeroIds = team?.heroIds || [];
+        const interceptCall = buildSquadCall(
+          cache,
+          stored,
+          activeIntercept.mapId,
+          activeIntercept.mineId,
+          interceptHeroIds
+        );
+        const summary = cache['getUnitSummary:unit'];
+        const squad = list(summary?.data?.squads).find(
+          (s: any) => (s.squadId ?? s.id) === activeIntercept.threatenedSquadId
+        );
+        const farmingHeroIds =
+          activeIntercept.farmingHeroIds ||
+          squad?.heroes?.map((h: any) => h.id || h) || [];
+
+        activeIntercept.phase = 'intercepting';
+        activeIntercept.farmingHeroIds = farmingHeroIds;
+        const calls = [stopCall, interceptCall].filter(Boolean);
+        return {
+          action: 'intercept',
+          reason: 'Intercepting mine attack · Recalling gatherer and dispatching combat team',
+          call: stopCall,
+          calls,
+          intercept: activeIntercept,
+          mine: {
+            mineId: activeIntercept.mineId,
+            mapId: activeIntercept.mapId,
+            configId: activeIntercept.mineConfigId,
+            coordinates: activeIntercept.coordinates,
+            resumeAfter: activeIntercept.impactAt + 1000,
+            defense: true,
+          },
+        };
+      } else {
+        if (timeLeft < minTimeNeeded) {
+          const stopCall = {
+            name: 'stopMineGathering',
+            feature: 'mine',
+            args: { squadId: activeIntercept.threatenedSquadId },
+          };
+          return {
+            action: 'recall',
+            reason: 'Insufficient time for freed slot to open before impact · withdrawing threatened gatherer',
+            call: stopCall,
+            intercept: null,
+            mine: {
+              mineId: activeIntercept.mineId,
+              mapId: activeIntercept.mapId,
+              configId: activeIntercept.mineConfigId,
+              coordinates: activeIntercept.coordinates,
+              resumeAfter: activeIntercept.impactAt + 1000,
+              defense: true,
+            },
+          };
+        }
+        return {
+          action: 'wait',
+          reason: 'Awaiting freed gathering squad return to open march slot for intercept',
+          wakeAt: Math.min(now + 2000, activeIntercept.impactAt - minTimeNeeded),
+          intercept: activeIntercept,
+        };
+      }
+    }
+
     if (activeIntercept.phase === 'intercepting') {
       const isAttackActive = Boolean(
         cache.incomingMineAttacks?.data?.attacks?.[activeIntercept.attackRouteId]
@@ -132,6 +273,13 @@ export function plan(
       if (now >= activeIntercept.impactAt) {
         activeIntercept.phase = 'awaiting_switch';
         activeIntercept.switchBackAt = now;
+      } else {
+        return {
+          action: 'wait',
+          reason: 'Intercept squad holding mine · awaiting enemy attack impact',
+          wakeAt: activeIntercept.impactAt,
+          intercept: activeIntercept,
+        };
       }
     }
 
@@ -250,17 +398,6 @@ export function plan(
       continue;
     }
 
-    if (now < attack.impactAt - 10000) {
-      return {
-        ...base,
-        action: 'wait',
-        reason: isAboveThreshold
-          ? 'Mine threatened · recall scheduled for final 10s'
-          : 'Mine threatened · intercept scheduled for final 10s',
-        room,
-        count,
-      };
-    }
     const configId = march.mineConfigId ?? cache.mineMap?.[march.mineId]?.mineConfigId;
     if (!configId) {
       return {
@@ -270,99 +407,25 @@ export function plan(
       };
     }
 
-    // Intercept branch: ONLY when wounded troops are within safe threshold (<= threshold) AND interceptTeamId is set
-    if (!isAboveThreshold && interceptTeamId) {
-      const maxMarches =
-        settings && Number.isInteger(settings.maxMarches)
-          ? Number(settings.maxMarches)
-          : cache.marchStatus?.data?.maxCount || 3;
-      const activeMarches = list(cache.marchStatus?.data?.marches).filter(
-        (m: any) => !['returnToOutpost', 'returnToOutpostFromMine'].includes(m.stage)
-      );
-      const availableSlots = Math.max(0, maxMarches - activeMarches.length);
-
-      if (availableSlots === 0 && (!activeIntercept || activeIntercept.phase === 'clearing_slot')) {
-        // No slots available: Recall nearest gathering squad to free a slot
-        const otherGatherers = activeMarches.filter(
-          (m: any) =>
-            smart?.gathering?.(m) &&
-            m.squadId !== march.squadId &&
-            m.mineId !== attack.mineId
-        );
-        if (otherGatherers.length > 0) {
-          const center =
-            cache.experimentalMineSearch?.data?.center ||
-            cache.experimentalMapContext?.data?.center || { x: 0, y: 0 };
-          otherGatherers.sort(
-            (a: any, b: any) =>
-              distance(a.targetCoordinates, center) - distance(b.targetCoordinates, center)
-          );
-          const nearest = otherGatherers[0];
-          return {
-            ...base,
-            action: 'clear_slot',
-            reason: 'Clearing march slot for intercept · Recalling nearest gathering squad',
-            call: {
-              name: 'stopMineGathering',
-              feature: 'mine',
-              args: { squadId: nearest.squadId },
-            },
-            intercept: {
-              phase: 'clearing_slot',
-              mineId: attack.mineId,
-              mapId: attack.mapId,
-              mineConfigId: configId,
-              attackRouteId: attack.routeId,
-              impactAt: attack.impactAt,
-              threatenedSquadId: march.squadId,
-              freedSquadId: nearest.squadId,
-              coordinates: march.targetCoordinates,
-            },
-            room,
-            count,
-          };
-        }
+    // Branch 1: Infirmary is above threshold -> Recall gatherers in final 10s (no intercept)
+    if (isAboveThreshold) {
+      if (now < attack.impactAt - 10000) {
+        return {
+          ...base,
+          action: 'wait',
+          reason: `Mine threatened · recall scheduled for final 10s (infirmary above ${thresholdPercent}%)`,
+          room,
+          count,
+        };
       }
-
-      // Slot is available (or will be with withdrawal of threatened squad):
-      // Withdraw threatened gathering squad and dispatch intercept squad
-      const stopCall = {
-        name: 'stopMineGathering',
-        feature: 'mine',
-        args: { squadId: march.squadId },
-      };
-
-      const customTeams = stored?.customTeams || cache?.customTeams || [];
-      const team = customTeams.find((t: any) => String(t.id) === String(interceptTeamId));
-      const interceptHeroIds = team?.heroIds || [];
-      const interceptCall = buildSquadCall(
-        cache,
-        stored,
-        attack.mapId,
-        attack.mineId,
-        interceptHeroIds
-      );
-
-      const farmingHeroIds =
-        squad?.heroes?.map((h: any) => h.id || h) || march.heroIds || [];
-
-      const calls = [stopCall, interceptCall].filter(Boolean);
       return {
         ...base,
-        action: 'intercept',
-        reason: 'Intercepting mine attack · Recalling gatherer and dispatching combat team',
-        call: stopCall,
-        calls,
-        intercept: {
-          phase: 'intercepting',
-          mineId: attack.mineId,
-          mapId: attack.mapId,
-          mineConfigId: configId,
-          attackRouteId: attack.routeId,
-          impactAt: attack.impactAt,
-          threatenedSquadId: march.squadId,
-          farmingHeroIds,
-          coordinates: march.targetCoordinates,
+        action: 'recall',
+        reason: `Withdrawing threatened gatherers · Infirmary occupancy above ${thresholdPercent}%`,
+        call: {
+          name: 'stopMineGathering',
+          feature: 'mine',
+          args: { squadId: march.squadId },
         },
         mine: {
           mineId: march.mineId,
@@ -377,15 +440,129 @@ export function plan(
       };
     }
 
-    // Above threshold: Hospital is overflowing -> recall gatherers back to base, NO intercept
+    // Branch 2: Intercept branch (!isAboveThreshold && interceptTeamId)
+    // Prioritized immediately upon attack signal (regardless of whether attack is > 2 minutes away)
+    const center =
+      cache.experimentalMineSearch?.data?.center ||
+      cache.experimentalMapContext?.data?.center ||
+      smart?.context?.(cache)?.center;
+    const mineCoords = march.targetCoordinates || cache.mineMap?.[march.mineId]?.coordinates;
+    const travelMs = estimateTravelMs(mineCoords, center);
+    const minTimeNeeded = travelMs != null ? travelMs + 3000 : 3000;
+    const timeLeft = attack.impactAt - now;
+
+    if (timeLeft < minTimeNeeded) {
+      // Remaining time is too short for intercept squad to travel to mine before impact
+      return {
+        ...base,
+        action: 'recall',
+        reason: 'Insufficient time for intercept squad to reach mine before impact · Withdrawing gatherer to base',
+        call: {
+          name: 'stopMineGathering',
+          feature: 'mine',
+          args: { squadId: march.squadId },
+        },
+        mine: {
+          mineId: march.mineId,
+          mapId: attack.mapId,
+          configId,
+          coordinates: march.targetCoordinates,
+          resumeAfter: attack.impactAt + 1000,
+          defense: true,
+        },
+        room,
+        count,
+      };
+    }
+
+    const maxMarches =
+      settings && Number.isInteger(settings.maxMarches)
+        ? Number(settings.maxMarches)
+        : cache.marchStatus?.data?.maxCount || 3;
+    const currentMarches = list(cache.marchStatus?.data?.marches);
+    const availableSlots = Math.max(0, maxMarches - currentMarches.length);
+
+    if (availableSlots === 0) {
+      // Slots full: Prioritize opening a slot immediately by recalling nearest gathering squad
+      const otherGatherers = currentMarches.filter(
+        (m: any) =>
+          smart?.gathering?.(m) &&
+          m.squadId !== march.squadId &&
+          m.mineId !== attack.mineId
+      );
+      if (otherGatherers.length > 0) {
+        if (center) {
+          otherGatherers.sort(
+            (a: any, b: any) =>
+              distance(a.targetCoordinates, center) - distance(b.targetCoordinates, center)
+          );
+        }
+        const nearest = otherGatherers[0];
+        return {
+          ...base,
+          action: 'clear_slot',
+          reason: 'Clearing march slot for intercept · Recalling nearest gathering squad',
+          call: {
+            name: 'stopMineGathering',
+            feature: 'mine',
+            args: { squadId: nearest.squadId },
+          },
+          intercept: {
+            phase: 'clearing_slot',
+            mineId: attack.mineId,
+            mapId: attack.mapId,
+            mineConfigId: configId,
+            attackRouteId: attack.routeId,
+            impactAt: attack.impactAt,
+            threatenedSquadId: march.squadId,
+            freedSquadId: nearest.squadId,
+            coordinates: march.targetCoordinates,
+          },
+          room,
+          count,
+        };
+      }
+    }
+
+    // Slot is available: swap squads immediately if time permits!
+    const stopCall = {
+      name: 'stopMineGathering',
+      feature: 'mine',
+      args: { squadId: march.squadId },
+    };
+
+    const rawCustom = stored?.customTeams?.[String(account)] ?? stored?.customTeams ?? cache?.customTeams ?? [];
+    const customTeams = Array.isArray(rawCustom) ? rawCustom : typeof rawCustom === 'object' ? Object.values(rawCustom).flat() : [];
+    const team = customTeams.find((t: any) => String(t?.id) === String(interceptTeamId));
+    const interceptHeroIds = team?.heroIds || [];
+    const interceptCall = buildSquadCall(
+      cache,
+      stored,
+      attack.mapId,
+      attack.mineId,
+      interceptHeroIds
+    );
+
+    const farmingHeroIds =
+      squad?.heroes?.map((h: any) => h.id || h) || march.heroIds || [];
+
+    const calls = [stopCall, interceptCall].filter(Boolean);
     return {
       ...base,
-      action: 'recall',
-      reason: `Withdrawing threatened gatherers · Infirmary occupancy above ${thresholdPercent}%`,
-      call: {
-        name: 'stopMineGathering',
-        feature: 'mine',
-        args: { squadId: march.squadId },
+      action: 'intercept',
+      reason: 'Intercepting mine attack · Recalling gatherer and dispatching combat team',
+      call: stopCall,
+      calls,
+      intercept: {
+        phase: 'intercepting',
+        mineId: attack.mineId,
+        mapId: attack.mapId,
+        mineConfigId: configId,
+        attackRouteId: attack.routeId,
+        impactAt: attack.impactAt,
+        threatenedSquadId: march.squadId,
+        farmingHeroIds,
+        coordinates: march.targetCoordinates,
       },
       mine: {
         mineId: march.mineId,
@@ -457,4 +634,5 @@ export const mineDefenseService = {
   unsafeMineIds,
   plan,
   sync,
+  estimateTravelMs,
 };

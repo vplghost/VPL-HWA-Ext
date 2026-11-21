@@ -1330,6 +1330,18 @@ const attemptedAutoJoinRallies = new Set<string>();
 export async function evaluatePriorityAutoJoin(record: any, cache: any, stored: any, tabId: number, customChrome?: any) {
   const cr = getActiveChrome(customChrome);
   if (stored.popupRpcEnabled !== true || !stored.priorityAutoJoin?.enabled || !tabId) return;
+
+  const now = Date.now();
+  const hasIncomingThreat = Array.isArray(cache?.marchStatus?.data?.marches) &&
+    Object.values(cache?.incomingMineAttacks?.data?.attacks || {}).some(
+      (a: any) => a?.impactAt > now && cache.marchStatus.data.marches.some(
+        (m: any) => m?.mineId === a?.mineId && ['gathering', 'interactionWithTarget'].includes(m?.stage)
+      )
+    );
+  if (hasIncomingThreat || stored.smartGatherState?.defense?.intercept || stored.smartGatherState?.defense?.pending) {
+    return;
+  }
+
   const minLevel = Number.isInteger(stored.priorityAutoJoin.minLevel) ? stored.priorityAutoJoin.minLevel : 10;
   if (
     record?.method !== 'POST' ||
@@ -2159,7 +2171,8 @@ export async function evaluateSmartGather(
   stored: any,
   tabId: number,
   now: number = Date.now(),
-  customChrome?: any
+  customChrome?: any,
+  preEvaluatedDefense?: any
 ) {
   const cr = getActiveChrome(customChrome);
   const smart = smartGatherService;
@@ -2174,8 +2187,8 @@ export async function evaluateSmartGather(
     await cr?.storage?.local?.set({ smartGatherState: state });
     return;
   }
-  const defense = await evaluateMineDefense(record, cache, stored, state, tabId, now, cr);
-  state = defense.state;
+  const defense = preEvaluatedDefense || await evaluateMineDefense(record, cache, stored, state, tabId, now, cr);
+  state = { ...state, defense: defense.state.defense, wakeAt: defense.state.wakeAt };
   if (defense.hold) {
     state.status = state.defense.status || 'Monitoring threatened mine';
     state.updatedAt = now;
@@ -2277,7 +2290,7 @@ export async function evaluateSmartGather(
   stored.smartGatherState = state;
 }
 
-export async function evaluateAutoGather(record: any, currentCache: any, stored: any, tabId: number, customChrome?: any) {
+export async function evaluateAutoGather(record: any, currentCache: any, stored: any, tabId: number, customChrome?: any, evaluatedDefense?: any) {
   const cr = getActiveChrome(customChrome);
   if (!tabId) return;
   if (
@@ -2289,6 +2302,7 @@ export async function evaluateAutoGather(record: any, currentCache: any, stored:
     mineDefenseService.sync(state, record, currentCache, Date.now());
     await cr?.storage?.local?.set({ smartGatherState: state });
   }
+  if (evaluatedDefense?.hold) return;
   if (stored.popupRpcEnabled !== true || !stored.autoGatherSettings?.enabled) return;
 
   const helper = autoGatherService;
@@ -2296,7 +2310,7 @@ export async function evaluateAutoGather(record: any, currentCache: any, stored:
 
   const now = Date.now();
   if (stored.autoGatherSettings.smartEnabled && smartGatherService) {
-    await evaluateSmartGather(record, currentCache, stored, tabId, now, cr);
+    await evaluateSmartGather(record, currentCache, stored, tabId, now, cr, evaluatedDefense);
     return;
   }
   const isLoad = helper.isGameLoadRecord(record);
@@ -2359,7 +2373,8 @@ export async function tickAutoGather(reset = false, customChrome?: any) {
       'troopCapacitySettings',
       'raidQueue',
       'monsterQueue',
-      'priorityAutoJoin'
+      'priorityAutoJoin',
+      'customTeams'
     ])) || {};
   const tab = await findActiveGameTab(cr);
   if (reset) {
@@ -3755,9 +3770,17 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       }
       if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id, record, cr);
       if (sender.tab?.id) await advanceResearchQueue(sender.tab.id, record, cr);
-      Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue']));
-      if (sender.tab?.id) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id, cr);
-      if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id, cr);
+      Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue', 'customTeams', 'troopCapacitySettings']));
+      let defenseHold = false;
+      let evaluatedDefense: any = null;
+      if (sender.tab?.id && stored.autoGatherSettings?.enabled && stored.autoGatherSettings?.smartEnabled) {
+        let smartState = smartGatherService.sync(stored.smartGatherState, record, cacheResult.cache, Date.now());
+        evaluatedDefense = await evaluateMineDefense(record, cacheResult.cache, stored, smartState, sender.tab.id, Date.now(), cr);
+        stored.smartGatherState = { ...smartState, defense: evaluatedDefense.state.defense, wakeAt: evaluatedDefense.state.wakeAt };
+        defenseHold = evaluatedDefense.hold;
+      }
+      if (sender.tab?.id && !defenseHold) await evaluatePriorityAutoJoin(record, cacheResult.cache, stored, sender.tab.id, cr);
+      if (sender.tab?.id) await evaluateAutoGather(record, cacheResult.cache, stored, sender.tab.id, cr, evaluatedDefense);
       if (sender.tab?.id) await runFreeSpin(false, record, sender.tab.id, cr);
       await reconcileSpeedup(cacheResult.cache, cr);
       await reconcileMailClaim(cacheResult.cache, cr);
