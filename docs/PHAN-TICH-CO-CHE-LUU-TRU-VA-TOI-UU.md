@@ -314,10 +314,10 @@ export function useWorldStore() {
 - [x] Chỉ lưu trữ `lastEncounter` (trận đánh vừa diễn ra) để background cập nhật vào key riêng `dungeonBattleHistory`.
 - [x] `DungeonModal.vue` tiếp tục sử dụng hàm `loadDungeonBattleHistory()` để đọc độc lập khi người dùng xem chiến báo.
 
-### Bước 3: Phân vùng Domain Keys cho `rpcCache`
-- [ ] Tách `marchStatus`, `mineMap` thành domain key `cache:world`.
-- [ ] Tách `heroGetAll`, `titanGetAll`, `inventoryGet` thành domain key `cache:roster`.
-- [ ] Cập nhật `useRpcCache.ts` để đọc và kết hợp các domain keys này một cách trong suốt.
+### Bước 3: Phân vùng Domain Keys cho `rpcCache` (Đã hoàn thành)
+- [x] Tách `marchStatus`, `mineMap` thành domain key `cache:world`.
+- [x] Tách `heroGetAll`, `titanGetAll`, `inventoryGet` thành domain key `cache:roster`.
+- [x] Cập nhật `useRpcCache.ts` để đọc và kết hợp các domain keys này một cách trong suốt.
 
 ### Bước 4: Áp dụng Debounced Write Coalescing trong `backgroundRuntime.ts` (Đã hoàn thành)
 - [x] Tạo cơ chế gom cụm ghi đĩa 300ms cho các gói tin MQTT có tần suất cao.

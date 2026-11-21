@@ -50,6 +50,8 @@ export const RUNTIME_EXCLUDE_KEYS = new Set([
   'rpcCache',
   'guildChat',
   'dungeonBattleHistory',
+  'cache:world',
+  'cache:roster',
 ]);
 
 /**

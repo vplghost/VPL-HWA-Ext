@@ -111,7 +111,20 @@ export async function flushRpcCacheImmediate(customChrome?: any): Promise<void> 
 
   const writes: Record<string, any> = {};
   if (chat) writes.guildChat = chat;
-  if (rpc) writes.rpcCache = rpc;
+  if (rpc) {
+    const worldSlice: any = {};
+    if (rpc.marchStatus) worldSlice.marchStatus = rpc.marchStatus;
+    if (rpc.mineMap) worldSlice.mineMap = rpc.mineMap;
+    if (Object.keys(worldSlice).length > 0) writes['cache:world'] = worldSlice;
+
+    const rosterSlice: any = {};
+    if (rpc.heroGetAll) rosterSlice.heroGetAll = rpc.heroGetAll;
+    if (rpc.titanGetAll) rosterSlice.titanGetAll = rpc.titanGetAll;
+    if (rpc.inventoryGet) rosterSlice.inventoryGet = rpc.inventoryGet;
+    if (Object.keys(rosterSlice).length > 0) writes['cache:roster'] = rosterSlice;
+
+    writes.rpcCache = rpc;
+  }
 
   await cr.storage.local.set(writes).catch(() => {});
 }
@@ -3536,6 +3549,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         (await cr.storage?.local?.get([
           'rpcCache',
           'guildChat',
+          'cache:world',
+          'cache:roster',
           'captureSettings',
           'popupRpcEnabled',
           'socketRefreshMode',
@@ -3550,6 +3565,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         ])) || {};
       const currentCache = {
         ...(stored.rpcCache || {}),
+        ...(stored['cache:world'] || {}),
+        ...(stored['cache:roster'] || {}),
         ...(pendingRpcCacheToSave || {}),
         ...(stored.guildChat ? { guildChat: stored.guildChat } : {}),
         ...(pendingGuildChatToSave ? { guildChat: pendingGuildChatToSave } : {})
