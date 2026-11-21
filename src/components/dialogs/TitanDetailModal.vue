@@ -18,6 +18,10 @@ import { formatNumber } from '@/src/utils/formatters';
 import { getGold } from '@/src/utils/resourceData';
 import { getItemIcon } from '@/src/utils/itemResources';
 import {
+  calculateTitanArtifactEvolvePlan,
+  type TitanArtifactChestOption,
+} from '@/src/utils/titanArtifactChestHelper';
+import {
   titanEvolutionCosts,
   calculateTitanLevelUpPlan,
   getTitanLevelFromExp,
@@ -323,6 +327,13 @@ export interface TitanArtifactSlot {
   fragCost: number;
   ownedFrags: number;
   canEvolve: boolean;
+  canEvolveDirectly: boolean;
+  canEvolveWithChests: boolean;
+  chestsPlan: TitanArtifactChestOption[];
+  totalChestsToOpen: number;
+  totalFragsFromChests: number;
+  tooltip: string;
+  buttonLabel: string;
   iconPath: string | null;
 }
 
@@ -357,7 +368,9 @@ const detailedArtifacts = computed<TitanArtifactSlot[]>(() => {
     const nextStar = star + 1;
     const fragCost = nextStar <= 6 ? (getTitanArtifactEvolveCost(nextStar) || 0) : 0;
     const ownedFrags = Number(invFrags[String(artifactId)]) || 0;
-    const canEvolve = star < 6 && fragCost > 0 && ownedFrags >= fragCost;
+    const invConsumable = cache.value?.inventoryGet?.data?.consumable || {};
+    const plan = calculateTitanArtifactEvolvePlan(artifactId, fragCost, ownedFrags, invConsumable, nextStar);
+    const canEvolve = star < 6 && fragCost > 0 && (ownedFrags >= fragCost || plan.canEvolveWithChests);
 
     const iconPath = getItemIcon('artifact', artifactId) || getItemIcon('fragmentArtifact', artifactId);
 
@@ -373,6 +386,13 @@ const detailedArtifacts = computed<TitanArtifactSlot[]>(() => {
       fragCost,
       ownedFrags,
       canEvolve,
+      canEvolveDirectly: plan.canEvolveDirectly,
+      canEvolveWithChests: plan.canEvolveWithChests,
+      chestsPlan: plan.chestsPlan,
+      totalChestsToOpen: plan.totalChestsToOpen,
+      totalFragsFromChests: plan.totalFragsFromChests,
+      tooltip: plan.tooltipText,
+      buttonLabel: plan.buttonLabel,
       iconPath,
     };
   });
@@ -405,16 +425,36 @@ async function handleArtifactLevelUp(slotId: number, artifactId: number) {
 async function handleArtifactEvolve(slotId: number) {
   if (!activeTitan.value || isEvolvingArtifact.value[slotId]) return;
   const numTitanId = Number(internalTitanId.value);
+  const art = detailedArtifacts.value[slotId];
+  if (!art || !art.canEvolve) return;
+
   isEvolvingArtifact.value[slotId] = true;
   try {
-    await dispatchRpc([
-      {
-        name: 'artifact_evolve',
-        args: { heroId: numTitanId, slotId },
-      },
-      { name: 'titanGetAll' },
-      { name: 'inventoryGet' },
-    ]);
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+
+    if (art.chestsPlan && art.chestsPlan.length > 0) {
+      for (const item of art.chestsPlan) {
+        if (item.countToOpen > 0) {
+          calls.push({
+            name: 'inventory_use',
+            args: {
+              libId: Number(item.chestId),
+              amount: item.countToOpen,
+              params: { choice: item.choiceIndex },
+            },
+          });
+        }
+      }
+    }
+
+    calls.push({
+      name: 'artifact_evolve',
+      args: { heroId: numTitanId, slotId },
+    });
+    calls.push({ name: 'titanGetAll' });
+    calls.push({ name: 'inventoryGet' });
+
+    await dispatchRpc(calls);
   } catch (err) {
     console.error('Failed to evolve titan artifact star:', err);
   } finally {
@@ -861,8 +901,12 @@ const skillsList = computed(() => {
                     <span
                       class="font-mono font-bold"
                       :class="art.canEvolve ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-400'"
+                      :title="art.tooltip"
                     >
                       {{ formatNumber(art.ownedFrags) }} / {{ formatNumber(art.fragCost) }}
+                      <span v-if="art.totalFragsFromChests > 0" class="text-purple-600 dark:text-purple-400 font-normal">
+                        (+{{ art.totalFragsFromChests }})
+                      </span>
                     </span>
                   </div>
 
@@ -870,12 +914,13 @@ const skillsList = computed(() => {
                     :id="`btn-titan-art-evolve-${art.slotId}`"
                     type="button"
                     :disabled="!art.canEvolve || isEvolvingArtifact[art.slotId]"
-                    class="cursor-pointer w-full py-1 rounded text-2xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="cursor-pointer w-full py-1 rounded text-2xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed select-none"
                     :class="art.canEvolve ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-2xs' : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'"
+                    :title="art.tooltip"
                     @click="handleArtifactEvolve(art.slotId)"
                   >
                     <span v-if="isEvolvingArtifact[art.slotId]" class="animate-spin inline-block">🔄</span>
-                    <span>⭐ Evolve to {{ art.star + 1 }}★</span>
+                    <span>{{ art.buttonLabel }}</span>
                   </button>
                 </div>
               </div>
