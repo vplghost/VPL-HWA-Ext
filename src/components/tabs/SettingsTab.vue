@@ -11,7 +11,8 @@ import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import type { ThemeMode } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
-const { recordingState, cache } = useRpcCache();
+const { recordingState, cache, updateRecordingState } = useRpcCache();
+const isTogglingRecording = ref(false);
 const { autoClaimSettings, priorityAutoJoin, teams: autoJoinTeams, pending: pendingClaims, selectedCount, busy: claimBusy, message: claimMessage, saveAutoClaim, savePriorityJoin, claimRewards } = usePopupAutomation(cache);
 const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab, gameEngineStatus, checkStatus } = useGameConnection();
 const engine = computed(() => engineDiagnostics(gameEngineStatus.value));
@@ -192,10 +193,24 @@ async function toggleMqtt() {
 }
 
 async function toggleRecording() {
-  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    chrome.runtime.sendMessage({
-      kind: recordingState.value?.active ? 'record-stop' : 'record-start',
-    });
+  if (isTogglingRecording.value) return;
+  isTogglingRecording.value = true;
+  const currentActive = Boolean(recordingState.value?.active);
+  const nextKind = currentActive ? 'record-stop' : 'record-start';
+  // Optimistic immediate update so the popup button responds synchronously without lag
+  updateRecordingState({ active: !currentActive });
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      const res = await chrome.runtime.sendMessage({ kind: nextKind });
+      if (res && typeof res.active === 'boolean') {
+        updateRecordingState(res);
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to toggle recording:', err);
+    updateRecordingState({ active: currentActive });
+  } finally {
+    isTogglingRecording.value = false;
   }
 }
 </script>
@@ -587,7 +602,8 @@ async function toggleRecording() {
         </div>
         <button
           type="button"
-          class="cursor-pointer px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5"
+          :disabled="isTogglingRecording"
+          class="cursor-pointer px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
           :class="
             recordingState?.active
               ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
@@ -595,7 +611,8 @@ async function toggleRecording() {
           "
           @click="toggleRecording"
         >
-          <span>{{ recordingState?.active ? '⏹ Stop Recording' : '🔴 Record API Session' }}</span>
+          <span v-if="isTogglingRecording" class="inline-block animate-spin mr-1">⏳</span>
+          <span>{{ isTogglingRecording ? (recordingState?.active ? 'Stopping...' : 'Starting...') : (recordingState?.active ? '⏹ Stop Recording' : '🔴 Record API Session') }}</span>
         </button>
       </div>
     </div>

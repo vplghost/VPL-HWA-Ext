@@ -113,6 +113,11 @@ function loadInitial(): Promise<void> {
   return initialLoad;
 }
 
+export function updateRecordingState(next: any) {
+  if (!next) return;
+  recordingState.value = typeof next.active === 'boolean' ? next : { active: Boolean(next) };
+}
+
 export function useRpcCache() {
   onMounted(() => {
     ensureStorageListener();
@@ -149,6 +154,7 @@ export function useRpcCache() {
     recordingState: readonly(recordingState),
     rpcQueueCount: readonly(rpcQueueCount),
     isInitialized: readonly(isInitialized),
+    updateRecordingState,
     updateCacheLocally,
     dispatchRpc,
     reload: loadInitial,

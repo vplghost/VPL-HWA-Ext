@@ -149,6 +149,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   let recordingActive = false;
   let recordingStateObserved = false;
   let freeSpinAccountId: string | null = null;
+  let updateButtonsRecordingState: (() => void) | null = null;
 
   function sendControl() {
     if (!currentSettings) return;
@@ -598,13 +599,16 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   try {
     win.chrome?.storage?.onChanged?.addListener?.((changes: any, area: string) => {
       if (bridgeContextInvalidated || area !== 'local') return;
-      if ('gameRecordingActive' in changes) {
+      if ('gameRecordingActive' in changes || 'recordingState' in changes) {
         recordingStateObserved = true;
-        const next = changes.gameRecordingActive.newValue === true;
+        const next = changes.gameRecordingActive
+          ? changes.gameRecordingActive.newValue === true
+          : Boolean(changes.recordingState?.newValue?.active);
         if (recordingActive !== next) {
           recordingActive = next;
           sendControl();
         }
+        updateButtonsRecordingState?.();
       }
       if ('rpcCache' in changes) {
         const cachedAccountId = changes.rpcCache.newValue?.accountStatus?.data?.id ?? changes.rpcCache.newValue?.userGetInfo?.data?.id;
@@ -731,6 +735,8 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         }
       } catch (_) {}
     }
+
+    updateButtonsRecordingState = syncRecordingState;
 
     recordBtn.addEventListener('click', () => {
       if (recordBtn.disabled) return;

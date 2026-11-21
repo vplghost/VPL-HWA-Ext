@@ -2475,6 +2475,11 @@ export async function handleControl(kind: string, customChrome?: any) {
   const stored = (await cr?.storage?.session?.get(RECORD_STATE_KEY)) || {};
   const state = stored[RECORD_STATE_KEY] || { active: false, nextIndex: 0 };
   if (kind === 'record-start') {
+    const next = { active: true, nextIndex: 0, nextInteractionIndex: 0, error: null };
+    await Promise.all([
+      cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next }),
+      cr?.storage?.local?.set({ gameRecordingActive: true, recordingState: next })
+    ]);
     await clearRecorded(cr);
     await clearInteractions(cr);
     await cr?.storage?.local?.remove('apiRecords');
@@ -2487,23 +2492,24 @@ export async function handleControl(kind: string, customChrome?: any) {
         }
       });
     }
-    const next = { active: true, nextIndex: 0, nextInteractionIndex: 0, error: null };
-    await cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next });
-    await cr?.storage?.local?.set({ gameRecordingActive: true, recordingState: next });
     return next;
   }
   if (kind === 'record-stop') {
     const next = { ...state, active: false };
-    await cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next });
-    await cr?.storage?.local?.set({ gameRecordingActive: false, recordingState: next });
+    await Promise.all([
+      cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next }),
+      cr?.storage?.local?.set({ gameRecordingActive: false, recordingState: next })
+    ]);
     return next;
   }
   if (kind === 'record-clear') {
+    const next = { active: false, nextIndex: 0, nextInteractionIndex: 0, error: null };
+    await Promise.all([
+      cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next }),
+      cr?.storage?.local?.set({ gameRecordingActive: false, recordingState: next })
+    ]);
     await clearRecorded(cr);
     await clearInteractions(cr);
-    const next = { active: false, nextIndex: 0, nextInteractionIndex: 0, error: null };
-    await cr?.storage?.session?.set({ [RECORD_STATE_KEY]: next });
-    await cr?.storage?.local?.set({ gameRecordingActive: false, recordingState: next });
     return next;
   }
   return state;
