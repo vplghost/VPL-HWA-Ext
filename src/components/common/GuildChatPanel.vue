@@ -16,6 +16,7 @@ const inputText = ref('');
 const isRefreshing = ref(false);
 const isSending = ref(false);
 const messagesContainer = ref<HTMLElement | null>(null);
+const pendingMessages = ref<ChatMsg[]>([]);
 
 const chatData = computed(() => cache.value.guildChat?.data || cache.value.chatGetAll?.data || {});
 const users = computed<Record<string, any>>(() => chatData.value.users || {});
@@ -30,6 +31,7 @@ interface ChatMsg {
   time: string;
   isMe: boolean;
   ctime: number;
+  pending?: boolean;
 }
 
 const displayLimit = ref(50);
@@ -48,7 +50,7 @@ const allMessages = computed<ChatMsg[]>(() => {
   // Sort chronologically ascending: oldest at top, newest at bottom
   valid.sort((a: any, b: any) => Number(a?.ctime || 0) - Number(b?.ctime || 0));
 
-  return valid.map((m: any, idx: number) => {
+  const list = valid.map((m: any, idx: number) => {
     const uId = String(m.userId ?? m.authorId ?? '');
     const user = users.value[uId] || {};
     const name = user.name || (uId === myId.value ? 'You' : `Player #${uId}`);
@@ -68,6 +70,14 @@ const allMessages = computed<ChatMsg[]>(() => {
       ctime,
     };
   });
+
+  for (const pm of pendingMessages.value) {
+    if (!list.some((m) => m.isMe && m.text === pm.text && Math.abs(m.ctime - pm.ctime) < 60)) {
+      list.push(pm);
+    }
+  }
+
+  return list;
 });
 
 const hasMoreOlder = computed(() => allMessages.value.length > displayLimit.value);
@@ -104,16 +114,39 @@ function handleScroll() {
   }
 }
 
+function applyChatResponse(resp: any) {
+  const getAllResult = resp?.results?.find((r: any) => r.result?.response?.messages)?.result?.response;
+  if (getAllResult?.messages && cache.value) {
+    const existing = cache.value.guildChat?.data || { messages: [], users: {} };
+    const incomingMessages = Array.isArray(getAllResult.messages) ? getAllResult.messages : [];
+    const incomingUsers = getAllResult.users || {};
+    const mergedUsers = { ...(existing.users || {}), ...incomingUsers };
+    const map = new Map();
+    for (const m of existing.messages || []) if (m?.id) map.set(String(m.id), m);
+    for (const m of incomingMessages) if (m?.id) map.set(String(m.id), m);
+    const mergedMessages = Array.from(map.values()).sort((a, b) => Number(a.ctime || 0) - Number(b.ctime || 0));
+    cache.value.guildChat = {
+      key: 'guildChat',
+      method: 'chatGetAll',
+      feature: 'clan',
+      group: 'chat',
+      data: { messages: mergedMessages, users: mergedUsers },
+      updatedAt: new Date().toISOString()
+    };
+  }
+}
+
 async function refreshChat() {
   if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
-    await dispatchRpc([{ name: 'chatGetAll', args: { chatType: 'clan' } }]);
+    const resp = await dispatchRpc([{ name: 'chatGetAll', args: { chatType: 'clan' } }]);
+    applyChatResponse(resp);
   } finally {
     setTimeout(() => {
       isRefreshing.value = false;
       scrollToBottom();
-    }, 500);
+    }, 300);
   }
 }
 
@@ -121,14 +154,32 @@ async function sendMessage() {
   const text = inputText.value.trim();
   if (!text || isSending.value) return;
 
+  const tempId = 'pending_' + Date.now();
+  const optimisticMsg: ChatMsg = {
+    id: tempId,
+    userId: myId.value,
+    name: cache.value.accountStatus?.data?.name || 'You',
+    text,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    isMe: true,
+    ctime: Math.floor(Date.now() / 1000),
+    pending: true
+  };
+  pendingMessages.value.push(optimisticMsg);
+  inputText.value = '';
+  scrollToBottom();
+
   isSending.value = true;
   try {
-    await dispatchRpc([
+    const resp = await dispatchRpc([
       { name: 'chatSendText', args: { chatType: 'clan', text } },
       { name: 'chatGetAll', args: { chatType: 'clan' } },
     ]);
-    inputText.value = '';
+    applyChatResponse(resp);
+    pendingMessages.value = pendingMessages.value.filter((pm) => pm.id !== tempId);
     scrollToBottom();
+  } catch (_) {
+    pendingMessages.value = pendingMessages.value.filter((pm) => pm.id !== tempId);
   } finally {
     isSending.value = false;
   }
@@ -148,6 +199,10 @@ watch(
     if (open) {
       displayLimit.value = 50;
       scrollToBottom();
+      const lastUpdate = Date.parse(cache.value.guildChat?.updatedAt || '');
+      if (!lastUpdate || Date.now() - lastUpdate > 60000) {
+        void refreshChat();
+      }
     }
   }
 );
@@ -249,14 +304,24 @@ watch(
         </div>
 
         <div
-          class="rounded-2xl px-3 py-1.5 max-w-[85%] break-words shadow-2xs leading-relaxed"
+          class="rounded-2xl px-3 py-1.5 max-w-[85%] break-words shadow-2xs leading-relaxed flex items-center gap-1.5"
           :class="
             msg.isMe
               ? 'bg-blue-600 text-white rounded-br-xs'
               : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-bl-xs'
           "
         >
-          {{ msg.text }}
+          <span>{{ msg.text }}</span>
+          <svg
+            v-if="msg.pending"
+            class="size-3 animate-spin text-blue-200 shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-label="Sending message..."
+          >
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
         </div>
       </div>
     </div>

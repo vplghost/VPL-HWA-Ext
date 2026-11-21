@@ -101,3 +101,42 @@ test('ignores CONNECT credentials and encodes binary PUBLISH payloads', async ()
   assert.equal(records[0].encoding, 'base64');
   assert.equal(records[0].payload, 'AP8B');
 });
+
+test('decodes MQTT 5 PUBLISH chatMessage with empty and non-empty properties as UTF-8', async () => {
+  const { window, records, control } = setup();
+  const socket = new window.WebSocket(endpoint);
+  control(true);
+
+  // 1. MQTT 5 with 0-length properties (standard game push)
+  const chatPayload = JSON.stringify({
+    method: 'msg',
+    result: {
+      type: 'chatMessage',
+      body: {
+        chatType: 'clan',
+        id: 12345,
+        userId: 6789,
+        ctime: 1795000000,
+        data: { text: 'Hello guild members!' },
+        user: { id: '6789', name: 'Commander' }
+      }
+    }
+  });
+  socket.receive(publish('hwm/user/6789', chatPayload, 0, 5));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0].encoding, 'utf8');
+  assert.equal(records[0].eventType, 'chatMessage');
+  assert.equal(records[0].eventMethod, 'msg');
+  assert.ok(records[0].payload.includes('Hello guild members!'));
+
+  // 2. MQTT 4 framed message without properties also decodes correctly
+  socket.receive(publish('hwm/user/6789', chatPayload, 0, 4));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(records.length, 2);
+  assert.equal(records[1].encoding, 'utf8');
+  assert.equal(records[1].eventType, 'chatMessage');
+  assert.ok(records[1].payload.includes('Hello guild members!'));
+});

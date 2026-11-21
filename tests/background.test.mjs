@@ -982,8 +982,9 @@ test('MQTT pushes update rally return, report, quest, and guild chat without rec
     chatType: 'clan', messageType: 'text', ctime: 1793890585,
     data: { text: 'hello' }, user: { id: '7', name: 'Member' }
   }, '2026-11-05T14:56:25.001Z'));
-  assert.equal(local.rpcCache.guildChat.data.messages[0].data.text, 'hello');
-  assert.equal(local.rpcCache.guildChat.data.users['7'].name, 'Member');
+  const chatState = local.guildChat || local.rpcCache?.guildChat;
+  assert.equal(chatState.data.messages[0].data.text, 'hello');
+  assert.equal(chatState.data.users['7'].name, 'Member');
 
   await send('api-record', socket('returnFromMobCompleted', { squadId: 'squad-1' },
     '2026-11-05T14:57:33.027Z'));

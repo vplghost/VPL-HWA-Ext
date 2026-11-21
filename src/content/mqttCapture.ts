@@ -86,6 +86,9 @@ export function installMqttCapture(customWindow?: any): void {
         const versionOffset = offset + 2 + protocolLength;
         const verByte = bytes[versionOffset];
         if (versionOffset < end && verByte !== undefined) version = verByte;
+      } else if (type === 2 && direction === 'received') {
+        // CONNACK: MQTT 5 has properties after Acknowledge Flags + Reason Code (length > 2)
+        if (end - offset > 2) version = 5;
       } else if (type === 3) {
         if (offset + 2 > end) break;
         const b0 = bytes[offset];
@@ -98,7 +101,17 @@ export function installMqttCapture(customWindow?: any): void {
         cursor += topicLength;
         const qos = (header >> 1) & 3;
         if (qos > 0) cursor += 2;
-        if (version === 5) {
+
+        let isMqtt5 = version === 5;
+        if (!isMqtt5 && cursor < end && bytes[cursor] === 0x00 && cursor + 1 < end && bytes[cursor + 1] === 0x7b) {
+          isMqtt5 = true;
+          version = 5;
+        } else if (isMqtt5 && cursor < end && (bytes[cursor] === 0x7b || bytes[cursor] === 0x5b)) {
+          // Payload begins directly with '{' or '[', indicating v4 framing without properties
+          isMqtt5 = false;
+        }
+
+        if (isMqtt5) {
           const properties = variableLength(bytes, cursor, end);
           if (!properties) break;
           cursor = properties.next + properties.value;
@@ -127,8 +140,25 @@ export function installMqttCapture(customWindow?: any): void {
       payload = new TextDecoder('utf-8', { fatal: true }).decode(preview);
       if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(payload)) throw new Error('binary payload');
     } catch (_) {
-      payload = base64(preview);
-      encoding = 'base64';
+      // Check if leading byte is a stray 0x00 MQTT 5 property length followed by JSON
+      if (preview.length > 2 && preview[0] === 0 && (preview[1] === 0x7b || preview[1] === 0x5b)) {
+        try {
+          const stripped = new TextDecoder('utf-8', { fatal: true }).decode(preview.subarray(1));
+          if (!/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(stripped)) {
+            payload = stripped;
+            encoding = 'utf8';
+          } else {
+            payload = base64(preview);
+            encoding = 'base64';
+          }
+        } catch {
+          payload = base64(preview);
+          encoding = 'base64';
+        }
+      } else {
+        payload = base64(preview);
+        encoding = 'base64';
+      }
     }
     let eventMethod: string | undefined;
     let eventType: string | undefined;
@@ -231,7 +261,7 @@ export function installMqttCapture(customWindow?: any): void {
           (url.hostname.includes('nextersglobal.com') || url.hostname.includes('emqx'))) ||
         (url && url.hostname.includes('emqx'));
       if (!isMqtt) return socket;
-      const state = { version: 4, pending: Promise.resolve(), socket, closed: false };
+      const state = { version: 5, pending: Promise.resolve(), socket, closed: false };
       activeSocketState = state;
       socket.addEventListener('close', () => {
         state.closed = true;

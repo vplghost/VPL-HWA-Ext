@@ -48,6 +48,8 @@ export const RUNTIME_EXCLUDE_KEYS = new Set([
   'recordingState',
   'rpcQueueCounts',
   'rpcCache',
+  'guildChat',
+  'dungeonBattleHistory',
 ]);
 
 /**

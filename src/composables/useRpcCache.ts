@@ -20,7 +20,19 @@ function handleStorageChange(changes: { [key: string]: chrome.storage.StorageCha
     revisions.set(id, (revisions.get(id) || 0) + 1);
   }
   if (areaName === 'local') {
-    if ('rpcCache' in changes) cache.value = changes.rpcCache?.newValue || {};
+    if ('rpcCache' in changes) {
+      const nextRpc = changes.rpcCache?.newValue || {};
+      if (!nextRpc.guildChat && cache.value?.guildChat) {
+        nextRpc.guildChat = cache.value.guildChat;
+      }
+      cache.value = nextRpc;
+    }
+    if ('guildChat' in changes) {
+      const nextChat = changes.guildChat?.newValue;
+      if (nextChat && cache.value) {
+        cache.value.guildChat = nextChat;
+      }
+    }
     if ('recordingState' in changes) recordingState.value = changes.recordingState?.newValue || { active: false };
     else if ('gameRecordingActive' in changes) {
       recordingState.value = { ...recordingState.value, active: changes.gameRecordingActive?.newValue === true };
@@ -48,8 +60,12 @@ function loadInitial(): Promise<void> {
     (revisions.get(area + ':' + key) || 0) === (started.get(area + ':' + key) || 0);
   initialLoad = (async () => {
     try {
-      const stored = await chrome.storage.local.get(['rpcCache', 'recordingState', 'gameRecordingActive']);
-      if (unchanged('local', 'rpcCache')) cache.value = stored.rpcCache || {};
+      const stored = await chrome.storage.local.get(['rpcCache', 'guildChat', 'recordingState', 'gameRecordingActive']);
+      if (unchanged('local', 'rpcCache')) {
+        const loaded = stored.rpcCache || {};
+        if (stored.guildChat) loaded.guildChat = stored.guildChat;
+        cache.value = loaded;
+      }
       if (unchanged('local', 'recordingState') && unchanged('local', 'gameRecordingActive') &&
           unchanged('session', 'recordingState')) {
         recordingState.value = stored.recordingState || { active: stored.gameRecordingActive === true };
