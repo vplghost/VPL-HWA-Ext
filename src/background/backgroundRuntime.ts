@@ -39,6 +39,96 @@ export const CACHE_KEY = 'rpcCache';
 let activeChrome: any = null;
 let pending: Promise<any> = Promise.resolve();
 
+const isNodeTest = typeof process !== 'undefined' && Boolean(process.env?.NODE_TEST_CONTEXT);
+let activeRpcDebounceMs = isNodeTest ? 0 : 300;
+let pendingRpcCacheToSave: any = null;
+let pendingGuildChatToSave: any = null;
+let rpcFlushTimer: any = null;
+let lastStorageChrome: any = null;
+
+export function setRpcDebounceMs(ms: number) {
+  activeRpcDebounceMs = Math.max(0, ms);
+}
+
+export function getRpcDebounceMs(): number {
+  return activeRpcDebounceMs;
+}
+
+export function isPassiveEvent(record: any): boolean {
+  if (!record) return false;
+  if (record.userAction === true || record.direct === true) return false;
+
+  // Check if extracted entries contain actions
+  try {
+    const entries = rpcCacheService.extract(record);
+    const hasExtractedAction = entries.some((e: any) =>
+      typeof e?.key === 'string' && (e.key.endsWith('Action') || e.key.includes('Claim') || e.key.includes('Upgrade'))
+    );
+    if (hasExtractedAction) return false;
+  } catch (_) {}
+
+  // Passive WebSocket MQTT notifications
+  if (record.transport === 'websocket' || record.method === 'PUBLISH' || Boolean(record.topic)) {
+    return true;
+  }
+
+  // HTTP RPC requests
+  if (record.method === 'POST') {
+    let calls: any[] = [];
+    if (record.requestBody) {
+      try {
+        const parsed = typeof record.requestBody === 'string' ? JSON.parse(record.requestBody) : record.requestBody;
+        calls = parsed?.calls || [];
+      } catch (_) {}
+    }
+    if (calls.length === 0) return true;
+
+    const actionPatterns = /^(?:claim|buy|upgrade|levelUp|start|end|attack|win|speedup|use|spin|craft|equip|heal|open|send|take|collect|join|create|dismiss|cancel|save|recall|return)/i;
+    const hasAction = calls.some((c: any) => actionPatterns.test(c?.name || ''));
+    if (hasAction) return false;
+
+    const passivePatterns = /^(?:get|tracker|observe|ping|check)/i;
+    const allPassive = calls.every((c: any) => passivePatterns.test(c?.name || ''));
+    if (allPassive) return true;
+  }
+
+  return false;
+}
+
+export async function flushRpcCacheImmediate(customChrome?: any): Promise<void> {
+  if (rpcFlushTimer) {
+    clearTimeout(rpcFlushTimer);
+    rpcFlushTimer = null;
+  }
+  const cr = getActiveChrome(customChrome) || lastStorageChrome;
+  if (!cr?.storage?.local) return;
+  if (!pendingRpcCacheToSave && !pendingGuildChatToSave) return;
+
+  const rpc = pendingRpcCacheToSave;
+  const chat = pendingGuildChatToSave;
+  pendingRpcCacheToSave = null;
+  pendingGuildChatToSave = null;
+
+  const writes: Record<string, any> = {};
+  if (chat) writes.guildChat = chat;
+  if (rpc) writes.rpcCache = rpc;
+
+  await cr.storage.local.set(writes).catch(() => {});
+}
+
+export function scheduleRpcDebounceFlush(cr: any, delayMs = activeRpcDebounceMs) {
+  lastStorageChrome = cr;
+  if (delayMs <= 0) {
+    flushRpcCacheImmediate(cr).catch(() => {});
+    return;
+  }
+  if (rpcFlushTimer) clearTimeout(rpcFlushTimer);
+  rpcFlushTimer = setTimeout(() => {
+    rpcFlushTimer = null;
+    flushRpcCacheImmediate(cr).catch(() => {});
+  }, delayMs);
+}
+
 export function getActiveChrome(override?: any): any {
   if (override) return override;
   if (activeChrome) return activeChrome;
@@ -55,7 +145,9 @@ export function getPending(): Promise<any> {
   return pending;
 }
 
-export function drainPending(): Promise<any> {
+export async function drainPending(): Promise<any> {
+  await pending;
+  await flushRpcCacheImmediate();
   return pending;
 }
 
@@ -2317,12 +2409,23 @@ export async function handleControl(kind: string, customChrome?: any) {
 
 export interface SetupBackgroundRuntimeOptions {
   chrome?: any;
+  rpcDebounceMs?: number;
 }
 
 export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = {}) {
   const cr = options.chrome || getActiveChrome();
   if (!cr) return null;
   setActiveChrome(cr);
+  if (options.rpcDebounceMs !== undefined) {
+    activeRpcDebounceMs = Math.max(0, options.rpcDebounceMs);
+  }
+  if (rpcFlushTimer) {
+    clearTimeout(rpcFlushTimer);
+    rpcFlushTimer = null;
+  }
+  pendingRpcCacheToSave = null;
+  pendingGuildChatToSave = null;
+  lastStorageChrome = cr;
   marchReadLeases.clear();
   attemptedAutoJoinRallies.clear();
   cityQueueLanes.clear();
@@ -3405,7 +3508,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     }
     if (message?.kind !== 'api-record' || !isGameUrl(sender.url)) return;
     const record = normalize(message.record);
-    if (!record) return;
+    if (!record) {
+      sendResponse?.({ saved: false, cached: false });
+      return;
+    }
     if (record.responseBody && record.responseBody.includes('"version"')) {
       try {
         const parsed = JSON.parse(record.responseBody);
@@ -3444,7 +3550,9 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         ])) || {};
       const currentCache = {
         ...(stored.rpcCache || {}),
-        ...(stored.guildChat ? { guildChat: stored.guildChat } : {})
+        ...(pendingRpcCacheToSave || {}),
+        ...(stored.guildChat ? { guildChat: stored.guildChat } : {}),
+        ...(pendingGuildChatToSave ? { guildChat: pendingGuildChatToSave } : {})
       };
       if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
       if (record.requestBody && /"name"\s*:\s*"(?:mobileLogin|userLogin)"/.test(record.requestBody)) {
@@ -3452,14 +3560,12 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       }
       const cacheResult = rpcCacheService.merge(currentCache, [record]);
       observeMarchReads(record, cacheResult.cache);
+      const isPassive = isPassiveEvent(record);
       if (cacheResult.changed) {
         const nextChat = cacheResult.cache.guildChat;
         const prevChat = currentCache.guildChat;
         const chatChanged = Boolean(nextChat && nextChat !== prevChat);
 
-        if (chatChanged) {
-          await cr.storage?.local?.set({ guildChat: nextChat });
-        }
         const rpcToSave: any = { ...cacheResult.cache };
         if (rpcToSave.dungeonStatus?.data?.battleHistory) {
           rpcToSave.dungeonStatus = {
@@ -3468,7 +3574,19 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           };
           delete rpcToSave.dungeonStatus.data.battleHistory;
         }
-        await cr.storage?.local?.set({ rpcCache: rpcToSave });
+
+        pendingRpcCacheToSave = rpcToSave;
+        if (chatChanged) {
+          pendingGuildChatToSave = nextChat;
+        }
+
+        if (isPassive && activeRpcDebounceMs > 0) {
+          scheduleRpcDebounceFlush(cr, activeRpcDebounceMs);
+        } else {
+          await flushRpcCacheImmediate(cr);
+        }
+      } else if (!isPassive && (pendingRpcCacheToSave || pendingGuildChatToSave)) {
+        await flushRpcCacheImmediate(cr);
       }
       if (cacheResult.cache?.remoteConfigStatus?.data && cr.storage?.local) {
         eventCatalogService.syncRemoteEventCatalog(cacheResult.cache.remoteConfigStatus.data, cr.storage.local).catch(() => {});
@@ -3800,6 +3918,11 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     clearRecorded: () => clearRecorded(cr),
     interactionEntries: () => interactionEntries(cr),
     clearInteractions: () => clearInteractions(cr),
-    drain: () => pending
+    flushRpcCache: () => flushRpcCacheImmediate(cr),
+    drain: async () => {
+      await pending;
+      await flushRpcCacheImmediate(cr);
+      return pending;
+    }
   };
 }
