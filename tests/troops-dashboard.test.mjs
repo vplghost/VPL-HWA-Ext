@@ -184,16 +184,16 @@ test('renderDashboardTroops renders 3 troop cards with accurate ready, hospital,
   assert.ok(text.includes('Lv.5: 50'));
   assert.ok(text.includes('Lv.7: 9,943'));
 
-  // Hospital & Healing timer
-  assert.ok(text.includes('Hospital: 2,717'));
+  // Hospital & Healing timer (2717 waiting in injuredUnits + 2686 healing in queue = 5,403 total)
+  assert.ok(text.includes('Hospital: 5,403'));
   assert.ok(text.includes('⏳ 1h 0m'));
 
   // Training & Timer
   assert.ok(text.includes('Training: 300'));
   assert.ok(text.includes('⏳ 30m 0s'));
 
-  // Max calculation: 9993 ready + 2717 hospital + 300 training = 13,010
-  assert.ok(text.includes('13,010'));
+  // Max calculation: 9993 ready + 5403 hospital + 300 training = 15,696
+  assert.ok(text.includes('15,696'));
 });
 
 test('Building #163 is named Garrison Wall in name-map', () => {

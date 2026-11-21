@@ -415,3 +415,83 @@ test('renderDashboardTroops respects max threshold and clamps unitsToTrain or di
   assert.equal(trainBtn.disabled, true);
   assert.ok(trainBtn.textContent.includes('Maxed'), 'Train button must say Maxed when threshold reached');
 });
+
+test('renderDashboardTroops accurately sums both waiting injured and active healing troops into hospital count', async () => {
+  const popupCode = await readFile(new URL('./helpers/legacy-popup-runtime.js', import.meta.url), 'utf8');
+  const mockChrome = {
+    runtime: {
+      getManifest: () => ({ version: '0.9.240' }),
+      sendMessage: () => {}
+    },
+    storage: { local: { set: async () => {}, get: async () => ({}) } }
+  };
+  const mockDoc = {
+    createElement: (tag) => new MockElement(tag),
+    querySelector: () => null
+  };
+  const context = vm.createContext({
+    document: mockDoc,
+    chrome: mockChrome,
+    setTimeout,
+    clearTimeout,
+    Date,
+    Number,
+    Array,
+    String,
+    Math,
+    console,
+    globalThis: {}
+  });
+
+  const declStart = popupCode.indexOf('let currentTroopTrainSettings =');
+  const declEnd = popupCode.indexOf(';', declStart) + 1;
+  vm.runInContext(popupCode.slice(declStart, declEnd), context);
+
+  context.currentTroopTrainSettings = { maxTargets: { 1: 6074 }, trainLevels: { 1: 7 } };
+  context.globalThis.currentTroopTrainSettings = context.currentTroopTrainSettings;
+
+  const fnStart = popupCode.indexOf('function renderDashboardTroops(');
+  const fnEnd = popupCode.indexOf('\nfunction renderEvents(', fnStart);
+  const fnCode = popupCode.slice(fnStart, fnEnd);
+  vm.runInContext(fnCode, context);
+
+  const container = new MockElement('div');
+  const now = 1794100000000;
+
+  // Spearmen: 5000 available + 548 waiting injured + 526 currently healing = 6074 total.
+  const mockCache = {
+    'getUnitSummary:unit': {
+      data: {
+        available: [{ unitId: 17, count: 5000 }]
+      }
+    },
+    'getTrainings:unit': {
+      data: { trainingQueues: [] }
+    },
+    'getHealing:unit': {
+      data: {
+        injuredUnits: [{ unitId: 17, count: 548 }],
+        healing: {
+          startDate: 1794100000000,
+          duration: 3600000,
+          units: [{ unitId: 17, count: 526 }]
+        }
+      }
+    }
+  };
+
+  context.renderDashboardTroops(mockCache, container, now);
+  const section = container.querySelector('#dashboard-troops-section');
+  const text = section.textContent;
+
+  // Hospital must sum both 548 waiting and 526 healing = 1,074
+  assert.ok(text.includes('Hospital: 1,074'), 'Hospital count must equal 548 waiting + 526 healing');
+  // Total troops must be 5000 ready + 1074 hospital = 6,074
+  assert.ok(text.includes('6,074'), 'Total troops must include all 6074 units');
+
+  // With maxTargets = 6074, remaining is 0 -> Train button should say Maxed
+  const actionHosts = section.querySelectorAll('.troop-card-action');
+  const trainBtn = actionHosts[1].children[0].children[1];
+  assert.equal(trainBtn.disabled, true);
+  assert.ok(trainBtn.textContent.includes('Maxed'), 'Train button must say Maxed when unhealed + healing troops reach cap');
+});

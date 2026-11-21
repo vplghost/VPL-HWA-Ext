@@ -193,11 +193,15 @@ const troopCards = computed(() => {
             </div>
             <div>
               <div class="text-[10px] text-slate-400 uppercase tracking-wider">Hospital</div>
-              <div class="font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+              <div
+                class="font-bold text-rose-600 dark:text-rose-400 tabular-nums"
+                :title="t.healingActiveCount > 0 && t.hospitalCount !== t.healingActiveCount ? `Total in Hospital: ${formatNumber(t.hospitalCount)} (${formatNumber(t.hospitalCount - t.healingActiveCount)} waiting + ${formatNumber(t.healingActiveCount)} healing)` : undefined"
+              >
                 {{ formatNumber(t.hospitalCount) }}
               </div>
               <div v-if="st.healingTimerText" class="inline-flex items-center gap-1 text-[9px] text-rose-500 font-mono">
-                {{ st.healingTimerText }}
+                <span>{{ st.healingTimerText }}</span>
+                <span v-if="t.healingActiveCount > 0" class="text-[9px] text-rose-400 font-normal">({{ formatNumber(t.healingActiveCount) }})</span>
                 <SpeedupControl v-if="isHealingActive" kind="healing" target-label="Hospital healing" />
               </div>
             </div>

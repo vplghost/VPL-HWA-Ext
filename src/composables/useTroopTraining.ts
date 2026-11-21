@@ -144,17 +144,16 @@ export function useTroopTraining() {
 
     // 4. Healing active & timer
     const healingUnits = normalizeArray(healing.value?.healing?.units);
-    if (healingUnits.length > 0 && Number.isFinite(healing.value?.healing?.startDate) && Number.isFinite(healing.value?.healing?.duration)) {
-      const endsAt = healing.value.healing.startDate + healing.value.healing.duration;
-      for (const item of healingUnits) {
-        const info = getTroopType(item?.unitId);
-        const count = Number(item?.count) || 0;
-        if (info && count > 0) {
-          stats[info.type].healingActiveCount += count;
+    const hasHealingTimer = Number.isFinite(healing.value?.healing?.startDate) && Number.isFinite(healing.value?.healing?.duration);
+    const endsAt = hasHealingTimer ? healing.value.healing.startDate + healing.value.healing.duration : null;
+    for (const item of healingUnits) {
+      const info = getTroopType(item?.unitId);
+      const count = Number(item?.count) || 0;
+      if (info && count > 0) {
+        stats[info.type].hospitalCount += count;
+        stats[info.type].healingActiveCount += count;
+        if (endsAt) {
           stats[info.type].healingEndsAt = endsAt;
-          if (stats[info.type].hospitalCount < count) {
-            stats[info.type].hospitalCount = count;
-          }
         }
       }
     }
