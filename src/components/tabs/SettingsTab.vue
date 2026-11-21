@@ -8,7 +8,8 @@ import '@/src/utils/metadata';
 import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
-import type { ThemeMode } from '@/src/types';
+import { TROOP_DEFS, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
+import type { ThemeMode, TroopTrainSettings } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
 const { recordingState, cache, updateRecordingState } = useRpcCache();
@@ -20,6 +21,55 @@ const enginePingMessage = ref('');
 const enginePingPending = ref(false);
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
+
+// Auto Troop Training
+const autoTrainEnabled = ref(false);
+const autoTrainLevels = ref<Record<number, number>>({ 0: 7, 1: 7, 2: 7 });
+
+async function loadTroopTrainSettings() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const stored = await chrome.storage.local.get('troopTrainSettings');
+      if (stored.troopTrainSettings) {
+        autoTrainEnabled.value = stored.troopTrainSettings.autoTrainEnabled === true;
+        if (stored.troopTrainSettings.trainLevels) {
+          autoTrainLevels.value = { ...autoTrainLevels.value, ...stored.troopTrainSettings.trainLevels };
+        }
+      }
+    } catch (_) {}
+  }
+}
+
+async function saveAutoTrain() {
+  const payload: TroopTrainSettings = {
+    autoTrainEnabled: autoTrainEnabled.value,
+    trainLevels: { ...autoTrainLevels.value },
+  };
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    try {
+      await chrome.storage.local.set({ troopTrainSettings: payload });
+      if (autoTrainEnabled.value && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ kind: 'auto-train-tick' }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+}
+
+const troopSettingsList = computed(() => {
+  return TROOP_DEFS.map((def) => {
+    const cap = getBuildingTrainingCapacity(def.type, cache?.value);
+    const savedLvl = autoTrainLevels.value[def.type];
+    const unlocked = getUnlockedTroopLevels(def.type, cache?.value, savedLvl);
+    if (!unlocked.includes(autoTrainLevels.value[def.type])) {
+      autoTrainLevels.value[def.type] = unlocked[unlocked.length - 1];
+    }
+    return {
+      ...def,
+      trainingCapacity: cap,
+      unlockedLevels: unlocked,
+    };
+  });
+});
 async function pingEngine() {
   enginePingPending.value = true;
   try {
@@ -101,6 +151,7 @@ onMounted(async () => {
         }
         tabSettings.value = result;
       }
+      await loadTroopTrainSettings();
     } catch (_) {}
   }
 });
@@ -408,6 +459,76 @@ async function toggleRecording() {
       <label class="flex items-center gap-2"><input id="setting-auto-frontier-rewards" v-model="autoFrontierEnabled" type="checkbox" @change="saveAutoFrontier" />Auto claim Frontier chest hourly (every 60 minutes)</label>
       <p class="text-xs text-slate-500">Collects accumulated Frontier (Eternal Story) chest rewards every hour while the game is open. Uses shared RPC settings.</p>
       <p role="status" class="text-xs text-slate-500">{{ autoFrontierStatus }}</p>
+    </section>
+
+    <!-- Auto Troop Training -->
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+            <span>🪖</span> Auto Troop Training
+          </h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            Automatically collect finished troops and train new units when queue is idle (batch size is min of max allowed and building training capacity).
+          </p>
+        </div>
+        <span
+          v-if="autoTrainEnabled"
+          class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+        >
+          Active
+        </span>
+      </div>
+
+      <!-- Master Toggle -->
+      <label for="setting-auto-train" class="flex items-center gap-2 cursor-pointer font-medium text-slate-800 dark:text-slate-200">
+        <input
+          id="setting-auto-train"
+          v-model="autoTrainEnabled"
+          type="checkbox"
+          class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-4 cursor-pointer"
+          @change="saveAutoTrain"
+        />
+        <span>Enable Auto Troop Training</span>
+      </label>
+
+      <!-- Troop Types Level Selection Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div
+          v-for="troop in troopSettingsList"
+          :key="troop.type"
+          class="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-3 space-y-2"
+        >
+          <div class="flex items-center justify-between">
+            <span class="inline-flex items-center gap-1 text-xs font-semibold" :class="troop.badgeCls">
+              <span>{{ troop.icon }}</span> <span>{{ troop.label }}</span>
+            </span>
+            <span class="text-[11px] text-slate-500 dark:text-slate-400">
+              Batch: <strong class="text-slate-700 dark:text-slate-200">{{ troop.trainingCapacity }}</strong>
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 pt-1">
+            <label :for="'auto-train-level-' + troop.type" class="text-xs text-slate-600 dark:text-slate-300">
+              Train Level:
+            </label>
+            <select
+              :id="'auto-train-level-' + troop.type"
+              v-model="autoTrainLevels[troop.type]"
+              class="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
+              @change="saveAutoTrain"
+            >
+              <option v-for="lvl in troop.unlockedLevels" :key="lvl" :value="lvl">
+                Lv.{{ lvl }}
+              </option>
+            </select>
+          </div>
+
+          <div class="text-[10px] text-slate-400">
+            Allowed levels: Lv.{{ troop.unlockedLevels[0] }} – Lv.{{ troop.unlockedLevels[troop.unlockedLevels.length - 1] }}
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">

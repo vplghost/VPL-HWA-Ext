@@ -4,7 +4,18 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { ref, computed } from 'vue';
-import { calculateTroopMax, getTroopType, normalizeArray, TROOP_DEFS, CAMP_BUILDING_IDS, troopStockProgress } from '../src/utils/troops.ts';
+import {
+  calculateTroopMax,
+  getTroopType,
+  normalizeArray,
+  TROOP_DEFS,
+  CAMP_BUILDING_IDS,
+  troopStockProgress,
+  CAMP_TRAINING_CAPACITY_BY_LEVEL,
+  getBuildingTrainingCapacity,
+  getUnlockedTroopLevels,
+  buildAutoTrainCalls,
+} from '../src/utils/troops.ts';
 import { DRILL_GROUND_LIMIT_BY_LEVEL } from '../src/utils/troopLimitData.ts';
 
 const snapshot = buildings => ({ buildingStatus: { data: { buildings } } });
@@ -46,7 +57,8 @@ test('actual troop training stays bounded by the confirmed stock limit and block
     'getUnitSummary:unit': { data: { available: [{ unitId: 1, count: 2760 }] } } });
   const calls = [];
   const context = { ref, computed, watch() {}, onMounted() {}, onUnmounted() {}, getTroopType, normalizeArray, TROOP_DEFS,
-    calculateTroopMax, CAMP_BUILDING_IDS, useRpcCache: () => ({ cache, dispatchRpc: async batch => { calls.push(batch); return { ok: true }; } }) };
+    calculateTroopMax, CAMP_BUILDING_IDS, CAMP_TRAINING_CAPACITY_BY_LEVEL, getBuildingTrainingCapacity, getUnlockedTroopLevels, buildAutoTrainCalls,
+    useRpcCache: () => ({ cache, dispatchRpc: async batch => { calls.push(batch); return { ok: true }; } }) };
   vm.runInNewContext(code + '\nglobalThis.api = useTroopTraining();', context);
   assert.equal(context.api.troopStats.value[0].maxTroops, 2770);
   await context.api.startTrain(0, 1);
@@ -87,6 +99,8 @@ test('actual Troops card reacts to cap changes and exposes correct overflow prog
   const setup = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
   const stats = ref([{ type: 0, readyCount: 14000, hospitalCount: 500, trainingCount: 1000, maxTroops: 14230 }]);
   const context = { computed, troopStockProgress, normalizeArray, getTroopType, formatNumber: String, formatDuration: String,
+    getBuildingTrainingCapacity, getUnlockedTroopLevels,
+    useRpcCache: () => ({ cache: ref({}) }),
     useTroopTraining: () => ({ troopStats: stats, trainSettings: ref({}), trainings: ref({}), now: ref(Date.now()) }) };
   const code = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
   vm.runInNewContext(code + '\nglobalThis.cards = troopCards;', context);

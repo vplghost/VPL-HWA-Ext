@@ -26,6 +26,7 @@ import { experimentalDataHelper } from '../utils/experimentalData.ts';
 import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { eventCatalogService } from '../services/eventCatalogService.ts';
 import { getEncounterKey } from '../utils/dungeonBattleHistory.ts';
+import { buildAutoTrainCalls } from '../utils/troops.ts';
 
 export const RECORD_STATE_KEY = 'recordingState';
 export const RECORD_PREFIX = 'record:';
@@ -559,6 +560,38 @@ export function advanceBuildingQueue(tabId?: number, record?: any, customChrome?
 
 export function advanceResearchQueue(tabId?: number, record?: any, customChrome?: any) {
   return advanceCityQueue('research', tabId, record, customChrome);
+}
+
+export async function advanceTroopTraining(tabId?: number, customChrome?: any) {
+  const cr = getActiveChrome(customChrome);
+  if (!tabId) tabId = (await findActiveGameTab(cr))?.id;
+  if (!tabId) return { ok: false, error: 'No active game tab found.' };
+
+  const stored =
+    (await cr?.storage?.local?.get([
+      'troopTrainSettings',
+      'rpcCache',
+      'popupRpcEnabled',
+      'socketRefreshMode',
+      'captureSettings',
+    ])) || {};
+
+  if (stored.popupRpcEnabled === false) return { ok: false, error: 'Popup RPC is disabled.' };
+  const settings = stored.troopTrainSettings;
+  if (!settings || !settings.autoTrainEnabled) return { ok: false, error: 'Auto train is disabled.' };
+
+  const plan = buildAutoTrainCalls(stored.rpcCache, settings);
+  if (!plan.calls.length) return { ok: true, calls: [] };
+
+  const dispatch = rpcMessageForSettings(stored, plan.calls);
+  if (!dispatch) return { ok: false, error: 'Could not prepare RPC message for current settings.' };
+
+  try {
+    await cr?.tabs?.sendMessage?.(tabId, dispatch);
+    return { ok: true, dispatched: plan.actions };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
 }
 
 export function advanceCityQueue(type: string, tabId?: number, record?: any, customChrome?: any) {
@@ -2720,6 +2753,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       if (tab?.id) {
         await advanceBuildingQueue(tab.id, undefined, cr);
         await advanceResearchQueue(tab.id, undefined, cr);
+        await advanceTroopTraining(tab.id, cr);
       }
     }
   });
@@ -2731,6 +2765,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     if (tab?.id) {
       await advanceBuildingQueue(tab.id, undefined, cr);
       await advanceResearchQueue(tab.id, undefined, cr);
+      await advanceTroopTraining(tab.id, cr);
     }
   });
 
@@ -2847,6 +2882,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         (isGameUrl(sender.url) && sender.tab?.id))
     ) {
       pending = pending.then(() => runFrontierRewardsClaim(Boolean(message.manual), cr));
+      pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      pending = pending.catch(() => {});
+      return true;
+    }
+    if (
+      message?.kind === 'auto-train-tick' &&
+      (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
+        (isGameUrl(sender.url) && sender.tab?.id))
+    ) {
+      pending = pending.then(() => advanceTroopTraining(sender.tab?.id, cr));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -4143,6 +4188,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     scheduleMailExpiry: (cache: any) => scheduleMailExpiry(cache, cr),
     advanceBuildingQueue: (tabId?: number, record?: any) => advanceBuildingQueue(tabId, record, cr),
     advanceResearchQueue: (tabId?: number, record?: any) => advanceResearchQueue(tabId, record, cr),
+    advanceTroopTraining: (tabId?: number) => advanceTroopTraining(tabId, cr),
     advanceCityQueue: (type: string, tabId?: number, record?: any) => advanceCityQueue(type, tabId, record, cr),
     runCityQueue: (type: string, tabId?: number, record?: any) => runCityQueue(type, tabId, record, cr),
     mutateCityQueue: (type: string, message: any) => mutateCityQueue(type, message, cr),

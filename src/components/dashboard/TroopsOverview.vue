@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { troopStockProgress } from '@/src/utils/troops';
+import { troopStockProgress, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
 import { useTroopTraining, getTroopType, normalizeArray } from '@/src/composables/useTroopTraining';
+import { useRpcCache } from '@/src/composables/useRpcCache';
 import { formatDuration, formatNumber } from '@/src/utils/formatters';
 import SpeedupControl from '@/src/components/common/SpeedupControl.vue';
+
+const { cache } = typeof useRpcCache === 'function' ? useRpcCache() : { cache: { value: {} } };
 
 const {
   troopStats,
@@ -28,13 +31,16 @@ const {
 function handleLevelChange(type: number, event: Event) {
   const target = event.target as HTMLSelectElement;
   const val = parseInt(target.value, 10);
-  if (!isNaN(val) && val >= 1 && val <= 9) {
+  if (!isNaN(val) && val >= 1 && val <= 10) {
     setTrainLevel(type, val);
   }
 }
 
 function getCardState(t: any) {
-  const progress = troopStockProgress(t);
+  const buildingCap = typeof getBuildingTrainingCapacity === 'function'
+    ? getBuildingTrainingCapacity(t.type, cache?.value)
+    : 26;
+  const progress = troopStockProgress(t, buildingCap);
 
   const queuesForType = normalizeArray(trainings.value?.trainingQueues).filter((q: any) => {
     const info = getTroopType(q?.unitId);
@@ -58,8 +64,13 @@ function getCardState(t: any) {
 
   const savedLevel = trainSettings.value?.trainLevels?.[t.type];
   const highestReadyLevel = levelsSorted.length > 0 ? levelsSorted[levelsSorted.length - 1][0] : 7;
-  const selectedLevel = typeof savedLevel === 'number' && savedLevel >= 1 && savedLevel <= 9 ? savedLevel : highestReadyLevel;
-
+  const unlockedLevels = typeof getUnlockedTroopLevels === 'function'
+    ? getUnlockedTroopLevels(t.type, cache?.value, savedLevel)
+    : [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const highestUnlocked = unlockedLevels[unlockedLevels.length - 1];
+  const selectedLevel = typeof savedLevel === 'number' && unlockedLevels.includes(savedLevel)
+    ? savedLevel
+    : (unlockedLevels.includes(highestReadyLevel) ? highestReadyLevel : highestUnlocked);
 
   const healingSec = t.healingEndsAt ? Math.max(0, Math.ceil((t.healingEndsAt - now.value) / 1000)) : null;
   const healingTimerText = healingSec !== null && healingSec > 0 ? formatDuration(healingSec) : healingSec !== null ? 'Ready' : null;
@@ -72,7 +83,9 @@ function getCardState(t: any) {
     completedQueue,
     activeQueue,
     levelStr,
+    unlockedLevels,
     selectedLevel,
+    buildingCap,
     healingTimerText,
     trainingTimerText,
   };
@@ -95,6 +108,13 @@ const troopCards = computed(() => {
           <span>🪖</span> Troops
         </h3>
         <span class="text-xs text-slate-400 dark:text-slate-500 font-normal">· Forces & Hospital</span>
+        <span
+          v-if="trainSettings?.autoTrainEnabled"
+          class="inline-flex items-center gap-1 rounded bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-200 dark:ring-indigo-800/60"
+          title="Auto Troop Training is enabled in Settings"
+        >
+          ⚡ Auto Train
+        </span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -291,7 +311,7 @@ const troopCards = computed(() => {
                   title="Select troop tier/level to train"
                   @change="handleLevelChange(t.type, $event)"
                 >
-                  <option v-for="lvl in 9" :key="lvl" :value="lvl">
+                  <option v-for="lvl in (st.unlockedLevels || [1, 2, 3, 4, 5, 6, 7, 8, 9])" :key="lvl" :value="lvl">
                     Lv.{{ lvl }}
                   </option>
                 </select>

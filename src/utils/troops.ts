@@ -1,10 +1,11 @@
 import { DRILL_GROUND_BUILDING_IDS, DRILL_GROUND_LIMIT_BY_LEVEL } from './troopLimitData.ts';
+import type { TroopTrainSettings } from '../types/index.ts';
 
 export function getTroopType(unitId: number | string): { type: 0 | 1 | 2; level: number } | null {
   const id = Number(unitId);
-  if (id >= 1 && id <= 9) return { type: 0, level: id };
-  if (id >= 11 && id <= 19) return { type: 1, level: id - 10 };
-  if (id >= 21 && id <= 29) return { type: 2, level: id - 20 };
+  if (id >= 1 && id <= 10) return { type: 0, level: id };
+  if (id >= 11 && id <= 20) return { type: 1, level: id - 10 };
+  if (id >= 21 && id <= 30) return { type: 2, level: id - 20 };
   return null;
 }
 
@@ -27,8 +28,99 @@ export const CAMP_BUILDING_IDS: Record<number, number> = {
   2: 40, // Infantry Camp
 };
 
+/**
+ * Cumulative permanent training capacity granted by Camp building levels 1–25.
+ * Extracted from game configs (levels 1=17, 2=22, 3=26, 4=30, ..., 25=167).
+ */
+export const CAMP_TRAINING_CAPACITY_BY_LEVEL = [
+  0, 17, 22, 26, 30, 35, 39, 43, 48, 52, 56, 61, 65, 69, 76, 84, 92, 101, 109, 117, 126, 134, 142, 151, 159, 167
+] as const;
+
+/**
+ * Resolve training capacity for corresponding camp building (Camps 41, 42, 40).
+ */
+export function getBuildingTrainingCapacity(type: number, cache: any): number {
+  if (!Number.isInteger(type) || type < 0 || type > 2) return 26;
+  const targetBuildingId = CAMP_BUILDING_IDS[type];
+  const raw = cache?.buildingStatus?.data?.buildings ?? cache?.['getSummary:building']?.data?.buildings;
+  if (!raw || typeof raw !== 'object') return 26;
+  for (const [key, value] of Object.entries(raw)) {
+    const b: any = value;
+    const id = Number(b?.buildingId ?? b?.id ?? (!Array.isArray(raw) ? key : NaN));
+    if (id !== targetBuildingId) continue;
+    const rawLevel = typeof b === 'number' ? b : b?.level;
+    const level = Number(rawLevel);
+    if (!Number.isInteger(level) || level <= 0) return 17;
+    if (level >= CAMP_TRAINING_CAPACITY_BY_LEVEL.length) {
+      return CAMP_TRAINING_CAPACITY_BY_LEVEL[CAMP_TRAINING_CAPACITY_BY_LEVEL.length - 1];
+    }
+    return CAMP_TRAINING_CAPACITY_BY_LEVEL[level];
+  }
+  return 26;
+}
+
+/**
+ * Get unlocked troop levels for a given type, restricted to player's unlocked tiers.
+ */
+export function getUnlockedTroopLevels(type: number, cache: any, savedLevel?: number): number[] {
+  if (!Number.isInteger(type) || type < 0 || type > 2) return [1];
+  const levels = new Set<number>();
+  const unitSummary = cache?.['getUnitSummary:unit']?.data ?? cache?.getUnitSummary?.data;
+
+  // 1. Available troops
+  for (const item of normalizeArray(unitSummary?.available)) {
+    const info = getTroopType(item?.unitId);
+    if (info && info.type === type && info.level >= 1 && info.level <= 10) {
+      levels.add(info.level);
+    }
+  }
+
+  // 2. Squads
+  for (const sq of normalizeArray(unitSummary?.squads)) {
+    for (const u of normalizeArray(sq?.units)) {
+      const info = getTroopType(u?.id ?? u?.unitId);
+      if (info && info.type === type && info.level >= 1 && info.level <= 10) {
+        levels.add(info.level);
+      }
+    }
+  }
+
+  // 3. Hospital
+  const healing = cache?.['getHealing:unit']?.data ?? cache?.getHealing?.data;
+  for (const item of normalizeArray(healing?.injuredUnits)) {
+    const info = getTroopType(item?.unitId);
+    if (info && info.type === type && info.level >= 1 && info.level <= 10) {
+      levels.add(info.level);
+    }
+  }
+
+  // 4. Training queues
+  const trainings = cache?.['getTrainings:unit']?.data ?? cache?.getTrainings?.data;
+  for (const q of normalizeArray(trainings?.trainingQueues)) {
+    const info = getTroopType(q?.unitId);
+    if (info && info.type === type && info.level >= 1 && info.level <= 10) {
+      levels.add(info.level);
+    }
+  }
+
+  let maxLvl = levels.size > 0 ? Math.max(...levels) : 1;
+  if (typeof savedLevel === 'number' && savedLevel >= 1 && savedLevel <= 10 && savedLevel > maxLvl) {
+    maxLvl = savedLevel;
+  }
+  maxLvl = Math.max(1, Math.min(10, maxLvl));
+
+  const result: number[] = [];
+  for (let lvl = 1; lvl <= maxLvl; lvl++) {
+    result.push(lvl);
+  }
+  return result;
+}
+
 /** Progress against the true cap, never against an inflated current-stock denominator. */
-export function troopStockProgress(stock: { readyCount: number; hospitalCount: number; trainingCount: number; maxTroops: number | null }) {
+export function troopStockProgress(
+  stock: { readyCount: number; hospitalCount: number; trainingCount: number; maxTroops: number | null },
+  trainingCapacity: number = 26
+) {
   const amounts = [stock.readyCount, stock.hospitalCount, stock.trainingCount].map(value =>
     Number.isFinite(value) ? Math.max(0, value) : 0);
   const currentTotal = amounts.reduce((sum, value) => sum + value, 0);
@@ -44,10 +136,13 @@ export function troopStockProgress(stock: { readyCount: number; hospitalCount: n
     availablePct -= width;
     return width;
   });
-  return { currentTotal, maxTarget, limitKnown, remaining, overLimit, occupancyPct,
+  return {
+    currentTotal, maxTarget, limitKnown, remaining, overLimit, occupancyPct,
     filledPct: segments.reduce((sum, value) => sum + value, 0),
     readyPct: segments[0], hospitalPct: segments[1], trainingPct: segments[2],
-    canTrain: limitKnown && remaining > 0, unitsToTrain: Math.min(26, remaining) };
+    canTrain: limitKnown && remaining > 0,
+    unitsToTrain: Math.min(trainingCapacity, remaining)
+  };
 }
 
 /** Stock limit, distinct from per-march capacity and per-batch trainingCapacity. */
@@ -78,4 +173,123 @@ export function calculateTroopMax(type: number, cache: any, _currentTotal = 0): 
     limit += value;
   }
   return limit;
+}
+
+export interface AutoTrainCallPlan {
+  calls: Array<{ name: string; args?: any; feature?: string }>;
+  actions: Array<{ type: number; action: 'collect' | 'train'; unitId: number; count?: number }>;
+}
+
+/**
+ * Builds atomic RPC calls for Auto Troop Training.
+ * For each troop type:
+ * - Collects finished training queue if completed.
+ * - If idle and below stock limit, starts training with count = min(remaining, buildingCapacity).
+ * - Level is constrained to player's unlocked troop levels.
+ */
+export function buildAutoTrainCalls(cache: any, settings: TroopTrainSettings, now = Date.now()): AutoTrainCallPlan {
+  const result: AutoTrainCallPlan = { calls: [], actions: [] };
+  if (!settings?.autoTrainEnabled) return result;
+
+  const trainings = cache?.['getTrainings:unit']?.data ?? cache?.getTrainings?.data;
+  const allQueues = normalizeArray(trainings?.trainingQueues);
+
+  for (const def of TROOP_DEFS) {
+    const type = def.type;
+    const queuesForType = allQueues.filter((q: any) => {
+      const info = getTroopType(q?.unitId);
+      return info && info.type === type;
+    });
+
+    // Check if there is an active queue
+    const activeQueue = queuesForType.find((q: any) =>
+      Number.isFinite(q.startDate) && Number.isFinite(q.duration) && q.startDate + q.duration > now
+    );
+    if (activeQueue) {
+      continue;
+    }
+
+    // Check if there is a completed queue that needs collecting
+    const completedQueue = queuesForType.find((q: any) =>
+      Number.isFinite(q.startDate) && Number.isFinite(q.duration) && q.startDate + q.duration <= now
+    );
+    if (completedQueue) {
+      result.calls.push({
+        name: 'completeTraining',
+        args: { unitId: Number(completedQueue.unitId) },
+        feature: 'unit',
+      });
+      result.actions.push({
+        type,
+        action: 'collect',
+        unitId: Number(completedQueue.unitId),
+      });
+    }
+
+    // Check stock limit
+    const maxTroops = calculateTroopMax(type, cache);
+    if (maxTroops == null) continue; // Unknown limit, do not train
+
+    let readyCount = 0;
+    let hospitalCount = 0;
+    let trainingCount = 0;
+
+    const unitSummary = cache?.['getUnitSummary:unit']?.data ?? cache?.getUnitSummary?.data;
+    for (const item of normalizeArray(unitSummary?.available)) {
+      const info = getTroopType(item?.unitId);
+      if (info && info.type === type) readyCount += Number(item?.count) || 0;
+    }
+    for (const sq of normalizeArray(unitSummary?.squads)) {
+      for (const u of normalizeArray(sq?.units)) {
+        const info = getTroopType(u?.id ?? u?.unitId);
+        if (info && info.type === type) readyCount += Number(u?.state?.survived) || 0;
+      }
+    }
+    const healing = cache?.['getHealing:unit']?.data ?? cache?.getHealing?.data;
+    for (const item of normalizeArray(healing?.injuredUnits)) {
+      const info = getTroopType(item?.unitId);
+      if (info && info.type === type) hospitalCount += Number(item?.count) || 0;
+    }
+    for (const q of queuesForType) {
+      trainingCount += Number(q?.unitCount) || 0;
+    }
+
+    const currentTotal = readyCount + hospitalCount + trainingCount;
+    const remaining = maxTroops - currentTotal;
+    if (remaining <= 0) continue; // Max reached
+
+    const buildingCap = getBuildingTrainingCapacity(type, cache);
+    const count = Math.min(buildingCap, remaining);
+    if (count <= 0) continue;
+
+    // Determine chosen level restricted to unlocked levels
+    const unlocked = getUnlockedTroopLevels(type, cache, settings.trainLevels?.[type]);
+    const configuredLevel = settings.trainLevels?.[type];
+    const chosenLevel = (typeof configuredLevel === 'number' && unlocked.includes(configuredLevel))
+      ? configuredLevel
+      : unlocked[unlocked.length - 1];
+
+    const targetUnitId = type === 0 ? chosenLevel : (type === 1 ? 10 + chosenLevel : 20 + chosenLevel);
+    const duration = Math.max(10000, Math.round(count * 46342));
+    const startDate = now;
+
+    result.calls.push({
+      name: 'startTraining',
+      args: { unitId: targetUnitId, count, startDate, duration },
+      feature: 'unit',
+    });
+    result.actions.push({
+      type,
+      action: 'train',
+      unitId: targetUnitId,
+      count,
+    });
+  }
+
+  if (result.calls.length > 0) {
+    result.calls.push({ name: 'getTrainings', feature: 'unit' });
+    result.calls.push({ name: 'getUnitSummary', feature: 'unit' });
+  }
+
+  return result;
 }

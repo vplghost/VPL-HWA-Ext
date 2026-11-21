@@ -1,16 +1,37 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from './useRpcCache.ts';
-import { getTroopType, TROOP_DEFS, normalizeArray, calculateTroopMax, CAMP_BUILDING_IDS } from '../utils/troops.ts';
+import {
+  getTroopType,
+  TROOP_DEFS,
+  normalizeArray,
+  calculateTroopMax,
+  CAMP_BUILDING_IDS,
+  CAMP_TRAINING_CAPACITY_BY_LEVEL,
+  getBuildingTrainingCapacity,
+  getUnlockedTroopLevels,
+  buildAutoTrainCalls,
+} from '../utils/troops.ts';
 import type { TroopTrainSettings, TroopUnitState } from '@/src/types';
 
-export { getTroopType, TROOP_DEFS, normalizeArray, calculateTroopMax, CAMP_BUILDING_IDS };
+export {
+  getTroopType,
+  TROOP_DEFS,
+  normalizeArray,
+  calculateTroopMax,
+  CAMP_BUILDING_IDS,
+  CAMP_TRAINING_CAPACITY_BY_LEVEL,
+  getBuildingTrainingCapacity,
+  getUnlockedTroopLevels,
+  buildAutoTrainCalls,
+};
 
 export function useTroopTraining() {
   const { cache, dispatchRpc } = useRpcCache();
-  const trainSettings = ref<TroopTrainSettings>({ maxTargets: {}, trainLevels: {} });
+  const trainSettings = ref<TroopTrainSettings>({ autoTrainEnabled: false, maxTargets: {}, trainLevels: {} });
   const isRefreshing = ref(false);
   const isSyncLoading = ref(false);
   const isHealLoading = ref(false);
+  const isAutoTraining = ref(false);
   const healStatus = ref('');
   const now = ref(Date.now());
   let timerInterval: any = null;
@@ -20,7 +41,11 @@ export function useTroopTraining() {
       try {
         const stored = await chrome.storage.local.get('troopTrainSettings');
         if (stored.troopTrainSettings) {
-          trainSettings.value = stored.troopTrainSettings;
+          trainSettings.value = {
+            autoTrainEnabled: stored.troopTrainSettings.autoTrainEnabled === true,
+            maxTargets: stored.troopTrainSettings.maxTargets || {},
+            trainLevels: stored.troopTrainSettings.trainLevels || {},
+          };
         }
       } catch (_) {}
     }
@@ -32,6 +57,20 @@ export function useTroopTraining() {
       try {
         await chrome.storage.local.set({ troopTrainSettings: next });
       } catch (_) {}
+    }
+  }
+
+  function setAutoTrain(enabled: boolean) {
+    const next = {
+      ...trainSettings.value,
+      autoTrainEnabled: enabled,
+    };
+    saveSettings(next);
+    if (enabled) {
+      checkAndExecuteAutoTrain();
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ kind: 'auto-train-tick' }).catch(() => {});
+      }
     }
   }
 
@@ -51,11 +90,28 @@ export function useTroopTraining() {
     saveSettings(next);
   }
 
+  async function checkAndExecuteAutoTrain() {
+    if (!trainSettings.value?.autoTrainEnabled || isAutoTraining.value || isRefreshing.value) return;
+    const plan = buildAutoTrainCalls(cache.value, trainSettings.value, now.value);
+    if (!plan.calls.length) return;
+
+    isAutoTraining.value = true;
+    try {
+      await dispatchRpc(plan.calls);
+    } catch (_) {
+    } finally {
+      isAutoTraining.value = false;
+    }
+  }
+
   onMounted(() => {
     loadSettings();
     timerInterval = setInterval(() => {
       now.value = Date.now();
-    }, 1000);
+      if (trainSettings.value?.autoTrainEnabled) {
+        checkAndExecuteAutoTrain();
+      }
+    }, 2000);
   });
 
   onUnmounted(() => {
@@ -219,7 +275,10 @@ export function useTroopTraining() {
     const remaining = t.maxTroops - currentTotal;
     if (remaining <= 0) return;
 
-    const count = Math.min(26, Math.max(0, remaining));
+    const buildingCap = typeof getBuildingTrainingCapacity === 'function'
+      ? getBuildingTrainingCapacity(type, cache.value)
+      : 26;
+    const count = Math.min(buildingCap, Math.max(0, remaining));
     if (count <= 0) return;
 
     const targetUnitId = type === 0 ? chosenLevel : (type === 1 ? 10 + chosenLevel : 20 + chosenLevel);
@@ -233,6 +292,7 @@ export function useTroopTraining() {
         feature: 'unit',
       },
       { name: 'getTrainings', feature: 'unit' },
+      { name: 'getUnitSummary', feature: 'unit' },
     ]);
   }
 
@@ -295,9 +355,11 @@ export function useTroopTraining() {
     isRefreshing,
     isSyncLoading,
     isHealLoading,
+    isAutoTraining,
     healStatus,
     now,
     trainings,
+    setAutoTrain,
     setMaxTarget,
     setTrainLevel,
     refreshTroops,
@@ -305,6 +367,7 @@ export function useTroopTraining() {
     startTrain,
     healAll,
     syncHealed,
+    checkAndExecuteAutoTrain,
   };
 }
 

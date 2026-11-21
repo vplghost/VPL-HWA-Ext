@@ -1,6 +1,7 @@
 export interface TroopTrainSettings {
-  maxTargets?: Record<string, number>;
-  trainLevels?: Record<string, number>;
+  autoTrainEnabled?: boolean;
+  maxTargets?: Record<string | number, number>;
+  trainLevels?: Record<string | number, number>;
 }
 
 export interface TroopUnitState {
