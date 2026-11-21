@@ -3204,13 +3204,22 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
     }
     if (message?.kind === 'record-status' && isAllowedOrigin) {
       pending = pending.then(async () => {
-        const state = (await cr.storage?.session?.get(RECORD_STATE_KEY))?.[RECORD_STATE_KEY] || { active: false };
-        const entries = await recordedEntries(cr);
-        const interactions = await interactionEntries(cr);
+        const sessionStore = await cr.storage?.session?.get(RECORD_STATE_KEY).catch(() => ({}));
+        let state = sessionStore?.[RECORD_STATE_KEY];
+        if (!state) {
+          const localStore = await cr.storage?.local?.get(RECORD_STATE_KEY).catch(() => ({}));
+          state = localStore?.[RECORD_STATE_KEY] || { active: false };
+        }
+        const count = typeof state.nextIndex === 'number'
+          ? state.nextIndex
+          : (await recordedEntries(cr)).length;
+        const interactionCount = typeof state.nextInteractionIndex === 'number'
+          ? state.nextInteractionIndex
+          : (await interactionEntries(cr)).length;
         return {
           active: Boolean(state.active),
-          count: entries.length,
-          interactionCount: interactions.length,
+          count,
+          interactionCount,
           error: state.error || null
         };
       });

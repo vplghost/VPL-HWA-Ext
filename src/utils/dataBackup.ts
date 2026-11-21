@@ -161,3 +161,140 @@ export function prepareImportUpdates(
     format,
   };
 }
+
+export interface PruneSummary {
+  removedInteractions: number;
+  removedLegacyKeys: number;
+  trimmedLogEntries: number;
+  totalPrunedKeys: number;
+  details: string[];
+}
+
+export interface PruneResult {
+  keysToRemove: string[];
+  updatesToSet: Record<string, any>;
+  summary: PruneSummary;
+}
+
+export const LEGACY_PRUNE_KEYS = new Set([
+  'apiRecords',
+  'claimRpcStatus',
+  'claimAllRpcStatus',
+  'frontierClaimStatus',
+  '_claimRpcStatus',
+  'hwa_last_rpc_headers',
+  'hwa_game_version',
+]);
+
+/**
+ * Identify and trim old or bloated data in chrome.storage.local without touching
+ * user settings, squads, active queues, or catalogs.
+ */
+export function pruneStorageData(allStorage: Record<string, any>): PruneResult {
+  const keysToRemove: string[] = [];
+  const updatesToSet: Record<string, any> = {};
+  let removedInteractions = 0;
+  let removedLegacyKeys = 0;
+  let trimmedLogEntries = 0;
+  const details: string[] = [];
+
+  for (const [key, val] of Object.entries(allStorage || {})) {
+    // 1. Remove recorded interaction logs
+    if (/^interaction:\d+$/.test(key)) {
+      keysToRemove.push(key);
+      removedInteractions++;
+      continue;
+    }
+
+    // 2. Remove obsolete / transient keys from older versions
+    if (LEGACY_PRUNE_KEYS.has(key)) {
+      keysToRemove.push(key);
+      removedLegacyKeys++;
+      continue;
+    }
+
+    // 3. Trim bloated queue logs (newest entries first, keep max 50)
+    if ((key === 'buildingQueueLogs' || key === 'researchQueueLogs') && Array.isArray(val)) {
+      if (val.length > 50) {
+        trimmedLogEntries += (val.length - 50);
+        updatesToSet[key] = val.slice(0, 50);
+        details.push(`Trimmed ${key} from ${val.length} to 50 entries`);
+      }
+    }
+
+    // 4. Trim daily activity history (keep max 30 days)
+    if (key === 'dailyActivityHistory' && Array.isArray(val)) {
+      if (val.length > 30) {
+        trimmedLogEntries += (val.length - 30);
+        updatesToSet[key] = val.slice(-30);
+        details.push(`Trimmed dailyActivityHistory from ${val.length} to 30 days`);
+      }
+    }
+
+    // 5. Trim dungeon battle history encounter records (keep max 50 records per encounter)
+    if (key === 'dungeonBattleHistory' && val && typeof val === 'object' && !Array.isArray(val)) {
+      let modified = false;
+      const newMap: Record<string, any> = {};
+      for (const [encKey, records] of Object.entries(val)) {
+        if (Array.isArray(records) && records.length > 50) {
+          trimmedLogEntries += (records.length - 50);
+          newMap[encKey] = records.slice(-50);
+          modified = true;
+        } else {
+          newMap[encKey] = records;
+        }
+      }
+      if (modified) {
+        updatesToSet[key] = newMap;
+        details.push('Trimmed dungeonBattleHistory encounter records');
+      }
+    }
+  }
+
+  if (removedInteractions > 0) {
+    details.push(`Removed ${removedInteractions} interaction record(s)`);
+  }
+  if (removedLegacyKeys > 0) {
+    details.push(`Removed ${removedLegacyKeys} legacy/transient key(s)`);
+  }
+
+  return {
+    keysToRemove,
+    updatesToSet,
+    summary: {
+      removedInteractions,
+      removedLegacyKeys,
+      trimmedLogEntries,
+      totalPrunedKeys: keysToRemove.length + Object.keys(updatesToSet).length,
+      details,
+    },
+  };
+}
+
+/**
+ * Execute storage pruning on chrome.storage.local (or provided mock storage).
+ */
+export async function executeStoragePrune(customStorage?: any): Promise<PruneSummary> {
+  const storage = customStorage || (typeof chrome !== 'undefined' ? chrome.storage?.local : null);
+  if (!storage) {
+    return {
+      removedInteractions: 0,
+      removedLegacyKeys: 0,
+      trimmedLogEntries: 0,
+      totalPrunedKeys: 0,
+      details: ['Storage is not accessible.'],
+    };
+  }
+
+  const allStorage = (await storage.get(null)) || {};
+  const { keysToRemove, updatesToSet, summary } = pruneStorageData(allStorage);
+
+  if (keysToRemove.length > 0) {
+    await storage.remove(keysToRemove);
+  }
+  if (Object.keys(updatesToSet).length > 0) {
+    await storage.set(updatesToSet);
+  }
+
+  return summary;
+}

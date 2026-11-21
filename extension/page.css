@@ -102,3 +102,25 @@
     opacity: 0;
   }
 }
+
+.hwa-icon-btn:disabled,
+.hwa-icon-btn[disabled],
+.hwa-icon-btn.is-busy {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  transform: none !important;
+}
+
+@keyframes hwa-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hwa-spin {
+  animation: hwa-spin 0.9s linear infinite !important;
+}

@@ -693,6 +693,8 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     clearBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>';
 
     let isRecording = false;
+    const defaultExportSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
+    const spinnerSvg = '<svg class="hwa-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
 
     async function syncRecordingState() {
       try {
@@ -709,19 +711,58 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
           ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="hwa-rec-dot"></span>'
           : '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><circle cx="12" cy="12" r="9"/></svg>';
         const hasRecords = count + interactionCount > 0;
+        const recTitle = isRecording
+          ? `Recording active (${count} API, ${interactionCount} UI). Click to stop`
+          : `Record game activity${hasRecords ? ` (${count} API, ${interactionCount} UI saved)` : ''}. Click to start`;
+        recordBtn.title = recTitle;
+        recordBtn.setAttribute('aria-label', recTitle);
+
         exportBtn.hidden = !hasRecords;
         clearBtn.hidden = !hasRecords;
         if (exportBtn.style) exportBtn.style.display = hasRecords ? 'inline-flex' : 'none';
         if (clearBtn.style) clearBtn.style.display = hasRecords ? 'inline-flex' : 'none';
+        if (hasRecords) {
+          const exportTitle = `Export game activity JSON (${count} API, ${interactionCount} UI entries)`;
+          exportBtn.title = exportTitle;
+          exportBtn.setAttribute('aria-label', exportTitle);
+          const clearTitle = `Clear recorded activity (${count + interactionCount} entries)`;
+          clearBtn.title = clearTitle;
+          clearBtn.setAttribute('aria-label', clearTitle);
+        }
       } catch (_) {}
     }
 
     recordBtn.addEventListener('click', () => {
+      if (recordBtn.disabled) return;
+      recordBtn.disabled = true;
+      recordBtn.classList?.add('is-busy');
       const nextKind = isRecording ? 'record-stop' : 'record-start';
-      sendBridgeMessage({ kind: nextKind }).then(syncRecordingState);
+      recordBtn.title = isRecording ? 'Stopping recording...' : 'Starting recording...';
+      sendBridgeMessage({ kind: nextKind })
+        .then(syncRecordingState)
+        .catch((err) => {
+          handleContextInvalidated(err);
+        })
+        .finally(() => {
+          recordBtn.disabled = false;
+          recordBtn.classList?.remove('is-busy');
+        });
     });
 
     exportBtn.addEventListener('click', () => {
+      if (exportBtn.disabled) return;
+      exportBtn.disabled = true;
+      exportBtn.classList?.add('is-busy');
+      exportBtn.innerHTML = spinnerSvg;
+      exportBtn.title = 'Exporting activity log...';
+
+      const resetExportBtn = () => {
+        exportBtn.disabled = false;
+        exportBtn.classList?.remove('is-busy');
+        exportBtn.innerHTML = defaultExportSvg;
+        syncRecordingState();
+      };
+
       try {
         const p = win.chrome?.runtime?.sendMessage?.({ kind: 'record-export' });
         if (p && typeof p.then === 'function') {
@@ -730,7 +771,10 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
             const interactions = res?.interactions || [];
             const BlobConstructor = win.Blob || (typeof Blob !== 'undefined' ? Blob : null);
             const UrlConstructor = win.URL || (typeof URL !== 'undefined' ? URL : null);
-            if ((!records.length && !interactions.length) || !BlobConstructor || !UrlConstructor) return;
+            if ((!records.length && !interactions.length) || !BlobConstructor || !UrlConstructor) {
+              resetExportBtn();
+              return;
+            }
             const timeline = [
               ...records.map((record: any) => ({ kind: 'api', ...record })),
               ...interactions.map((entry: any) => ({ kind: 'interaction', ...entry }))
@@ -782,19 +826,40 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
             a.download = `hwa-game-record-${ts}.json`;
             a.click();
             UrlConstructor.revokeObjectURL(url);
-          }).catch((err: any) => handleContextInvalidated(err));
+            resetExportBtn();
+          }).catch((err: any) => {
+            handleContextInvalidated(err);
+            resetExportBtn();
+          });
+        } else {
+          resetExportBtn();
         }
       } catch (err) {
         handleContextInvalidated(err);
+        resetExportBtn();
       }
     });
 
     clearBtn.addEventListener('click', () => {
-      exportBtn.hidden = true;
-      clearBtn.hidden = true;
-      if (exportBtn.style) exportBtn.style.display = 'none';
-      if (clearBtn.style) clearBtn.style.display = 'none';
-      sendBridgeMessage({ kind: 'record-clear' }).then(syncRecordingState);
+      if (clearBtn.disabled) return;
+      clearBtn.disabled = true;
+      clearBtn.classList?.add('is-busy');
+      clearBtn.title = 'Clearing log...';
+      sendBridgeMessage({ kind: 'record-clear' })
+        .then(() => {
+          exportBtn.hidden = true;
+          clearBtn.hidden = true;
+          if (exportBtn.style) exportBtn.style.display = 'none';
+          if (clearBtn.style) clearBtn.style.display = 'none';
+          syncRecordingState();
+        })
+        .catch((err) => {
+          handleContextInvalidated(err);
+        })
+        .finally(() => {
+          clearBtn.disabled = false;
+          clearBtn.classList?.remove('is-busy');
+        });
     });
 
     const parent = doc.body || doc.documentElement;

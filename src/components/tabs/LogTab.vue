@@ -6,6 +6,7 @@ import {
   createConfigExportPayload,
   createFullDataExportPayload,
   prepareImportUpdates,
+  executeStoragePrune,
 } from '@/src/utils/dataBackup';
 
 const { logs, filteredLogs, search, sort, error, busy, control } = useRecorder();
@@ -18,8 +19,35 @@ async function exportLogs() {
 // Backup & Restore state
 const overwriteExisting = ref(true);
 const importStatus = ref<{ type: 'success' | 'error'; message: string } | null>(null);
+const pruneStatus = ref<{ type: 'success' | 'error'; message: string; details?: string[] } | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const isExporting = ref(false);
+const isPruning = ref(false);
+
+async function handlePruneStorage() {
+  if (isPruning.value) return;
+  isPruning.value = true;
+  pruneStatus.value = null;
+  try {
+    const summary = await executeStoragePrune();
+    const total = summary.totalPrunedKeys;
+    const itemsText = total === 1 ? '1 item' : `${total} items`;
+    pruneStatus.value = {
+      type: 'success',
+      message: total > 0
+        ? `Cleaned ${itemsText} from local storage (${summary.removedInteractions} interactions, ${summary.removedLegacyKeys} legacy keys, ${summary.trimmedLogEntries} log entries trimmed).`
+        : 'Storage is already clean. No obsolete or bloated items found.',
+      details: summary.details,
+    };
+  } catch (err: any) {
+    pruneStatus.value = {
+      type: 'error',
+      message: `Prune failed: ${err?.message || err}`,
+    };
+  } finally {
+    isPruning.value = false;
+  }
+}
 
 async function exportConfig() {
   isExporting.value = true;
@@ -153,6 +181,18 @@ async function handleFileSelect(event: Event) {
             <span>📦</span>
             <span>Export All Data</span>
           </button>
+
+          <!-- Prune Storage Button -->
+          <button
+            type="button"
+            id="prune-storage-btn"
+            class="cursor-pointer px-3 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-xs font-semibold text-amber-800 dark:text-amber-200 transition-colors flex items-center gap-1.5 shadow-2xs"
+            :disabled="isPruning || isExporting"
+            @click="handlePruneStorage"
+          >
+            <span>🧹</span>
+            <span>{{ isPruning ? 'Pruning...' : 'Prune Old Data' }}</span>
+          </button>
         </div>
 
         <!-- Import Group -->
@@ -209,6 +249,30 @@ async function handleFileSelect(event: Event) {
           type="button"
           class="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold px-1"
           @click="importStatus = null"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Prune Storage Feedback Alert Banner -->
+      <div
+        v-if="pruneStatus"
+        id="prune-status-banner"
+        class="rounded-lg p-2.5 text-xs flex items-center justify-between gap-2 border"
+        :class="
+          pruneStatus.type === 'success'
+            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+            : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+        "
+      >
+        <div class="flex items-center gap-2">
+          <span>{{ pruneStatus.type === 'success' ? '🧹' : '⚠️' }}</span>
+          <span class="font-medium">{{ pruneStatus.message }}</span>
+        </div>
+        <button
+          type="button"
+          class="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold px-1"
+          @click="pruneStatus = null"
         >
           ✕
         </button>
