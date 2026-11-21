@@ -90,14 +90,22 @@ test('campaign soul stone missions: isMissionRaidable and getMissionTries evalua
   assert.equal(isMissionRaidable(1, missionProgressMap, { disabledIds }), false);
 });
 
-test('HeroDetailModal template includes Soul Stone Farm add button and triggers campaign soul modal', () => {
+test('HeroDetailModal template includes Soul Stone Farm add button conditionally when farmable', () => {
   const filePath = path.resolve(__dirname, '../src/components/dialogs/HeroDetailModal.vue');
   const content = fs.readFileSync(filePath, 'utf8');
 
-  // Verify button exists with correct ID and title
+  // Verify button exists with correct ID and conditional check
   assert.ok(
     content.includes('id="btn-farm-soul-stone"'),
     'HeroDetailModal should contain #btn-farm-soul-stone'
+  );
+  assert.ok(
+    content.includes('v-if="canFarmSoulStones"'),
+    'HeroDetailModal should conditionally show #btn-farm-soul-stone with v-if="canFarmSoulStones"'
+  );
+  assert.ok(
+    content.includes('canFarmSoulStones = computed('),
+    'HeroDetailModal should define canFarmSoulStones computed property'
   );
   assert.ok(
     content.includes('handleSoulStoneFarm'),
@@ -111,6 +119,14 @@ test('HeroDetailModal template includes Soul Stone Farm add button and triggers 
     content.includes("emit('openCampaignSoul'"),
     'HeroDetailModal should emit openCampaignSoul event'
   );
+
+  // Verify getHeroSoulMissions correctly identifies farmable vs non-farmable heroes
+  const pickerData = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../src/data/campaign-picker.json'), 'utf8'));
+  const farmableHero = getHeroSoulMissions(1, pickerData.missions);
+  assert.ok(Array.isArray(farmableHero) && farmableHero.length > 0, 'Hero 1 should have farmable missions');
+
+  const nonFarmableHero = getHeroSoulMissions(99999, pickerData.missions);
+  assert.ok(Array.isArray(nonFarmableHero) && nonFarmableHero.length === 0, 'Hero 99999 should not have farmable missions');
 });
 
 test('CampaignRaidModal template includes Soul Stones mode tab, Raid All button, and fragmentHero drops', () => {

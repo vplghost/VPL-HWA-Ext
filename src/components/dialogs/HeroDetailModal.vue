@@ -20,6 +20,8 @@ import {
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { getSkillPoints, getGold } from '@/src/utils/resourceData';
+import pickerData from '@/src/data/campaign-picker.json';
+import { getHeroSoulMissions } from '@/src/data/campaignData';
 import {
   getArtifactUpgradePlan,
   type ArtifactUpgradePlan,
@@ -154,6 +156,11 @@ const equipmentRank = computed(() => {
 const soulProgress = computed(() => {
   if (!activeHero.value) return null;
   return getHeroSoulProgress(currentHeroId.value, activeHero.value, cache.value?.inventoryGet?.data);
+});
+
+const canFarmSoulStones = computed(() => {
+  if (!currentHeroId.value) return false;
+  return getHeroSoulMissions(currentHeroId.value, pickerData?.missions).length > 0;
 });
 
 // Skills
@@ -927,6 +934,7 @@ function handleSoulStoneFarm() {
                     <span>Soul Stones:</span>
                     <div class="flex items-center gap-1.5">
                       <button
+                        v-if="canFarmSoulStones"
                         type="button"
                         id="btn-farm-soul-stone"
                         class="cursor-pointer inline-flex items-center justify-center w-4 h-4 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-900/60 dark:hover:bg-amber-800 dark:text-amber-200 text-3xs font-bold transition-colors shadow-2xs"
