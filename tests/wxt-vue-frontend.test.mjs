@@ -1367,6 +1367,19 @@ test('Tower auto button hides and tower chest quests are marked unfulfillable wh
   assert.match(questsTab, /Cannot Perform Today \(Tower Cleared\)/, 'QuestsTab must render Cannot Perform Today section');
 });
 
+test('HeroDetailModal includes hero skins overview and smart leveling with auto-chest opening', async () => {
+  const content = await readFile(join(root, 'src/components/dialogs/HeroDetailModal.vue'), 'utf8');
+  assert.match(content, /detailedSkins/, 'HeroDetailModal must compute detailedSkins');
+  assert.match(content, /getHeroSkinsDetailed/, 'HeroDetailModal must import and call getHeroSkinsDetailed');
+  assert.match(content, /name:\s*['"]skin_upgrade['"]/, 'HeroDetailModal must dispatch skin_upgrade RPC');
+  assert.match(content, /name:\s*['"]inventory_use['"]/, 'HeroDetailModal must support auto-chest opening via inventory_use');
+  assert.match(content, /upgradeSkin/, 'HeroDetailModal must implement upgradeSkin handler');
+  assert.match(content, /👘.*Skins/, 'HeroDetailModal must display Skins section header');
+  assert.match(content, /\+1/, 'HeroDetailModal must provide +1 upgrade button');
+  assert.match(content, /→\s*\{\{\s*skin\.plan\.targetNextTen\s*\}\}/, 'HeroDetailModal must provide button to target next 10 milestone');
+  assert.match(content, /skin\.plan\.isMax/, 'HeroDetailModal must display max level indicator when skin is maxed');
+});
+
 
 
 

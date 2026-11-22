@@ -26,6 +26,12 @@ import {
   getArtifactUpgradePlan,
   type ArtifactUpgradePlan,
 } from '@/src/utils/artifactHelper';
+import {
+  getHeroSkinsDetailed,
+  getHeroMainStat,
+  getSkinStoneInfo,
+  type HeroSkinDetailedItem,
+} from '@/src/utils/skinHelper';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -562,6 +568,111 @@ async function upgradeArtifactWithChests(slotId: number) {
     upgradingArtifactSlot.value = null;
     upgradingArtifactAction.value = null;
     isUpgradingArtifact.value = false;
+  }
+}
+
+// Skins
+function getAssetUrl(file?: string): string {
+  if (!file) return '';
+  if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+    return chrome.runtime.getURL(file);
+  }
+  return file;
+}
+
+const inventoryCoins = computed<Record<string | number, number>>(() => {
+  return cache.value?.inventoryGet?.data?.coin || cache.value?.userGetInfo?.data?.coin || {};
+});
+
+const heroMainStat = computed(() => getHeroMainStat(currentHeroId.value));
+const skinStoneInfo = computed(() => getSkinStoneInfo(heroMainStat.value));
+const ownedSkinStones = computed(() => Number(inventoryCoins.value?.[skinStoneInfo.value.coinId]) || 0);
+const ownedLargeSkinChests = computed(() => Number(inventoryConsumables.value?.[65]) || 0);
+const ownedSmallSkinChests = computed(() => Number(inventoryConsumables.value?.[51]) || 0);
+
+const detailedSkins = computed<HeroSkinDetailedItem[]>(() => {
+  return getHeroSkinsDetailed(
+    currentHeroId.value,
+    activeHero.value,
+    inventoryCoins.value,
+    inventoryConsumables.value
+  );
+});
+
+const isUpgradingSkin = ref(false);
+const upgradingSkinId = ref<number | null>(null);
+const upgradingSkinAction = ref<'single' | 'ten' | 'tenPlus10' | null>(null);
+const skinActionError = ref<string | null>(null);
+
+async function upgradeSkin(skin: HeroSkinDetailedItem, targetLevel: number, actionType: 'single' | 'ten' | 'tenPlus10') {
+  if (isUpgradingSkin.value || !activeHero.value) return;
+  const numHeroId = Number(currentHeroId.value);
+  if (!numHeroId) return;
+
+  const plan = actionType === 'single'
+    ? skin.plan.singlePlan
+    : actionType === 'ten'
+    ? skin.plan.nextTenPlan
+    : skin.plan.nextTenPlus10Plan;
+
+  if (!plan.canAfford || targetLevel <= skin.level) return;
+
+  const delta = targetLevel - skin.level;
+  if (delta <= 0) return;
+
+  isUpgradingSkin.value = true;
+  upgradingSkinId.value = skin.id;
+  upgradingSkinAction.value = actionType;
+  skinActionError.value = null;
+
+  try {
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+
+    // 1. Open Large Chests (libId 65) if needed
+    if (plan.openLargeCount > 0) {
+      calls.push({
+        name: 'inventory_use',
+        args: {
+          libId: 65,
+          amount: plan.openLargeCount,
+          params: { choice: plan.choiceIndex }
+        }
+      });
+    }
+
+    // 2. Open Small Chests (libId 51) if needed
+    if (plan.openSmallCount > 0) {
+      calls.push({
+        name: 'inventory_use',
+        args: {
+          libId: 51,
+          amount: plan.openSmallCount,
+          params: { choice: plan.choiceIndex }
+        }
+      });
+    }
+
+    // 3. Upgrade skin levels
+    for (let i = 0; i < delta; i++) {
+      calls.push({
+        name: 'skin_upgrade',
+        args: { unitId: numHeroId, skinId: skin.id }
+      });
+    }
+
+    // 4. Synchronize state
+    calls.push({ name: 'heroGetAll' });
+    calls.push({ name: 'inventoryGet' });
+    calls.push({ name: 'userGetInfo' });
+
+    await dispatchRpc(calls);
+  } catch (err: any) {
+    console.error('Failed to upgrade hero skin:', err);
+    skinActionError.value = err?.message || 'Failed to upgrade hero skin';
+  } finally {
+    isUpgradingSkin.value = false;
+    upgradingSkinId.value = null;
+    upgradingSkinAction.value = null;
   }
 }
 
@@ -1350,7 +1461,186 @@ function handleSoulStoneFarm() {
             </div>
           </div>
 
-          <!-- 4. Equipment Slots & Campaign Farm Section -->
+          <!-- 4. Skins Section -->
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <span>👘</span> Skins
+                  <span class="text-xs font-semibold text-slate-400">({{ detailedSkins.length }})</span>
+                </h4>
+                <div class="text-2xs text-slate-400 dark:text-slate-500">
+                  Enhance stats with skin stones and auto-chest opening
+                </div>
+              </div>
+
+              <!-- Resource summary bar: Skin stones and Chests -->
+              <div class="flex items-center gap-3 text-2xs bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60 flex-wrap">
+                <!-- Direct Skin Stones -->
+                <div class="flex items-center gap-1.5" :title="`${skinStoneInfo.name}: ${formatNumber(ownedSkinStones)}`">
+                  <img :src="getAssetUrl(skinStoneInfo.icon)" :alt="skinStoneInfo.name" class="size-4.5 object-contain" />
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedSkinStones) }}</span>
+                </div>
+
+                <span class="text-slate-300 dark:text-slate-600">|</span>
+
+                <!-- Large Skin Stone Chest (65) -->
+                <div class="flex items-center gap-1" :title="`Large Skin Stone Chest (150 stones each): ${formatNumber(ownedLargeSkinChests)}`">
+                  <img :src="getAssetUrl('assets/items/consumable/65.png')" alt="Large Skin Stone Chest" class="size-4.5 object-contain" />
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedLargeSkinChests) }}</span>
+                </div>
+
+                <!-- Skin Stone Chest (51) -->
+                <div class="flex items-center gap-1" :title="`Skin Stone Chest (150 stones each): ${formatNumber(ownedSmallSkinChests)}`">
+                  <img :src="getAssetUrl('assets/items/consumable/51.png')" alt="Skin Stone Chest" class="size-4.5 object-contain" />
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedSmallSkinChests) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Error banner if any -->
+            <div v-if="skinActionError" class="p-2 rounded bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 text-xs flex items-center justify-between">
+              <span>⚠️ {{ skinActionError }}</span>
+              <button type="button" class="text-2xs underline cursor-pointer ml-2" @click="skinActionError = null">Dismiss</button>
+            </div>
+
+            <!-- Empty state -->
+            <div v-if="detailedSkins.length === 0" class="text-center py-6 text-xs text-slate-400 dark:text-slate-500 italic">
+              No skins unlocked for this hero.
+            </div>
+
+            <!-- Skins Cards Grid -->
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div
+                v-for="skin in detailedSkins"
+                :key="skin.id"
+                class="rounded-lg border p-2.5 flex flex-col justify-between transition-all bg-slate-50/70 border-slate-200 dark:bg-slate-900/40 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+              >
+                <!-- Skin Header & Badges -->
+                <div class="space-y-1.5 mb-2">
+                  <div class="flex items-center justify-between gap-1.5">
+                    <div class="font-bold text-xs text-slate-800 dark:text-slate-100 truncate" :title="skin.name">
+                      {{ skin.name }}
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <span
+                        v-if="skin.isCurrent"
+                        class="text-3xs px-1.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                      >
+                        Active
+                      </span>
+                      <span
+                        v-if="skin.isDefault"
+                        class="text-3xs px-1.5 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                      >
+                        Default
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Level and Stat -->
+                  <div class="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400">
+                    <span class="font-bold text-slate-700 dark:text-slate-300">Lv. {{ skin.level }} / {{ skin.maxLevel }}</span>
+                    <span class="text-indigo-600 dark:text-indigo-400 font-medium">{{ skin.statLabel }}</span>
+                  </div>
+
+                  <!-- Level Progress Bar -->
+                  <div class="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
+                      :style="{ width: `${Math.min(100, (skin.level / skin.maxLevel) * 100)}%` }"
+                    ></div>
+                  </div>
+                </div>
+
+                <!-- Action Buttons / Max Level -->
+                <div v-if="skin.plan.isMax" class="text-center py-1.5 text-2xs font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/30 rounded border border-amber-200 dark:border-amber-900/40">
+                  ★ MAX LEVEL ({{ skin.maxLevel }}) ★
+                </div>
+
+                <div
+                  v-else
+                  class="grid gap-1.5 pt-1 border-t border-slate-200 dark:border-slate-800/80"
+                  :class="skin.plan.targetNextTen < skin.maxLevel ? 'grid-cols-3' : 'grid-cols-2'"
+                >
+                  <!-- Button +1 -->
+                  <button
+                    type="button"
+                    :disabled="isUpgradingSkin || !skin.plan.singlePlan.canAfford"
+                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    :class="[
+                      skin.plan.singlePlan.canAfford
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700 dark:border-emerald-500'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700',
+                      isUpgradingSkin ? 'pointer-events-none' : '',
+                      upgradingSkinId === skin.id && upgradingSkinAction === 'single' ? 'ring-2 ring-emerald-400 opacity-90' : ''
+                    ]"
+                    :title="`Upgrade +1 Level. Cost: ${formatNumber(skin.plan.costSingle)} stones${skin.plan.singlePlan.totalChestsToOpen > 0 ? ` (opens ${skin.plan.singlePlan.totalChestsToOpen} chest${skin.plan.singlePlan.totalChestsToOpen > 1 ? 's' : ''})` : ''}`"
+                    @click="upgradeSkin(skin, skin.plan.targetSingle, 'single')"
+                  >
+                    <div class="flex items-center gap-0.5">
+                      <span v-if="upgradingSkinId === skin.id && upgradingSkinAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                      <span v-else>+1</span>
+                    </div>
+                    <span class="text-3xs font-normal opacity-90">
+                      ({{ formatNumber(skin.plan.costSingle) }}<span v-if="skin.plan.singlePlan.totalChestsToOpen > 0"> 🎁{{ skin.plan.singlePlan.totalChestsToOpen }}</span>)
+                    </span>
+                  </button>
+
+                  <!-- Button -> Next Ten (e.g. -> 10, -> 20, -> 30) -->
+                  <button
+                    type="button"
+                    :disabled="isUpgradingSkin || !skin.plan.nextTenPlan.canAfford"
+                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    :class="[
+                      skin.plan.nextTenPlan.canAfford
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-700 dark:border-amber-500'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700',
+                      isUpgradingSkin ? 'pointer-events-none' : '',
+                      upgradingSkinId === skin.id && upgradingSkinAction === 'ten' ? 'ring-2 ring-amber-400 opacity-90' : ''
+                    ]"
+                    :title="`Upgrade to Lv. ${skin.plan.targetNextTen} (+${skin.plan.targetNextTen - skin.level} lvls). Cost: ${formatNumber(skin.plan.costNextTen)} stones${skin.plan.nextTenPlan.totalChestsToOpen > 0 ? ` (opens ${skin.plan.nextTenPlan.totalChestsToOpen} chest${skin.plan.nextTenPlan.totalChestsToOpen > 1 ? 's' : ''})` : ''}`"
+                    @click="upgradeSkin(skin, skin.plan.targetNextTen, 'ten')"
+                  >
+                    <div class="flex items-center gap-0.5">
+                      <span v-if="upgradingSkinId === skin.id && upgradingSkinAction === 'ten'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                      <span v-else>→ {{ skin.plan.targetNextTen }}</span>
+                    </div>
+                    <span class="text-3xs font-normal opacity-90">
+                      ({{ formatNumber(skin.plan.costNextTen) }}<span v-if="skin.plan.nextTenPlan.totalChestsToOpen > 0"> 🎁{{ skin.plan.nextTenPlan.totalChestsToOpen }}</span>)
+                    </span>
+                  </button>
+
+                  <!-- Button -> Next Ten + 10 (e.g. -> 20, -> 30, -> 40) -->
+                  <button
+                    v-if="skin.plan.targetNextTen < skin.maxLevel"
+                    type="button"
+                    :disabled="isUpgradingSkin || !skin.plan.nextTenPlus10Plan.canAfford"
+                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    :class="[
+                      skin.plan.nextTenPlus10Plan.canAfford
+                        ? 'bg-purple-600 hover:bg-purple-500 text-white border-purple-700 dark:border-purple-500'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700',
+                      isUpgradingSkin ? 'pointer-events-none' : '',
+                      upgradingSkinId === skin.id && upgradingSkinAction === 'tenPlus10' ? 'ring-2 ring-purple-400 opacity-90' : ''
+                    ]"
+                    :title="`Upgrade to Lv. ${skin.plan.targetNextTenPlus10} (+${skin.plan.targetNextTenPlus10 - skin.level} lvls). Cost: ${formatNumber(skin.plan.costNextTenPlus10)} stones${skin.plan.nextTenPlus10Plan.totalChestsToOpen > 0 ? ` (opens ${skin.plan.nextTenPlus10Plan.totalChestsToOpen} chest${skin.plan.nextTenPlus10Plan.totalChestsToOpen > 1 ? 's' : ''})` : ''}`"
+                    @click="upgradeSkin(skin, skin.plan.targetNextTenPlus10, 'tenPlus10')"
+                  >
+                    <div class="flex items-center gap-0.5">
+                      <span v-if="upgradingSkinId === skin.id && upgradingSkinAction === 'tenPlus10'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                      <span v-else>→ {{ skin.plan.targetNextTenPlus10 }}</span>
+                    </div>
+                    <span class="text-3xs font-normal opacity-90">
+                      ({{ formatNumber(skin.plan.costNextTenPlus10) }}<span v-if="skin.plan.nextTenPlus10Plan.totalChestsToOpen > 0"> 🎁{{ skin.plan.nextTenPlus10Plan.totalChestsToOpen }}</span>)
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Equipment Slots & Campaign Farm Section -->
           <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div>
