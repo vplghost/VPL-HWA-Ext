@@ -50,11 +50,13 @@ export const DUAL_ELEMENT_TITANS: Record<string, number[]> = {
 export const DUNGEON_SAVED_LINEUPS_KEY = 'dungeonSavedLineups';
 
 /**
- * Checks if a titan ID is eligible for a given door element (Water, Fire, Earth, Mixed).
+ * Checks if a titan ID is eligible for a given door element (Water, Fire, Earth, Neutral).
+ * Server official naming for multi-element doors is "neutral" (attackerType: "neutral").
+ * Also accepts "mixed" for backwards compatibility.
  */
 export function isTitanEligibleForDoor(titanId: number, element: string, titanMetadata?: any): boolean {
   const normElem = element.toLowerCase();
-  if (normElem === 'mixed' || !normElem) return true;
+  if (normElem === 'neutral' || normElem === 'mixed' || !normElem) return true;
 
   // Dual-element titans allowed in specific elemental doors
   if (DUAL_ELEMENT_TITANS[normElem]?.includes(titanId)) return true;

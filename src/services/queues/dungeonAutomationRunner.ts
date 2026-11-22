@@ -45,10 +45,10 @@ export function resolveSquadForDoor(
   }
 ): number[] {
   const normElem = doorElement.toLowerCase();
-  const elemKey = (normElem === 'water' || normElem === 'fire' || normElem === 'earth') ? normElem : 'mixed';
+  const elemKey = (normElem === 'water' || normElem === 'fire' || normElem === 'earth') ? normElem : 'neutral';
 
   // 1. Saved lineup
-  const saved = options.savedLineups?.[elemKey];
+  const saved = options.savedLineups?.[elemKey] || (elemKey === 'neutral' ? options.savedLineups?.['mixed'] : null);
   if (Array.isArray(saved) && saved.length > 0) {
     const aliveAndEligible = saved
       .map(Number)
@@ -74,7 +74,7 @@ export function resolveSquadForDoor(
 
   // 3. Server Saved Team
   const serverTeams = options.cache?.teamGetAll?.data || {};
-  const serverCandidate = serverTeams[`dungeon_${elemKey}`] || (elemKey === 'mixed' ? serverTeams['dungeon'] : null);
+  const serverCandidate = serverTeams[`dungeon_${elemKey}`] || (elemKey === 'neutral' ? (serverTeams['dungeon_neutral'] || serverTeams['dungeon'] || serverTeams['dungeon_mixed']) : null);
   if (Array.isArray(serverCandidate) && serverCandidate.length > 0) {
     const ids = serverCandidate
       .map(Number)
@@ -85,7 +85,7 @@ export function resolveSquadForDoor(
   }
 
   // 4. Default Pool fallback
-  const pool = DEFAULT_TITAN_POOLS[elemKey] || DEFAULT_TITAN_POOLS.mixed;
+  const pool = DEFAULT_TITAN_POOLS[elemKey] || DEFAULT_TITAN_POOLS.neutral || DEFAULT_TITAN_POOLS.mixed;
   const picked = pool
     .map(Number)
     .filter((id) => !states[String(id)]?.isDead && isTitanEligibleForDoor(id, doorElement, getTitanMetadata(id)));
@@ -136,7 +136,7 @@ export async function executeDungeonAutomationStep(
   for (let idx = 0; idx < doors.length; idx++) {
     const door = doors[idx];
     const rawElem = door?.attackerType || door?.element || '';
-    let doorElement = 'Mixed';
+    let doorElement = 'Neutral';
     if (/water/i.test(rawElem)) doorElement = 'Water';
     else if (/fire/i.test(rawElem)) doorElement = 'Fire';
     else if (/earth/i.test(rawElem)) doorElement = 'Earth';
@@ -251,10 +251,16 @@ export async function executeDungeonAutomationStep(
   // 5. Refresh dungeon status
   await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
 
+  const rawAttacker = bestDoor.door?.attackerType || bestDoor.door?.element || '';
+  let doorElem = 'Neutral';
+  if (/water/i.test(rawAttacker)) doorElem = 'Water';
+  else if (/fire/i.test(rawAttacker)) doorElem = 'Fire';
+  else if (/earth/i.test(rawAttacker)) doorElem = 'Earth';
+
   return {
     floorPassed: floorNumber,
     doorIdx: bestDoor.doorIdx,
-    doorElement: bestDoor.door?.attackerType || bestDoor.door?.element || 'Mixed',
+    doorElement: doorElem,
     chosenEvaluation: bestDoor,
     evaluations,
   };

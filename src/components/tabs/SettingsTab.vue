@@ -19,6 +19,11 @@ const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab, gameEn
 const engine = computed(() => engineDiagnostics(gameEngineStatus.value));
 const enginePingMessage = ref('');
 const enginePingPending = ref(false);
+const wasmTestPending = ref(false);
+const wasmTestResult = ref<any>(null);
+const wasmTestError = ref<string | null>(null);
+const wasmTestErrorDetail = ref<any>(null);
+const showWasmDiagnostics = ref(false);
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
 
@@ -79,6 +84,28 @@ async function pingEngine() {
     await checkStatus();
   } catch (cause) { enginePingMessage.value = String(cause); }
   finally { enginePingPending.value = false; }
+}
+
+async function testWasmEngine() {
+  wasmTestPending.value = true;
+  wasmTestResult.value = null;
+  wasmTestError.value = null;
+  wasmTestErrorDetail.value = null;
+  showWasmDiagnostics.value = false;
+  try {
+    const response = await chrome.runtime.sendMessage({ kind: 'test-wasm-engine' });
+    if (!response) throw new Error('No response from game tab or extension background.');
+    if (response.ok && response.result) {
+      wasmTestResult.value = response.result;
+    } else {
+      wasmTestError.value = response.error || 'WASM engine diagnostic probe failed.';
+      if (response.errorDetail) wasmTestErrorDetail.value = response.errorDetail;
+    }
+  } catch (cause: any) {
+    wasmTestError.value = cause?.message || String(cause);
+  } finally {
+    wasmTestPending.value = false;
+  }
 }
 
 const dispatchMode = ref<'piggyback' | 'direct'>('direct');
@@ -707,8 +734,46 @@ async function toggleRecording() {
         <dt>RPC authentication headers</dt><dd id="engine-rpc-headers">{{ engine.rpcHeaders }}</dd>
         <dt>Game tab extension version</dt><dd>{{ gameEngineStatus?.extensionVersion || 'Unknown' }}</dd>
       </dl>
-      <button id="btn-ping-engine" type="button" :disabled="enginePingPending" @click="pingEngine" class="rounded-lg px-3 py-1.5 bg-indigo-600 text-white disabled:opacity-50">Ping Engine</button>
-      <p id="engine-ping-result" role="status" class="text-slate-500">{{ enginePingMessage }}</p>
+      <div class="flex items-center gap-2 pt-1">
+        <button id="btn-ping-engine" type="button" :disabled="enginePingPending" @click="pingEngine" class="cursor-pointer rounded-lg px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 text-xs font-semibold transition-colors">Ping Engine</button>
+        <button id="btn-test-wasm-engine" type="button" :disabled="wasmTestPending" @click="testWasmEngine" class="cursor-pointer rounded-lg px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 text-xs font-semibold transition-colors">Test WASM Engine</button>
+      </div>
+      <p v-if="enginePingMessage" id="engine-ping-result" role="status" class="text-slate-500 text-xs font-mono">{{ enginePingMessage }}</p>
+
+      <!-- WASM Diagnostic Probe Results -->
+      <div v-if="wasmTestResult || wasmTestError" id="engine-wasm-test-container" class="mt-2 space-y-1.5 text-xs">
+        <div v-if="wasmTestResult" class="p-2.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <div class="font-bold flex items-center gap-1.5">
+            <span>✅</span> WASM Engine Diagnostics PASSED
+          </div>
+          <div class="font-mono text-[11px] mt-1 space-y-0.5">
+            <div>Table size: {{ wasmTestResult.tableSize }} · Memory: {{ wasmTestResult.memorySizeMb }} MB</div>
+            <div>String roundtrip: "{{ wasmTestResult.sampleString }}"</div>
+            <div>Verified symbols ({{ wasmTestResult.verifiedSymbolsCount }}): {{ wasmTestResult.verifiedSymbols?.join(', ') }}</div>
+          </div>
+        </div>
+
+        <div v-if="wasmTestError" class="p-2.5 rounded-lg border border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200 space-y-1.5">
+          <div class="font-bold flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><span>⚠️</span> WASM Engine Test Failed</span>
+            <button
+              v-if="wasmTestErrorDetail"
+              type="button"
+              class="cursor-pointer px-2 py-0.5 rounded border border-rose-300 dark:border-rose-700 bg-white/60 dark:bg-slate-900/60 hover:bg-white text-[10px] font-semibold"
+              @click="showWasmDiagnostics = !showWasmDiagnostics"
+            >
+              {{ showWasmDiagnostics ? 'Ẩn chi tiết' : 'Xem chẩn đoán' }}
+            </button>
+          </div>
+          <p id="engine-wasm-test-result" class="font-mono text-[11px] break-words">{{ wasmTestError }}</p>
+          <div v-if="showWasmDiagnostics && wasmTestErrorDetail" class="bg-black/85 text-emerald-300 p-2 rounded font-mono text-[10px] leading-relaxed overflow-x-auto max-h-36 border border-black/40">
+            <div>Phase: {{ wasmTestErrorDetail.phase }}</div>
+            <div>Kind: {{ wasmTestErrorDetail.kind }}</div>
+            <div v-if="wasmTestErrorDetail.context" class="mt-0.5">Context: {{ JSON.stringify(wasmTestErrorDetail.context) }}</div>
+            <div v-if="wasmTestErrorDetail.stack" class="text-slate-400 mt-1 whitespace-pre">{{ wasmTestErrorDetail.stack }}</div>
+          </div>
+        </div>
+      </div>
     </section>
     <!-- Session Profiling & Recording -->
     <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs">

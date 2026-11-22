@@ -856,7 +856,127 @@ export function installInterceptor(customWindow?: any): void {
         try { if (hPresets) invoke('GCHandle_FreeHandle', hPresets); } catch (_) {}
       }
     };
+    win.__hwaTestWasmEngine = testWasmEngineProbe;
   }
+
+  async function testWasmEngineProbe(targetInst?: any) {
+    let currentPhase = 'INIT_BRIDGE';
+    try {
+      const activeInst = targetInst || activeUnityInstance || findActiveUnityInstance(win, doc);
+      if (!activeInst) {
+        throw new Error('Unity game instance not found. Make sure the game is loaded in this tab.');
+      }
+
+      currentPhase = 'INSPECT_MODULE';
+      const mod = activeInst?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule || activeInst;
+      const asm = mod?.asm || mod;
+      if (!asm) {
+        throw new Error('Unity WebAssembly asm not found in game engine instance');
+      }
+
+      const values = Object.values(asm);
+      const table = (values.find((v: any) => v instanceof WebAssembly.Table) || (mod as any).wasmTable) as WebAssembly.Table | undefined;
+      const memory = (values.find((v: any) => v instanceof WebAssembly.Memory) || (mod as any).wasmMemory) as WebAssembly.Memory | undefined;
+
+      if (!table || !memory) {
+        throw new Error('WASM table or memory not accessible in Unity engine');
+      }
+
+      currentPhase = 'MEMORY_PRIMITIVES';
+      const malloc = (asm as any).Ol || (asm as any).malloc || (asm as any)._malloc;
+      const free = (asm as any).Pl || (asm as any).free || (asm as any)._free;
+      if (typeof malloc !== 'function' || typeof free !== 'function') {
+        throw new Error('WASM malloc/free memory primitives not found');
+      }
+
+      const heap = {
+        buffer: memory.buffer,
+        u8: new Uint8Array(memory.buffer),
+        u16: new Uint16Array(memory.buffer),
+        i32: new Int32Array(memory.buffer),
+        u32: new Uint32Array(memory.buffer)
+      };
+
+      // Read string from IL2CPP System.String pointer
+      const readString = (ptr: number): string | null => {
+        if (!ptr) return null;
+        const len = heap.i32[(ptr + 8) >>> 2];
+        if (len < 0 || len > 2000000) return null;
+        const u16Start = (ptr + 12) >>> 1;
+        let s = '';
+        for (let i = 0; i < len; i += 8192) {
+          s += String.fromCharCode.apply(null, Array.from(heap.u16.subarray(u16Start + i, u16Start + Math.min(len, i + 8192))));
+        }
+        return s;
+      };
+
+      currentPhase = 'STRING_ROUNDTRIP';
+      const sampleText = 'HWA_DIAGNOSTIC_' + Date.now();
+      const byteCount = 12 + (sampleText.length * 2) + 2;
+      const strPtr = malloc(byteCount) >>> 0;
+      if (!strPtr) {
+        throw new Error(`Failed to allocate ${byteCount} bytes in WASM heap for string diagnostic`);
+      }
+
+      let readBack: string | null = null;
+      try {
+        heap.i32[(strPtr + 8) >>> 2] = sampleText.length;
+        const u16Start = (strPtr + 12) >>> 1;
+        for (let i = 0; i < sampleText.length; i++) {
+          heap.u16[u16Start + i] = sampleText.charCodeAt(i);
+        }
+        heap.u16[u16Start + sampleText.length] = 0;
+
+        readBack = readString(strPtr);
+        if (readBack !== sampleText) {
+          throw new Error(`String roundtrip mismatch: expected "${sampleText}", got "${readBack}"`);
+        }
+      } finally {
+        try { free(strPtr); } catch (_) {}
+      }
+
+      currentPhase = 'VERIFY_TABLE_SYMBOLS';
+      const sym = {
+        Play_ctor: 11594,
+        Play_start: 469995,
+        Play_get_result: 469999,
+        Play_createBattleData: 175082,
+        Play_executeBattle: 175078,
+        Play_createResult: 175081,
+        Play_dispose: 175079,
+        BattleData_serializeResult: 49386,
+        JSON_Parse: 1763,
+        Object_ToString: 16323,
+      };
+      const verifiedSyms: string[] = [];
+      for (const [sName, sIdx] of Object.entries(sym)) {
+        if (sIdx < table.length) {
+          const fn = table.get(sIdx);
+          if (typeof fn === 'function') {
+            verifiedSyms.push(sName);
+          }
+        }
+      }
+
+      return {
+        ok: true,
+        tableSize: table.length,
+        memorySizeMb: Math.round(memory.buffer.byteLength / (1024 * 1024)),
+        sampleString: readBack,
+        verifiedSymbolsCount: verifiedSyms.length,
+        verifiedSymbols: verifiedSyms.slice(0, 5),
+        timestamp: new Date().toISOString()
+      };
+    } catch (err: any) {
+      const errorDetail = describeWasmException(err, currentPhase, { kind: 'diagnostic_probe' });
+      const enriched = new Error(errorDetail.message);
+      (enriched as any).errorDetail = errorDetail;
+      (enriched as any)._phase = currentPhase;
+      throw enriched;
+    }
+  }
+
+  win.__hwaTestWasmEngine = testWasmEngineProbe;
 
   function instrumentEngineMethod(instance: any, methodName: string, source: any) {
     try {
@@ -1229,6 +1349,33 @@ export function installInterceptor(customWindow?: any): void {
             source: 'hwa-helper-api',
             kind: 'simulate-battle-result',
             simId,
+            ok: false,
+            error: detail.message || err?.message || String(err),
+            errorDetail: detail
+          }, loc.origin);
+        }
+      })();
+      return;
+    }
+
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'test-wasm-engine') {
+      const testId = event.data.testId;
+      (async () => {
+        try {
+          const result = await testWasmEngineProbe();
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'test-wasm-engine-result',
+            testId,
+            ok: true,
+            result
+          }, loc.origin);
+        } catch (err: any) {
+          const detail = (err as any)?.errorDetail || describeWasmException(err, (err as any)?._phase || 'TEST_WASM_ENGINE', { kind: 'diagnostic_probe' });
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'test-wasm-engine-result',
+            testId,
             ok: false,
             error: detail.message || err?.message || String(err),
             errorDetail: detail

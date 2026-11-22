@@ -31,7 +31,8 @@ const emit = defineEmits<{
 }>();
 
 const { cache, dispatchRpc } = useRpcCache();
-const { customTeams } = useAccountTeams();
+const accountId = computed(() => cache.value.accountStatus?.data?.id || cache.value.userGetInfo?.data?.id);
+const { customTeams } = useAccountTeams(accountId);
 
 const selectedTitanIds = ref<number[]>([]);
 const isSimulating = ref(false);
@@ -56,10 +57,9 @@ interface TeamPresetOption {
 const availableTeamPresets = computed<TeamPresetOption[]>(() => {
   const list: TeamPresetOption[] = [];
   const elemKey = doorElementKey.value;
-  const isMixed = isMixedDoor.value;
 
   // 1. Saved lineup for this element
-  const saved = savedLineups.value[elemKey];
+  const saved = savedLineups.value[elemKey] || (elemKey === 'neutral' ? savedLineups.value['mixed'] : null);
   if (Array.isArray(saved) && saved.length > 0) {
     const ids = saved.map(Number);
     const eligibleCount = ids.filter((id) => isTitanEligibleForDoor(id, doorElement.value, getTitanMetadata(id))).length;
@@ -72,11 +72,31 @@ const availableTeamPresets = computed<TeamPresetOption[]>(() => {
     });
   }
 
-  // 2. Server teams (teamGetAll)
+  // 2. Custom Titan Teams (from useAccountTeams)
+  for (const ct of customTeams.value) {
+    const isTitanTeam = ct.type === 'titan' || ct.heroIds.some((id) => Number(id) >= 4000);
+    if (!isTitanTeam) continue;
+    const ids = ct.heroIds.map(Number);
+    const eligibleCount = ids.filter((id) => isTitanEligibleForDoor(id, doorElement.value, getTitanMetadata(id))).length;
+    if (eligibleCount > 0) {
+      list.push({
+        id: `custom_${ct.id}`,
+        label: `⚡ Custom: ${ct.name}`,
+        category: 'custom',
+        memberIds: ids,
+        eligibleCount,
+      });
+    }
+  }
+
+  // 3. Server teams (teamGetAll)
   const serverTeamsObj = cache.value.teamGetAll?.data || {};
   const serverKeys = [
     { key: `dungeon_${elemKey}`, label: `🏰 Server Dungeon (${doorElement.value})` },
-    { key: 'dungeon', label: '🏰 Server Dungeon (Mixed)' },
+    { key: 'dungeon_neutral', label: '🏰 Server Dungeon (Neutral)' },
+    { key: 'dungeon', label: '🏰 Server Dungeon (Default)' },
+    { key: 'champClanDefence_titans', label: '🛡️ Guild War Titan Defense' },
+    { key: 'titan_arena', label: '⚔️ Titan Arena Team' },
     { key: 'dungeon_water', label: '🏰 Server Water Team' },
     { key: 'dungeon_fire', label: '🏰 Server Fire Team' },
     { key: 'dungeon_earth', label: '🏰 Server Earth Team' },
@@ -101,23 +121,6 @@ const availableTeamPresets = computed<TeamPresetOption[]>(() => {
           });
         }
       }
-    }
-  }
-
-  // 3. Custom Titan Teams
-  for (const ct of customTeams.value) {
-    const isTitanTeam = ct.type === 'titan' || ct.heroIds.some((id) => Number(id) >= 4000);
-    if (!isTitanTeam) continue;
-    const ids = ct.heroIds.map(Number);
-    const eligibleCount = ids.filter((id) => isTitanEligibleForDoor(id, doorElement.value, getTitanMetadata(id))).length;
-    if (eligibleCount > 0) {
-      list.push({
-        id: `custom_${ct.id}`,
-        label: `⚡ ${ct.name}`,
-        category: 'custom',
-        memberIds: ids,
-        eligibleCount,
-      });
     }
   }
 
@@ -149,13 +152,14 @@ const doorElement = computed<string>(() => {
   if (/water/i.test(raw)) return 'Water';
   if (/fire/i.test(raw)) return 'Fire';
   if (/earth/i.test(raw)) return 'Earth';
-  return 'Mixed';
+  return 'Neutral';
 });
 
-const isMixedDoor = computed(() => doorElement.value === 'Mixed');
-const doorElementKey = computed<'water' | 'fire' | 'earth' | 'mixed'>(() => {
+const isNeutralDoor = computed(() => doorElement.value === 'Neutral');
+const isMixedDoor = isNeutralDoor; // backwards-compatible alias
+const doorElementKey = computed<'water' | 'fire' | 'earth' | 'neutral'>(() => {
   const el = doorElement.value.toLowerCase();
-  return (el === 'water' || el === 'fire' || el === 'earth') ? el : 'mixed';
+  return (el === 'water' || el === 'fire' || el === 'earth') ? el : 'neutral';
 });
 
 // Load persistent saved lineups from storage
@@ -172,10 +176,17 @@ async function loadSavedLineups() {
 
 // Persist accepted lineup for the door's element type
 async function persistAcceptedLineup(elemKey: string, lineup: number[]) {
-  savedLineups.value = {
+  const updated: Record<string, number[]> = {
     ...savedLineups.value,
     [elemKey]: [...lineup],
   };
+  // Cross-sync neutral and mixed for backwards compatibility
+  if (elemKey === 'neutral') {
+    updated.mixed = [...lineup];
+  } else if (elemKey === 'mixed') {
+    updated.neutral = [...lineup];
+  }
+  savedLineups.value = updated;
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     try {
       await chrome.storage.local.set({
@@ -228,8 +239,8 @@ const availableTitans = computed<SimTitanItem[]>(() => {
     const isSavedMatch = serverSaved.map(Number).includes(id);
 
     // Element restriction check:
-    // Mixed doors allow all. Elemental doors allow matching element, dual-element Elarites, or saved team members.
-    if (!isMixedDoor.value && normElem !== normDoor && !isDual && !isSavedMatch) {
+    // Neutral/Mixed doors allow all. Elemental doors allow matching element, dual-element Elarites, or saved team members.
+    if (!isNeutralDoor.value && !isMixedDoor.value && normElem !== normDoor && !isDual && !isSavedMatch) {
       continue;
     }
 
@@ -502,7 +513,7 @@ async function handleSubmitOfficial() {
                     'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300': doorElement === 'Earth',
                     'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300': doorElement === 'Water',
                     'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300': doorElement === 'Fire',
-                    'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300': doorElement === 'Mixed'
+                    'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300': doorElement === 'Neutral' || doorElement === 'Mixed'
                   }"
                 >
                   Required Element: {{ doorElement }}
@@ -644,17 +655,18 @@ async function handleSubmitOfficial() {
 
                   <div
                     v-if="showTeamDropdown"
-                    class="absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl z-50 p-1.5 space-y-1 text-xs"
+                    class="absolute right-0 top-full mt-1.5 w-64 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl z-50 p-1.5 space-y-1 text-xs"
                   >
-                    <div class="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-700/60">
-                      Preset Teams
+                    <div class="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
+                      <span>Preset Teams</span>
+                      <span class="font-normal capitalize text-[9px]">({{ doorElement }})</span>
                     </div>
 
                     <div v-if="availableTeamPresets.length === 0" class="px-2 py-2 text-slate-400 text-center text-[11px]">
                       No preset teams found.
                     </div>
 
-                    <div v-else class="max-h-48 overflow-y-auto space-y-0.5">
+                    <div v-else class="max-h-56 overflow-y-auto space-y-0.5">
                       <button
                         v-for="preset in availableTeamPresets"
                         :key="preset.id"

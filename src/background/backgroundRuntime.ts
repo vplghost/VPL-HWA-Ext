@@ -3502,6 +3502,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         message?.kind === 'engine-ping' ||
         message?.kind === 'engine-send-message' ||
         message?.kind === 'simulate-battle' ||
+        message?.kind === 'test-wasm-engine' ||
         message?.kind === 'campaign-raid' ||
         message?.kind === 'craft-fragment' ||
         message?.kind === 'craft-recipe') &&
@@ -3541,7 +3542,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
               .catch(() => {});
           }
 
-          if (!queued && (forwardedMessage.kind === 'refresh-rpc' || forwardedMessage.kind === 'simulate-battle')) {
+          if (!queued && (forwardedMessage.kind === 'refresh-rpc' || forwardedMessage.kind === 'simulate-battle' || forwardedMessage.kind === 'test-wasm-engine')) {
             try {
               let settled = false;
               const onDone = (resp: any) => {
@@ -3575,7 +3576,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           cr.tabs.sendMessage(targetTab.id, forwardedMessage).catch(() => {});
           sendResponse({ ok: true, queued, error: null });
         });
-      if (message.kind === 'engine-ping' || message.kind === 'simulate-battle') forward();
+      if (message.kind === 'engine-ping' || message.kind === 'simulate-battle' || message.kind === 'test-wasm-engine') forward();
       else
         cr.storage?.local
           ?.get(['popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'claimRpcStatus', 'rpcCache'])

@@ -40,6 +40,15 @@ describe('Dungeon Simulator & Automation Engine', () => {
       assert.equal(isTitanEligibleForDoor(4050, 'water', { element: 'spirit' }), false);
     });
 
+    it('allows all titans in neutral (official server name) and mixed doors', () => {
+      assert.equal(isTitanEligibleForDoor(4052, 'neutral', { element: 'spirit' }), true);
+      assert.equal(isTitanEligibleForDoor(4000, 'neutral', { element: 'water' }), true);
+      assert.equal(isTitanEligibleForDoor(4010, 'neutral', { element: 'fire' }), true);
+      assert.equal(isTitanEligibleForDoor(4020, 'neutral', { element: 'earth' }), true);
+      assert.equal(isTitanEligibleForDoor(4053, 'Neutral', { element: 'spirit' }), true);
+      assert.equal(isTitanEligibleForDoor(4052, 'mixed', { element: 'spirit' }), true);
+    });
+
     it('allows standard element titans in their respective doors', () => {
       assert.equal(isTitanEligibleForDoor(4000, 'water', { element: 'water' }), true);
       assert.equal(isTitanEligibleForDoor(4000, 'fire', { element: 'water' }), false);
@@ -146,6 +155,40 @@ describe('Dungeon Simulator & Automation Engine', () => {
       ];
       const squad = resolveSquadForDoor('Water', states, { customTeams });
       assert.deepEqual(squad, [4000, 4001, 4002, 4003, 4004]);
+    });
+
+    it('resolves Neutral doors with official neutral or legacy mixed savedLineups', () => {
+      const states = {
+        '4000': { hp: 1000000, maxHp: 1000000, isDead: false },
+        '4001': { hp: 1000000, maxHp: 1000000, isDead: false },
+        '4002': { hp: 1000000, maxHp: 1000000, isDead: false },
+        '4004': { hp: 1000000, maxHp: 1000000, isDead: false },
+        '4053': { hp: 1000000, maxHp: 1000000, isDead: false },
+      };
+      // Test with neutral key
+      const savedNeutral = { neutral: [4004, 4053, 4002, 4001, 4000] };
+      const squad1 = resolveSquadForDoor('Neutral', states, { savedLineups: savedNeutral });
+      assert.deepEqual(squad1, [4004, 4053, 4002, 4001, 4000]);
+
+      // Test with legacy mixed key fallback
+      const savedMixed = { mixed: [4000, 4001, 4002, 4004, 4053] };
+      const squad2 = resolveSquadForDoor('Neutral', states, { savedLineups: savedMixed });
+      assert.deepEqual(squad2, [4000, 4001, 4002, 4004, 4053]);
+    });
+
+    it('resolves Neutral doors from custom titan teams when savedLineup is empty', () => {
+      const states = {
+        '4000': { hp: 1000000, maxHp: 1000000, isDead: false },
+        '4001': { hp: 1000000, maxHp: 1000000, isDead: false },
+        '4002': { hp: 1000000, maxHp: 1000000, isDead: false },
+        '4004': { hp: 1000000, maxHp: 1000000, isDead: false },
+        '4053': { hp: 1000000, maxHp: 1000000, isDead: false },
+      };
+      const customTeams = [
+        { id: 'custom_neutral', name: 'My Neutral Squad', type: 'titan', heroIds: [4053, 4004, 4002, 4001, 4000] },
+      ];
+      const squad = resolveSquadForDoor('Neutral', states, { customTeams });
+      assert.deepEqual(squad, [4053, 4004, 4002, 4001, 4000]);
     });
   });
 
