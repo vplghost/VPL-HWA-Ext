@@ -24,6 +24,11 @@ const wasmTestResult = ref<any>(null);
 const wasmTestError = ref<string | null>(null);
 const wasmTestErrorDetail = ref<any>(null);
 const showWasmDiagnostics = ref(false);
+const wasmCallPending = ref(false);
+const wasmCallResult = ref<any>(null);
+const wasmCallError = ref<string | null>(null);
+const wasmCallErrorDetail = ref<any>(null);
+const showWasmCallDiagnostics = ref(false);
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
 
@@ -105,6 +110,28 @@ async function testWasmEngine() {
     wasmTestError.value = cause?.message || String(cause);
   } finally {
     wasmTestPending.value = false;
+  }
+}
+
+async function testWasmCall() {
+  wasmCallPending.value = true;
+  wasmCallResult.value = null;
+  wasmCallError.value = null;
+  wasmCallErrorDetail.value = null;
+  showWasmCallDiagnostics.value = false;
+  try {
+    const response = await chrome.runtime.sendMessage({ kind: 'test-wasm-call' });
+    if (!response) throw new Error('No response from game tab or extension background.');
+    if (response.ok && response.result) {
+      wasmCallResult.value = response.result;
+    } else {
+      wasmCallError.value = response.error || 'WASM engine live call probe failed.';
+      if (response.errorDetail) wasmCallErrorDetail.value = response.errorDetail;
+    }
+  } catch (cause: any) {
+    wasmCallError.value = cause?.message || String(cause);
+  } finally {
+    wasmCallPending.value = false;
   }
 }
 
@@ -734,9 +761,10 @@ async function toggleRecording() {
         <dt>RPC authentication headers</dt><dd id="engine-rpc-headers">{{ engine.rpcHeaders }}</dd>
         <dt>Game tab extension version</dt><dd>{{ gameEngineStatus?.extensionVersion || 'Unknown' }}</dd>
       </dl>
-      <div class="flex items-center gap-2 pt-1">
+      <div class="flex items-center gap-2 pt-1 flex-wrap">
         <button id="btn-ping-engine" type="button" :disabled="enginePingPending" @click="pingEngine" class="cursor-pointer rounded-lg px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 text-xs font-semibold transition-colors">Ping Engine</button>
         <button id="btn-test-wasm-engine" type="button" :disabled="wasmTestPending" @click="testWasmEngine" class="cursor-pointer rounded-lg px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 text-xs font-semibold transition-colors">Test WASM Engine</button>
+        <button id="btn-test-wasm-call" type="button" :disabled="wasmCallPending" @click="testWasmCall" class="cursor-pointer rounded-lg px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 text-xs font-semibold transition-colors">Test Live Call</button>
       </div>
       <p v-if="enginePingMessage" id="engine-ping-result" role="status" class="text-slate-500 text-xs font-mono">{{ enginePingMessage }}</p>
 
@@ -773,6 +801,42 @@ async function toggleRecording() {
             <div>Kind: {{ wasmTestErrorDetail.kind }}</div>
             <div v-if="wasmTestErrorDetail.context" class="mt-0.5">Context: {{ JSON.stringify(wasmTestErrorDetail.context) }}</div>
             <div v-if="wasmTestErrorDetail.stack" class="text-slate-400 mt-1 whitespace-pre">{{ wasmTestErrorDetail.stack }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WASM Live Function Call Results -->
+      <div v-if="wasmCallResult || wasmCallError" id="engine-wasm-call-container" class="mt-2 space-y-1.5 text-xs">
+        <div v-if="wasmCallResult" class="p-2.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <div class="font-bold flex items-center gap-1.5">
+            <span>✅</span> Live Engine Function Call PASSED
+          </div>
+          <div class="font-mono text-[11px] mt-1 space-y-0.5">
+            <div>{{ wasmCallResult.message }}</div>
+            <div v-if="wasmCallResult.jsonNodePtr">JSON_Parse: {{ wasmCallResult.jsonNodePtr }}</div>
+            <div v-if="wasmCallResult.typePtr">Type_GetType: {{ wasmCallResult.typePtr }}</div>
+            <div v-if="wasmCallResult.stringClass">String class: {{ wasmCallResult.stringClass }}</div>
+          </div>
+        </div>
+
+        <div v-if="wasmCallError" class="p-2.5 rounded-lg border border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200 space-y-1.5">
+          <div class="font-bold flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><span>⚠️</span> Live Engine Call Failed / Trap</span>
+            <button
+              v-if="wasmCallErrorDetail"
+              type="button"
+              class="cursor-pointer px-2 py-0.5 rounded border border-rose-300 dark:border-rose-700 bg-white/60 dark:bg-slate-900/60 hover:bg-white text-[10px] font-semibold"
+              @click="showWasmCallDiagnostics = !showWasmCallDiagnostics"
+            >
+              {{ showWasmCallDiagnostics ? 'Ẩn chi tiết' : 'Xem chẩn đoán' }}
+            </button>
+          </div>
+          <p id="engine-wasm-call-result" class="font-mono text-[11px] break-words">{{ wasmCallError }}</p>
+          <div v-if="showWasmCallDiagnostics && wasmCallErrorDetail" class="bg-black/85 text-emerald-300 p-2 rounded font-mono text-[10px] leading-relaxed overflow-x-auto max-h-36 border border-black/40">
+            <div>Phase: {{ wasmCallErrorDetail.phase }}</div>
+            <div>Kind: {{ wasmCallErrorDetail.kind }}</div>
+            <div v-if="wasmCallErrorDetail.context" class="mt-0.5">Context: {{ JSON.stringify(wasmCallErrorDetail.context) }}</div>
+            <div v-if="wasmCallErrorDetail.stack" class="text-slate-400 mt-1 whitespace-pre">{{ wasmCallErrorDetail.stack }}</div>
           </div>
         </div>
       </div>

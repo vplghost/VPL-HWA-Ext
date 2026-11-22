@@ -1012,6 +1012,190 @@ export function installInterceptor(customWindow?: any): void {
       }
     };
     win.__hwaTestWasmEngine = testWasmEngineProbe;
+
+  async function testWasmEngineCall(targetInst?: any) {
+    let currentPhase = 'INIT_BRIDGE';
+    try {
+      const activeInst = targetInst || activeUnityInstance || findActiveUnityInstance(win, doc);
+      if (!activeInst) {
+        throw new Error('Unity game instance not found. Make sure the game is loaded in this tab.');
+      }
+
+      currentPhase = 'INSPECT_MODULE';
+      const mod = activeInst?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule || activeInst;
+      const asm = mod?.asm || mod;
+      if (!asm) {
+        throw new Error('Unity WebAssembly asm not found in game engine instance');
+      }
+
+      const values = Object.values(asm);
+      const table = (values.find((v: any) => v instanceof WebAssembly.Table) || (mod as any).wasmTable) as WebAssembly.Table | undefined;
+      const memory = (values.find((v: any) => v instanceof WebAssembly.Memory) || (mod as any).wasmMemory) as WebAssembly.Memory | undefined;
+
+      if (!table || !memory) {
+        throw new Error('WASM table or memory not accessible in Unity engine');
+      }
+
+      currentPhase = 'MEMORY_PRIMITIVES';
+      const malloc = (asm as any).Ol || (asm as any).malloc || (asm as any)._malloc;
+      const free = (asm as any).Pl || (asm as any).free || (asm as any)._free;
+      if (typeof malloc !== 'function' || typeof free !== 'function') {
+        throw new Error('WASM malloc/free memory primitives not found');
+      }
+
+      const heap = {
+        buffer: memory.buffer,
+        u8: new Uint8Array(memory.buffer),
+        u16: new Uint16Array(memory.buffer),
+        i32: new Int32Array(memory.buffer),
+        u32: new Uint32Array(memory.buffer)
+      };
+
+      const sym = {
+        JSON_Parse: 1763,
+        Type_GetType: 38793,
+        Object_ToString: 16323,
+        Presets_clanWarReplay: 174207,
+      };
+
+      const fn = (name: keyof typeof sym) => {
+        const idx = sym[name];
+        const func = table.get(idx);
+        if (typeof func !== 'function') throw new Error(`Unity engine function '${name}' (index ${idx}) not available in WASM table`);
+        return func;
+      };
+
+      const invokePtr = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0) >>> 0;
+
+      const callTableFn = (index: number, ...args: any[]): number => {
+        const func = table.get(index);
+        if (typeof func !== 'function') return 0;
+        const requiredLen = func.length;
+        const callArgs = args.slice(0, requiredLen);
+        while (callArgs.length < requiredLen) {
+          callArgs.push(0);
+        }
+        return (func(...callArgs) >>> 0);
+      };
+
+      // Step 1: Learn String class pointer
+      currentPhase = 'RESOLVE_STRING_CLASS';
+      let stringClassPtr = 0;
+      const probeObjects = [
+        () => callTableFn(sym.Presets_clanWarReplay, 1, 0),
+        () => callTableFn(sym.Presets_clanWarReplay, 0, 0),
+      ];
+      for (const probeFn of probeObjects) {
+        try {
+          const probePtr = probeFn();
+          if (probePtr > 0) {
+            const strSamplePtr = invokePtr('Object_ToString', probePtr);
+            if (strSamplePtr > 0) {
+              const kPtr = heap.u32[strSamplePtr >>> 2];
+              if (kPtr > 65536 && kPtr < memory.buffer.byteLength) {
+                stringClassPtr = kPtr;
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!stringClassPtr) {
+        const targetWords = ['BattleInstantPlay', 'BattlePresets', 'BattleData', 'dungeon', 'titan'];
+        const maxScan = Math.min(memory.buffer.byteLength, 256 * 1024 * 1024);
+        const u16 = heap.u16;
+        for (const word of targetWords) {
+          const wLen = word.length;
+          const firstCode = word.charCodeAt(0);
+          const u16Limit = (maxScan - (16 + wLen * 2)) >>> 1;
+          for (let i = 8; i < u16Limit && !stringClassPtr; i += 2) {
+            if (u16[i] === firstCode) {
+              let match = true;
+              for (let j = 1; j < wLen; j++) {
+                if (u16[i + j] !== word.charCodeAt(j)) { match = false; break; }
+              }
+              if (match) {
+                const strPtr = (i * 2) - 12;
+                if (strPtr >= 1024 && strPtr + 16 < memory.buffer.byteLength) {
+                  const rLen = heap.i32[(strPtr + 8) >>> 2];
+                  const sync = heap.u32[(strPtr + 4) >>> 2];
+                  const candKlass = heap.u32[strPtr >>> 2];
+                  if (rLen === wLen && sync === 0 && candKlass > 65536 && candKlass < memory.buffer.byteLength) {
+                    stringClassPtr = candKlass;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          if (stringClassPtr) break;
+        }
+      }
+
+      if (!stringClassPtr) {
+        throw new Error('Could not resolve IL2CPP String class descriptor from live objects or heap scan');
+      }
+
+      const forgeString = (str: string): number => {
+        const len = str.length;
+        const ptr = malloc(16 + 2 * len) >>> 0;
+        if (!ptr) throw new Error('malloc failed for forgeString');
+        heap.u32[ptr >>> 2] = stringClassPtr;
+        heap.u32[(ptr + 4) >>> 2] = 0;
+        heap.i32[(ptr + 8) >>> 2] = len;
+        const u16Start = (ptr + 12) >>> 1;
+        for (let i = 0; i < len; i++) {
+          heap.u16[u16Start + i] = str.charCodeAt(i);
+        }
+        heap.u16[u16Start + len] = 0;
+        return ptr;
+      };
+
+      // Step 2: Live function execution probe (calling JSON_Parse with small test JSON)
+      currentPhase = 'EXECUTE_JSON_PARSE_PROBE';
+      const testJson = '{"diagnostic_check":1}';
+      const testJsonPtr = forgeString(testJson);
+      let jsonNodePtr = 0;
+      try {
+        jsonNodePtr = invokePtr('JSON_Parse', testJsonPtr);
+      } finally {
+        try { free(testJsonPtr); } catch (_) {}
+      }
+
+      if (!jsonNodePtr) {
+        throw new Error('Unity JSON_Parse returned null/zero pointer for test JSON');
+      }
+
+      // Step 3: Type_GetType probe
+      currentPhase = 'EXECUTE_TYPE_GET_PROBE';
+      const typeName = 'BattleInstantPlay';
+      const typeNamePtr = forgeString(typeName);
+      let typePtr = 0;
+      try {
+        typePtr = invokePtr('Type_GetType', typeNamePtr);
+      } finally {
+        try { free(typeNamePtr); } catch (_) {}
+      }
+
+      return {
+        ok: true,
+        jsonNodePtr: `0x${jsonNodePtr.toString(16)}`,
+        typePtr: `0x${typePtr.toString(16)}`,
+        stringClass: `0x${stringClassPtr.toString(16)}`,
+        message: 'Unity Engine basic functions (JSON_Parse, Type_GetType) executed successfully without traps',
+        timestamp: new Date().toISOString()
+      };
+    } catch (err: any) {
+      const errorDetail = describeWasmException(err, currentPhase, { kind: 'live_call_probe' });
+      const enriched = new Error(errorDetail.message);
+      (enriched as any).errorDetail = errorDetail;
+      (enriched as any)._phase = currentPhase;
+      throw enriched;
+    }
+  }
+
+  win.__hwaTestWasmCall = testWasmEngineCall;
   }
 
   async function testWasmEngineProbe(targetInst?: any) {
@@ -1190,6 +1374,18 @@ export function installInterceptor(customWindow?: any): void {
         }
       }
 
+      let liveCallReport: any = null;
+      try {
+        currentPhase = 'PROBE_BASIC_ENGINE_CALL';
+        liveCallReport = await testWasmEngineCall(activeInst);
+      } catch (callErr: any) {
+        liveCallReport = {
+          ok: false,
+          error: callErr?.message || String(callErr),
+          detail: callErr?.errorDetail || null
+        };
+      }
+
       return {
         ok: true,
         tableSize: table.length,
@@ -1201,6 +1397,7 @@ export function installInterceptor(customWindow?: any): void {
         verifiedPresets: verifiedPresets.length > 0
           ? verifiedPresets.join(', ')
           : (probedStringClass ? 'Managed GetUninitializedObject fallback ready' : 'Direct ctor fallback available'),
+        liveCall: liveCallReport,
         timestamp: new Date().toISOString()
       };
     } catch (err: any) {
@@ -1213,6 +1410,190 @@ export function installInterceptor(customWindow?: any): void {
   }
 
   win.__hwaTestWasmEngine = testWasmEngineProbe;
+
+  async function testWasmEngineCall(targetInst?: any) {
+    let currentPhase = 'INIT_BRIDGE';
+    try {
+      const activeInst = targetInst || activeUnityInstance || findActiveUnityInstance(win, doc);
+      if (!activeInst) {
+        throw new Error('Unity game instance not found. Make sure the game is loaded in this tab.');
+      }
+
+      currentPhase = 'INSPECT_MODULE';
+      const mod = activeInst?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule || activeInst;
+      const asm = mod?.asm || mod;
+      if (!asm) {
+        throw new Error('Unity WebAssembly asm not found in game engine instance');
+      }
+
+      const values = Object.values(asm);
+      const table = (values.find((v: any) => v instanceof WebAssembly.Table) || (mod as any).wasmTable) as WebAssembly.Table | undefined;
+      const memory = (values.find((v: any) => v instanceof WebAssembly.Memory) || (mod as any).wasmMemory) as WebAssembly.Memory | undefined;
+
+      if (!table || !memory) {
+        throw new Error('WASM table or memory not accessible in Unity engine');
+      }
+
+      currentPhase = 'MEMORY_PRIMITIVES';
+      const malloc = (asm as any).Ol || (asm as any).malloc || (asm as any)._malloc;
+      const free = (asm as any).Pl || (asm as any).free || (asm as any)._free;
+      if (typeof malloc !== 'function' || typeof free !== 'function') {
+        throw new Error('WASM malloc/free memory primitives not found');
+      }
+
+      const heap = {
+        buffer: memory.buffer,
+        u8: new Uint8Array(memory.buffer),
+        u16: new Uint16Array(memory.buffer),
+        i32: new Int32Array(memory.buffer),
+        u32: new Uint32Array(memory.buffer)
+      };
+
+      const sym = {
+        JSON_Parse: 1763,
+        Type_GetType: 38793,
+        Object_ToString: 16323,
+        Presets_clanWarReplay: 174207,
+      };
+
+      const fn = (name: keyof typeof sym) => {
+        const idx = sym[name];
+        const func = table.get(idx);
+        if (typeof func !== 'function') throw new Error(`Unity engine function '${name}' (index ${idx}) not available in WASM table`);
+        return func;
+      };
+
+      const invokePtr = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0) >>> 0;
+
+      const callTableFn = (index: number, ...args: any[]): number => {
+        const func = table.get(index);
+        if (typeof func !== 'function') return 0;
+        const requiredLen = func.length;
+        const callArgs = args.slice(0, requiredLen);
+        while (callArgs.length < requiredLen) {
+          callArgs.push(0);
+        }
+        return (func(...callArgs) >>> 0);
+      };
+
+      // Step 1: Learn String class pointer
+      currentPhase = 'RESOLVE_STRING_CLASS';
+      let stringClassPtr = 0;
+      const probeObjects = [
+        () => callTableFn(sym.Presets_clanWarReplay, 1, 0),
+        () => callTableFn(sym.Presets_clanWarReplay, 0, 0),
+      ];
+      for (const probeFn of probeObjects) {
+        try {
+          const probePtr = probeFn();
+          if (probePtr > 0) {
+            const strSamplePtr = invokePtr('Object_ToString', probePtr);
+            if (strSamplePtr > 0) {
+              const kPtr = heap.u32[strSamplePtr >>> 2];
+              if (kPtr > 65536 && kPtr < memory.buffer.byteLength) {
+                stringClassPtr = kPtr;
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!stringClassPtr) {
+        const targetWords = ['BattleInstantPlay', 'BattlePresets', 'BattleData', 'dungeon', 'titan'];
+        const maxScan = Math.min(memory.buffer.byteLength, 256 * 1024 * 1024);
+        const u16 = heap.u16;
+        for (const word of targetWords) {
+          const wLen = word.length;
+          const firstCode = word.charCodeAt(0);
+          const u16Limit = (maxScan - (16 + wLen * 2)) >>> 1;
+          for (let i = 8; i < u16Limit && !stringClassPtr; i += 2) {
+            if (u16[i] === firstCode) {
+              let match = true;
+              for (let j = 1; j < wLen; j++) {
+                if (u16[i + j] !== word.charCodeAt(j)) { match = false; break; }
+              }
+              if (match) {
+                const strPtr = (i * 2) - 12;
+                if (strPtr >= 1024 && strPtr + 16 < memory.buffer.byteLength) {
+                  const rLen = heap.i32[(strPtr + 8) >>> 2];
+                  const sync = heap.u32[(strPtr + 4) >>> 2];
+                  const candKlass = heap.u32[strPtr >>> 2];
+                  if (rLen === wLen && sync === 0 && candKlass > 65536 && candKlass < memory.buffer.byteLength) {
+                    stringClassPtr = candKlass;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          if (stringClassPtr) break;
+        }
+      }
+
+      if (!stringClassPtr) {
+        throw new Error('Could not resolve IL2CPP String class descriptor from live objects or heap scan');
+      }
+
+      const forgeString = (str: string): number => {
+        const len = str.length;
+        const ptr = malloc(16 + 2 * len) >>> 0;
+        if (!ptr) throw new Error('malloc failed for forgeString');
+        heap.u32[ptr >>> 2] = stringClassPtr;
+        heap.u32[(ptr + 4) >>> 2] = 0;
+        heap.i32[(ptr + 8) >>> 2] = len;
+        const u16Start = (ptr + 12) >>> 1;
+        for (let i = 0; i < len; i++) {
+          heap.u16[u16Start + i] = str.charCodeAt(i);
+        }
+        heap.u16[u16Start + len] = 0;
+        return ptr;
+      };
+
+      // Step 2: Live function execution probe (calling JSON_Parse with small test JSON)
+      currentPhase = 'EXECUTE_JSON_PARSE_PROBE';
+      const testJson = '{"diagnostic_check":1}';
+      const testJsonPtr = forgeString(testJson);
+      let jsonNodePtr = 0;
+      try {
+        jsonNodePtr = invokePtr('JSON_Parse', testJsonPtr);
+      } finally {
+        try { free(testJsonPtr); } catch (_) {}
+      }
+
+      if (!jsonNodePtr) {
+        throw new Error('Unity JSON_Parse returned null/zero pointer for test JSON');
+      }
+
+      // Step 3: Type_GetType probe
+      currentPhase = 'EXECUTE_TYPE_GET_PROBE';
+      const typeName = 'BattleInstantPlay';
+      const typeNamePtr = forgeString(typeName);
+      let typePtr = 0;
+      try {
+        typePtr = invokePtr('Type_GetType', typeNamePtr);
+      } finally {
+        try { free(typeNamePtr); } catch (_) {}
+      }
+
+      return {
+        ok: true,
+        jsonNodePtr: `0x${jsonNodePtr.toString(16)}`,
+        typePtr: `0x${typePtr.toString(16)}`,
+        stringClass: `0x${stringClassPtr.toString(16)}`,
+        message: 'Unity Engine basic functions (JSON_Parse, Type_GetType) executed successfully without traps',
+        timestamp: new Date().toISOString()
+      };
+    } catch (err: any) {
+      const errorDetail = describeWasmException(err, currentPhase, { kind: 'live_call_probe' });
+      const enriched = new Error(errorDetail.message);
+      (enriched as any).errorDetail = errorDetail;
+      (enriched as any)._phase = currentPhase;
+      throw enriched;
+    }
+  }
+
+  win.__hwaTestWasmCall = testWasmEngineCall;
 
   function instrumentEngineMethod(instance: any, methodName: string, source: any) {
     try {
@@ -1611,6 +1992,33 @@ export function installInterceptor(customWindow?: any): void {
           win.postMessage({
             source: 'hwa-helper-api',
             kind: 'test-wasm-engine-result',
+            testId,
+            ok: false,
+            error: detail.message || err?.message || String(err),
+            errorDetail: detail
+          }, loc.origin);
+        }
+      })();
+      return;
+    }
+
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'test-wasm-call') {
+      const testId = event.data.testId;
+      (async () => {
+        try {
+          const result = await testWasmEngineCall();
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'test-wasm-call-result',
+            testId,
+            ok: true,
+            result
+          }, loc.origin);
+        } catch (err: any) {
+          const detail = (err as any)?.errorDetail || describeWasmException(err, (err as any)?._phase || 'TEST_WASM_CALL', { kind: 'live_call_probe' });
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'test-wasm-call-result',
             testId,
             ok: false,
             error: detail.message || err?.message || String(err),

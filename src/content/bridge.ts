@@ -100,6 +100,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   const pendingRpcRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
   const pendingSimRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
   const pendingWasmTestRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
+  const pendingWasmCallRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
   const getNow = () => (typeof win.Date?.now === 'function' ? win.Date.now() : Date.now());
 
   function handleContextInvalidated(err: any, notifyUser = true) {
@@ -118,6 +119,10 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         try { clearTimeout(req.timeout); req.resolve({ ok: false, error: 'Extension context invalidated.' }); } catch (_) {}
       }
       pendingWasmTestRequests.clear();
+      for (const req of pendingWasmCallRequests.values()) {
+        try { clearTimeout(req.timeout); req.resolve({ ok: false, error: 'Extension context invalidated.' }); } catch (_) {}
+      }
+      pendingWasmCallRequests.clear();
       if (!notifyUser) return;
       const notify = typeof win.alert === 'function' ? win.alert : console.warn;
       notify('HWA Helper extension was updated or reloaded. Please refresh this game page to reconnect.');
@@ -316,6 +321,22 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       return;
     }
 
+    if (event.data.kind === 'test-wasm-call-result') {
+      const testId = event.data.testId;
+      if (testId && pendingWasmCallRequests.has(testId)) {
+        const pending = pendingWasmCallRequests.get(testId);
+        pendingWasmCallRequests.delete(testId);
+        if (pending?.timeout) clearTimeout(pending.timeout);
+        pending?.resolve?.({
+          ok: event.data.ok === true,
+          result: event.data.result || null,
+          error: event.data.error || null,
+          errorDetail: event.data.errorDetail || null
+        });
+      }
+      return;
+    }
+
     if (event.data.kind === 'interaction-record') {
       if (recordingActive && event.data.entry) saveInteraction(event.data.entry);
       return;
@@ -448,6 +469,22 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         win.postMessage({
           source: 'hwa-helper-control',
           kind: 'test-wasm-engine',
+          testId
+        }, win.location.origin);
+        return true;
+      }
+      if (message?.kind === 'test-wasm-call') {
+        const testId = 'call_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const timeout = setTimeout(() => {
+          if (pendingWasmCallRequests.has(testId)) {
+            pendingWasmCallRequests.delete(testId);
+            sendResponse?.({ ok: false, error: 'WASM live call test timed out in game page bridge.' });
+          }
+        }, 15000);
+        pendingWasmCallRequests.set(testId, { resolve: sendResponse, timeout });
+        win.postMessage({
+          source: 'hwa-helper-control',
+          kind: 'test-wasm-call',
           testId
         }, win.location.origin);
         return true;

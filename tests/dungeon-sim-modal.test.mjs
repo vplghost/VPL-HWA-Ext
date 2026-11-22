@@ -88,14 +88,30 @@ test('SettingsTab integrates Game Engine Diagnostics with Test WASM Engine butto
   assert.match(content, /wasmTestError/, 'Must track wasmTestError state');
   assert.match(content, /showWasmDiagnostics/, 'Must have showWasmDiagnostics toggle');
   assert.match(content, /id="engine-wasm-test-container"/, 'Must define #engine-wasm-test-container for result display');
+
+  // Must have test-wasm-call button and handlers
+  assert.match(content, /id="btn-test-wasm-call"/, 'Must define #btn-test-wasm-call button');
+  assert.match(content, /testWasmCall/, 'Must define testWasmCall handler');
+  assert.match(content, /wasmCallPending/, 'Must track wasmCallPending state');
+  assert.match(content, /wasmCallResult/, 'Must track wasmCallResult state');
+  assert.match(content, /wasmCallError/, 'Must track wasmCallError state');
+  assert.match(content, /showWasmCallDiagnostics/, 'Must have showWasmCallDiagnostics toggle');
+  assert.match(content, /id="engine-wasm-call-container"/, 'Must define #engine-wasm-call-container for live call result display');
 });
 
 test('backgroundRuntime and bridge forward test-wasm-engine messages with error detail preservation', async () => {
   const bgContent = await readFile(resolve(root, 'src/background/backgroundRuntime.ts'), 'utf8');
   assert.match(bgContent, /message\?\.kind === 'test-wasm-engine'/, 'Must permit test-wasm-engine in background sender check');
   assert.match(bgContent, /forwardedMessage\.kind === 'test-wasm-engine'/, 'Must await tab response for test-wasm-engine');
+  assert.match(bgContent, /message\?\.kind === 'test-wasm-call'/, 'Must permit test-wasm-call in background sender check');
 
   const bridgeContent = await readFile(resolve(root, 'src/content/bridge.ts'), 'utf8');
   assert.match(bridgeContent, /message\?\.kind === 'test-wasm-engine'/, 'Must forward test-wasm-engine to game window');
   assert.match(bridgeContent, /event\.data\.kind === 'test-wasm-engine-result'/, 'Must resolve test-wasm-engine-result to caller');
+  assert.match(bridgeContent, /message\?\.kind === 'test-wasm-call'/, 'Must forward test-wasm-call to game window');
+  assert.match(bridgeContent, /event\.data\.kind === 'test-wasm-call-result'/, 'Must resolve test-wasm-call-result to caller');
+
+  const interceptorContent = await readFile(resolve(root, 'src/content/interceptor.ts'), 'utf8');
+  assert.match(interceptorContent, /__hwaTestWasmCall/, 'interceptor must expose __hwaTestWasmCall');
+  assert.match(interceptorContent, /kind === 'test-wasm-call'/, 'interceptor must listen for test-wasm-call message');
 });
