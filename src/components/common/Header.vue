@@ -335,10 +335,20 @@ const researchQueues = computed(() => {
 const buildingRemaining = computed(() => {
   const queues = buildingQueues.value;
   if (!queues.length) return '—';
-  const ends = queues
-    .map(getQueueEndMs)
-    .filter((end): end is number => Number.isFinite(end) && (end as number) > now.value);
-  if (!ends.length) {
+
+  const items = queues.map((q: any) => {
+    const end = getQueueEndMs(q);
+    const isFinished = end !== null && end <= now.value;
+    const remainingSec = end !== null && end > now.value ? Math.max(0, Math.ceil((end - now.value) / 1000)) : null;
+    return {
+      end: end ?? Infinity,
+      isFinished,
+      remainingSec,
+      timerText: isFinished ? 'Ready' : remainingSec !== null ? formatDuration(remainingSec) : null,
+    };
+  }).filter((item) => item.isFinished || item.remainingSec !== null);
+
+  if (!items.length) {
     const hasFinished = queues.some((q: any) => {
       const end = getQueueEndMs(q);
       return end !== null && end <= now.value;
@@ -346,14 +356,20 @@ const buildingRemaining = computed(() => {
     if (hasFinished) return 'Ready';
     return '—';
   }
-  const minEnd = Math.min(...ends);
-  const remainingSec = Math.max(0, Math.ceil((minEnd - now.value) / 1000));
-  return formatDuration(remainingSec);
+
+  // Sort: finished items first, then earliest ending items
+  items.sort((a, b) => {
+    if (a.isFinished && !b.isFinished) return -1;
+    if (!a.isFinished && b.isFinished) return 1;
+    return a.end - b.end;
+  });
+
+  return items.map((i) => i.timerText).join(' · ');
 });
 
 const buildingTooltipText = computed(() => {
   const queues = buildingQueues.value;
-  if (!queues.length) return 'Construction: Idle (Click to view Buildings)';
+  if (!queues.length) return 'Construction: All slots idle (Click to view Buildings)';
   const active = queues.filter((q: any) => {
     const end = getQueueEndMs(q);
     return end !== null && end > now.value;
@@ -365,21 +381,21 @@ const buildingTooltipText = computed(() => {
   const lines: string[] = [];
   if (active.length > 0) {
     lines.push('Construction in progress:');
-    for (const q of active) {
+    active.forEach((q: any, idx: number) => {
       const name = getBuildingName(q.buildingId);
       const level = (q.level ?? q.nextLevel) ? ` (Lv. ${q.level ?? q.nextLevel})` : '';
       const end = getQueueEndMs(q)!;
       const remainingSec = Math.max(0, Math.ceil((end - now.value) / 1000));
-      lines.push(`• ${name}${level} · ${formatDuration(remainingSec)} remaining`);
-    }
+      lines.push(`• Slot ${idx + 1}: ${name}${level} · ${formatDuration(remainingSec)} remaining`);
+    });
   }
   if (finished.length > 0) {
     lines.push(active.length > 0 ? '\nReady to finish:' : 'Ready to finish:');
-    for (const q of finished) {
+    finished.forEach((q: any, idx: number) => {
       const name = getBuildingName(q.buildingId);
       const level = (q.level ?? q.nextLevel) ? ` (Lv. ${q.level ?? q.nextLevel})` : '';
-      lines.push(`• ${name}${level} · Ready!`);
-    }
+      lines.push(`• Slot ${idx + 1}: ${name}${level} · Ready!`);
+    });
   }
   lines.push('\n(Click to view Buildings)');
   return lines.join('\n');
@@ -389,10 +405,20 @@ const buildingTooltipText = computed(() => {
 const researchRemaining = computed(() => {
   const queues = researchQueues.value;
   if (!queues.length) return '—';
-  const ends = queues
-    .map(getQueueEndMs)
-    .filter((end): end is number => Number.isFinite(end) && (end as number) > now.value);
-  if (!ends.length) {
+
+  const items = queues.map((q: any) => {
+    const end = getQueueEndMs(q);
+    const isFinished = end !== null && end <= now.value;
+    const remainingSec = end !== null && end > now.value ? Math.max(0, Math.ceil((end - now.value) / 1000)) : null;
+    return {
+      end: end ?? Infinity,
+      isFinished,
+      remainingSec,
+      timerText: isFinished ? 'Ready' : remainingSec !== null ? formatDuration(remainingSec) : null,
+    };
+  }).filter((item) => item.isFinished || item.remainingSec !== null);
+
+  if (!items.length) {
     const hasFinished = queues.some((q: any) => {
       const end = getQueueEndMs(q);
       return end !== null && end <= now.value;
@@ -400,14 +426,19 @@ const researchRemaining = computed(() => {
     if (hasFinished) return 'Ready';
     return '—';
   }
-  const minEnd = Math.min(...ends);
-  const remainingSec = Math.max(0, Math.ceil((minEnd - now.value) / 1000));
-  return formatDuration(remainingSec);
+
+  items.sort((a, b) => {
+    if (a.isFinished && !b.isFinished) return -1;
+    if (!a.isFinished && b.isFinished) return 1;
+    return a.end - b.end;
+  });
+
+  return items.map((i) => i.timerText).join(' · ');
 });
 
 const researchTooltipText = computed(() => {
   const queues = researchQueues.value;
-  if (!queues.length) return 'Research: Idle (Click to view Personal Research)';
+  if (!queues.length) return 'Research: All slots idle (Click to view Personal Research)';
   const active = queues.filter((q: any) => {
     const end = getQueueEndMs(q);
     return end !== null && end > now.value;
@@ -419,21 +450,21 @@ const researchTooltipText = computed(() => {
   const lines: string[] = [];
   if (active.length > 0) {
     lines.push('Research in progress:');
-    for (const q of active) {
+    active.forEach((q: any, idx: number) => {
       const name = getResearchName(q.researchId);
       const level = (q.level ?? q.nextLevel) ? ` (Lv. ${q.level ?? q.nextLevel})` : '';
       const end = getQueueEndMs(q)!;
       const remainingSec = Math.max(0, Math.ceil((end - now.value) / 1000));
-      lines.push(`• ${name}${level} · ${formatDuration(remainingSec)} remaining`);
-    }
+      lines.push(`• Slot ${idx + 1}: ${name}${level} · ${formatDuration(remainingSec)} remaining`);
+    });
   }
   if (finished.length > 0) {
     lines.push(active.length > 0 ? '\nReady to finish:' : 'Ready to finish:');
-    for (const q of finished) {
+    finished.forEach((q: any, idx: number) => {
       const name = getResearchName(q.researchId);
       const level = (q.level ?? q.nextLevel) ? ` (Lv. ${q.level ?? q.nextLevel})` : '';
-      lines.push(`• ${name}${level} · Ready!`);
-    }
+      lines.push(`• Slot ${idx + 1}: ${name}${level} · Ready!`);
+    });
   }
   lines.push('\n(Click to view Personal Research)');
   return lines.join('\n');

@@ -192,7 +192,8 @@ export function normalizeQueuedItem<T extends Partial<BuildingQueueItem>>(item: 
 export function calculateQueueTimeline(
   rawQueues: any = [],
   queueItems: any = [],
-  now = Date.now()
+  now = Date.now(),
+  options?: { maxSlots?: number }
 ): BuildingQueueTimeline {
   const safeQueues = Array.isArray(rawQueues)
     ? rawQueues
@@ -205,31 +206,51 @@ export function calculateQueueTimeline(
     ? Object.values(queueItems)
     : [];
   const inProgress = safeQueues.filter((q: any) => getQueueEnd(q, now) > now);
-  let currentCursor =
-    inProgress.length > 0 ? Math.max(...inProgress.map((q: any) => getQueueEnd(q, now))) : now;
+
+  const maxSlots = options?.maxSlots ?? (safeQueues.length > 1 ? safeQueues.length : 1);
+  const builderCursors: number[] = [];
+  for (let i = 0; i < maxSlots; i++) {
+    if (i < inProgress.length) {
+      builderCursors.push(getQueueEnd(inProgress[i], now));
+    } else {
+      builderCursors.push(now);
+    }
+  }
 
   const timeline: BuildingQueueItem[] = [];
   let totalDurationMs = 0;
   for (const rawItem of safeItems) {
     const item = normalizeQueuedItem(rawItem);
     const durationMs = Number(item.durationMs) || 1000;
-    const estStart = currentCursor;
+
+    let earliestIndex = 0;
+    for (let c = 1; c < builderCursors.length; c++) {
+      if (builderCursors[c] < builderCursors[earliestIndex]) {
+        earliestIndex = c;
+      }
+    }
+
+    const estStart = Math.max(now, builderCursors[earliestIndex]);
     const estFinish = estStart + durationMs;
+    builderCursors[earliestIndex] = estFinish;
     totalDurationMs += durationMs;
     timeline.push({
       ...item,
       estStart,
       estFinish,
     });
-    currentCursor = estFinish;
   }
+
+  const builderFreeAt =
+    inProgress.length >= maxSlots
+      ? Math.min(...inProgress.map((q: any) => getQueueEnd(q, now)))
+      : now;
 
   return {
     items: timeline,
     totalDurationMs,
-    allDoneAt: currentCursor,
-    builderFreeAt:
-      inProgress.length > 0 ? Math.max(...inProgress.map((q: any) => getQueueEnd(q, now))) : now,
+    allDoneAt: Math.max(...builderCursors, now),
+    builderFreeAt: inProgress.length > 0 && maxSlots === 1 ? Math.max(...inProgress.map((q: any) => getQueueEnd(q, now))) : builderFreeAt,
   };
 }
 
@@ -275,34 +296,24 @@ export function planNextStep(
     ? queueState.items.map(normalizeQueuedItem)
     : [];
 
-  while (safeItems.length > 0) {
-    const top = safeItems[0];
-    const bId = Number(top?.buildingId);
-    const reqNextLevel = Number(top?.nextLevel);
+  // 1. Separate already completed items
+  const pendingItems: BuildingQueueItem[] = [];
+  for (const item of safeItems) {
+    const bId = Number(item.buildingId);
+    const reqNextLevel = Number(item.nextLevel);
     const curLvl = buildingLevels.get(bId) ?? 0;
     if (Number.isFinite(bId) && Number.isFinite(reqNextLevel) && curLvl >= reqNextLevel) {
       skippedItems.push({
-        ...top,
+        ...item,
         currentLevel: curLvl,
         reason: `Already completed (level ${curLvl} >= target ${reqNextLevel})`,
       });
-      safeItems.shift();
     } else {
-      break;
+      pendingItems.push(item);
     }
   }
 
-  if (inProgress.length > 0) {
-    const nextWake = Math.min(...inProgress.map((q) => getQueueEnd(q, now))) + 1000;
-    return {
-      action: 'wait',
-      wakeAt: nextWake,
-      calls: [],
-      skippedItems,
-      remainingItemsAfterSkip: safeItems,
-    };
-  }
-
+  // 2. Complete finished constructions first if any
   const calls: any[] = [];
   for (const f of finished) {
     const bId = Number(f.buildingId ?? f.id);
@@ -320,14 +331,101 @@ export function planNextStep(
     }
   }
 
-  if (queueState?.enabled !== false && safeItems.length > 0 && safeItems[0]) {
-    const nextItem = safeItems[0];
-    const bId = Number(nextItem.buildingId);
-    const nextLvl = Number(nextItem.nextLevel);
+  // 3. Determine max capacity:
+  // Explicitly configured maxSlots (e.g. 2), or detected from active queues (> 1),
+  // otherwise default to 1 for backward compatibility.
+  const maxSlots =
+    Number(queueState?.maxSlots) ||
+    (rawQueues.length > 1 ? rawQueues.length : 1);
+
+  // If all builder slots are currently occupied, wait until the earliest one finishes
+  if (inProgress.length >= maxSlots) {
+    const nextWake = Math.min(...inProgress.map((q) => getQueueEnd(q, now))) + 1000;
+    return {
+      action: calls.length > 0 ? 'complete-only' : 'wait',
+      wakeAt: nextWake,
+      calls,
+      skippedItems,
+      remainingItemsAfterSkip: pendingItems,
+    };
+  }
+
+  // 4. We have at least one free builder slot! Look for the highest priority eligible item.
+  const inProgressBuildingIds = new Set<number>(
+    inProgress
+      .map((q) => Number(q.buildingId ?? q.id))
+      .filter((id) => Number.isFinite(id))
+  );
+
+  const inProgressProjectedLevels = new Map<number, number>(buildingLevels);
+  for (const q of inProgress) {
+    const qId = Number(q.buildingId ?? q.id);
+    const qLvl = Number(q.nextLevel ?? q.level);
+    if (Number.isFinite(qId) && Number.isFinite(qLvl)) {
+      inProgressProjectedLevels.set(qId, Math.max(inProgressProjectedLevels.get(qId) || 0, qLvl));
+    }
+  }
+
+  const hasBuildingData = buildingLevels.size > 0;
+  const currentHallLvl = buildingLevels.get(20);
+  const projectedHallLvl = inProgressProjectedLevels.get(20);
+
+  let startedCandidate: BuildingQueueItem | null = null;
+  let startedCandidateIndex = -1;
+
+  if (queueState?.enabled !== false && pendingItems.length > 0) {
+    for (let i = 0; i < pendingItems.length; i++) {
+      const item = pendingItems[i];
+      const bId = Number(item.buildingId);
+      const nextLvl = Number(item.nextLevel);
+
+      // Cannot upgrade the same building if it is already in progress in another parallel slot
+      if (inProgressBuildingIds.has(bId)) {
+        continue;
+      }
+
+      // Check if item's prerequisite is currently in-progress in the parallel slot
+      if (inProgress.length > 0 && hasBuildingData) {
+        // Hall limitation: if nextLvl exceeds current Hall, but parallel slot is currently building Hall
+        if (
+          bId !== 20 &&
+          Number.isFinite(currentHallLvl) &&
+          nextLvl > (currentHallLvl as number) &&
+          Number.isFinite(projectedHallLvl) &&
+          (projectedHallLvl as number) >= nextLvl
+        ) {
+          // Hall is being upgraded in parallel slot, skip this item for now
+          continue;
+        }
+
+        // Check if any missing prerequisite is currently being built in parallel slot
+        if (buildingDataHelper?.getMissingRequirements) {
+          const missingNow = buildingDataHelper.getMissingRequirements(bId, nextLvl, buildingLevels) || [];
+          if (missingNow.length > 0 && missingNow.some((m: any) => inProgressBuildingIds.has(m.buildingId))) {
+            // Prerequisite is being upgraded in parallel slot, skip this item for now
+            continue;
+          }
+        }
+      }
+
+      // Found the first valid item!
+      startedCandidate = item;
+      startedCandidateIndex = i;
+      break;
+    }
+  }
+
+  if (startedCandidate && startedCandidateIndex >= 0) {
+    const bId = Number(startedCandidate.buildingId);
+    const nextLvl = Number(startedCandidate.nextLevel);
     const currentLvl =
-      nextItem.currentLevel !== undefined ? Number(nextItem.currentLevel) : nextLvl > 1 ? nextLvl - 1 : 0;
+      startedCandidate.currentLevel !== undefined
+        ? Number(startedCandidate.currentLevel)
+        : nextLvl > 1
+        ? nextLvl - 1
+        : 0;
     const durationMs =
-      Number(nextItem.durationMs) ||
+      Number(startedCandidate.durationMs) ||
       calculateEffectiveDurationMs(bId, nextLvl) ||
       60000;
 
@@ -343,20 +441,53 @@ export function planNextStep(
     });
     calls.push({ name: 'getSummary', feature: 'building', args: {} });
 
+    const remainingItems = [
+      ...pendingItems.slice(0, startedCandidateIndex),
+      ...pendingItems.slice(startedCandidateIndex + 1),
+    ];
+
+    const allWakeTimes = [
+      ...inProgress.map((q) => getQueueEnd(q, now)),
+      now + durationMs,
+    ];
+    const nextWake = Math.min(...allWakeTimes) + 1000;
+
     return {
       action: 'start',
       startedItem: {
-        ...nextItem,
+        ...startedCandidate,
         buildingId: bId,
         nextLevel: nextLvl,
         currentLevel: currentLvl,
         durationMs,
       },
-      remainingItems: safeItems.slice(1),
-      wakeAt: now + durationMs + 1000,
+      remainingItems,
+      wakeAt: nextWake,
       calls,
       skippedItems,
-      remainingItemsAfterSkip: safeItems,
+      remainingItemsAfterSkip: pendingItems,
+    };
+  }
+
+  // If no item could be started because of prerequisite bottlenecks while other slots are working
+  if (inProgress.length > 0) {
+    const nextWake = Math.min(...inProgress.map((q) => getQueueEnd(q, now))) + 1000;
+    if (calls.length > 0) {
+      calls.push({ name: 'getSummary', feature: 'building', args: {} });
+      return {
+        action: 'complete-only',
+        wakeAt: nextWake,
+        calls,
+        skippedItems,
+        remainingItemsAfterSkip: pendingItems,
+      };
+    }
+    return {
+      action: 'wait',
+      wakeAt: nextWake,
+      calls: [],
+      skippedItems,
+      remainingItemsAfterSkip: pendingItems,
     };
   }
 
@@ -367,7 +498,7 @@ export function planNextStep(
       wakeAt: null,
       calls,
       skippedItems,
-      remainingItemsAfterSkip: safeItems,
+      remainingItemsAfterSkip: pendingItems,
     };
   }
 
@@ -376,7 +507,7 @@ export function planNextStep(
     wakeAt: null,
     calls: [],
     skippedItems,
-    remainingItemsAfterSkip: safeItems,
+    remainingItemsAfterSkip: pendingItems,
   };
 }
 

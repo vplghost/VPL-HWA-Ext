@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 import { buildingDataHelper } from '../src/data/buildingData.ts';
 import { buildingQueueService } from '../src/services/queues/buildingQueue.ts';
+import { dashboardQueues } from '../src/utils/dashboardState.ts';
 
 function createContext() {
   return {
@@ -326,4 +327,136 @@ test('getEligibleCandidates with includeUnbuilt option discovers unbuilt standal
   assert.ok(candidates.some((c) => c.id === 183 && c.nextLevel === 1), 'Headquarters 2 discovered as unbuilt candidate');
   assert.ok(candidates.some((c) => c.id === 184 && c.nextLevel === 1), 'Headquarters 3 discovered as unbuilt candidate');
   assert.ok(!candidates.some((c) => c.id === 23), 'Sub-structure Bed is never discovered');
+});
+
+test('multi-slot: planNextStep starts a parallel building when maxSlots is 2 and one slot is free', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+  const now = 1000000;
+
+  // Slot 1 is currently building #41 (starts at now, finishes at now + 50000)
+  const cache = {
+    buildingStatus: {
+      data: {
+        buildings: [
+          { buildingId: 20, level: 22 },
+          { buildingId: 41, level: 21 },
+          { buildingId: 29, level: 20 },
+        ],
+        queues: [
+          { buildingId: 41, nextLevel: 22, startDate: now, durationMs: 50000 },
+        ],
+      },
+    },
+  };
+
+  const queueState = {
+    enabled: true,
+    maxSlots: 2,
+    items: [
+      { buildingId: 29, nextLevel: 21, durationMs: 15000 },
+    ],
+  };
+
+  const step = qHelper.planNextStep(queueState, cache, now);
+  assert.equal(step.action, 'start');
+  assert.equal(step.startedItem.buildingId, 29);
+  assert.equal(step.startedItem.nextLevel, 21);
+  assert.equal(step.calls.some((c) => c.name === 'startConstruction' && c.args.buildingId === 29), true);
+});
+
+test('multi-slot: planNextStep skips item whose prerequisite is currently being upgraded in parallel slot', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+  const now = 1000000;
+
+  // Hall of Heroes #20 is currently at level 21, and slot 1 is upgrading it to 22.
+  // Item 0: Barracks #41 wants to go to level 22 (requires Hall 22, so it cannot be built now).
+  // Item 1: Building #29 wants to go to level 21 (requires Hall 21, which is ALREADY met).
+  const cache = {
+    buildingStatus: {
+      data: {
+        buildings: [
+          { buildingId: 20, level: 21 },
+          { buildingId: 41, level: 21 },
+          { buildingId: 29, level: 20 },
+        ],
+        queues: [
+          { buildingId: 20, nextLevel: 22, startDate: now, durationMs: 60000 },
+        ],
+      },
+    },
+  };
+
+  const queueState = {
+    enabled: true,
+    maxSlots: 2,
+    items: [
+      { buildingId: 41, nextLevel: 22, durationMs: 40000 }, // Bottlenecked by Hall 22 in slot 1 -> should SKIP
+      { buildingId: 29, nextLevel: 21, durationMs: 15000 }, // Eligible now -> should START
+    ],
+  };
+
+  const step = qHelper.planNextStep(queueState, cache, now);
+  assert.equal(step.action, 'start');
+  assert.equal(step.startedItem.buildingId, 29, 'Building 29 should start because Building 41 was skipped');
+  assert.equal(step.startedItem.nextLevel, 21);
+  // Skipped item 41 must still remain in remainingItems for future rounds!
+  assert.equal(step.remainingItems.length, 1);
+  assert.equal(step.remainingItems[0].buildingId, 41);
+});
+
+test('multi-slot: calculateQueueTimeline distributes items across 2 builders', () => {
+  const { hwaHelperBuildingQueue: qHelper } = createContext();
+  const now = 1000000;
+
+  const rawQueues = [
+    { buildingId: 41, level: 22, startDate: now, durationMs: 20000 }, // Builder 1 finishes at now + 20000
+    { buildingId: 29, level: 21, startDate: now, durationMs: 10000 }, // Builder 2 finishes at now + 10000
+  ];
+  const queueItems = [
+    { buildingId: 30, nextLevel: 21, durationMs: 15000 }, // Goes to Builder 2 (free at now + 10000 -> finishes 25000)
+    { buildingId: 31, nextLevel: 21, durationMs: 10000 }, // Goes to Builder 1 (free at now + 20000 -> finishes 30000)
+  ];
+
+  const timeline = qHelper.calculateQueueTimeline(rawQueues, queueItems, now, { maxSlots: 2 });
+  assert.equal(timeline.items[0].buildingId, 30);
+  assert.equal(timeline.items[0].estStart, now + 10000);
+  assert.equal(timeline.items[0].estFinish, now + 25000);
+
+  assert.equal(timeline.items[1].buildingId, 31);
+  assert.equal(timeline.items[1].estStart, now + 20000);
+  assert.equal(timeline.items[1].estFinish, now + 30000);
+
+  assert.equal(timeline.allDoneAt, now + 30000);
+  assert.equal(timeline.builderFreeAt, now + 10000);
+});
+
+test('dashboardQueues returns 2 slots for building queue with idle placeholder when 1 slot is free', () => {
+  const now = 1795332000000;
+  const cache = {
+    buildingStatus: {
+      data: {
+        queues: [
+          { buildingId: 41, level: 22, startDate: now - 5000, durationMs: 25000 },
+        ],
+      },
+    },
+  };
+
+  const res = dashboardQueues(cache, 'building', now);
+  assert.equal(res.state, 'active');
+  assert.equal(res.rows.length, 1);
+  assert.equal(res.slots.length, 2);
+
+  // Slot 1 is active
+  assert.equal(res.slots[0].slotIndex, 1);
+  assert.equal(res.slots[0].isIdle, false);
+  assert.equal(res.slots[0].entityId, 41);
+  assert.equal(res.slots[0].state, 'active');
+  assert.equal(res.slots[0].timerText, '20s');
+
+  // Slot 2 is idle placeholder
+  assert.equal(res.slots[1].slotIndex, 2);
+  assert.equal(res.slots[1].isIdle, true);
+  assert.equal(res.slots[1].state, 'idle');
+  assert.equal(res.slots[1].timerText, 'Idle');
 });

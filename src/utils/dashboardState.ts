@@ -86,7 +86,23 @@ export function calculateAccountMaxMarches(cache: Record<string, any>): number {
 
 export function dashboardQueues(cache: Record<string, any>, kind: 'building' | 'research', now = Date.now()) {
   const status = cache[`${kind}Status`]?.data ?? cache[`${kind}_getQueue`]?.data;
-  if (status == null) return { state: 'unknown', rows: [] };
+  if (status == null) {
+    const defaultSlotsCount = kind === 'building' ? 2 : 1;
+    const placeholderSlots = [];
+    for (let i = 0; i < defaultSlotsCount; i++) {
+      placeholderSlots.push({
+        slotIndex: i + 1,
+        id: `unknown-slot-${i}`,
+        entityId: null,
+        level: null,
+        state: 'unknown',
+        timerText: 'Syncing',
+        progressPercent: 0,
+        isIdle: false,
+      });
+    }
+    return { state: 'unknown', rows: [], slots: placeholderSlots };
+  }
   const raw = status.queues ?? status.queue ?? (Array.isArray(status) ? status
     : status[`${kind}Id`] != null || status.startDate != null || status.startTime != null ? [status]
     : Object.values(status).filter((value) => value && typeof value === 'object'));
@@ -103,7 +119,31 @@ export function dashboardQueues(cache: Record<string, any>, kind: 'building' | '
       progressPercent: state === 'ready' ? 100 : queueProgressPercent(queue, now),
     };
   });
-  return { state: rows.length ? 'active' : 'idle', rows };
+
+  const maxSlots = kind === 'building' ? Math.max(2, rows.length) : Math.max(1, rows.length);
+  const slots = [];
+  for (let i = 0; i < maxSlots; i++) {
+    if (rows[i]) {
+      slots.push({
+        slotIndex: i + 1,
+        isIdle: false,
+        ...rows[i],
+      });
+    } else {
+      slots.push({
+        slotIndex: i + 1,
+        id: `empty-slot-${i}`,
+        entityId: null,
+        level: null,
+        state: 'idle',
+        timerText: 'Idle',
+        progressPercent: 0,
+        isIdle: true,
+      });
+    }
+  }
+
+  return { state: rows.length ? 'active' : 'idle', rows, slots };
 }
 
 export function dashboardMarches(cache: Record<string, any>, now = Date.now()) {

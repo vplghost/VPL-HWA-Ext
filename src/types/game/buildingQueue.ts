@@ -4,6 +4,7 @@ export type { BuildingQueueItem };
 
 export interface BuildingQueueState {
   enabled?: boolean;
+  maxSlots?: number;
   items: BuildingQueueItem[];
   wakeAt?: number | null;
 }
