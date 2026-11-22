@@ -750,6 +750,7 @@ async function toggleRecording() {
             <div>Table size: {{ wasmTestResult.tableSize }} · Memory: {{ wasmTestResult.memorySizeMb }} MB</div>
             <div>String roundtrip: "{{ wasmTestResult.sampleString }}"</div>
             <div>Verified symbols ({{ wasmTestResult.verifiedSymbolsCount }}): {{ wasmTestResult.verifiedSymbols?.join(', ') }}</div>
+            <div v-if="wasmTestResult.stringClass">String class: {{ wasmTestResult.stringClass }}</div>
             <div v-if="wasmTestResult.verifiedPresets">Presets probed: {{ wasmTestResult.verifiedPresets }}</div>
           </div>
         </div>

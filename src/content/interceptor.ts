@@ -682,7 +682,99 @@ export function installInterceptor(customWindow?: any): void {
       let playPtr = 0;
 
       try {
-        // Step 1: Create presets for battle
+        // Helper: scan linear memory for IL2CPP System.String descriptor
+        const findStringClassFromHeap = (): number => {
+          const targetWords = ['BattleInstantPlay', 'BattlePresets', 'BattleData', 'dungeon', 'titan', 'Neutral', 'arena'];
+          const byteLen = memory.buffer.byteLength;
+          const maxScan = Math.min(byteLen, 256 * 1024 * 1024);
+          const u16 = heap.u16;
+
+          for (const word of targetWords) {
+            const wLen = word.length;
+            const codes = new Uint16Array(wLen);
+            for (let i = 0; i < wLen; i++) codes[i] = word.charCodeAt(i);
+            const firstCode = codes[0];
+
+            const u16Limit = (maxScan - (16 + wLen * 2)) >>> 1;
+            for (let i = 8; i < u16Limit; i += 2) {
+              if (u16[i] === firstCode) {
+                let match = true;
+                for (let j = 1; j < wLen; j++) {
+                  if (u16[i + j] !== codes[j]) {
+                    match = false;
+                    break;
+                  }
+                }
+                if (match) {
+                  const strPtr = (i * 2) - 12;
+                  if (strPtr >= 1024 && strPtr + 16 < byteLen) {
+                    const reportedLen = heap.i32[(strPtr + 8) >>> 2];
+                    const syncBlock = heap.u32[(strPtr + 4) >>> 2];
+                    const candidateKlass = heap.u32[strPtr >>> 2];
+                    if (reportedLen === wLen && syncBlock === 0 && candidateKlass > 65536 && candidateKlass < byteLen) {
+                      return candidateKlass;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          return 0;
+        };
+
+        // Step 1: Learn String class pointer
+        currentPhase = 'LEARN_STRING_CLASS';
+        let stringClassPtr = 0;
+
+        // Try getting stringClass from managed instances via Object.ToString
+        const probeObjects = [
+          () => callTableFn(sym.Presets_clanWarReplay, 1, 0),
+          () => callTableFn(sym.Presets_clanWarReplay, 0, 0),
+          () => callTableFn(sym.Presets_tower, 0, 0),
+          () => callTableFn(sym.Presets_createReplay, 0, 0),
+        ];
+
+        for (const probeFn of probeObjects) {
+          try {
+            const probePtr = probeFn();
+            if (probePtr > 0) {
+              const strSamplePtr = invokePtr('Object_ToString', probePtr);
+              if (strSamplePtr > 0) {
+                const kPtr = heap.u32[strSamplePtr >>> 2];
+                if (kPtr > 65536 && kPtr < memory.buffer.byteLength) {
+                  stringClassPtr = kPtr;
+                  break;
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        // If not found from live objects, scan heap memory for System.String instances
+        if (!stringClassPtr) {
+          stringClassPtr = findStringClassFromHeap();
+        }
+
+        if (!stringClassPtr) {
+          throw new Error('Failed to obtain IL2CPP String class descriptor from managed objects or memory scan');
+        }
+
+        const forgeString = (str: string): number => {
+          const len = str.length;
+          const ptr = malloc(16 + 2 * len) >>> 0;
+          if (!ptr) throw new Error('malloc failed for forgeString');
+          heap.u32[ptr >>> 2] = stringClassPtr;
+          heap.u32[(ptr + 4) >>> 2] = 0;
+          heap.i32[(ptr + 8) >>> 2] = len;
+          const u16Start = (ptr + 12) >>> 1;
+          for (let i = 0; i < len; i++) {
+            heap.u16[u16Start + i] = str.charCodeAt(i);
+          }
+          heap.u16[u16Start + len] = 0;
+          return ptr;
+        };
+
+        // Step 2: Create presets for battle
         // In HWA client, Presets_clanWarReplay: 0 = Titan replay, 1 = Hero replay
         currentPhase = 'CREATE_PRESETS';
         const isTitan = String(rawBattle?.type || '').toLowerCase().includes('titan');
@@ -744,7 +836,29 @@ export function installInterceptor(customWindow?: any): void {
           }
         }
 
-        // Direct constructor fallback if factory presets failed
+        // Managed BattlePresets constructor fallback (IL2CPP GetUninitializedObject)
+        if (!presetPtr) {
+          try {
+            const presetsTypeNamePtr = forgeString('BattlePresets');
+            let presetsTypePtr = 0;
+            try {
+              presetsTypePtr = invokePtr('Type_GetType', presetsTypeNamePtr);
+            } finally {
+              free(presetsTypeNamePtr);
+            }
+            if (presetsTypePtr > 0) {
+              const managedPresetsPtr = invokePtr('GetUninitializedObject', presetsTypePtr);
+              if (managedPresetsPtr > 0) {
+                callTableFn(sym.BattlePresets_ctorDefault, managedPresetsPtr, 0);
+                presetPtr = managedPresetsPtr;
+              }
+            }
+          } catch (e: any) {
+            candidateErrors.push(`Managed BattlePresets ctor failed: ${e?.message || String(e)}`);
+          }
+        }
+
+        // Raw malloc fallback if managed allocation wasn't available
         if (!presetPtr) {
           try {
             const fallbackPtr = malloc(128) >>> 0;
@@ -753,34 +867,13 @@ export function installInterceptor(customWindow?: any): void {
               presetPtr = fallbackPtr;
             }
           } catch (e: any) {
-            candidateErrors.push(`Fallback BattlePresets ctor failed: ${e?.message || String(e)}`);
+            candidateErrors.push(`Raw BattlePresets ctor failed: ${e?.message || String(e)}`);
           }
         }
 
         if (!presetPtr) {
           throw new Error(`Failed to create BattlePresets for simulation (isTitan: ${isTitan}). Candidates: [${candidateErrors.join('; ')}]`);
         }
-
-        // Step 2: Learn String class pointer from Object.ToString(presetPtr)
-        currentPhase = 'LEARN_STRING_CLASS';
-        const strSamplePtr = invokePtr('Object_ToString', presetPtr);
-        if (!strSamplePtr) throw new Error('Failed to obtain String class descriptor from Object.ToString');
-        const stringClassPtr = heap.u32[strSamplePtr >>> 2];
-
-        const forgeString = (str: string): number => {
-          const len = str.length;
-          const ptr = malloc(16 + 2 * len) >>> 0;
-          if (!ptr) throw new Error('malloc failed for forgeString');
-          heap.u32[ptr >>> 2] = stringClassPtr;
-          heap.u32[(ptr + 4) >>> 2] = 0;
-          heap.i32[(ptr + 8) >>> 2] = len;
-          const u16Start = (ptr + 12) >>> 1;
-          for (let i = 0; i < len; i++) {
-            heap.u16[u16Start + i] = str.charCodeAt(i);
-          }
-          heap.u16[u16Start + len] = 0;
-          return ptr;
-        };
 
         // Step 3: Serialize and parse JSON input into game data structure
         currentPhase = 'PARSE_JSON_INPUT';
@@ -1042,11 +1135,59 @@ export function installInterceptor(customWindow?: any): void {
         { name: 'tower(0)', idx: 468118, args: [0] },
       ];
       const verifiedPresets: string[] = [];
+      let probedStringClass = 0;
+
       for (const p of presetCandidates) {
         try {
           const ptr = callTableFn(p.idx, ...p.args);
-          if (ptr > 0) verifiedPresets.push(`${p.name} (0x${ptr.toString(16)})`);
+          if (ptr > 0) {
+            verifiedPresets.push(`${p.name} (0x${ptr.toString(16)})`);
+            if (!probedStringClass) {
+              const strFn = table.get(sym.Object_ToString);
+              if (typeof strFn === 'function') {
+                const sPtr = (strFn(ptr, 0) >>> 0);
+                if (sPtr > 0) {
+                  const k = heap.u32[sPtr >>> 2];
+                  if (k > 65536 && k < memory.buffer.byteLength) {
+                    probedStringClass = k;
+                  }
+                }
+              }
+            }
+          }
         } catch (_) {}
+      }
+
+      if (!probedStringClass) {
+        const targetWords = ['BattleInstantPlay', 'BattlePresets', 'BattleData', 'dungeon', 'titan'];
+        const maxScan = Math.min(memory.buffer.byteLength, 256 * 1024 * 1024);
+        const u16 = heap.u16;
+        for (const word of targetWords) {
+          const wLen = word.length;
+          const firstCode = word.charCodeAt(0);
+          const u16Limit = (maxScan - (16 + wLen * 2)) >>> 1;
+          for (let i = 8; i < u16Limit && !probedStringClass; i += 2) {
+            if (u16[i] === firstCode) {
+              let match = true;
+              for (let j = 1; j < wLen; j++) {
+                if (u16[i + j] !== word.charCodeAt(j)) { match = false; break; }
+              }
+              if (match) {
+                const strPtr = (i * 2) - 12;
+                if (strPtr >= 1024 && strPtr + 16 < memory.buffer.byteLength) {
+                  const rLen = heap.i32[(strPtr + 8) >>> 2];
+                  const sync = heap.u32[(strPtr + 4) >>> 2];
+                  const candKlass = heap.u32[strPtr >>> 2];
+                  if (rLen === wLen && sync === 0 && candKlass > 65536 && candKlass < memory.buffer.byteLength) {
+                    probedStringClass = candKlass;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          if (probedStringClass) break;
+        }
       }
 
       return {
@@ -1056,7 +1197,10 @@ export function installInterceptor(customWindow?: any): void {
         sampleString: readBack,
         verifiedSymbolsCount: verifiedSyms.length,
         verifiedSymbols: verifiedSyms.slice(0, 5),
-        verifiedPresets: verifiedPresets.length > 0 ? verifiedPresets.join(', ') : 'Direct ctor fallback available',
+        stringClass: probedStringClass > 0 ? `0x${probedStringClass.toString(16)}` : 'Not found',
+        verifiedPresets: verifiedPresets.length > 0
+          ? verifiedPresets.join(', ')
+          : (probedStringClass ? 'Managed GetUninitializedObject fallback ready' : 'Direct ctor fallback available'),
         timestamp: new Date().toISOString()
       };
     } catch (err: any) {
