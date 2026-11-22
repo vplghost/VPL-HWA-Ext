@@ -2,10 +2,23 @@ import { onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
 import { normalizeArray } from '../utils/troops.ts';
 import { teamMemberIds } from '../utils/teamMembers.ts';
 
-export interface AccountTeam { id: string; name: string; heroIds: number[]; maxTroops?: number }
+export interface AccountTeam { id: string; name: string; heroIds: number[]; type?: 'hero' | 'titan'; maxTroops?: number }
 export function normalizeAccountTeams(raw: unknown): AccountTeam[] {
   return normalizeArray(raw).filter(team => team && typeof team === 'object' && team.id != null)
-    .map(team => ({ ...team, heroIds: teamMemberIds(team.heroIds) }));
+    .map(team => {
+      const ids = teamMemberIds(team.heroIds);
+      const isTitan = team.type === 'titan' || (ids.length > 0 && ids.every(id => Number(id) >= 4000));
+      const res: AccountTeam = {
+        ...team,
+        heroIds: ids
+      };
+      if (team.type != null) {
+        res.type = team.type;
+      } else if (isTitan) {
+        res.type = 'titan';
+      }
+      return res;
+    });
 }
 
 export function useAccountTeams(accountId: Ref<string | number | undefined>) {

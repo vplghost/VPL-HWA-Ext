@@ -27,6 +27,7 @@ function setup(data) {
   const context = { ref: Vue.ref, computed: Vue.computed, normalizeArray, formatNumber,
     getTitanMetadata,
     useRpcCache: () => ({ cache, dispatchRpc() {}, updateCacheLocally() {} }),
+    useAccountTeams: () => ({ customTeams: Vue.ref([]) }),
     defineProps: () => ({ modelValue: true }), defineEmits: () => () => {},
     onMounted() {}, onUnmounted() {}, watch() {} };
   vm.runInNewContext(js + '\nglobalThis.api = { doors, activeBattle, floorNumber, handleImgError };', context);

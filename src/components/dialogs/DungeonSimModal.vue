@@ -3,55 +3,17 @@ import { ref, computed, watch } from 'vue';
 import { getTitanMetadata } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import UnitStars from '@/src/components/common/UnitStars.vue';
-import {
-  hasHealingTitan,
-  HEALING_TITAN_IDS,
-} from '@/src/utils/dungeonBattleHistory';
 import { getEffectiveTitanStates, DEFAULT_TITAN_POOLS } from '@/src/services/queues/dungeonAutomation';
-
-export interface SimTitanItem {
-  id: number;
-  name: string;
-  element: string;
-  role: string;
-  avatar: string | null;
-  hp: number;
-  maxHp: number;
-  hpPct: number;
-  energy: number;
-  energyPct: number;
-  isDead: boolean;
-  power?: number;
-  level?: number;
-  star?: number;
-  isDualElement?: boolean;
-}
-
-export interface SimResultPayload {
-  win: boolean;
-  stars: number;
-  duration: number;
-  seed: number;
-  attackers: Record<string, { hp: number; maxHp: number; energy: number; isDead: boolean; hpDelta: number }>;
-  defenders: Record<string, { hp: number; isDead: boolean }>;
-  rawBattle?: any;
-  endArgs?: any;
-}
-
-/**
- * Spirit / Elarite titans with secondary elemental associations in Hero Wars Alliance:
- * - Orm (4052): Water / Elarite Support -> allowed in Water doors
- * - Alecto (4051): Fire / Elarite Marksman -> allowed in Fire doors
- * - Pallant (4050): Earth / Elarite Tank -> allowed in Earth doors
- */
-const DUAL_ELEMENT_TITANS: Record<string, number[]> = {
-  water: [4052],
-  fire: [4051],
-  earth: [4050],
-};
-
-const DUNGEON_SAVED_LINEUPS_KEY = 'dungeonSavedLineups';
+import {
+  simulateBattleLocally,
+  DUAL_ELEMENT_TITANS,
+  DUNGEON_SAVED_LINEUPS_KEY,
+  isTitanEligibleForDoor,
+  type SimTitanItem,
+  type SimResultPayload,
+} from '@/src/utils/dungeonBattleSim';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -67,6 +29,7 @@ const emit = defineEmits<{
 }>();
 
 const { cache, dispatchRpc } = useRpcCache();
+const { customTeams } = useAccountTeams();
 
 const selectedTitanIds = ref<number[]>([]);
 const isSimulating = ref(false);
@@ -75,6 +38,105 @@ const simResult = ref<SimResultPayload | null>(null);
 const errorMessage = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
 const savedLineups = ref<Record<string, number[]>>({});
+const showTeamDropdown = ref(false);
+
+interface TeamPresetOption {
+  id: string;
+  label: string;
+  category: 'saved' | 'server' | 'custom';
+  memberIds: number[];
+  eligibleCount: number;
+}
+
+const availableTeamPresets = computed<TeamPresetOption[]>(() => {
+  const list: TeamPresetOption[] = [];
+  const elemKey = doorElementKey.value;
+  const isMixed = isMixedDoor.value;
+
+  // 1. Saved lineup for this element
+  const saved = savedLineups.value[elemKey];
+  if (Array.isArray(saved) && saved.length > 0) {
+    const ids = saved.map(Number);
+    const eligibleCount = ids.filter((id) => isTitanEligibleForDoor(id, doorElement.value, getTitanMetadata(id))).length;
+    list.push({
+      id: `saved_${elemKey}`,
+      label: `💾 Saved ${doorElement.value} Lineup`,
+      category: 'saved',
+      memberIds: ids,
+      eligibleCount,
+    });
+  }
+
+  // 2. Server teams (teamGetAll)
+  const serverTeamsObj = cache.value.teamGetAll?.data || {};
+  const serverKeys = [
+    { key: `dungeon_${elemKey}`, label: `🏰 Server Dungeon (${doorElement.value})` },
+    { key: 'dungeon', label: '🏰 Server Dungeon (Mixed)' },
+    { key: 'dungeon_water', label: '🏰 Server Water Team' },
+    { key: 'dungeon_fire', label: '🏰 Server Fire Team' },
+    { key: 'dungeon_earth', label: '🏰 Server Earth Team' },
+  ];
+
+  const seenServerKeys = new Set<string>();
+  for (const sk of serverKeys) {
+    if (seenServerKeys.has(sk.key)) continue;
+    seenServerKeys.add(sk.key);
+    const rawIds = serverTeamsObj[sk.key];
+    if (Array.isArray(rawIds) && rawIds.length > 0) {
+      const ids = rawIds.map(Number).filter((id) => id >= 4000);
+      if (ids.length > 0) {
+        const eligibleCount = ids.filter((id) => isTitanEligibleForDoor(id, doorElement.value, getTitanMetadata(id))).length;
+        if (eligibleCount > 0) {
+          list.push({
+            id: `server_${sk.key}`,
+            label: sk.label,
+            category: 'server',
+            memberIds: ids,
+            eligibleCount,
+          });
+        }
+      }
+    }
+  }
+
+  // 3. Custom Titan Teams
+  for (const ct of customTeams.value) {
+    const isTitanTeam = ct.type === 'titan' || ct.heroIds.some((id) => Number(id) >= 4000);
+    if (!isTitanTeam) continue;
+    const ids = ct.heroIds.map(Number);
+    const eligibleCount = ids.filter((id) => isTitanEligibleForDoor(id, doorElement.value, getTitanMetadata(id))).length;
+    if (eligibleCount > 0) {
+      list.push({
+        id: `custom_${ct.id}`,
+        label: `⚡ ${ct.name}`,
+        category: 'custom',
+        memberIds: ids,
+        eligibleCount,
+      });
+    }
+  }
+
+  return list;
+});
+
+function applyPresetTeam(teamMemberIds: number[]) {
+  const aliveMap = new Map(availableTitans.value.filter((t) => !t.isDead).map((t) => [t.id, t]));
+  const picked: number[] = [];
+
+  // Pick eligible and alive titans from the preset
+  for (const id of teamMemberIds) {
+    const numId = Number(id);
+    if (aliveMap.has(numId) && isTitanEligibleForDoor(numId, doorElement.value, getTitanMetadata(numId)) && !picked.includes(numId)) {
+      picked.push(numId);
+      if (picked.length >= 5) break;
+    }
+  }
+
+  selectedTitanIds.value = picked;
+  simResult.value = null;
+  errorMessage.value = null;
+  showTeamDropdown.value = false;
+}
 
 // Door requirements
 const doorElement = computed<string>(() => {
@@ -335,105 +397,6 @@ async function handleRunSimulation() {
 }
 
 /**
- * Local battle outcome simulation based on damage curves, healers, and survivability
- */
-function simulateBattleLocally(
-  rawBattle: any,
-  seed: number,
-  teamIds: number[],
-  states: Record<string, any>
-): SimResultPayload {
-  const hasHealer = hasHealingTitan(teamIds);
-  const isEarth = teamIds.some((id) => id >= 4020 && id <= 4024);
-  const isWater = teamIds.some((id) => (id >= 4000 && id <= 4004) || id === 4052);
-
-  // Frontline tank check
-  const frontlineId = teamIds[0];
-  const frontlineState = states[String(frontlineId)] || {};
-  const frontlineCurHp = Number(frontlineState.hp) || 1000000;
-  const frontlineMaxHp = Number(frontlineState.maxHp) || 1000000;
-  const frontlineHpPct = (frontlineCurHp / frontlineMaxHp) * 100;
-
-  // Frontline tank mortality threshold: If tank < 30% HP and no Major Healer -> casualty
-  const tankFatal = frontlineHpPct < 30 && !isWater;
-
-  const attackersOutput: Record<string, any> = {};
-  let totalDelta = 0;
-
-  teamIds.forEach((id, idx) => {
-    const s = states[String(id)] || {};
-    const maxHp = Number(s.maxHp) || 1000000;
-    const curHp = Number(s.hp) || maxHp;
-    const curEnergy = Number(s.energy) || 0;
-
-    let finalHp = curHp;
-    let isDead = false;
-
-    if (idx === 0 && tankFatal) {
-      finalHp = 0;
-      isDead = true;
-    } else if (hasHealer) {
-      // Recover 8% - 25% HP when healer is present
-      const healAmt = Math.round(maxHp * (isWater ? 0.25 : 0.08));
-      finalHp = Math.min(maxHp, curHp + healAmt);
-    } else {
-      // No healer: minor chip damage (3% - 8%)
-      const dmg = Math.round(maxHp * (0.04 + (idx === 0 ? 0.06 : 0.02)));
-      finalHp = Math.max(1, curHp - dmg);
-    }
-
-    const hpDelta = finalHp - curHp;
-    totalDelta += hpDelta;
-    const finalEnergy = Math.min(1000, curEnergy + 400);
-
-    attackersOutput[String(id)] = {
-      hp: finalHp,
-      maxHp,
-      energy: finalEnergy,
-      isDead,
-      hpDelta,
-    };
-  });
-
-  const stars = tankFatal ? 2 : 3;
-  const duration = tankFatal ? 24.0 : (isWater ? 18.5 : 14.2);
-
-  const progressAttackersHeroes: Record<string, any> = {};
-  for (const [id, s] of Object.entries(attackersOutput)) {
-    if (!s.isDead) {
-      progressAttackersHeroes[id] = {
-        isDead: false,
-        hp: s.hp,
-        energy: s.energy,
-      };
-    }
-  }
-
-  const endArgs = {
-    result: { win: true, stars },
-    progress: [
-      {
-        defenders: { heroes: {}, input: [] },
-        attackers: { heroes: progressAttackersHeroes, input: [] },
-        duration,
-        seed,
-      },
-    ],
-  };
-
-  return {
-    win: true,
-    stars,
-    duration,
-    seed,
-    attackers: attackersOutput,
-    defenders: {},
-    rawBattle,
-    endArgs,
-  };
-}
-
-/**
  * Accept simulation outcome and submit officially to the game server.
  * Saves the chosen lineup for this door's element type.
  */
@@ -582,7 +545,47 @@ async function handleSubmitOfficial() {
                 </span>
               </div>
 
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 relative">
+                <!-- Team Presets Dropdown -->
+                <div class="relative">
+                  <button
+                    type="button"
+                    class="cursor-pointer text-blue-600 dark:text-blue-400 hover:underline font-semibold text-2xs inline-flex items-center gap-1"
+                    @click="showTeamDropdown = !showTeamDropdown"
+                  >
+                    <span>📋 Load Team</span>
+                    <span class="text-[9px]">▾</span>
+                  </button>
+
+                  <div
+                    v-if="showTeamDropdown"
+                    class="absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl z-50 p-1.5 space-y-1 text-xs"
+                  >
+                    <div class="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-700/60">
+                      Preset Teams
+                    </div>
+
+                    <div v-if="availableTeamPresets.length === 0" class="px-2 py-2 text-slate-400 text-center text-[11px]">
+                      No preset teams found.
+                    </div>
+
+                    <div v-else class="max-h-48 overflow-y-auto space-y-0.5">
+                      <button
+                        v-for="preset in availableTeamPresets"
+                        :key="preset.id"
+                        type="button"
+                        class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                        @click="applyPresetTeam(preset.memberIds)"
+                      >
+                        <span class="truncate font-medium text-slate-700 dark:text-slate-200">{{ preset.label }}</span>
+                        <span class="text-[10px] text-slate-400 font-mono shrink-0 ml-1">
+                          ({{ preset.eligibleCount }}/5)
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   class="cursor-pointer text-indigo-600 dark:text-indigo-400 hover:underline font-semibold text-2xs"

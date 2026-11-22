@@ -13,6 +13,9 @@ import { getTitanMetadata } from '@/src/utils/metadata';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
 import { getEffectiveTitanStates } from '@/src/services/queues/dungeonAutomation';
+import { useAccountTeams } from '@/src/composables/useAccountTeams';
+import { executeDungeonAutomationStep } from '@/src/services/queues/dungeonAutomationRunner';
+import { DUNGEON_SAVED_LINEUPS_KEY } from '@/src/utils/dungeonBattleSim';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -216,6 +219,67 @@ async function resetActiveBattle() {
   await refreshDungeon();
 }
 
+const { customTeams } = useAccountTeams();
+const isAutomating = ref(false);
+const autoStopRequested = ref(false);
+const autoStatusMessage = ref<string | null>(null);
+const autoFloorCount = ref(0);
+
+async function startAutomation() {
+  if (isAutomating.value) return;
+  isAutomating.value = true;
+  autoStopRequested.value = false;
+  autoStatusMessage.value = 'Automation started. Simulating doors...';
+  autoFloorCount.value = 0;
+
+  // Load persistent saved lineups
+  let savedLineups: Record<string, number[]> = {};
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const res = await chrome.storage.local.get(DUNGEON_SAVED_LINEUPS_KEY);
+      if (res?.[DUNGEON_SAVED_LINEUPS_KEY]) {
+        savedLineups = res[DUNGEON_SAVED_LINEUPS_KEY];
+      }
+    } catch (_) {}
+  }
+
+  try {
+    while (isAutomating.value && !autoStopRequested.value) {
+      const step = await executeDungeonAutomationStep({
+        cache,
+        dispatchRpc,
+        savedLineups,
+        customTeams: customTeams.value,
+        safetyThresholdPct: 20,
+      });
+
+      if (step.stopped) {
+        autoStatusMessage.value = step.stopReason || 'Automation stopped.';
+        break;
+      }
+
+      autoFloorCount.value++;
+      const chosen = step.chosenEvaluation;
+      const tankLoss = chosen?.tankLossPct != null ? chosen.tankLossPct.toFixed(1) : '0';
+      const teamLoss = chosen?.teamLossPct != null ? chosen.teamLossPct.toFixed(1) : '0';
+      autoStatusMessage.value = `Floor ${step.floorPassed} cleared via Door ${(step.doorIdx ?? 0) + 1} (${step.doorElement}). Tank loss: ${tankLoss}%, Team loss: ${teamLoss}%.`;
+
+      // Brief delay between floors to avoid rapid-fire RPC and give UI time to reflect state
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+  } catch (err: any) {
+    autoStatusMessage.value = `Automation error: ${err.message || String(err)}`;
+  } finally {
+    isAutomating.value = false;
+  }
+}
+
+function stopAutomation() {
+  autoStopRequested.value = true;
+  isAutomating.value = false;
+  autoStatusMessage.value = 'Automation stopped by user.';
+}
+
 function getTitanName(id: number | string): string {
   const meta = getTitanMetadata(id);
   return meta?.name || `Titan ${id}`;
@@ -258,14 +322,28 @@ function handleImgError(e: Event) {
           </div>
 
           <div class="flex items-center gap-2">
-            <!-- Hidden Auto Button matching legacy HTML contract -->
+            <!-- Automation Run/Stop Button -->
             <button
+              v-if="!isAutomating"
               id="dungeon-auto-btn"
-              hidden
               type="button"
-              class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-blue-500 bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs"
+              class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-emerald-500 bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs transition-all"
+              title="Start intelligent dungeon automation (picks safest door, stops if HP < 20%)"
+              @click="startAutomation"
             >
+              <span>⚡</span>
               <span class="dungeon-auto-label">Auto Attack</span>
+            </button>
+            <button
+              v-else
+              id="dungeon-stop-auto-btn"
+              type="button"
+              class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-rose-500 bg-rose-600 hover:bg-rose-500 active:scale-95 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs transition-all animate-pulse"
+              title="Stop ongoing dungeon automation"
+              @click="stopAutomation"
+            >
+              <span>🛑</span>
+              <span>Stop Auto</span>
             </button>
 
             <!-- Refresh Button -->
@@ -311,6 +389,38 @@ function handleImgError(e: Event) {
 
         <!-- Modal Body -->
         <div id="dungeon-modal-body" class="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+          <!-- Automation Status Banner -->
+          <div
+            v-if="autoStatusMessage"
+            class="rounded-xl border p-3.5 space-y-1.5 transition-all text-xs"
+            :class="
+              isAutomating
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200'
+                : autoStatusMessage.includes('stopped') || autoStatusMessage.includes('threshold') || autoStatusMessage.includes('below')
+                ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                : 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200'
+            "
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 font-bold">
+                <span v-if="isAutomating" class="inline-flex size-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span>{{ isAutomating ? '⚡ Automation Running' : '🛑 Automation Info' }}</span>
+                <span v-if="autoFloorCount > 0" class="rounded bg-white/70 dark:bg-slate-800/80 px-1.5 py-0.2 text-[10px] font-mono">
+                  +{{ autoFloorCount }} floors passed
+                </span>
+              </div>
+              <button
+                v-if="!isAutomating"
+                type="button"
+                class="cursor-pointer text-[10px] opacity-70 hover:opacity-100"
+                @click="autoStatusMessage = null"
+              >
+                ✕ Clear
+              </button>
+            </div>
+            <p class="font-medium leading-relaxed">{{ autoStatusMessage }}</p>
+          </div>
+
           <!-- Active Battle Banner -->
           <div
             v-if="activeBattle"

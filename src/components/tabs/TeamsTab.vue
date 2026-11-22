@@ -13,6 +13,7 @@ interface CustomTeam {
   id: string;
   name: string;
   heroIds: number[];
+  type?: 'hero' | 'titan';
   maxTroops?: number;
 }
 
@@ -28,6 +29,8 @@ const editingTeamId = ref<string | null>(null);
 const isRefreshing = ref(false);
 
 const formName = ref('');
+const formTeamType = ref<'hero' | 'titan'>('hero');
+const customTeamFilter = ref<'all' | 'hero' | 'titan'>('all');
 const formMaxTroops = ref<string>('');
 const selectedHeroIds = ref<number[]>([]);
 const heroSearch = ref('');
@@ -130,8 +133,49 @@ const filteredHeroes = computed(() => {
   );
 });
 
-function openAddTeam() {
+// Available titans sorted by power descending
+const sortedTitans = computed(() => {
+  return Object.entries(titansData.value)
+    .map(([id, titan]: [string, any]) => {
+      const meta = getTitanMetadata(id);
+      return {
+        id: Number(id),
+        name: meta?.name || `Titan #${id}`,
+        element: meta?.element || '',
+        role: meta?.role || '',
+        power: Number(titan.power) || 0,
+        level: Number(titan.level) || 1,
+        star: Number(titan.star) || 1,
+      };
+    })
+    .sort((a, b) => b.power - a.power);
+});
+
+const filteredTitans = computed(() => {
+  const q = heroSearch.value.trim().toLowerCase();
+  if (!q) return sortedTitans.value;
+  return sortedTitans.value.filter(
+    (t) =>
+      t.name.toLowerCase().includes(q) ||
+      String(t.id).includes(q) ||
+      t.element.toLowerCase().includes(q) ||
+      t.role.toLowerCase().includes(q)
+  );
+});
+
+const visibleCustomTeams = computed(() => {
+  if (customTeamFilter.value === 'hero') {
+    return customTeams.value.filter((t) => t.type !== 'titan' && !teamMemberIds(t.heroIds).some((id) => Number(id) >= 4000));
+  }
+  if (customTeamFilter.value === 'titan') {
+    return customTeams.value.filter((t) => t.type === 'titan' || teamMemberIds(t.heroIds).some((id) => Number(id) >= 4000));
+  }
+  return customTeams.value;
+});
+
+function openAddTeam(type: 'hero' | 'titan' = 'hero') {
   editingTeamId.value = null;
+  formTeamType.value = type;
   formName.value = '';
   formMaxTroops.value = '';
   selectedHeroIds.value = [];
@@ -142,6 +186,7 @@ function openAddTeam() {
 
 function openEditTeam(team: CustomTeam) {
   editingTeamId.value = team.id;
+  formTeamType.value = team.type || (team.heroIds.some((id) => Number(id) >= 4000) ? 'titan' : 'hero');
   formName.value = team.name;
   formMaxTroops.value = team.maxTroops !== undefined ? String(team.maxTroops) : '';
   selectedHeroIds.value = teamMemberIds(team.heroIds);
@@ -150,8 +195,10 @@ function openEditTeam(team: CustomTeam) {
   isEditing.value = true;
 }
 
-function cloneServerTeamToCustom(st: { label: string; heroIds: number[] }) {
+function cloneServerTeamToCustom(st: { label: string; heroIds: number[]; mode?: string }) {
   editingTeamId.value = null;
+  const isTitan = st.heroIds.some((id) => Number(id) >= 4000) || String(st.mode || '').includes('dungeon');
+  formTeamType.value = isTitan ? 'titan' : 'hero';
   formName.value = `${st.label} Team`;
   formMaxTroops.value = '';
   selectedHeroIds.value = st.heroIds.slice(0, 5);
@@ -181,20 +228,21 @@ async function saveTeam() {
     return;
   }
   if (selectedHeroIds.value.length !== 5) {
-    formError.value = `Select exactly 5 heroes (${selectedHeroIds.value.length}/5 selected).`;
+    formError.value = `Select exactly 5 ${formTeamType.value === 'titan' ? 'titans' : 'heroes'} (${selectedHeroIds.value.length}/5 selected).`;
     return;
   }
 
   const maxTroops = formMaxTroops.value === '' ? undefined : Number(formMaxTroops.value);
-  if (maxTroops !== undefined && (!Number.isSafeInteger(maxTroops) || maxTroops <= 0)) {
+  if (formTeamType.value === 'hero' && maxTroops !== undefined && (!Number.isSafeInteger(maxTroops) || maxTroops <= 0)) {
     formError.value = 'Troop limit must be a positive whole number.';
     return;
   }
   const team: CustomTeam = {
     id: editingTeamId.value || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `team_${Date.now()}`),
     name: formName.value.trim(),
+    type: formTeamType.value,
     heroIds: [...selectedHeroIds.value],
-    maxTroops,
+    maxTroops: formTeamType.value === 'titan' ? undefined : maxTroops,
   };
 
   const next = [...customTeams.value.filter((t) => t.id !== team.id), team];
@@ -298,15 +346,24 @@ function getTeamPower(memberIds: unknown): number {
           <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
         </button>
 
-        <button
-          v-if="!isEditing"
-          id="btn-add-custom-team"
-          type="button"
-          class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors"
-          @click="openAddTeam"
-        >
-          <span>+ Add Custom Team</span>
-        </button>
+        <template v-if="!isEditing">
+          <button
+            id="btn-add-custom-team"
+            type="button"
+            class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors"
+            @click="openAddTeam('hero')"
+          >
+            <span>+ Add Hero Team</span>
+          </button>
+          <button
+            id="btn-add-titan-team"
+            type="button"
+            class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors"
+            @click="openAddTeam('titan')"
+          >
+            <span>⚡ + Add Titan Team</span>
+          </button>
+        </template>
       </div>
     </div>
 
@@ -317,9 +374,29 @@ function getTeamPower(memberIds: unknown): number {
       class="rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 p-4 space-y-3.5 shadow-sm"
     >
       <div class="flex items-center justify-between border-b border-blue-100 dark:border-blue-900/40 pb-2.5">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
-          {{ editingTeamId ? 'Edit Custom Team' : 'Create Custom Team' }}
-        </h3>
+        <div class="flex items-center gap-3">
+          <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
+            {{ editingTeamId ? 'Edit Custom Team' : 'Create Custom Team' }}
+          </h3>
+          <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-100 dark:bg-slate-800">
+            <button
+              type="button"
+              class="cursor-pointer px-2.5 py-1 text-xs font-semibold rounded-md transition-colors"
+              :class="formTeamType === 'hero' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+              @click="formTeamType = 'hero'; selectedHeroIds = []"
+            >
+              🦸 Hero Team
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2.5 py-1 text-xs font-semibold rounded-md transition-colors"
+              :class="formTeamType === 'titan' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+              @click="formTeamType = 'titan'; selectedHeroIds = []"
+            >
+              ⚡ Titan Team
+            </button>
+          </div>
+        </div>
         <button
           type="button"
           class="cursor-pointer text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
@@ -335,13 +412,13 @@ function getTeamPower(memberIds: unknown): number {
           <input
             v-model="formName"
             type="text"
-            placeholder="e.g. Boss Slayers, Farm Squad..."
+            :placeholder="formTeamType === 'titan' ? 'e.g. Water Rush, Dungeon Core...' : 'e.g. Boss Slayers, Farm Squad...'"
             maxlength="80"
             class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500"
           />
         </label>
 
-        <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">
+        <label v-if="formTeamType === 'hero'" class="block text-xs font-medium text-slate-700 dark:text-slate-300">
           Maximum Troops (blank = automatic)
           <input
             v-model="formMaxTroops"
@@ -351,6 +428,9 @@ function getTeamPower(memberIds: unknown): number {
             class="mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500"
           />
         </label>
+        <div v-else class="flex flex-col justify-end text-xs text-slate-500 dark:text-slate-400 pb-1">
+          <span>⚡ Titan squad for Dungeon & Tournament. Troop limits do not apply to Titans.</span>
+        </div>
       </div>
 
       <!-- Selected Heroes Preview -->
@@ -423,21 +503,81 @@ function getTeamPower(memberIds: unknown): number {
         </div>
       </div>
 
-      <!-- Hero Picker Search & Grid -->
+      <!-- Picker Search & Grid -->
       <div class="space-y-2 pt-2 border-t border-blue-100 dark:border-blue-900/40">
         <div class="flex items-center justify-between gap-2">
           <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
-            Choose 5 Heroes:
+            {{ formTeamType === 'titan' ? 'Choose 5 Titans:' : 'Choose 5 Heroes:' }}
           </label>
           <input
             v-model="heroSearch"
             type="search"
-            placeholder="Search hero..."
+            :placeholder="formTeamType === 'titan' ? 'Search titan...' : 'Search hero...'"
             class="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-800 dark:text-slate-200 w-44 outline-none"
           />
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-52 overflow-y-auto p-1 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900">
+        <!-- Titans Grid -->
+        <div
+          v-if="formTeamType === 'titan'"
+          class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-52 overflow-y-auto p-1 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
+        >
+          <button
+            v-for="t in filteredTitans"
+            :key="t.id"
+            type="button"
+            class="hero-hover-trigger cursor-pointer text-left flex items-center justify-between p-1.5 rounded-md text-xs transition-colors"
+            :class="
+              selectedHeroIds.includes(t.id)
+                ? 'bg-amber-600 text-white font-semibold'
+                : selectedHeroIds.length >= 5
+                ? 'opacity-40 cursor-not-allowed text-slate-600 dark:text-slate-400'
+                : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
+            "
+            @click="toggleHero(t.id)"
+          >
+            <div class="flex items-center gap-1.5 min-w-0 pr-1">
+              <span
+                class="relative size-5 rounded-full overflow-hidden shrink-0 inline-flex items-center justify-center border bg-slate-200 dark:bg-slate-700"
+                :class="getMemberStarGlow(t.id)"
+              >
+                <img
+                  v-if="getMemberAvatarUrl(t.id)"
+                  :src="getMemberAvatarUrl(t.id)"
+                  :alt="t.name"
+                  class="size-full object-cover"
+                  loading="lazy"
+                />
+                <span v-else class="text-[9px]">⚡</span>
+              </span>
+              <div class="truncate flex items-center gap-1">
+                <span class="truncate">{{ t.name }}</span>
+                <span class="text-[9px] px-1 py-0.2 rounded font-mono shrink-0 uppercase"
+                  :class="
+                    t.element === 'water' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' :
+                    t.element === 'fire' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300' :
+                    t.element === 'earth' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300' :
+                    'bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300'
+                  "
+                >
+                  {{ t.element }}
+                </span>
+              </div>
+            </div>
+            <span class="text-[10px] font-mono shrink-0 opacity-80">{{ formatNumber(t.power) }}</span>
+            <TitanHoverCard
+              :titan-id="t.id"
+              :titan="getMemberSnapshot(t.id)"
+              :inventory="cache.inventoryGet?.data"
+            />
+          </button>
+        </div>
+
+        <!-- Heroes Grid -->
+        <div
+          v-else
+          class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-52 overflow-y-auto p-1 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
+        >
           <button
             v-for="h in filteredHeroes"
             :key="h.id"
@@ -504,33 +644,79 @@ function getTeamPower(memberIds: unknown): number {
 
     <!-- SECTION 1: CUSTOM TEAMS -->
     <div id="custom-teams-section" class="space-y-2.5">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-          <span>⚙️</span>
-          <span>Custom Preset Teams</span>
-          <span class="text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">
-            {{ customTeams.length }}
-          </span>
-        </h3>
-        <span class="text-xs text-slate-400">Custom presets for Raids, Monsters, and Gathering</span>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+            <span>⚙️</span>
+            <span>Custom Preset Teams</span>
+            <span class="text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">
+              {{ visibleCustomTeams.length }}
+            </span>
+          </h3>
+
+          <!-- Filter Tabs -->
+          <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-100 dark:bg-slate-800 text-[11px]">
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-0.5 font-semibold rounded-md transition-colors"
+              :class="customTeamFilter === 'all' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'"
+              @click="customTeamFilter = 'all'"
+            >
+              All ({{ customTeams.length }})
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-0.5 font-semibold rounded-md transition-colors"
+              :class="customTeamFilter === 'hero' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'"
+              @click="customTeamFilter = 'hero'"
+            >
+              🦸 Heroes
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-0.5 font-semibold rounded-md transition-colors"
+              :class="customTeamFilter === 'titan' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'"
+              @click="customTeamFilter = 'titan'"
+            >
+              ⚡ Titans
+            </button>
+          </div>
+        </div>
+        <span class="text-xs text-slate-400">Custom presets for Raids, Monsters, Dungeon, and Gathering</span>
       </div>
 
-      <div v-if="customTeams.length === 0 && !isEditing" class="p-6 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-        No custom teams configured. Click "+ Add Custom Team" or "+ Clone" from a server squad below.
+      <div v-if="visibleCustomTeams.length === 0 && !isEditing" class="p-6 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+        {{ customTeams.length === 0 ? 'No custom teams configured. Click "+ Add Hero Team" or "+ Add Titan Team" above.' : 'No custom teams matching the selected filter.' }}
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
         <div
-          v-for="team in customTeams"
+          v-for="team in visibleCustomTeams"
           :key="team.id"
           class="custom-team-card rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xs space-y-2"
         >
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-1.5 min-w-0">
-              <span class="rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 px-2 py-0.5 text-xs font-bold truncate">
+              <span
+                class="rounded border px-2 py-0.5 text-xs font-bold truncate"
+                :class="
+                  team.type === 'titan' || teamMemberIds(team.heroIds).some((id) => Number(id) >= 4000)
+                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                    : 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60'
+                "
+              >
                 {{ team.name }}
               </span>
-              <span class="rounded bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shrink-0">
+              <span
+                v-if="team.type === 'titan' || teamMemberIds(team.heroIds).some((id) => Number(id) >= 4000)"
+                class="rounded bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 shrink-0 font-medium"
+              >
+                ⚡ Titan Team
+              </span>
+              <span
+                v-else
+                class="rounded bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shrink-0"
+              >
                 Troops: {{ team.maxTroops != null ? formatNumber(team.maxTroops) : 'Auto' }}
               </span>
             </div>
