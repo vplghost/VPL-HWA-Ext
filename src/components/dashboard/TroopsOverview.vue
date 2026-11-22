@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { troopStockProgress, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
+import { troopStockProgress, getBuildingTrainingCapacity, getUnlockedTroopLevels, isCampBuildingUpgrading } from '@/src/utils/troops';
 import { useTroopTraining, getTroopType, normalizeArray } from '@/src/composables/useTroopTraining';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { formatDuration, formatNumber } from '@/src/utils/formatters';
@@ -41,6 +41,9 @@ function getCardState(t: any) {
     ? getBuildingTrainingCapacity(t.type, cache?.value)
     : 26;
   const progress = troopStockProgress(t, buildingCap);
+  const isUpgrading = typeof isCampBuildingUpgrading === 'function'
+    ? isCampBuildingUpgrading(t.type, cache?.value)
+    : false;
 
   const queuesForType = normalizeArray(trainings.value?.trainingQueues).filter((q: any) => {
     const info = getTroopType(q?.unitId);
@@ -80,6 +83,7 @@ function getCardState(t: any) {
 
   return {
     ...progress,
+    isUpgrading,
     completedQueue,
     activeQueue,
     levelStr,
@@ -281,6 +285,9 @@ const troopCards = computed(() => {
               <span v-else-if="st.activeQueue" class="text-indigo-600 dark:text-indigo-400 font-medium">
                 In training
               </span>
+              <span v-else-if="st.isUpgrading" class="text-amber-600 dark:text-amber-400 font-medium">
+                🏗️ Camp upgrading
+              </span>
               <span v-else-if="!st.limitKnown" class="text-amber-600 dark:text-amber-400">Sync building levels to determine the limit</span>
               <span v-else-if="!st.canTrain" class="text-amber-600 dark:text-amber-400 font-medium">
                 Max reached ({{ formatNumber(st.currentTotal) }})
@@ -301,6 +308,15 @@ const troopCards = computed(() => {
               >
                 <span>✓</span> <span>Ready / Collect</span>
               </button>
+
+              <!-- Camp Upgrading Badge (hide train button during building upgrade) -->
+              <span
+                v-else-if="st.isUpgrading"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 ring-1 ring-amber-200 dark:ring-amber-800/50"
+                title="Camp building is currently under construction / upgrade"
+              >
+                🏗️ Camp Upgrading
+              </span>
 
               <!-- Train Controls -->
               <div v-else-if="!st.activeQueue" class="flex items-center gap-1">

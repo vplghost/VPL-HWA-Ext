@@ -402,10 +402,10 @@ test('useTroopTraining exports normalizeArray and guards against non-array paylo
   assert.deepEqual(normalizeArray([1, 2, 3]), [1, 2, 3]);
   assert.deepEqual(normalizeArray({ a: 1, b: 2 }), [1, 2]);
 
-  // Camp Building mappings
-  assert.equal(CAMP_BUILDING_IDS[0], 41, 'Marksmen Camp is building 41');
+  // Camp Building mappings: 0 = Infantry (40), 1 = Spearmen (42), 2 = Marksmen (41)
+  assert.equal(CAMP_BUILDING_IDS[0], 40, 'Infantry Camp is building 40');
   assert.equal(CAMP_BUILDING_IDS[1], 42, 'Spearmen Camp is building 42');
-  assert.equal(CAMP_BUILDING_IDS[2], 40, 'Infantry Camp is building 40');
+  assert.equal(CAMP_BUILDING_IDS[2], 41, 'Marksmen Camp is building 41');
 
   // Dynamic capacity from Camp Level + Expansion Researches
   const mockCache = {

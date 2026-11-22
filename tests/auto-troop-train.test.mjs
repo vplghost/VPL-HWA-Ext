@@ -5,6 +5,7 @@ import {
   CAMP_TRAINING_CAPACITY_BY_LEVEL,
   getBuildingTrainingCapacity,
   getUnlockedTroopLevels,
+  isCampBuildingUpgrading,
   buildAutoTrainCalls,
   troopStockProgress,
   getTroopType,
@@ -18,21 +19,21 @@ test('getBuildingTrainingCapacity resolves correct capacity from camp building l
   assert.equal(CAMP_TRAINING_CAPACITY_BY_LEVEL[10], 56);
   assert.equal(CAMP_TRAINING_CAPACITY_BY_LEVEL[25], 167);
 
-  // Type 0 (Marksmen Camp, buildingId 41)
+  // Type 0 = Infantry Camp (40), Type 1 = Spearmen Camp (42), Type 2 = Marksmen Camp (41)
   const cacheLvl3 = {
     buildingStatus: {
       data: {
         buildings: [
-          { buildingId: 41, level: 3 },
-          { buildingId: 42, level: 2 },
           { buildingId: 40, level: 1 },
+          { buildingId: 42, level: 2 },
+          { buildingId: 41, level: 3 },
         ],
       },
     },
   };
-  assert.equal(getBuildingTrainingCapacity(0, cacheLvl3), 26);
+  assert.equal(getBuildingTrainingCapacity(0, cacheLvl3), 17);
   assert.equal(getBuildingTrainingCapacity(1, cacheLvl3), 22);
-  assert.equal(getBuildingTrainingCapacity(2, cacheLvl3), 17);
+  assert.equal(getBuildingTrainingCapacity(2, cacheLvl3), 26);
 
   // Keyed object format from getSummary:building
   const cacheKeyed = {
@@ -45,10 +46,9 @@ test('getBuildingTrainingCapacity resolves correct capacity from camp building l
       },
     },
   };
-  assert.equal(getBuildingTrainingCapacity(0, cacheKeyed), 56);
+  assert.equal(getBuildingTrainingCapacity(0, cacheKeyed), 26); // Default 26 when building 40 missing
   assert.equal(getBuildingTrainingCapacity(1, cacheKeyed), 35);
-  // Missing building defaults to 26
-  assert.equal(getBuildingTrainingCapacity(2, cacheKeyed), 26);
+  assert.equal(getBuildingTrainingCapacity(2, cacheKeyed), 56);
 });
 
 test('getUnlockedTroopLevels restricts options to unlocked player tiers', () => {
@@ -72,13 +72,13 @@ test('getUnlockedTroopLevels restricts options to unlocked player tiers', () => 
     },
   };
 
-  // Marksmen (type 0): highest in available is 5 -> [1, 2, 3, 4, 5]
+  // Infantry (type 0): highest in available is 5 -> [1, 2, 3, 4, 5]
   assert.deepEqual(getUnlockedTroopLevels(0, cache), [1, 2, 3, 4, 5]);
 
   // Spearmen (type 1): highest in available is 13 (lvl 3) -> [1, 2, 3]
   assert.deepEqual(getUnlockedTroopLevels(1, cache), [1, 2, 3]);
 
-  // Infantry (type 2): highest in available is 27 (lvl 7) -> [1, 2, 3, 4, 5, 6, 7]
+  // Marksmen (type 2): highest in available is 27 (lvl 7) -> [1, 2, 3, 4, 5, 6, 7]
   assert.deepEqual(getUnlockedTroopLevels(2, cache), [1, 2, 3, 4, 5, 6, 7]);
 
   // If saved level is higher than currently detected, preserve saved choice
@@ -86,6 +86,85 @@ test('getUnlockedTroopLevels restricts options to unlocked player tiers', () => 
 
   // Empty cache fallback
   assert.deepEqual(getUnlockedTroopLevels(0, {}), [1]);
+});
+
+test('isCampBuildingUpgrading detects building upgrade state for all camp types', () => {
+  const cacheWithInfantryUpgrading = {
+    buildingStatus: {
+      data: {
+        queues: [
+          { buildingId: 40, level: 8, startDate: 1000, durationMs: 5000 },
+        ],
+      },
+    },
+  };
+  assert.equal(isCampBuildingUpgrading(0, cacheWithInfantryUpgrading), true);
+  assert.equal(isCampBuildingUpgrading(1, cacheWithInfantryUpgrading), false);
+  assert.equal(isCampBuildingUpgrading(2, cacheWithInfantryUpgrading), false);
+
+  const cacheWithMarksmenUpgrading = {
+    'getSummary:building': {
+      data: {
+        queues: [
+          { id: 41, level: 12, startDate: 1000, duration: 60000 },
+        ],
+      },
+    },
+  };
+  assert.equal(isCampBuildingUpgrading(0, cacheWithMarksmenUpgrading), false);
+  assert.equal(isCampBuildingUpgrading(1, cacheWithMarksmenUpgrading), false);
+  assert.equal(isCampBuildingUpgrading(2, cacheWithMarksmenUpgrading), true);
+
+  // Empty or invalid
+  assert.equal(isCampBuildingUpgrading(0, {}), false);
+  assert.equal(isCampBuildingUpgrading(99, cacheWithInfantryUpgrading), false);
+});
+
+test('buildAutoTrainCalls skips training when camp building is upgrading but still collects completed queues', () => {
+  const now = 1794200000000;
+  const cache = {
+    buildingStatus: {
+      data: {
+        buildings: [
+          { buildingId: 182, level: 1 }, // 2770 cap
+          { buildingId: 40, level: 3 },  // Infantry Camp
+        ],
+        queues: [
+          // Infantry camp (40) is currently upgrading
+          { buildingId: 40, level: 4, startDate: now - 5000, durationMs: 100000 },
+        ],
+      },
+    },
+    'getUnitSummary:unit': {
+      data: {
+        available: [
+          { unitId: 7, count: 1000 },
+        ],
+      },
+    },
+    'getTrainings:unit': {
+      data: {
+        trainingQueues: [
+          // Completed training queue for Infantry (type 0, unitId 7)
+          { unitId: 7, unitCount: 26, startDate: now - 100000, duration: 50000 },
+        ],
+      },
+    },
+  };
+
+  const plan = buildAutoTrainCalls(cache, {
+    autoTrainEnabled: true,
+    trainLevels: { 0: 7 },
+  }, now);
+
+  // Should collect the completed queue
+  const collect = plan.actions.find(a => a.type === 0 && a.action === 'collect');
+  assert.ok(collect, 'Must collect completed queue even if building is upgrading');
+  assert.equal(collect.unitId, 7);
+
+  // But MUST NOT start a new training queue because camp building 40 is upgrading!
+  const train = plan.actions.find(a => a.type === 0 && a.action === 'train');
+  assert.equal(train, undefined, 'Must not start training when camp building is upgrading');
 });
 
 test('buildAutoTrainCalls respects autoTrainEnabled gate and skips active queues', () => {
@@ -97,7 +176,7 @@ test('buildAutoTrainCalls respects autoTrainEnabled gate and skips active queues
           { buildingId: 182, level: 10 },
           { buildingId: 183, level: 10 },
           { buildingId: 184, level: 10 },
-          { buildingId: 41, level: 3 }, // 26 cap
+          { buildingId: 40, level: 3 }, // 26 cap for Infantry (type 0)
         ],
       },
     },
@@ -109,7 +188,7 @@ test('buildAutoTrainCalls respects autoTrainEnabled gate and skips active queues
     'getTrainings:unit': {
       data: {
         trainingQueues: [
-          // Active queue for Marksmen (type 0)
+          // Active queue for Infantry (type 0)
           { unitId: 7, unitCount: 26, startDate: now - 10000, duration: 60000 },
         ],
       },
@@ -129,19 +208,19 @@ test('buildAutoTrainCalls respects autoTrainEnabled gate and skips active queues
   const trainedTypes = enabled.actions.map(a => a.type);
   assert.ok(!trainedTypes.includes(0), 'Active training queue must not be interrupted');
   assert.ok(trainedTypes.includes(1), 'Idle Spearmen queue should start training');
-  assert.ok(trainedTypes.includes(2), 'Idle Infantry queue should start training');
+  assert.ok(trainedTypes.includes(2), 'Idle Marksmen queue should start training');
 });
 
 test('buildAutoTrainCalls collects completed queues and trains min(remaining, buildingCapacity)', () => {
   const now = 1794200000000;
   // Drill grounds level 1 = 2770 max stock limit
-  // Marksmen Camp level 2 = 22 trainingCapacity
+  // Infantry Camp level 2 = 22 trainingCapacity
   const cache = {
     buildingStatus: {
       data: {
         buildings: [
           { buildingId: 182, level: 1 },
-          { buildingId: 41, level: 2 }, // 22 batch capacity
+          { buildingId: 40, level: 2 }, // 22 batch capacity
         ],
       },
     },
@@ -156,7 +235,7 @@ test('buildAutoTrainCalls collects completed queues and trains min(remaining, bu
     'getTrainings:unit': {
       data: {
         trainingQueues: [
-          // Completed queue for Marksmen (type 0)
+          // Completed queue for Infantry (type 0)
           { unitId: 7, unitCount: 22, startDate: now - 100000, duration: 50000 },
         ],
       },
@@ -173,7 +252,7 @@ test('buildAutoTrainCalls collects completed queues and trains min(remaining, bu
   assert.ok(collect, 'Must collect completed queue');
   assert.equal(collect.unitId, 7);
 
-  // Should have startTraining for Marksmen clamped to min(remaining, buildingCapacity)
+  // Should have startTraining for Infantry clamped to min(remaining, buildingCapacity)
   // remaining = 2770 - (2760 + 0) = 10, buildingCapacity = 22 -> min is 10!
   const train = plan.actions.find(a => a.type === 0 && a.action === 'train');
   assert.ok(train, 'Must start training for idle queue');
@@ -195,7 +274,7 @@ test('buildAutoTrainCalls blocks training when troop stock reaches or exceeds ma
       data: {
         buildings: [
           { buildingId: 182, level: 1 }, // 2770 cap
-          { buildingId: 41, level: 3 },  // 26 capacity
+          { buildingId: 40, level: 3 },  // 26 capacity
         ],
       },
     },
@@ -213,6 +292,6 @@ test('buildAutoTrainCalls blocks training when troop stock reaches or exceeds ma
     trainLevels: { 0: 7 },
   }, now);
 
-  const marksmenTrain = plan.actions.find(a => a.type === 0 && a.action === 'train');
-  assert.equal(marksmenTrain, undefined, 'Must not train when already over cap');
+  const infantryTrain = plan.actions.find(a => a.type === 0 && a.action === 'train');
+  assert.equal(infantryTrain, undefined, 'Must not train when already over cap');
 });

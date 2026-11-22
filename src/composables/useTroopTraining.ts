@@ -9,6 +9,7 @@ import {
   CAMP_TRAINING_CAPACITY_BY_LEVEL,
   getBuildingTrainingCapacity,
   getUnlockedTroopLevels,
+  isCampBuildingUpgrading,
   buildAutoTrainCalls,
 } from '../utils/troops.ts';
 import type { TroopTrainSettings, TroopUnitState } from '@/src/types';
@@ -22,6 +23,7 @@ export {
   CAMP_TRAINING_CAPACITY_BY_LEVEL,
   getBuildingTrainingCapacity,
   getUnlockedTroopLevels,
+  isCampBuildingUpgrading,
   buildAutoTrainCalls,
 };
 
@@ -269,6 +271,7 @@ export function useTroopTraining() {
   }
 
   async function startTrain(type: 0 | 1 | 2, chosenLevel: number) {
+    if (isCampBuildingUpgrading(type, cache.value)) return;
     const t = troopStats.value[type];
     if (!t || t.maxTroops == null) return;
     const currentTotal = t.readyCount + t.hospitalCount + t.trainingCount;

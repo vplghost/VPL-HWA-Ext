@@ -14,6 +14,7 @@ import {
   CAMP_TRAINING_CAPACITY_BY_LEVEL,
   getBuildingTrainingCapacity,
   getUnlockedTroopLevels,
+  isCampBuildingUpgrading,
   buildAutoTrainCalls,
 } from '../src/utils/troops.ts';
 import { DRILL_GROUND_LIMIT_BY_LEVEL } from '../src/utils/troopLimitData.ts';
@@ -57,7 +58,7 @@ test('actual troop training stays bounded by the confirmed stock limit and block
     'getUnitSummary:unit': { data: { available: [{ unitId: 1, count: 2760 }] } } });
   const calls = [];
   const context = { ref, computed, watch() {}, onMounted() {}, onUnmounted() {}, getTroopType, normalizeArray, TROOP_DEFS,
-    calculateTroopMax, CAMP_BUILDING_IDS, CAMP_TRAINING_CAPACITY_BY_LEVEL, getBuildingTrainingCapacity, getUnlockedTroopLevels, buildAutoTrainCalls,
+    calculateTroopMax, CAMP_BUILDING_IDS, CAMP_TRAINING_CAPACITY_BY_LEVEL, getBuildingTrainingCapacity, getUnlockedTroopLevels, isCampBuildingUpgrading, buildAutoTrainCalls,
     useRpcCache: () => ({ cache, dispatchRpc: async batch => { calls.push(batch); return { ok: true }; } }) };
   vm.runInNewContext(code + '\nglobalThis.api = useTroopTraining();', context);
   assert.equal(context.api.troopStats.value[0].maxTroops, 2770);

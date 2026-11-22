@@ -17,16 +17,35 @@ export function normalizeArray<T = any>(val: any): T[] {
 }
 
 export const TROOP_DEFS = [
-  { type: 0 as const, label: 'Marksmen', icon: '🏹', badgeCls: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' },
+  { type: 0 as const, label: 'Infantry', icon: '🛡️', badgeCls: 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' },
   { type: 1 as const, label: 'Spearmen', icon: '🔱', badgeCls: 'bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300' },
-  { type: 2 as const, label: 'Infantry', icon: '🛡️', badgeCls: 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' },
+  { type: 2 as const, label: 'Marksmen', icon: '🏹', badgeCls: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' },
 ];
 
 export const CAMP_BUILDING_IDS: Record<number, number> = {
-  0: 41, // Marksmen Camp
+  0: 40, // Infantry Camp
   1: 42, // Spearmen Camp
-  2: 40, // Infantry Camp
+  2: 41, // Marksmen Camp
 };
+
+/**
+ * Checks whether the camp building corresponding to the troop type is currently upgrading.
+ */
+export function isCampBuildingUpgrading(type: number, cache: any): boolean {
+  if (!Number.isInteger(type) || type < 0 || type > 2) return false;
+  const targetBuildingId = CAMP_BUILDING_IDS[type];
+  if (!targetBuildingId) return false;
+
+  const status = cache?.buildingStatus?.data ?? cache?.['getSummary:building']?.data ?? cache?.building_getQueue?.data;
+  if (!status) return false;
+
+  const raw = status.queues ?? status.queue ?? (Array.isArray(status) ? status : []);
+  const queues = normalizeArray(raw);
+  return queues.some((q: any) => {
+    const bId = Number(q?.buildingId ?? q?.id);
+    return bId === targetBuildingId;
+  });
+}
 
 /**
  * Cumulative permanent training capacity granted by Camp building levels 1–25.
@@ -224,6 +243,11 @@ export function buildAutoTrainCalls(cache: any, settings: TroopTrainSettings, no
         action: 'collect',
         unitId: Number(completedQueue.unitId),
       });
+    }
+
+    // If camp building is currently upgrading, cannot start training new troops
+    if (isCampBuildingUpgrading(type, cache)) {
+      continue;
     }
 
     // Check stock limit
