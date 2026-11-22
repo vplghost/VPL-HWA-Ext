@@ -181,8 +181,8 @@ test('capacity uses hero data and falls back after saved values become stale', (
 test('capacity defaults and corrected troop ranges apply without manual capacities', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(data.normalizeCapacitySettings())), { defaultHero: 600, base: 950 });
   assert.equal(data.squadCapacity([1, 2, 3, 4, 5], {}, {}, 950), 3950);
-  for (const [id, label, level] of [[1, 'Marksmen', 1], [9, 'Marksmen', 9], [11, 'Spearmen', 1],
-      [19, 'Spearmen', 9], [21, 'Infantry', 1], [29, 'Infantry', 9]]) {
+  for (const [id, label, level] of [[1, 'Infantry', 1], [9, 'Infantry', 9], [11, 'Spearmen', 1],
+      [19, 'Spearmen', 9], [21, 'Marksmen', 1], [29, 'Marksmen', 9]]) {
     assert.equal(data.unitInfo(id).label, label); assert.equal(data.unitInfo(id).level, level);
   }
   for (const id of [0, 10, 20, 30, 31, -1]) assert.equal(data.unitInfo(id), null);

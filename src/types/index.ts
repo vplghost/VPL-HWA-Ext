@@ -5,7 +5,7 @@ export interface TroopTrainSettings {
 }
 
 export interface TroopUnitState {
-  type: 0 | 1 | 2; // 0: Marksmen, 1: Spearmen, 2: Infantry
+  type: 0 | 1 | 2; // 0: Infantry, 1: Spearmen, 2: Marksmen
   label: string;
   icon: string;
   badgeCls: string;

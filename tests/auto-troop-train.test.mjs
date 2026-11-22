@@ -295,3 +295,55 @@ test('buildAutoTrainCalls blocks training when troop stock reaches or exceeds ma
   const infantryTrain = plan.actions.find(a => a.type === 0 && a.action === 'train');
   assert.equal(infantryTrain, undefined, 'Must not train when already over cap');
 });
+
+test('troop type classification maps ID 20s to Marksmen, 10s to Spearmen, and 0s to Infantry', async () => {
+  const { unitInfo } = await import('../src/utils/experimentalData.ts');
+
+  // Head 2 (e.g. 21, 26, 27) = Marksmen (type 2)
+  const u27 = unitInfo(27);
+  assert.equal(u27?.type, 2);
+  assert.equal(u27?.label, 'Marksmen');
+  assert.equal(u27?.level, 7);
+
+  const u26 = unitInfo(26);
+  assert.equal(u26?.type, 2);
+  assert.equal(u26?.label, 'Marksmen');
+  assert.equal(u26?.level, 6);
+
+  // Head 1 (e.g. 17) = Spearmen (type 1)
+  const u17 = unitInfo(17);
+  assert.equal(u17?.type, 1);
+  assert.equal(u17?.label, 'Spearmen');
+  assert.equal(u17?.level, 7);
+
+  // Head 0 (e.g. 7) = Infantry (type 0)
+  const u7 = unitInfo(7);
+  assert.equal(u7?.type, 0);
+  assert.equal(u7?.label, 'Infantry');
+  assert.equal(u7?.level, 7);
+});
+
+test('isCampBuildingUpgrading extracts queues from building_getSummary and prevents Marksmen train when Camp 41 is upgrading', () => {
+  // Simulating tracking log structure where Building 41 (Marksmen Camp) is upgrading
+  const cacheWithMarksmenCampUpgrading = {
+    building_getSummary: {
+      data: {
+        queues: [
+          { buildingId: 41, nextLevel: 22, startDate: 1795287896295, durationMs: 50251200 },
+        ],
+      },
+    },
+  };
+
+  assert.equal(isCampBuildingUpgrading(0, cacheWithMarksmenCampUpgrading), false, 'Infantry camp not upgrading');
+  assert.equal(isCampBuildingUpgrading(1, cacheWithMarksmenCampUpgrading), false, 'Spearmen camp not upgrading');
+  assert.equal(isCampBuildingUpgrading(2, cacheWithMarksmenCampUpgrading), true, 'Marksmen camp 41 must be detected as upgrading');
+
+  // buildAutoTrainCalls must not dispatch startTraining for Marksmen (type 2 / unitId 26)
+  const plan = buildAutoTrainCalls(cacheWithMarksmenCampUpgrading, {
+    autoTrainEnabled: true,
+    trainLevels: { 2: 6 },
+  });
+  const marksmenTrain = plan.actions.find(a => a.type === 2 && a.action === 'train');
+  assert.equal(marksmenTrain, undefined, 'Must block Marksmen training to prevent server ValidationError');
+});

@@ -318,7 +318,7 @@ export function useSquadTeams(
     if (info) return info;
     const level = unitId % 10;
     const type = Math.floor(unitId / 10);
-    const labels = ['Marksmen', 'Spearmen', 'Infantry'];
+    const labels = ['Infantry', 'Spearmen', 'Marksmen'];
     return {
       type: type >= 0 && type <= 2 ? type : 0,
       level: level >= 1 && level <= 9 ? level : 1,
@@ -326,10 +326,10 @@ export function useSquadTeams(
     };
   }
 
-  // 3 Troop summary cards: Marksmen (type 0), Spearmen (type 1), Infantry (type 2)
+  // 3 Troop summary cards: Infantry (type 0), Spearmen (type 1), Marksmen (type 2)
   const troopTypeSummaries = computed<TroopSummaryBlock[]>(() => {
     const results: TroopSummaryBlock[] = [];
-    const labels = ['Marksmen', 'Spearmen', 'Infantry'];
+    const labels = ['Infantry', 'Spearmen', 'Marksmen'];
 
     for (let type = 0; type < 3; type++) {
       const typeUnits = allocatedTroops.value.filter((u) => {

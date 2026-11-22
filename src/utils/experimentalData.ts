@@ -208,7 +208,7 @@ export function capacityModel(
 }
 
 export interface UnitInfo {
-  type: number; // 0: Marksmen, 1: Spearmen, 2: Infantry
+  type: number; // 0: Infantry, 1: Spearmen, 2: Marksmen
   level: number; // 1-9
   label: string;
 }
@@ -216,7 +216,7 @@ export interface UnitInfo {
 export function unitInfo(id: number): UnitInfo | null {
   const level = id % 10;
   const type = Math.floor(id / 10);
-  const labels = ['Marksmen', 'Spearmen', 'Infantry'];
+  const labels = ['Infantry', 'Spearmen', 'Marksmen'];
   return Number.isInteger(id) && level >= 1 && level <= 9 && type >= 0 && type <= 2
     ? { type, level, label: labels[type] ?? 'Unknown' }
     : null;

@@ -28,6 +28,57 @@ export const CAMP_BUILDING_IDS: Record<number, number> = {
   2: 41, // Marksmen Camp
 };
 
+export function extractBuildingQueues(cache: any): any[] {
+  if (!cache || typeof cache !== 'object') return [];
+  const raw =
+    cache?.buildingStatus?.data?.queues ??
+    cache?.buildingStatus?.data?.queue ??
+    cache?.buildingStatus?.queues ??
+    cache?.buildingStatus?.queue ??
+    cache?.['getSummary:building']?.data?.queues ??
+    cache?.['getSummary:building']?.data?.queue ??
+    cache?.['getSummary:building']?.queues ??
+    cache?.building_getSummary?.data?.queues ??
+    cache?.building_getSummary?.queues ??
+    cache?.building_getQueue?.data?.queues ??
+    cache?.building_getQueue?.data ??
+    cache?.buildingSummary?.data?.queues ??
+    cache?.clan_getSummary?.data?.queues ??
+    cache?.getSummary?.data?.queues ??
+    (Array.isArray(cache?.buildingStatus?.data) ? cache.buildingStatus.data : null);
+
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    if (Array.isArray(raw.queues)) return raw.queues;
+    if (
+      Number.isFinite(raw.buildingId) ||
+      Number.isFinite(raw.id) ||
+      Number.isFinite(raw.startDate) ||
+      Number.isFinite(raw.startTime)
+    ) {
+      return [raw];
+    }
+    return Object.values(raw).filter((item) => item && typeof item === 'object');
+  }
+  return [];
+}
+
+export function extractBuildingsRaw(cache: any): any {
+  if (!cache || typeof cache !== 'object') return null;
+  return (
+    cache?.buildingStatus?.data?.buildings ??
+    cache?.buildingStatus?.buildings ??
+    cache?.['getSummary:building']?.data?.buildings ??
+    cache?.['getSummary:building']?.buildings ??
+    cache?.building_getSummary?.data?.buildings ??
+    cache?.building_getSummary?.buildings ??
+    cache?.clan_getSummary?.data?.buildings ??
+    cache?.getSummary?.data?.buildings ??
+    cache?.buildingSummary?.data?.buildings ??
+    null
+  );
+}
+
 /**
  * Checks whether the camp building corresponding to the troop type is currently upgrading.
  */
@@ -36,11 +87,7 @@ export function isCampBuildingUpgrading(type: number, cache: any): boolean {
   const targetBuildingId = CAMP_BUILDING_IDS[type];
   if (!targetBuildingId) return false;
 
-  const status = cache?.buildingStatus?.data ?? cache?.['getSummary:building']?.data ?? cache?.building_getQueue?.data;
-  if (!status) return false;
-
-  const raw = status.queues ?? status.queue ?? (Array.isArray(status) ? status : []);
-  const queues = normalizeArray(raw);
+  const queues = extractBuildingQueues(cache);
   return queues.some((q: any) => {
     const bId = Number(q?.buildingId ?? q?.id);
     return bId === targetBuildingId;
@@ -61,8 +108,9 @@ export const CAMP_TRAINING_CAPACITY_BY_LEVEL = [
 export function getBuildingTrainingCapacity(type: number, cache: any): number {
   if (!Number.isInteger(type) || type < 0 || type > 2) return 26;
   const targetBuildingId = CAMP_BUILDING_IDS[type];
-  const raw = cache?.buildingStatus?.data?.buildings ?? cache?.['getSummary:building']?.data?.buildings;
+  const raw = extractBuildingsRaw(cache);
   if (!raw || typeof raw !== 'object') return 26;
+
   for (const [key, value] of Object.entries(raw)) {
     const b: any = value;
     const id = Number(b?.buildingId ?? b?.id ?? (!Array.isArray(raw) ? key : NaN));
@@ -167,7 +215,7 @@ export function troopStockProgress(
 /** Stock limit, distinct from per-march capacity and per-batch trainingCapacity. */
 export function calculateTroopMax(type: number, cache: any, _currentTotal = 0): number | null {
   if (!Number.isInteger(type) || type < 0 || type > 2) return null;
-  const raw = cache?.buildingStatus?.data?.buildings ?? cache?.['getSummary:building']?.data?.buildings;
+  const raw = extractBuildingsRaw(cache);
   if (raw == null) {
     const unitSummary = cache?.['getUnitSummary:unit']?.data ?? cache?.getUnitSummary?.data;
     const direct = unitSummary?.limits?.[type];
