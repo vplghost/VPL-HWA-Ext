@@ -8,11 +8,13 @@ import UnitStars from '@/src/components/common/UnitStars.vue';
 import { getEffectiveTitanStates, DEFAULT_TITAN_POOLS } from '@/src/services/queues/dungeonAutomation';
 import {
   simulateBattleWithUnity,
+  BattleSimError,
   DUAL_ELEMENT_TITANS,
   DUNGEON_SAVED_LINEUPS_KEY,
   isTitanEligibleForDoor,
   type SimTitanItem,
   type SimResultPayload,
+  type SimErrorDetail,
 } from '@/src/utils/dungeonBattleSim';
 
 const props = defineProps<{
@@ -36,6 +38,9 @@ const isSimulating = ref(false);
 const isSubmitting = ref(false);
 const simResult = ref<SimResultPayload | null>(null);
 const errorMessage = ref<string | null>(null);
+const errorDetail = ref<SimErrorDetail | null>(null);
+const showDiagnostics = ref(false);
+const copiedDiagnostics = ref(false);
 const successMessage = ref<string | null>(null);
 const savedLineups = ref<Record<string, number[]>>({});
 const showTeamDropdown = ref(false);
@@ -383,12 +388,42 @@ async function handleRunSimulation() {
     const outcome = await simulateBattleWithUnity(resPayload, seed);
 
     simResult.value = outcome;
+    errorDetail.value = null;
   } catch (err: any) {
     simResult.value = null;
-    errorMessage.value = `Unity Engine simulation error: ${err.message || String(err)}`;
+    if (err instanceof BattleSimError && err.detail) {
+      errorDetail.value = err.detail;
+      errorMessage.value = err.message;
+    } else if (err?.detail) {
+      errorDetail.value = err.detail;
+      errorMessage.value = err.message || String(err);
+    } else {
+      errorDetail.value = null;
+      errorMessage.value = `Unity Engine simulation error: ${err.message || String(err)}`;
+    }
   } finally {
     isSimulating.value = false;
   }
+}
+
+async function copyDiagnostics() {
+  if (!errorMessage.value && !errorDetail.value) return;
+  const payload = {
+    timestamp: new Date().toISOString(),
+    floorNumber: props.floorNumber,
+    doorIdx: props.doorIdx,
+    doorElement: doorElement.value,
+    selectedTitans: selectedTitanIds.value,
+    error: errorMessage.value,
+    detail: errorDetail.value,
+  };
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    copiedDiagnostics.value = true;
+    setTimeout(() => {
+      copiedDiagnostics.value = false;
+    }, 2000);
+  } catch (_) {}
 }
 
 /**
@@ -491,9 +526,64 @@ async function handleSubmitOfficial() {
         <!-- MODAL BODY -->
         <div class="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
           <!-- Error & Success Banners -->
-          <div v-if="errorMessage" class="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200 flex items-center gap-2">
-            <span>⚠️</span>
-            <span class="flex-1 font-medium">{{ errorMessage }}</span>
+          <div v-if="errorMessage" class="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-start gap-2 min-w-0">
+                <span class="text-base leading-none mt-0.5">⚠️</span>
+                <div>
+                  <div class="font-bold text-xs leading-snug">Giả lập Unity Engine gặp lỗi</div>
+                  <div class="text-2xs opacity-90 mt-0.5 break-words font-mono">{{ errorMessage }}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  class="cursor-pointer px-2 py-1 rounded bg-rose-200/80 hover:bg-rose-300 dark:bg-rose-900/60 dark:hover:bg-rose-800 text-[11px] font-semibold transition-colors"
+                  :disabled="isSimulating"
+                  @click="handleSimulateBattle"
+                >
+                  🔄 Thử lại
+                </button>
+                <button
+                  type="button"
+                  class="cursor-pointer px-2 py-1 rounded border border-rose-300 dark:border-rose-700 bg-white/60 dark:bg-slate-900/60 hover:bg-white text-[11px] font-semibold transition-colors"
+                  @click="showDiagnostics = !showDiagnostics"
+                >
+                  {{ showDiagnostics ? 'Ẩn chẩn đoán' : 'Chẩn đoán lỗi' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Detailed Diagnostics Accordion -->
+            <div v-if="showDiagnostics" class="pt-2 border-t border-rose-200/60 dark:border-rose-900/40 space-y-2 text-2xs">
+              <div class="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                <span class="font-semibold">Chi tiết kỹ thuật & Ngữ cảnh trận đấu:</span>
+                <button
+                  type="button"
+                  class="cursor-pointer px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold"
+                  @click="copyDiagnostics"
+                >
+                  {{ copiedDiagnostics ? '✅ Đã chép' : '📋 Sao chép' }}
+                </button>
+              </div>
+              <div class="bg-black/85 text-emerald-300 p-2.5 rounded font-mono text-[10px] leading-relaxed overflow-x-auto max-h-48 border border-black/40">
+                <div v-if="errorDetail">
+                  <div><span class="text-slate-400">Phase:</span> {{ errorDetail.phase || 'N/A' }}</div>
+                  <div><span class="text-slate-400">Kind:</span> {{ errorDetail.kind || 'generic' }}</div>
+                  <div><span class="text-slate-400">Message:</span> {{ errorDetail.message }}</div>
+                  <div v-if="errorDetail.context" class="mt-1">
+                    <span class="text-slate-400">Context:</span> {{ JSON.stringify(errorDetail.context, null, 2) }}
+                  </div>
+                  <div v-if="errorDetail.stack" class="mt-1 text-slate-500 whitespace-pre">
+                    <span class="text-slate-400">Stack:</span> {{ errorDetail.stack }}
+                  </div>
+                </div>
+                <div v-else>
+                  <div>{{ errorMessage }}</div>
+                  <div class="text-slate-500 mt-1">Door: {{ doorIdx + 1 }} · Element: {{ doorElement }} · Squad: [{{ selectedTitanIds.join(', ') }}]</div>
+                </div>
+              </div>
+            </div>
           </div>
           <div v-if="successMessage" class="p-3 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200 flex items-center gap-2">
             <span>✅</span>

@@ -535,10 +535,43 @@ export function installInterceptor(customWindow?: any): void {
     setupWasmSimulationBridge(instance);
   }
 
+  function describeWasmException(err: any, phase: string, context?: any) {
+    const isWasmException = (typeof WebAssembly !== 'undefined' && err instanceof (WebAssembly as any).Exception) ||
+      String(err?.constructor?.name) === 'Exception' ||
+      String(err).includes('WebAssembly.Exception');
+    const isRuntimeTrap = (typeof WebAssembly !== 'undefined' && err instanceof (WebAssembly as any).RuntimeError) ||
+      String(err?.constructor?.name) === 'RuntimeError';
+
+    const kind: 'managed' | 'trap' | 'generic' = isWasmException ? 'managed' : (isRuntimeTrap ? 'trap' : 'generic');
+    let detailMsg = '';
+    if (isWasmException) {
+      detailMsg = `IL2CPP managed exception in phase '${phase}' (Unity engine C# runtime threw an unhandled exception).`;
+    } else if (isRuntimeTrap) {
+      detailMsg = `WebAssembly execution trap in phase '${phase}': ${err?.message || 'memory out of bounds or arithmetic exception'}.`;
+    } else {
+      detailMsg = `Simulation failed in phase '${phase}': ${err?.message || String(err)}`;
+    }
+
+    return {
+      phase,
+      kind,
+      message: detailMsg,
+      rawMessage: err?.message || String(err),
+      context: {
+        battleType: context?.type,
+        seed: context?.seed,
+        attackerIds: Object.keys(context?.attackers || {}),
+        defenderCount: Array.isArray(context?.defenders) ? context.defenders.length : (context?.defenders ? Object.keys(context.defenders).length : 0),
+      },
+      stack: err?.stack || ''
+    };
+  }
+
   function setupWasmSimulationBridge(instance: any) {
     if (win.__hwaSimulateBattle) return;
 
     win.__hwaSimulateBattle = async function (rawBattle: any, seed: number) {
+      let currentPhase = 'INIT_BRIDGE';
       const activeInst = instance || activeUnityInstance || findActiveUnityInstance(win, doc);
       if (!activeInst) {
         throw new Error('Unity game instance not found. Make sure the game is loaded in this tab.');
@@ -616,67 +649,92 @@ export function installInterceptor(customWindow?: any): void {
         return s;
       };
 
-      // Create presets for battle
-      // In HWA client, Presets_clanWarReplay: 0 = Titan replay, 1 = Hero replay
-      const isTitan = String(rawBattle?.type || '').toLowerCase().includes('titan');
-      const presetPtr = invokePtr('Presets_clanWarReplay', isTitan ? 0 : 1);
-      if (!presetPtr) throw new Error('Failed to create BattlePresets for simulation');
+      let hPlay = 0;
+      let hPresets = 0;
+      let playPtr = 0;
 
-      // Learn String class pointer from Object.ToString(presetPtr)
-      const strSamplePtr = invokePtr('Object_ToString', presetPtr);
-      if (!strSamplePtr) throw new Error('Failed to obtain String class descriptor from Object.ToString');
-      const stringClassPtr = heap.u32[strSamplePtr >>> 2];
-
-      const forgeString = (str: string): number => {
-        const len = str.length;
-        const ptr = malloc(16 + 2 * len) >>> 0;
-        if (!ptr) throw new Error('malloc failed for forgeString');
-        heap.u32[ptr >>> 2] = stringClassPtr;
-        heap.u32[(ptr + 4) >>> 2] = 0;
-        heap.i32[(ptr + 8) >>> 2] = len;
-        const u16Start = (ptr + 12) >>> 1;
-        for (let i = 0; i < len; i++) {
-          heap.u16[u16Start + i] = str.charCodeAt(i);
+      try {
+        // Step 1: Create presets for battle
+        // In HWA client, Presets_clanWarReplay: 0 = Titan replay, 1 = Hero replay
+        currentPhase = 'CREATE_PRESETS';
+        const isTitan = String(rawBattle?.type || '').toLowerCase().includes('titan');
+        let presetPtr = 0;
+        try {
+          presetPtr = invokePtr('Presets_clanWarReplay', isTitan ? 0 : 1);
+        } catch (ePreset) {
+          console.warn('[HWA-Simulator] Primary Presets_clanWarReplay failed, trying fallback...', ePreset);
+          try {
+            presetPtr = invokePtr('Presets_clanWarReplay', isTitan ? 1 : 0);
+          } catch (_) {}
         }
-        heap.u16[u16Start + len] = 0;
-        return ptr;
-      };
+        if (!presetPtr) throw new Error('Failed to create BattlePresets for simulation');
 
-      const rawJson = JSON.stringify(Object.assign({}, rawBattle, { seed: seed >>> 0 }));
-      const rawJsonStrPtr = forgeString(rawJson);
-      let jsonNodePtr = 0;
-      try {
-        jsonNodePtr = invokePtr('JSON_Parse', rawJsonStrPtr);
-      } finally {
-        free(rawJsonStrPtr);
-      }
-      if (!jsonNodePtr) throw new Error('JSON_Parse returned null for rawBattle payload');
+        // Step 2: Learn String class pointer from Object.ToString(presetPtr)
+        currentPhase = 'LEARN_STRING_CLASS';
+        const strSamplePtr = invokePtr('Object_ToString', presetPtr);
+        if (!strSamplePtr) throw new Error('Failed to obtain String class descriptor from Object.ToString');
+        const stringClassPtr = heap.u32[strSamplePtr >>> 2];
 
-      const dataObjPtr = invokePtr('DataObject_fromObject', jsonNodePtr);
-      if (!dataObjPtr) throw new Error('DataObject_fromObject returned null');
+        const forgeString = (str: string): number => {
+          const len = str.length;
+          const ptr = malloc(16 + 2 * len) >>> 0;
+          if (!ptr) throw new Error('malloc failed for forgeString');
+          heap.u32[ptr >>> 2] = stringClassPtr;
+          heap.u32[(ptr + 4) >>> 2] = 0;
+          heap.i32[(ptr + 8) >>> 2] = len;
+          const u16Start = (ptr + 12) >>> 1;
+          for (let i = 0; i < len; i++) {
+            heap.u16[u16Start + i] = str.charCodeAt(i);
+          }
+          heap.u16[u16Start + len] = 0;
+          return ptr;
+        };
 
-      // Allocate BattleInstantPlay
-      const playTypeNamePtr = forgeString('BattleInstantPlay');
-      let playTypePtr = 0;
-      try {
-        playTypePtr = invokePtr('Type_GetType', playTypeNamePtr);
-      } finally {
-        free(playTypeNamePtr);
-      }
-      if (!playTypePtr) throw new Error('BattleInstantPlay type not found in Unity IL2CPP runtime');
+        // Step 3: Serialize and parse JSON input into game data structure
+        currentPhase = 'PARSE_JSON_INPUT';
+        const normalizedSeed = seed >>> 0;
+        const rawJson = JSON.stringify(Object.assign({}, rawBattle, { seed: normalizedSeed }));
+        const rawJsonStrPtr = forgeString(rawJson);
+        let jsonNodePtr = 0;
+        try {
+          jsonNodePtr = invokePtr('JSON_Parse', rawJsonStrPtr);
+        } finally {
+          free(rawJsonStrPtr);
+        }
+        if (!jsonNodePtr) throw new Error('JSON_Parse returned null for rawBattle payload');
 
-      const playPtr = invokePtr('GetUninitializedObject', playTypePtr);
-      if (!playPtr) throw new Error('Could not instantiate BattleInstantPlay object');
+        currentPhase = 'CONVERT_DATA_OBJECT';
+        const dataObjPtr = invokePtr('DataObject_fromObject', jsonNodePtr);
+        if (!dataObjPtr) throw new Error('DataObject_fromObject returned null');
 
-      const hPlay = invokePtr('GCHandle_Alloc', playPtr);
-      const hPresets = invokePtr('GCHandle_Alloc', presetPtr);
+        // Step 4: Allocate BattleInstantPlay
+        currentPhase = 'RESOLVE_PLAY_TYPE';
+        const playTypeNamePtr = forgeString('BattleInstantPlay');
+        let playTypePtr = 0;
+        try {
+          playTypePtr = invokePtr('Type_GetType', playTypeNamePtr);
+        } finally {
+          free(playTypeNamePtr);
+        }
+        if (!playTypePtr) throw new Error('BattleInstantPlay type not found in Unity IL2CPP runtime');
 
-      try {
-        // Construct BattleInstantPlay(dataObj, presets, 0, 0, 0)
+        currentPhase = 'ALLOC_PLAY_OBJECT';
+        playPtr = invokePtr('GetUninitializedObject', playTypePtr);
+        if (!playPtr) throw new Error('Could not instantiate BattleInstantPlay object');
+
+        hPlay = invokePtr('GCHandle_Alloc', playPtr);
+        hPresets = invokePtr('GCHandle_Alloc', presetPtr);
+
+        // Step 5: Construct BattleInstantPlay(dataObj, presets, 0, 0, 0)
+        currentPhase = 'CONSTRUCT_BATTLE_PLAY';
         invoke('Play_ctor', playPtr, dataObjPtr, presetPtr, 0, 0, 0);
+
+        // Step 6: Start battle execution loop
+        currentPhase = 'START_BATTLE_PLAY';
         invoke('Play_start', playPtr);
 
-        // Await completion via Play_get_result polling
+        // Step 7: Await completion via Play_get_result polling
+        currentPhase = 'WAIT_BATTLE_RESULT';
         let resultHandle = 0;
         const startWait = Date.now();
         while (!resultHandle && Date.now() - startWait < 5000) {
@@ -686,12 +744,18 @@ export function installInterceptor(customWindow?: any): void {
           }
         }
 
+        // Step 8: Create battle data and execute physics & AI simulation
+        currentPhase = 'CREATE_BATTLE_DATA';
         const battleDataPtr = invokePtr('Play_createBattleData', playPtr, dataObjPtr, 1);
         if (!battleDataPtr) throw new Error('Play_createBattleData returned null');
 
+        currentPhase = 'EXECUTE_BATTLE';
         invoke('Play_executeBattle', playPtr);
+
+        currentPhase = 'CREATE_RESULT';
         invoke('Play_createResult', playPtr);
 
+        currentPhase = 'SERIALIZE_RESULT';
         const resultStrPtr = invokePtr('BattleData_serializeResult', battleDataPtr);
         const resultJsonStr = readString(resultStrPtr);
         if (!resultJsonStr) throw new Error('BattleData_serializeResult returned empty string');
@@ -735,7 +799,7 @@ export function installInterceptor(customWindow?: any): void {
           win,
           stars,
           duration,
-          seed,
+          seed: normalizedSeed,
           attackers: attackersOut,
           defenders: defendersOut,
           progress: parsedProgress,
@@ -745,8 +809,19 @@ export function installInterceptor(customWindow?: any): void {
             progress: [parsedProgress]
           }
         };
+      } catch (err: any) {
+        const errorDetail = describeWasmException(err, currentPhase, {
+          type: rawBattle?.type,
+          seed,
+          attackers: rawBattle?.attackers,
+          defenders: rawBattle?.defenders
+        });
+        console.error('[HWA-Simulator] Battle Simulation Failure Diagnostics:', errorDetail);
+        const enrichedError = new Error(errorDetail.message);
+        (enrichedError as any).errorDetail = errorDetail;
+        throw enrichedError;
       } finally {
-        try { invoke('Play_dispose', playPtr); } catch (_) {}
+        try { if (playPtr) invoke('Play_dispose', playPtr); } catch (_) {}
         try { if (hPlay) invoke('GCHandle_FreeHandle', hPlay); } catch (_) {}
         try { if (hPresets) invoke('GCHandle_FreeHandle', hPresets); } catch (_) {}
       }
@@ -1114,12 +1189,19 @@ export function installInterceptor(customWindow?: any): void {
             result
           }, loc.origin);
         } catch (err: any) {
+          const detail = err?.errorDetail || describeWasmException(err, 'DISPATCH_SIMULATION', {
+            type: rawBattle?.type,
+            seed,
+            attackers: rawBattle?.attackers,
+            defenders: rawBattle?.defenders
+          });
           win.postMessage({
             source: 'hwa-helper-api',
             kind: 'simulate-battle-result',
             simId,
             ok: false,
-            error: err?.message || String(err)
+            error: detail.message || err?.message || String(err),
+            errorDetail: detail
           }, loc.origin);
         }
       })();

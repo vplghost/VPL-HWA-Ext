@@ -64,10 +64,33 @@ export function isTitanEligibleForDoor(titanId: number, element: string, titanMe
   return elem === normElem;
 }
 
+export interface SimErrorDetail {
+  phase?: string;
+  kind?: 'managed' | 'trap' | 'generic';
+  message: string;
+  rawMessage?: string;
+  context?: {
+    battleType?: string;
+    seed?: number;
+    attackerIds?: string[];
+    defenderCount?: number;
+  };
+  stack?: string;
+}
+
+export class BattleSimError extends Error {
+  detail?: SimErrorDetail;
+  constructor(message: string, detail?: SimErrorDetail) {
+    super(message);
+    this.name = 'BattleSimError';
+    this.detail = detail;
+  }
+}
+
 /**
  * Simulates a battle outcome strictly using the game's official Unity WebAssembly engine.
  * Completely eliminates empirical/heuristic formulas to prevent invalid battle desyncs with server.
- * If Unity engine is not available or fails, throws an error so caller can notify the user immediately.
+ * If Unity engine is not available or fails, throws a BattleSimError so caller can notify the user immediately.
  */
 export async function simulateBattleWithUnity(
   rawBattle: any,
@@ -77,8 +100,13 @@ export async function simulateBattleWithUnity(
 
   // 1. Direct in-page Unity simulation (when running inside the game tab)
   if (typeof window !== 'undefined' && typeof (window as any).__hwaSimulateBattle === 'function') {
-    const directOutcome = await (window as any).__hwaSimulateBattle(rawBattle, effectiveSeed);
-    if (directOutcome) return directOutcome;
+    try {
+      const directOutcome = await (window as any).__hwaSimulateBattle(rawBattle, effectiveSeed);
+      if (directOutcome) return directOutcome;
+    } catch (err: any) {
+      if (err instanceof BattleSimError) throw err;
+      throw new BattleSimError(err?.message || String(err), err?.errorDetail);
+    }
   }
 
   // 2. Cross-context RPC via chrome.runtime messaging (when running from Popup, Modal, or Background Worker)
@@ -108,10 +136,11 @@ export async function simulateBattleWithUnity(
     if (resp?.ok && resp?.result) {
       return resp.result;
     }
-    throw new Error(resp?.error || 'Unity Engine battle simulation is unavailable. Please ensure the game tab is open and loaded.');
+    const errMsg = resp?.error || 'Unity Engine battle simulation is unavailable. Please ensure the game tab is open and loaded.';
+    throw new BattleSimError(errMsg, resp?.errorDetail);
   }
 
-  throw new Error('Unity Engine battle simulation requires active game tab or extension environment.');
+  throw new BattleSimError('Unity Engine battle simulation requires active game tab or extension environment.');
 }
 
 /**

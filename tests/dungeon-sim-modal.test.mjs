@@ -46,9 +46,15 @@ test('DungeonSimModal Single File Component defines simulation controls, squad p
   assert.match(content, /doorElement/, 'Must evaluate doorElement');
   assert.match(content, /autoSelectSquad/, 'Must provide autoSelectSquad quick action');
   assert.match(content, /selectedTitanIds/, 'Must track selectedTitanIds');
+
+  // Error diagnostics and retry controls
+  assert.match(content, /showDiagnostics/, 'Must have showDiagnostics state for granular diagnostics');
+  assert.match(content, /copyDiagnostics/, 'Must have copyDiagnostics action for clipboard export');
+  assert.match(content, /errorDetail/, 'Must track structured errorDetail');
+  assert.match(content, /Thử lại/, 'Must have retry simulation action in error banner');
 });
 
-test('interceptor captures Unity instance and prepares Model A simulation bridge', async () => {
+test('interceptor captures Unity instance and prepares Model A simulation bridge with granular error diagnostics', async () => {
   const content = await readFile(resolve(root, 'src/content/interceptor.ts'), 'utf8');
 
   // Must set __hwaUnityInstance and __hwaUnityModule
@@ -58,4 +64,9 @@ test('interceptor captures Unity instance and prepares Model A simulation bridge
   // Must setup simulation bridge
   assert.match(content, /win\.__hwaSimulateBattle\s*=/, 'Must define __hwaSimulateBattle on window');
   assert.match(content, /setupWasmSimulationBridge/, 'Must define setupWasmSimulationBridge');
+
+  // Must have describeWasmException for granular phase tracking and avoiding opaque [object WebAssembly.Exception]
+  assert.match(content, /describeWasmException/, 'Must define describeWasmException helper');
+  assert.match(content, /currentPhase\s*=/, 'Must track currentPhase during simulation steps');
+  assert.match(content, /errorDetail/, 'Must forward errorDetail in simulate-battle-result');
 });

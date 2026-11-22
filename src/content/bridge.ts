@@ -288,7 +288,8 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         pending?.resolve?.({
           ok: event.data.ok === true,
           result: event.data.result || null,
-          error: event.data.error || null
+          error: event.data.error || null,
+          errorDetail: event.data.errorDetail || null
         });
       }
       return;

@@ -204,9 +204,10 @@ export async function executeDungeonAutomationStep(
   try {
     outcome = await simulateBattleWithUnity(startPayload, seed);
   } catch (err: any) {
+    const phasePrefix = err?.detail?.phase ? ` at [${err.detail.phase}]` : '';
     return {
       stopped: true,
-      stopReason: `Unity battle simulation failed: ${err.message || String(err)}. Aborted to protect titans.`,
+      stopReason: `Unity battle simulation failed${phasePrefix}: ${err.message || String(err)}. Aborted to protect titans.`,
       chosenEvaluation: bestDoor,
       evaluations,
     };

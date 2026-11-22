@@ -303,5 +303,70 @@ describe('Dungeon Simulator & Automation Engine', () => {
       assert.equal(step.stopped, true);
       assert.match(step.stopReason, /Unity battle simulation failed/);
     });
+
+    it('wraps WebAssembly / IL2CPP runtime errors with granular phase diagnostics in BattleSimError', async () => {
+      const { BattleSimError } = await import('../src/utils/dungeonBattleSim.ts');
+      
+      const simError = new BattleSimError('IL2CPP managed exception in phase \'EXECUTE_BATTLE\'', {
+        phase: 'EXECUTE_BATTLE',
+        kind: 'managed',
+        message: 'IL2CPP managed exception in phase \'EXECUTE_BATTLE\' (Unity engine C# runtime threw an unhandled exception).',
+        rawMessage: '[object WebAssembly.Exception]',
+        context: {
+          battleType: 'dungeon_titan',
+          seed: 4177167138,
+          attackerIds: ['4000', '4001', '4002', '4004', '4053'],
+          defenderCount: 5
+        }
+      });
+
+      assert.equal(simError.name, 'BattleSimError');
+      assert.equal(simError.detail.phase, 'EXECUTE_BATTLE');
+      assert.equal(simError.detail.kind, 'managed');
+      assert.equal(simError.detail.context.seed, 4177167138);
+
+      globalThis.window = {
+        __hwaSimulateBattle: async () => {
+          throw simError;
+        }
+      };
+
+      const mockCache = {
+        value: {
+          dungeonStatus: {
+            data: {
+              floorNumber: 60,
+              currentFloorDoors: [{ attackerType: 'mixed', power: 300000 }],
+              states: {
+                titans: {
+                  '4000': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4001': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4002': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4004': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4053': { hp: 1000000, maxHp: 1000000, isDead: false },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const dispatchRpc = async (calls) => {
+        if (calls[0]?.name === 'dungeonStartBattle') {
+          return { results: [{ result: { response: { seed: 4177167138 } } }] };
+        }
+        return { results: [] };
+      };
+
+      const step = await executeDungeonAutomationStep({
+        cache: mockCache,
+        dispatchRpc,
+        safetyThresholdPct: 20,
+      });
+
+      assert.equal(step.stopped, true);
+      assert.match(step.stopReason, /at \[EXECUTE_BATTLE\]/);
+      assert.match(step.stopReason, /IL2CPP managed exception/);
+    });
   });
 });
