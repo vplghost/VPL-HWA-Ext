@@ -1,0 +1,27 @@
+{
+  "version": "1.294.1020",
+  "buildRelease": "83d4310c-dded-4bd3-a443-55f22b534671",
+  "dungeon": {
+    "kind": "titan-dungeon",
+    "preset": {
+      "isReplay": true,
+      "isAuto": true,
+      "configType": "titan"
+    },
+    "defaultBattleMs": 500,
+    "firstBattleTimeoutMs": 30000,
+    "collectEvery": 5,
+    "safetyRules": {
+      "minStars": 3,
+      "minTankHpPercent": 30,
+      "abortOnDeadTitan": true
+    }
+  },
+  "frontier": {
+    "kind": "hero-frontier",
+    "defenseTeamEveryLevels": 500,
+    "priorWeight": 4,
+    "powerGapFull": 0.30,
+    "defaultSeeds": 100
+  }
+}

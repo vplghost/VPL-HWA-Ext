@@ -1,0 +1,104 @@
+{
+  "version": "1.294.1020",
+  "extractedAt": "2026-11-21T22:57:05.116Z",
+  "totalSymbolsCount": 486916,
+  "functions": {
+    "Play_ctor": {
+      "index": 11594,
+      "name": "BattleInstantPlay__ctor_m7DB276FD39E2EB4DF76913B6F02F420DB0EFE0D7"
+    },
+    "Play_start": {
+      "index": 82984,
+      "name": "CommandBattleStartReplay_startReplay_m22E1E8418DE4BAF5880A0BECEEAD388735FA405C"
+    },
+    "Play_get_result": {
+      "index": 468056,
+      "name": "BattleReplay_get_result_m2CFBBAFABF1F791D87E7D178E587F5ADDEBB797D"
+    },
+    "Play_createBattleData": {
+      "index": 175082,
+      "name": "BattleInstantPlay_createBattleData_m34AE90645688E29C5F97073393FBF22C431EEA6C"
+    },
+    "Play_executeBattle": {
+      "index": 175078,
+      "name": "BattleInstantPlay_executeBattle_mC8CEDDAF9BB2BD6D83FFD0B5C00B58EBB772A405"
+    },
+    "Play_createResult": {
+      "index": 175081,
+      "name": "BattleInstantPlay_createResult_m85EB43A629D985A21B5EB1E862F43DB8415F8EC6"
+    },
+    "Play_dispose": {
+      "index": 49566,
+      "name": "AudioPlay_disposeSound_mCD5374442484AB105BE872FD960324A8044CC383"
+    },
+    "BattlePresets_ctor5": {
+      "index": 6579,
+      "name": "BattlePresets__ctor_mF7449BBED4BAB4EAF944E599EEC5087BB9E01685"
+    },
+    "Presets_clanWarReplay": {
+      "index": 174207,
+      "name": "BattlePresetsFactory_clanWarReplay_m99C22FE5C926B3385E7C668ED8D28DC2BD3E5447"
+    },
+    "Presets_arenaReplay": {
+      "index": 174209,
+      "name": "BattlePresetsFactory_arenaReplay_mF8DEC383CB0B9E68F5EA50BDBF2E81A32AD8FFC3"
+    },
+    "Presets_get_isReplay": {
+      "index": 468101,
+      "name": "BattlePresets_get_isReplay_m4A8CAB37BD40CF1B4BEEB59E29DAF90E34FD4E5D"
+    },
+    "BattleData_serializeResult": {
+      "index": 49386,
+      "name": "BattleData_serializeResult_m47DE682099AE6D04FD2AB20479BD406B92B29E21"
+    },
+    "BattleData_getStars": {
+      "index": 28182,
+      "name": "BattleData_getStars_mF6907DCDB13D7652BD034F37924A33111A6BE051"
+    },
+    "Config_get_titan": {
+      "index": 17061,
+      "name": "BattleConfigStorage_get_titanClanPvp_mBA746515E54DBB8357788C05F81923B7E0117E98"
+    },
+    "JSON_Parse": {
+      "index": 1763,
+      "name": "JSONNode_Parse_mFD3EDE7E12E0CC5319C50FBCEE3D68991C374533"
+    },
+    "DataObject_fromObject": {
+      "index": 15292,
+      "name": "DataObject_fromObject_m559ACEEB280DBB84C6B57A7CE2C02592C1FBC4EC"
+    },
+    "Type_GetType": {
+      "index": 561,
+      "name": "Type_GetTypeFromHandle_m6062B81682F79A4D6DF2640692EE6D9987858C57"
+    },
+    "GetUninitializedObject": {
+      "index": 26825,
+      "name": "FormatterServices_GetUninitializedObject_mA2B57E3C189694129FE2870B8188421DF78468A1"
+    },
+    "Object_GetType": {
+      "index": 607,
+      "name": "Object_GetType_mE10A8FC1E57F3DF29972CCBC026C2DC3942263B3"
+    },
+    "Object_ToString": {
+      "index": 16323,
+      "name": "Object_ToString_mF8AC1EB9D85AB52EC8FD8B8BDD131E855E69673F"
+    },
+    "RuntimeType_get_FullName": {
+      "index": 305865,
+      "name": "RuntimeType_get_FullName_m12D30D607669B81D445AB420246A3D7CD19B4920"
+    },
+    "GCHandle_Alloc": {
+      "index": 2129,
+      "name": "GCHandle_Alloc_m3BFD398427352FC756FFE078F01A504B681352EC"
+    },
+    "GCHandle_FreeHandle": {
+      "index": 1845,
+      "name": "GCHandle_Free_m1320A260E487EB1EA6D95F9E54BFFCB5A4EF83A3"
+    },
+    "GC_Collect": {
+      "index": 8195,
+      "name": "BlockingCollection_1_System_Collections_ICollection_get_SyncRoot_mC09D5481E8EDD0ADBDEEE5E880211D10FF93A2F8_gshared"
+    }
+  },
+  "unresolvedCount": 0
+}

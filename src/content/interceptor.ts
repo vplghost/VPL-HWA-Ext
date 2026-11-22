@@ -528,7 +528,48 @@ export function installInterceptor(customWindow?: any): void {
     }
     activeUnityInstance = instance;
     win.__hwaUnityInstance = instance;
+    if (instance?.Module) {
+      win.__hwaUnityModule = instance.Module;
+    }
     reportEngineStatus(`instance-${source}`);
+    setupWasmSimulationBridge(instance);
+  }
+
+  function setupWasmSimulationBridge(instance: any) {
+    if (win.__hwaSimulateBattle) return;
+
+    win.__hwaSimulateBattle = async function (rawBattle: any, seed: number) {
+      try {
+        const mod = instance?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule;
+        const asm = mod?.asm;
+        if (!asm) {
+          throw new Error('Unity WebAssembly asm not found');
+        }
+
+        const values = Object.values(asm);
+        const table = values.find((v: any) => v instanceof WebAssembly.Table) as WebAssembly.Table | undefined;
+        const memory = values.find((v: any) => v instanceof WebAssembly.Memory) as WebAssembly.Memory | undefined;
+
+        if (!table || !memory) {
+          throw new Error('WASM table or memory not accessible');
+        }
+
+        const heap = {
+          u8: new Uint8Array(memory.buffer),
+          u16: new Uint16Array(memory.buffer),
+          i32: new Int32Array(memory.buffer),
+          u32: new Uint32Array(memory.buffer)
+        };
+
+        const malloc = (asm as any).Ol || (asm as any).malloc || (asm as any)._malloc;
+        const free = (asm as any).Pl || (asm as any).free || (asm as any)._free;
+
+        // If malloc is available, we can execute via WASM or parse
+        return null;
+      } catch (err) {
+        return null;
+      }
+    };
   }
 
   function instrumentEngineMethod(instance: any, methodName: string, source: any) {

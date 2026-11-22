@@ -24,3 +24,6 @@ node_modules/
 !/temp/**/README
 !/temp/**/README.*
 /temp/edge-*/
+
+# hwa-sim large downloaded binaries
+/hwa-sim/downloads/

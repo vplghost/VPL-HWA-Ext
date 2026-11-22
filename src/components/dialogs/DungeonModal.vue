@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UnitStars from '@/src/components/common/UnitStars.vue';
+import DungeonSimModal from '@/src/components/dialogs/DungeonSimModal.vue';
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import {
@@ -93,7 +94,8 @@ const casualtiesList = computed<any[]>(() => {
 });
 
 const doors = computed<any[]>(() => {
-  return normalizeArray(dungeonData.value.currentFloorDoors).filter((door: any) => door && typeof door === 'object')
+  const rawDoors = dungeonData.value.currentFloorDoors || dungeonData.value.floor?.userData || [];
+  return normalizeArray(rawDoors).filter((door: any) => door && typeof door === 'object')
     .map((door: any) => {
       const enemies = normalizeArray(door.team ?? door.enemies).map((unit: any) => {
         const rawId = unit && typeof unit === 'object' ? unit.id : unit;
@@ -146,6 +148,21 @@ const stackLevel = computed(() => getModalStackLevel('dungeon'));
 const storedBattleHistory = ref<Record<string, any>>({});
 const isSimulatingBattle = ref(false);
 const simulatingDoorIdx = ref<number | null>(null);
+
+// Interactive Simulation Dialog state
+const isSimModalOpen = ref(false);
+const activeSimDoor = ref<any>(null);
+const activeSimDoorIdx = ref(0);
+
+function openSimModal(door: any, idx: number) {
+  activeSimDoor.value = door;
+  activeSimDoorIdx.value = idx;
+  isSimModalOpen.value = true;
+}
+
+function handleSimBattleSubmitted() {
+  refreshDungeon();
+}
 
 const DUNGEON_SIM_SETTINGS_KEY = 'dungeonSimSettings';
 const simHpBonusPercent = ref(0);
@@ -918,12 +935,9 @@ function handleImgError(e: Event) {
                   <p v-else class="text-[11px] text-slate-400 dark:text-slate-500">Enemy Titan data unavailable.</p>
                 </div>
 
-                <!-- Simulated Attack Action (when matching encounter exists) -->
-                <div
-                  v-if="door.match"
-                  class="pt-2 border-t border-slate-200 dark:border-slate-700/60 space-y-2"
-                >
-                  <div class="flex items-center justify-between text-[11px]">
+                <!-- Door Actions: Interactive Simulation & Historic Auto Clear -->
+                <div class="pt-2 border-t border-slate-200 dark:border-slate-700/60 space-y-2">
+                  <div v-if="door.match" class="flex items-center justify-between text-[11px]">
                     <span class="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                       <span>⚡</span>
                       <span>Matching team recorded</span>
@@ -933,24 +947,22 @@ function handleImgError(e: Event) {
                     </span>
                   </div>
 
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-1 overflow-hidden" title="Deployed team">
-                      <span
-                        v-for="hId in door.match.record.playerTeam"
-                        :key="hId"
-                        class="inline-block relative"
-                      >
-                        <img
-                          :src="`assets/titans/${hId}.png`"
-                          class="size-5 rounded-full object-cover border border-slate-200 dark:border-slate-700"
-                          :title="`Titan #${hId}`"
-                          alt=""
-                          @error="handleImgError"
-                        />
-                      </span>
-                    </div>
-
+                  <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <!-- Interactive Simulation Button -->
                     <button
+                      :id="`btn-door-sim-${idx}`"
+                      type="button"
+                      class="dungeon-door-sim-btn cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-indigo-600/30 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 dark:text-indigo-300 dark:border-indigo-800 px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all active:scale-95"
+                      :title="`Tấn công giả lập cho Cửa ${Number(idx) + 1}`"
+                      @click="openSimModal(door, idx)"
+                    >
+                      <span>🧪</span>
+                      <span>Tấn công giả lập</span>
+                    </button>
+
+                    <!-- Historic Auto Clear Button (when match exists) -->
+                    <button
+                      v-if="door.match"
                       type="button"
                       class="dungeon-simulate-attack-btn cursor-pointer inline-flex items-center gap-1 rounded-lg border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       :disabled="isSimulatingBattle"
@@ -968,7 +980,7 @@ function handleImgError(e: Event) {
                         <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
                         <path d="M12 2a10 10 0 0 1 10 10" />
                       </svg>
-                      <span v-else>⚔️</span>
+                      <span v-else>⚡</span>
                       <span>{{ isSimulatingBattle && simulatingDoorIdx === idx ? 'Clearing...' : 'Auto Clear' }}</span>
                     </button>
                   </div>
@@ -1070,5 +1082,15 @@ function handleImgError(e: Event) {
         </div>
       </div>
     </div>
+
+    <!-- Interactive Battle Simulation Modal (Model A) -->
+    <DungeonSimModal
+      v-model="isSimModalOpen"
+      :door="activeSimDoor"
+      :door-idx="activeSimDoorIdx"
+      :floor-number="floorNumber"
+      :titan-states="dungeonData.states?.titans || {}"
+      @battle-submitted="handleSimBattleSubmitted"
+    />
   </Teleport>
 </template>

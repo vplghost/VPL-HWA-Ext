@@ -1,0 +1,898 @@
+{
+  "description": "Real dungeon battle sample captured from game session 2026-11-20",
+  "clientVersion": "1.294.1020",
+  "rawBattle": {
+    "userId": "1216438103",
+    "typeId": -1002440,
+    "attackers": {
+      "4020": {
+        "id": 4020,
+        "xp": 42660,
+        "level": 60,
+        "star": 4,
+        "skills": {
+          "4019": 60
+        },
+        "power": 13955,
+        "artifacts": [
+          {
+            "level": 10,
+            "star": 2
+          },
+          {
+            "level": 10,
+            "star": 1
+          },
+          {
+            "level": 40,
+            "star": 2
+          }
+        ],
+        "skins": {
+          "10009": 20
+        },
+        "currentSkin": 10009,
+        "skinsInfo": [],
+        "currentSkinRank": 0,
+        "physicalAttack": 58729.23,
+        "anticrit": 1,
+        "hp": 1937434.54,
+        "antidodge": 1,
+        "GlobalAttack": 100,
+        "damageTo": {
+          "water": 588
+        },
+        "defenseFrom": {
+          "water": 232
+        },
+        "skin": 10009,
+        "skinRank": 0,
+        "currentSkinColorId": 0,
+        "scale": 0.8,
+        "state": {
+          "isDead": false,
+          "hp": 1425783,
+          "energy": 512
+        }
+      },
+      "4021": {
+        "id": 4021,
+        "xp": 24260,
+        "level": 50,
+        "star": 3,
+        "skills": {
+          "4021": 50
+        },
+        "power": 7631,
+        "artifacts": [
+          {
+            "level": 1,
+            "star": 1
+          },
+          {
+            "level": 1,
+            "star": 1
+          },
+          {
+            "level": 1,
+            "star": 1
+          }
+        ],
+        "skins": {
+          "10010": 8
+        },
+        "currentSkin": 10010,
+        "skinsInfo": [],
+        "currentSkinRank": 0,
+        "physicalAttack": 52248.71,
+        "anticrit": 1,
+        "hp": 796742.67,
+        "antidodge": 1,
+        "GlobalAttack": 100,
+        "damageTo": {
+          "water": 117
+        },
+        "defenseFrom": {
+          "water": 47
+        },
+        "skin": 10010,
+        "skinRank": 0,
+        "currentSkinColorId": 0,
+        "scale": 0.8,
+        "state": {
+          "isDead": false,
+          "hp": 796742,
+          "energy": 400
+        }
+      },
+      "4022": {
+        "id": 4022,
+        "xp": 24260,
+        "level": 50,
+        "star": 3,
+        "skills": {
+          "4023": 50
+        },
+        "power": 8341,
+        "artifacts": [
+          {
+            "level": 40,
+            "star": 5
+          },
+          {
+            "level": 8,
+            "star": 1
+          },
+          {
+            "level": 20,
+            "star": 1
+          }
+        ],
+        "skins": {
+          "10011": 15
+        },
+        "currentSkin": 10011,
+        "skinsInfo": [],
+        "currentSkinRank": 0,
+        "physicalAttack": 51464.41,
+        "anticrit": 1,
+        "hp": 880343.14,
+        "antidodge": 1,
+        "GlobalAttack": 100,
+        "damageTo": {
+          "water": 526
+        },
+        "defenseFrom": {
+          "water": 208
+        },
+        "skin": 10011,
+        "skinRank": 0,
+        "currentSkinColorId": 0,
+        "scale": 0.8,
+        "state": {
+          "isDead": false,
+          "hp": 880343,
+          "energy": 1000
+        }
+      },
+      "4023": {
+        "id": 4023,
+        "xp": 42660,
+        "level": 60,
+        "star": 3,
+        "skills": {
+          "4025": 60,
+          "4026": 60
+        },
+        "power": 11005,
+        "artifacts": [
+          {
+            "level": 20,
+            "star": 3
+          },
+          {
+            "level": 15,
+            "star": 2
+          },
+          {
+            "level": 20,
+            "star": 1
+          }
+        ],
+        "skins": {
+          "10012": 25
+        },
+        "currentSkin": 10012,
+        "skinsInfo": [],
+        "currentSkinRank": 0,
+        "physicalAttack": 70518.65,
+        "anticrit": 1,
+        "hp": 1194256.21,
+        "antidodge": 1,
+        "GlobalAttack": 100,
+        "damageTo": {
+          "water": 800
+        },
+        "defenseFrom": {
+          "water": 316
+        },
+        "skin": 10012,
+        "skinRank": 0,
+        "currentSkinColorId": 0,
+        "scale": 0.8,
+        "state": {
+          "isDead": false,
+          "hp": 1194256,
+          "energy": 600
+        }
+      },
+      "4024": {
+        "id": 4024,
+        "xp": 24260,
+        "level": 50,
+        "star": 3,
+        "skills": {
+          "4046": 50,
+          "4047": 50
+        },
+        "power": 6233,
+        "artifacts": [
+          {
+            "level": 1,
+            "star": 1
+          },
+          {
+            "level": 1,
+            "star": 2
+          },
+          {
+            "level": 4,
+            "star": 2
+          }
+        ],
+        "skins": {
+          "10040": 6
+        },
+        "currentSkin": 10040,
+        "skinsInfo": [],
+        "currentSkinRank": 0,
+        "physicalAttack": 34376.7,
+        "anticrit": 1,
+        "hp": 760834.25,
+        "antidodge": 1,
+        "GlobalAttack": 100,
+        "damageTo": {
+          "water": 129
+        },
+        "defenseFrom": {
+          "water": 52
+        },
+        "skin": 10040,
+        "skinRank": 0,
+        "currentSkinColorId": 0,
+        "scale": 0.8,
+        "state": {
+          "isDead": false,
+          "hp": 760834,
+          "energy": 500
+        }
+      }
+    },
+    "defenders": [
+      {
+        "1": {
+          "id": 4003,
+          "xp": 30420,
+          "level": 54,
+          "star": 5,
+          "skills": {
+            "4007": 54,
+            "4008": 54
+          },
+          "power": 13652,
+          "artifacts": [
+            {
+              "level": 1,
+              "star": 0
+            },
+            {
+              "level": 1,
+              "star": 0
+            },
+            {
+              "level": 1,
+              "star": 0
+            }
+          ],
+          "skins": [],
+          "currentSkin": 0,
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "physicalAttack": 95473.53,
+          "anticrit": 1,
+          "hp": 1404050.68,
+          "antidodge": 1,
+          "GlobalAttack": 100,
+          "skin": 0,
+          "skinRank": 0,
+          "currentSkinColorId": 0,
+          "scale": 0.8
+        },
+        "2": {
+          "id": 4000,
+          "xp": 30420,
+          "level": 54,
+          "star": 5,
+          "skills": {
+            "4001": 54
+          },
+          "power": 13640,
+          "artifacts": [
+            {
+              "level": 1,
+              "star": 0
+            },
+            {
+              "level": 1,
+              "star": 0
+            },
+            {
+              "level": 1,
+              "star": 0
+            }
+          ],
+          "skins": [],
+          "currentSkin": 0,
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "anticrit": 1,
+          "antidodge": 1,
+          "hp": 1471042.18,
+          "physicalAttack": 90260.9,
+          "GlobalAttack": 100,
+          "skin": 0,
+          "skinRank": 0,
+          "currentSkinColorId": 0,
+          "scale": 0.8
+        },
+        "3": {
+          "id": 4002,
+          "xp": 28730,
+          "level": 53,
+          "star": 5,
+          "skills": {
+            "4005": 53
+          },
+          "power": 13265,
+          "artifacts": [
+            {
+              "level": 1,
+              "star": 0
+            },
+            {
+              "level": 1,
+              "star": 0
+            },
+            {
+              "level": 1,
+              "star": 0
+            }
+          ],
+          "skins": [],
+          "currentSkin": 0,
+          "skinsInfo": [],
+          "currentSkinRank": 0,
+          "physicalAttack": 97546.46,
+          "anticrit": 1,
+          "hp": 1300491.13,
+          "antidodge": 1,
+          "GlobalAttack": 100,
+          "skin": 0,
+          "skinRank": 0,
+          "currentSkinColorId": 0,
+          "scale": 0.8
+        }
+      }
+    ],
+    "effects": [],
+    "reward": {
+      "dungeonActivity": 6,
+      "consumable": {
+        "20": 25
+      },
+      "fragmentTitan": {
+        "4011": 1
+      }
+    },
+    "startTime": 1795173698,
+    "seed": 1237270575,
+    "type": "dungeon_titan",
+    "battleFeatures": [
+      "battleFeature_202",
+      "battleFeature_204",
+      "battleFeature_207"
+    ],
+    "battleEffects": {
+      "LightTitanShield": 1,
+      "Buff_Duplicate": 71,
+      "StatUp": 5,
+      "AntimagePassive": 7,
+      "EnergyWarlockDamageRetarget": 9,
+      "Levitation": 251,
+      "Curse": 11,
+      "Hero500MUlt": 441,
+      "Hero500MArmorDebuff": 13,
+      "AstarothResurrect": 35,
+      "RufusResurrect": 36,
+      "MorriganResurrect": 37,
+      "BlockAllyBuffs": 38,
+      "Hero25Ult": 39,
+      "Buff": 40,
+      "AlchemistUlt": 41,
+      "TargetBackline": 42,
+      "SandPhantomUlt": 43,
+      "ScorpioUlt": 44,
+      "ValueSkillModifier": 45,
+      "AttackSpeedOnly": 46,
+      "Speed": 47,
+      "Speed_Duplicate": 48,
+      "Hero500MCritMultiplie": 50,
+      "precent": 53,
+      "Hero16Ult": 252,
+      "Curse_Duplicate": 67,
+      "Selfdamage": 69,
+      "Selfdamage_Duplicate": 70,
+      "NoCopy": 72,
+      "Blindness": 73,
+      "BlacksmithSword": 97,
+      "Debuff": 76,
+      "FishBuffNextAttack": 79,
+      "GhostSpear": 80,
+      "MagicResistDebuff": 81,
+      "EmpathyOfEternity": 82,
+      "VampireUlt": 83,
+      "WaterMark": 84,
+      "Hero44PetMasterMark": 85,
+      "Hero45Stack": 86,
+      "EmptyMark": 89,
+      "Hero45StackApplier": 90,
+      "BlacksmithSword_V1": 99,
+      "MojoStacks": 95,
+      "IrisDebuff": 384,
+      "AbaddonRessurectionProgress": 467,
+      "FattyRessurectionProgress": 102,
+      "EffectPaladinSpirit": 104,
+      "MojoDamageCounter": 143,
+      "BlockEnergy": 107,
+      "AttackSpeed": 108,
+      "SmallMushroom": 298,
+      "AbbadonShield": 110,
+      "JudgeShield": 111,
+      "PaladinShield": 112,
+      "JesterShield": 113,
+      "EnergyWarlockEnergyBoostShield": 114,
+      "FloweyUlt": 115,
+      "FattyUlt": 117,
+      "MStoneSkin": 118,
+      "ShieldMultiDamageTypes": 119,
+      "Hero500MUltV2": 121,
+      "MushroomView": 122,
+      "EpicBoss": 123,
+      "BossAutoResurrect": 124,
+      "EventBossMagicDamageReduce": 125,
+      "EventBossHealBlock": 126,
+      "EventBossPhysicalDamageReduce": 177,
+      "EventBossDamageOverTime": 128,
+      "EventBossDamageReduce": 178,
+      "EventBossDamageOverTimeView": 130,
+      "EventBossPhysicalDamageReduceViewLoop": 131,
+      "EventBossPhysicalDamageReduceViewBack": 132,
+      "EventBossMagicDamageReduceViewLoop": 133,
+      "EventBossMagicDamageReduceViewBack": 134,
+      "EventBossHealBlockView": 135,
+      "StunView": 136,
+      "JuliusSkill2ShieldSelf": 494,
+      "MushroomSkill3Effect": 138,
+      "BigMushroom": 297,
+      "BlackSmithEmptyShield": 140,
+      "damageLimit": 141,
+      "DemonSpearUlt": 142,
+      "JuliusSatelliteView": 144,
+      "JuliusSkill2ShieldCopy": 493,
+      "JuliusSkill2ShieldView": 209,
+      "JuliusSkill2ShieldViewProxy": 147,
+      "JuliusUltShield": 495,
+      "JuliusUltShieldHealView": 149,
+      "JuliusSkill2buffDelay": 150,
+      "JuliusUltShieldTag": 151,
+      "LightTitanMark": 152,
+      "EventBossSlow": 153,
+      "EventBossBurnStats": 154,
+      "EventBossDamageReturnView": 155,
+      "EventBossSlowView_FRONT": 156,
+      "EventBossSlowView_FLOOR": 157,
+      "EventBossSlowView_BACK": 158,
+      "EventBossBurnStatsView": 159,
+      "EventBossDamageReturn": 160,
+      "AidanCustomShield": 296,
+      "KeilaSelfHeal": 280,
+      "KeilaJumpEffectBack": 279,
+      "KeilaJumpEffect": 323,
+      "WaitBackJumpEffect": 400,
+      "BlockDamageAndEffects": 167,
+      "ResurrectProgress": 168,
+      "KaylaFireEffect": 401,
+      "KaylaFireEffectEndView": 171,
+      "Convert": 172,
+      "KaylaIdentEffect": 175,
+      "AidenIdentEffect": 176,
+      "AidenUltBurn": 179,
+      "UltIyari": 180,
+      "BlockForJump": 282,
+      "CommonDot": 183,
+      "Hero59UltEffect": 202,
+      "Hero59UltDebuffStrength": 185,
+      "Hero59BrokenArmorEffect": 456,
+      "Knockback": 248,
+      "HeroSkill2RunViewFX": 192,
+      "Hero59Skill2ReturnFX": 195,
+      "Hero59RainFx": 196,
+      "HeidiMysticHeroCounter": 197,
+      "Hero59SoundFx": 199,
+      "FakeDeathEffect": 301,
+      "BlackSmithShield": 242,
+      "OctaviaMirror": 203,
+      "HeidyToxinView": 204,
+      "SetEnergy": 208,
+      "HeidiCheckToxin": 212,
+      "EventBossExtraCritDamage": 213,
+      "EventBossBerserk": 214,
+      "EventBossBuffNotHeal": 215,
+      "EventBossSkillDamage": 216,
+      "EventBossMagCrit": 217,
+      "EventBossPureDamage": 218,
+      "BlockMove": 225,
+      "OctaviaMirrorHit": 226,
+      "PreyMark": 264,
+      "OyaChannelingEffect": 228,
+      "StunDisable": 240,
+      "SupportDebuff": 244,
+      "WarriorBuff": 245,
+      "Stun": 246,
+      "Silence": 247,
+      "Knockup": 249,
+      "MCharm": 356,
+      "ControlDebuff": 253,
+      "EmptyControl": 254,
+      "UltGlutton": 255,
+      "EnergyWarlockEnergyLock": 256,
+      "KnockupTagUI": 257,
+      "Hero49Paralysis": 259,
+      "VisualDarkTitan": 260,
+      "ControlTagUI": 261,
+      "MStoneCage": 262,
+      "StunTagUI": 263,
+      "LaraCritMultiplierEffect": 489,
+      "MarkGod": 266,
+      "HealIncrease": 267,
+      "Oreol": 268,
+      "DarkStarMarkV2": 273,
+      "DarkUltraEffect": 274,
+      "Hero64Root": 275,
+      "WaitDeath": 281,
+      "NoHeal_OnAlly": 2128,
+      "EffectImmune_OnAlly": 2000,
+      "ReflectDamage_OnEnemy": 2001,
+      "CritIncrease_OnEnemy": 2002,
+      "CritMultiplier_OnAlly": 2003,
+      "DodgeIncrease_OnEnemy": 2004,
+      "SlowmoBattle_OnAlly": 2005,
+      "Hero64Channeling": 377,
+      "Hero64Copy": 378,
+      "Hero65skill2Effect": 292,
+      "Hero65skill1Effect": 437,
+      "Hero65skill4Effect": 432,
+      "AidanCooldown": 322,
+      "MushroomCopy": 299,
+      "StackableBuffWithTagBuff": 302,
+      "StackableBuffWithTagDebuff": 303,
+      "Hero65skill3Effect": 446,
+      "HeidiToxinImpactor": 448,
+      "HeidiToxin": 449,
+      "hero66_blue": 330,
+      "hero66_violet": 331,
+      "hero66_red": 332,
+      "hero66_orange": 333,
+      "hero66_signature1": 326,
+      "hero66_signature2": 327,
+      "hero66_signature3": 328,
+      "hero66_signature4": 329,
+      "hero66_skill4Effect": 316,
+      "hero66_summonTime": 317,
+      "towerBossPassive": 340,
+      "dotEffectAA": 319,
+      "dotEffectSkill1": 320,
+      "dotEffectSkill3": 321,
+      "Hero66Resurrect": 324,
+      "Hero68Skill3BattleEffect": 460,
+      "Hero67Skill1Effect": 447,
+      "Hero67Skill2Effect": 352,
+      "Hero67Skill4Effect": 337,
+      "RufusUltShield": 338,
+      "RufusResurrectionProgress": 339,
+      "Hero69MainEffect": 491,
+      "Hero69Skill2Activator": 342,
+      "Hero69Skill3Activator": 343,
+      "Hero69Skill4Activator": 344,
+      "EarthSummonerEffect": 345,
+      "EarthSummonerPassive": 346,
+      "EarthSummonerPassive3titans": 347,
+      "EarthSummonerPassive4titans": 348,
+      "EarthSummonerPassive5titans": 349,
+      "EarthSummonerPassive1titans": 350,
+      "EarthSummonerPassive2titans": 351,
+      "Hero70Sleeping": 376,
+      "Hero70Sleep": 354,
+      "Hero70Skill2Effect": 451,
+      "Hero70SleepingVisual": 357,
+      "Hero70Sheep": 358,
+      "Hero70SheepCd": 359,
+      "FireSummonerEffect": 360,
+      "FireSummonerPassive": 362,
+      "FireSummonerPassive1titans": 363,
+      "FireSummonerPassive2titans": 364,
+      "FireSummonerPassive3titans": 365,
+      "FireSummonerPassive4titans": 396,
+      "FireSummonerPassive4titansMark": 367,
+      "FireSummonerPassive5titans": 368,
+      "Hero12Skill1PokrovaEffect": 369,
+      "Hero05Pokrov1Effect": 370,
+      "FireSummonerPassive4titansVisual": 371,
+      "Hero71UltEffect": 372,
+      "Hero71Skill2Effect": 373,
+      "Hero71Skill3Effect": 374,
+      "Hero71SkillPokrov1Effect": 375,
+      "Hero71Skill3Visual": 379,
+      "Hero72Summon": 381,
+      "Hero72Skill3Effect": 382,
+      "Hero37SkillPok1MarkEffect": 383,
+      "DamageOverTime": 385,
+      "WaterSummonerEffect": 386,
+      "WaterSummonerPassive": 387,
+      "WaterSummonerPassive1titans": 388,
+      "WaterSummonerPassive2titans": 389,
+      "WaterSummonerPassive3titans": 390,
+      "WaterSummonerPassive4titans": 391,
+      "WaterSummonerPassive5titans": 392,
+      "IrisResurrectBlock": 393,
+      "Hero54Skill8Effect": 394,
+      "Hero36Skill8Effect": 395,
+      "IrisBlock": 397,
+      "Hero54View": 398,
+      "Hero49Skill9Effect": 399,
+      "Hero79Skill1Effect": 402,
+      "Hero79Skill3Effect": 403,
+      "Hero79Skill4Effect": 404,
+      "Hero73Skill1Effect": 405,
+      "Hero73Skill2PokrovEffect": 406,
+      "LightSummonerEffect": 407,
+      "SummonerPassive1titans": 408,
+      "SummonerPassive2titans": 409,
+      "SummonerPassive3titans": 410,
+      "SummonerPassive5titans": 411,
+      "LightSummonerPassive4titans": 412,
+      "SummonerPassive": 413,
+      "AutoAttackBlindness": 414,
+      "Hero74Skill1Effect": 417,
+      "OyaPokrovEffect": 418,
+      "FireRuneMark": 438,
+      "DarkSummonerEffect": 420,
+      "DarkSummonerPassive4titans": 421,
+      "Hero74BuffCD": 422,
+      "AlvanorSkill8Effect": 423,
+      "Hero75Skill1Effect": 424,
+      "Hero75Skill3Effect": 425,
+      "Hero75Skill9Effect": 426,
+      "Hero6Paralysis": 427,
+      "Hero6Skill1Effect": 428,
+      "Hero6Skill2Effect": 429,
+      "Hero6Skill3Effect": 471,
+      "Hero6Skill9Effect": 431,
+      "SkillPokrov1Effect": 433,
+      "Skill1Effect": 434,
+      "ParalyzeEffect": 435,
+      "TitanAvalon": 436,
+      "IrisDot": 439,
+      "WarlockDamageRetarget": 442,
+      "Hero500Debuff": 443,
+      "PeriodicDamage": 444,
+      "AreaPeriodicDamage": 445,
+      "Hero49PeriodicDamage": 450,
+      "Hero29Skill8Effect": 452,
+      "Hero29Skill9Effect": 469,
+      "BloodFountain": 454,
+      "MagicTitSupportEffect": 455,
+      "Hero59Skill9Effect": 458,
+      "Hero68Skill8Effect": 459,
+      "GlobalStats": 461,
+      "RufusPurpleSkill": 462,
+      "SatoriPurple": 463,
+      "AstarothPurple": 464,
+      "Ressurection": 466,
+      "BoomerangUltV2": 468,
+      "TitanMagicTankUltEffect": 470,
+      "Hero77Skill2Effect": 472,
+      "Hero77Skill8Effect": 473,
+      "CleaverDotYellow": 475,
+      "Hero40Skill3Effect": 477,
+      "Hero73Skill1PokrovEffect": 478,
+      "Hero76EffectSkill3": 479,
+      "Hero21Skill4Effect": 480,
+      "MagicHurricane": 481,
+      "TitanMagicUltraHealEffect": 482,
+      "TitanMagicUltraDmgEffect": 483,
+      "Hero40AutoAttackBuff": 484,
+      "hero78skill1Effect": 485,
+      "hero78skill2Effect": 486,
+      "hero78skill8Effect": 487,
+      "Hero27Skill1PokrovEffect": 488,
+      "Hero69Skill9Activator": 490,
+      "Hero56Skill4Effect": 492,
+      "Hero56Skill8Effect": 496,
+      "Hero56Skill9Effect": 497,
+      "CastSpeedBuff": 498,
+      "CastSpeedDebuff": 499,
+      "UpdatableBuffWithTagBuff": 500,
+      "UpdatableBuffWithTagDebuff": 501,
+      "LuckyUltEffect": 1001,
+      "GeneratorShieldView": 1003,
+      "DestroyedDebuff": 1004,
+      "TargetMark": 1006,
+      "UltCooldown": 1007,
+      "ShieldCooldown": 1008,
+      "TargetCooldown": 1009,
+      "MorriganDebuff": 1012,
+      "SkyshipUpdateCooldownEffect": 1013,
+      "IntContainerEffect": 1014,
+      "GeneratorShieldBase": 1017,
+      "JorgenEnergyBuff": 1018,
+      "DamageIncreaseBuff": 1019,
+      "Tutorial_Mission1_DemonChains_V2": 1020,
+      "EventBossRandomBuffDebuff": 1028,
+      "EventBossCritAndMiss": 1029,
+      "DropItemHeal": 1500,
+      "DropItemDamage": 1501,
+      "DropItemEnergy": 1502,
+      "DamagePerSecond_OnAlly": 2079,
+      "PureDamageImmune_OnEnemy": 2008,
+      "Silence_OnAlly": 2009,
+      "PhysicalDamageImmune_OnEnemy": 2010,
+      "Blind_OnAlly": 2011,
+      "AllStatBuff2_OnEnemy": 2012,
+      "AllStatBuff4_OnEnemy": 2013,
+      "AllStatBuff8_OnEnemy": 2014,
+      "MagicTowerEffectFactionPhysAttack_OnAlly": 2015,
+      "MagicTowerEffectStunnedAdditionalDamage_OnEnemy": 2016,
+      "MagicTowerEffectStunOnAutoAttack_OnAlly": 2017,
+      "MagicTowerEffectDamageAndStunAtStart_OnEnemy": 2018,
+      "MagicTowerEffectDefenceBuffWhenOnControl_OnAlly": 2019,
+      "MagicTowerEffectEnergyAtStart_OnAlly": 2020,
+      "MagicTowerEffectIncreaseMagicalAttackAtStart_OnAlly": 2021,
+      "MagicTowerEffectIncreasePhysicalAttackAtStart_OnAlly": 2022,
+      "MagicTowerEffectStatsBoostUniqueFaction_OnAlly": 2023,
+      "MagicTowerEffectCritsAdditionalDamage_OnEnemy": 2024,
+      "MagicTowerEffectBlockFirstAttacks_OnAlly": 2025,
+      "MagicTowerEffectSilenceAndAtkBuffAtStart_OnAlly": 2026,
+      "MagicTowerEffectLifeStealBuff_OnAlly": 2027,
+      "MagicTowerEffectDodgeBuff_OnAlly": 2028,
+      "MagicTowerEffectCritBuff_OnAlly": 2029,
+      "MagicTowerEffectSilenceEachSeconds_OnEnemy": 2030,
+      "MagicTowerEffectPenetrationBuffEachSeconds_OnAlly": 2031,
+      "MagicTowerEffectDefDebuffEachSeconds_OnEnemy": 2032,
+      "MagicTowerEffectLifeStealBuffAfterUlt_OnAlly": 2033,
+      "MagicTowerEffectHealWhenOnControl_OnAlly": 2034,
+      "MagicTowerEffectHealWhenMadeControl_OnAlly": 2035,
+      "MagicTowerEffectBlindnessAfterStun_OnEnemy": 2036,
+      "MagicTowerEffectBlockAfterUlt_OnAlly": 2037,
+      "MagicTowerEffectCritsMostRightAtStart_OnAlly": 2038,
+      "MagicTowerEffectCritsMostRightAtStart_OnAllyTeam": 2039,
+      "MagicTowerEffectIncreaseEnergyMostLeftAtStart_OnAlly": 2040,
+      "MagicTowerEffectIncreaseEnergyMostLeftAtStart_OnAllyTeam": 2041,
+      "MagicTowerEffectIncreaseHealthAtStart_OnAlly": 2042,
+      "MagicTowerEffectIncreaseHealthMostRightAtStart_OnAlly": 2043,
+      "MagicTowerEffectIncreaseHealthMostRightAtStart_OnAllyTeam": 2044,
+      "MagicTowerEffectIncreaseMagDmgAfterSkill_OnAlly": 2045,
+      "MagicTowerEffectIncreasePhysDmgAfterAttack_OnAlly": 2046,
+      "MagicTowerEffectSilenceAfterCrit_OnEnemy": 2047,
+      "MagicTowerEffectIncreaseEnergyAfterAutoAttack_OnAlly": 2048,
+      "MagicTowerEffectIncreaseEnergyAfterDamage_OnAlly": 2049,
+      "MagicTowerEffectIncreasePhysDmg_OnEnemy": 2050,
+      "MagicTowerEffectIncreaseMagDmg_OnEnemy": 2051,
+      "MagicTowerEffectPeriodicHeal_OnAlly": 2052,
+      "MagicTowerEffectPeriodicHeal_OnAllyTeam": 2053,
+      "MagicTowerEffectCritFirstAutoAttacks_OnAlly": 2054,
+      "MagicTowerEffectSilenceEachSeconds_OnEnemyTeam": 2055,
+      "MagicTowerEffectAllDamageDot": 2063,
+      "MagicTowerEffectDamageOnDeath": 2064,
+      "MagicTowerEffectCritOnAutoAttack": 2065,
+      "AllStatBuff3_OnEnemy": 2066,
+      "AllStatBuff6_OnEnemy": 2067,
+      "NotMove_onEnemy": 2068,
+      "EventBossfightEffectIncreaseEnergyAfterDamage_OnAlly": 2069,
+      "EventBossfightEffectIncreaseEnergyMostLeftAtStart_OnAlly": 2070,
+      "MagicTowerEffectIncDamageOnLostHealth_OnAlly": 2071,
+      "MagicTowerEffectSoloFactionAtkBuff_OnAlly": 2072,
+      "MagicTowerEffectReflectShieldAndBlocked_OnAlly": 2073,
+      "MagicTowerEffectBlockAfterAllyBuff_OnAlly": 2074,
+      "MagicTowerEffectDodgeDisabler_OnEnemy": 2075,
+      "MagicTowerEffectRedirectMagAtk_OnEnemy": 2076,
+      "MagicTowerEffectBurnEnergyOnDeath_OnEnemy": 2077,
+      "IncreaseMagicAttackBattleYasmine": 2080,
+      "EnergyAtStartHigh_OnAlly": 2100,
+      "EnergyAtStartMedium_OnAlly": 2101,
+      "EnergyAtStartLow_OnAlly": 2102,
+      "ClanClashEffectIncreasePhysicalAttack_1": 2103,
+      "ClanClashEffectIncreasePhysicalAttack_2": 2104,
+      "ClanClashEffectIncreasePhysicalAttack_3": 2105,
+      "ClanClashEffectIncreasePhysicalAttack_4": 2106,
+      "ClanClashEffectIncreasePhysicalAttack_5": 2107,
+      "ClanClashEffectIncreaseMagicAttack_1": 2108,
+      "ClanClashEffectIncreaseMagicAttack_2": 2109,
+      "ClanClashEffectIncreaseMagicAttack_3": 2110,
+      "ClanClashEffectIncreaseMagicAttack_4": 2111,
+      "ClanClashEffectIncreaseMagicAttack_5": 2112,
+      "ClanClashEffectIncreaseArmor_1": 2113,
+      "ClanClashEffectIncreaseArmor_2": 2114,
+      "ClanClashEffectIncreaseArmor_3": 2115,
+      "ClanClashEffectIncreaseArmor_4": 2116,
+      "ClanClashEffectIncreaseArmor_5": 2117,
+      "ClanClashEffectIncreaseMagicArmor_1": 2118,
+      "ClanClashEffectIncreaseMagicArmor_2": 2119,
+      "ClanClashEffectIncreaseMagicArmor_3": 2120,
+      "ClanClashEffectIncreaseMagicArmor_4": 2121,
+      "ClanClashEffectIncreaseMagicArmor_5": 2122,
+      "ClanClashEffectIncreaseHP_1": 2123,
+      "ClanClashEffectIncreaseHP_2": 2124,
+      "ClanClashEffectIncreaseHP_3": 2125,
+      "ClanClashEffectIncreaseHP_4": 2126,
+      "ClanClashEffectIncreaseHP_5": 2127
+    },
+    "rewardMultiplier": 1
+  },
+  "actualClientProgress": {
+    "result": {
+      "win": true,
+      "stars": 3
+    },
+    "progress": [
+      {
+        "defenders": {
+          "heroes": {},
+          "input": []
+        },
+        "attackers": {
+          "heroes": {
+            "4020": {
+              "isDead": false,
+              "hp": 914132,
+              "energy": 512
+            },
+            "4021": {
+              "isDead": false,
+              "hp": 796742,
+              "energy": 400
+            },
+            "4022": {
+              "isDead": false,
+              "hp": 880343,
+              "energy": 1000
+            },
+            "4023": {
+              "isDead": false,
+              "hp": 1194256,
+              "energy": 600
+            },
+            "4024": {
+              "isDead": false,
+              "hp": 760834,
+              "energy": 500
+            }
+          },
+          "input": []
+        },
+        "duration": 14.6566,
+        "seed": 1237270575
+      }
+    ]
+  },
+  "serverReward": {
+    "dungeonActivity": 6,
+    "consumable": {
+      "20": 25
+    },
+    "fragmentTitan": {
+      "4011": 1
+    }
+  },
+  "dungeonActivityGained": 3668
+}
