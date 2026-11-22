@@ -54,12 +54,9 @@ async function openBoxes() {
   message.value = 'Checking available video boxes…';
 
   try {
-    // Refresh counters first to get authoritative placement state if needed
-    let currentCounters = counters.value;
-    if (!currentCounters) {
-      await dispatchRpc([{ name: 'cinemaGetCounters', args: {} }]);
-      currentCounters = cache.value.cinemaGetCounters?.data;
-    }
+    // Always refresh counters first to get authoritative placement state
+    await dispatchRpc([{ name: 'cinemaGetCounters', args: {} }]);
+    const currentCounters = cache.value.cinemaGetCounters?.data || counters.value;
 
     const viewed = Number(currentCounters?.placementViewed ?? 0);
     if (viewed >= 5) {
@@ -68,32 +65,19 @@ async function openBoxes() {
       return;
     }
 
-    const availableCount = Math.max(0, 5 - viewed);
-    const rewardList = currentCounters?.placementRewards || [];
-
-    // Determine boxes to open (boxNum 0..4)
-    const boxesToOpen: number[] = [];
-    if (rewardList.length > 0) {
-      for (const item of rewardList) {
-        if (Number.isInteger(item?.boxNum) && !boxesToOpen.includes(item.boxNum)) {
-          boxesToOpen.push(item.boxNum);
-        }
-      }
-    }
-    // Fallback: fill up to 5 box numbers (0..4)
-    for (let i = 0; i < 5; i++) {
-      if (!boxesToOpen.includes(i)) boxesToOpen.push(i);
+    // Determine boxes to open: boxNum goes from viewed..4 (boxNum 0 is first, 4 is last)
+    const queue: number[] = [];
+    for (let i = viewed; i < 5; i++) {
+      queue.push(i);
     }
 
-    // Slice to the remaining count today
-    const queue = boxesToOpen.slice(0, availableCount);
     let opened = 0;
     let earnedGold = 0;
 
     for (let idx = 0; idx < queue.length; idx++) {
       if (abortClaim) break;
       const boxNum = queue[idx];
-      message.value = `Opening box ${idx + 1}/${queue.length}…`;
+      message.value = `Opening box ${boxNum + 1}/5…`;
 
       const response = await dispatchRpc([{
         name: 'cinemaGiveReward',
@@ -103,7 +87,12 @@ async function openBoxes() {
       if (abortClaim) break;
 
       if (!response?.ok) {
-        message.value = response?.error || `Failed to open box ${idx + 1}.`;
+        const errMsg = String(response?.error || '');
+        if (errMsg.toLowerCase().includes('already')) {
+          // Box was already opened on server, proceed to next box
+          continue;
+        }
+        message.value = response?.error || `Failed to open box ${boxNum + 1}.`;
         break;
       }
 

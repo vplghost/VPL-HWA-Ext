@@ -140,4 +140,6 @@ test('FreeBoxButton SFC component exists and has expected button ID and tooltip 
   assert.ok(sfcContent.includes('Free Video Boxes'), 'Tooltip and labels must reference Free Video Boxes in English');
   assert.ok(sfcContent.includes("name: 'cinemaGiveReward'"), 'Must dispatch cinemaGiveReward');
   assert.ok(sfcContent.includes("name: 'cinemaGetCounters'"), 'Must dispatch cinemaGetCounters');
+  assert.ok(sfcContent.includes('for (let i = viewed; i < 5; i++)'), 'Must start queue from viewed to avoid Already opened errors');
+  assert.ok(sfcContent.includes("includes('already')"), 'Must gracefully continue if already opened error is returned');
 });
