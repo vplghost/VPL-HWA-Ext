@@ -79,13 +79,13 @@ test('skinHelper: resolves hero primary stat and skin stones correctly', () => {
 });
 
 test('skinHelper: buildChestOpenPlan optimizes large and small skin stone chests', () => {
-  // Need 400 stones, have 2 large chests (300) and 3 small chests (450)
-  const res = buildChestOpenPlan(400, 1, 2, 3);
+  // Need 330 stones, have 2 large chests (300) and 5 small chests (50)
+  const res = buildChestOpenPlan(330, 1, 2, 5);
   assert.equal(res.canFulfill, true);
-  assert.equal(res.totalYield, 450); // 2 large (300) + 1 small (150) = 450
+  assert.equal(res.totalYield, 330); // 2 large (300) + 3 small (30) = 330
   assert.deepEqual(res.plan, [
     { libId: 65, name: 'Large Skin Stone Chest', amount: 2, choiceIndex: 1, yieldPerChest: 150 },
-    { libId: 51, name: 'Skin Stone Chest', amount: 1, choiceIndex: 1, yieldPerChest: 150 },
+    { libId: 51, name: 'Skin Stone Chest', amount: 3, choiceIndex: 1, yieldPerChest: 10 },
   ]);
 
   // Deficit 0
@@ -96,7 +96,7 @@ test('skinHelper: buildChestOpenPlan optimizes large and small skin stone chests
   // Insufficient chests
   const insuff = buildChestOpenPlan(500, 1, 1, 1);
   assert.equal(insuff.canFulfill, false);
-  assert.equal(insuff.totalYield, 300); // 1 large (150) + 1 small (150) = 300
+  assert.equal(insuff.totalYield, 160); // 1 large (150) + 1 small (10) = 160
 });
 
 test('skinHelper: getHeroSkinsDetailed calculates complete plans for a hero', () => {

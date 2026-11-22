@@ -268,7 +268,7 @@ export function getSkinStoneInfo(mainStat: HeroMainStat): SkinStoneInfo {
 
 /**
  * Builds an optimal chest-opening plan to bridge a skin stone deficit.
- * Large Skin Stone Chest (65) and Skin Stone Chest (51) each yield 150 stones.
+ * Large Skin Stone Chest (65) yields 150 stones, Skin Stone Chest (51) yields 10 stones.
  */
 export function buildChestOpenPlan(
   neededStones: number,
@@ -294,18 +294,18 @@ export function buildChestOpenPlan(
     remaining = Math.max(0, remaining - useLarge * 150);
   }
 
-  // 2. Small Skin Stone Chests (libId: 51, yields 150)
+  // 2. Small Skin Stone Chests (libId: 51, yields 10)
   if (smallChests > 0 && remaining > 0) {
-    const needChests = Math.ceil(remaining / 150);
+    const needChests = Math.ceil(remaining / 10);
     const useSmall = Math.min(smallChests, needChests);
     plan.push({
       libId: 51,
       name: 'Skin Stone Chest',
       amount: useSmall,
       choiceIndex,
-      yieldPerChest: 150,
+      yieldPerChest: 10,
     });
-    remaining = Math.max(0, remaining - useSmall * 150);
+    remaining = Math.max(0, remaining - useSmall * 10);
   }
 
   const totalYield = plan.reduce((sum, item) => sum + item.amount * item.yieldPerChest, 0);

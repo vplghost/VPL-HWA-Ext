@@ -98,17 +98,17 @@ export const CHOICE_CHEST_DEFINITIONS: Record<number | string, ChestChoiceOption
     {
       choiceIndex: 0,
       label: 'Intelligence Skin Stone',
-      reward: { type: 'coin', id: 8, name: 'Intelligence Skin Stone', amount: 150 }
+      reward: { type: 'coin', id: 8, name: 'Intelligence Skin Stone', amount: 10 }
     },
     {
       choiceIndex: 1,
       label: 'Strength Skin Stone',
-      reward: { type: 'coin', id: 9, name: 'Strength Skin Stone', amount: 150 }
+      reward: { type: 'coin', id: 9, name: 'Strength Skin Stone', amount: 10 }
     },
     {
       choiceIndex: 2,
       label: 'Agility Skin Stone',
-      reward: { type: 'coin', id: 10, name: 'Agility Skin Stone', amount: 150 }
+      reward: { type: 'coin', id: 10, name: 'Agility Skin Stone', amount: 10 }
     },
   ],
 

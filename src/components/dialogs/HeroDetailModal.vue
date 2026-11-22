@@ -185,6 +185,8 @@ interface SkillSlotConfig {
   rankName: string;
   bg: string;
   badge: string;
+  dotColor: string;
+  accentBorder: string;
   delta: number;
   maxLvl: number;
 }
@@ -198,6 +200,8 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
     rankName: 'White',
     bg: 'border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40',
     badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
+    dotColor: 'bg-slate-400 dark:bg-slate-500',
+    accentBorder: 'border-l-[3px] border-l-slate-400 dark:border-l-slate-500',
     delta: 0,
     maxLvl: heroLevel.value,
   },
@@ -209,6 +213,8 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
     rankName: 'Green',
     bg: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20',
     badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
+    dotColor: 'bg-emerald-500',
+    accentBorder: 'border-l-[3px] border-l-emerald-500',
     delta: 0,
     maxLvl: heroLevel.value,
   },
@@ -220,6 +226,8 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
     rankName: 'Blue',
     bg: 'border-sky-200 bg-sky-50/60 dark:border-sky-900/40 dark:bg-sky-950/20',
     badge: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200',
+    dotColor: 'bg-sky-500',
+    accentBorder: 'border-l-[3px] border-l-sky-500',
     delta: 20,
     maxLvl: Math.max(0, heroLevel.value - 20),
   },
@@ -231,6 +239,8 @@ const skillSlots = computed<SkillSlotConfig[]>(() => [
     rankName: 'Violet',
     bg: 'border-purple-200 bg-purple-50/60 dark:border-purple-900/40 dark:bg-purple-950/20',
     badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200',
+    dotColor: 'bg-purple-500',
+    accentBorder: 'border-l-[3px] border-l-purple-500',
     delta: 40,
     maxLvl: Math.max(0, heroLevel.value - 40),
   },
@@ -1189,26 +1199,26 @@ function handleSoulStoneFarm() {
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div
                 v-for="s in skillSlots"
                 :key="s.slot"
-                class="flex flex-col justify-between p-2.5 rounded-lg border transition-all"
-                :class="
+                class="flex flex-col justify-between p-2 rounded-lg border transition-all"
+                :class="[
                   heroColor >= s.rankReq || s.slot <= skillKeys.length
                     ? s.bg
-                    : 'border-dashed border-slate-200 bg-slate-50/30 text-slate-400 dark:border-slate-800 dark:bg-slate-900/30'
-                "
+                    : 'border-dashed border-slate-200 bg-slate-50/30 text-slate-400 dark:border-slate-800 dark:bg-slate-900/30',
+                  heroColor >= s.rankReq || s.slot <= skillKeys.length ? s.accentBorder : ''
+                ]"
               >
-                <!-- Top Row: tier badge, name, action button/badge -->
-                <div class="flex items-center justify-between gap-1.5 min-w-0">
-                  <div class="flex items-center gap-1.5 min-w-0 flex-1 mr-1">
+                <!-- Top Row: Tier indicator dot, name, action button/badge -->
+                <div class="flex items-center justify-between gap-1 min-w-0">
+                  <div class="flex items-center gap-1.5 min-w-0 flex-1 mr-0.5">
                     <span
-                      class="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold uppercase tracking-wider shrink-0"
-                      :class="s.badge"
-                    >
-                      {{ s.tier }}
-                    </span>
+                      class="size-2 rounded-full shrink-0 shadow-2xs"
+                      :class="s.dotColor"
+                      :title="`Tier: ${s.tier} (Unlocked at rank ${s.rankName})`"
+                    ></span>
                     <span
                       class="font-bold text-xs truncate"
                       :class="
@@ -1222,17 +1232,17 @@ function handleSoulStoneFarm() {
                     </span>
                   </div>
 
-                  <!-- Right Action Wrap -->
-                  <div class="shrink-0 flex items-center gap-1.5">
+                  <!-- Right Action Wrap: Max and + buttons -->
+                  <div class="shrink-0 flex items-center gap-1">
                     <span
                       v-if="!(heroColor >= s.rankReq || s.slot <= skillKeys.length)"
-                      class="px-1.5 py-0.5 rounded text-3xs text-slate-400 bg-slate-100 dark:bg-slate-800 dark:text-slate-500"
+                      class="px-1.5 py-0.2 rounded text-3xs text-slate-400 bg-slate-100 dark:bg-slate-800 dark:text-slate-500"
                     >
-                      Locked
+                      🔒
                     </span>
                     <span
                       v-else-if="isSkillMax(s)"
-                      class="px-2 py-0.5 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                      class="px-1.5 py-0.2 rounded text-3xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
                     >
                       MAX
                     </span>
@@ -1240,7 +1250,7 @@ function handleSoulStoneFarm() {
                       <button
                         type="button"
                         :disabled="isUpgradingSkills || upgradingSkills[s.slot] || getSkillMaxAddable(s) <= 0"
-                        class="btn-upgrade-skill-max inline-flex items-center justify-center px-1.5 h-6 rounded-md text-2xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-300 dark:ring-emerald-700/60 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed select-none"
+                        class="btn-upgrade-skill-max inline-flex items-center justify-center px-1.5 h-5.5 rounded text-3xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 ring-1 ring-emerald-300 dark:ring-emerald-700/60 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed select-none"
                         :class="{
                           'pointer-events-none': isUpgradingSkills || upgradingSkills[s.slot],
                           'ring-2 ring-emerald-500 dark:ring-emerald-400': upgradingSkills[s.slot] && upgradingSkillAction[s.slot] === 'max'
@@ -1259,7 +1269,7 @@ function handleSoulStoneFarm() {
                       <button
                         type="button"
                         :disabled="isUpgradingSkills || upgradingSkills[s.slot] || skillPoints <= 0"
-                        class="btn-upgrade-skill inline-flex items-center justify-center size-6 rounded-md font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed select-none"
+                        class="btn-upgrade-skill inline-flex items-center justify-center size-5.5 rounded font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed select-none"
                         :class="{
                           'pointer-events-none': isUpgradingSkills || upgradingSkills[s.slot],
                           'ring-2 ring-emerald-300 dark:ring-emerald-500': upgradingSkills[s.slot] && upgradingSkillAction[s.slot] === 'single'
@@ -1273,7 +1283,7 @@ function handleSoulStoneFarm() {
                         @click="upgradeSkill(s)"
                       >
                         <span v-if="upgradingSkills[s.slot] && upgradingSkillAction[s.slot] === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                        <svg v-else class="size-3.5 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <svg v-else class="size-3 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <path d="M12 5v14M5 12h14" />
                         </svg>
                       </button>
@@ -1284,15 +1294,15 @@ function handleSoulStoneFarm() {
                 <!-- Bottom Area -->
                 <div class="mt-2 space-y-1">
                   <template v-if="heroColor >= s.rankReq || s.slot <= skillKeys.length">
-                    <div class="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400">
+                    <div class="flex items-center justify-between text-3xs text-slate-500 dark:text-slate-400">
                       <span>
-                        Level:
+                        Lv.
                         <span class="font-bold text-slate-700 dark:text-slate-200">
                           {{ getSkillDisplayLevel(s) }}
                         </span>
                         / {{ s.maxLvl }}
                       </span>
-                      <span>
+                      <span class="font-semibold">
                         {{ getSkillProgressPercent(s) }}%
                       </span>
                     </div>
@@ -1304,8 +1314,8 @@ function handleSoulStoneFarm() {
                       ></div>
                     </div>
                   </template>
-                  <div v-else class="text-2xs text-slate-400 italic">
-                    🔒 Unlocks at rank {{ s.rankName }}
+                  <div v-else class="text-3xs text-slate-400 italic">
+                    🔒 Rank {{ s.rankName }}
                   </div>
                 </div>
               </div>
@@ -1376,6 +1386,15 @@ function handleSoulStoneFarm() {
                     </span>
                   </div>
 
+                  <!-- Level Progress Bar -->
+                  <div class="h-1.5 w-full bg-slate-200/80 dark:bg-slate-700 rounded-full overflow-hidden my-1.5">
+                    <div
+                      class="h-full rounded-full transition-all duration-300"
+                      :class="art.plan.isMax ? 'bg-amber-500' : 'bg-gradient-to-r from-amber-500 to-emerald-500'"
+                      :style="{ width: `${art.plan.isMax ? 100 : Math.min(100, (art.level / (art.plan.targetLevel || 100)) * 100)}%` }"
+                    ></div>
+                  </div>
+
                   <!-- Resource owned status -->
                   <div class="text-3xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 bg-slate-100/60 dark:bg-slate-900/50 px-2 py-1 rounded">
                     <span class="truncate" :title="art.plan.resourceName">
@@ -1404,7 +1423,7 @@ function handleSoulStoneFarm() {
                   <button
                     type="button"
                     :disabled="isUpgradingArtifact || !art.plan.canUpgradeOne"
-                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    class="h-6.5 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-none"
                     :class="[
                       art.plan.canUpgradeOne
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700 dark:border-emerald-500'
@@ -1415,18 +1434,15 @@ function handleSoulStoneFarm() {
                     :title="`Upgrade +1 Level. Cost: ${art.plan.costForNextOne} ${art.plan.shortName} (Owned: ${art.plan.ownedAmount})`"
                     @click="upgradeArtifactSingle(art.slotId)"
                   >
-                    <div class="flex items-center gap-0.5">
-                      <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                      <span v-else>+1</span>
-                    </div>
-                    <span class="text-3xs font-normal opacity-85">({{ art.plan.costForNextOne }})</span>
+                    <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                    <span v-else>+1</span>
                   </button>
 
                   <!-- Button +{#1} (up to milestone with owned resources) -->
                   <button
                     type="button"
                     :disabled="isUpgradingArtifact || !art.plan.canUpgradeMilestone || art.plan.milestoneLevels <= 0"
-                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    class="h-6.5 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-none"
                     :class="[
                       art.plan.canUpgradeMilestone && art.plan.milestoneLevels > 0
                         ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-700 dark:border-amber-500'
@@ -1437,11 +1453,8 @@ function handleSoulStoneFarm() {
                     :title="`Upgrade to Lv. ${art.plan.currentLevel + (art.plan.milestoneLevels > 0 ? art.plan.milestoneLevels : art.plan.levelsDelta)} (+${art.plan.milestoneLevels > 0 ? art.plan.milestoneLevels : art.plan.levelsDelta} levels). Cost: ${art.plan.milestoneLevels > 0 ? art.plan.milestoneCost : art.plan.totalCost} ${art.plan.shortName}`"
                     @click="upgradeArtifactToMilestone(art.slotId)"
                   >
-                    <div class="flex items-center gap-0.5">
-                      <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'milestone'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                      <span v-else>+{{ art.plan.milestoneLevels > 0 ? art.plan.milestoneLevels : art.plan.levelsDelta }}</span>
-                    </div>
-                    <span class="text-3xs font-normal opacity-85">({{ art.plan.milestoneLevels > 0 ? art.plan.milestoneCost : art.plan.totalCost }})</span>
+                    <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'milestone'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                    <span v-else>+{{ art.plan.milestoneLevels > 0 ? art.plan.milestoneLevels : art.plan.levelsDelta }}</span>
                   </button>
 
                   <!-- Button +{#2} (with corresponding chest opening) -->
@@ -1449,7 +1462,7 @@ function handleSoulStoneFarm() {
                     v-if="art.plan.chestPlan.hasChests && art.plan.chestPlan.canUpgradeWithChests"
                     type="button"
                     :disabled="isUpgradingArtifact || !art.plan.chestPlan.canUpgradeWithChests"
-                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    class="h-6.5 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-none"
                     :class="[
                       art.plan.chestPlan.canUpgradeWithChests
                         ? 'bg-purple-600 hover:bg-purple-500 text-white border-purple-700 dark:border-purple-500'
@@ -1460,11 +1473,8 @@ function handleSoulStoneFarm() {
                     :title="`Upgrade +${art.plan.chestPlan.levelsDeltaWithChests} levels (opens ${art.plan.chestPlan.chestsToOpen} ${art.plan.chestPlan.chestName} for +${art.plan.chestPlan.chestsToOpen * art.plan.chestPlan.resourcePerChest} ${art.plan.shortName}). Total cost: ${art.plan.chestPlan.totalCostWithChests} ${art.plan.shortName}`"
                     @click="upgradeArtifactWithChests(art.slotId)"
                   >
-                    <div class="flex items-center gap-0.5">
-                      <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'chest'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                      <span v-else>+{{ art.plan.chestPlan.levelsDeltaWithChests }}</span>
-                    </div>
-                    <span class="text-3xs font-normal opacity-90">({{ art.plan.chestPlan.chestsToOpen }} 🎁)</span>
+                    <span v-if="upgradingArtifactSlot === art.slotId && upgradingArtifactAction === 'chest'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                    <span v-else>+{{ art.plan.chestPlan.levelsDeltaWithChests }}</span>
                   </button>
                 </div>
 
@@ -1581,7 +1591,7 @@ function handleSoulStoneFarm() {
                   <button
                     type="button"
                     :disabled="isUpgradingSkin || !skin.plan?.singlePlan?.canAfford"
-                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    class="h-6.5 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-none"
                     :class="[
                       skin.plan?.singlePlan?.canAfford
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700 dark:border-emerald-500'
@@ -1592,20 +1602,15 @@ function handleSoulStoneFarm() {
                     :title="`Upgrade +1 Level. Cost: ${formatNumber(skin.plan?.costSingle ?? skin.plan?.costOne ?? 0)} stones${(skin.plan?.singlePlan?.totalChestsToOpen ?? 0) > 0 ? ` (opens ${skin.plan.singlePlan.totalChestsToOpen} chest${skin.plan.singlePlan.totalChestsToOpen > 1 ? 's' : ''})` : ''}`"
                     @click="upgradeSkin(skin, skin.plan?.targetSingle ?? (skin.level + 1), 'single')"
                   >
-                    <div class="flex items-center gap-0.5">
-                      <span v-if="upgradingSkinId === (skin.skinId ?? skin.id) && upgradingSkinAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                      <span v-else>+1</span>
-                    </div>
-                    <span class="text-3xs font-normal opacity-90">
-                      ({{ formatNumber(skin.plan?.costSingle ?? skin.plan?.costOne ?? 0) }}<span v-if="(skin.plan?.singlePlan?.totalChestsToOpen ?? 0) > 0"> 🎁{{ skin.plan.singlePlan.totalChestsToOpen }}</span>)
-                    </span>
+                    <span v-if="upgradingSkinId === (skin.skinId ?? skin.id) && upgradingSkinAction === 'single'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                    <span v-else>+1</span>
                   </button>
 
                   <!-- Button -> Next Ten (e.g. -> 10, -> 20, -> 30) -->
                   <button
                     type="button"
                     :disabled="isUpgradingSkin || !skin.plan?.nextTenPlan?.canAfford"
-                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    class="h-6.5 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-none"
                     :class="[
                       skin.plan?.nextTenPlan?.canAfford
                         ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-700 dark:border-amber-500'
@@ -1616,13 +1621,8 @@ function handleSoulStoneFarm() {
                     :title="`Upgrade to Lv. ${skin.plan?.targetNextTen} (+${(skin.plan?.targetNextTen ?? skin.level) - skin.level} lvls). Cost: ${formatNumber(skin.plan?.costNextTen ?? 0)} stones${(skin.plan?.nextTenPlan?.totalChestsToOpen ?? 0) > 0 ? ` (opens ${skin.plan.nextTenPlan.totalChestsToOpen} chest${skin.plan.nextTenPlan.totalChestsToOpen > 1 ? 's' : ''})` : ''}`"
                     @click="upgradeSkin(skin, skin.plan?.targetNextTen ?? skin.level, 'ten')"
                   >
-                    <div class="flex items-center gap-0.5">
-                      <span v-if="upgradingSkinId === (skin.skinId ?? skin.id) && upgradingSkinAction === 'ten'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                      <span v-else>→ {{ skin.plan?.targetNextTen }}</span>
-                    </div>
-                    <span class="text-3xs font-normal opacity-90">
-                      ({{ formatNumber(skin.plan?.costNextTen ?? 0) }}<span v-if="(skin.plan?.nextTenPlan?.totalChestsToOpen ?? 0) > 0"> 🎁{{ skin.plan.nextTenPlan.totalChestsToOpen }}</span>)
-                    </span>
+                    <span v-if="upgradingSkinId === (skin.skinId ?? skin.id) && upgradingSkinAction === 'ten'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                    <span v-else>+{{ (skin.plan?.targetNextTen ?? skin.level) - skin.level }}</span>
                   </button>
 
                   <!-- Button -> Next Ten + 10 (e.g. -> 20, -> 30, -> 40) -->
@@ -1630,7 +1630,7 @@ function handleSoulStoneFarm() {
                     v-if="(skin.plan?.targetNextTen ?? 60) < skin.maxLevel"
                     type="button"
                     :disabled="isUpgradingSkin || !skin.plan?.nextTenPlus10Plan?.canAfford"
-                    class="py-1 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex flex-col items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-tight"
+                    class="h-6.5 px-1 rounded-md text-xs font-bold cursor-pointer transition-all flex items-center justify-center border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed select-none active:scale-95 leading-none"
                     :class="[
                       skin.plan?.nextTenPlus10Plan?.canAfford
                         ? 'bg-purple-600 hover:bg-purple-500 text-white border-purple-700 dark:border-purple-500'
@@ -1641,13 +1641,8 @@ function handleSoulStoneFarm() {
                     :title="`Upgrade to Lv. ${skin.plan?.targetNextTenPlus10} (+${(skin.plan?.targetNextTenPlus10 ?? skin.level) - skin.level} lvls). Cost: ${formatNumber(skin.plan?.costNextTenPlus10 ?? 0)} stones${(skin.plan?.nextTenPlus10Plan?.totalChestsToOpen ?? 0) > 0 ? ` (opens ${skin.plan.nextTenPlus10Plan.totalChestsToOpen} chest${skin.plan.nextTenPlus10Plan.totalChestsToOpen > 1 ? 's' : ''})` : ''}`"
                     @click="upgradeSkin(skin, skin.plan?.targetNextTenPlus10 ?? skin.level, 'tenPlus10')"
                   >
-                    <div class="flex items-center gap-0.5">
-                      <span v-if="upgradingSkinId === (skin.skinId ?? skin.id) && upgradingSkinAction === 'tenPlus10'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
-                      <span v-else>→ {{ skin.plan?.targetNextTenPlus10 }}</span>
-                    </div>
-                    <span class="text-3xs font-normal opacity-90">
-                      ({{ formatNumber(skin.plan?.costNextTenPlus10 ?? 0) }}<span v-if="(skin.plan?.nextTenPlus10Plan?.totalChestsToOpen ?? 0) > 0"> 🎁{{ skin.plan.nextTenPlus10Plan.totalChestsToOpen }}</span>)
-                    </span>
+                    <span v-if="upgradingSkinId === (skin.skinId ?? skin.id) && upgradingSkinAction === 'tenPlus10'" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
+                    <span v-else>+{{ (skin.plan?.targetNextTenPlus10 ?? skin.level) - skin.level }}</span>
                   </button>
                 </div>
               </div>
