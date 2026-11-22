@@ -614,7 +614,11 @@ export function installInterceptor(customWindow?: any): void {
         Play_createResult: 175081,
         Play_dispose: 175079,
         Presets_clanWarReplay: 174207,
+        Presets_arenaReplay: 174209,
+        Presets_titanArenaReplay: 468119,
+        Presets_createReplay: 468122,
         Presets_get_isReplay: 468101,
+        BattlePresets_ctor5: 6579,
         BattleData_serializeResult: 49386,
         BattleData_getStars: 28182,
         JSON_Parse: 1763,
@@ -659,15 +663,41 @@ export function installInterceptor(customWindow?: any): void {
         currentPhase = 'CREATE_PRESETS';
         const isTitan = String(rawBattle?.type || '').toLowerCase().includes('titan');
         let presetPtr = 0;
-        try {
-          presetPtr = invokePtr('Presets_clanWarReplay', isTitan ? 0 : 1);
-        } catch (ePreset) {
-          console.warn('[HWA-Simulator] Primary Presets_clanWarReplay failed, trying fallback...', ePreset);
+        const candidateErrors: string[] = [];
+
+        // Candidate list in priority order
+        const candidates = isTitan
+          ? [
+              { name: 'Presets_clanWarReplay(0)', fn: () => invokePtr('Presets_clanWarReplay', 0) },
+              { name: 'Presets_clanWarReplay(1)', fn: () => invokePtr('Presets_clanWarReplay', 1) },
+              { name: 'Presets_titanArenaReplay(0)', fn: () => invokePtr('Presets_titanArenaReplay', 0) },
+              { name: 'Presets_createReplay(0)', fn: () => invokePtr('Presets_createReplay', 0) },
+              { name: 'Presets_arenaReplay(0)', fn: () => invokePtr('Presets_arenaReplay', 0) },
+            ]
+          : [
+              { name: 'Presets_clanWarReplay(1)', fn: () => invokePtr('Presets_clanWarReplay', 1) },
+              { name: 'Presets_clanWarReplay(0)', fn: () => invokePtr('Presets_clanWarReplay', 0) },
+              { name: 'Presets_arenaReplay(0)', fn: () => invokePtr('Presets_arenaReplay', 0) },
+              { name: 'Presets_createReplay(0)', fn: () => invokePtr('Presets_createReplay', 0) },
+            ];
+
+        for (const cand of candidates) {
           try {
-            presetPtr = invokePtr('Presets_clanWarReplay', isTitan ? 1 : 0);
-          } catch (_) {}
+            const ptr = cand.fn();
+            if (ptr && ptr > 0) {
+              presetPtr = ptr;
+              break;
+            } else {
+              candidateErrors.push(`${cand.name} returned 0`);
+            }
+          } catch (e: any) {
+            candidateErrors.push(`${cand.name} thrown: ${e?.message || String(e)}`);
+          }
         }
-        if (!presetPtr) throw new Error('Failed to create BattlePresets for simulation');
+
+        if (!presetPtr) {
+          throw new Error(`Failed to create BattlePresets for simulation (isTitan: ${isTitan}). Candidates: [${candidateErrors.join('; ')}]`);
+        }
 
         // Step 2: Learn String class pointer from Object.ToString(presetPtr)
         currentPhase = 'LEARN_STRING_CLASS';
