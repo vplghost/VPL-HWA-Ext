@@ -9,9 +9,19 @@ const { cache, dispatchRpc } = useRpcCache();
 
 const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const counters = computed<CinemaCountersData | undefined>(() => cache.value.cinemaGetCounters?.data);
+
+// Video Boxes (0..4)
 const placementViewed = computed(() => Number(counters.value?.placementViewed ?? 0));
 const remainingBoxes = computed(() => Math.max(0, 5 - placementViewed.value));
-const allClaimed = computed(() => counters.value ? placementViewed.value >= 5 : false);
+const allBoxesClaimed = computed(() => counters.value ? placementViewed.value >= 5 : false);
+
+// Video Tickets (Cinema 0..8)
+const cinemaViewed = computed(() => Number(counters.value?.viewed ?? 0));
+const remainingTickets = computed(() => Math.max(0, 8 - cinemaViewed.value));
+const allTicketsClaimed = computed(() => counters.value ? cinemaViewed.value >= 8 : false);
+
+const totalRemaining = computed(() => remainingBoxes.value + remainingTickets.value);
+const allClaimed = computed(() => allBoxesClaimed.value && allTicketsClaimed.value);
 
 const pending = shallowRef<boolean>(false);
 const message = ref<string>('');
@@ -22,11 +32,11 @@ const disabled = computed(() =>
 );
 
 const tooltip = computed(() => {
-  if (!props.hasGameTab) return 'Open the game to claim Free Video Boxes';
-  if (allClaimed.value) return 'All 5 Free Video Boxes claimed today';
-  if (pending.value) return message.value || 'Opening Free Video Boxes…';
+  if (!props.hasGameTab) return 'Open the game to claim Free Video Boxes & Tickets';
+  if (allClaimed.value) return 'All Free Video Boxes & Video Tickets claimed today';
+  if (pending.value) return message.value || 'Opening Free Video Boxes & Tickets…';
   if (message.value) return message.value;
-  return `Free Video Boxes: ${remainingBoxes.value}/5 available today`;
+  return `Free Video Boxes: ${remainingBoxes.value}/5, Video Tickets: ${remainingTickets.value}/8 available today`;
 });
 
 // Auto-fetch counters on mount if not available
@@ -51,88 +61,131 @@ async function openBoxes() {
 
   pending.value = true;
   abortClaim = false;
-  message.value = 'Checking available video boxes…';
+  message.value = 'Checking available video boxes and tickets…';
 
   try {
     // Always refresh counters first to get authoritative placement state
     await dispatchRpc([{ name: 'cinemaGetCounters', args: {} }]);
     const currentCounters = cache.value.cinemaGetCounters?.data || counters.value;
 
+    let opened = 0;
+    let earnedGold = 0;
+    let earnedTickets = 0;
+
+    // --- Phase 1: Open Video Boxes ---
     const placementRewards = Array.isArray(currentCounters?.placementRewards) ? currentCounters.placementRewards : [];
     const claimedSet = new Set(placementRewards.map((r: any) => Number(r?.boxNum)));
     const remaining = [0, 1, 2, 3, 4].filter((num) => !claimedSet.has(num));
-
     const viewed = Number(currentCounters?.placementViewed ?? claimedSet.size);
-    if (viewed >= 5 || remaining.length === 0) {
-      pending.value = false;
-      message.value = 'All 5 video boxes have already been opened today.';
-      return;
-    }
 
-    if (currentCounters?.placementAvailable != null && Number(currentCounters.placementAvailable) <= 0) {
-      pending.value = false;
-      message.value = 'No video boxes currently available. Please check back later.';
-      return;
-    }
+    if (viewed < 5 && remaining.length > 0) {
+      const availableLimit = Number.isFinite(currentCounters?.placementAvailable) && Number(currentCounters?.placementAvailable) > 0
+        ? Number(currentCounters?.placementAvailable)
+        : remaining.length;
+      const queue = remaining.slice(0, availableLimit);
 
-    const availableLimit = Number.isFinite(currentCounters?.placementAvailable) && Number(currentCounters?.placementAvailable) > 0
-      ? Number(currentCounters?.placementAvailable)
-      : remaining.length;
-    const queue = remaining.slice(0, availableLimit);
+      for (let idx = 0; idx < queue.length; idx++) {
+        if (abortClaim) break;
+        const boxNum = queue[idx];
+        message.value = `Opening box ${boxNum + 1}/5…`;
 
-    let opened = 0;
-    let earnedGold = 0;
+        const response: any = await dispatchRpc([{
+          name: 'cinemaGiveReward',
+          args: { type: 'firstPlacement', boxNum }
+        }]);
 
-    for (let idx = 0; idx < queue.length; idx++) {
-      if (abortClaim) break;
-      const boxNum = queue[idx];
-      message.value = `Opening box ${boxNum + 1}/5…`;
+        if (abortClaim) break;
 
-      const response: any = await dispatchRpc([{
-        name: 'cinemaGiveReward',
-        args: { type: 'firstPlacement', boxNum }
-      }]);
+        const callResult = response?.results?.[0];
+        const rpcError = callResult?.result?.error || callResult?.result?.response?.error || callResult?.error || response?.error;
 
-      if (abortClaim) break;
-
-      const callResult = response?.results?.[0];
-      const rpcError = callResult?.result?.error || callResult?.result?.response?.error || callResult?.error || response?.error;
-
-      if (rpcError || response?.ok === false) {
-        const errMsg = String(
-          typeof rpcError === 'object'
-            ? rpcError.description || rpcError.name || rpcError.message || JSON.stringify(rpcError)
-            : rpcError || response?.error || ''
-        );
-        if (errMsg.toLowerCase().includes('already')) {
-          // Box was already opened on server, record box in local cache and continue to next box
-          continue;
+        if (rpcError || response?.ok === false) {
+          const errMsg = String(
+            typeof rpcError === 'object'
+              ? rpcError.description || rpcError.name || rpcError.message || JSON.stringify(rpcError)
+              : rpcError || response?.error || ''
+          );
+          if (errMsg.toLowerCase().includes('already')) {
+            // Box was already opened on server, record box in local cache and continue to next box
+            continue;
+          }
+          message.value = errMsg || `Failed to open box ${boxNum + 1}.`;
+          break;
         }
-        message.value = errMsg || `Failed to open box ${boxNum + 1}.`;
-        break;
-      }
 
-      opened++;
-      const lastStatus = cache.value.cinemaGiveRewardStatus?.data;
-      if (lastStatus?.success && lastStatus.reward?.gold) {
-        earnedGold += Number(lastStatus.reward.gold) || 0;
-      }
+        opened++;
+        const lastStatus = cache.value.cinemaGiveRewardStatus?.data;
+        if (lastStatus?.success && lastStatus.reward?.gold) {
+          earnedGold += Number(lastStatus.reward.gold) || 0;
+        }
 
-      // Small delay between calls for clean sequential RPC dispatch
-      if (idx < queue.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 350));
+        // Small delay between calls for clean sequential RPC dispatch
+        if (idx < queue.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 350));
+        }
+      }
+    }
+
+    // --- Phase 2: Claim Free Video Tickets ---
+    const cinemaViewedCount = Number(currentCounters?.viewed ?? 0);
+    const maxTickets = Math.max(0, 8 - cinemaViewedCount);
+    const ticketAvailableLimit = Number.isFinite(currentCounters?.available) && Number(currentCounters?.available) > 0
+      ? Math.min(maxTickets, Number(currentCounters?.available))
+      : maxTickets;
+
+    if (!abortClaim && ticketAvailableLimit > 0) {
+      for (let t = 0; t < ticketAvailableLimit; t++) {
+        if (abortClaim) break;
+        message.value = `Claiming video ticket ${earnedTickets + 1}/${ticketAvailableLimit}…`;
+
+        const response: any = await dispatchRpc([{
+          name: 'cinemaGiveReward',
+          args: { type: 'cinema' }
+        }]);
+
+        if (abortClaim) break;
+
+        const callResult = response?.results?.[0];
+        const rpcError = callResult?.result?.error || callResult?.result?.response?.error || callResult?.error || response?.error;
+
+        if (rpcError || response?.ok === false) {
+          const errMsg = String(
+            typeof rpcError === 'object'
+              ? rpcError.description || rpcError.name || rpcError.message || JSON.stringify(rpcError)
+              : rpcError || response?.error || ''
+          );
+          if (errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('limit')) {
+            break;
+          }
+          message.value = errMsg || `Failed to claim video ticket ${earnedTickets + 1}.`;
+          break;
+        }
+
+        earnedTickets++;
+        if (t < ticketAvailableLimit - 1) {
+          await new Promise(resolve => setTimeout(resolve, 350));
+        }
       }
     }
 
     // Final sync of counters and inventory
-    if (opened > 0) {
+    if (opened > 0 || earnedTickets > 0) {
       await dispatchRpc([
         { name: 'cinemaGetCounters', args: {} },
         { name: 'userGetInfo' },
         { name: 'inventoryGet' }
       ]);
-      const goldStr = earnedGold > 0 ? ` (+${earnedGold.toLocaleString('en-US')} Gold)` : '';
-      message.value = `Successfully opened ${opened} video box${opened > 1 ? 'es' : ''}${goldStr}!`;
+      const parts: string[] = [];
+      if (opened > 0) {
+        const goldStr = earnedGold > 0 ? ` (+${earnedGold.toLocaleString('en-US')} Gold)` : '';
+        parts.push(`opened ${opened} video box${opened > 1 ? 'es' : ''}${goldStr}`);
+      }
+      if (earnedTickets > 0) {
+        parts.push(`claimed ${earnedTickets} video ticket${earnedTickets > 1 ? 's' : ''}`);
+      }
+      message.value = `Successfully ${parts.join(' and ')}!`;
+    } else if (!message.value || message.value.startsWith('Checking')) {
+      message.value = 'All video boxes and tickets have already been claimed today.';
     }
   } catch (error) {
     message.value = error instanceof Error ? error.message : String(error);
@@ -169,10 +222,10 @@ async function openBoxes() {
       </svg>
       <!-- Remaining count badge -->
       <span
-        v-if="remainingBoxes > 0 && !allClaimed"
+        v-if="totalRemaining > 0 && !allClaimed"
         class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-purple-600 px-1 text-[10px] font-bold text-white shadow-sm dark:bg-purple-500"
       >
-        {{ remainingBoxes }}
+        {{ totalRemaining }}
       </span>
     </button>
     <span class="sr-only" role="status" aria-live="polite">{{ message }}</span>

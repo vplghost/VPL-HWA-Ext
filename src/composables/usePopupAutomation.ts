@@ -47,7 +47,7 @@ export function usePopupAutomation(
       (s.reports && p?.hasReports ? 1 : 0) +
       (s.quests ? (p?.questIds?.length || 0) : 0) +
       (s.attentionBonuses ? (p?.attentionBonusIds?.length || 0) : 0) +
-      (s.videoBoxes ? (p?.videoBoxNums?.length || 0) : 0) +
+      (s.videoBoxes ? ((p?.videoBoxNums?.length || 0) + (p?.videoTicketCount || 0)) : 0) +
       (s.alchemySpin && p?.hasAlchemySpin ? 1 : 0) +
       (s.airshipGift && p?.hasAirshipGift ? 1 : 0) +
       (s.dailyBonus && p?.hasDailyBonus ? 1 : 0) +

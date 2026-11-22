@@ -186,4 +186,56 @@ test('FreeBoxButton SFC component exists and has expected button ID and tooltip 
   assert.ok(sfcContent.includes("name: 'cinemaGetCounters'"), 'Must dispatch cinemaGetCounters');
   assert.ok(sfcContent.includes('!claimedSet.has(num)'), 'Must filter out already claimed boxes');
   assert.ok(sfcContent.includes("includes('already')"), 'Must gracefully continue if already opened error is returned');
+  assert.ok(sfcContent.includes("type: 'cinema'"), 'Must support claiming cinema video tickets');
+});
+
+test('cinemaGiveReward with type cinema increments viewed and decrements available without touching placementViewed', () => {
+  const rpcCache = setupCache();
+  const initialCache = {
+    cinemaGetCounters: {
+      key: 'cinemaGetCounters',
+      method: 'cinemaGetCounters',
+      group: 'other',
+      data: {
+        viewed: 3,
+        available: 5,
+        placementViewed: 2,
+        placementAvailable: 3,
+        placementRewards: [
+          { boxNum: 0, reward: { stamina: 20 } },
+          { boxNum: 1, reward: { gold: 15000 } }
+        ]
+      },
+      updatedAt: '2026-11-22T07:00:00.000Z'
+    }
+  };
+
+  const ticketRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-22T07:05:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{ name: 'cinemaGiveReward', args: { type: 'cinema' }, ident: 'ident-ticket-1' }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'ident-ticket-1',
+        result: {
+          response: {
+            coin: { '1000': 1 }
+          }
+        }
+      }]
+    })
+  };
+
+  const { cache } = rpcCache.merge(initialCache, [ticketRecord]);
+  assert.ok(cache.cinemaGetCounters, 'cinemaGetCounters must exist');
+  assert.equal(cache.cinemaGetCounters.data.viewed, 4, 'viewed must increment to 4');
+  assert.equal(cache.cinemaGetCounters.data.available, 4, 'available must decrement to 4');
+  assert.equal(cache.cinemaGetCounters.data.placementViewed, 2, 'placementViewed must remain untouched');
+  assert.equal(cache.cinemaGetCounters.data.placementAvailable, 3, 'placementAvailable must remain untouched');
+  assert.equal(cache.cinemaGiveRewardStatus.data.success, true);
+  assert.equal(cache.cinemaGiveRewardStatus.data.type, 'cinema');
 });

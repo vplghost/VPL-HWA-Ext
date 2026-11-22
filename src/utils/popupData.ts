@@ -949,8 +949,9 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     attentionBonusIds = avail.ready ? avail.readyBonusIds : [];
   }
 
-  // Video mystery boxes (firstPlacement 0..4)
+  // Video mystery boxes (firstPlacement 0..4) and Video tickets (cinema)
   let videoBoxNums: number[] = [];
+  let videoTicketCount = 0;
   const cinemaCounters = cache.cinemaGetCounters?.data;
   if (cinemaCounters && typeof cinemaCounters === 'object') {
     const placementViewed = Number(cinemaCounters.placementViewed ?? 0);
@@ -960,6 +961,13 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     const remaining = [0, 1, 2, 3, 4].filter((num) => !claimedSet.has(num));
     if (placementViewed < 5 && remaining.length > 0 && placementAvailable > 0) {
       videoBoxNums = remaining.slice(0, placementAvailable);
+    }
+
+    // Cinema video tickets (up to 8 per day)
+    const viewed = Number(cinemaCounters.viewed ?? 0);
+    const available = Number(cinemaCounters.available ?? 0);
+    if (viewed < 8 && available > 0) {
+      videoTicketCount = Math.min(available, 8 - viewed);
     }
   }
 
@@ -1023,6 +1031,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     dailyQuestIds.length +
     attentionBonusIds.length +
     videoBoxNums.length +
+    videoTicketCount +
     (hasAlchemySpin ? 1 : 0) +
     (hasAirshipGift ? 1 : 0) +
     (hasDailyBonus ? 1 : 0) +
@@ -1038,6 +1047,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     battlePassRewards,
     attentionBonusIds,
     videoBoxNums,
+    videoTicketCount,
     hasAlchemySpin,
     hasAirshipGift,
     hasDailyBonus,
@@ -1168,6 +1178,15 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
     }
   }
 
+  if (opt.videoBoxes && pending.videoTicketCount > 0) {
+    for (let i = 0; i < pending.videoTicketCount; i++) {
+      calls.push({
+        name: 'cinemaGiveReward',
+        args: { type: 'cinema' },
+      });
+    }
+  }
+
   if (opt.alchemySpin && pending.hasAlchemySpin) {
     calls.push({
       name: 'refillable_alchemyUseVideo',
@@ -1214,7 +1233,7 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
     calls.push({ name: 'mailGetAll', args: {} }, { name: 'questGetAll', args: {} });
     if (
       (opt.attentionBonuses && pending.attentionBonusIds.length > 0) ||
-      (opt.videoBoxes && pending.videoBoxNums.length > 0) ||
+      (opt.videoBoxes && (pending.videoBoxNums.length > 0 || pending.videoTicketCount > 0)) ||
       (opt.alchemySpin && pending.hasAlchemySpin) ||
       (opt.airshipGift && pending.hasAirshipGift) ||
       (opt.dailyBonus && pending.hasDailyBonus) ||
@@ -1255,7 +1274,7 @@ export function buildAutoClaimCalls(cache: any, options: any = {}, now = Date.no
     }
     if (
       (opt.attentionBonuses && pending.attentionBonusIds.length > 0) ||
-      (opt.videoBoxes && pending.videoBoxNums.length > 0) ||
+      (opt.videoBoxes && (pending.videoBoxNums.length > 0 || pending.videoTicketCount > 0)) ||
       (opt.freeOffers && pending.freeOfferIds.length > 0)
     ) {
       calls.push(

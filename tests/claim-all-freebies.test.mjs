@@ -363,3 +363,27 @@ test('DashboardTab.vue and ClaimAllFreebiesButton.vue provide dashboard claim in
   assert.ok(buttonContent.includes('id="dashboard-claim-all-freebies"'), 'button ID must be dashboard-claim-all-freebies');
   assert.ok(buttonContent.includes('id="dashboard-claim-all-freebies-badge"'), 'badge ID must exist');
 });
+
+test('getPendingClaims and buildAutoClaimCalls include cinema video tickets', () => {
+  const cacheWithTickets = {
+    cinemaGetCounters: {
+      data: {
+        viewed: 2,
+        available: 6,
+        placementViewed: 5,
+        placementAvailable: 0,
+        placementRewards: [
+          { boxNum: 0 }, { boxNum: 1 }, { boxNum: 2 }, { boxNum: 3 }, { boxNum: 4 }
+        ]
+      }
+    }
+  };
+
+  const pending = getPendingClaims(cacheWithTickets);
+  assert.equal(pending.videoBoxNums.length, 0, 'All video boxes claimed');
+  assert.equal(pending.videoTicketCount, 6, 'Should detect 6 available video tickets');
+
+  const { calls } = buildAutoClaimCalls(cacheWithTickets, { videoBoxes: true });
+  const ticketCalls = calls.filter((c) => c.name === 'cinemaGiveReward' && c.args?.type === 'cinema');
+  assert.equal(ticketCalls.length, 6, 'Must generate 6 cinemaGiveReward calls with type cinema');
+});

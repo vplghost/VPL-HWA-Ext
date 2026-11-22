@@ -597,10 +597,12 @@ async function toggleRecording() {
           <input id="autoclaim-opt-video-boxes" v-model="autoClaimSettings.videoBoxes" type="checkbox" class="mt-0.5 rounded" @change="saveAutoClaim" />
           <div class="flex-1 text-xs">
             <div class="flex items-center justify-between font-medium text-slate-800 dark:text-slate-200">
-              <span>🎬 Video Mystery Boxes</span>
-              <span v-if="pendingClaims.videoBoxNums?.length" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ pendingClaims.videoBoxNums.length }} ready</span>
+              <span>🎬 Video Boxes & Tickets</span>
+              <span v-if="pendingClaims.videoBoxNums?.length || pendingClaims.videoTicketCount" class="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                {{ [pendingClaims.videoBoxNums?.length ? `${pendingClaims.videoBoxNums.length} Boxes` : '', pendingClaims.videoTicketCount ? `${pendingClaims.videoTicketCount} Tickets` : ''].filter(Boolean).join(', ') }} ready
+              </span>
             </div>
-            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Free video ad placement mystery boxes (0-4)</div>
+            <div class="text-slate-500 dark:text-slate-400 mt-0.5">Free video mystery boxes (0-4) & Cinema tickets (up to 8/day)</div>
           </div>
         </label>
 

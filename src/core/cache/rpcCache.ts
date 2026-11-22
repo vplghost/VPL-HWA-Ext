@@ -3001,18 +3001,27 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           ));
           if ((entry.data.success || isAlreadyOpened) && next.cinemaGetCounters?.data) {
             const counters = { ...next.cinemaGetCounters.data };
-            const prevRewards = Array.isArray(counters.placementRewards) ? [...counters.placementRewards] : [];
-            if (entry.data.boxNum != null && !prevRewards.some((r: any) => Number(r?.boxNum) === Number(entry.data.boxNum))) {
-              prevRewards.push({ boxNum: entry.data.boxNum });
-            }
-            counters.placementRewards = prevRewards;
-            if (entry.data.success) {
-              counters.placementViewed = Math.min(5, (counters.placementViewed ?? 0) + 1);
-              if (Number.isFinite(counters.placementAvailable) && counters.placementAvailable > 0) {
-                counters.placementAvailable -= 1;
+            if (entry.data.type === 'cinema' || (entry.data.boxNum == null && entry.data.type !== 'firstPlacement')) {
+              if (entry.data.success) {
+                counters.viewed = (counters.viewed ?? 0) + 1;
+                if (Number.isFinite(counters.available) && counters.available > 0) {
+                  counters.available -= 1;
+                }
               }
             } else {
-              counters.placementViewed = Math.min(5, Math.max(counters.placementViewed ?? 0, prevRewards.length));
+              const prevRewards = Array.isArray(counters.placementRewards) ? [...counters.placementRewards] : [];
+              if (entry.data.boxNum != null && !prevRewards.some((r: any) => Number(r?.boxNum) === Number(entry.data.boxNum))) {
+                prevRewards.push({ boxNum: entry.data.boxNum });
+              }
+              counters.placementRewards = prevRewards;
+              if (entry.data.success) {
+                counters.placementViewed = Math.min(5, (counters.placementViewed ?? 0) + 1);
+                if (Number.isFinite(counters.placementAvailable) && counters.placementAvailable > 0) {
+                  counters.placementAvailable -= 1;
+                }
+              } else {
+                counters.placementViewed = Math.min(5, Math.max(counters.placementViewed ?? 0, prevRewards.length));
+              }
             }
             next.cinemaGetCounters = {
               ...next.cinemaGetCounters,

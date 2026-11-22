@@ -23,7 +23,12 @@ const readyChannels = computed(() => {
   if (s.reports && p?.hasReports) channels.push('Reports');
   if (s.quests && p?.questIds?.length) channels.push(`Quests: ${p.questIds.length}`);
   if (s.attentionBonuses && p?.attentionBonusIds?.length) channels.push(`Chests: ${p.attentionBonusIds.length}`);
-  if (s.videoBoxes && p?.videoBoxNums?.length) channels.push(`Video Boxes: ${p.videoBoxNums.length}`);
+  if (s.videoBoxes && (p?.videoBoxNums?.length || p?.videoTicketCount)) {
+    const parts: string[] = [];
+    if (p?.videoBoxNums?.length) parts.push(`${p.videoBoxNums.length} Boxes`);
+    if (p?.videoTicketCount) parts.push(`${p.videoTicketCount} Tickets`);
+    channels.push(`Video: ${parts.join(', ')}`);
+  }
   if (s.alchemySpin && p?.hasAlchemySpin) channels.push('Alchemy');
   if (s.airshipGift && p?.hasAirshipGift) channels.push('Airship');
   if (s.dailyBonus && p?.hasDailyBonus) channels.push('Daily Bonus');
