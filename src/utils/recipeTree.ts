@@ -355,8 +355,28 @@ export function extractDropsFromRaidResponse(raw: any): CampaignDropsAccumulator
   const processEntry = (item: any) => {
     if (!item || typeof item !== 'object') return;
 
-    // Guard against whole-account or whole-inventory dumps (e.g. userGetInfo, inventoryGet)
-    if (item.userId != null || item.accountId != null || item.slots != null || (item.gear && item.heroes)) {
+    // Guard against whole-account or whole-inventory dumps (e.g. userGetInfo, inventoryGet, heroGetAll, teamGetAll, etc.)
+    if (
+      item.userId != null ||
+      item.accountId != null ||
+      item.slots != null ||
+      (item.gear && item.heroes) ||
+      item.refillable != null ||
+      item.vip != null ||
+      item.serverTime != null ||
+      item.coin != null ||
+      item.material != null ||
+      item.fragmentTitan != null ||
+      item.titanGear != null ||
+      item.artifact != null ||
+      item.fragmentArtifact != null ||
+      item.lootboxChanced != null ||
+      item.squads != null ||
+      item.units != null ||
+      item.buildings != null ||
+      item.heroes != null ||
+      item.titans != null
+    ) {
       return;
     }
 

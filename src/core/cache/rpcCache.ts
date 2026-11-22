@@ -6074,6 +6074,12 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 inv.consumable[id] = (Number(inv.consumable[id]) || 0) + Number(count);
               }
             }
+            if (currentDrops.fragmentHero) {
+              inv.fragmentHero = { ...(inv.fragmentHero || {}) };
+              for (const [id, count] of Object.entries(currentDrops.fragmentHero)) {
+                inv.fragmentHero[id] = (Number(inv.fragmentHero[id]) || 0) + Number(count);
+              }
+            }
             next.inventoryGet = {
               ...next.inventoryGet,
               data: inv,
@@ -6091,6 +6097,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               gear: { ...(prev.data?.drops?.gear || {}) },
               scroll: { ...(prev.data?.drops?.scroll || {}) },
               consumable: { ...(prev.data?.drops?.consumable || {}) },
+              fragmentHero: { ...(prev.data?.drops?.fragmentHero || {}) },
               gold: (prev.data?.drops?.gold || 0) + (entry.data?.drops?.gold || 0),
               experience: (prev.data?.drops?.experience || 0) + (entry.data?.drops?.experience || 0)
             };
@@ -6117,6 +6124,11 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             if (entry.data?.drops?.consumable) {
               for (const [k, v] of Object.entries(entry.data.drops.consumable)) {
                 combinedDrops.consumable[k] = (combinedDrops.consumable[k] || 0) + v;
+              }
+            }
+            if (entry.data?.drops?.fragmentHero) {
+              for (const [k, v] of Object.entries(entry.data.drops.fragmentHero)) {
+                combinedDrops.fragmentHero[k] = (combinedDrops.fragmentHero[k] || 0) + v;
               }
             }
             entry.data = {

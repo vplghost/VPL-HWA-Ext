@@ -87,11 +87,21 @@ export async function waitForCampaignRaidResult(
   timeoutMs = 3500,
   now: () => number = Date.now,
   sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  expectedMissionId?: number
 ): Promise<{ ok: boolean; pending?: boolean; drops?: any; error?: string }> {
   const start = now();
   while (now() - start < timeoutMs) {
     const current = read();
     if (current?.updatedAt && current.updatedAt !== previousUpdatedAt) {
+      if (
+        expectedMissionId != null &&
+        current.data &&
+        (current.data as any).missionId != null &&
+        Number((current.data as any).missionId) !== Number(expectedMissionId)
+      ) {
+        await sleep(60);
+        continue;
+      }
       if (current.data?.failed) return { ok: false, error: current.data.error || 'Raid failed' };
       return { ok: true, drops: current.data?.currentDrops || current.data?.drops };
     }

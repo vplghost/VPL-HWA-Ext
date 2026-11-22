@@ -614,7 +614,14 @@ function mergeDropsToInventory(rawDrops: any) {
 }
 
 async function waitForRaidResult(prevUpdatedAt?: string, timeoutMs = 3500) {
-  return waitForCampaignRaidResult(() => cache.value?.lastCampaignRaidResult, prevUpdatedAt, timeoutMs);
+  return waitForCampaignRaidResult(
+    () => cache.value?.lastCampaignRaidResult,
+    prevUpdatedAt,
+    timeoutMs,
+    undefined,
+    undefined,
+    Number(missionId.value)
+  );
 }
 
 async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: boolean; drops?: any; error?: string }> {
@@ -636,17 +643,21 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
   // Sends multiple calls with times: 1 in one RPC request
   try {
     const numCalls = Math.max(1, Math.min(100, Number(times) || 1));
-    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+    const calls: Array<{ name: string; args?: any; feature?: string; ident?: string }> = [];
+    const raidCallIdents = new Set<string>();
     for (let k = 0; k < numCalls; k++) {
+      const ident = `mraid_${k}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      raidCallIdents.add(ident);
       calls.push({
         name: 'missionRaid',
         args: { id: Number(missionId.value), times: 1 },
+        ident,
       });
     }
-    calls.push({ name: 'playable_getAvailable' });
-    calls.push({ name: 'worldStars_getAvailable' });
-    calls.push({ name: 'inventoryGet' });
-    calls.push({ name: 'userGetInfo' });
+    calls.push({ name: 'playable_getAvailable', ident: `play_${Date.now()}` });
+    calls.push({ name: 'worldStars_getAvailable', ident: `stars_${Date.now()}` });
+    calls.push({ name: 'inventoryGet', ident: `inv_${Date.now()}` });
+    calls.push({ name: 'userGetInfo', ident: `user_${Date.now()}` });
 
     const resp: any = await dispatchRpc(calls);
     if (resp && resp.ok === false) {
@@ -659,17 +670,22 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
 
     // Fast-path: Check if direct RPC response contains raid results
     if (Array.isArray(resp?.results)) {
-      const errResult = resp.results.slice(0, numCalls).find((r: any) => r?.error || r?.result?.error);
+      // Find results strictly matching missionRaid calls by ident or name
+      const raidResults = resp.results.filter(
+        (r: any) => raidCallIdents.has(r?.ident) || (r?.name === 'missionRaid' && r?.result?.response)
+      );
+      const effectiveResults = raidResults.length > 0 ? raidResults : resp.results.slice(0, numCalls);
+
+      const errResult = effectiveResults.find((r: any) => r?.error || r?.result?.error);
       const err = errResult?.error || errResult?.result?.error;
       if (err) {
         disableMissionToday(missionId.value);
         return { ok: false, error: typeof err === 'string' ? err : err.message || 'Raid rejected by server' };
       }
 
-      // ONLY extract responses for the missionRaid calls (indices 0..numCalls-1)
+      // ONLY extract responses for the missionRaid calls
       // Exclude secondary synchronization calls (inventoryGet, userGetInfo, etc.) to prevent drops multiplication
-      const missionResponses = resp.results
-        .slice(0, numCalls)
+      const missionResponses = effectiveResults
         .filter((r: any) => r?.result?.response)
         .map((r: any) => r.result.response);
 
@@ -831,7 +847,6 @@ async function executeSequentialLoop(totalTimes: number) {
 
       if (res.drops) {
         mergeDropsIntoAccumulator(accumulatedDrops, res.drops);
-        mergeDropsToInventory(res.drops);
         localRaidResult.value = {
           missionId: missionId.value,
           times: completed,
@@ -964,7 +979,6 @@ async function executeRaidAllSoulMissions() {
 
       if (res.drops) {
         mergeDropsIntoAccumulator(accumulatedDrops, res.drops);
-        mergeDropsToInventory(res.drops);
         localRaidResult.value = {
           missionId: m.id,
           times: totalRaidsDone,

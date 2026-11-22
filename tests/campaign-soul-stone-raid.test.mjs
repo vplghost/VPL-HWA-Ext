@@ -193,31 +193,40 @@ test('extractDropsFromRaidResponse ignores non-raid dumps like inventoryGet and 
   assert.equal(validDrops.experience, 10);
   assert.equal(validDrops.fragmentHero[24], 1);
 
-  // Entire inventory dump from inventoryGet must be ignored
+  // Entire inventory dump from inventoryGet must be ignored (without slots or userId)
   const fullInventoryDump = {
+    coin: { 1: 500000 },
+    material: { 1: 100 },
+    fragmentHero: { 24: 500, 7: 800 },
     gear: { 101: 50, 102: 120 },
     fragmentGear: { 201: 500 },
-    slots: { 1: {} }
+    fragmentTitan: { 4001: 50 }
   };
   const invDrops = extractDropsFromRaidResponse(fullInventoryDump);
   assert.equal(Object.keys(invDrops.gear).length, 0, 'Inventory gear must not be counted as raid drops');
   assert.equal(Object.keys(invDrops.fragmentGear).length, 0);
+  assert.equal(Object.keys(invDrops.fragmentHero).length, 0, 'Inventory fragmentHero must not be counted as raid drops');
 
-  // User account dump from userGetInfo must be ignored
+  // User account dump from userGetInfo must be ignored (even with only id, level, and refillable)
   const fullUserDump = {
     id: 12345,
-    userId: 12345,
+    level: 78,
     gold: 50000000,
-    rubies: 1000
+    rubies: 1000,
+    refillable: [{ id: 1, amount: 100 }]
   };
   const userDrops = extractDropsFromRaidResponse(fullUserDump);
   assert.equal(userDrops.gold, 0, 'User balance must not be counted as raid drop gold');
 
-  // Verify CampaignRaidModal slices resp.results to numCalls
+  // Verify CampaignRaidModal uses raidCallIdents and ident-based filtering
   const modalPath = path.resolve(__dirname, '../src/components/dialogs/CampaignRaidModal.vue');
   const modalContent = fs.readFileSync(modalPath, 'utf8');
   assert.ok(
-    modalContent.includes('resp.results.slice(0, numCalls)'),
-    'CampaignRaidModal must slice results to numCalls to exclude synchronization calls'
+    modalContent.includes('raidCallIdents.has'),
+    'CampaignRaidModal must filter results matching raidCallIdents to exclude synchronization calls'
+  );
+  assert.ok(
+    modalContent.includes('`mraid_'),
+    'CampaignRaidModal must generate explicit ident for each missionRaid call'
   );
 });
