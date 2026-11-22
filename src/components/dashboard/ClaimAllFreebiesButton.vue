@@ -33,6 +33,7 @@ const readyChannels = computed(() => {
   if (s.airshipGift && p?.hasAirshipGift) channels.push('Airship');
   if (s.dailyBonus && p?.hasDailyBonus) channels.push('Daily Bonus');
   if (s.freeOffers && p?.freeOfferIds?.length) channels.push(`Offers: ${p.freeOfferIds.length}`);
+  if (s.frontierRewards && p?.hasFrontierRewards) channels.push('Frontier');
   return channels;
 });
 

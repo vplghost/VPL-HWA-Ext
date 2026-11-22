@@ -866,6 +866,25 @@ export interface PendingClaimsResult {
   totalCount: number;
 }
 
+export function hasNonZeroReward(reward: any): boolean {
+  if (!reward || typeof reward !== 'object') return false;
+  return Object.values(reward).some((val: any) => {
+    if (typeof val === 'number') return val > 0;
+    if (typeof val === 'string') return Number(val) > 0;
+    if (val && typeof val === 'object') {
+      return Object.values(val).some((subVal: any) => {
+        if (typeof subVal === 'number') return subVal > 0;
+        if (typeof subVal === 'string') return Number(subVal) > 0;
+        if (subVal && typeof subVal === 'object') {
+          return Object.values(subVal).some((leaf: any) => Number(leaf) > 0);
+        }
+        return false;
+      });
+    }
+    return false;
+  });
+}
+
 export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: any): PendingClaimsResult {
   if (!cache || typeof cache !== 'object') {
     return {
@@ -1014,7 +1033,7 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
   // Frontier rewards chest (Eternal Story)
   const chestData = cache.eternalStoryChestStatus?.data;
   const hasFrontierRewards = Boolean(
-    (chestData?.reward && Object.keys(chestData.reward).length > 0) ||
+    hasNonZeroReward(chestData?.reward) ||
     Number(chestData?.filled_in_percents) > 0
   );
 

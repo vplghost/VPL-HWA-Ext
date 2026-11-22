@@ -387,3 +387,49 @@ test('getPendingClaims and buildAutoClaimCalls include cinema video tickets', ()
   const ticketCalls = calls.filter((c) => c.name === 'cinemaGiveReward' && c.args?.type === 'cinema');
   assert.equal(ticketCalls.length, 6, 'Must generate 6 cinemaGiveReward calls with type cinema');
 });
+
+test('getPendingClaims ignores empty/zero Frontier chest rewards (claim_null prevention)', () => {
+  // Case 1: Empty coin 0 reward as seen in actual tracking logs (hwa-game-record-202611221718_claim_null.json)
+  const emptyChestCache = {
+    eternalStoryChestStatus: {
+      data: {
+        reward: { coin: { '23': 0 } },
+        filled_in_percents: 0,
+        collected_at: 1795342723
+      }
+    }
+  };
+  const pendingEmpty = getPendingClaims(emptyChestCache);
+  assert.equal(pendingEmpty.hasFrontierRewards, false, 'Must not report hasFrontierRewards when reward amount is 0 and filled_in_percents is 0');
+  const { calls: emptyCalls } = buildAutoClaimCalls(emptyChestCache, { frontierRewards: true });
+  const collectCalls = emptyCalls.filter((c) => c.name === 'eternalStory_collectChest');
+  assert.equal(collectCalls.length, 0, 'Must not dispatch eternalStory_collectChest when chest is empty');
+
+  // Case 2: Legitimate Frontier reward with non-zero coin
+  const realChestCache = {
+    eternalStoryChestStatus: {
+      data: {
+        reward: { coin: { '23': 25 } },
+        filled_in_percents: 0,
+        collected_at: 1795342723
+      }
+    }
+  };
+  const pendingReal = getPendingClaims(realChestCache);
+  assert.equal(pendingReal.hasFrontierRewards, true, 'Must report hasFrontierRewards when reward contains positive coins');
+  const { calls: realCalls } = buildAutoClaimCalls(realChestCache, { frontierRewards: true });
+  assert.ok(realCalls.some((c) => c.name === 'eternalStory_collectChest'));
+
+  // Case 3: Filled percentage > 0
+  const filledPercentCache = {
+    eternalStoryChestStatus: {
+      data: {
+        reward: {},
+        filled_in_percents: 50,
+        collected_at: 1795342723
+      }
+    }
+  };
+  const pendingPercent = getPendingClaims(filledPercentCache);
+  assert.equal(pendingPercent.hasFrontierRewards, true, 'Must report hasFrontierRewards when filled_in_percents > 0');
+});
