@@ -1376,8 +1376,8 @@ test('HeroDetailModal includes hero skins overview and smart leveling with auto-
   assert.match(content, /upgradeSkin/, 'HeroDetailModal must implement upgradeSkin handler');
   assert.match(content, /👘.*Skins/, 'HeroDetailModal must display Skins section header');
   assert.match(content, /\+1/, 'HeroDetailModal must provide +1 upgrade button');
-  assert.match(content, /→\s*\{\{\s*skin\.plan\.targetNextTen\s*\}\}/, 'HeroDetailModal must provide button to target next 10 milestone');
-  assert.match(content, /skin\.plan\.isMax/, 'HeroDetailModal must display max level indicator when skin is maxed');
+  assert.match(content, /→\s*\{\{\s*skin\.plan(?:\.|\?\.)targetNextTen\s*\}\}/, 'HeroDetailModal must provide button to target next 10 milestone');
+  assert.match(content, /skin\.plan(?:\.|\?\.)isMax/, 'HeroDetailModal must display max level indicator when skin is maxed');
 });
 
 

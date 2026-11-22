@@ -118,23 +118,37 @@ test('skinHelper: getHeroSkinsDetailed calculates complete plans for a hero', ()
 
   // Default skin: level 5
   const defaultSkin = skins[0];
+  assert.equal(defaultSkin.id, 1);
   assert.equal(defaultSkin.skinId, 1);
   assert.equal(defaultSkin.isDefault, true);
   assert.equal(defaultSkin.level, 5);
   assert.equal(defaultSkin.plan.costOne, 55); // lvl 6 cost is 55
+  assert.equal(defaultSkin.plan.costSingle, 55);
+  assert.equal(defaultSkin.plan.targetSingle, 6);
   assert.equal(defaultSkin.plan.canUpgradeOneDirect, true); // 100 >= 55
+  assert.equal(defaultSkin.plan.singlePlan.canAfford, true);
+  assert.equal(defaultSkin.plan.singlePlan.cost, 55);
+  assert.equal(defaultSkin.plan.singlePlan.totalChestsToOpen, 0);
+
   assert.equal(defaultSkin.plan.targetNextTen, 10);
   assert.equal(defaultSkin.plan.deltaNextTen, 5); // 5 -> 10
   assert.equal(defaultSkin.plan.costNextTen, 275); // 55 * 5 = 275
   assert.equal(defaultSkin.plan.canUpgradeNextTenDirect, false); // 100 < 275
   assert.equal(defaultSkin.plan.canUpgradeNextTenWithChests, true); // 100 + (7*150) >= 275
   assert.equal(defaultSkin.plan.chestsForNextTen, 2); // deficit 175 -> ceil(175/150) = 2 chests
+  assert.equal(defaultSkin.plan.nextTenPlan.canAfford, true);
+  assert.equal(defaultSkin.plan.nextTenPlan.cost, 275);
+  assert.equal(defaultSkin.plan.nextTenPlan.totalChestsToOpen, 2);
+  assert.equal(defaultSkin.plan.nextTenPlan.openLargeCount, 2);
 
   // Demonic skin: level 10
   const demonicSkin = skins[1];
+  assert.equal(demonicSkin.id, 35);
   assert.equal(demonicSkin.skinId, 35);
   assert.equal(demonicSkin.isDefault, false);
   assert.equal(demonicSkin.level, 10);
   assert.equal(demonicSkin.plan.targetNextTen, 20); // next multiple of 10 from 10 is 20!
   assert.equal(demonicSkin.plan.deltaNextTen, 10);
+  assert.equal(demonicSkin.plan.nextTenPlan !== undefined, true);
+  assert.equal(typeof demonicSkin.plan.nextTenPlan.canAfford, 'boolean');
 });

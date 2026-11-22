@@ -22,12 +22,25 @@ export interface ChestPlanItem {
   yieldPerChest: number;
 }
 
+export interface SkinSubPlan {
+  canAfford: boolean;
+  cost: number;
+  openChests: ChestPlanItem[];
+  totalChestsToOpen: number;
+  openLargeCount: number;
+  openSmallCount: number;
+  choiceIndex: number;
+}
+
 export interface SkinUpgradePlan {
+  targetSingle: number;
+  costSingle: number;
   costOne: number;
   canUpgradeOneDirect: boolean;
   canUpgradeOneWithChests: boolean;
   chestsForOne: number;
   openChestsPlanOne: ChestPlanItem[];
+  singlePlan: SkinSubPlan;
 
   targetNextTen: number;
   deltaNextTen: number;
@@ -36,6 +49,7 @@ export interface SkinUpgradePlan {
   canUpgradeNextTenWithChests: boolean;
   chestsForNextTen: number;
   openChestsPlanNextTen: ChestPlanItem[];
+  nextTenPlan: SkinSubPlan;
 
   targetNextTenPlus10: number;
   deltaNextTenPlus10: number;
@@ -44,11 +58,13 @@ export interface SkinUpgradePlan {
   canUpgradeNextTenPlus10WithChests: boolean;
   chestsForNextTenPlus10: number;
   openChestsPlanNextTenPlus10: ChestPlanItem[];
+  nextTenPlus10Plan: SkinSubPlan;
 
   isMax: boolean;
 }
 
 export interface HeroSkinItem {
+  id: number;
   skinId: number;
   name: string;
   level: number;
@@ -60,6 +76,8 @@ export interface HeroSkinItem {
   skinType: SkinType;
   plan: SkinUpgradePlan;
 }
+
+export type HeroSkinDetailedItem = HeroSkinItem;
 
 export const STAT_LABELS: Record<string, string> = {
   PA: 'Physical Attack',
@@ -384,7 +402,47 @@ export function getHeroSkinsDetailed(
     const canUpgradeNextTenPlus10WithChests = !isMax && deltaNextTenPlus10 > deltaNextTen && (canUpgradeNextTenPlus10Direct || chestPlanNextTenPlus10.canFulfill);
     const chestsForNextTenPlus10 = chestPlanNextTenPlus10.plan.reduce((s, p) => s + p.amount, 0);
 
+    const targetSingle = isMax ? level : level + 1;
+    const costSingle = costOne;
+
+    const largeOne = chestPlanOne.plan.filter(p => p.libId === 65).reduce((s, p) => s + p.amount, 0);
+    const smallOne = chestPlanOne.plan.filter(p => p.libId === 51).reduce((s, p) => s + p.amount, 0);
+    const singlePlan: SkinSubPlan = {
+      canAfford: canUpgradeOneWithChests,
+      cost: costOne,
+      openChests: chestPlanOne.plan,
+      totalChestsToOpen: chestsForOne,
+      openLargeCount: largeOne,
+      openSmallCount: smallOne,
+      choiceIndex: stoneInfo.choiceIndex,
+    };
+
+    const largeNextTen = chestPlanNextTen.plan.filter(p => p.libId === 65).reduce((s, p) => s + p.amount, 0);
+    const smallNextTen = chestPlanNextTen.plan.filter(p => p.libId === 51).reduce((s, p) => s + p.amount, 0);
+    const nextTenPlan: SkinSubPlan = {
+      canAfford: canUpgradeNextTenWithChests,
+      cost: costNextTen,
+      openChests: chestPlanNextTen.plan,
+      totalChestsToOpen: chestsForNextTen,
+      openLargeCount: largeNextTen,
+      openSmallCount: smallNextTen,
+      choiceIndex: stoneInfo.choiceIndex,
+    };
+
+    const largeNextTenPlus10 = chestPlanNextTenPlus10.plan.filter(p => p.libId === 65).reduce((s, p) => s + p.amount, 0);
+    const smallNextTenPlus10 = chestPlanNextTenPlus10.plan.filter(p => p.libId === 51).reduce((s, p) => s + p.amount, 0);
+    const nextTenPlus10Plan: SkinSubPlan = {
+      canAfford: canUpgradeNextTenPlus10WithChests,
+      cost: costNextTenPlus10,
+      openChests: chestPlanNextTenPlus10.plan,
+      totalChestsToOpen: chestsForNextTenPlus10,
+      openLargeCount: largeNextTenPlus10,
+      openSmallCount: smallNextTenPlus10,
+      choiceIndex: stoneInfo.choiceIndex,
+    };
+
     return {
+      id: skinId,
       skinId,
       name,
       level,
@@ -395,11 +453,14 @@ export function getHeroSkinsDetailed(
       isDefault,
       skinType,
       plan: {
+        targetSingle,
+        costSingle,
         costOne,
         canUpgradeOneDirect,
         canUpgradeOneWithChests,
         chestsForOne,
         openChestsPlanOne: chestPlanOne.plan,
+        singlePlan,
 
         targetNextTen,
         deltaNextTen,
@@ -408,6 +469,7 @@ export function getHeroSkinsDetailed(
         canUpgradeNextTenWithChests,
         chestsForNextTen,
         openChestsPlanNextTen: chestPlanNextTen.plan,
+        nextTenPlan,
 
         targetNextTenPlus10,
         deltaNextTenPlus10,
@@ -416,6 +478,7 @@ export function getHeroSkinsDetailed(
         canUpgradeNextTenPlus10WithChests,
         chestsForNextTenPlus10,
         openChestsPlanNextTenPlus10: chestPlanNextTenPlus10.plan,
+        nextTenPlus10Plan,
 
         isMax,
       },
