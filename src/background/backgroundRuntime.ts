@@ -25,7 +25,6 @@ import { worldReadService } from '../services/worldReadService.ts';
 import { experimentalDataHelper } from '../utils/experimentalData.ts';
 import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { eventCatalogService } from '../services/eventCatalogService.ts';
-import { getEncounterKey } from '../utils/dungeonBattleHistory.ts';
 import { buildAutoTrainCalls } from '../utils/troops.ts';
 import { observedToday } from '../composables/activityState.ts';
 
@@ -3867,47 +3866,6 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id, cr);
       if (sender.tab?.id) await updateTowerRun(record, sender.tab.id, cr);
       if (sender.tab?.id) await updateDungeonRun(record, sender.tab.id, cr);
-      if (cacheResult.changed && cr?.storage?.local) {
-        const lastEnc = cacheResult.cache?.dungeonStatus?.data?.lastEncounter;
-        const history = cacheResult.cache?.dungeonStatus?.data?.battleHistory;
-        if (lastEnc || history) {
-          const storedHist = (await cr.storage.local.get('dungeonBattleHistory').catch(() => ({}))) as any;
-          const existing = storedHist?.dungeonBattleHistory || {};
-          let hasNew = false;
-          if (lastEnc) {
-            const encKey = getEncounterKey(lastEnc.enemyTeam.map((e: any) => e.id), lastEnc.playerTeam);
-            const list = Array.isArray(existing[encKey]) ? [...existing[encKey]] : [];
-            if (!list.some((item: any) => item.id === lastEnc.id)) {
-              list.push(lastEnc);
-              if (list.length > 50) list.splice(0, list.length - 50);
-              existing[encKey] = list;
-              hasNew = true;
-            }
-          }
-          if (history) {
-            for (const [k, v] of Object.entries(history)) {
-              if (!existing[k]) {
-                existing[k] = v;
-                hasNew = true;
-              } else if (Array.isArray(v)) {
-                const list = [...existing[k]];
-                for (const item of (v as any[])) {
-                  if (!list.some((existingItem: any) => existingItem.id === item.id)) {
-                    list.push(item);
-                    hasNew = true;
-                  }
-                }
-                if (list.length > 50) list.splice(0, list.length - 50);
-                existing[k] = list;
-                hasNew = true;
-              }
-            }
-          }
-          if (hasNew) {
-            await cr.storage.local.set({ dungeonBattleHistory: existing }).catch(() => {});
-          }
-        }
-      }
       if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id, record, cr);
       if (sender.tab?.id) await advanceResearchQueue(sender.tab.id, record, cr);
       Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue', 'customTeams', 'troopCapacitySettings']));

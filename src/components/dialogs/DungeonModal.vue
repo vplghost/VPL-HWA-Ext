@@ -12,14 +12,6 @@ import {
 import { getTitanMetadata } from '@/src/utils/metadata';
 import { normalizeArray } from '@/src/utils/troops';
 import { formatNumber } from '@/src/utils/formatters';
-import {
-  findMatchingEncounter,
-  buildSimulatedEndBattleArgs,
-  exportDungeonBattleHistory,
-  loadDungeonBattleHistory,
-  hasHealingTitan,
-  HEALING_TITAN_IDS,
-} from '@/src/utils/dungeonBattleHistory';
 import { getEffectiveTitanStates } from '@/src/services/queues/dungeonAutomation';
 
 const props = defineProps<{
@@ -113,7 +105,6 @@ const doors = computed<any[]>(() => {
 
       return {
         ...door,
-        match: getDoorMatch({ ...door, enemies }),
         enemies,
       };
     });
@@ -153,10 +144,6 @@ const titanEntries = computed(() => {
 
 const stackLevel = computed(() => getModalStackLevel('dungeon'));
 
-const storedBattleHistory = ref<Record<string, any>>({});
-const isSimulatingBattle = ref(false);
-const simulatingDoorIdx = ref<number | null>(null);
-
 // Interactive Simulation Dialog state
 const isSimModalOpen = ref(false);
 const activeSimDoor = ref<any>(null);
@@ -170,182 +157,6 @@ function openSimModal(door: any, idx: number) {
 
 function handleSimBattleSubmitted() {
   refreshDungeon();
-}
-
-const DUNGEON_SIM_SETTINGS_KEY = 'dungeonSimSettings';
-const simHpBonusPercent = ref(0);
-const simEnergyBonusPercent = ref(0);
-const simEnforceHealerRule = ref(true);
-const simAutoDetectDeath = ref(true);
-const showSimSettings = ref(false);
-const battleErrorBanner = ref<string | null>(null);
-
-async function loadSimSettings() {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
-    try {
-      const res = await chrome.storage.local.get(DUNGEON_SIM_SETTINGS_KEY);
-      const s = res?.[DUNGEON_SIM_SETTINGS_KEY];
-      if (s) {
-        if (typeof s.hpBonusPercent === 'number') simHpBonusPercent.value = Math.max(0, Math.min(50, s.hpBonusPercent));
-        if (typeof s.energyBonusPercent === 'number') simEnergyBonusPercent.value = Math.max(0, Math.min(50, s.energyBonusPercent));
-        if (typeof s.enforceHealerRule === 'boolean') simEnforceHealerRule.value = s.enforceHealerRule;
-        if (typeof s.autoDetectDeath === 'boolean') simAutoDetectDeath.value = s.autoDetectDeath;
-      }
-    } catch (_) {}
-  }
-}
-
-async function saveSimSettings() {
-  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
-    try {
-      await chrome.storage.local.set({
-        [DUNGEON_SIM_SETTINGS_KEY]: {
-          hpBonusPercent: Number(simHpBonusPercent.value) || 0,
-          energyBonusPercent: Number(simEnergyBonusPercent.value) || 0,
-          enforceHealerRule: simEnforceHealerRule.value,
-          autoDetectDeath: simAutoDetectDeath.value,
-        },
-      });
-    } catch (_) {}
-  }
-}
-
-function resetSimSettings() {
-  simHpBonusPercent.value = 0;
-  simEnergyBonusPercent.value = 0;
-  simEnforceHealerRule.value = true;
-  simAutoDetectDeath.value = true;
-}
-
-function applyPreset(hp: number, energy: number) {
-  simHpBonusPercent.value = hp;
-  simEnergyBonusPercent.value = energy;
-}
-
-watch([simHpBonusPercent, simEnergyBonusPercent, simEnforceHealerRule, simAutoDetectDeath], () => {
-  saveSimSettings();
-});
-
-const mergedBattleHistory = computed(() => {
-  const cacheHistory = dungeonData.value.battleHistory || {};
-  return { ...storedBattleHistory.value, ...cacheHistory };
-});
-
-async function loadHistory() {
-  if (typeof loadDungeonBattleHistory === 'function') {
-    try {
-      const data = await loadDungeonBattleHistory();
-      if (data && typeof data === 'object') {
-        storedBattleHistory.value = data;
-      }
-    } catch (_) {}
-  }
-}
-
-function getDoorMatch(door: any) {
-  if (typeof findMatchingEncounter !== 'function') return null;
-  const titanStates = effectiveTitanStates.value;
-  return findMatchingEncounter(door.enemies || door.team || [], titanStates, mergedBattleHistory.value);
-}
-
-async function handleSimulateAttack(door: any, doorIdx: number, record: any) {
-  if (isSimulatingBattle.value) return;
-  isSimulatingBattle.value = true;
-  simulatingDoorIdx.value = doorIdx;
-  battleErrorBanner.value = null;
-
-  try {
-    const startCall = {
-      name: 'dungeonStartBattle',
-      args: {
-        teamNum: doorIdx,
-        heroes: record.playerTeam,
-      },
-    };
-    const startRpcRes = await dispatchRpc([startCall]);
-
-    let seed = record.startResponse?.seed || 0;
-    let attackers = record.startResponse?.attackers || {};
-    const resPayload = startRpcRes?.results?.[0]?.result?.response || startRpcRes?.results?.[0]?.response;
-    if (resPayload?.seed) {
-      seed = resPayload.seed;
-      if (resPayload.attackers) attackers = resPayload.attackers;
-    } else {
-      const waitDeadline = Date.now() + 2000;
-      while (Date.now() < waitDeadline) {
-        const active = cache.value.dungeonStatus?.data?.activeBattle;
-        if (active?.seed) {
-          seed = active.seed;
-          if (active.attackers) attackers = active.attackers;
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 200));
-      }
-    }
-
-    const endArgs =
-      typeof buildSimulatedEndBattleArgs === 'function'
-        ? buildSimulatedEndBattleArgs(record, { seed, attackers }, {
-            hpBonusPercent: simHpBonusPercent.value,
-            energyBonusPercent: simEnergyBonusPercent.value,
-            allowNonHealerRecovery: !simEnforceHealerRule.value,
-            autoDetectDeath: simAutoDetectDeath.value,
-          })
-        : {
-            result: { win: true, stars: record.stars || 3 },
-            progress: [
-              {
-                defenders: { heroes: {}, input: [] },
-                attackers: {
-                  heroes: Object.fromEntries(
-                    record.playerTeam.map((id: number) => [
-                      String(id),
-                      { isDead: false, hp: 1000000, energy: 800 },
-                    ])
-                  ),
-                  input: [],
-                },
-                duration: Number(record.duration) || 20,
-                seed,
-              },
-            ],
-          };
-
-    // Step 1: Conclude battle first
-    const endRpcRes = await dispatchRpc([{ name: 'dungeonEndBattle', args: endArgs }]);
-    const firstEndRes = endRpcRes?.results?.[0];
-    if (firstEndRes?.result?.response?.error || firstEndRes?.error) {
-      const errMsg = firstEndRes?.result?.response?.error || firstEndRes?.error?.description || 'Server rejected battle';
-      battleErrorBanner.value = `Battle Rejected by Server: "${errMsg}". Pre-battle HP correlation or threshold violated. Adjust settings or attack manually.`;
-      await refreshDungeon();
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 250));
-
-    // Step 2: Milestone checkpoint (saveProgress must be dispatched separately after battle is finalized)
-    const curFloor = floorNumber.value;
-    const respawn = Number(dungeonData.value.respawnFloor) || 0;
-    if (curFloor > respawn && curFloor % 10 === 0) {
-      await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
-      await new Promise((r) => setTimeout(r, 150));
-    }
-
-    // Step 3: Refresh dungeon status
-    await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
-    await new Promise((r) => setTimeout(r, 350));
-    await refreshDungeon();
-  } catch (err) {
-    console.error('Failed to simulate dungeon attack:', err);
-  } finally {
-    isSimulatingBattle.value = false;
-    simulatingDoorIdx.value = null;
-  }
-}
-
-function handleExportHistory() {
-  if (typeof exportDungeonBattleHistory === 'function') {
-    exportDungeonBattleHistory(mergedBattleHistory.value);
-  }
 }
 
 function close() {
@@ -365,8 +176,6 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      loadHistory();
-      loadSimSettings();
       registerModalOpen('dungeon');
       document.addEventListener('keydown', handleKeydown);
     } else {
@@ -377,8 +186,6 @@ watch(
 );
 
 onMounted(() => {
-  loadHistory();
-  loadSimSettings();
   if (props.modelValue) {
     registerModalOpen('dungeon');
     document.addEventListener('keydown', handleKeydown);
@@ -487,30 +294,6 @@ function handleImgError(e: Event) {
               <span class="dungeon-refresh-label">{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
             </button>
 
-            <!-- Export Battle History Button -->
-            <button
-              id="dungeon-export-btn"
-              type="button"
-              class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80 shadow-2xs"
-              title="Export battle encounter history (JSON)"
-              @click="handleExportHistory"
-            >
-              <svg
-                class="size-3.5 text-slate-500 dark:text-slate-400 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span class="dungeon-export-label">Export</span>
-            </button>
-
             <!-- Close Button -->
             <button
               id="dungeon-modal-close"
@@ -600,28 +383,6 @@ function handleImgError(e: Event) {
             <div class="text-[11px] font-medium text-slate-600 dark:text-slate-300">
               Floor {{ floorNumber }}
             </div>
-          </div>
-
-          <!-- Battle Error Banner -->
-          <div
-            v-if="battleErrorBanner"
-            id="dungeon-battle-error-banner"
-            class="rounded-xl border border-rose-300 bg-rose-50/90 p-3.5 text-rose-900 shadow-2xs dark:border-rose-800 dark:bg-rose-950/70 dark:text-rose-200 flex items-start justify-between gap-3 text-xs"
-          >
-            <div class="flex items-start gap-2.5">
-              <span class="text-base leading-none">⚠️</span>
-              <div>
-                <div class="font-bold">Battle Rejected by Server</div>
-                <div class="mt-0.5 text-rose-700 dark:text-rose-300">{{ battleErrorBanner }}</div>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold px-1"
-              @click="battleErrorBanner = null"
-            >
-              ✕
-            </button>
           </div>
 
           <!-- SECTION 1: OVERVIEW STATS -->
@@ -723,173 +484,7 @@ function handleImgError(e: Event) {
                 <span>Floor {{ floorNumber }} Doors</span>
               </h3>
 
-              <div class="flex items-center gap-2">
-                <button
-                  id="btn-toggle-dungeon-sim-settings"
-                  type="button"
-                  class="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
-                  :class="showSimSettings || simHpBonusPercent > 0 || simEnergyBonusPercent > 0
-                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300'
-                    : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'"
-                  @click="showSimSettings = !showSimSettings"
-                >
-                  <span>⚙️ Tuning</span>
-                  <span
-                    v-if="simHpBonusPercent > 0 || simEnergyBonusPercent > 0"
-                    class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-600 text-white"
-                  >
-                    +{{ simHpBonusPercent }}% HP / +{{ simEnergyBonusPercent }}% E
-                  </span>
-                </button>
-                <span class="text-xs text-slate-500 dark:text-slate-400">{{ doors.length }} choices</span>
-              </div>
-            </div>
-
-            <!-- Simulation Tuning Settings Panel -->
-            <div
-              v-if="showSimSettings"
-              id="dungeon-sim-settings-panel"
-              class="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-3 animate-in fade-in duration-150"
-            >
-              <div class="flex items-center justify-between">
-                <div class="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
-                  <span>⚙️</span>
-                  <span>Auto-Clear Outcome Tuning (Tùy chỉnh kết quả dự đoán)</span>
-                </div>
-                <button
-                  id="btn-reset-dungeon-sim-settings"
-                  type="button"
-                  class="cursor-pointer text-xs text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-semibold"
-                  @click="resetSimSettings"
-                >
-                  Reset (0%)
-                </button>
-              </div>
-              <p class="text-2xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                Tùy chỉnh tỷ lệ % HP và Energy giữ lại sau trận so với kết quả ghi nhận mẫu. Người chơi có thể thử nghiệm từng mức để tìm ngưỡng chấp nhận an toàn của server.
-              </p>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <!-- HP Retained Bonus Slider -->
-                <div class="space-y-1.5">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <span>❤️</span>
-                      <span>HP Retained Bonus:</span>
-                    </span>
-                    <span id="label-sim-hp-bonus" class="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      +{{ simHpBonusPercent }}%
-                    </span>
-                  </div>
-                  <input
-                    id="input-sim-hp-bonus"
-                    type="range"
-                    min="0"
-                    max="50"
-                    step="5"
-                    v-model.number="simHpBonusPercent"
-                    class="w-full accent-emerald-600 cursor-pointer"
-                  />
-                  <div class="flex justify-between text-[10px] text-slate-400 font-mono">
-                    <span>0% (Standard)</span>
-                    <span>+25%</span>
-                    <span>+50% (Max)</span>
-                  </div>
-                </div>
-
-                <!-- Energy Retained Bonus Slider -->
-                <div class="space-y-1.5">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <span>⚡</span>
-                      <span>Energy Retained Bonus:</span>
-                    </span>
-                    <span id="label-sim-energy-bonus" class="font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                      +{{ simEnergyBonusPercent }}%
-                    </span>
-                  </div>
-                  <input
-                    id="input-sim-energy-bonus"
-                    type="range"
-                    min="0"
-                    max="50"
-                    step="5"
-                    v-model.number="simEnergyBonusPercent"
-                    class="w-full accent-indigo-600 cursor-pointer"
-                  />
-                  <div class="flex justify-between text-[10px] text-slate-400 font-mono">
-                    <span>0% (Standard)</span>
-                    <span>+25%</span>
-                    <span>+50% (Max)</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Quick Presets -->
-              <div class="flex items-center gap-2 flex-wrap pt-1 text-2xs">
-                <span class="text-slate-400">Nhanh:</span>
-                <button
-                  type="button"
-                  class="cursor-pointer px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-medium"
-                  @click="applyPreset(0, 0)"
-                >
-                  Standard (0%)
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-medium"
-                  @click="applyPreset(10, 15)"
-                >
-                  Light (+10% / +15%)
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-medium"
-                  @click="applyPreset(20, 25)"
-                >
-                  Moderate (+20% / +25%)
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-medium"
-                  @click="applyPreset(35, 40)"
-                >
-                  Aggressive (+35% / +40%)
-                </button>
-              </div>
-
-              <!-- Realism & Death Toggles -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-slate-200/70 dark:border-slate-700/70 text-xs">
-                <label class="flex items-start gap-2 cursor-pointer select-none">
-                  <input
-                    id="checkbox-sim-enforce-healer"
-                    type="checkbox"
-                    v-model="simEnforceHealerRule"
-                    class="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-700 dark:focus:ring-offset-slate-800"
-                  />
-                  <div>
-                    <span class="font-semibold text-slate-800 dark:text-slate-200">Healer-Only HP Recovery</span>
-                    <p class="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Giới hạn HP sau trận ≤ HP trước trận đối với team không có Titan hồi máu (Hyperion, Iyari...).
-                    </p>
-                  </div>
-                </label>
-
-                <label class="flex items-start gap-2 cursor-pointer select-none">
-                  <input
-                    id="checkbox-sim-auto-death"
-                    type="checkbox"
-                    v-model="simAutoDetectDeath"
-                    class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700 dark:focus:ring-offset-slate-800"
-                  />
-                  <div>
-                    <span class="font-semibold text-slate-800 dark:text-slate-200">Auto-Detect Fatal Damage</span>
-                    <p class="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Tự động loại bỏ Titan tử trận và hạ xuống 2⭐/1⭐ khi HP trước trận không đủ gánh đòn, dồn sát thương dư sang hàng sau.
-                    </p>
-                  </div>
-                </label>
-              </div>
+              <span class="text-xs text-slate-500 dark:text-slate-400">{{ doors.length }} choices</span>
             </div>
 
             <div id="dungeon-doors-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -943,55 +538,19 @@ function handleImgError(e: Event) {
                   <p v-else class="text-[11px] text-slate-400 dark:text-slate-500">Enemy Titan data unavailable.</p>
                 </div>
 
-                <!-- Door Actions: Interactive Simulation & Historic Auto Clear -->
-                <div class="pt-2 border-t border-slate-200 dark:border-slate-700/60 space-y-2">
-                  <div v-if="door.match" class="flex items-center justify-between text-[11px]">
-                    <span class="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                      <span>⚡</span>
-                      <span>Matching team recorded</span>
-                    </span>
-                    <span class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                      {{ door.match.record.stars }}★ · {{ Math.round(door.match.record.duration || 15) }}s
-                    </span>
-                  </div>
-
-                  <div class="flex items-center justify-between gap-2 flex-wrap">
-                    <!-- Interactive Simulation Button -->
-                    <button
-                      :id="`btn-door-sim-${idx}`"
-                      type="button"
-                      class="dungeon-door-sim-btn cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-indigo-600/30 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 dark:text-indigo-300 dark:border-indigo-800 px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all active:scale-95"
-                      :title="`Tấn công giả lập cho Cửa ${Number(idx) + 1}`"
-                      @click="openSimModal(door, idx)"
-                    >
-                      <span>🧪</span>
-                      <span>Tấn công giả lập</span>
-                    </button>
-
-                    <!-- Historic Auto Clear Button (when match exists) -->
-                    <button
-                      v-if="door.match"
-                      type="button"
-                      class="dungeon-simulate-attack-btn cursor-pointer inline-flex items-center gap-1 rounded-lg border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      :disabled="isSimulatingBattle"
-                      :title="`Simulate attack for Door ${Number(idx) + 1} with recorded metrics`"
-                      @click="handleSimulateAttack(door, idx, door.match.record)"
-                    >
-                      <svg
-                        v-if="isSimulatingBattle && simulatingDoorIdx === idx"
-                        class="size-3 animate-spin shrink-0"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                      >
-                        <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
-                        <path d="M12 2a10 10 0 0 1 10 10" />
-                      </svg>
-                      <span v-else>⚡</span>
-                      <span>{{ isSimulatingBattle && simulatingDoorIdx === idx ? 'Clearing...' : 'Auto Clear' }}</span>
-                    </button>
-                  </div>
+                <!-- Door Actions: Interactive Simulation -->
+                <div class="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between gap-2 flex-wrap">
+                  <!-- Interactive Simulation Button -->
+                  <button
+                    :id="`btn-door-sim-${idx}`"
+                    type="button"
+                    class="dungeon-door-sim-btn cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-indigo-600/30 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 dark:text-indigo-300 dark:border-indigo-800 px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all active:scale-95"
+                    :title="`Simulate battle for Door ${Number(idx) + 1}`"
+                    @click="openSimModal(door, idx)"
+                  >
+                    <span>🧪</span>
+                    <span>Simulate</span>
+                  </button>
                 </div>
               </div>
             </div>

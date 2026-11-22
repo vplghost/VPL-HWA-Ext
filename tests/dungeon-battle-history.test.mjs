@@ -523,23 +523,24 @@ test('buildSimulatedEndBattleArgs auto-detects fatal damage on frontline titan a
   assert.ok(endArgs.progress[0].attackers.heroes['4022'].hp < 836745);
 });
 
-test('DungeonModal.vue includes #dungeon-export-btn, sim settings tuning UI, and sequential save progress', async () => {
-  const source = await readFile(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
-  assert.match(source, /id="dungeon-export-btn"/);
-  assert.match(source, /handleExportHistory/);
-  assert.match(source, /dungeon-simulate-attack-btn/);
+test('DungeonModal.vue uses interactive simulation modal and removed obsolete history auto-clear buttons', async () => {
+  const modalSource = await readFile(new URL('../src/components/dialogs/DungeonModal.vue', import.meta.url), 'utf8');
+  const simModalSource = await readFile(new URL('../src/components/dialogs/DungeonSimModal.vue', import.meta.url), 'utf8');
 
-  // Simulation settings tuning UI
-  assert.match(source, /btn-toggle-dungeon-sim-settings/);
-  assert.match(source, /dungeon-sim-settings-panel/);
-  assert.match(source, /input-sim-hp-bonus/);
-  assert.match(source, /input-sim-energy-bonus/);
-  assert.match(source, /checkbox-sim-enforce-healer/);
-  assert.match(source, /checkbox-sim-auto-death/);
-  assert.match(source, /dungeon-battle-error-banner/);
-  assert.match(source, /btn-reset-dungeon-sim-settings/);
+  // Interactive simulation UI is wired
+  assert.match(modalSource, /dungeon-door-sim-btn/);
+  assert.match(modalSource, /openSimModal/);
+  assert.match(modalSource, /<DungeonSimModal/);
 
-  // Verification that dungeonSaveProgress is dispatched separately, not in the same batch with dungeonEndBattle
-  assert.match(source, /await dispatchRpc\(\[\{\s*name:\s*['"]dungeonEndBattle['"]/);
-  assert.match(source, /await dispatchRpc\(\[\{\s*name:\s*['"]dungeonSaveProgress['"]/);
+  // Obsolete history auto-clear and tuning UI have been completely removed
+  assert.equal(modalSource.includes('id="dungeon-export-btn"'), false);
+  assert.equal(modalSource.includes('handleExportHistory'), false);
+  assert.equal(modalSource.includes('dungeon-simulate-attack-btn'), false);
+  assert.equal(modalSource.includes('btn-toggle-dungeon-sim-settings'), false);
+  assert.equal(modalSource.includes('dungeon-sim-settings-panel'), false);
+  assert.equal(modalSource.includes('dungeon-battle-error-banner'), false);
+
+  // Sequential save progress in DungeonSimModal
+  assert.match(simModalSource, /await dispatchRpc\(\[\{\s*name:\s*['"]dungeonEndBattle['"]/);
+  assert.match(simModalSource, /await dispatchRpc\(\[\{\s*name:\s*['"]dungeonSaveProgress['"]/);
 });
