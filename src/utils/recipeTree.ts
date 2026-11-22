@@ -355,6 +355,11 @@ export function extractDropsFromRaidResponse(raw: any): CampaignDropsAccumulator
   const processEntry = (item: any) => {
     if (!item || typeof item !== 'object') return;
 
+    // Guard against whole-account or whole-inventory dumps (e.g. userGetInfo, inventoryGet)
+    if (item.userId != null || item.accountId != null || item.slots != null || (item.gear && item.heroes)) {
+      return;
+    }
+
     if (item.result && item.result.response) {
       processEntry(item.result.response);
       return;

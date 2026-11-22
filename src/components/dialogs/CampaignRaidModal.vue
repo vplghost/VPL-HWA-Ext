@@ -659,14 +659,17 @@ async function executeRaidCall(times: number): Promise<{ ok: boolean; pending?: 
 
     // Fast-path: Check if direct RPC response contains raid results
     if (Array.isArray(resp?.results)) {
-      const errResult = resp.results.find((r: any) => r?.error || r?.result?.error);
+      const errResult = resp.results.slice(0, numCalls).find((r: any) => r?.error || r?.result?.error);
       const err = errResult?.error || errResult?.result?.error;
       if (err) {
         disableMissionToday(missionId.value);
         return { ok: false, error: typeof err === 'string' ? err : err.message || 'Raid rejected by server' };
       }
 
+      // ONLY extract responses for the missionRaid calls (indices 0..numCalls-1)
+      // Exclude secondary synchronization calls (inventoryGet, userGetInfo, etc.) to prevent drops multiplication
       const missionResponses = resp.results
+        .slice(0, numCalls)
         .filter((r: any) => r?.result?.response)
         .map((r: any) => r.result.response);
 

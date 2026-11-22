@@ -11,6 +11,7 @@ import {
   isMissionRaidable,
   getMissionTries,
 } from '../src/data/campaignData.ts';
+import { extractDropsFromRaidResponse } from '../src/utils/recipeTree.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -175,5 +176,48 @@ test('useModals composable supports campaignFarmMode and selectedCampaignSoulHer
   assert.ok(
     content.includes('selectedCampaignSoulHeroId'),
     'useModals should support selectedCampaignSoulHeroId in openModal'
+  );
+});
+
+test('extractDropsFromRaidResponse ignores non-raid dumps like inventoryGet and userGetInfo', () => {
+  // Valid mission raid drop
+  const validRaid = {
+    0: {
+      gold: 500,
+      experience: 10,
+      fragmentHero: { 24: 1 }
+    }
+  };
+  const validDrops = extractDropsFromRaidResponse(validRaid);
+  assert.equal(validDrops.gold, 500);
+  assert.equal(validDrops.experience, 10);
+  assert.equal(validDrops.fragmentHero[24], 1);
+
+  // Entire inventory dump from inventoryGet must be ignored
+  const fullInventoryDump = {
+    gear: { 101: 50, 102: 120 },
+    fragmentGear: { 201: 500 },
+    slots: { 1: {} }
+  };
+  const invDrops = extractDropsFromRaidResponse(fullInventoryDump);
+  assert.equal(Object.keys(invDrops.gear).length, 0, 'Inventory gear must not be counted as raid drops');
+  assert.equal(Object.keys(invDrops.fragmentGear).length, 0);
+
+  // User account dump from userGetInfo must be ignored
+  const fullUserDump = {
+    id: 12345,
+    userId: 12345,
+    gold: 50000000,
+    rubies: 1000
+  };
+  const userDrops = extractDropsFromRaidResponse(fullUserDump);
+  assert.equal(userDrops.gold, 0, 'User balance must not be counted as raid drop gold');
+
+  // Verify CampaignRaidModal slices resp.results to numCalls
+  const modalPath = path.resolve(__dirname, '../src/components/dialogs/CampaignRaidModal.vue');
+  const modalContent = fs.readFileSync(modalPath, 'utf8');
+  assert.ok(
+    modalContent.includes('resp.results.slice(0, numCalls)'),
+    'CampaignRaidModal must slice results to numCalls to exclude synchronization calls'
   );
 });
