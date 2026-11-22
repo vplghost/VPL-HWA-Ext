@@ -613,11 +613,23 @@ export function installInterceptor(customWindow?: any): void {
         Play_executeBattle: 175078,
         Play_createResult: 175081,
         Play_dispose: 175079,
+        Presets_replay: 14054,
+        Presets_manual: 35515,
+        Presets_manualRaid: 35516,
+        Presets_arena: 35517,
         Presets_clanWarReplay: 174207,
+        Presets_challengeAuto: 174208,
         Presets_arenaReplay: 174209,
+        Presets_tower: 468118,
         Presets_titanArenaReplay: 468119,
+        Presets_titanArenaRaid: 468120,
+        Presets_titanArenaManual: 468121,
         Presets_createReplay: 468122,
+        Presets_clanWar: 468123,
+        Presets_clanBoss: 468124,
+        Presets_challengeReplayAuto: 468125,
         Presets_get_isReplay: 468101,
+        BattlePresets_ctorDefault: 14053,
         BattlePresets_ctor5: 6579,
         BattleData_serializeResult: 49386,
         BattleData_getStars: 28182,
@@ -639,6 +651,18 @@ export function installInterceptor(customWindow?: any): void {
 
       const invoke = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0);
       const invokePtr = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0) >>> 0;
+
+      // Safe caller that pads arguments to match exact WebAssembly function signature length
+      const callTableFn = (index: number, ...args: any[]): number => {
+        const func = table.get(index);
+        if (typeof func !== 'function') return 0;
+        const requiredLen = func.length;
+        const callArgs = args.slice(0, requiredLen);
+        while (callArgs.length < requiredLen) {
+          callArgs.push(0);
+        }
+        return (func(...callArgs) >>> 0);
+      };
 
       // Read string from IL2CPP System.String pointer
       const readString = (ptr: number): string | null => {
@@ -665,20 +689,45 @@ export function installInterceptor(customWindow?: any): void {
         let presetPtr = 0;
         const candidateErrors: string[] = [];
 
-        // Candidate list in priority order
+        // Comprehensive candidate list supporting exact WASM arities
         const candidates = isTitan
           ? [
-              { name: 'Presets_clanWarReplay(0)', fn: () => invokePtr('Presets_clanWarReplay', 0) },
-              { name: 'Presets_clanWarReplay(1)', fn: () => invokePtr('Presets_clanWarReplay', 1) },
-              { name: 'Presets_titanArenaReplay(0)', fn: () => invokePtr('Presets_titanArenaReplay', 0) },
-              { name: 'Presets_createReplay(0)', fn: () => invokePtr('Presets_createReplay', 0) },
-              { name: 'Presets_arenaReplay(0)', fn: () => invokePtr('Presets_arenaReplay', 0) },
+              // 1. ClanWar Replay (Titan variants with arity padding)
+              { name: 'Presets_clanWarReplay(0, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 0, 0) },
+              { name: 'Presets_clanWarReplay(1, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 1, 0) },
+              { name: 'Presets_clanWarReplay(0, 1)', fn: () => callTableFn(sym.Presets_clanWarReplay, 0, 1) },
+              { name: 'Presets_clanWarReplay(1, 1)', fn: () => callTableFn(sym.Presets_clanWarReplay, 1, 1) },
+
+              // 2. Titan Arena variants
+              { name: 'Presets_titanArenaReplay(0)', fn: () => callTableFn(sym.Presets_titanArenaReplay, 0) },
+              { name: 'Presets_titanArenaRaid(0)', fn: () => callTableFn(sym.Presets_titanArenaRaid, 0) },
+              { name: 'Presets_titanArenaManual(0)', fn: () => callTableFn(sym.Presets_titanArenaManual, 0) },
+
+              // 3. Generic Replay and Challenge Auto
+              { name: 'Presets_replay(0, 1, 0)', fn: () => callTableFn(sym.Presets_replay, 0, 1, 0) },
+              { name: 'Presets_replay(1, 1, 0)', fn: () => callTableFn(sym.Presets_replay, 1, 1, 0) },
+              { name: 'Presets_replay(0, 0, 0)', fn: () => callTableFn(sym.Presets_replay, 0, 0, 0) },
+              { name: 'Presets_createReplay(0)', fn: () => callTableFn(sym.Presets_createReplay, 0) },
+              { name: 'Presets_challengeReplayAuto(0)', fn: () => callTableFn(sym.Presets_challengeReplayAuto, 0) },
+
+              // 4. Other battle modes
+              { name: 'Presets_clanWar(0)', fn: () => callTableFn(sym.Presets_clanWar, 0) },
+              { name: 'Presets_arenaReplay(0, 0, 0)', fn: () => callTableFn(sym.Presets_arenaReplay, 0, 0, 0) },
+              { name: 'Presets_tower(0)', fn: () => callTableFn(sym.Presets_tower, 0) },
+              { name: 'Presets_manualRaid(0)', fn: () => callTableFn(sym.Presets_manualRaid, 0) },
+              { name: 'Presets_manual(0)', fn: () => callTableFn(sym.Presets_manual, 0) },
             ]
           : [
-              { name: 'Presets_clanWarReplay(1)', fn: () => invokePtr('Presets_clanWarReplay', 1) },
-              { name: 'Presets_clanWarReplay(0)', fn: () => invokePtr('Presets_clanWarReplay', 0) },
-              { name: 'Presets_arenaReplay(0)', fn: () => invokePtr('Presets_arenaReplay', 0) },
-              { name: 'Presets_createReplay(0)', fn: () => invokePtr('Presets_createReplay', 0) },
+              // Hero priority
+              { name: 'Presets_clanWarReplay(1, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 1, 0) },
+              { name: 'Presets_clanWarReplay(0, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 0, 0) },
+              { name: 'Presets_replay(1, 1, 0)', fn: () => callTableFn(sym.Presets_replay, 1, 1, 0) },
+              { name: 'Presets_replay(0, 1, 0)', fn: () => callTableFn(sym.Presets_replay, 0, 1, 0) },
+              { name: 'Presets_arenaReplay(0, 0, 0)', fn: () => callTableFn(sym.Presets_arenaReplay, 0, 0, 0) },
+              { name: 'Presets_createReplay(0)', fn: () => callTableFn(sym.Presets_createReplay, 0) },
+              { name: 'Presets_tower(0)', fn: () => callTableFn(sym.Presets_tower, 0) },
+              { name: 'Presets_challengeReplayAuto(0)', fn: () => callTableFn(sym.Presets_challengeReplayAuto, 0) },
+              { name: 'Presets_clanWar(0)', fn: () => callTableFn(sym.Presets_clanWar, 0) },
             ];
 
         for (const cand of candidates) {
@@ -692,6 +741,19 @@ export function installInterceptor(customWindow?: any): void {
             }
           } catch (e: any) {
             candidateErrors.push(`${cand.name} thrown: ${e?.message || String(e)}`);
+          }
+        }
+
+        // Direct constructor fallback if factory presets failed
+        if (!presetPtr) {
+          try {
+            const fallbackPtr = malloc(128) >>> 0;
+            if (fallbackPtr > 0) {
+              callTableFn(sym.BattlePresets_ctorDefault, fallbackPtr, 0);
+              presetPtr = fallbackPtr;
+            }
+          } catch (e: any) {
+            candidateErrors.push(`Fallback BattlePresets ctor failed: ${e?.message || String(e)}`);
           }
         }
 
@@ -958,6 +1020,35 @@ export function installInterceptor(customWindow?: any): void {
         }
       }
 
+      currentPhase = 'PROBE_PRESETS';
+      const callTableFn = (index: number, ...args: any[]): number => {
+        const func = table.get(index);
+        if (typeof func !== 'function') return 0;
+        const requiredLen = func.length;
+        const callArgs = args.slice(0, requiredLen);
+        while (callArgs.length < requiredLen) callArgs.push(0);
+        try {
+          return (func(...callArgs) >>> 0);
+        } catch {
+          return 0;
+        }
+      };
+
+      const presetCandidates = [
+        { name: 'clanWarReplay(0,0)', idx: 174207, args: [0, 0] },
+        { name: 'clanWarReplay(1,0)', idx: 174207, args: [1, 0] },
+        { name: 'replay(0,1,0)', idx: 14054, args: [0, 1, 0] },
+        { name: 'createReplay(0)', idx: 468122, args: [0] },
+        { name: 'tower(0)', idx: 468118, args: [0] },
+      ];
+      const verifiedPresets: string[] = [];
+      for (const p of presetCandidates) {
+        try {
+          const ptr = callTableFn(p.idx, ...p.args);
+          if (ptr > 0) verifiedPresets.push(`${p.name} (0x${ptr.toString(16)})`);
+        } catch (_) {}
+      }
+
       return {
         ok: true,
         tableSize: table.length,
@@ -965,6 +1056,7 @@ export function installInterceptor(customWindow?: any): void {
         sampleString: readBack,
         verifiedSymbolsCount: verifiedSyms.length,
         verifiedSymbols: verifiedSyms.slice(0, 5),
+        verifiedPresets: verifiedPresets.length > 0 ? verifiedPresets.join(', ') : 'Direct ctor fallback available',
         timestamp: new Date().toISOString()
       };
     } catch (err: any) {
