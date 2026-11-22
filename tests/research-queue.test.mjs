@@ -705,3 +705,80 @@ test('renderResearchDialog includes eligible unresearched tech (0 -> 1) such as 
   assert.ok(medalIcons.length > 0, 'Must have element with special-resource-icon class for styling');
 });
 
+test('research-queue planNextStep waits for Research Center upgrade to complete before starting research', () => {
+  const now = 5000000;
+  const rcDuration = 60000;
+  const rcFinishAt = now + rcDuration;
+
+  // Cache where Research Center (#43) is currently upgrading in buildingStatus
+  const cacheWithUpgradingRc = {
+    buildingStatus: {
+      data: {
+        buildings: [{ buildingId: 43, level: 20 }],
+        queues: [
+          { buildingId: 43, nextLevel: 21, startDate: now, durationMs: rcDuration }
+        ]
+      }
+    },
+    researchStatus: {
+      data: {
+        queues: [],
+        completedResearches: []
+      }
+    }
+  };
+
+  const queueState = {
+    enabled: true,
+    items: [
+      { researchId: 505, currentLevel: 1, nextLevel: 2, durationMs: 30000 }
+    ]
+  };
+
+  // 1. Research queue should WAIT because Research Center is upgrading
+  const plan = queueHelper.planNextStep(queueState, cacheWithUpgradingRc, now);
+  assert.equal(plan.action, 'wait');
+  assert.equal(plan.wakeAt, rcFinishAt + 1000);
+  assert.equal(plan.reason, 'Research Center is upgrading');
+  assert.equal(plan.calls.length, 0, 'Must not dispatch startResearch while RC is upgrading');
+
+  // 2. If finished research needs completion, it should complete-only and then wait for RC
+  const cacheWithFinishedResearch = {
+    ...cacheWithUpgradingRc,
+    researchStatus: {
+      data: {
+        queues: [{ researchId: 501, level: 2, startDate: now - 50000, durationMs: 20000 }]
+      }
+    }
+  };
+  const planComplete = queueHelper.planNextStep(queueState, cacheWithFinishedResearch, now);
+  assert.equal(planComplete.action, 'complete-only');
+  assert.equal(planComplete.wakeAt, rcFinishAt + 1000);
+  assert.equal(planComplete.reason, 'Research Center is upgrading');
+  assert.equal(planComplete.calls[0].name, 'completeResearch');
+
+  // 3. calculateQueueTimeline should shift research estStart after Research Center finishes
+  const timeline = queueHelper.calculateQueueTimeline([], queueState.items, now, cacheWithUpgradingRc);
+  assert.ok(timeline.items[0].estStart >= rcFinishAt, 'Research must not be estimated to start before RC finishes upgrade');
+
+  // 4. Once Research Center upgrade completes (no queues), research starts immediately
+  const cacheRcDone = {
+    buildingStatus: {
+      data: {
+        buildings: [{ buildingId: 43, level: 21 }],
+        queues: []
+      }
+    },
+    researchStatus: {
+      data: {
+        queues: [],
+        completedResearches: []
+      }
+    }
+  };
+  const planReady = queueHelper.planNextStep(queueState, cacheRcDone, now + rcDuration + 2000);
+  assert.equal(planReady.action, 'start');
+  assert.equal(planReady.calls[0].name, 'startResearch');
+  assert.equal(planReady.calls[0].args.researchId, 505);
+});
+

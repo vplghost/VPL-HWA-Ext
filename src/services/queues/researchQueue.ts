@@ -84,10 +84,57 @@ export function getQueueEnd(q: any, now: number = Date.now()): number {
   return start + dur;
 }
 
+export const RESEARCH_CENTER_BUILDING_IDS = [43, 165];
+
+export function extractBuildingQueues(cache: Record<string, any>): any[] {
+  const raw =
+    cache?.buildingStatus?.data?.queues ??
+    cache?.buildingStatus?.data?.queue ??
+    (Array.isArray(cache?.buildingStatus?.data) ? cache.buildingStatus.data : null) ??
+    cache?.building_getQueue?.data?.queues ??
+    cache?.building_getQueue?.data;
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    if (Array.isArray(raw.queues)) return raw.queues;
+    if (
+      Number.isFinite(raw.buildingId) ||
+      Number.isFinite(raw.id) ||
+      Number.isFinite(raw.startDate) ||
+      Number.isFinite(raw.startTime)
+    ) {
+      return [raw];
+    }
+    return Object.values(raw).filter((item) => item && typeof item === 'object');
+  }
+  return [];
+}
+
+export function isResearchCenterUpgrading(
+  cache: Record<string, any>,
+  now: number = Date.now()
+): { upgrading: boolean; wakeAt?: number; buildingId?: number; nextLevel?: number } {
+  const bQueues = extractBuildingQueues(cache);
+  for (const q of bQueues) {
+    const bId = Number((q as any)?.buildingId ?? (q as any)?.id);
+    if (RESEARCH_CENTER_BUILDING_IDS.includes(bId)) {
+      const end = getQueueEnd(q, now);
+      const wakeAt = end > now ? end + 1000 : now + 5000;
+      return {
+        upgrading: true,
+        wakeAt,
+        buildingId: bId,
+        nextLevel: Number((q as any)?.nextLevel ?? (q as any)?.level),
+      };
+    }
+  }
+  return { upgrading: false };
+}
+
 export function calculateQueueTimeline(
   rawQueues: any = [],
   queueItems: any = [],
-  now: number = Date.now()
+  now: number = Date.now(),
+  cache?: Record<string, any>
 ): ResearchQueueTimeline {
   const safeQueues = Array.isArray(rawQueues)
     ? rawQueues
@@ -102,6 +149,11 @@ export function calculateQueueTimeline(
   const inProgress = safeQueues.filter((q: any) => getQueueEnd(q, now) > now);
   let currentCursor =
     inProgress.length > 0 ? Math.max(...inProgress.map((q: any) => getQueueEnd(q, now))) : now;
+
+  const rcUpgrade = cache ? isResearchCenterUpgrading(cache, now) : { upgrading: false };
+  if (rcUpgrade.upgrading && rcUpgrade.wakeAt && rcUpgrade.wakeAt > currentCursor) {
+    currentCursor = rcUpgrade.wakeAt;
+  }
 
   const timeline: ResearchQueueItem[] = [];
   let totalDurationMs = 0;
@@ -208,6 +260,30 @@ export function planNextStep(
         },
       });
     }
+  }
+
+  // If Research Center is upgrading, hold research queue and wait until upgrade completes
+  const rcUpgrade = isResearchCenterUpgrading(cache, now);
+  if (rcUpgrade.upgrading) {
+    if (calls.length > 0) {
+      calls.push({ name: 'getSummary', feature: 'personalResearch', args: {} });
+      return {
+        action: 'complete-only',
+        wakeAt: rcUpgrade.wakeAt ?? now + 5000,
+        calls,
+        skippedItems,
+        remainingItemsAfterSkip: safeItems,
+        reason: 'Research Center is upgrading',
+      };
+    }
+    return {
+      action: 'wait',
+      wakeAt: rcUpgrade.wakeAt ?? now + 5000,
+      calls: [],
+      skippedItems,
+      remainingItemsAfterSkip: safeItems,
+      reason: 'Research Center is upgrading',
+    };
   }
 
   if (queueState?.enabled !== false && safeItems.length > 0 && safeItems[0]) {
@@ -344,6 +420,9 @@ export const researchQueueService = {
   getQueueEnd,
   calculateQueueTimeline,
   extractResearchLevels,
+  extractBuildingQueues,
+  isResearchCenterUpgrading,
+  RESEARCH_CENTER_BUILDING_IDS,
   planNextStep,
   addToQueue,
   removeFromQueue,

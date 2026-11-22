@@ -218,10 +218,17 @@ async function finishResearch(f: any) {
   }
 }
 
+// Research Center Upgrade Status
+const rcUpgradeStatus = computed(() => {
+  return rQueueHelper?.isResearchCenterUpgrading
+    ? rQueueHelper.isResearchCenterUpgrading(cache.value, now.value)
+    : { upgrading: false };
+});
+
 // Timeline
 const queueTimeline = computed(() => {
   if (rQueueHelper?.calculateQueueTimeline) {
-    return rQueueHelper.calculateQueueTimeline(rawQueues.value, researchQueue.value.items, now.value);
+    return rQueueHelper.calculateQueueTimeline(rawQueues.value, researchQueue.value.items, now.value, cache.value);
   }
   let currentEst = now.value;
   if (activeQueues.value.length > 0) {
@@ -681,6 +688,19 @@ async function refreshResearch() {
 
       <!-- Dialog Body -->
       <div id="research-dialog-body" class="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh_-_60px)]">
+        <!-- Research Center Upgrading Warning Banner -->
+        <div
+          v-if="rcUpgradeStatus?.upgrading"
+          id="research-center-upgrading-alert"
+          class="flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-2xs dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <span class="text-base select-none shrink-0 leading-none">⏳</span>
+          <div class="flex-1 leading-relaxed">
+            <strong class="font-semibold text-slate-900 dark:text-slate-100">Research Center is currently upgrading.</strong>
+            <span class="ml-1">Research queue will wait until Research Center finishes upgrading before starting next technology.</span>
+          </div>
+        </div>
+
         <!-- Section 1: Active Research Queue -->
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center justify-between gap-2">

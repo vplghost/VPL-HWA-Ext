@@ -863,11 +863,12 @@ export async function runCityQueue(type: string, tabId?: number, record?: any, c
     if (changedWait)
       await log(
         'wait',
-        'Observed upgrade ends at ' +
+        (plan.reason ? `${plan.reason}. ` : '') +
+          'Observed upgrade ends at ' +
           new Date(observedEnd).toLocaleTimeString() +
           '. Occupancy will be checked again within 60 seconds.',
         'info',
-        { waitUntil: observedEnd, wakeAt: queue.wakeAt }
+        { waitUntil: observedEnd, wakeAt: queue.wakeAt, reason: plan.reason }
       );
     return queue;
   }

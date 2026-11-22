@@ -23,4 +23,5 @@ export interface ResearchQueuePlanResult {
   remainingItemsAfterSkip: ResearchQueueItem[];
   startedItem?: ResearchQueueItem;
   remainingItems?: ResearchQueueItem[];
+  reason?: string;
 }
