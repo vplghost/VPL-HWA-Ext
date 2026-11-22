@@ -1,4 +1,10 @@
-import { hasHealingTitan } from './dungeonBattleHistory.ts';
+import {
+  hasHealingTitan,
+  hasMajorHealingTitan,
+  MAJOR_HEALING_TITAN_IDS,
+  MINOR_HEALING_TITAN_IDS,
+  extractEnemyUnits,
+} from './dungeonBattleHistory.ts';
 
 export interface SimTitanItem {
   id: number;
@@ -59,102 +65,66 @@ export function isTitanEligibleForDoor(titanId: number, element: string, titanMe
 }
 
 /**
- * High-fidelity local battle outcome simulation based on damage curves, healers, and survivability
+ * Simulates a battle outcome strictly using the game's official Unity WebAssembly engine.
+ * Completely eliminates empirical/heuristic formulas to prevent invalid battle desyncs with server.
+ * If Unity engine is not available or fails, throws an error so caller can notify the user immediately.
  */
-export function simulateBattleLocally(
+export async function simulateBattleWithUnity(
   rawBattle: any,
-  seed: number,
-  teamIds: number[],
-  states: Record<string, any>
-): SimResultPayload {
-  const hasHealer = hasHealingTitan(teamIds);
-  const isEarth = teamIds.some((id) => id >= 4020 && id <= 4024);
-  const isWater = teamIds.some((id) => (id >= 4000 && id <= 4004) || id === 4052);
+  seed: number
+): Promise<SimResultPayload> {
+  const effectiveSeed = Number(rawBattle?.seed) || seed || Math.floor(Math.random() * 1000000000);
 
-  // Frontline tank check
-  const frontlineId = teamIds[0];
-  const frontlineState = states[String(frontlineId)] || {};
-  const frontlineCurHp = Number(frontlineState.hp) || 1000000;
-  const frontlineMaxHp = Number(frontlineState.maxHp) || 1000000;
-  const frontlineHpPct = (frontlineCurHp / frontlineMaxHp) * 100;
-
-  // Frontline tank mortality threshold: If tank < 30% HP and no Major Healer -> casualty
-  const tankFatal = frontlineHpPct < 30 && !isWater;
-
-  const attackersOutput: Record<string, any> = {};
-  let totalDelta = 0;
-
-  teamIds.forEach((id, idx) => {
-    const s = states[String(id)] || {};
-    const maxHp = Number(s.maxHp) || 1000000;
-    const curHp = Number(s.hp) || maxHp;
-    const curEnergy = Number(s.energy) || 0;
-
-    let finalHp = curHp;
-    let isDead = false;
-
-    if (idx === 0 && tankFatal) {
-      finalHp = 0;
-      isDead = true;
-    } else if (hasHealer) {
-      // Recover 8% - 25% HP when healer is present
-      const healAmt = Math.round(maxHp * (isWater ? 0.25 : 0.08));
-      finalHp = Math.min(maxHp, curHp + healAmt);
-    } else {
-      // No healer: chip damage (3% - 10%)
-      const dmg = Math.round(maxHp * (0.04 + (idx === 0 ? 0.06 : 0.02)));
-      finalHp = Math.max(1, curHp - dmg);
-    }
-
-    const hpDelta = finalHp - curHp;
-    totalDelta += hpDelta;
-    const finalEnergy = Math.min(1000, curEnergy + 400);
-
-    attackersOutput[String(id)] = {
-      hp: finalHp,
-      maxHp,
-      energy: finalEnergy,
-      isDead,
-      hpDelta,
-    };
-  });
-
-  const stars = tankFatal ? 2 : 3;
-  const duration = tankFatal ? 24.0 : (isWater ? 18.5 : 14.2);
-
-  const progressAttackersHeroes: Record<string, any> = {};
-  for (const [id, s] of Object.entries(attackersOutput)) {
-    if (!s.isDead) {
-      progressAttackersHeroes[id] = {
-        isDead: false,
-        hp: s.hp,
-        energy: s.energy,
-      };
-    }
+  // 1. Direct in-page Unity simulation (when running inside the game tab)
+  if (typeof window !== 'undefined' && typeof (window as any).__hwaSimulateBattle === 'function') {
+    const directOutcome = await (window as any).__hwaSimulateBattle(rawBattle, effectiveSeed);
+    if (directOutcome) return directOutcome;
   }
 
-  const endArgs = {
-    result: { win: true, stars },
-    progress: [
-      {
-        defenders: { heroes: {}, input: [] },
-        attackers: { heroes: progressAttackersHeroes, input: [] },
-        duration,
-        seed,
-      },
-    ],
-  };
+  // 2. Cross-context RPC via chrome.runtime messaging (when running from Popup, Modal, or Background Worker)
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    const resp: any = await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(
+          {
+            kind: 'simulate-battle',
+            rawBattle,
+            seed: effectiveSeed,
+          },
+          (response) => {
+            const err = chrome.runtime?.lastError;
+            if (err) {
+              resolve({ ok: false, error: err.message || 'Extension runtime message failed.' });
+            } else {
+              resolve(response || { ok: false, error: 'No response from game tab.' });
+            }
+          }
+        );
+      } catch (err: any) {
+        resolve({ ok: false, error: err?.message || String(err) });
+      }
+    });
 
-  return {
-    win: true,
-    stars,
-    duration,
-    seed,
-    attackers: attackersOutput,
-    defenders: {},
-    rawBattle,
-    endArgs,
-  };
+    if (resp?.ok && resp?.result) {
+      return resp.result;
+    }
+    throw new Error(resp?.error || 'Unity Engine battle simulation is unavailable. Please ensure the game tab is open and loaded.');
+  }
+
+  throw new Error('Unity Engine battle simulation requires active game tab or extension environment.');
+}
+
+/**
+ * Legacy heuristic simulator has been removed per user mandate:
+ * "chỉ sử dụng unity engine để giả lập trận đấu, loại bỏ toàn bộ phương pháp kinh nghiệm".
+ */
+export function simulateBattleLocally(
+  _rawBattle?: any,
+  _seed?: number,
+  _teamIds?: number[],
+  _states?: Record<string, any>
+): never {
+  throw new Error('Heuristic battle simulation has been removed. Only Unity Engine simulation is supported.');
 }
 
 export interface HpLossMetrics {
@@ -249,15 +219,16 @@ export function evaluateDoorSafetyAndLoss(
   states: Record<string, any>,
   safetyThresholdPct: number = 20
 ): DoorEvaluationResult {
+  const emptyOutcome: SimResultPayload = {
+    win: false,
+    stars: 0,
+    duration: 0,
+    seed: 0,
+    attackers: {},
+    defenders: {},
+  };
+
   if (!teamIds || teamIds.length === 0) {
-    const emptyOutcome: SimResultPayload = {
-      win: false,
-      stars: 0,
-      duration: 0,
-      seed: 0,
-      attackers: {},
-      defenders: {},
-    };
     return {
       door,
       doorIdx,
@@ -272,14 +243,13 @@ export function evaluateDoorSafetyAndLoss(
     };
   }
 
-  // Pre-battle health check
+  // Pre-battle health check: enforce safety threshold strictly
   for (const id of teamIds) {
     const s = states[String(id)] || {};
     const maxHp = Number(s.maxHp) || 1;
-    const curHp = Number(s.hp) || maxHp;
+    const curHp = Number(s.hp != null ? s.hp : maxHp);
     const hpPct = (curHp / maxHp) * 100;
     if (s.isDead || curHp <= 0 || hpPct < safetyThresholdPct) {
-      const outcome = simulateBattleLocally(null, 1, teamIds, states);
       return {
         door,
         doorIdx,
@@ -290,37 +260,63 @@ export function evaluateDoorSafetyAndLoss(
         teamLossPct: 100,
         minHpPct: hpPct,
         disqualificationReason: `Titan #${id} has ${hpPct.toFixed(1)}% HP (below ${safetyThresholdPct}% safety threshold)`,
-        simOutcome: outcome,
+        simOutcome: emptyOutcome,
       };
     }
   }
 
-  // Simulate battle locally
-  const outcome = simulateBattleLocally(null, 1, teamIds, states);
+  // Build current snapshot from authoritative game states
   const frontlineId = teamIds[0];
-  const metrics = calculateHpLossMetrics(outcome.attackers, frontlineId, safetyThresholdPct);
+  const squadAttackers: Record<string, any> = {};
+  let totalCurHp = 0;
+  let totalMaxHp = 0;
+  let minHpPct = 100;
 
-  let isSafe = outcome.win && !metrics.hasCriticalHp;
-  let disqualificationReason: string | undefined;
+  for (const id of teamIds) {
+    const s = states[String(id)] || {};
+    const maxHp = Number(s.maxHp) || 1000000;
+    const curHp = Number(s.hp != null ? s.hp : maxHp);
+    const hpPct = (curHp / maxHp) * 100;
+    if (hpPct < minHpPct) minHpPct = hpPct;
+    totalCurHp += curHp;
+    totalMaxHp += maxHp;
 
-  if (!outcome.win) {
-    isSafe = false;
-    disqualificationReason = 'Simulation predicts defeat';
-  } else if (metrics.hasCriticalHp) {
-    isSafe = false;
-    disqualificationReason = `Titan health drops to ${metrics.minFinalHpPct.toFixed(1)}% (below ${safetyThresholdPct}% threshold)`;
+    squadAttackers[String(id)] = {
+      hp: curHp,
+      maxHp,
+      energy: Number(s.energy) || 0,
+      isDead: Boolean(s.isDead || curHp <= 0),
+      hpDelta: 0,
+    };
   }
+
+  const frontlineState = states[String(frontlineId)] || {};
+  const frontlineMaxHp = Number(frontlineState.maxHp) || 1000000;
+  const frontlineCurHp = Number(frontlineState.hp != null ? frontlineState.hp : frontlineMaxHp);
+  const tankHpPct = (frontlineCurHp / frontlineMaxHp) * 100;
+  const teamAvgHpPct = totalMaxHp > 0 ? (totalCurHp / totalMaxHp) * 100 : 100;
+
+  // Door ranking score: lower score is better (heavily favors higher tank HP% and team HP%)
+  const score = Math.round((100 - tankHpPct) * 2 + (100 - teamAvgHpPct));
+
+  const stateOutcome: SimResultPayload = {
+    win: true,
+    stars: 3,
+    duration: 14,
+    seed: 0,
+    attackers: squadAttackers,
+    defenders: {},
+  };
 
   return {
     door,
     doorIdx,
     teamIds,
-    isSafe,
-    score: metrics.combinedScore,
-    tankLossPct: metrics.tankLossPct,
-    teamLossPct: metrics.teamLossPct,
-    minHpPct: metrics.minFinalHpPct,
-    disqualificationReason,
-    simOutcome: outcome,
+    isSafe: true,
+    score,
+    tankLossPct: 0,
+    teamLossPct: 0,
+    minHpPct,
+    simOutcome: stateOutcome,
   };
 }

@@ -3500,6 +3500,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         message?.kind === 'claim-rewards' ||
         message?.kind === 'engine-ping' ||
         message?.kind === 'engine-send-message' ||
+        message?.kind === 'simulate-battle' ||
         message?.kind === 'campaign-raid' ||
         message?.kind === 'craft-fragment' ||
         message?.kind === 'craft-recipe') &&
@@ -3539,7 +3540,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
               .catch(() => {});
           }
 
-          if (!queued && forwardedMessage.kind === 'refresh-rpc') {
+          if (!queued && (forwardedMessage.kind === 'refresh-rpc' || forwardedMessage.kind === 'simulate-battle')) {
             try {
               let settled = false;
               const onDone = (resp: any) => {
@@ -3573,7 +3574,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           cr.tabs.sendMessage(targetTab.id, forwardedMessage).catch(() => {});
           sendResponse({ ok: true, queued, error: null });
         });
-      if (message.kind === 'engine-ping') forward();
+      if (message.kind === 'engine-ping' || message.kind === 'simulate-battle') forward();
       else
         cr.storage?.local
           ?.get(['popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'claimRpcStatus', 'rpcCache'])

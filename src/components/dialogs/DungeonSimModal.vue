@@ -7,7 +7,7 @@ import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import UnitStars from '@/src/components/common/UnitStars.vue';
 import { getEffectiveTitanStates, DEFAULT_TITAN_POOLS } from '@/src/services/queues/dungeonAutomation';
 import {
-  simulateBattleLocally,
+  simulateBattleWithUnity,
   DUAL_ELEMENT_TITANS,
   DUNGEON_SAVED_LINEUPS_KEY,
   isTitanEligibleForDoor,
@@ -379,18 +379,13 @@ async function handleRunSimulation() {
 
     const seed = Number(resPayload.seed) || Math.floor(Math.random() * 1000000000);
 
-    let outcome: SimResultPayload;
-
-    if (typeof window !== 'undefined' && (window as any).__hwaSimulateBattle) {
-      outcome = await (window as any).__hwaSimulateBattle(resPayload, seed);
-    } else {
-      // High-Fidelity Simulation Heuristic based on empirical 31-battle dataset
-      outcome = simulateBattleLocally(resPayload, seed, selectedTitanIds.value, props.titanStates);
-    }
+    // Strictly simulate via Unity WebAssembly Engine; no heuristic fallback
+    const outcome = await simulateBattleWithUnity(resPayload, seed);
 
     simResult.value = outcome;
   } catch (err: any) {
-    errorMessage.value = `Simulation error: ${err.message || String(err)}`;
+    simResult.value = null;
+    errorMessage.value = `Unity Engine simulation error: ${err.message || String(err)}`;
   } finally {
     isSimulating.value = false;
   }

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  simulateBattleWithUnity,
   simulateBattleLocally,
   calculateHpLossMetrics,
   evaluateDoorSafetyAndLoss,
@@ -13,6 +14,14 @@ import {
 } from '../src/services/queues/dungeonAutomationRunner.ts';
 
 describe('Dungeon Simulator & Automation Engine', () => {
+  describe('Heuristic Elimination & Unity Simulation Enforcement', () => {
+    it('throws when simulateBattleLocally is called, confirming heuristic removal', () => {
+      assert.throws(
+        () => simulateBattleLocally(),
+        /Heuristic battle simulation has been removed\. Only Unity Engine simulation is supported\./
+      );
+    });
+  });
   describe('Dual Element Titans & Door Eligibility', () => {
     it('allows Orm (4052) in Water doors as dual element', () => {
       assert.equal(isTitanEligibleForDoor(4052, 'water', { element: 'spirit' }), true);
@@ -220,6 +229,21 @@ describe('Dungeon Simulator & Automation Engine', () => {
         return { results: [] };
       };
 
+      globalThis.window = {
+        __hwaSimulateBattle: async (_rawBattle, seed) => ({
+          win: true,
+          stars: 3,
+          duration: 12.5,
+          seed,
+          attackers: {},
+          defenders: {},
+          endArgs: {
+            result: { win: true, stars: 3 },
+            progress: [{ duration: 12.5 }]
+          }
+        })
+      };
+
       const step = await executeDungeonAutomationStep({
         cache: mockCache,
         dispatchRpc,
@@ -231,6 +255,53 @@ describe('Dungeon Simulator & Automation Engine', () => {
       assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonStartBattle'), true);
       assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonEndBattle'), true);
       assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonGetInfo'), true);
+    });
+
+    it('halts automation and reports error when Unity Engine simulation fails', async () => {
+      const mockCache = {
+        value: {
+          dungeonStatus: {
+            data: {
+              floorNumber: 55,
+              currentFloorDoors: [
+                { attackerType: 'water', power: 300000 },
+              ],
+              states: {
+                titans: {
+                  '4000': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4001': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4002': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4003': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4004': { hp: 1000000, maxHp: 1000000, isDead: false },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const dispatchRpc = async (calls) => {
+        if (calls[0]?.name === 'dungeonStartBattle') {
+          return { results: [{ result: { response: { seed: 12345 } } }] };
+        }
+        return { results: [] };
+      };
+
+      // Mock Unity engine throwing error
+      globalThis.window = {
+        __hwaSimulateBattle: async () => {
+          throw new Error('WASM table or memory not accessible');
+        }
+      };
+
+      const step = await executeDungeonAutomationStep({
+        cache: mockCache,
+        dispatchRpc,
+        safetyThresholdPct: 20,
+      });
+
+      assert.equal(step.stopped, true);
+      assert.match(step.stopReason, /Unity battle simulation failed/);
     });
   });
 });

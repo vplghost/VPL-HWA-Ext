@@ -1,6 +1,6 @@
 import { getTitanMetadata } from '../../utils/metadata.ts';
 import {
-  simulateBattleLocally,
+  simulateBattleWithUnity,
   evaluateDoorSafetyAndLoss,
   isTitanEligibleForDoor,
   type DoorEvaluationResult,
@@ -199,12 +199,27 @@ export async function executeDungeonAutomationStep(
 
   const seed = Number(startPayload.seed) || Math.floor(Math.random() * 1000000000);
 
-  // 2. Simulate outcome locally or through game engine
+  // 2. Simulate outcome strictly using Unity Engine (zero heuristic fallback)
   let outcome: SimResultPayload;
-  if (typeof window !== 'undefined' && (window as any).__hwaSimulateBattle) {
-    outcome = await (window as any).__hwaSimulateBattle(startPayload, seed);
-  } else {
-    outcome = simulateBattleLocally(startPayload, seed, bestDoor.teamIds, titanStates);
+  try {
+    outcome = await simulateBattleWithUnity(startPayload, seed);
+  } catch (err: any) {
+    return {
+      stopped: true,
+      stopReason: `Unity battle simulation failed: ${err.message || String(err)}. Aborted to protect titans.`,
+      chosenEvaluation: bestDoor,
+      evaluations,
+    };
+  }
+
+  // Abort if battle was lost or less than 3 stars to avoid titan casualty
+  if (!outcome.win || outcome.stars < 3) {
+    return {
+      stopped: true,
+      stopReason: `Unity simulation predicted defeat or non-3-star outcome (${outcome.stars} stars). Battle aborted without loss.`,
+      chosenEvaluation: bestDoor,
+      evaluations,
+    };
   }
 
   // 3. End battle

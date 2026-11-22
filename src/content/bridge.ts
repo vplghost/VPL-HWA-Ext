@@ -98,6 +98,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   const timeoutManager = createBridgeTimeoutManager(win);
   let bridgeContextInvalidated = false;
   const pendingRpcRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
+  const pendingSimRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
   const getNow = () => (typeof win.Date?.now === 'function' ? win.Date.now() : Date.now());
 
   function handleContextInvalidated(err: any, notifyUser = true) {
@@ -108,6 +109,10 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         try { clearTimeout(req.timeout); req.resolve({ ok: false, error: 'Extension context invalidated.' }); } catch (_) {}
       }
       pendingRpcRequests.clear();
+      for (const req of pendingSimRequests.values()) {
+        try { clearTimeout(req.timeout); req.resolve({ ok: false, error: 'Extension context invalidated.' }); } catch (_) {}
+      }
+      pendingSimRequests.clear();
       if (!notifyUser) return;
       const notify = typeof win.alert === 'function' ? win.alert : console.warn;
       notify('HWA Helper extension was updated or reloaded. Please refresh this game page to reconnect.');
@@ -274,6 +279,21 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       return;
     }
 
+    if (event.data.kind === 'simulate-battle-result') {
+      const simId = event.data.simId;
+      if (simId && pendingSimRequests.has(simId)) {
+        const pending = pendingSimRequests.get(simId);
+        pendingSimRequests.delete(simId);
+        if (pending?.timeout) clearTimeout(pending.timeout);
+        pending?.resolve?.({
+          ok: event.data.ok === true,
+          result: event.data.result || null,
+          error: event.data.error || null
+        });
+      }
+      return;
+    }
+
     if (event.data.kind === 'interaction-record') {
       if (recordingActive && event.data.entry) saveInteraction(event.data.entry);
       return;
@@ -374,6 +394,24 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
           param: message.param
         }, win.location.origin);
         sendResponse?.({ ok: true });
+        return true;
+      }
+      if (message?.kind === 'simulate-battle') {
+        const simId = 'sim_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const timeout = setTimeout(() => {
+          if (pendingSimRequests.has(simId)) {
+            pendingSimRequests.delete(simId);
+            sendResponse?.({ ok: false, error: 'Battle simulation timed out in game page bridge.' });
+          }
+        }, 30000);
+        pendingSimRequests.set(simId, { resolve: sendResponse, timeout });
+        win.postMessage({
+          source: 'hwa-helper-control',
+          kind: 'simulate-battle',
+          simId,
+          rawBattle: message.rawBattle,
+          seed: message.seed
+        }, win.location.origin);
         return true;
       }
     });

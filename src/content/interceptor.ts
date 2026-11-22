@@ -539,35 +539,216 @@ export function installInterceptor(customWindow?: any): void {
     if (win.__hwaSimulateBattle) return;
 
     win.__hwaSimulateBattle = async function (rawBattle: any, seed: number) {
+      const activeInst = instance || activeUnityInstance || findActiveUnityInstance(win, doc);
+      if (!activeInst) {
+        throw new Error('Unity game instance not found. Make sure the game is loaded in this tab.');
+      }
+
+      const mod = activeInst?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule || activeInst;
+      const asm = mod?.asm || mod;
+      if (!asm) {
+        throw new Error('Unity WebAssembly asm not found');
+      }
+
+      const values = Object.values(asm);
+      const table = (values.find((v: any) => v instanceof WebAssembly.Table) || (mod as any).wasmTable) as WebAssembly.Table | undefined;
+      const memory = (values.find((v: any) => v instanceof WebAssembly.Memory) || (mod as any).wasmMemory) as WebAssembly.Memory | undefined;
+
+      if (!table || !memory) {
+        throw new Error('WASM table or memory not accessible in Unity engine');
+      }
+
+      const heap = {
+        buffer: memory.buffer,
+        u8: new Uint8Array(memory.buffer),
+        u16: new Uint16Array(memory.buffer),
+        i32: new Int32Array(memory.buffer),
+        u32: new Uint32Array(memory.buffer)
+      };
+
+      const malloc = (asm as any).Ol || (asm as any).malloc || (asm as any)._malloc;
+      const free = (asm as any).Pl || (asm as any).free || (asm as any)._free;
+      if (typeof malloc !== 'function' || typeof free !== 'function') {
+        throw new Error('WASM malloc/free memory primitives not found');
+      }
+
+      const sym = {
+        Play_ctor: 11594,
+        Play_start: 469995,
+        Play_get_result: 469999,
+        Play_createBattleData: 175082,
+        Play_executeBattle: 175078,
+        Play_createResult: 175081,
+        Play_dispose: 175079,
+        Presets_clanWarReplay: 174207,
+        Presets_get_isReplay: 468101,
+        BattleData_serializeResult: 49386,
+        BattleData_getStars: 28182,
+        JSON_Parse: 1763,
+        DataObject_fromObject: 15292,
+        Type_GetType: 38793,
+        GetUninitializedObject: 26825,
+        Object_ToString: 16323,
+        GCHandle_Alloc: 2129,
+        GCHandle_FreeHandle: 1845
+      };
+
+      const fn = (name: keyof typeof sym) => {
+        const idx = sym[name];
+        const func = table.get(idx);
+        if (typeof func !== 'function') throw new Error(`Unity engine function '${name}' (index ${idx}) not available in WASM table`);
+        return func;
+      };
+
+      const invoke = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0);
+      const invokePtr = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0) >>> 0;
+
+      // Read string from IL2CPP System.String pointer
+      const readString = (ptr: number): string | null => {
+        if (!ptr) return null;
+        const len = heap.i32[(ptr + 8) >>> 2];
+        if (len < 0 || len > 2000000) return null;
+        const u16Start = (ptr + 12) >>> 1;
+        let s = '';
+        for (let i = 0; i < len; i += 8192) {
+          s += String.fromCharCode.apply(null, Array.from(heap.u16.subarray(u16Start + i, u16Start + Math.min(len, i + 8192))));
+        }
+        return s;
+      };
+
+      // Create presets for battle
+      // In HWA client, Presets_clanWarReplay: 0 = Titan replay, 1 = Hero replay
+      const isTitan = String(rawBattle?.type || '').toLowerCase().includes('titan');
+      const presetPtr = invokePtr('Presets_clanWarReplay', isTitan ? 0 : 1);
+      if (!presetPtr) throw new Error('Failed to create BattlePresets for simulation');
+
+      // Learn String class pointer from Object.ToString(presetPtr)
+      const strSamplePtr = invokePtr('Object_ToString', presetPtr);
+      if (!strSamplePtr) throw new Error('Failed to obtain String class descriptor from Object.ToString');
+      const stringClassPtr = heap.u32[strSamplePtr >>> 2];
+
+      const forgeString = (str: string): number => {
+        const len = str.length;
+        const ptr = malloc(16 + 2 * len) >>> 0;
+        if (!ptr) throw new Error('malloc failed for forgeString');
+        heap.u32[ptr >>> 2] = stringClassPtr;
+        heap.u32[(ptr + 4) >>> 2] = 0;
+        heap.i32[(ptr + 8) >>> 2] = len;
+        const u16Start = (ptr + 12) >>> 1;
+        for (let i = 0; i < len; i++) {
+          heap.u16[u16Start + i] = str.charCodeAt(i);
+        }
+        heap.u16[u16Start + len] = 0;
+        return ptr;
+      };
+
+      const rawJson = JSON.stringify(Object.assign({}, rawBattle, { seed: seed >>> 0 }));
+      const rawJsonStrPtr = forgeString(rawJson);
+      let jsonNodePtr = 0;
       try {
-        const mod = instance?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule;
-        const asm = mod?.asm;
-        if (!asm) {
-          throw new Error('Unity WebAssembly asm not found');
+        jsonNodePtr = invokePtr('JSON_Parse', rawJsonStrPtr);
+      } finally {
+        free(rawJsonStrPtr);
+      }
+      if (!jsonNodePtr) throw new Error('JSON_Parse returned null for rawBattle payload');
+
+      const dataObjPtr = invokePtr('DataObject_fromObject', jsonNodePtr);
+      if (!dataObjPtr) throw new Error('DataObject_fromObject returned null');
+
+      // Allocate BattleInstantPlay
+      const playTypeNamePtr = forgeString('BattleInstantPlay');
+      let playTypePtr = 0;
+      try {
+        playTypePtr = invokePtr('Type_GetType', playTypeNamePtr);
+      } finally {
+        free(playTypeNamePtr);
+      }
+      if (!playTypePtr) throw new Error('BattleInstantPlay type not found in Unity IL2CPP runtime');
+
+      const playPtr = invokePtr('GetUninitializedObject', playTypePtr);
+      if (!playPtr) throw new Error('Could not instantiate BattleInstantPlay object');
+
+      const hPlay = invokePtr('GCHandle_Alloc', playPtr);
+      const hPresets = invokePtr('GCHandle_Alloc', presetPtr);
+
+      try {
+        // Construct BattleInstantPlay(dataObj, presets, 0, 0, 0)
+        invoke('Play_ctor', playPtr, dataObjPtr, presetPtr, 0, 0, 0);
+        invoke('Play_start', playPtr);
+
+        // Await completion via Play_get_result polling
+        let resultHandle = 0;
+        const startWait = Date.now();
+        while (!resultHandle && Date.now() - startWait < 5000) {
+          resultHandle = invokePtr('Play_get_result', playPtr);
+          if (!resultHandle) {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+          }
         }
 
-        const values = Object.values(asm);
-        const table = values.find((v: any) => v instanceof WebAssembly.Table) as WebAssembly.Table | undefined;
-        const memory = values.find((v: any) => v instanceof WebAssembly.Memory) as WebAssembly.Memory | undefined;
+        const battleDataPtr = invokePtr('Play_createBattleData', playPtr, dataObjPtr, 1);
+        if (!battleDataPtr) throw new Error('Play_createBattleData returned null');
 
-        if (!table || !memory) {
-          throw new Error('WASM table or memory not accessible');
+        invoke('Play_executeBattle', playPtr);
+        invoke('Play_createResult', playPtr);
+
+        const resultStrPtr = invokePtr('BattleData_serializeResult', battleDataPtr);
+        const resultJsonStr = readString(resultStrPtr);
+        if (!resultJsonStr) throw new Error('BattleData_serializeResult returned empty string');
+
+        const parsedProgress = JSON.parse(resultJsonStr);
+        const stars = Number(invoke('BattleData_getStars', battleDataPtr)) || 0;
+        const win = stars > 0;
+
+        // Map attackers and defenders state from progress
+        const attackersOut: Record<string, any> = {};
+        const rawAttackers = rawBattle?.attackers || {};
+        const progAttackers = parsedProgress?.attackers?.heroes || {};
+
+        for (const [idStr, rawAttacker] of Object.entries(rawAttackers) as any) {
+          const progHero = progAttackers[idStr] || {};
+          const maxHp = Number(rawAttacker.hp || rawAttacker.maxHp || 1000000);
+          const finalHp = Number(progHero.hp != null ? progHero.hp : (rawAttacker.state?.hp != null ? rawAttacker.state.hp : maxHp));
+          const initHp = Number(rawAttacker.state?.hp != null ? rawAttacker.state.hp : maxHp);
+          const hpDelta = finalHp - initHp;
+          attackersOut[idStr] = {
+            hp: finalHp,
+            maxHp,
+            energy: Number(progHero.energy || rawAttacker.state?.energy || 0),
+            isDead: Boolean(progHero.isDead || finalHp <= 0),
+            hpDelta
+          };
         }
 
-        const heap = {
-          u8: new Uint8Array(memory.buffer),
-          u16: new Uint16Array(memory.buffer),
-          i32: new Int32Array(memory.buffer),
-          u32: new Uint32Array(memory.buffer)
+        const defendersOut: Record<string, any> = {};
+        const progDefenders = parsedProgress?.defenders?.heroes || {};
+        for (const [idStr, progDef] of Object.entries(progDefenders) as any) {
+          defendersOut[idStr] = {
+            hp: Number(progDef.hp || 0),
+            isDead: Boolean(progDef.isDead || progDef.hp <= 0)
+          };
+        }
+
+        const duration = Number(parsedProgress?.duration) || 0;
+
+        return {
+          win,
+          stars,
+          duration,
+          seed,
+          attackers: attackersOut,
+          defenders: defendersOut,
+          progress: parsedProgress,
+          rawBattle,
+          endArgs: {
+            result: { win, stars },
+            progress: [parsedProgress]
+          }
         };
-
-        const malloc = (asm as any).Ol || (asm as any).malloc || (asm as any)._malloc;
-        const free = (asm as any).Pl || (asm as any).free || (asm as any)._free;
-
-        // If malloc is available, we can execute via WASM or parse
-        return null;
-      } catch (err) {
-        return null;
+      } finally {
+        try { invoke('Play_dispose', playPtr); } catch (_) {}
+        try { if (hPlay) invoke('GCHandle_FreeHandle', hPlay); } catch (_) {}
+        try { if (hPresets) invoke('GCHandle_FreeHandle', hPresets); } catch (_) {}
       }
     };
   }
@@ -910,6 +1091,38 @@ export function installInterceptor(customWindow?: any): void {
         error,
         call: { objectName, methodName, param }
       }, loc.origin);
+      return;
+    }
+
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'simulate-battle') {
+      const { simId, rawBattle, seed } = event.data;
+      (async () => {
+        try {
+          if (!win.__hwaSimulateBattle) {
+            setupWasmSimulationBridge(activeUnityInstance);
+          }
+          if (typeof win.__hwaSimulateBattle !== 'function') {
+            throw new Error('Unity battle simulation engine is not initialized or ready. Please reload the game page.');
+          }
+          const result = await win.__hwaSimulateBattle(rawBattle, seed);
+          if (!result) throw new Error('Unity simulation produced empty result.');
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'simulate-battle-result',
+            simId,
+            ok: true,
+            result
+          }, loc.origin);
+        } catch (err: any) {
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'simulate-battle-result',
+            simId,
+            ok: false,
+            error: err?.message || String(err)
+          }, loc.origin);
+        }
+      })();
       return;
     }
   });
