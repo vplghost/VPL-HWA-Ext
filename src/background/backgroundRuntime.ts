@@ -27,6 +27,7 @@ import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { eventCatalogService } from '../services/eventCatalogService.ts';
 import { getEncounterKey } from '../utils/dungeonBattleHistory.ts';
 import { buildAutoTrainCalls } from '../utils/troops.ts';
+import { observedToday } from '../composables/activityState.ts';
 
 export const RECORD_STATE_KEY = 'recordingState';
 export const RECORD_PREFIX = 'record:';
@@ -3244,6 +3245,13 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         const dungeonData = stored.rpcCache?.dungeonStatus?.data;
         if (!dungeonData || !Array.isArray(dungeonData.currentFloorDoors) || !dungeonData.currentFloorDoors.length) {
           return { ok: false, error: 'Open Titan Dungeon interface in the game before starting automation.' };
+        }
+        const isToday = stored.rpcCache?.dungeonStatus?.updatedAt
+          ? observedToday(stored.rpcCache.dungeonStatus, Date.now(), stored.rpcCache?.questResetStatus?.data?.nextDayAt)
+          : true;
+        if (!isToday) {
+          dungeonAutomationService.resetTitanStates(stored.rpcCache);
+          await cr.storage?.local?.set({ [CACHE_KEY]: stored.rpcCache });
         }
         const accountId = stored.rpcCache?.accountStatus?.data?.id ?? stored.rpcCache?.userGetInfo?.data?.id;
         const baseSettings =

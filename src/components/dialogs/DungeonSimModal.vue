@@ -9,6 +9,7 @@ import {
   HEALING_TITAN_IDS,
   buildSimulatedEndBattleArgs,
 } from '@/src/utils/dungeonBattleHistory';
+import { getEffectiveTitanStates } from '@/src/services/queues/dungeonAutomation';
 
 export interface SimTitanItem {
   id: number;
@@ -91,7 +92,9 @@ const enemies = computed(() => {
 
 // Full titan pool
 const availableTitans = computed<SimTitanItem[]>(() => {
-  const states = props.titanStates || {};
+  const states = props.titanStates && Object.keys(props.titanStates).length > 0
+    ? props.titanStates
+    : getEffectiveTitanStates(cache.value);
   const titanRoster = cache.value.titanGetAll?.data || {};
 
   const allIds = new Set<string>([...Object.keys(states), ...Object.keys(titanRoster)]);

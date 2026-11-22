@@ -20,6 +20,7 @@ import {
   titanArtifactLevelCosts as typedTitanArtifactLevelCosts,
 } from '../../data/titanMetadata.ts';
 import { getTitanLevelFromExp as typedGetTitanLevelFromExp } from '../../data/titanLevelData.ts';
+import { observedToday } from '../../composables/activityState.ts';
 
 const getNameMap = (): any => typedNameMap;
 const getMineTypes = (): any => typedMineTypes;
@@ -5281,14 +5282,37 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
 
         if (entry.key === 'dungeonStatus') {
           const previous = next.dungeonStatus?.data || {};
-          const isNewDay = next.dungeonStatus?.updatedAt && entry.updatedAt &&
-            new Date(next.dungeonStatus.updatedAt).toDateString() !== new Date(entry.updatedAt).toDateString();
+          const nextReset = next.questResetStatus?.data?.nextDayAt;
+          const entryTime = entry.updatedAt ? new Date(entry.updatedAt).getTime() : 0;
+          const prevTime = next.dungeonStatus?.updatedAt ? new Date(next.dungeonStatus.updatedAt).getTime() : 0;
+          const isDateDiff = prevTime > 0 && entryTime > 0 &&
+            new Date(prevTime).toDateString() !== new Date(entryTime).toDateString();
+          const isResetDiff = prevTime > 0 && entryTime > 0 && Number.isFinite(nextReset) &&
+            !observedToday({ updatedAt: prevTime }, entryTime, nextReset);
+          const isNewDay = isDateDiff || isResetDiff;
           const isGetInfo = entry.method === 'dungeonGetInfo';
 
           let mergedTitans;
           if (isNewDay) {
             // Daily rest reset: clear fallen titan states and restore fresh HP/energy
-            mergedTitans = entry.data.states?.titans ? { ...entry.data.states.titans } : {};
+            if (isGetInfo) {
+              const rawTitans = entry.data.states?.titans || {};
+              mergedTitans = {};
+              for (const [id, state] of Object.entries(rawTitans) as [string, any][]) {
+                const maxHp = Number(state?.maxHp) || Number(state?.hp) || 1000000;
+                mergedTitans[id] = {
+                  ...state,
+                  hp: maxHp,
+                  maxHp,
+                  energy: 0,
+                  isDead: false,
+                };
+              }
+            } else if (entry.method === 'dungeonEndBattle') {
+              mergedTitans = { ...(entry.data.states?.titans || {}) };
+            } else {
+              mergedTitans = {};
+            }
           } else if (isGetInfo && entry.data.states?.titans !== undefined) {
             // Full snapshot from dungeonGetInfo
             mergedTitans = { ...entry.data.states.titans };

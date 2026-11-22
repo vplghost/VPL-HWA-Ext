@@ -20,6 +20,7 @@ import {
   hasHealingTitan,
   HEALING_TITAN_IDS,
 } from '@/src/utils/dungeonBattleHistory';
+import { getEffectiveTitanStates } from '@/src/services/queues/dungeonAutomation';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -118,9 +119,13 @@ const doors = computed<any[]>(() => {
     });
 });
 
+const effectiveTitanStates = computed(() => {
+  return getEffectiveTitanStates(cache.value);
+});
+
 const titanEntries = computed(() => {
-  const titans = dungeonData.value.states?.titans || {};
-  return Object.entries(titans).map(([id, state]: [string, any]) => {
+  const states = effectiveTitanStates.value;
+  return Object.entries(states).map(([id, state]: [string, any]) => {
     const meta = getTitanMetadata(id);
     const maxHp = state.maxHp || 1;
     const hp = Math.max(0, state.hp || 0);
@@ -140,6 +145,9 @@ const titanEntries = computed(() => {
       energyPct,
       isDead,
     };
+  }).sort((a, b) => {
+    if (a.isDead !== b.isDead) return a.isDead ? 1 : -1;
+    return Number(a.id) - Number(b.id);
   });
 });
 
@@ -236,7 +244,7 @@ async function loadHistory() {
 
 function getDoorMatch(door: any) {
   if (typeof findMatchingEncounter !== 'function') return null;
-  const titanStates = dungeonData.value.states?.titans || {};
+  const titanStates = effectiveTitanStates.value;
   return findMatchingEncounter(door.enemies || door.team || [], titanStates, mergedBattleHistory.value);
 }
 
@@ -1089,7 +1097,7 @@ function handleImgError(e: Event) {
       :door="activeSimDoor"
       :door-idx="activeSimDoorIdx"
       :floor-number="floorNumber"
-      :titan-states="dungeonData.states?.titans || {}"
+      :titan-states="effectiveTitanStates"
       @battle-submitted="handleSimBattleSubmitted"
     />
   </Teleport>

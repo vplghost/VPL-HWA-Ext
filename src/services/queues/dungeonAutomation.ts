@@ -4,6 +4,7 @@ import type {
   DungeonPlanResult,
 } from '../../types/game/dungeonAutomation.ts';
 import { titanMetadata } from '../../data/titanMetadata.ts';
+import { observedToday } from '../../composables/activityState.ts';
 
 export const DEFAULT_DOOR_PRIORITY: string[] = ['prime', 'water', 'mixed', 'neutral', 'earth', 'fire'];
 export const DEFAULT_ATTACKER_PRIORITY: string[] = ['water', 'mixed', 'neutral', 'earth', 'fire'];
@@ -29,6 +30,66 @@ export function isTitanAlive(titanState: any): boolean {
   if (titanState.isDead === true) return false;
   if (typeof titanState.hp === 'number' && titanState.hp <= 0) return false;
   return true;
+}
+
+/**
+ * Resolves the effective in-dungeon status for titans, handling daily rest reset.
+ * At the start of a new day, all titans are restored to full HP (100%), energy 0, and alive (isDead: false).
+ */
+export function getEffectiveTitanStates(
+  cache: any,
+  now = Date.now()
+): Record<string, { hp: number; maxHp: number; energy: number; isDead: boolean }> {
+  const dungeonEntry = cache?.dungeonStatus;
+  const dungeonData = dungeonEntry?.data || cache?.dungeonGetInfo?.data || {};
+  const nextReset = cache?.questResetStatus?.data?.nextDayAt;
+  const hasUpdatedAt = Boolean(dungeonEntry?.updatedAt);
+  const isToday = hasUpdatedAt ? observedToday(dungeonEntry, now, nextReset) : true;
+
+  const roster = cache?.titanGetAll?.data || {};
+  const states = dungeonData?.states?.titans || {};
+  const effective: Record<string, { hp: number; maxHp: number; energy: number; isDead: boolean }> = {};
+
+  const allIds = new Set<string>([...Object.keys(states), ...Object.keys(roster)]);
+
+  for (const id of allIds) {
+    const rosterTitan = roster[id];
+    const rawState = states[id];
+    const maxHp = Number(rawState?.maxHp) || Number(rosterTitan?.hp) || 1000000;
+
+    if (!isToday) {
+      // Start of a new day: all titans are fully healed, energy reset to 0, alive
+      effective[id] = {
+        hp: maxHp,
+        maxHp,
+        energy: 0,
+        isDead: false,
+      };
+    } else {
+      // Current day
+      if (rawState) {
+        const hp = Math.max(0, rawState.hp != null ? Number(rawState.hp) : maxHp);
+        const energy = Math.max(0, Number(rawState.energy) || 0);
+        const isDead = rawState.isDead === true || hp <= 0;
+        effective[id] = {
+          hp,
+          maxHp,
+          energy,
+          isDead,
+        };
+      } else {
+        // Not yet deployed today -> fresh at 100% HP, 0 energy, alive
+        effective[id] = {
+          hp: maxHp,
+          maxHp,
+          energy: 0,
+          isDead: false,
+        };
+      }
+    }
+  }
+
+  return effective;
 }
 
 export function getPoolForType(type: string, cache: any, customPools: any = {}): number[] {
@@ -107,7 +168,7 @@ export function pickLineupFromPool(
 
 export function getLineupForDoor(door: any, cache: any, customLineups: any = {}): number[] {
   const type = String(door?.attackerType || '').toLowerCase();
-  const titanStates = cache?.dungeonStatus?.data?.states?.titans || {};
+  const titanStates = getEffectiveTitanStates(cache);
   const lineupInfo = pickLineupFromPool(type, titanStates, cache, { lineups: customLineups });
   if (lineupInfo.selectedHeroes.length > 0) {
     return lineupInfo.selectedHeroes;
@@ -164,7 +225,7 @@ export function checkLineupIntactness(
 export function evaluateDoor(door: any, teamNum: number | string, cache: any, options: any = {}): DungeonDoorEvaluation {
   const primeElement = (cache?.dungeonStatus?.data?.elements?.prime || '').toLowerCase();
   const attackerType = String(door?.attackerType || '').toLowerCase();
-  const titanStates = cache?.dungeonStatus?.data?.states?.titans || {};
+  const titanStates = getEffectiveTitanStates(cache);
   const lineupInfo = pickLineupFromPool(attackerType, titanStates, cache, options);
   const heroes = lineupInfo.selectedHeroes;
   const isPrime = Boolean(primeElement && attackerType === primeElement);
@@ -324,8 +385,13 @@ export function planDungeon(cache: any, options: any = {}): DungeonPlanResult {
 }
 
 export function resetTitanStates(cache: any): any {
-  if (cache?.dungeonStatus?.data?.states) {
+  if (cache?.dungeonStatus?.data) {
+    if (!cache.dungeonStatus.data.states) {
+      cache.dungeonStatus.data.states = {};
+    }
     cache.dungeonStatus.data.states.titans = {};
+    cache.dungeonStatus.data.activeBattle = null;
+    cache.dungeonStatus.data.todayTitanite = 0;
   }
   return cache;
 }
@@ -336,6 +402,7 @@ export const dungeonAutomationService = {
   DEFAULT_TITAN_POOLS,
   FALLBACK_LINEUPS,
   isTitanAlive,
+  getEffectiveTitanStates,
   getPoolForType,
   pickLineupFromPool,
   getLineupForDoor,
