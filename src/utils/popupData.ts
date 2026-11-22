@@ -958,12 +958,8 @@ export function getPendingClaims(cache: any, now = Date.now(), dynamicCatalog?: 
     const placementRewards = Array.isArray(cinemaCounters.placementRewards) ? cinemaCounters.placementRewards : [];
     const claimedSet = new Set(placementRewards.map((r: any) => Number(r?.boxNum)));
     const remaining = [0, 1, 2, 3, 4].filter((num) => !claimedSet.has(num));
-    if (placementViewed < 5) {
-      if (placementAvailable > 0) {
-        videoBoxNums = remaining.slice(0, placementAvailable);
-      } else if (placementRewards.length === 0 && placementViewed === 0) {
-        videoBoxNums = [0, 1, 2, 3, 4];
-      }
+    if (placementViewed < 5 && remaining.length > 0 && placementAvailable > 0) {
+      videoBoxNums = remaining.slice(0, placementAvailable);
     }
   }
 

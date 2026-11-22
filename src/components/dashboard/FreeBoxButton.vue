@@ -58,18 +58,27 @@ async function openBoxes() {
     await dispatchRpc([{ name: 'cinemaGetCounters', args: {} }]);
     const currentCounters = cache.value.cinemaGetCounters?.data || counters.value;
 
-    const viewed = Number(currentCounters?.placementViewed ?? 0);
-    if (viewed >= 5) {
+    const placementRewards = Array.isArray(currentCounters?.placementRewards) ? currentCounters.placementRewards : [];
+    const claimedSet = new Set(placementRewards.map((r: any) => Number(r?.boxNum)));
+    const remaining = [0, 1, 2, 3, 4].filter((num) => !claimedSet.has(num));
+
+    const viewed = Number(currentCounters?.placementViewed ?? claimedSet.size);
+    if (viewed >= 5 || remaining.length === 0) {
       pending.value = false;
       message.value = 'All 5 video boxes have already been opened today.';
       return;
     }
 
-    // Determine boxes to open: boxNum goes from viewed..4 (boxNum 0 is first, 4 is last)
-    const queue: number[] = [];
-    for (let i = viewed; i < 5; i++) {
-      queue.push(i);
+    if (currentCounters?.placementAvailable != null && Number(currentCounters.placementAvailable) <= 0) {
+      pending.value = false;
+      message.value = 'No video boxes currently available. Please check back later.';
+      return;
     }
+
+    const availableLimit = Number.isFinite(currentCounters?.placementAvailable) && Number(currentCounters?.placementAvailable) > 0
+      ? Number(currentCounters?.placementAvailable)
+      : remaining.length;
+    const queue = remaining.slice(0, availableLimit);
 
     let opened = 0;
     let earnedGold = 0;
@@ -79,20 +88,27 @@ async function openBoxes() {
       const boxNum = queue[idx];
       message.value = `Opening box ${boxNum + 1}/5…`;
 
-      const response = await dispatchRpc([{
+      const response: any = await dispatchRpc([{
         name: 'cinemaGiveReward',
         args: { type: 'firstPlacement', boxNum }
       }]);
 
       if (abortClaim) break;
 
-      if (!response?.ok) {
-        const errMsg = String(response?.error || '');
+      const callResult = response?.results?.[0];
+      const rpcError = callResult?.result?.error || callResult?.result?.response?.error || callResult?.error || response?.error;
+
+      if (rpcError || response?.ok === false) {
+        const errMsg = String(
+          typeof rpcError === 'object'
+            ? rpcError.description || rpcError.name || rpcError.message || JSON.stringify(rpcError)
+            : rpcError || response?.error || ''
+        );
         if (errMsg.toLowerCase().includes('already')) {
-          // Box was already opened on server, proceed to next box
+          // Box was already opened on server, record box in local cache and continue to next box
           continue;
         }
-        message.value = response?.error || `Failed to open box ${boxNum + 1}.`;
+        message.value = errMsg || `Failed to open box ${boxNum + 1}.`;
         break;
       }
 

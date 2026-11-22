@@ -134,12 +134,56 @@ test('account change clears cinema counters and reward status', () => {
   assert.equal(cache.cinemaGiveRewardReceipts, undefined, 'cinemaGiveRewardReceipts must be cleared on account change');
 });
 
+test('cinemaGiveReward with Already error updates placementRewards and placementViewed in cache', () => {
+  const rpcCache = setupCache();
+  const initialCache = {
+    cinemaGetCounters: {
+      key: 'cinemaGetCounters',
+      method: 'cinemaGetCounters',
+      group: 'other',
+      data: {
+        placementViewed: 0,
+        placementAvailable: 1,
+        placementRewards: []
+      },
+      updatedAt: '2026-11-22T04:00:00.000Z'
+    }
+  };
+
+  const alreadyRecord = {
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-22T04:05:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{ name: 'cinemaGiveReward', args: { type: 'firstPlacement', boxNum: 0 }, ident: 'ident-reward-0' }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'ident-reward-0',
+        result: {
+          error: {
+            name: 'Already',
+            description: 'opened box #0 in /app/classes/RPCRequest.php (1325); rpc=`cinema_giveReward`'
+          }
+        }
+      }]
+    })
+  };
+
+  const { cache } = rpcCache.merge(initialCache, [alreadyRecord]);
+  assert.ok(cache.cinemaGetCounters, 'cinemaGetCounters must still exist');
+  assert.equal(cache.cinemaGetCounters.data.placementViewed, 1, 'placementViewed should be updated to 1');
+  assert.equal(cache.cinemaGetCounters.data.placementRewards.length, 1, 'Box #0 must be recorded in placementRewards');
+  assert.equal(cache.cinemaGetCounters.data.placementRewards[0].boxNum, 0);
+});
+
 test('FreeBoxButton SFC component exists and has expected button ID and tooltip copy', () => {
   const sfcContent = readFileSync('src/components/dashboard/FreeBoxButton.vue', 'utf8');
   assert.ok(sfcContent.includes('id="dashboard-free-video-boxes"'), 'Button must have ID dashboard-free-video-boxes');
   assert.ok(sfcContent.includes('Free Video Boxes'), 'Tooltip and labels must reference Free Video Boxes in English');
   assert.ok(sfcContent.includes("name: 'cinemaGiveReward'"), 'Must dispatch cinemaGiveReward');
   assert.ok(sfcContent.includes("name: 'cinemaGetCounters'"), 'Must dispatch cinemaGetCounters');
-  assert.ok(sfcContent.includes('for (let i = viewed; i < 5; i++)'), 'Must start queue from viewed to avoid Already opened errors');
+  assert.ok(sfcContent.includes('!claimedSet.has(num)'), 'Must filter out already claimed boxes');
   assert.ok(sfcContent.includes("includes('already')"), 'Must gracefully continue if already opened error is returned');
 });

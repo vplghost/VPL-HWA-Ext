@@ -1952,7 +1952,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             data: {
               token: call.ident,
               success: !error && Boolean(response),
-              error: error ? String(typeof error === 'object' ? error.message || error.description || JSON.stringify(error) : error).slice(0, 200) : null,
+              error: error ? String(typeof error === 'object' ? `${error.name ? error.name + ': ' : ''}${error.description || error.message || JSON.stringify(error)}` : error).slice(0, 200) : null,
               boxNum: call.args?.boxNum,
               type: call.args?.type,
               reward: response && typeof response === 'object' && !Array.isArray(response) ? response : null,
@@ -2995,17 +2995,25 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               updatedAt: entry.updatedAt
             };
           }
-          if (entry.data.success && next.cinemaGetCounters?.data) {
+          const isAlreadyOpened = Boolean(entry.data?.error && (
+            String(entry.data.error).toLowerCase().includes('already') ||
+            String(entry.data.error).toLowerCase().includes('opened box')
+          ));
+          if ((entry.data.success || isAlreadyOpened) && next.cinemaGetCounters?.data) {
             const counters = { ...next.cinemaGetCounters.data };
-            counters.placementViewed = Math.min(5, (counters.placementViewed ?? 0) + 1);
-            if (Number.isFinite(counters.placementAvailable) && counters.placementAvailable > 0) {
-              counters.placementAvailable -= 1;
-            }
             const prevRewards = Array.isArray(counters.placementRewards) ? [...counters.placementRewards] : [];
             if (entry.data.boxNum != null && !prevRewards.some((r: any) => Number(r?.boxNum) === Number(entry.data.boxNum))) {
               prevRewards.push({ boxNum: entry.data.boxNum });
             }
             counters.placementRewards = prevRewards;
+            if (entry.data.success) {
+              counters.placementViewed = Math.min(5, (counters.placementViewed ?? 0) + 1);
+              if (Number.isFinite(counters.placementAvailable) && counters.placementAvailable > 0) {
+                counters.placementAvailable -= 1;
+              }
+            } else {
+              counters.placementViewed = Math.min(5, Math.max(counters.placementViewed ?? 0, prevRewards.length));
+            }
             next.cinemaGetCounters = {
               ...next.cinemaGetCounters,
               data: counters,
