@@ -3,7 +3,7 @@ id: doc-45cb642564ea6f7fbd7553c41c582fe2
 title: Legend Draft System
 description: Legend Draft state machine, 3-choice per step protocol, Unity WebGL hooking architecture, and empirical verification data
 createdAt: '2026-11-02T06:43:38.355Z'
-updatedAt: '2026-11-17T11:15:14.841Z'
+updatedAt: '2026-11-23T20:24:56.999Z'
 tags:
   - draft
   - legend-draft
@@ -136,3 +136,22 @@ In the WXT + Vue 3 architecture, src/components/dialogs/DraftModal.vue provides 
 - Provenance: src/components/dialogs/DraftModal.vue, 	ests/legend-draft-ui.test.mjs.
 \n## Empirical Findings & Live Verification (Match #360295686)\nAnalysis of `temp/tracking-data/hwa-game-record-202611090106_legends_draft.json` and comprehensive documentation in [LEGENDS-DRAFT-ANALYSIS.md](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/docs/LEGENDS-DRAFT-ANALYSIS.md):\n\n### 1. Match Metadata & Chronology\n- **Match ID:** 360295686\n- **Opponent:** ShallowWorkmans (Level 120, Clan: Apex Assassins, Rating: 1730)\n- **User Rating:** 1600 (+50 win delta -> 1650)\n- **5-Step Defense Selection (stageId = 2):**\n  - Step 1: Left card (1197, 427) -> Pick 11 (Chabba)\n  - Step 2: Right card (2054, 458) -> Pick 58 (Fafnir)\n  - Step 3: Left card (1200, 476) -> Pick 67 (Cascade)\n  - Step 4: Right card (2023, 483) -> Pick 500 (Kayla)\n  - Step 5: Left card (1090, 405) -> Pick 54 (Iris)\n  - Submitted RPC: `randomDraft_saveDefence {"heroes": [11, 58, 67, 500, 54]}`\n- **5-Step Attack Selection (stageId = 4):**\n  - Step 1: Right card (2027, 458) -> Pick 55 (Mushy and Shroom)\n  - Step 2: Left card (1221, 485) -> Pick 10 (Jorgen)\n  - Step 3: Middle card (1660, 454) -> Pick 29 (Lian)\n  - Step 4: Left card (1082, 411) -> Pick 72 (Byrna)\n  - Step 5: Left card (1136, 419) -> Pick 57 (Tristan)\n  - Submitted RPC: `randomDraft_saveAttack {"heroes": [55, 10, 29, 72, 57]}`\n- **Battle Outcome (stageId = 7):**\n  - User Attackers in replay: `[10, 29, 55, 57, 72]`\n  - Enemy Attackers in replay: `[9, 16, 32, 33, 52]`\n  - Result: 0 (Victory), rating +50, BP EXP +100.\n\n### 2. Stream Cipher & Keystream Masking Proof\nByte-by-byte differential analysis across Stage 2 and Stage 4 in Match #360504765 proves:\n- Bytes 0..9 are identical (XOR = 0x00).\n- Bytes 10..11 differ by exactly `0x04 0x04` (corresponding to stageId transition 2 -> 4).\n- Bytes 12..19 are identical.\n- Bytes 20..21 differ by `0x04 0x04`.\n- Bytes 22..31 are identical.\nThis eliminates block ciphers (e.g. AES-CBC) and proves a stream cipher / byte-wise keystream mask.\nFull analysis and decoding directions are detailed in [LEGENDS-DRAFT-ANALYSIS.md](file:///C:/Projects/git/vplghost/VPL-HWA-Ext/docs/LEGENDS-DRAFT-ANALYSIS.md).\n
 temp/append_doc.txt
+
+## Phase 1 Readonly Dialog & WASM Table Index Hooking (2026-11-24)
+
+### 1. Reverse Engineering & Table Hook Resolution
+- **WASM Table Index**: Resolved `BaseXORCipher_decrypt` at Table Index `330804` (fid `471299`) and `BaseXORCipher_cipher` at `330805`.
+- **Heap Memory Plaintext Extraction**: Hooking index `330804` via `src/content/interceptor.ts` directly captures the return value pointer (`String_t*`) from Unity WebGL memory heap:
+  - String length: `len = heapI32[(resultPtr + 8) >>> 2]`
+  - Chars array: `heapU16.subarray((resultPtr + 12) >>> 1, ...)`
+- **Payload Schema (`DraftsDto`)**:
+  - `playerTeam.heroes`: Matrix of 5 steps $\times$ 3 candidate hero IDs = 15 candidates.
+  - `chosenDefenceHeroes` / `chosenAttackHeroes`: Picked hero IDs per round.
+  - `stageFinishTs` / `gameTimeTs`: Pick phase expiration countdown.
+
+### 2. Runtime Architecture & Auto-Opening
+- **Components**:
+  - `src/components/dialogs/LegendsDraftModal.vue`: Read-only 5 columns (rounds) $\times$ 3 cards (choices) candidate grid with role badges, main stat indicators, countdown, and opponent card.
+  - `src/composables/useDraft.ts`: Manages reactive draft session, automatic session rebinding on new match, and error reporting.
+  - `src/components/tabs/SettingsTab.vue`: `#setting-auto-open-draft` persisted in `chrome.storage.local`.
+- **Provenance**: `@task-VHE-VAGQQH`, `docs/LEGENDS-DRAFT-DECODING.md`, `src/utils/draftHelper.ts`.
