@@ -1,5 +1,5 @@
 ---
-name: WASM_extract
+name: wasm-extract
 description: Quy trình dịch ngược, phân giải Table Index, kiểm thử tương tác qua Native Bridge, và tạo thư viện wrapper TypeScript cho các hàm Unity WebGL IL2CPP.
 ---
 
