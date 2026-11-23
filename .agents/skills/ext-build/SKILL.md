@@ -1,11 +1,11 @@
 ---
 name: ext-build
-description: Nâng version extension (build/patch, minor, major), thực hiện build đồng thời cả bản Debug/Unpacked (.output/chrome-mv3) và bản Production (dist/), chạy test xác thực và commit thay đổi bằng kn-commit.
+description: Nâng version extension (build/patch, minor, major), thực hiện build đồng thời cả bản Debug/Unpacked (.output/chrome-mv3) và bản Production (dist/), cập nhật CHANGELOG.md từ git commits, chạy test xác thực và commit thay đổi bằng kn-commit.
 ---
 
 # Extension Version Bumping & Build Workflow (ext-build)
 
-Skill này chuẩn hóa quy trình 4 bước để **nâng phiên bản**, **biên dịch đồng bộ extension cho cả 2 môi trường (Debug Unpacked và Production)**, **kiểm thử chất lượng**, và **commit** thay đổi vào Git repository theo chuẩn `kn-commit`.
+Skill này chuẩn hóa quy trình 5 bước để **nâng phiên bản**, **biên dịch đồng bộ extension cho cả 2 môi trường (Debug Unpacked và Production)**, **kiểm thử chất lượng**, **cập nhật CHANGELOG.md từ lịch sử commit**, và **commit** thay đổi vào Git repository theo chuẩn `kn-commit`.
 
 ```mermaid
 flowchart TD
@@ -25,7 +25,8 @@ flowchart TD
     
     I --> K["Xác thực: npm test & xác thực cả 2 thư mục"]
     J --> K
-    K --> L["Tạo Commit theo chuẩn kn-commit"]
+    K --> L["Cập nhật CHANGELOG.md<br/>(Tổng hợp commit từ phiên bản trước đó)"]
+    L --> M["Tạo Commit theo chuẩn kn-commit"]
 ```
 
 ---
@@ -44,8 +45,12 @@ flowchart TD
    - Trừ khi người dùng nêu rõ từ khóa "minor" hoặc "major", luôn nâng build version (`patch`, ví dụ: `0.11.203` -> `0.11.204`).
 4. **Đồng bộ tuyệt đối phiên bản**:
    - Bộ 3 tệp `package.json`, `package-lock.json`, và `extension/manifest.json` (cùng các manifest trong `dist/` và `.output/chrome-mv3/`) luôn được đồng bộ cùng một số phiên bản.
-5. **Quy trình Commit tuân thủ `kn-commit`**:
-   - Chỉ commit khi toàn bộ kiểm thử `npm test` thành công (`0` fail) và cả 2 bản build đều được xác thực hợp lệ.
+5. **Ghi nhận CHANGELOG.md minh bạch và chính xác**:
+   - Luôn cập nhật tệp `CHANGELOG.md` trước khi commit phát hành.
+   - Nội dung phiên bản mới được tổng hợp trực tiếp từ danh sách các commit đã thực hiện kể từ phiên bản ghi nhận gần nhất trong changelog đến `HEAD`.
+   - Phân loại rõ ràng theo các nhóm chuẩn: `### Added`, `### Fixed`, `### Changed` (hoặc `### Refactored`).
+6. **Quy trình Commit tuân thủ `kn-commit`**:
+   - Chỉ commit khi toàn bộ kiểm thử `npm test` thành công (`0` fail), `CHANGELOG.md` đã được ghi nhận đầy đủ, và cả 2 bản build đều được xác thực hợp lệ.
 
 ---
 
@@ -110,13 +115,55 @@ npm test
 
 ---
 
-### Bước 4: Tạo Commit Theo Chuẩn `kn-commit`
+### Bước 4: Cập Nhật CHANGELOG.md Từ Lịch Sử Commit
+
+Ghi nhận các thay đổi của phiên bản mới vào đầu tệp `CHANGELOG.md`:
+
+1. **Xác định phiên bản đã ghi nhận trước đó**:
+   - Đọc tiêu đề phiên bản gần nhất trong `CHANGELOG.md` (ví dụ: dòng `## 0.11.134 — YYYY-MM-DD`).
+   - Lấy số phiên bản đó (ví dụ: `0.11.134`).
+
+2. **Truy xuất các commit kể từ phiên bản trước đến `HEAD`**:
+   - Tìm commit hash của đợt release/bump phiên bản trước đó:
+     ```powershell
+     git log --grep="0.11.134" -n 1 --format="%H"
+     ```
+   - Trích xuất danh sách các commit và nội dung chi tiết:
+     ```powershell
+     git log <commit-hash-phiên-bản-trước>..HEAD --oneline
+     # Xem chi tiết các commit tính năng hoặc sửa lỗi:
+     git log <commit-hash-phiên-bản-trước>..HEAD --format="- %s%n%b"
+     ```
+
+3. **Tổng hợp và định dạng mục Changelog**:
+   - Phân loại các commit vào các mục chuẩn:
+     - **`### Added`**: Các tính năng mới (commits `feat:...`).
+     - **`### Fixed`**: Các bản sửa lỗi (commits `fix:...`).
+     - **`### Changed` / `### Refactored`**: Các cải tiến hoặc tái cấu trúc (commits `refactor:...`, `perf:...`).
+   - Viết mục mới chèn ngay bên dưới `# Changelog` và trên mục phiên bản trước:
+     ```markdown
+     ## <PHIÊN_BẢN_MỚI> — YYYY-MM-DD
+
+     ### Added
+
+     - **<Tiêu đề tính năng> (<các file chính>)**:
+       - Chi tiết thay đổi dựa trên commit...
+
+     ### Fixed
+
+     - **<Tiêu đề sửa lỗi> (<các file chính>)**:
+       - Chi tiết sửa lỗi dựa trên commit...
+     ```
+
+---
+
+### Bước 5: Tạo Commit Theo Chuẩn `kn-commit`
 
 Áp dụng quy trình của skill `kn-commit`:
 
 1. **Stage các tệp liên quan**:
    ```powershell
-   git add package.json package-lock.json extension/manifest.json dist/
+   git add package.json package-lock.json extension/manifest.json CHANGELOG.md dist/
    git status
    git diff --staged
    ```
@@ -127,12 +174,13 @@ npm test
    - **Tiêu đề**: `chore(release): bump version to <NEW_VERSION> and dual-build [dist, .output]`
    - **Body mẫu**:
      ```markdown
-     chore(release): bump version to 0.11.204 and dual-build [dist, .output]
+     chore(release): bump version to 0.11.210 and dual-build [dist, .output]
 
-     - Bump extension version from 0.11.203 to 0.11.204 (patch)
+     - Bump extension version from 0.11.209 to 0.11.210 (patch)
      - Build clean production extension in dist/ (debug bridge disabled)
      - Build unpacked debug extension in .output/chrome-mv3 (native messaging bridge enabled)
-     - Validate test suite (1175 tests pass) and verify artifacts
+     - Update CHANGELOG.md with changes from previous releases
+     - Validate test suite and verify build artifacts
      ```
 
 3. **Xác nhận & Commit**:
@@ -152,3 +200,5 @@ npm test
 | **Chạy Tests** | `npm test` |
 | **Kiểm tra quyền Debug Bridge** | `Select-String -Path ".output/chrome-mv3/manifest.json" -Pattern "nativeMessaging"` |
 | **Kiểm tra quyền Production sạch** | `Select-String -Path "dist/manifest.json" -Pattern "nativeMessaging"` (phải rỗng) |
+| **Tìm commit phiên bản trước** | `git log --grep="<VERSION_TRƯỚC>" -n 1 --format="%H"` |
+| **Xem các commit cần đưa vào Changelog** | `git log <HASH_TRƯỚC>..HEAD --oneline` |
