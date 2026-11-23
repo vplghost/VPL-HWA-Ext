@@ -45,8 +45,12 @@ function getCardState(t: any) {
     ? isCampBuildingUpgrading(t.type, cache?.value)
     : false;
 
-  const queuesForType = normalizeArray(trainings.value?.trainingQueues).filter((q: any) => {
-    const info = getTroopType(q?.unitId);
+  const allQueues = [
+    ...normalizeArray(trainings.value?.trainingQueues),
+    ...normalizeArray(trainings.value?.upgradeQueues),
+  ];
+  const queuesForType = allQueues.filter((q: any) => {
+    const info = getTroopType(q?.targetUnitId ?? q?.sourceUnitId ?? q?.unitId);
     return info && info.type === t.type;
   });
 
@@ -231,11 +235,15 @@ const troopCards = computed(() => {
             </div>
             <div>
               <div class="text-[10px] text-slate-400 uppercase tracking-wider">Training</div>
-              <div class="font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">
+              <div
+                class="font-bold text-indigo-600 dark:text-indigo-400 tabular-nums"
+                :title="t.promotingCount > 0 ? `Training: ${formatNumber(t.trainingCount - t.promotingCount)} + Promoting: ${formatNumber(t.promotingCount)}` : undefined"
+              >
                 {{ formatNumber(t.trainingCount) }}
               </div>
               <div v-if="st.trainingTimerText" class="text-[9px] text-indigo-500 font-mono">
                 {{ st.trainingTimerText }}
+                <span v-if="t.promotingCount > 0" class="text-[9px] text-indigo-400 font-normal"> (Promote)</span>
               </div>
             </div>
           </div>
@@ -280,10 +288,10 @@ const troopCards = computed(() => {
             <!-- Status Text -->
             <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
               <span v-if="st.completedQueue" class="text-emerald-600 dark:text-emerald-400 font-semibold">
-                Training finished
+                {{ st.completedQueue?.targetUnitId ? 'Promote finished' : 'Training finished' }}
               </span>
               <span v-else-if="st.activeQueue" class="text-indigo-600 dark:text-indigo-400 font-medium">
-                In training
+                {{ st.activeQueue?.targetUnitId ? 'Promoting' : 'In training' }}
               </span>
               <span v-else-if="st.isUpgrading" class="text-amber-600 dark:text-amber-400 font-medium">
                 🏗️ Camp upgrading
@@ -356,7 +364,7 @@ const troopCards = computed(() => {
 
               <!-- In Progress Badge -->
               <span v-else class="text-[10px] text-slate-400 dark:text-slate-500">
-                {{ st.trainingTimerText ? `Ends in ${st.trainingTimerText}` : 'Training' }}
+                {{ st.activeQueue?.targetUnitId ? (st.trainingTimerText ? `Promoting (${st.trainingTimerText})` : 'Promoting') : (st.trainingTimerText ? `Ends in ${st.trainingTimerText}` : 'Training') }}
               </span>
             </div>
           </div>

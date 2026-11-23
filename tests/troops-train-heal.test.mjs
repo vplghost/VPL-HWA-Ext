@@ -201,6 +201,43 @@ test('rpc-cache merges startTrainingAction, completeTrainingAction, and startHea
   assert.ok(healingObj, 'Healing object must be set');
   assert.equal(healingObj.duration, 288000);
   assert.equal(healingObj.units.length, 3);
+
+  // 4. completeTraining for upgradeQueues: removes upgradeQueue and adds count to targetUnitId
+  const cacheWithUpgrade = {
+    'getUnitSummary:unit': {
+      data: {
+        available: [
+          { unitId: 28, count: 50 }
+        ]
+      }
+    },
+    'getTrainings:unit': {
+      data: {
+        trainingQueues: [],
+        upgradeQueues: [
+          { sourceUnitId: 27, targetUnitId: 28, unitCount: 1868, startDate: 1000, duration: 5000 }
+        ]
+      }
+    }
+  };
+  const completeUpgradeRecord = {
+    transport: 'http',
+    method: 'POST',
+    status: 200,
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    timestamp: '2026-11-10T14:20:00.000Z',
+    requestBody: JSON.stringify({
+      calls: [{ name: 'completeTraining', args: { unitId: 28 }, ident: 'call-comp-up-28', feature: 'unit' }]
+    }),
+    responseBody: JSON.stringify({
+      results: [{ ident: 'call-comp-up-28', result: { response: {} } }]
+    })
+  };
+  const afterCompleteUpgrade = cacheHelper.merge(cacheWithUpgrade, [completeUpgradeRecord]);
+  assert.ok(afterCompleteUpgrade.changed, 'Cache must change on completeTraining for upgradeQueue');
+  assert.equal(afterCompleteUpgrade.cache['getTrainings:unit'].data.upgradeQueues.length, 0);
+  const avail28 = afterCompleteUpgrade.cache['getUnitSummary:unit'].data.available.find((u) => u.unitId === 28);
+  assert.equal(avail28.count, 50 + 1868, 'Available count for unitId 28 must increase by 1868');
 });
 
 test('renderDashboardTroops renders ready, train, and heal action buttons and handles interactions', async () => {

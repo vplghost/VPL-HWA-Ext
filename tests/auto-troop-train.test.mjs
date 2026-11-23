@@ -347,3 +347,107 @@ test('isCampBuildingUpgrading extracts queues from building_getSummary and preve
   const marksmenTrain = plan.actions.find(a => a.type === 2 && a.action === 'train');
   assert.equal(marksmenTrain, undefined, 'Must block Marksmen training to prevent server ValidationError');
 });
+
+test('upgradeQueues: getUnlockedTroopLevels unlocks target and source levels from upgradeQueues', () => {
+  const cache = {
+    'getTrainings:unit': {
+      data: {
+        trainingQueues: [],
+        upgradeQueues: [
+          {
+            sourceUnitId: 27,
+            targetUnitId: 28,
+            unitCount: 1868,
+            startDate: 1000,
+            duration: 50000,
+          },
+        ],
+      },
+    },
+  };
+
+  // Marksmen (type 2): targetUnitId 28 -> Level 8 unlocked!
+  const unlocked = getUnlockedTroopLevels(2, cache);
+  assert.deepEqual(unlocked, [1, 2, 3, 4, 5, 6, 7, 8]);
+});
+
+test('upgradeQueues: buildAutoTrainCalls respects active upgrade queue and does not attempt training', () => {
+  const now = 10000;
+  const cache = {
+    'getSummary:building': {
+      data: {
+        buildings: {
+          '41': { level: 20 },
+        },
+      },
+    },
+    'getUnitSummary:unit': {
+      data: {
+        limits: [100000, 100000, 100000],
+        available: [
+          { unitId: 27, count: 500 },
+        ],
+      },
+    },
+    'getTrainings:unit': {
+      data: {
+        trainingQueues: [],
+        upgradeQueues: [
+          {
+            sourceUnitId: 27,
+            targetUnitId: 28,
+            unitCount: 1868,
+            startDate: 5000,
+            duration: 20000, // ends at 25000 > now (active)
+          },
+        ],
+      },
+    },
+  };
+
+  const plan = buildAutoTrainCalls(cache, { autoTrainEnabled: true }, now);
+  const marksmenTrain = plan.actions.find(a => a.type === 2 && a.action === 'train');
+  assert.equal(marksmenTrain, undefined, 'Marksmen camp is busy promoting; must not train');
+});
+
+test('upgradeQueues: buildAutoTrainCalls collects finished upgrade queue', () => {
+  const now = 30000;
+  const cache = {
+    'getSummary:building': {
+      data: {
+        buildings: {
+          '41': { level: 20 },
+        },
+      },
+    },
+    'getUnitSummary:unit': {
+      data: {
+        limits: [100000, 100000, 100000],
+        available: [
+          { unitId: 27, count: 500 },
+        ],
+      },
+    },
+    'getTrainings:unit': {
+      data: {
+        trainingQueues: [],
+        upgradeQueues: [
+          {
+            sourceUnitId: 27,
+            targetUnitId: 28,
+            unitCount: 1868,
+            startDate: 5000,
+            duration: 20000, // ends at 25000 <= now (completed)
+          },
+        ],
+      },
+    },
+  };
+
+  const plan = buildAutoTrainCalls(cache, { autoTrainEnabled: true }, now);
+  const collectAction = plan.actions.find(a => a.type === 2 && a.action === 'collect');
+  assert.ok(collectAction, 'Should generate collect action for finished upgrade');
+  assert.equal(collectAction.unitId, 28);
+  const collectCall = plan.calls.find(c => c.name === 'completeTraining' && c.args?.unitId === 28);
+  assert.ok(collectCall, 'Should dispatch completeTraining with targetUnitId 28');
+});

@@ -16,6 +16,8 @@ export interface TroopUnitState {
   healingEndsAt: number | null;
   trainingCount: number;
   trainingEndsAt: number | null;
+  promotingCount?: number;
+  isPromoting?: boolean;
   maxTroops: number | null;
 }
 

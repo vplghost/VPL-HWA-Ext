@@ -2480,7 +2480,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           }];
         }
         if ((key === 'completeTraining:unit' || call.name === 'completeTraining') && result?.response) {
-          const unitId = Number(call.args?.unitId);
+          const unitId = Number(call.args?.unitId ?? call.args?.targetUnitId);
           if (Number.isInteger(unitId)) {
             return [{
               key: 'completeTrainingAction',
@@ -5930,6 +5930,20 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 next[trainKey] = {
                   ...next[trainKey],
                   data: { ...next[trainKey].data, trainingQueues: queues },
+                  updatedAt: entry.updatedAt
+                };
+                changed = true;
+              }
+            }
+            if (next[trainKey]?.data?.upgradeQueues) {
+              const upQueues = [...next[trainKey].data.upgradeQueues];
+              const idx = upQueues.findIndex((q) => Number(q.targetUnitId ?? q.unitId) === unitId);
+              if (idx >= 0) {
+                trainedCount = Number(upQueues[idx].unitCount) || 0;
+                upQueues.splice(idx, 1);
+                next[trainKey] = {
+                  ...next[trainKey],
+                  data: { ...next[trainKey].data, upgradeQueues: upQueues },
                   updatedAt: entry.updatedAt
                 };
                 changed = true;

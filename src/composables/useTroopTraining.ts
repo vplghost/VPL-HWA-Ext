@@ -160,6 +160,8 @@ export function useTroopTraining() {
       healingEndsAt: null,
       trainingCount: 0,
       trainingEndsAt: null,
+      promotingCount: 0,
+      isPromoting: false,
       maxTroops: 0,
     })) as [TroopUnitState, TroopUnitState, TroopUnitState];
 
@@ -236,6 +238,25 @@ export function useTroopTraining() {
       }
     }
 
+    // 6. Upgrade / Promoting queues & timer
+    const upgradeQueueList = normalizeArray(trainings.value?.upgradeQueues);
+    for (const q of upgradeQueueList) {
+      const unitId = q?.targetUnitId ?? q?.sourceUnitId ?? q?.unitId;
+      const info = getTroopType(unitId);
+      const count = Number(q?.unitCount) || 0;
+      if (info && count > 0) {
+        stats[info.type].trainingCount += count;
+        stats[info.type].promotingCount = (stats[info.type].promotingCount || 0) + count;
+        stats[info.type].isPromoting = true;
+        if (Number.isFinite(q.startDate) && Number.isFinite(q.duration)) {
+          const endsAt = q.startDate + q.duration;
+          if (!stats[info.type].trainingEndsAt || endsAt < stats[info.type].trainingEndsAt!) {
+            stats[info.type].trainingEndsAt = endsAt;
+          }
+        }
+      }
+    }
+
     // Latest game stock capacity comes only from completed Drill Grounds levels.
     for (const t of stats) {
       t.maxTroops = calculateTroopMax(t.type, cache.value);
@@ -261,7 +282,7 @@ export function useTroopTraining() {
   }
 
   async function collectTraining(completedQueue: any) {
-    const qUnitId = Number(completedQueue.unitId);
+    const qUnitId = Number(completedQueue.targetUnitId ?? completedQueue.unitId);
     // Wait for the background reducer's actual game response before updating UI.
     await dispatchRpc([
       { name: 'completeTraining', args: { unitId: qUnitId }, feature: 'unit' },

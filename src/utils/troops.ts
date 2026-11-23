@@ -169,6 +169,14 @@ export function getUnlockedTroopLevels(type: number, cache: any, savedLevel?: nu
       levels.add(info.level);
     }
   }
+  for (const q of normalizeArray(trainings?.upgradeQueues)) {
+    for (const uId of [q?.targetUnitId, q?.sourceUnitId, q?.unitId]) {
+      const info = getTroopType(uId);
+      if (info && info.type === type && info.level >= 1 && info.level <= 10) {
+        levels.add(info.level);
+      }
+    }
+  }
 
   let maxLvl = levels.size > 0 ? Math.max(...levels) : 1;
   if (typeof savedLevel === 'number' && savedLevel >= 1 && savedLevel <= 10 && savedLevel > maxLvl) {
@@ -259,12 +267,15 @@ export function buildAutoTrainCalls(cache: any, settings: TroopTrainSettings, no
   if (!settings?.autoTrainEnabled) return result;
 
   const trainings = cache?.['getTrainings:unit']?.data ?? cache?.getTrainings?.data;
-  const allQueues = normalizeArray(trainings?.trainingQueues);
+  const allQueues = [
+    ...normalizeArray(trainings?.trainingQueues),
+    ...normalizeArray(trainings?.upgradeQueues),
+  ];
 
   for (const def of TROOP_DEFS) {
     const type = def.type;
     const queuesForType = allQueues.filter((q: any) => {
-      const info = getTroopType(q?.unitId);
+      const info = getTroopType(q?.targetUnitId ?? q?.sourceUnitId ?? q?.unitId);
       return info && info.type === type;
     });
 
@@ -281,15 +292,16 @@ export function buildAutoTrainCalls(cache: any, settings: TroopTrainSettings, no
       Number.isFinite(q.startDate) && Number.isFinite(q.duration) && q.startDate + q.duration <= now
     );
     if (completedQueue) {
+      const targetUnitId = Number(completedQueue.targetUnitId ?? completedQueue.unitId);
       result.calls.push({
         name: 'completeTraining',
-        args: { unitId: Number(completedQueue.unitId) },
+        args: { unitId: targetUnitId },
         feature: 'unit',
       });
       result.actions.push({
         type,
         action: 'collect',
-        unitId: Number(completedQueue.unitId),
+        unitId: targetUnitId,
       });
     }
 
