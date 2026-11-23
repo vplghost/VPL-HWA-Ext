@@ -393,3 +393,61 @@ test('active queues saved before the boss-list upgrade can finish their current 
   step = queue.advance(step.state, rpc(step.calls, [heroes, inventory], 81000), {}, 81001);
   assert.equal(step.state.phase, 'searching');
 });
+
+test('rally creation prioritizes highest-level troops across multiple types dynamically', () => {
+  const customInventory = {
+    squads: [],
+    available: [
+      { unitId: 8, count: 500 },  // Type 0, Tier 8
+      { unitId: 18, count: 500 }, // Type 1, Tier 8
+      { unitId: 27, count: 1000 },// Type 2, Tier 7
+      { unitId: 6, count: 2000 }, // Type 0, Tier 6
+    ]
+  };
+  const cache = {
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': { data: customInventory },
+    experimentalRallySearch: {
+      updatedAt: new Date(1000).toISOString(),
+      data: { mapId: 'map', mobConfigIds: [64], mobs: [{ mobId: 'boss-a' }] }
+    },
+    'resource:world-energy': { data: { amount: 100 } }
+  };
+  const step = queue.start({ ...options, maxTroops: 800, firstMobId: 'boss-a', autoCancel: false }, 1, 10, 1000, cache);
+  assert.equal(step.state.phase, 'creating');
+  const units = step.calls[0].args.squad.units;
+  const total = units.reduce((s, u) => s + u.count, 0);
+  assert.equal(total, 800);
+  // All 800 troops must come from Tier 8 units (unitId 8 and 18)
+  const tier8Count = units.filter(u => u.unitId === 8 || u.unitId === 18).reduce((s, u) => s + u.count, 0);
+  assert.equal(tier8Count, 800);
+  // Tier 7 and Tier 6 should not be used when Tier 8 capacity is sufficient
+  assert.ok(!units.some(u => u.unitId === 27 || u.unitId === 6));
+});
+
+test('queue waits when raid squad is returning before dispatching next rally', () => {
+  const returningCache = {
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': { data: inventory },
+    'mapObjectGetAll:march': {
+      march1: { data: { stage: 'returnToOutpost', heroes: [{ id: 1 }, { id: 2 }] } }
+    },
+    experimentalRallySearch: {
+      updatedAt: new Date(1000).toISOString(),
+      data: { mapId: 'map', mobConfigIds: [64], mobs: [{ mobId: 'boss-a' }] }
+    },
+    'resource:world-energy': { data: { amount: 100 } }
+  };
+  // Start while squad is returning should enter waiting_rally instead of creating
+  const step = queue.start({ ...options, firstMobId: 'boss-a', autoCancel: false }, 1, 10, 1000, returningCache);
+  assert.equal(step.state.phase, 'waiting_rally');
+  assert.deepEqual(step.calls, [
+    { name: 'getMarches', feature: 'march' },
+    { name: 'getUnitSummary', feature: 'unit' }
+  ]);
+
+  // Once march is gone, advance moves to refreshing/creating
+  const clearedCache = { ...returningCache, 'mapObjectGetAll:march': {} };
+  const nextStep = queue.advance(step.state, null, clearedCache, 2000);
+  assert.equal(nextStep.state.phase, 'refreshing');
+});

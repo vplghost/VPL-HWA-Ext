@@ -222,7 +222,11 @@ export function unitInfo(id: number): UnitInfo | null {
     : null;
 }
 
-export function allocateTroops(summary: any, capacity: number): Array<{ unitId: number; count: number }> {
+export function allocateTroops(
+  summary: any,
+  capacity: number,
+  prioritizeHighestLevel: boolean = false
+): Array<{ unitId: number; count: number }> {
   if (!Number.isSafeInteger(capacity) || capacity <= 0) return [];
   const stocks = new Map<number, number>();
   for (const item of asArray(summary?.available)) {
@@ -230,6 +234,57 @@ export function allocateTroops(summary: any, capacity: number): Array<{ unitId: 
     if (unitInfo(id) && Number.isSafeInteger(item.count) && item.count > 0) {
       stocks.set(id, Math.max(stocks.get(id) || 0, item.count));
     }
+  }
+
+  // When prioritizeHighestLevel is true (e.g. Rally Raids), select troops strictly from highest level (9 down to 1).
+  // When multiple troop types share the same level, balance capacity evenly among available types at that level.
+  if (prioritizeHighestLevel) {
+    const units: Array<{ unitId: number; count: number }> = [];
+    let left = capacity;
+
+    for (let tier = 9; tier >= 1 && left > 0; tier--) {
+      const availableAtTier = [0, 1, 2]
+        .map((type) => {
+          const unitId = type * 10 + tier;
+          return { unitId, type, count: stocks.get(unitId) || 0 };
+        })
+        .filter((item) => item.count > 0);
+
+      if (!availableAtTier.length) continue;
+
+      const totalAtTier = availableAtTier.reduce((sum, item) => sum + item.count, 0);
+      if (totalAtTier <= left) {
+        for (const item of availableAtTier) {
+          units.push({ unitId: item.unitId, count: item.count });
+        }
+        left -= totalAtTier;
+      } else {
+        const quotasAtTier = new Map<number, number>();
+        let leftAtTier = left;
+        while (leftAtTier > 0) {
+          const open = availableAtTier.filter(
+            (item) => (quotasAtTier.get(item.unitId) || 0) < item.count
+          );
+          if (!open.length) break;
+          const step = Math.max(1, Math.floor(leftAtTier / open.length));
+          for (const item of open) {
+            const currentQuota = quotasAtTier.get(item.unitId) || 0;
+            const amount = Math.min(step, item.count - currentQuota, leftAtTier);
+            quotasAtTier.set(item.unitId, currentQuota + amount);
+            leftAtTier -= amount;
+            if (leftAtTier <= 0) break;
+          }
+        }
+        for (const [unitId, count] of quotasAtTier.entries()) {
+          if (count > 0) {
+            units.push({ unitId, count });
+          }
+        }
+        left = 0;
+        break;
+      }
+    }
+    return units;
   }
 
   const totals = [0, 1, 2].map((type) =>

@@ -87,7 +87,8 @@ export function search(state: RaidQueueState, now: number): RaidQueueStepResult 
 export function nextBoss(
   state: RaidQueueState,
   cache: Record<string, any> | null | undefined,
-  now: number
+  now: number,
+  settings?: any
 ): RaidQueueStepResult {
   const data = getDataHelper();
   const bossQueue = state.bossQueue;
@@ -102,6 +103,18 @@ export function nextBoss(
     currentQueue = [];
     state.bossQueue = { ...bossQueue, queue: [] };
   }
+
+  // Filter out any bosses that were marked defeated, failed, or won
+  const won = safeList(cache?.experimentalDefeatedBosses?.data);
+  currentQueue = currentQueue.filter(
+    (b: any) =>
+      b?.mobId &&
+      !state.failedBossIds?.includes(b.mobId) &&
+      !state.wonBossIds?.includes(b.mobId) &&
+      !won.some((item: any) => item?.mapId === state.options.mapId && item?.mobId === b.mobId)
+  );
+  state.bossQueue = { ...bossQueue, queue: currentQueue };
+
   if (!currentQueue.length) return search(state, now);
   const energy = energyAt(cache, now);
   if (Number.isFinite(energy) && (energy as number) < RALLY_ENERGY_COST) {
@@ -109,6 +122,29 @@ export function nextBoss(
       state: stop(state, `Not enough World Energy for a rally (need ${RALLY_ENERGY_COST}).`),
     };
   }
+
+  // Dynamically re-allocate troops from the latest unit summary at the exact moment of creating rally
+  // prioritizing highest level troops down to lowest level
+  const currentSummary = cache?.['getUnitSummary:unit']?.data || cache?.getUnitSummary?.data || state.roster?.units;
+  const heroesData = cache?.heroGetAll?.data || state.roster?.heroes;
+  if (currentSummary && heroesData && state.options?.heroIds?.length) {
+    const cap = data.capacityModel(
+      state.options.heroIds,
+      heroesData,
+      cache?.troopCapacityEvidence?.data,
+      settings || state.options.capacitySettings,
+      state.accountId
+    ).total;
+    const freshUnits = data.allocateTroops(
+      currentSummary,
+      data.teamTroopCapacity(cap, state.options.maxTroops),
+      true
+    );
+    if (freshUnits && freshUnits.length > 0) {
+      state.squad = data.buildSquad(state.options.heroIds, freshUnits);
+    }
+  }
+
   const mobId = currentQueue[0]?.mobId;
   const call = data.buildRallyCall(state.options.mapId, mobId, state.squad, state.options.waitSeconds);
   if (!call) return { state: stop(state, 'No available troops. Refresh the form.') };
@@ -153,6 +189,27 @@ export function areHeroesDeployed(summary: any, heroIds: number[]): boolean {
   return summary.squads.some((squad: any) =>
     squad.heroes?.some((hero: any) => heroIds.includes(hero.id ?? hero.heroId))
   );
+}
+
+export function hasReturningRallySquad(
+  cache: Record<string, any> | null | undefined,
+  heroIds?: number[],
+  now: number = Date.now()
+): boolean {
+  const marchList = [
+    ...safeList(cache?.marchStatus?.data?.marches),
+    ...safeList(cache?.['mapObjectGetAll:march']),
+  ];
+  return marchList.some((raw: any) => {
+    if (!raw) return false;
+    const m = raw.data || raw;
+    const squadHeroes = m.squad?.heroes || m.heroes || [];
+    const isOurHeroes = Array.isArray(heroIds) && heroIds.length > 0 &&
+      squadHeroes.some((h: any) => heroIds.includes(h.id ?? h.heroId));
+    const isReturningStage = m.stage === 'returnToOutpost' || m.type === 'returnToOutpost' || m.route?.type === 'returnToOutpost' || m.kind === 'return';
+    const notArrived = Number.isFinite(m.endsAt) ? now < m.endsAt : true;
+    return isOurHeroes && isReturningStage && notArrived;
+  });
 }
 
 export function start(
@@ -224,6 +281,7 @@ export function start(
   const summary = cache['getUnitSummary:unit']?.data;
   const isGuildRaidActive = hasActiveRaidPending(cache, now);
   const areDeployed = summary ? areHeroesDeployed(summary, options.heroIds) : false;
+  const isReturning = hasReturningRallySquad(cache, options.heroIds, now);
   const won = safeList(cache.experimentalDefeatedBosses?.data);
   const mobs = safeList(searchData?.mobs);
 
@@ -241,7 +299,7 @@ export function start(
     searchedAt > now ||
     now - searchedAt > 300000
   ) {
-    if (isGuildRaidActive || areDeployed) {
+    if (isGuildRaidActive || areDeployed || isReturning) {
       return {
         state: { ...state, phase: 'waiting_rally', sentAt: now, wakeAt: now + 5000 },
         calls: [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }],
@@ -261,7 +319,7 @@ export function start(
   ].filter(Boolean);
   const uniqueQueue = [...new Map(ordered.map((mob: any) => [mob.mobId, { mobId: mob.mobId }])).values()];
 
-  if (isGuildRaidActive || areDeployed || !summary) {
+  if (isGuildRaidActive || areDeployed || isReturning || !summary) {
     const waitState: RaidQueueState = {
       ...state,
       phase: 'waiting_rally',
@@ -285,7 +343,7 @@ export function start(
   ).total;
   const squad = data.buildSquad(
     options.heroIds,
-    data.allocateTroops(summary, data.teamTroopCapacity(cap, options.maxTroops))
+    data.allocateTroops(summary, data.teamTroopCapacity(cap, options.maxTroops), true)
   );
   if (!squad) return null;
 
@@ -296,7 +354,8 @@ export function start(
       bossQueue: state.bossQueue ? { ...state.bossQueue, queue: uniqueQueue } : { remain_raid_count: Number(state.options?.count || 1), queue: uniqueQueue },
     },
     cache,
-    now
+    now,
+    settings
   );
 }
 
@@ -380,15 +439,17 @@ export function advance(
           return { state: stop(state, `Not enough World Energy: ${String(detail).slice(0, 160)}.`) };
         }
         consumeBoss(state, true);
-        if (
-          /not.?found|not.?exist|expired|unavailable|already.*(?:dead|defeated|killed)|invalid.?mob|mob.*(?:missing|removed)/i.test(
-            JSON.stringify(error)
-          )
-        ) {
+        if (/unit|troop|soldier|squad/i.test(JSON.stringify(error))) {
+          return issue(state, 'refreshing', rosterCalls(), now);
+        }
+        const isMobUnavailable = /not.?found|not.?exist|expired|unavailable|already.*(?:dead|defeated|killed)|invalid.*(?:mob|target)|mob.*(?:missing|removed|not|dead|invalid|fail)|target.*(?:missing|dead|invalid|not|fail)|cannot.*find|disappeared/i.test(
+          JSON.stringify(error)
+        );
+        if (isMobUnavailable || !state.bossQueue?.queue?.length) {
           state.bossQueue = { ...state.bossQueue, queue: [] };
           return search(state, now);
         }
-        return nextBoss(state, cache, now);
+        return nextBoss(state, cache, now, settings);
       }
       return { state: stop(state, `${call.name} failed: ${String(detail).slice(0, 160)}. No automatic retry.`) };
     }
@@ -397,7 +458,8 @@ export function advance(
   if (state.phase === 'waiting_rally') {
     const isGuildRaidActive = hasActiveRaidPending(cache, now);
     const areDeployed = areHeroesDeployed(cache?.['getUnitSummary:unit']?.data, state.options?.heroIds);
-    if (!isGuildRaidActive && !areDeployed) {
+    const isReturning = hasReturningRallySquad(cache, state.options?.heroIds, now);
+    if (!isGuildRaidActive && !areDeployed && !isReturning) {
       return issue(state, 'refreshing', rosterCalls(), now);
     }
     if (now > (state.sentAt || now) + 3600000) {
@@ -446,11 +508,11 @@ export function advance(
         settings || state.options.capacitySettings,
         state.accountId
       ).total;
-      const units = data.allocateTroops(state.roster.units, data.teamTroopCapacity(cap, state.options.maxTroops));
+      const units = data.allocateTroops(state.roster.units, data.teamTroopCapacity(cap, state.options.maxTroops), true);
       state.squad = data.buildSquad(state.options.heroIds, units);
       if (!state.squad) return { state: stop(state, 'No available troops. Refresh the form.') };
       state.roster = null;
-      return nextBoss(state, cache, now);
+      return nextBoss(state, cache, now, settings);
     }
   }
 
@@ -478,7 +540,7 @@ export function advance(
       };
       state.searchedAt = now;
       if (!state.bossQueue.queue.length) return { state: stop(state, 'No boss found for the selected level.') };
-      return nextBoss(state, cache, now);
+      return nextBoss(state, cache, now, settings);
     }
   }
 

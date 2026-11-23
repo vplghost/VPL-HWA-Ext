@@ -163,6 +163,22 @@ test('troop allocator maximizes capacity, uses highest tier first and redistribu
   const balanced = data.allocateTroops({ available: [7, 17, 27].map((unitId) => ({ unitId, count: 1000 })) }, 1000);
   assert.deepEqual(Array.from(balanced, (unit) => unit.count), [334, 333, 333]);
   assert.equal(data.allocateTroops({ available: [{ unitId: 99, count: 10 }] }, 10).length, 0);
+
+  // When prioritizeHighestLevel is true, higher tiers are strictly chosen across all types before lower tiers
+  const mixedSummary = {
+    available: [
+      { unitId: 8, count: 100 },
+      { unitId: 18, count: 100 },
+      { unitId: 27, count: 500 },
+      { unitId: 6, count: 1000 },
+    ],
+  };
+  const prioritized = data.allocateTroops(mixedSummary, 250, true);
+  assert.equal(prioritized.reduce((sum, u) => sum + u.count, 0), 250);
+  assert.equal(prioritized.find(u => u.unitId === 8)?.count, 100);
+  assert.equal(prioritized.find(u => u.unitId === 18)?.count, 100);
+  assert.equal(prioritized.find(u => u.unitId === 27)?.count, 50);
+  assert.equal(prioritized.find(u => u.unitId === 6), undefined, 'Must not take tier 6 when higher tiers suffice');
 });
 
 test('capacity uses hero data and falls back after saved values become stale', () => {

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.217 — 2026-11-23
+
+### Added
+
+- **Daily Activity & Energy Statistics Refactor (`activityStats.ts`, `Dashboard.vue`, `ActivityGoals.vue`)**:
+  - Separated Campaign Energy and World Energy into distinct, dedicated cards on the Dashboard, eliminating ambiguous combined energy metrics.
+  - Added Titan Dungeon tracking (total battles and personal titanite progress) and Frontier (Eternal Story) tracking (cleared stages and reward coins).
+  - Tracked Brigand Camps across sessions and modal attacks via `brigandCampHistory`.
+  - Attributed unassigned rally losses directly to auto-join losses without showing a negative loss badge on rallies led.
+  - Re-balanced Daily Progress & Automation metrics layout into 7 concise, actionable cards.
+
+### Fixed
+
+- **Raid Queue Dynamic Highest-Level Troop Allocation & Auto-Search (`raidQueue.ts`, `experimentalData.ts`)**:
+  - **Highest-Tier Troop Priority**: Enhanced `allocateTroops` with `prioritizeHighestLevel` parameter. When true, troops are prioritized and exhausted strictly from Tier 9 down to Tier 1 across all unit types, preventing lower-tier units from being allocated when higher tiers are available.
+  - **Dynamic Re-Allocation & Returning Squad Wait**: Added `hasReturningRallySquad` in `raidQueue.ts` to detect returning marches (`returnToOutpost`). Raid queue pauses in `waiting_rally` and dynamically recalculates fresh troop availability right at the moment of creating the rally, avoiding quantity/level mismatch errors.
+  - **Dead / Missing Boss Auto-Search**: When target bosses are defeated or missing from map, stale queue entries are purged and `searchMob` is triggered automatically, preventing queue freezes or stalls.
+
 ## 0.11.214 — 2026-11-23
 
 ### Added
