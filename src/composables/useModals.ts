@@ -20,7 +20,8 @@ export type ModalName =
   | 'battlePass'
   | 'guildChat'
   | 'log'
-  | 'chest';
+  | 'chest'
+  | 'frontier';
 
 const modalState = reactive<Record<ModalName, boolean>>({
   building: false,
@@ -43,6 +44,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   guildChat: false,
   log: false,
   chest: false,
+  frontier: false,
 });
 
 const modalContext = reactive<{

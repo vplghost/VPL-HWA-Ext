@@ -35,6 +35,7 @@ import BattlePassModal from '@/src/components/dialogs/BattlePassModal.vue';
 import GuildVersusModal from '@/src/components/dialogs/GuildVersusModal.vue';
 import GuildChatPanel from '@/src/components/common/GuildChatPanel.vue';
 import ChestModal from '@/src/components/dialogs/ChestModal.vue';
+import FrontierModal from '@/src/components/dialogs/FrontierModal.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -97,6 +98,7 @@ const { modalState, modalContext } = useModals();
         :initial-chest-id="modalContext.selectedChestId"
         :initial-category="modalContext.selectedChestCategory"
       />
+      <FrontierModal v-model="modalState.frontier" />
     </div>
   </div>
 </template>

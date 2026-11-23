@@ -40,6 +40,10 @@ export interface RpcCache {
   research_getQueue?: { data?: any };
   cinemaGetCounters?: { data?: import('./game/cinema').CinemaCountersData; updatedAt?: string };
   cinemaGiveRewardStatus?: { data?: import('./game/cinema').CinemaGiveRewardResult; updatedAt?: string };
+  eternalStoryStatus?: { data?: import('./game/frontier').FrontierState; updatedAt?: string };
+  eternalStoryChestStatus?: { data?: import('./game/frontier').FrontierChestData; updatedAt?: string };
+  eternalStoryDailyProgress?: { data?: import('./game/frontier').FrontierDailyProgress; updatedAt?: string };
+  eternalStoryTeam?: { data?: { units: number[][] }; updatedAt?: string };
   registrationTime?: number;
   [key: string]: any;
 }
@@ -89,5 +93,6 @@ export * from './game/gatherQueue';
 export * from './game/towerAutomation';
 export * from './game/dungeonAutomation';
 export * from './game/attentionBonus';
+export * from './game/frontier';
 export * from './game/rpcCache';
 

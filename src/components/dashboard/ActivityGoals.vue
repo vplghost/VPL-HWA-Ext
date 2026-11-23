@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { expeditionActivity } from '@/src/utils/expeditions';
 import { useNow } from '@/src/composables/useNow';
 import '@/src/utils/metadata';
-import { towerActivityState, arenaActivityState, dungeonActivityState, guildVersusActivityState, observedToday, readyQuestCount } from '@/src/composables/activityState';
+import { towerActivityState, arenaActivityState, dungeonActivityState, guildVersusActivityState, frontierActivityState, observedToday, readyQuestCount } from '@/src/composables/activityState';
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import { dailyQuests } from '@/src/data/questData';
@@ -84,6 +84,16 @@ const activities = computed<ActivityRow[]>(() => {
   });
 
   rows.push(expeditionActivity(cache.value, now.value));
+
+  // Frontier (Ải Viễn Chinh)
+  rows.push({
+    id: 'frontier',
+    title: 'Frontier',
+    icon: '🧭',
+    ...frontierActivityState(cache.value, now.value),
+    isInteractive: true,
+  });
+
   return rows;
 });
 
@@ -93,6 +103,7 @@ function handleActivityClick(act: ActivityRow) {
   else if (act.id === 'expeditions') openModal('expeditions');
   else if (act.id === 'quests') openModal('questDetail');
   else if (act.id === 'guildVersus') openModal('guildVersus');
+  else if (act.id === 'frontier') openModal('frontier');
 }
 </script>
 

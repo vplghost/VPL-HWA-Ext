@@ -61,6 +61,8 @@ export const RPC_CACHE_DEFINITIONS: Record<string, string> = {
   eternalStory_getState: 'events',
   eternalStory_getChest: 'events',
   eternalStory_collectChest: 'events',
+  eternalStory_autoFight: 'events',
+  battle_teamSet: 'teams',
   refillable_alchemyUseVideo: 'header',
   refillable_skillpointsUseVideo: 'heroes',
   brawl_getAll: 'events',

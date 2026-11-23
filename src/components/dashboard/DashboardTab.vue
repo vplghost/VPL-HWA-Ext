@@ -4,6 +4,7 @@ import ResourceSummary from './ResourceSummary.vue';
 import IncomeOverview from './IncomeOverview.vue';
 import TroopsOverview from './TroopsOverview.vue';
 import QueuesOverview from './QueuesOverview.vue';
+import FrontierCard from './FrontierCard.vue';
 import ActivityGoals from './ActivityGoals.vue';
 import FreeAlchemySpinButton from './FreeAlchemySpinButton.vue';
 import FreeBoxButton from './FreeBoxButton.vue';
@@ -102,6 +103,8 @@ async function refreshAllDashboard() {
     { name: 'titanGetAll' },
     { name: 'expeditionGet' },
     { name: 'heroGetAll' },
+    { name: 'eternalStory_getChest', args: {} },
+    { name: 'eternalStory_getState', args: { hero_packs: [] } },
     ]);
     dashboardRefreshMessage.value = !result?.ok
       ? `Energy refresh requested. Other dashboard refresh failed: ${result?.error || 'RPC error'}`
@@ -262,6 +265,9 @@ async function refreshAllDashboard() {
 
     <!-- Active Queues & Marches -->
     <QueuesOverview />
+
+    <!-- Frontier (Eternal Story) Activity Card -->
+    <FrontierCard />
 
     <!-- Daily Activities & Progress -->
     <ActivityGoals />

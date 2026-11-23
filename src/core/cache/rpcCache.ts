@@ -109,6 +109,8 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
     eternalStory_getState: 'events',
     eternalStory_getChest: 'events',
     eternalStory_collectChest: 'events',
+    eternalStory_autoFight: 'events',
+    battle_teamSet: 'teams',
     refillable_alchemyUseVideo: 'header',
     refillable_skillpointsUseVideo: 'heroes',
     brawl_getAll: 'events',
@@ -2128,6 +2130,48 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             updatedAt: record.timestamp
           }];
         }
+        if (call.name === 'eternalStory_autoFight' && result?.response) {
+          const res = result.response;
+          const entries: any[] = [];
+          if (res.state?.mission) {
+            entries.push({
+              key: 'eternalStoryStatus',
+              method: call.name,
+              feature: null,
+              group: 'events',
+              data: res.state,
+              updatedAt: record.timestamp
+            });
+          }
+          const win = !res.lost_battle;
+          entries.push({
+            key: 'eternalStoryFightResult',
+            method: call.name,
+            feature: null,
+            group: 'events',
+            data: {
+              win,
+              reward: res.reward,
+              lostBattle: res.lost_battle,
+              heroPacks: call.args?.hero_packs,
+              stage: res.state?.mission?.position
+            },
+            updatedAt: record.timestamp
+          });
+          return entries;
+        }
+        if (call.name === 'battle_teamSet' && call.args?.key === 'eternalStory' &&
+            result && Object.hasOwn(result, 'response') && !result.error && !result.response?.error &&
+            Array.isArray(call.args.units)) {
+          return [{
+            key: 'eternalStoryTeam',
+            method: call.name,
+            feature: null,
+            group: 'teams',
+            data: { units: call.args.units },
+            updatedAt: record.timestamp
+          }];
+        }
         if (call.name === 'brawl_getAll' && Array.isArray(result?.response)) {
           return [{
             key: 'brawlStatus',
@@ -3185,6 +3229,48 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 reward: {},
                 filled_in_percents: 0,
                 collected_at: entry.data.collectedTo || Math.floor(Date.parse(entry.updatedAt) / 1000)
+              },
+              updatedAt: entry.updatedAt
+            };
+          }
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'eternalStoryFightResult') {
+          next.eternalStoryFightResult = entry;
+          if (entry.data?.win) {
+            const previousProgress = next.eternalStoryDailyProgress?.data;
+            const entryDay = new Date(entry.updatedAt).toDateString();
+            const isSameDay = previousProgress?.date === entryDay;
+            const clearedCount = isSameDay ? (Number(previousProgress.clearedCount) || 0) + 1 : 1;
+            const clearedStages = isSameDay && Array.isArray(previousProgress.clearedStages) ? [...previousProgress.clearedStages] : [];
+            if (entry.data.stage != null && !clearedStages.includes(entry.data.stage)) {
+              clearedStages.push(entry.data.stage);
+            }
+            next.eternalStoryDailyProgress = {
+              key: 'eternalStoryDailyProgress',
+              method: entry.method,
+              feature: null,
+              group: 'events',
+              data: {
+                date: entryDay,
+                clearedCount,
+                clearedStages
+              },
+              updatedAt: entry.updatedAt
+            };
+          }
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'eternalStoryTeam') {
+          next.eternalStoryTeam = entry;
+          if (next.teamGetAll?.data && Array.isArray(entry.data?.units?.[0])) {
+            next.teamGetAll = {
+              ...next.teamGetAll,
+              data: {
+                ...next.teamGetAll.data,
+                eternalStory: entry.data.units[0]
               },
               updatedAt: entry.updatedAt
             };

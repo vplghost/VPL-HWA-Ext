@@ -170,3 +170,54 @@ export function guildVersusActivityState(cache: Record<string, any>, now = Date.
     progress,
   };
 }
+
+export function frontierActivityState(cache: Record<string, any>, now = Date.now()) {
+  const statusEntry = cache.eternalStoryStatus;
+  const chestEntry = cache.eternalStoryChestStatus;
+  const progressEntry = cache.eternalStoryDailyProgress;
+
+  if (!statusEntry && !chestEntry) {
+    return { state: 'unknown' as const, detail: 'Waiting for game data' };
+  }
+
+  const mission = statusEntry?.data?.mission;
+  const chest = chestEntry?.data;
+  const progress = progressEntry?.data;
+  const isToday = progress?.date === new Date(now).toDateString();
+  const todayCleared = isToday ? (Number(progress?.clearedCount) || 0) : 0;
+
+  const stage = mission?.position;
+  const world = mission?.world;
+  const defenders = mission?.defender_packs?.[0] || [];
+  const enemyPower = defenders.reduce((sum: number, d: any) => sum + (Number(d.power) || 0), 0);
+
+  const chestPercent = Number(chest?.filled_in_percents) || 0;
+  const chestCoins = Number(chest?.reward?.coin?.['23']) || 0;
+
+  let detail = '';
+  if (stage != null) {
+    detail = `Stage ${stage}${world ? ` (World ${world})` : ''} · Power: ${enemyPower.toLocaleString()}`;
+  } else {
+    detail = 'Frontier ready';
+  }
+
+  if (todayCleared > 0) {
+    detail += ` · Cleared: ${todayCleared} today`;
+  }
+  if (chestPercent > 0 || chestCoins > 0) {
+    detail += ` · Chest: ${chestPercent}% (${chestCoins} coins)`;
+  }
+
+  const state = (chestPercent >= 80 || (stage != null && todayCleared === 0)) ? ('pending' as const) : ('info' as const);
+
+  return {
+    state,
+    detail,
+    currentStage: stage,
+    world,
+    enemyPower,
+    todayCleared,
+    chestPercent,
+    chestCoins,
+  };
+}
