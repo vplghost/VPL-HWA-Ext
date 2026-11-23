@@ -37,6 +37,7 @@ import GuildChatPanel from '@/src/components/common/GuildChatPanel.vue';
 import ChestModal from '@/src/components/dialogs/ChestModal.vue';
 import FrontierModal from '@/src/components/dialogs/FrontierModal.vue';
 import MarchDetailModal from '@/src/components/dialogs/MarchDetailModal.vue';
+import LegendsDraftModal from '@/src/components/dialogs/LegendsDraftModal.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -104,6 +105,7 @@ const { modalState, modalContext } = useModals();
         v-model="modalState.marchDetail"
         :initial-march-id="modalContext.selectedMarchId"
       />
+      <LegendsDraftModal v-model="modalState.legendsDraft" />
     </div>
   </div>
 </template>

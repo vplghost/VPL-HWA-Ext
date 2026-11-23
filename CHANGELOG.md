@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.228 — 2026-11-24
+
+### Added
+
+- **Phase 1 Readonly Legends Draft Dialog with Native WASM Table Hook (`LegendsDraftModal.vue`, `useDraft.ts`, `interceptor.ts`)**:
+  - **15 Candidate Heroes Matrix UI**: Built read-only modal dialog presenting all 15 draft candidates across 5 pick steps (columns) and 3 hero cards (rows). Each card showcases avatar, name, main stat badge (STR/AGI/INT), role/class, and highlights picked choices with gold/amber glow and `✓ ĐÃ CHỌN` badge.
+  - **Dynamic Stage & Opponent Header**: Features real-time phase indicator (`Defense Phase` in Stage 2, `Attack Phase` in Stage 4, `Ready` in Stage 5), match ID, rating delta, opponent profile (name, level, clan), and live countdown timer until `stageFinishTs`.
+  - **Native WebAssembly Table Index Hook (Table #330804)**: Hooked `BaseXORCipher_decrypt` in Unity WebGL WebAssembly table to extract plaintext JSON directly from heap memory without requiring server session key knowledge.
+  - **RPC Interception & Auto-Opening**: Integrated RPC sniffer for `randomDraft_getInfo` and `randomDraft_register` to trigger automatic dialog display when `autoOpenDraftDialog` setting is enabled.
+  - **Seamless Session Rebinding & Error Diagnostics**: Rebinds all data seamlessly when a new draft match starts while dialog remains open, and renders a diagnostic error box with raw dump if decoding encounters an exception.
+  - **Settings Option**: Added `#setting-auto-open-draft` checkbox in SettingsTab to configure auto-opening behavior.
+
 ## 0.11.226 — 2026-11-24
 
 ### Fixed

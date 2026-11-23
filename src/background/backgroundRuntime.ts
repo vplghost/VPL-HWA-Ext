@@ -3777,6 +3777,64 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       sendResponse({ ok: true });
       return true;
     }
+    if (['draft-decrypted', 'draft-decrypt-error', 'draft-rpc-event'].includes(message?.kind)) {
+      try {
+        cr.storage?.local?.get(['autoOpenDraftDialog', 'legendsDraftSession'], (stored: any) => {
+          const autoOpen = stored?.autoOpenDraftDialog !== false;
+          let session = stored?.legendsDraftSession || {};
+
+          if (message.kind === 'draft-decrypted') {
+            const dto = message.data?.draft;
+            session = {
+              ...session,
+              heroSteps: dto?.playerTeam?.heroes || session.heroSteps || [],
+              chosenDefenceHeroes: dto?.chosenDefenceHeroes || session.chosenDefenceHeroes || [],
+              chosenAttackHeroes: dto?.chosenAttackHeroes || session.chosenAttackHeroes || [],
+              stageFinishTs: dto?.stageFinishTs || session.stageFinishTs,
+              gameTimeTs: dto?.gameTimeTs || session.gameTimeTs,
+              error: null,
+              errorDetail: null,
+              updatedAt: Date.now()
+            };
+          } else if (message.kind === 'draft-rpc-event') {
+            const resp = message.data?.response;
+            if (resp) {
+              if (resp.matchId != null && resp.matchId !== session.matchId) {
+                session.heroSteps = [];
+                session.chosenDefenceHeroes = [];
+                session.chosenAttackHeroes = [];
+              }
+              session = {
+                ...session,
+                matchId: resp.matchId != null ? Number(resp.matchId) : session.matchId,
+                stageId: resp.stageId != null ? Number(resp.stageId) : session.stageId,
+                stageFinishTs: resp.stageFinishTs != null ? Number(resp.stageFinishTs) : session.stageFinishTs,
+                userRating: resp.rating?.userRating != null ? Number(resp.rating.userRating) : session.userRating,
+                enemyRating: resp.rating?.enemyRating != null ? Number(resp.rating.enemyRating) : session.enemyRating,
+                enemyUser: resp.enemyUser ? { ...resp.enemyUser } : session.enemyUser,
+                rawCiphertext: resp.draft || session.rawCiphertext,
+                updatedAt: Date.now()
+              };
+            }
+          } else if (message.kind === 'draft-decrypt-error') {
+            session = {
+              ...session,
+              error: message.data?.error || 'Decryption error',
+              errorDetail: message.data?.detail || null,
+              updatedAt: Date.now()
+            };
+          }
+
+          cr.storage?.local?.set?.({ legendsDraftSession: session })?.catch?.(() => {});
+
+          if (autoOpen) {
+            cr.runtime?.sendMessage?.({ kind: 'open-draft-dialog', session })?.catch?.(() => {});
+          }
+        });
+      } catch (_) {}
+      sendResponse?.({ ok: true });
+      return true;
+    }
     if (message?.kind !== 'api-record' || !isGameUrl(sender.url)) return;
     const record = normalize(message.record);
     if (!record) {

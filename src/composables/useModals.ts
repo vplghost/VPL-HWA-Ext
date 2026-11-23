@@ -22,7 +22,8 @@ export type ModalName =
   | 'log'
   | 'chest'
   | 'frontier'
-  | 'marchDetail';
+  | 'marchDetail'
+  | 'legendsDraft';
 
 const modalState = reactive<Record<ModalName, boolean>>({
   building: false,
@@ -47,6 +48,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   chest: false,
   frontier: false,
   marchDetail: false,
+  legendsDraft: false,
 });
 
 const modalContext = reactive<{

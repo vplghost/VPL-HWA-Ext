@@ -533,6 +533,92 @@ export function installInterceptor(customWindow?: any): void {
     }
     reportEngineStatus(`instance-${source}`);
     setupWasmSimulationBridge(instance);
+    tryHookWasmDraftCipher(instance);
+  }
+
+  function tryHookWasmDraftCipher(instance?: any) {
+    try {
+      const activeInst = instance || activeUnityInstance || findActiveUnityInstance(win, doc);
+      if (!activeInst) return;
+      const mod = activeInst?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule || activeInst;
+      const asm = mod?.asm || mod;
+      if (!asm) return;
+      const values = Object.values(asm);
+      const table = (values.find((v: any) => v instanceof WebAssembly.Table) || (mod as any).wasmTable) as WebAssembly.Table | undefined;
+      const memory = (values.find((v: any) => v instanceof WebAssembly.Memory) || (mod as any).wasmMemory) as WebAssembly.Memory | undefined;
+      if (!table || !memory) return;
+
+      const TABLE_INDEX_DRAFT_DECRYPT = 330804;
+      if (table.length <= TABLE_INDEX_DRAFT_DECRYPT) return;
+
+      const originalDecrypt = table.get(TABLE_INDEX_DRAFT_DECRYPT);
+      if (typeof originalDecrypt !== 'function' || (originalDecrypt as any).__hwaHooked) return;
+
+      const hookedDecrypt = function (...args: any[]) {
+        const resultPtr = originalDecrypt.apply(this, args);
+        try {
+          if (resultPtr && memory?.buffer) {
+            const heapI32 = new Int32Array(memory.buffer);
+            const len = heapI32[(resultPtr + 8) >>> 2];
+            if (len > 10 && len < 2000000) {
+              const u16Start = (resultPtr + 12) >>> 1;
+              const heapU16 = new Uint16Array(memory.buffer);
+              let s = '';
+              for (let i = 0; i < len; i += 8192) {
+                s += String.fromCharCode.apply(null, Array.from(heapU16.subarray(u16Start + i, u16Start + Math.min(len, i + 8192))));
+              }
+              if (s.startsWith('{') && (s.includes('"playerTeam"') || s.includes('"heroes"') || s.includes('"chosenDefenceHeroes"'))) {
+                try {
+                  const draftDto = JSON.parse(s);
+                  win.postMessage({
+                    source: 'hwa-helper-api',
+                    kind: 'draft-decrypted',
+                    draft: draftDto,
+                    raw: s
+                  }, loc.origin);
+                } catch (parseErr: any) {
+                  win.postMessage({
+                    source: 'hwa-helper-api',
+                    kind: 'draft-decrypt-error',
+                    error: `JSON parse error: ${parseErr?.message || parseErr}`,
+                    detail: parseErr?.stack,
+                    raw: s
+                  }, loc.origin);
+                }
+              }
+            }
+          }
+        } catch (hookErr: any) {
+          console.warn('[HWA-Helper] Error in draft decrypt hook:', hookErr);
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'draft-decrypt-error',
+            error: `Memory read error: ${hookErr?.message || hookErr}`,
+            detail: hookErr?.stack
+          }, loc.origin);
+        }
+        return resultPtr;
+      };
+      (hookedDecrypt as any).__hwaHooked = true;
+      table.set(TABLE_INDEX_DRAFT_DECRYPT, hookedDecrypt);
+    } catch (_) {}
+  }
+
+  function inspectDraftRpc(resText: string | null | undefined) {
+    if (!resText || !resText.includes('randomDraft')) return;
+    try {
+      const parsed = JSON.parse(resText);
+      for (const r of (parsed?.results || [])) {
+        const resp = r?.result?.response;
+        if (resp && (resp.stageId !== undefined || resp.matchId !== undefined || resp.draft !== undefined)) {
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'draft-rpc-event',
+            response: resp
+          }, loc.origin);
+        }
+      }
+    } catch (_) {}
   }
 
   function describeWasmException(err: any, phase: string, context?: any) {
@@ -2337,6 +2423,7 @@ export function installInterceptor(customWindow?: any): void {
                 Promise.all([requestBody, readFetchResponse(response)]).then(([request, received]) => {
                   const reqText = request?.text ?? null;
                   const resText = received?.text ?? null;
+                  inspectDraftRpc(resText);
                   if (resText && resText.includes('"version"')) {
                     try {
                       const parsed = JSON.parse(resText);
@@ -2583,6 +2670,7 @@ export function installInterceptor(customWindow?: any): void {
           if (String(info.method).toUpperCase() === 'POST') {
             const received = readXhrResponse(this);
             const resText = received?.text ?? null;
+            inspectDraftRpc(resText);
             info.requestBody.then((request: any) => {
               const reqText = request?.text ?? null;
               record('xhr', info.method, info.url,

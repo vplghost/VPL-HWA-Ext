@@ -8,6 +8,7 @@ import '@/src/utils/metadata';
 import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
+import { useDraft } from '@/src/composables/useDraft';
 import { TROOP_DEFS, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
 import type { ThemeMode, TroopTrainSettings } from '@/src/types';
 
@@ -31,6 +32,7 @@ const wasmCallErrorDetail = ref<any>(null);
 const showWasmCallDiagnostics = ref(false);
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
+const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
 
 // Auto Troop Training
 const autoTrainEnabled = ref(false);
@@ -513,6 +515,33 @@ async function toggleRecording() {
       <label class="flex items-center gap-2"><input id="setting-auto-frontier-rewards" v-model="autoFrontierEnabled" type="checkbox" @change="saveAutoFrontier" />Auto claim Frontier chest hourly (every 60 minutes)</label>
       <p class="text-xs text-slate-500">Collects accumulated Frontier (Eternal Story) chest rewards every hour while the game is open. Uses shared RPC settings.</p>
       <p role="status" class="text-xs text-slate-500">{{ autoFrontierStatus }}</p>
+    </section>
+
+    <!-- Legends Draft -->
+    <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold flex items-center gap-1.5">
+          <span>🏆</span> Legends Draft
+        </h3>
+        <span
+          v-if="autoOpenDraft"
+          class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+        >
+          Active
+        </span>
+      </div>
+      <label class="flex items-center gap-2">
+        <input
+          id="setting-auto-open-draft"
+          v-model="autoOpenDraft"
+          type="checkbox"
+          @change="saveDraftAutoOpen(autoOpenDraft)"
+        />
+        Tự động mở Draft Dialog khi nhận được tín hiệu trận đấu (Auto-open Legends Draft Dialog)
+      </label>
+      <p class="text-xs text-slate-500">
+        Tự động mở cửa sổ 15 tướng ứng viên khi game gửi tín hiệu bắt đầu hoặc chuyển vòng chọn trong Legends Draft (giải mã trực tiếp qua WASM Table Hook #330804).
+      </p>
     </section>
 
     <!-- Auto Troop Training -->
