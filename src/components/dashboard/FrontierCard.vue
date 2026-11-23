@@ -31,16 +31,16 @@ const chestCoins = computed(() => frontierState.value.chestCoins ?? 0);
 async function handleCollectChest() {
   if (isCollecting.value) return;
   isCollecting.value = true;
-  actionMsg.value = 'Đang thu thập rương...';
+  actionMsg.value = 'Collecting AFK chest...';
   try {
     const res = await collectFrontierChest(dispatchRpc);
     if (res?.ok) {
-      actionMsg.value = 'Thu thập rương thành công!';
+      actionMsg.value = 'Chest collected successfully!';
     } else {
-      actionMsg.value = res?.error || 'Thu thập rương thất bại.';
+      actionMsg.value = res?.error || 'Failed to collect chest.';
     }
   } catch (err: any) {
-    actionMsg.value = err?.message || 'Lỗi kết nối RPC.';
+    actionMsg.value = err?.message || 'RPC communication error.';
   } finally {
     isCollecting.value = false;
     setTimeout(() => { actionMsg.value = ''; }, 3000);
@@ -50,16 +50,16 @@ async function handleCollectChest() {
 async function handleRefresh() {
   if (isRefreshing.value) return;
   isRefreshing.value = true;
-  actionMsg.value = 'Đang làm mới thông tin...';
+  actionMsg.value = 'Refreshing Frontier status...';
   try {
     const res = await refreshFrontierState(dispatchRpc);
     if (res?.ok) {
-      actionMsg.value = 'Làm mới thành công!';
+      actionMsg.value = 'Frontier refreshed!';
     } else {
-      actionMsg.value = res?.error || 'Làm mới thất bại.';
+      actionMsg.value = res?.error || 'Failed to refresh.';
     }
   } catch (err: any) {
-    actionMsg.value = err?.message || 'Lỗi khi gửi yêu cầu làm mới.';
+    actionMsg.value = err?.message || 'Error sending refresh RPC.';
   } finally {
     isRefreshing.value = false;
     setTimeout(() => { actionMsg.value = ''; }, 2500);
@@ -84,10 +84,10 @@ function handleOpenModal() {
               v-if="currentStage"
               class="px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-100 text-violet-800 dark:bg-violet-950/70 dark:text-violet-300"
             >
-              Ải {{ currentStage }}<span v-if="world"> · Thế giới {{ world }}</span>
+              Stage {{ currentStage }}<span v-if="world"> · World {{ world }}</span>
             </span>
           </div>
-          <p class="text-[11px] text-slate-400">Ải Viễn Chinh & Chiến dịch Tự động</p>
+          <p class="text-[11px] text-slate-400">Campaign Battles & Auto Progression</p>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ function handleOpenModal() {
           type="button"
           :disabled="isRefreshing"
           class="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-          title="Làm mới dữ liệu Frontier"
+          title="Refresh Frontier data from game"
           @click="handleRefresh"
         >
           <span :class="{ 'animate-spin inline-block': isRefreshing }">🔄</span>
@@ -106,7 +106,7 @@ function handleOpenModal() {
           class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-all shadow-2xs flex items-center gap-1"
           @click="handleOpenModal"
         >
-          <span>Chi tiết & Tự động</span>
+          <span>Details & Auto Battle</span>
           <span>↗</span>
         </button>
       </div>
@@ -120,21 +120,21 @@ function handleOpenModal() {
     <!-- Key Metrics Grid -->
     <div class="grid grid-cols-3 gap-2 text-center">
       <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60">
-        <div class="text-[10px] text-slate-400 uppercase font-semibold">Ải cần đánh</div>
+        <div class="text-[10px] text-slate-400 uppercase font-semibold">Target Stage</div>
         <div class="text-sm font-bold text-slate-800 dark:text-slate-100">
-          {{ currentStage ? `Ải ${currentStage}` : 'Chờ dữ liệu' }}
+          {{ currentStage ? `Stage ${currentStage}` : 'Waiting' }}
         </div>
       </div>
       <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60">
-        <div class="text-[10px] text-slate-400 uppercase font-semibold">Lực chiến quái</div>
+        <div class="text-[10px] text-slate-400 uppercase font-semibold">Enemy Power</div>
         <div class="text-sm font-bold text-amber-600 dark:text-amber-400">
           ⚡ {{ formatNumber(enemyPower) }}
         </div>
       </div>
       <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60">
-        <div class="text-[10px] text-slate-400 uppercase font-semibold">Vượt hôm nay</div>
+        <div class="text-[10px] text-slate-400 uppercase font-semibold">Cleared Today</div>
         <div class="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-          🏆 {{ todayCleared }} ải
+          🏆 {{ todayCleared }} stages
         </div>
       </div>
     </div>
@@ -142,15 +142,15 @@ function handleOpenModal() {
     <!-- Enemy Team Preview -->
     <div v-if="defenders.length" class="space-y-1">
       <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-        <span>Đội hình trấn giữ ải:</span>
-        <span class="text-[10px] text-slate-400">{{ defenders.length }} tướng</span>
+        <span>Defending Lineup:</span>
+        <span class="text-[10px] text-slate-400">{{ defenders.length }} heroes</span>
       </div>
       <div class="flex items-center gap-1.5 overflow-x-auto py-1">
         <div
           v-for="d in defenders"
           :key="d.id"
           class="relative group shrink-0 flex flex-col items-center p-1 rounded-md bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/60 w-12"
-          :title="`${getHeroName(d.id)} (Lv.${d.level || 120}) - LC: ${formatNumber(d.power)}`"
+          :title="`${getHeroName(d.id)} (Lv.${d.level || 120}) - Power: ${formatNumber(d.power)}`"
         >
           <img
             v-if="getHeroAvatar(d.id)"
@@ -178,11 +178,11 @@ function handleOpenModal() {
         <span class="text-xl">🎁</span>
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
-            <span>Rương tích lũy</span>
+            <span>AFK Chest</span>
             <span class="text-[10px] text-violet-600 dark:text-violet-400">({{ chestPercent }}%)</span>
           </div>
           <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-            Tích lũy: <strong class="text-amber-600 dark:text-amber-400 font-bold">{{ chestCoins.toLocaleString() }}</strong> Xu Viễn Chinh
+            Accumulated: <strong class="text-amber-600 dark:text-amber-400 font-bold">{{ chestCoins.toLocaleString() }}</strong> Frontier Coins
           </div>
           <!-- Progress bar -->
           <div class="w-32 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1">
@@ -206,7 +206,7 @@ function handleOpenModal() {
         @click="handleCollectChest"
       >
         <span v-if="isCollecting" class="animate-spin inline-block mr-1">⏳</span>
-        <span>Thu thập</span>
+        <span>Collect</span>
       </button>
     </div>
   </div>

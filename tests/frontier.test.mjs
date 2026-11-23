@@ -145,18 +145,26 @@ test('frontierActivityState computes correct stage, detail, and pending state', 
   assert.ok(state.detail.includes('Cleared: 3 today'));
 });
 
-test('FrontierCard and FrontierModal components exist with required UI controls', async () => {
+test('FrontierCard and FrontierModal components exist with required UI controls and English localization', async () => {
   const cardSrc = await readFile(resolve(root, 'src/components/dashboard/FrontierCard.vue'), 'utf8');
   assert.ok(cardSrc.includes('Frontier'), 'Card should include Frontier title');
-  assert.ok(cardSrc.includes('currentStage'), 'Card should display currentStage');
-  assert.ok(cardSrc.includes('enemyPower'), 'Card should display enemyPower');
-  assert.ok(cardSrc.includes('todayCleared'), 'Card should display todayCleared');
+  assert.ok(cardSrc.includes('Target Stage'), 'Card should display Target Stage in English');
+  assert.ok(cardSrc.includes('Enemy Power'), 'Card should display Enemy Power in English');
+  assert.ok(cardSrc.includes('Cleared Today'), 'Card should display Cleared Today in English');
+  assert.ok(cardSrc.includes('Details & Auto Battle'), 'Card should have Details & Auto Battle button');
   assert.ok(cardSrc.includes('handleCollectChest'), 'Card should have quick chest collect');
   assert.ok(cardSrc.includes('handleOpenModal'), 'Card should have open modal trigger');
 
   const modalSrc = await readFile(resolve(root, 'src/components/dialogs/FrontierModal.vue'), 'utf8');
   assert.ok(modalSrc.includes('ModalDialog'), 'Modal should use ModalDialog');
+  assert.ok(modalSrc.includes('Lineup & Stage'), 'Modal should display Lineup & Stage tab in English');
+  assert.ok(modalSrc.includes('Automation & Simulation'), 'Modal should display Automation & Simulation tab in English');
+  assert.ok(modalSrc.includes('frontier-preset-picker'), 'Modal should have preset picker for saved teams');
+  assert.ok(modalSrc.includes('onSelectPresetTeam'), 'Modal should handle preset team selection');
   assert.ok(modalSrc.includes('selectedSquad'), 'Modal should support squad selection');
+  assert.ok(modalSrc.includes('maxDefeats'), 'Modal should provide maxDefeats threshold setting');
+  assert.ok(modalSrc.includes('rotateTeams'), 'Modal should provide rotateTeams on defeat option');
+  assert.ok(modalSrc.includes('selectedRotateTeamIds'), 'Modal should allow selecting custom teams for rotation');
   assert.ok(modalSrc.includes('startAutoFight'), 'Modal should have auto battle function');
   assert.ok(modalSrc.includes('handleSingleFight'), 'Modal should have single fight function');
   assert.ok(modalSrc.includes('useWasmSim'), 'Modal should have WASM simulation option');
