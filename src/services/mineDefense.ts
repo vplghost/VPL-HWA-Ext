@@ -1,7 +1,13 @@
 import type { HospitalRoomInfo, MineDefensePlan } from '../types/game/mineDefense';
 import { getInfirmaryCapacity } from '../data/mineDefenseData.ts';
 import { smartGatherService } from './queues/smartGather.ts';
-import { experimentalDataHelper } from '../utils/experimentalData.ts';
+import {
+  capacityModel,
+  normalizeCapacitySettings,
+  allocateTroops,
+  buildSquad,
+} from '../utils/squadCapacity.ts';
+import { buildGatherCall } from '../utils/mineData.ts';
 
 const list = (value: any): any[] =>
   Array.isArray(value) ? value : value && typeof value === 'object' ? Object.values(value) : [];
@@ -46,19 +52,19 @@ function buildSquadCall(
   if (!summary) return null;
   const availSummary = Array.isArray(summary?.available) ? summary : { available: list(summary?.units) };
   const heroes = cache.heroGetAll?.data || {};
-  const model = experimentalDataHelper.capacityModel(
+  const model = capacityModel(
     heroIds,
     heroes,
     cache?.troopCapacityEvidence?.data,
-    experimentalDataHelper.normalizeCapacitySettings(stored?.troopCapacitySettings),
+    normalizeCapacitySettings(stored?.troopCapacitySettings),
     cache?.accountStatus?.data?.id ?? undefined
   );
   const capacity = model.total;
   if (!capacity || capacity <= 0) return null;
-  const troops = experimentalDataHelper.allocateTroops(availSummary, capacity);
-  const squad = experimentalDataHelper.buildSquad(heroIds, troops);
+  const troops = allocateTroops(availSummary, capacity);
+  const squad = buildSquad(heroIds, troops);
   if (!squad) return null;
-  return experimentalDataHelper.buildGatherCall(mapId, String(mineId), squad);
+  return buildGatherCall(mapId, String(mineId), squad);
 }
 
 export function hospital(cache: Record<string, any>, now: number): HospitalRoomInfo | null {

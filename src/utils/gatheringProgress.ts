@@ -1,4 +1,4 @@
-import { getMineTypeLevel } from './experimentalData.ts';
+import { getMineTypeLevel } from './mineData.ts';
 
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const clamp = (value: number) => Math.max(0, Math.min(1, value));

@@ -1,6 +1,6 @@
 import { isInactiveResource } from './itemResources.ts';
 import { getItemName } from '../data/nameData.ts';
-import { getMineTypeLevel } from './experimentalData.ts';
+import { getMineTypeLevel } from './mineData.ts';
 
 export interface ResourceTheme {
   name: string;

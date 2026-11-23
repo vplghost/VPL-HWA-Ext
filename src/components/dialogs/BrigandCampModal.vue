@@ -5,7 +5,7 @@ import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useDialogTeamSelection } from '@/src/composables/useDialogTeamSelection';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { getHeroMetadata, getItemName, starGlowClass } from '@/src/utils/metadata';
-import { teamOptions as getTeamOptions } from '@/src/utils/experimentalData';
+import { teamOptions as getTeamOptions } from '@/src/utils/squadCapacity';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import { getAmountAt } from '@/src/utils/resourceData';
 import { BRIGAND_ENERGY_COST, campHeroIds, campAttackError, campAttackCalls, campSearchCalls, availableCamps } from '@/src/utils/brigandCamp';

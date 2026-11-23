@@ -16,7 +16,7 @@ import { monsterSquadPower, monsterPowerComparison, formatMonsterPower } from '@
 import {
   soloMonsterConfigIds,
   soloMonsterLevel,
-} from '@/src/utils/experimentalData';
+} from '@/src/utils/mobData';
 
 const props = defineProps<{
   modelValue: boolean;

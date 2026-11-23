@@ -13,8 +13,8 @@ import {
   teamTroopCapacity as getTeamTroopCapacity,
   allocateTroops as getAllocateTroops,
   unitInfo as getUnitInfoData,
-  buildOptimizedGatheringTeam,
-} from '@/src/utils/experimentalData';
+} from '@/src/utils/squadCapacity';
+import { buildOptimizedGatheringTeam } from '@/src/utils/mineData';
 
 export interface SquadTeamOption {
   id: string;

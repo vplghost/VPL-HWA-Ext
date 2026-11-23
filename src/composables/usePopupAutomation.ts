@@ -1,6 +1,6 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
 import { getPendingClaims, buildAutoClaimCalls, normalizeAutoClaim, type AutoClaimSettings } from '../utils/popupData.ts';
-import { availableHeroIds, autoJoinTeamOptions } from '../utils/experimentalData.ts';
+import { availableHeroIds, autoJoinTeamOptions } from '../utils/squadCapacity.ts';
 
 export { normalizeAutoClaim, type AutoClaimSettings };
 export function normalizePriorityJoin(value: any = {}) {

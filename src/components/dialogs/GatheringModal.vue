@@ -12,11 +12,11 @@ import { gatheringProgress } from '@/src/utils/gatheringProgress';
 import { calculateAccountMaxMarches } from '@/src/utils/dashboardState';
 import {
   getMineConfigId,
-  buildSquad,
   buildGatherCall,
   buildMineSearchCall,
   buildOptimizedGatheringTeam,
-} from '@/src/utils/experimentalData';
+} from '@/src/utils/mineData';
+import { buildSquad } from '@/src/utils/squadCapacity';
 
 const props = defineProps<{
   modelValue: boolean;

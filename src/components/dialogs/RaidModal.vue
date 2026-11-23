@@ -17,7 +17,7 @@ import {
   bossLevel as getBossLevel,
   rallyWaitOptions,
   rallyPhase,
-} from '@/src/utils/experimentalData';
+} from '@/src/utils/mobData';
 
 const props = defineProps<{
   modelValue: boolean;

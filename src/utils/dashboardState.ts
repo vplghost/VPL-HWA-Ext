@@ -1,7 +1,7 @@
 import { normalizeArray } from './troops.ts';
 import { formatDuration } from './formatters.ts';
 import { gatheringProgress } from './gatheringProgress.ts';
-import { bossLevel, soloMonsterLevel } from './experimentalData.ts';
+import { bossLevel, soloMonsterLevel } from './mobData.ts';
 import { getMarchBadgeInfo, isMarchExpired } from './resourceData.ts';
 
 const timestampMs = (value: unknown): number | null => {

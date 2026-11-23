@@ -6,7 +6,7 @@ import { RESOURCE_THEMES } from './resourceData.ts';
 import {
   bossLevel,
   soloMonsterLevel,
-} from './experimentalData.ts';
+} from './mobData.ts';
 
 /**
  * Format remaining time duration for march stages

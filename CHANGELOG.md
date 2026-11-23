@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.222 — 2026-11-23
+
+### Refactored
+
+- **Decompose `experimentalData.ts` into Domain Utilities (`squadCapacity.ts`, `mobData.ts`, `mineData.ts`)**:
+  - **`squadCapacity.ts`**: Encapsulated troop capacity estimation/matrix modeling (`capacityModel`, `squadCapacity`, `heroCapacity`, `normalizeCapacitySettings`), unit definitions (`unitInfo`), allocation algorithm (`allocateTroops` with tier priority), and team option builders (`availableHeroIds`, `teamOptions`, `buildSquad`).
+  - **`mobData.ts`**: Consolidated Boss and Solo Monster level mappings (`bossConfigId`, `bossLevel`, `soloMonsterConfigIds`, `soloMonsterLevel`), rally phase calculations (`rallyPhase`, `rallyMembers`), and rally RPC builders (`buildRallyCall`, `buildJoinRallyCall`).
+  - **`mineData.ts`**: Consolidated remote mine configurations, cargo weights/capacities (`calculateMineCargo`, `calculateRequiredTroopsForCargo`), mine RPC builders (`buildMineSearchCall`, `buildGatherCall`), and gathering optimization (`buildOptimizedGatheringTeam`).
+  - **Clean Direct Imports**: Migrated modals, composables, and services across `src/` to import directly from domain utilities while retaining `experimentalData.ts` as a backwards-compatible barrel export.
+
 ## 0.11.221 — 2026-11-23
 
 ### Added
