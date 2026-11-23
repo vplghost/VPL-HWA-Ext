@@ -458,6 +458,17 @@ export function refillDescription(entry: ResourceEntry | undefined, now = Date.n
 }
 
 /**
+ * Single source of truth for Skill Points soft cap.
+ * Defaults to 20 (upgraded soft cap after building slot pack / bundle / VIP).
+ */
+export function getSkillPointsCap(cache?: any): number {
+  if (!cache) return 20;
+  const entryCap = cache['resource:refillable:2']?.data?.cap;
+  if (Number.isFinite(entryCap) && entryCap > 0) return entryCap;
+  return 20;
+}
+
+/**
  * Single source of truth for Skill Points.
  * Prioritizes resource:refillable:2 with live time-based refill calculation,
  * with fallback to userGetInfo.data.refillable (id: 2).
@@ -479,7 +490,7 @@ export function getSkillPoints(cache: any, now = Date.now()): number {
           lastRefillAt: fromUser.lastRefill * 1000,
           refillEveryMs: 300000,
           refillAmount: 1,
-          cap: 10,
+          cap: getSkillPointsCap(cache),
           renewable: true
         }
       };
@@ -556,6 +567,7 @@ export function getWorldEnergy(cache: any, now = Date.now()): number | null {
 
 export const resourceDataHelper = {
   getSkillPoints,
+  getSkillPointsCap,
   getGold,
   getStarMoney,
   getEnergy,

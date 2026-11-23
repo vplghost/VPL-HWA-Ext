@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.221 — 2026-11-23
+
+### Added
+
+- **Skill Points Soft Cap Upgrade to 20 (`resourceData.ts`, `rpcCache.ts`, `HeroDetailModal.vue`, `Header.vue`)**:
+  - **Dynamic Soft Cap Resolution (`getSkillPointsCap`)**: Discovered game client config source in `temp/splitlib/refillable.json` (`maxValue: [10, 10, 10, 10, 20]`) and `refillable_upgrade_item.pb`. Standard accounts use index 0 (`10`), while purchasing the Building Slot Pack / Construction Queue Pack or VIP milestone activates the upgrade tier (`20`).
+  - **Header & Modals Integration**: Dynamic cap `skillPointsCap` replaces hardcoded `10` across `HeroDetailModal.vue` (`claimFreeSkillPoints` checks, display label, and tooltips) and `Header.vue` (`isCapped` amber status guard).
+  - **RPC Cache Awareness**: `userGetInfo` dynamically sets `cap = 20` for refillable id 2 (`resource:refillable:2`) when building queue upgrade or VIP points are detected.
+
 ## 0.11.219 — 2026-11-23
 
 ### Added

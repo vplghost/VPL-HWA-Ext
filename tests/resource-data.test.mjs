@@ -73,7 +73,7 @@ test('getSkillPoints calculates live regenerated skill points up to cap 10 and f
   assert.equal(resources.getSkillPoints(cacheWithResource, baseTime + 300000), 6);
   assert.equal(resources.getSkillPoints(cacheWithResource, baseTime + 300000 * 20), 10, 'Must cap at 10');
 
-  // 2. Fallback to userGetInfo.data.refillable[id: 2]
+  // 2. Fallback to userGetInfo.data.refillable[id: 2] (uses soft cap 20)
   const cacheWithUser = {
     userGetInfo: {
       data: {
@@ -85,7 +85,11 @@ test('getSkillPoints calculates live regenerated skill points up to cap 10 and f
     }
   };
   assert.equal(resources.getSkillPoints(cacheWithUser, baseTime + 300000), 4);
-  assert.equal(resources.getSkillPoints(cacheWithUser, baseTime + 300000 * 10), 10);
+  assert.equal(resources.getSkillPoints(cacheWithUser, baseTime + 300000 * 10), 13);
+  assert.equal(resources.getSkillPoints(cacheWithUser, baseTime + 300000 * 30), 20, 'Must cap at 20');
+  assert.equal(resources.getSkillPointsCap({}), 20);
+  assert.equal(resources.getSkillPointsCap({ 'resource:refillable:2': { data: { cap: 10 } } }), 10);
+  assert.equal(resources.getSkillPointsCap({ 'resource:refillable:2': { data: { cap: 20 } } }), 20);
 
   // 3. Fallback when userGetInfo has no lastRefill
   const cacheWithUserStatic = {

@@ -7,6 +7,7 @@ import { useResourceSelection } from '@/src/composables/useResourceSelection';
 import {
   formatResourceAmount,
   getAmountAt,
+  getSkillPointsCap,
   remainingMinutes,
   hoursMinutes,
   resourceAppearance,
@@ -518,7 +519,7 @@ const headerResourceEntries = computed(() => {
       const entry = { key: k, data: v.data };
       if (isSelectableForHeader(entry) && Array.isArray(resourceSelection.value) && resourceSelection.value.includes(k)) {
         const val = getAmountAt(entry, now.value);
-        const cap = entry.data?.cap;
+        const cap = k === 'resource:refillable:2' ? getSkillPointsCap(cache.value) : entry.data?.cap;
         const isCapped = Number.isFinite(val) && Number.isFinite(cap) && (val as number) >= cap!;
         entries.push({
           key: k,

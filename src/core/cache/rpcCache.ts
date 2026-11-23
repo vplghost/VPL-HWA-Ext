@@ -1925,7 +1925,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
         if (call.name === 'refillable_skillpointsUseVideo') {
           if (call.args?.type !== 'skill_points' || call.feature || !result) return [];
           const res = result.response;
-          const points = Number(res?.skill_point ?? 10);
+          const points = Number(res?.skill_point ?? 20);
           const error = result.error || res?.error;
           const entries = [];
           if (!error && points > 0) {
@@ -1933,7 +1933,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               lastRefillAt: Date.parse(record.timestamp),
               refillEveryMs: 300000,
               refillAmount: 1,
-              cap: 10,
+              cap: 20,
               renewable: true
             }));
             entries.push(...resource('refillable:55', 0, record, call.name, 'Skill Point Video', {
@@ -2348,8 +2348,17 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           for (const item of info.refillable || []) {
             const rule = getRefillableRules()?.[item.id];
             const label = rule?.label || `Refillable #${item.id}`;
-            const cap = rule?.capFromTeamLevel && Number.isInteger(teamLevel) && teamLevel > 0 ?
+            let cap = rule?.capFromTeamLevel && Number.isInteger(teamLevel) && teamLevel > 0 ?
               (teamLevel === 1 ? 60 : 60 + teamLevel) : rule?.cap;
+            if (item.id === 2) {
+              const hasBuildingUpgrade = Number(info.buildingQueueCount || 0) > 1 ||
+                (Array.isArray(info.buildingQueues) && info.buildingQueues.length > 1) ||
+                (Number(info.vipPoints || 0) > 0) ||
+                (Number(info.vipLevel || 0) > 0);
+              if (hasBuildingUpgrade) {
+                cap = 20;
+              }
+            }
             const timed = item.id === 53 && Number.isFinite(item.lastRefill) ? { lastRefillAt: item.lastRefill * 1000 } : rule && Number.isFinite(item.lastRefill) && Number.isFinite(cap) ? {
               lastRefillAt: item.lastRefill * 1000, refillEveryMs: rule.interval,
               refillAmount: 1, cap, renewable: true

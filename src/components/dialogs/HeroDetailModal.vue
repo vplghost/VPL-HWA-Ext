@@ -19,7 +19,7 @@ import {
   starGlowClass,
 } from '@/src/utils/metadata';
 import { formatNumber } from '@/src/utils/formatters';
-import { getSkillPoints, getGold } from '@/src/utils/resourceData';
+import { getSkillPoints, getSkillPointsCap, getGold } from '@/src/utils/resourceData';
 import pickerData from '@/src/data/campaign-picker.json';
 import { getHeroSoulMissions } from '@/src/data/campaignData';
 import {
@@ -269,6 +269,7 @@ const isUpgradingAllSkills = ref(false);
 
 // Available skill points and gold (canonical single source of truth)
 const skillPoints = computed(() => getSkillPoints(cache.value, now.value));
+const skillPointsCap = computed(() => getSkillPointsCap(cache.value));
 const currentGold = computed(() => getGold(cache.value));
 
 function getSkillPointsNeeded(s: SkillSlotConfig): number {
@@ -314,7 +315,7 @@ const hasFreeSkillPoints = computed(() => {
 });
 
 async function claimFreeSkillPoints() {
-  if (isClaimingFreeSkillPoints.value || isUpgradingSkills.value || skillPoints.value >= 10) return;
+  if (isClaimingFreeSkillPoints.value || isUpgradingSkills.value || skillPoints.value >= skillPointsCap.value) return;
   isClaimingFreeSkillPoints.value = true;
 
   try {
@@ -1139,24 +1140,24 @@ function handleSoulStoneFarm() {
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                   "
                 >
-                  <span>⚡</span> {{ skillPoints }}/10
+                  <span>⚡</span> {{ skillPoints }}/{{ skillPointsCap }}
                 </span>
                 <button
                   v-if="hasFreeSkillPoints"
                   type="button"
                   id="claim-free-skill-points-btn"
-                  :disabled="isClaimingFreeSkillPoints || isUpgradingSkills || skillPoints >= 10"
+                  :disabled="isClaimingFreeSkillPoints || isUpgradingSkills || skillPoints >= skillPointsCap"
                   class="btn-claim-free-skill-points inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed select-none"
                   :class="[
-                    skillPoints < 10 && !isClaimingFreeSkillPoints && !isUpgradingSkills
+                    skillPoints < skillPointsCap && !isClaimingFreeSkillPoints && !isUpgradingSkills
                       ? 'bg-amber-400 hover:bg-amber-300 text-amber-950 ring-1 ring-amber-500/50 animate-pulse hover:animate-none'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400',
                     isClaimingFreeSkillPoints || isUpgradingSkills ? 'pointer-events-none' : ''
                   ]"
                   :title="
-                    skillPoints >= 10
-                      ? 'Skill points are full (10/10). Spend points before claiming.'
-                      : 'Claim free 10 skill points (Video Bonus)'
+                    skillPoints >= skillPointsCap
+                      ? `Skill points are full (${skillPointsCap}/${skillPointsCap}). Spend points before claiming.`
+                      : 'Claim free skill points (Video Bonus)'
                   "
                   aria-label="Claim free skill points"
                   @click="claimFreeSkillPoints"
