@@ -122,6 +122,23 @@ export async function executeDungeonAutomationStep(
   const doors = Array.isArray(rawDoors) ? rawDoors : Object.values(rawDoors);
 
   if (doors.length === 0) {
+    // Check if this is a checkpoint/save lever floor with no doors
+    const respawnFloor = Number(dungeonData.respawnFloor) || 0;
+    const saveFloor = Number(dungeonData.saveFloor) || 0;
+    const canSave =
+      (saveFloor > respawnFloor) ||
+      (dungeonData.readyToSave === true) ||
+      (floorNumber > respawnFloor && floorNumber % 10 === 0);
+
+    if (canSave) {
+      await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
+      await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+      return {
+        floorPassed: floorNumber,
+        stopReason: `Checkpoint saved at floor ${floorNumber}.`,
+      };
+    }
+
     return {
       stopped: true,
       stopReason: `No available doors on floor ${floorNumber}.`,
@@ -242,13 +259,47 @@ export async function executeDungeonAutomationStep(
     };
   }
 
-  // 4. Save checkpoint if floor % 10 === 0
-  const respawnFloor = Number(dungeonData.respawnFloor) || 0;
-  if (floorNumber > respawnFloor && floorNumber % 10 === 0) {
+  // 4. Save checkpoint: Check multiple indicators based on IL2CPP PlayerDungeonManager logic:
+  // - saveFloor > respawnFloor
+  // - readyToSave === true
+  // - nextFloor - 1 === respawnFloor
+  // - floorNumber % 10 === 0
+  const endDungeon = endPayload?.result?.response?.dungeon || endPayload?.response?.dungeon || {};
+  const currentRespawn = Number(endDungeon.respawnFloor ?? dungeonData.respawnFloor) || 0;
+  const currentSaveFloor = Number(endDungeon.saveFloor ?? dungeonData.saveFloor) || 0;
+  const nextFloor = Number(endDungeon.floorNumber) || (floorNumber + 1);
+
+  const shouldSaveCheckpoint =
+    (currentSaveFloor > currentRespawn) ||
+    (endDungeon.readyToSave === true) ||
+    (dungeonData.readyToSave === true) ||
+    (currentRespawn > 0 && nextFloor - 1 === currentRespawn) ||
+    (floorNumber > currentRespawn && floorNumber % 10 === 0);
+
+  if (shouldSaveCheckpoint) {
     await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
   }
 
-  // 5. Refresh dungeon status
+  // 5. Update local titan states immediately to prevent state desync between floors
+  if (cache?.value?.dungeonStatus?.data?.states?.titans) {
+    const titanStore = cache.value.dungeonStatus.data.states.titans;
+    const serverTitans = endDungeon?.states?.titans;
+    if (serverTitans && typeof serverTitans === 'object') {
+      Object.assign(titanStore, serverTitans);
+    } else if (outcome?.attackers) {
+      for (const [id, att] of Object.entries(outcome.attackers)) {
+        if (titanStore[id]) {
+          titanStore[id].hp = att.hp;
+          titanStore[id].isDead = att.isDead;
+          if (att.energy != null) titanStore[id].energy = att.energy;
+        } else {
+          titanStore[id] = { hp: att.hp, maxHp: att.maxHp, energy: att.energy || 0, isDead: att.isDead };
+        }
+      }
+    }
+  }
+
+  // 6. Refresh dungeon status
   await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
 
   const rawAttacker = bestDoor.door?.attackerType || bestDoor.door?.element || '';

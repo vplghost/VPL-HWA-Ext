@@ -55,6 +55,7 @@ export interface UnityDebugBridge {
   readMem: (ptr: number, type: string, count?: number) => any;
   writeMem: (ptr: number, type: string, value: any) => any;
   executeChain: (steps: ChainStep[]) => Promise<{ ok: boolean; results: any[]; error?: string }>;
+  getLiveDungeonState: () => any;
 }
 
 declare global {
@@ -607,6 +608,63 @@ function evaluateSimpleExpression(expr: string): { success: boolean; value?: any
 }
 
 /**
+ * Reads live Dungeon state directly from IL2CPP WASM memory via PlayerDungeonManager
+ */
+export function getLiveDungeonState(): any {
+  const ctx = getWasmContext();
+  if (!ctx.wasmTable) return { ok: false, error: 'WASM Table not found' };
+
+  try {
+    const fnGetInstance = ctx.wasmTable.get(1797); // GameModel_get_instance
+    const fnGetPlayer = ctx.wasmTable.get(707); // GameModel_get_player
+    const fnGetDungeon = ctx.wasmTable.get(3831); // Player_get_dungeon
+    const fnGetCurrentFloor = ctx.wasmTable.get(334505); // PlayerDungeonManager_get_currentFloor
+    const fnGetFloorNum = ctx.wasmTable.get(334516); // PlayerDungeonFloor_get_number
+    const fnGetFloorType = ctx.wasmTable.get(31824); // PlayerDungeonFloor_get_type
+    const fnGetReadyToSave = ctx.wasmTable.get(334501); // PlayerDungeonManager_get_readyToSave
+    const fnGetSaveFloor = ctx.wasmTable.get(334498); // PlayerDungeonManager_get_saveFloor
+    const fnGetRespawnFloor = ctx.wasmTable.get(334500); // PlayerDungeonManager_get_respawnFloor
+
+    if (typeof fnGetInstance !== 'function' || typeof fnGetPlayer !== 'function' || typeof fnGetDungeon !== 'function') {
+      return { ok: false, error: 'Core IL2CPP functions not available in table' };
+    }
+
+    const gameModel = fnGetInstance();
+    if (!gameModel) return { ok: false, error: 'GameModel instance is null' };
+
+    const player = fnGetPlayer(gameModel);
+    if (!player) return { ok: false, error: 'Player instance is null' };
+
+    const dungeonMgr = fnGetDungeon(player);
+    if (!dungeonMgr) return { ok: false, error: 'PlayerDungeonManager is null' };
+
+    const currentFloor = typeof fnGetCurrentFloor === 'function' ? fnGetCurrentFloor(dungeonMgr) : null;
+    const floorNumber = (currentFloor && typeof fnGetFloorNum === 'function') ? fnGetFloorNum(currentFloor) : null;
+    const floorType = (currentFloor && typeof fnGetFloorType === 'function') ? fnGetFloorType(currentFloor) : null;
+    const readyToSave = typeof fnGetReadyToSave === 'function' ? Boolean(fnGetReadyToSave(dungeonMgr)) : false;
+    const saveFloor = typeof fnGetSaveFloor === 'function' ? fnGetSaveFloor(dungeonMgr) : null;
+    const respawnFloor = typeof fnGetRespawnFloor === 'function' ? fnGetRespawnFloor(dungeonMgr) : null;
+
+    return {
+      ok: true,
+      pointers: {
+        gameModel,
+        player,
+        dungeonMgr,
+        currentFloor,
+      },
+      floorNumber,
+      floorType,
+      readyToSave,
+      saveFloor,
+      respawnFloor,
+    };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+/**
  * Initializes Tier 1 Bridge in MAIN world
  */
 export function initUnityMainBridge(): UnityDebugBridge | null {
@@ -659,6 +717,7 @@ export function initUnityMainBridge(): UnityDebugBridge | null {
     readMem,
     writeMem,
     executeChain,
+    getLiveDungeonState,
   };
 
   window.addEventListener('message', async (event: MessageEvent) => {

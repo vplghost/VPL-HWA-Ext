@@ -259,10 +259,14 @@ async function startAutomation() {
       }
 
       autoFloorCount.value++;
-      const chosen = step.chosenEvaluation;
-      const tankLoss = chosen?.tankLossPct != null ? chosen.tankLossPct.toFixed(1) : '0';
-      const teamLoss = chosen?.teamLossPct != null ? chosen.teamLossPct.toFixed(1) : '0';
-      autoStatusMessage.value = `Floor ${step.floorPassed} cleared via Door ${(step.doorIdx ?? 0) + 1} (${step.doorElement}). Tank loss: ${tankLoss}%, Team loss: ${teamLoss}%.`;
+      if (step.doorIdx != null) {
+        const chosen = step.chosenEvaluation;
+        const tankLoss = chosen?.tankLossPct != null ? chosen.tankLossPct.toFixed(1) : '0';
+        const teamLoss = chosen?.teamLossPct != null ? chosen.teamLossPct.toFixed(1) : '0';
+        autoStatusMessage.value = `Floor ${step.floorPassed} cleared via Door ${(step.doorIdx ?? 0) + 1} (${step.doorElement}). Tank loss: ${tankLoss}%, Team loss: ${teamLoss}%.`;
+      } else {
+        autoStatusMessage.value = step.stopReason || `Checkpoint reached and saved at Floor ${step.floorPassed}.`;
+      }
 
       // Brief delay between floors to avoid rapid-fire RPC and give UI time to reflect state
       await new Promise((resolve) => setTimeout(resolve, 800));
