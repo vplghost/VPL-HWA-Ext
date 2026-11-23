@@ -235,13 +235,22 @@ async function attack() {
       error.value = '';
       message.value = 'Camp defeated. World Energy and rewards updated.';
       void updateCacheLocally((draft) => {
+        const nowIso = new Date().toISOString();
         draft.brigandCampStatus = {
-          updatedAt: new Date().toISOString(),
+          updatedAt: nowIso,
           data: {
             success: true,
             campId: request.campId,
             ...(typeof data === 'object' ? data : {})
           }
+        };
+        const prevCamps = Array.isArray(draft.brigandCampHistory?.data) ? draft.brigandCampHistory.data : [];
+        draft.brigandCampHistory = {
+          updatedAt: nowIso,
+          data: [
+            ...prevCamps.filter((item: any) => item?.campId !== request.campId),
+            { campId: request.campId, success: true, timestamp: nowIso }
+          ]
         };
         if (draft.refillableGetAll?.data) {
           const worldEnergyItem = Object.values(draft.refillableGetAll.data).find(

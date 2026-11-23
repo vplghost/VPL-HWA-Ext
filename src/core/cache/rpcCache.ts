@@ -3247,6 +3247,14 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             if (entry.data.stage != null && !clearedStages.includes(entry.data.stage)) {
               clearedStages.push(entry.data.stage);
             }
+            let coinsAdded = 0;
+            if (entry.data?.reward?.coin) {
+              for (const val of Object.values(entry.data.reward.coin)) {
+                coinsAdded += Number(val) || 0;
+              }
+            }
+            if (coinsAdded === 0) coinsAdded = 1000;
+            const coinsEarned = isSameDay ? (Number(previousProgress?.coinsEarned) || 0) + coinsAdded : coinsAdded;
             next.eternalStoryDailyProgress = {
               key: 'eternalStoryDailyProgress',
               method: entry.method,
@@ -3255,7 +3263,8 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               data: {
                 date: entryDay,
                 clearedCount,
-                clearedStages
+                clearedStages,
+                coinsEarned
               },
               updatedAt: entry.updatedAt
             };
@@ -6252,12 +6261,22 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           changed = true;
           continue;
         }
-        if (entry.key === 'brigandCampStatus' && entry.data.success &&
-            next.brigandCampSummary && next.brigandCampSummary.updatedAt <= entry.updatedAt) {
-          next.brigandCampSummary = { ...next.brigandCampSummary, updatedAt: entry.updatedAt,
-            data: { ...next.brigandCampSummary.data,
-              camps: (next.brigandCampSummary.data.camps || []).filter(camp => camp.id !== entry.data.campId)
-            } };
+        if (entry.key === 'brigandCampStatus' && entry.data.success) {
+          if (next.brigandCampSummary && next.brigandCampSummary.updatedAt <= entry.updatedAt) {
+            next.brigandCampSummary = { ...next.brigandCampSummary, updatedAt: entry.updatedAt,
+              data: { ...next.brigandCampSummary.data,
+                camps: (next.brigandCampSummary.data.camps || []).filter(camp => camp.id !== entry.data.campId)
+              } };
+          }
+          const prevHistory = Array.isArray(next.brigandCampHistory?.data) ? next.brigandCampHistory.data : [];
+          next.brigandCampHistory = {
+            key: 'brigandCampHistory',
+            updatedAt: entry.updatedAt,
+            data: [
+              ...prevHistory.filter(item => item?.campId !== entry.data.campId),
+              { campId: entry.data.campId, success: true, timestamp: entry.updatedAt }
+            ]
+          };
         }
         if (entry.key === 'brigandCampSummary') {
           const victory = next.brigandCampStatus;

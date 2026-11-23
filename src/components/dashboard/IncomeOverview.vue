@@ -569,8 +569,8 @@ watch(
           </div>
         </div>
 
-        <!-- Activity Metrics Grid (5 Cards) -->
-        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 my-2 flex-1 items-stretch">
+        <!-- Activity Metrics Grid (7 Cards: Auto-Join, Campaign, Rallies Led, Monsters, Camps, Dungeon, Frontier) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 my-2 flex-1 items-stretch">
           <!-- 1. Raid Auto-Join (Automation highlight) -->
           <div
             class="rounded-lg bg-white dark:bg-slate-900 p-2 border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between shadow-2xs group relative"
@@ -590,11 +590,11 @@ watch(
                 {{ activityStats.gameAutoJoinCount }} <span class="text-[9px] font-semibold text-slate-400">Game</span>
               </span>
             </div>
-            <!-- Defeat/Loss Slot or Whitespace Placeholder -->
+            <!-- Defeat/Loss Slot: All rally losses belong to Auto-join -->
             <div class="h-4 flex items-center text-[10px] leading-none">
-              <span v-if="activityStats.autoJoinLosses > 0" class="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-0.5">
+              <span v-if="(activityStats.autoJoinLosses + (activityStats.rallyLosses || 0)) > 0" class="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-0.5">
                 <span class="text-[9px]">⚠️</span>
-                <span>{{ activityStats.autoJoinLosses }} {{ activityStats.autoJoinLosses === 1 ? 'loss' : 'losses' }}</span>
+                <span>{{ activityStats.autoJoinLosses + (activityStats.rallyLosses || 0) }} {{ (activityStats.autoJoinLosses + (activityStats.rallyLosses || 0)) === 1 ? 'loss' : 'losses' }}</span>
               </span>
               <span v-else class="text-transparent select-none pointer-events-none">&nbsp;</span>
             </div>
@@ -632,13 +632,9 @@ watch(
             <div class="my-0.5 text-sm font-black text-purple-600 dark:text-purple-400 tabular-nums">
               {{ formatNumber(activityStats.organizedRalliesCount) }}
             </div>
-            <!-- Defeat/Loss Slot or Whitespace Placeholder -->
+            <!-- Whitespace placeholder: losses are attributed to auto-join -->
             <div class="h-4 flex items-center text-[10px] leading-none">
-              <span v-if="activityStats.rallyLosses > 0" class="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-0.5">
-                <span class="text-[9px]">⚠️</span>
-                <span>{{ activityStats.rallyLosses }} {{ activityStats.rallyLosses === 1 ? 'loss' : 'losses' }}</span>
-              </span>
-              <span v-else class="text-transparent select-none pointer-events-none">&nbsp;</span>
+              <span class="text-transparent select-none pointer-events-none">&nbsp;</span>
             </div>
             <div class="text-[9px] text-slate-400 truncate">
               Organized
@@ -686,29 +682,81 @@ watch(
               Brigands cleared
             </div>
           </div>
-        </div>
 
-        <!-- Unified Total Energy Consumed Bar (Bottom) -->
-        <div class="rounded-lg bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-700/80 px-3 py-2 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-          <div class="flex items-center gap-2">
-            <span class="text-sm">⚡</span>
-            <div>
-              <span class="text-[10px] text-slate-400 uppercase font-semibold block leading-tight">Total Energy Consumed</span>
-              <span class="text-xs font-black text-amber-500 dark:text-amber-400 tabular-nums">
-                {{ formatNumber(activityStats.totalEnergySpent) }}
-                <span class="text-[10px] font-medium text-slate-400">pts</span>
+          <!-- 6. Titan Dungeon -->
+          <div class="rounded-lg bg-white dark:bg-slate-900 p-2 border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between shadow-2xs">
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <span>⛏️</span> Dungeon
+            </span>
+            <div class="my-0.5 text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums flex items-baseline gap-1">
+              {{ formatNumber(activityStats.dungeonBattlesToday) }}
+              <span class="text-[9px] font-semibold text-slate-400">battles</span>
+            </div>
+            <!-- Personal Titanite slot -->
+            <div class="h-4 flex items-center text-[10px] leading-none">
+              <span v-if="activityStats.personalTitaniteToday > 0" class="font-bold text-amber-500 dark:text-amber-400 flex items-center gap-0.5" title="Personal Titanite earned today">
+                <span class="text-[9px]">💎</span>
+                <span>{{ formatNumber(activityStats.personalTitaniteToday) }} titanite</span>
               </span>
+              <span v-else class="text-slate-400 text-[10px] select-none">0 titanite</span>
+            </div>
+            <div class="text-[9px] text-slate-400 truncate">
+              Personal progress
             </div>
           </div>
 
-          <div class="flex items-center gap-2 text-2xs">
-            <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-              <span class="text-slate-400">Campaign:</span>
-              <span class="font-bold text-sky-600 dark:text-sky-400 tabular-nums">{{ formatNumber(activityStats.campaignEnergySpent) }} ⚡</span>
+          <!-- 7. Frontier Progression -->
+          <div class="rounded-lg bg-white dark:bg-slate-900 p-2 border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between shadow-2xs">
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <span>🛡️</span> Frontier
+            </span>
+            <div class="my-0.5 text-sm font-black text-blue-600 dark:text-blue-400 tabular-nums flex items-baseline gap-1">
+              {{ formatNumber(activityStats.frontierStagesToday) }}
+              <span class="text-[9px] font-semibold text-slate-400">stages</span>
             </div>
-            <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-              <span class="text-slate-400">World:</span>
-              <span class="font-bold text-amber-600 dark:text-amber-400 tabular-nums">{{ formatNumber(activityStats.worldEnergySpent) }} 🌐</span>
+            <!-- Frontier Stage Reward Coins (excluding time-based AFK chest) -->
+            <div class="h-4 flex items-center text-[10px] leading-none">
+              <span v-if="activityStats.frontierCoinsToday > 0" class="font-bold text-amber-500 dark:text-amber-400 flex items-center gap-0.5" title="Frontier coins earned from cleared stages today">
+                <span class="text-[9px]">🪙</span>
+                <span>+{{ formatNumber(activityStats.frontierCoinsToday) }}</span>
+              </span>
+              <span v-else class="text-slate-400 text-[10px] select-none">0 coins</span>
+            </div>
+            <div class="text-[9px] text-slate-400 truncate">
+              Stage rewards
+            </div>
+          </div>
+        </div>
+
+        <!-- Separate Independent Energy Meters (Campaign Energy & World Energy) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+          <!-- Campaign Energy Meter -->
+          <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 px-3 py-2 flex items-center justify-between shadow-2xs">
+            <div class="flex items-center gap-2">
+              <span class="text-base">⚡</span>
+              <div>
+                <span class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block leading-tight">Campaign Energy Spent</span>
+                <span class="text-[10px] text-slate-400">Campaign Raids (6⚡ / raid)</span>
+              </div>
+            </div>
+            <div class="text-sm font-black text-sky-600 dark:text-sky-400 tabular-nums flex items-baseline gap-1">
+              {{ formatNumber(activityStats.campaignEnergySpent) }}
+              <span class="text-[10px] font-bold text-slate-400">⚡</span>
+            </div>
+          </div>
+
+          <!-- World Energy Meter -->
+          <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 px-3 py-2 flex items-center justify-between shadow-2xs">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🌐</span>
+              <div>
+                <span class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block leading-tight">World Energy Spent</span>
+                <span class="text-[10px] text-slate-400">Rallies (25🌐), Monsters & Camps (10🌐)</span>
+              </div>
+            </div>
+            <div class="text-sm font-black text-amber-600 dark:text-amber-400 tabular-nums flex items-baseline gap-1">
+              {{ formatNumber(activityStats.worldEnergySpent) }}
+              <span class="text-[10px] font-bold text-slate-400">🌐</span>
             </div>
           </div>
         </div>

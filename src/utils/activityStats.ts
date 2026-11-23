@@ -16,6 +16,11 @@ export interface DailyActivityStats {
   monsterLosses: number;
   brigandCampsCount: number;
   campLosses: number;
+  // Progression: Dungeon & Frontier
+  dungeonBattlesToday: number;
+  personalTitaniteToday: number;
+  frontierStagesToday: number;
+  frontierCoinsToday: number;
   // Energy consumption
   campaignEnergySpent: number;
   worldEnergySpent: number;
@@ -250,23 +255,43 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
   }
 
   // 7. Brigand Camps Cleared
-  let brigandCampsCount = campReports;
+  const campIdsToday = new Set<string>();
+  let campAttacksCount = 0;
+  const campHistory = Array.isArray(cache?.brigandCampHistory?.data)
+    ? cache.brigandCampHistory.data
+    : (Array.isArray(cache?.brigandCampHistory) ? cache.brigandCampHistory : []);
+
+  for (const ch of campHistory) {
+    if (!ch) continue;
+    const timeVal = ch.at || ch.timestamp || ch.updatedAt;
+    if (!timeVal) continue;
+    const dStr = formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal);
+    if (dStr === today && ch.success !== false) {
+      campAttacksCount++;
+      if (ch.campId) campIdsToday.add(String(ch.campId));
+    }
+  }
+
   const brigandStatus = cache?.brigandCampStatus?.data;
   if (brigandStatus?.success && cache?.brigandCampStatus?.updatedAt) {
     if (formatUtcDay(Date.parse(cache.brigandCampStatus.updatedAt)) === today) {
-      brigandCampsCount = Math.max(brigandCampsCount, 1);
+      if (brigandStatus.campId) campIdsToday.add(String(brigandStatus.campId));
+      else if (campIdsToday.size === 0) campIdsToday.add('status-camp');
+      campAttacksCount = Math.max(campAttacksCount, 1);
     }
   }
+
+  let brigandCampsCount = Math.max(campReports, campIdsToday.size, campAttacksCount);
 
   // Preserve overall losses from battleReportSummary if individual reports were claimed/pruned
   if (todayReports?.losses && Number(todayReports.losses) > (rallyLosses + autoJoinLosses + monsterLosses + campLosses)) {
     const unassigned = Number(todayReports.losses) - (rallyLosses + autoJoinLosses + monsterLosses + campLosses);
-    if (rallyReports > 0 && organizedRalliesCount > 0) {
-      rallyLosses += unassigned;
+    if (rallyReports > 0) {
+      autoJoinLosses += unassigned;
     } else if (monsterReports > 0) {
       monsterLosses += unassigned;
     } else {
-      rallyLosses += unassigned;
+      autoJoinLosses += unassigned;
     }
   }
 
@@ -283,7 +308,61 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     }
   }
 
-  // 8. Energy Consumption Calculations
+  // 8. Dungeon Progression
+  const dungeonStatus = cache?.dungeonStatus?.data || cache?.dungeonGetInfo?.data;
+  const dungeonUpdated = cache?.dungeonStatus?.updatedAt || cache?.dungeonGetInfo?.updatedAt;
+  const isDungeonToday = dungeonUpdated ? formatUtcDay(Date.parse(dungeonUpdated)) === today : true;
+
+  const dungeonCombatLog = dungeonStatus?.dailyCombatLog;
+  const isCombatLogToday = dungeonCombatLog?.date
+    ? new Date(dungeonCombatLog.date).toDateString() === new Date(now).toDateString()
+    : true;
+
+  let dungeonBattlesToday = 0;
+  if (isCombatLogToday && dungeonCombatLog) {
+    dungeonBattlesToday = Math.max(
+      Number(dungeonCombatLog.totalBattles) || 0,
+      (Number(dungeonCombatLog.flawlessCount) || 0) +
+        (Array.isArray(dungeonCombatLog.casualtyBattles) ? dungeonCombatLog.casualtyBattles.length : 0)
+    );
+  }
+
+  const battleHistory = cache?.dungeonBattleHistory;
+  if (battleHistory && typeof battleHistory === 'object') {
+    let historyBattlesToday = 0;
+    for (const item of Object.values(battleHistory)) {
+      if (item && typeof item === 'object') {
+        const timeVal = (item as any).timestamp || (item as any).updatedAt || (item as any).at;
+        if (timeVal && formatUtcDay(typeof timeVal === 'string' ? Date.parse(timeVal) : timeVal) === today) {
+          historyBattlesToday++;
+        }
+      }
+    }
+    dungeonBattlesToday = Math.max(dungeonBattlesToday, historyBattlesToday);
+  }
+
+  let personalTitaniteToday = 0;
+  if (isDungeonToday && dungeonStatus) {
+    personalTitaniteToday = Number(
+      dungeonStatus.todayTitanite ??
+      dungeonStatus.dungeonActivity ??
+      (isCombatLogToday ? dungeonCombatLog?.todayTitanite : 0) ??
+      0
+    );
+  } else if (dungeonStatus?.todayTitanite != null) {
+    personalTitaniteToday = Number(dungeonStatus.todayTitanite) || 0;
+  }
+
+  // 9. Frontier Progression
+  const frontierProgress = cache?.eternalStoryDailyProgress?.data;
+  const isFrontierToday = frontierProgress?.date === new Date(now).toDateString() ||
+    (cache?.eternalStoryDailyProgress?.updatedAt && formatUtcDay(Date.parse(cache.eternalStoryDailyProgress.updatedAt)) === today);
+  const frontierStagesToday = isFrontierToday ? (Number(frontierProgress?.clearedCount) || 0) : 0;
+  const frontierCoinsToday = isFrontierToday
+    ? (Number(frontierProgress?.coinsEarned) || (frontierStagesToday * 1000))
+    : 0;
+
+  // 10. Energy Consumption Calculations
   // Only host/organized rallies consume World Energy (joining rallies costs 0 World Energy)
   const campaignEnergySpent = campaignCount * CAMPAIGN_ENERGY_COST;
   const worldEnergySpent =
@@ -307,6 +386,10 @@ export function getTodayActivityStats(cache: Record<string, any> = {}, now = Dat
     monsterLosses,
     brigandCampsCount,
     campLosses,
+    dungeonBattlesToday,
+    personalTitaniteToday,
+    frontierStagesToday,
+    frontierCoinsToday,
     campaignEnergySpent,
     worldEnergySpent,
     totalEnergySpent,
@@ -342,6 +425,11 @@ export function getActivityStatsForDay(
     const camps = Math.max(liveToday.brigandCampsCount, existing.brigandCampsCount || 0);
     const campBattleLoss = Math.max(liveToday.campLosses, existing.campLosses || 0);
 
+    const dungeonBattles = Math.max(liveToday.dungeonBattlesToday, existing.dungeonBattlesToday || 0);
+    const titanite = Math.max(liveToday.personalTitaniteToday, existing.personalTitaniteToday || 0);
+    const frontierStages = Math.max(liveToday.frontierStagesToday, existing.frontierStagesToday || 0);
+    const frontierCoins = Math.max(liveToday.frontierCoinsToday, existing.frontierCoinsToday || 0);
+
     const campaignEnergy = campaign * CAMPAIGN_ENERGY_COST;
     // Only host/organized rallies consume World Energy
     const worldEnergy =
@@ -363,6 +451,10 @@ export function getActivityStatsForDay(
       monsterLosses: monsterLoss,
       brigandCampsCount: camps,
       campLosses: campBattleLoss,
+      dungeonBattlesToday: dungeonBattles,
+      personalTitaniteToday: titanite,
+      frontierStagesToday: frontierStages,
+      frontierCoinsToday: frontierCoins,
       campaignEnergySpent: campaignEnergy,
       worldEnergySpent: worldEnergy,
       totalEnergySpent: campaignEnergy + worldEnergy,
@@ -416,7 +508,7 @@ export function getActivityStatsForDay(
   const monsters = Math.max(history?.monstersCount || 0, monsterReports);
   const camps = Math.max(history?.brigandCampsCount || 0, campReports);
 
-  const autoLoss = history?.autoJoinLosses || 0;
+  let autoLoss = history?.autoJoinLosses || 0;
   const campLoss = history?.campaignLosses || 0;
   let rallyLoss = history?.rallyLosses || 0;
   let monsterLoss = history?.monsterLosses || 0;
@@ -425,10 +517,15 @@ export function getActivityStatsForDay(
   // Attribute past day losses if summary has losses not yet broken down
   if (dayReports?.losses && Number(dayReports.losses) > (rallyLoss + autoLoss + monsterLoss + campBattleLoss)) {
     const unassigned = Number(dayReports.losses) - (rallyLoss + autoLoss + monsterLoss + campBattleLoss);
-    if (rallyReports > 0 && orgRallies > 0) rallyLoss += unassigned;
+    if (rallyReports > 0) autoLoss += unassigned;
     else if (monsterReports > 0) monsterLoss += unassigned;
-    else rallyLoss += unassigned;
+    else autoLoss += unassigned;
   }
+
+  const dungeonBattles = history?.dungeonBattlesToday || 0;
+  const titanite = history?.personalTitaniteToday || 0;
+  const frontierStages = history?.frontierStagesToday || 0;
+  const frontierCoins = history?.frontierCoinsToday || 0;
 
   const campaignEnergy = campaign * CAMPAIGN_ENERGY_COST;
   // Only host/organized rallies consume World Energy
@@ -451,6 +548,10 @@ export function getActivityStatsForDay(
     monsterLosses: monsterLoss,
     brigandCampsCount: camps,
     campLosses: campBattleLoss,
+    dungeonBattlesToday: dungeonBattles,
+    personalTitaniteToday: titanite,
+    frontierStagesToday: frontierStages,
+    frontierCoinsToday: frontierCoins,
     campaignEnergySpent: campaignEnergy,
     worldEnergySpent: worldEnergy,
     totalEnergySpent: campaignEnergy + worldEnergy,
@@ -498,6 +599,10 @@ export async function persistDailyActivityStats(
       monsterLosses: Math.max(existing?.monsterLosses || 0, stats.monsterLosses),
       brigandCampsCount: Math.max(existing?.brigandCampsCount || 0, stats.brigandCampsCount),
       campLosses: Math.max(existing?.campLosses || 0, stats.campLosses),
+      dungeonBattlesToday: Math.max(existing?.dungeonBattlesToday || 0, stats.dungeonBattlesToday || 0),
+      personalTitaniteToday: Math.max(existing?.personalTitaniteToday || 0, stats.personalTitaniteToday || 0),
+      frontierStagesToday: Math.max(existing?.frontierStagesToday || 0, stats.frontierStagesToday || 0),
+      frontierCoinsToday: Math.max(existing?.frontierCoinsToday || 0, stats.frontierCoinsToday || 0),
       campaignEnergySpent: Math.max(existing?.campaignEnergySpent || 0, stats.campaignEnergySpent),
       worldEnergySpent: Math.max(existing?.worldEnergySpent || 0, stats.worldEnergySpent),
       totalEnergySpent: Math.max(existing?.totalEnergySpent || 0, stats.totalEnergySpent),

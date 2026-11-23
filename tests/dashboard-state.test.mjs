@@ -6,7 +6,7 @@ import ts from 'typescript';
 import { ref, computed } from 'vue';
 import { expeditionActivity } from '../src/utils/expeditions.ts';
 import { dashboardQueues, dashboardMarches, queueEndMs, queueProgressPercent, calculateAccountMaxMarches } from '../src/utils/dashboardState.ts';
-import { towerActivityState, arenaActivityState, dungeonActivityState, guildVersusActivityState, observedToday, readyQuestCount } from '../src/composables/activityState.ts';
+import { towerActivityState, arenaActivityState, dungeonActivityState, guildVersusActivityState, frontierActivityState, observedToday, readyQuestCount } from '../src/composables/activityState.ts';
 
 const now = new Date(2026, 10, 13, 12).getTime();
 const entry = (data, time = now - 1000) => ({ data, updatedAt: new Date(time).toISOString() });
@@ -180,7 +180,7 @@ async function setupComponent(file, expose, initial = {}) {
   const context = { computed, ref, useNow: () => clock, useRpcCache: () => ({ cache }),
     useModals: () => ({ openModal: id => opened.push(id) }), dashboardQueues, dashboardMarches, calculateAccountMaxMarches,
     getBuildingName: id => `Building ${id}`, getResearchName: id => `Research ${id}`,
-    expeditionActivity, towerActivityState, arenaActivityState, observedToday, dungeonActivityState: (cache, time) => dungeonActivityState(cache, time, meta), guildVersusActivityState, readyQuestCount };
+    expeditionActivity, towerActivityState, arenaActivityState, observedToday, dungeonActivityState: (cache, time) => dungeonActivityState(cache, time, meta), guildVersusActivityState, frontierActivityState, readyQuestCount };
   const js = ts.transpileModule(setup, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/export \{\};?/g, '');
   vm.runInNewContext(js + '\nglobalThis.exposed = {' + expose + '};', context);
   return { ...context.exposed, cache, clock, opened };
@@ -205,7 +205,7 @@ test('dashboard queue SFC reacts to snapshots, countdown expiry and march dialog
 test('daily activity SFC reacts to exhaustion, new attempts and day rollover', async () => {
   const view = await setupComponent('ActivityGoals.vue', 'activities, handleActivityClick', { ...dungeon(),
     towerStatus: entry({ isCleared: true }), 'resource:refillable:6': entry({ amount: 0 }) });
-  assert.equal(view.activities.value.length, 8, 'Must have exactly 8 cards for a balanced 4-row 2-column grid');
+  assert.equal(view.activities.value.length, 9, 'Must have 9 cards including Frontier');
   view.handleActivityClick({ id: 'expeditions' });
   view.handleActivityClick({ id: 'guildVersus' });
   assert.deepEqual(view.opened, ['expeditions', 'guildVersus']);

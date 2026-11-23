@@ -19,6 +19,10 @@ test('getTodayActivityStats returns zeroes on empty cache', () => {
   assert.equal(stats.monsterLosses, 0);
   assert.equal(stats.brigandCampsCount, 0);
   assert.equal(stats.campLosses, 0);
+  assert.equal(stats.dungeonBattlesToday, 0);
+  assert.equal(stats.personalTitaniteToday, 0);
+  assert.equal(stats.frontierStagesToday, 0);
+  assert.equal(stats.frontierCoinsToday, 0);
   assert.equal(stats.campaignEnergySpent, 0);
   assert.equal(stats.worldEnergySpent, 0);
   assert.equal(stats.totalEnergySpent, 0);
@@ -212,4 +216,91 @@ test('getTodayActivityStats tracks rallies led from battle reports without misat
   // Total 3 reports - 2 led - 1 ext = 0 unassigned, NOT falsely counted as game auto joins!
   assert.equal(stats.gameAutoJoinCount, 0);
   assert.equal(stats.worldEnergySpent, 50); // 2 led * 25
+});
+
+test('getTodayActivityStats tracks brigand camps from brigandCampHistory and brigandCampStatus', () => {
+  const cache = {
+    brigandCampHistory: {
+      data: [
+        { campId: 'camp-1', at: '2026-11-18T04:00:00Z', success: true },
+        { campId: 'camp-2', at: '2026-11-18T06:00:00Z', success: true },
+        { campId: 'camp-yesterday', at: '2026-11-17T06:00:00Z', success: true },
+      ],
+    },
+    brigandCampStatus: {
+      updatedAt: '2026-11-18T08:00:00Z',
+      data: { success: true, campId: 'camp-3' },
+    },
+  };
+
+  const stats = getTodayActivityStats(cache, testNow);
+  assert.equal(stats.brigandCampsCount, 3);
+  assert.equal(stats.worldEnergySpent, 30); // 3 camps * 10
+});
+
+test('getTodayActivityStats tracks dungeon battles and personal titanite progress', () => {
+  const cache = {
+    dungeonStatus: {
+      updatedAt: '2026-11-18T08:00:00Z',
+      data: {
+        floorNumber: 52,
+        dungeonActivity: 186,
+        todayTitanite: 186,
+        dailyCombatLog: {
+          date: 'Wed Nov 18 2026',
+          totalBattles: 14,
+          flawlessCount: 12,
+          casualtyBattles: [
+            { floorNumber: 50, win: true, casualties: [101] },
+            { floorNumber: 51, win: true, casualties: [102] },
+          ],
+        },
+      },
+    },
+  };
+
+  const stats = getTodayActivityStats(cache, testNow);
+  assert.equal(stats.dungeonBattlesToday, 14);
+  assert.equal(stats.personalTitaniteToday, 186);
+});
+
+test('getTodayActivityStats tracks frontier stages cleared and reward coins', () => {
+  const cache = {
+    eternalStoryDailyProgress: {
+      updatedAt: '2026-11-18T09:00:00Z',
+      data: {
+        date: 'Wed Nov 18 2026',
+        clearedCount: 4,
+        clearedStages: [11, 12, 13, 14],
+        coinsEarned: 4000,
+      },
+    },
+  };
+
+  const stats = getTodayActivityStats(cache, testNow);
+  assert.equal(stats.frontierStagesToday, 4);
+  assert.equal(stats.frontierCoinsToday, 4000);
+});
+
+test('getTodayActivityStats attributes unassigned rally losses from summary to autoJoinLosses', () => {
+  const cache = {
+    accountStatus: { data: { id: 100 } },
+    battleReportSummary: {
+      data: {
+        days: {
+          '2026-11-18': {
+            losses: 2,
+            types: {
+              rallyMobAttackResult: 5,
+            },
+          },
+        },
+      },
+    },
+  };
+
+  const stats = getTodayActivityStats(cache, testNow);
+  // Summary had 2 losses during rallies with no leader loss specified -> assigned to autoJoinLosses
+  assert.equal(stats.autoJoinLosses, 2);
+  assert.equal(stats.rallyLosses, 0);
 });

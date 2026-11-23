@@ -51,6 +51,7 @@ export interface FrontierDailyProgress {
   date: string;
   clearedCount: number;
   clearedStages: number[];
+  coinsEarned?: number;
 }
 
 export interface FrontierActivityState {
