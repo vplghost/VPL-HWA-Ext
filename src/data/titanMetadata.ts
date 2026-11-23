@@ -15,7 +15,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Water",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4000.png",
-    "skills": ["Song of Valhalla"],
+    "skills": ["Icy Aegis"],
     "artifacts": [
       11001,
       12003,
@@ -41,7 +41,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Water",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4002.png",
-    "skills": ["Weakening Fog"],
+    "skills": ["Abyss Curse"],
     "artifacts": [
       11003,
       12003,
@@ -54,7 +54,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Water",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4003.png",
-    "skills": ["Frost Needles", "Compassion"],
+    "skills": ["Frost Needles","Frigid Healing"],
     "artifacts": [
       11004,
       12003,
@@ -67,7 +67,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Water",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4004.png",
-    "skills": ["Abyssal Charge", "Sea Beast"],
+    "skills": ["Child of Water","Deep Current"],
     "artifacts": [
       11023,
       12003,
@@ -80,7 +80,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Fire",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4010.png",
-    "skills": ["Grievous Slash"],
+    "skills": ["Crushing Blow"],
     "artifacts": [
       11005,
       12001,
@@ -93,7 +93,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Fire",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4011.png",
-    "skills": ["Flame Cannon"],
+    "skills": ["Erupting Rage"],
     "artifacts": [
       11006,
       12001,
@@ -106,7 +106,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Fire",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4012.png",
-    "skills": ["Soul of Fire"],
+    "skills": ["Burning Blood"],
     "artifacts": [
       11007,
       12001,
@@ -119,7 +119,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Fire",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4013.png",
-    "skills": ["Incinerating Ray", "Blastwave"],
+    "skills": ["Incinerating Ray","Herald of Flame"],
     "artifacts": [
       11008,
       12001,
@@ -132,7 +132,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Fire",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4014.png",
-    "skills": ["Solar Flare", "Fiery Spirit"],
+    "skills": ["Child of Flame","Blazing Blessing"],
     "artifacts": [
       11022,
       12001,
@@ -145,7 +145,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Earth",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4020.png",
-    "skills": ["Earthquake"],
+    "skills": ["Anger of the Earth"],
     "artifacts": [
       11009,
       12002,
@@ -158,7 +158,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Earth",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4021.png",
-    "skills": ["Piercing Hail"],
+    "skills": ["Emerald Storm"],
     "artifacts": [
       11010,
       12002,
@@ -171,7 +171,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Earth",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4022.png",
-    "skills": ["Overgrowth"],
+    "skills": ["Forest Embrace"],
     "artifacts": [
       11011,
       12002,
@@ -184,7 +184,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Earth",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4023.png",
-    "skills": ["Creeping Thorns", "Underground Prison"],
+    "skills": ["Burden of Creation","Subterranean Prison"],
     "artifacts": [
       11012,
       12002,
@@ -197,7 +197,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Earth",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4024.png",
-    "skills": ["Spore Cloud", "Verdant Guard"],
+    "skills": ["Child of Nature","Earth's Call"],
     "artifacts": [
       11021,
       12002,
@@ -210,7 +210,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Darkness",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4030.png",
-    "skills": ["Abyssal Shield"],
+    "skills": ["Wormhole"],
     "artifacts": [
       11014,
       12004,
@@ -223,7 +223,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Darkness",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4031.png",
-    "skills": ["Black Hole"],
+    "skills": ["Essence Burnout"],
     "artifacts": [
       11013,
       12004,
@@ -236,7 +236,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Darkness",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4032.png",
-    "skills": ["Death Veil"],
+    "skills": ["Shadow Rampage"],
     "artifacts": [
       11015,
       12004,
@@ -249,7 +249,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Darkness",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4033.png",
-    "skills": ["Dark Devourer", "Abyssal Void"],
+    "skills": ["Touch of the Abyss","Eternal Sacrifice"],
     "artifacts": [
       11016,
       12004,
@@ -262,7 +262,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Darkness",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4034.png",
-    "skills": ["Shadow Rift", "Void Soul"],
+    "skills": ["Child of Darkness","Shadow Bond"],
     "artifacts": [
       11025,
       12004,
@@ -275,7 +275,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Light",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4040.png",
-    "skills": ["Stellar Barrier"],
+    "skills": ["Vengeful Barrier"],
     "artifacts": [
       11017,
       12005,
@@ -288,7 +288,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Light",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4041.png",
-    "skills": ["Sunbeam"],
+    "skills": ["Stellar Destruction"],
     "artifacts": [
       11018,
       12005,
@@ -301,7 +301,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Light",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4042.png",
-    "skills": ["Beacon of Light"],
+    "skills": ["Beacon of Life"],
     "artifacts": [
       11019,
       12005,
@@ -314,7 +314,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Light",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4043.png",
-    "skills": ["Supernova", "Solar Embrace"],
+    "skills": ["Scorching summoning","Invoke Light"],
     "artifacts": [
       11020,
       12005,
@@ -327,7 +327,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Light",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4044.png",
-    "skills": ["Radiant Dawn", "Sun Guard"],
+    "skills": ["Child of Light","Eternal Sunshine"],
     "artifacts": [
       11024,
       12005,
@@ -340,7 +340,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Spirit",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4050.png",
-    "skills": ["Spirit Aegis"],
+    "skills": ["Elarite Ram"],
     "artifacts": [
       11028,
       12006,
@@ -353,7 +353,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Spirit",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4051.png",
-    "skills": ["Soul Spear"],
+    "skills": ["Fate's Judgment"],
     "artifacts": [
       11026,
       12006,
@@ -366,7 +366,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Spirit",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4052.png",
-    "skills": ["Echo of Spirit"],
+    "skills": ["Devastating Link"],
     "artifacts": [
       11027,
       12006,
@@ -379,7 +379,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Spirit",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4053.png",
-    "skills": ["Astral Blast", "Cosmic Resonance"],
+    "skills": ["Crystal Vortex","Supreme Harmony"],
     "artifacts": [
       11029,
       12006,
@@ -392,7 +392,7 @@ export const titanMetadata: TitanMetadataDict = {
     "element": "Spirit",
     "hasAvatar": true,
     "avatarFile": "assets/titans/4054.png",
-    "skills": ["Child of Elarite", "Elarite Resonance"],
+    "skills": ["Child of Elarite","Elarite Resonance"],
     "artifacts": [
       11030,
       12006,

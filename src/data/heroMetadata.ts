@@ -19,7 +19,7 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/1.png",
     "skills": [
       "Crystal of Selias",
-      "Crystalline Cataclysm",
+      "Crystalline Onslaught",
       "Piercing Light",
       "Rainbow Halo"
     ],
@@ -162,7 +162,7 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/2.png",
     "skills": [
-      "Iron Sky",
+      "Iron Skies",
       "Unstoppable Charge",
       "Retaliation",
       "Harun's Pride"
@@ -307,9 +307,9 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/3.png",
     "skills": [
       "Blade Whirlwind",
-      "Enraging Soul",
-      "Piercing Pain",
-      "Wrath of the Dead"
+      "Enraged Soul",
+      "Dancing Blades",
+      "Piercing Pain"
     ],
     "equipment": {
       "1": [
@@ -595,9 +595,9 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/5.png",
     "skills": [
       "Fetters of the Wind",
-      "Dragon's Breath",
+      "Breath of the Abyss",
       "Explosive Sphere",
-      "Alien Life"
+      "Stolen Life"
     ],
     "equipment": {
       "1": [
@@ -739,9 +739,9 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/6.png",
     "skills": [
       "Paralysis",
-      "Mage's Curse",
-      "Dark Deal",
-      "Dread"
+      "Dreaded Shadow",
+      "Bonds of Darkness",
+      "Curse Master"
     ],
     "equipment": {
       "1": [
@@ -1026,10 +1026,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/8.png",
     "skills": [
-      "Big Powder Keg",
-      "Fire Arrow",
-      "Discharge",
-      "Wild Fire"
+      "Rapid Fire",
+      "Big Badda Boom!",
+      "Fire Support",
+      "Thirst for Blood"
     ],
     "equipment": {
       "1": [
@@ -1170,10 +1170,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/9.png",
     "skills": [
-      "Death Flower",
-      "Spy Drone",
-      "Toxic Smoke",
-      "Camouflage"
+      "Deathflower",
+      "Poison Mastery",
+      "Snake Charmer",
+      "Detrimental Effect"
     ],
     "equipment": {
       "1": [
@@ -1316,8 +1316,8 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Doppelganger",
       "Power Throw",
-      "Spell Puppeteer",
-      "Underworld Power"
+      "Chain Lightning",
+      "Spell Expert"
     ],
     "equipment": {
       "1": [
@@ -1458,10 +1458,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/11.png",
     "skills": [
-      "Bottomless Stomach",
-      "Gluttony",
-      "Heavy Fat",
-      "Wild Hunger"
+      "Wild Hunger",
+      "Burp",
+      "Fat Layer",
+      "Bottomless Belly"
     ],
     "equipment": {
       "1": [
@@ -1602,10 +1602,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/12.png",
     "skills": [
-      "Hyper Jump",
       "Demolition Robot",
-      "Toxic Spray",
-      "Plasma Explosion"
+      "Teleport",
+      "Underground Strike",
+      "Neurotoxin"
     ],
     "equipment": {
       "1": [
@@ -1746,9 +1746,9 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/13.png",
     "skills": [
-      "Total Extermination",
-      "Magic Missiles",
+      "Total Destruction",
       "Magnetic Field",
+      "Antimatter Blast",
       "Full Charge"
     ],
     "equipment": {
@@ -1890,10 +1890,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/14.png",
     "skills": [
-      "Big Gun",
-      "Concussion",
-      "Smokescreen",
-      "Armor-Piercing Bullet"
+      "Heavy Caliber",
+      "Smoke Screen",
+      "Cannonade",
+      "Concussion"
     ],
     "equipment": {
       "1": [
@@ -2035,9 +2035,9 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/15.png",
     "skills": [
       "Lead Storm",
-      "Fragmentation Grenade",
-      "Fire Support",
-      "High-Caliber Burst"
+      "Penetrating Shot",
+      "Suppressive Fire",
+      "Ranging Shot"
     ],
     "equipment": {
       "1": [
@@ -2178,10 +2178,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/16.png",
     "skills": [
-      "Instruments of Fate",
+      "Instrument of Fate",
       "Foresight",
-      "Shackles of Weakness",
-      "Dimensional Shift"
+      "Retribution",
+      "Shackles of Weakness"
     ],
     "equipment": {
       "1": [
@@ -2324,7 +2324,7 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Totem of Wrath",
       "Healing Spirits",
-      "Cursed Arrows",
+      "Cursed Bones",
       "Hex"
     ],
     "equipment": {
@@ -2468,8 +2468,8 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Ion Cyclone",
       "Force Field",
-      "Interference",
-      "Compact Generator"
+      "Spacial Rift",
+      "Enhanced Generator"
     ],
     "equipment": {
       "1": [
@@ -2610,10 +2610,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/19.png",
     "skills": [
-      "Black Arrow",
-      "Shadow Fall",
-      "Dark Reflection",
-      "Night Vengeance"
+      "Vengeful Souls",
+      "Forest Whisper",
+      "Companion",
+      "Black Arrows"
     ],
     "equipment": {
       "1": [
@@ -2755,9 +2755,9 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/20.png",
     "skills": [
       "Deadly Shower",
-      "True Shot",
+      "True Light",
       "Smart Arrow",
-      "Beast Slayer"
+      "Punishing Arrows"
     ],
     "equipment": {
       "1": [
@@ -2898,10 +2898,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/21.png",
     "skills": [
-      "Righteous Wrath",
-      "Holy Shield",
+      "Divine Protection",
+      "Retribution Ray",
       "Compassion",
-      "Ascended"
+      "Ascension"
     ],
     "equipment": {
       "1": [
@@ -3045,7 +3045,7 @@ export const heroMetadata: HeroMetadataDict = {
       "Masquerade",
       "Boldness",
       "Frolic",
-      "Trick"
+      "Trickster"
     ],
     "equipment": {
       "1": [
@@ -3186,10 +3186,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/23.png",
     "skills": [
-      "Armament of Beauty",
+      "Enchantment",
+      "Hypnotic Ball",
       "Wandering Lights",
-      "Conciliation",
-      "Hypnotic Ball"
+      "Conciliation"
     ],
     "equipment": {
       "1": [
@@ -3332,8 +3332,8 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Rusty Hook",
       "Putrefaction",
-      "Heavyweight",
-      "Kitchen Scraps"
+      "Mutilation",
+      "Heavyweight"
     ],
     "equipment": {
       "1": [
@@ -3474,10 +3474,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/25.png",
     "skills": [
+      "Awakening",
       "Mirage",
-      "Phantom Strike",
-      "Storm Blades",
-      "Awakening"
+      "Dark Craft",
+      "Storm Blades"
     ],
     "equipment": {
       "1": [
@@ -3618,10 +3618,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/26.png",
     "skills": [
-      "Ritual of Flames",
-      "Gehenna",
-      "Infernal Pact",
-      "Possession"
+      "Underworld Seal",
+      "Demonic Fury",
+      "Fire Breath",
+      "Sacrifice"
     ],
     "equipment": {
       "1": [
@@ -3762,10 +3762,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/27.png",
     "skills": [
-      "Underpants",
+      "Sentence",
+      "Omen",
       "Gehenna",
-      "Infiltration",
-      "Faith"
+      "Doctrine of Faith"
     ],
     "equipment": {
       "1": [
@@ -3906,10 +3906,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/28.png",
     "skills": [
-      "Dragon's Claw",
+      "Qing Long",
       "Spear of Dawn",
-      "Open Heart",
-      "Dragon's Blood"
+      "Dragon´s Claw",
+      "Open Heart"
     ],
     "equipment": {
       "1": [
@@ -4051,9 +4051,9 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/29.png",
     "skills": [
       "Fountain of Blood",
-      "Ancestors' Amulet",
+      "Ancestors´ Amulet",
       "Wings of Night",
-      "Blood Covenant"
+      "Blood Seal"
     ],
     "equipment": {
       "1": [
@@ -4195,8 +4195,8 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/30.png",
     "skills": [
       "Heavy Wisdom",
-      "Ruined Memory",
-      "Lost Youth",
+      "Rune of Suppression",
+      "Protective Dome",
       "Memory Loss"
     ],
     "equipment": {
@@ -4338,10 +4338,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/31.png",
     "skills": [
-      "Kinetic Potion",
-      "Fatigue Acid",
-      "Inebriating Potion",
-      "Exhausting Potion"
+      "Elixir of Vigor",
+      "Acid Shot",
+      "Potion of Fatigue",
+      "Inordinate Fury"
     ],
     "equipment": {
       "1": [
@@ -4482,8 +4482,8 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/32.png",
     "skills": [
+      "Star Birth",
       "Solar Wind",
-      "Retribution",
       "Celestial Guardians",
       "Flaming Retribution"
     ],
@@ -4628,8 +4628,8 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Lord of the Storm",
       "Chain Lightning",
-      "Conductance",
-      "Wind Whisper"
+      "Lightning Bolt",
+      "Conductance"
     ],
     "equipment": {
       "1": [
@@ -4770,9 +4770,9 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/34.png",
     "skills": [
-      "Frozen Needle",
+      "Icy Vengeance",
       "Chains of Frost",
-      "Cold Touch",
+      "Frozen Needles",
       "Crystallization"
     ],
     "equipment": {
@@ -4914,10 +4914,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/35.png",
     "skills": [
-      "Torment of Power",
-      "Icy Grasp",
+      "Torment of Powerlessness",
+      "Cycle of Energies",
       "Leper",
-      "Tainted Shield"
+      "Tainted Wounds"
     ],
     "equipment": {
       "1": [
@@ -5059,9 +5059,9 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/36.png",
     "skills": [
       "Queen of Flowers",
-      "Poisonous Pollen",
-      "Queen's Revenge",
-      "Toxic Affection"
+      "Poisoned Pollen",
+      "Poisonous Bonds",
+      "Queen's Revenge"
     ],
     "equipment": {
       "1": [
@@ -5202,10 +5202,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/37.png",
     "skills": [
-      "You Will Not Stop Me",
-      "I See You",
-      "Beam of Pain",
-      "Survival Instinct"
+      "You will not stop me",
+      "I will take your life",
+      "I see you",
+      "The spirits will heal me"
     ],
     "equipment": {
       "1": [
@@ -5348,8 +5348,8 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Shifting Sands",
       "Mirage",
-      "Dervish",
-      "Many As One"
+      "Perfect Blades",
+      "Many Truths"
     ],
     "equipment": {
       "1": [
@@ -5490,10 +5490,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/39.png",
     "skills": [
+      "Focus of Hatred",
+      "Reflection of Pain",
       "Shelter of Sands",
-      "Focused Fury",
-      "Shadow of Fury",
-      "Desert Reflection"
+      "Fury of Akhreb Ummi"
     ],
     "equipment": {
       "1": [
@@ -5634,7 +5634,7 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/40.png",
     "skills": [
-      "Astraea",
+      "Astral Projection",
       "Serenity",
       "Disharmony",
       "Equilibrium"
@@ -5779,9 +5779,9 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/41.png",
     "skills": [
       "Nexus of Horror",
-      "Negator of Dimensions",
+      "Negator of Laws",
       "Deadly Tendrils",
-      "Survival Instinct"
+      "Survival Factor"
     ],
     "equipment": {
       "1": [
@@ -5923,8 +5923,8 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/42.png",
     "skills": [
       "Rakashi's Barrier",
-      "Rakashi's Blessing",
       "Rakashi's Mockery",
+      "Devourer of Magic",
       "Rakashi's Oath"
     ],
     "equipment": {
@@ -6066,8 +6066,8 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/43.png",
     "skills": [
-      "Two Faces",
-      "White / Dark Night",
+      "Two Fates",
+      "White Night",
       "Limbo",
       "Zenith"
     ],
@@ -6210,10 +6210,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/44.png",
     "skills": [
-      "Best Friends",
+      "Go for it, Lucas!",
+      "Rampant Nature",
       "Predator's Charge",
-      "Tracker's Instinct",
-      "Bond of Hearts"
+      "Tracker's Mark"
     ],
     "equipment": {
       "1": [
@@ -6356,8 +6356,8 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Ravenous Pack",
       "Spirit Banishment",
-      "Wisdom of Ancients",
-      "Imminent End"
+      "Centurial Wisdom",
+      "Looming Justice"
     ],
     "equipment": {
       "1": [
@@ -6498,10 +6498,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/46.png",
     "skills": [
-      "Forefather's Oath",
-      "Secret of Long Life",
+      "Foremother's Oath",
+      "Secret of Longevity",
       "Tea Party",
-      "Speed of Ancestors"
+      "Healing Brew"
     ],
     "equipment": {
       "1": [
@@ -6642,10 +6642,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/47.png",
     "skills": [
-      "Terravok's Wrath",
-      "Earth Stone",
-      "Nature's Barrier",
-      "Living Earth"
+      "Titan's Fist",
+      "Living Earth",
+      "Stone Grasp",
+      "Nature's Barrier"
     ],
     "equipment": {
       "1": [
@@ -6788,8 +6788,8 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Dance of Death",
       "Assassin's Instinct",
-      "Embraced by Pain",
-      "Unknown Toxins"
+      "Embrace of Pain",
+      "Unknown Toxin"
     ],
     "equipment": {
       "1": [
@@ -6930,10 +6930,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/50.png",
     "skills": [
-      "Tessellation",
-      "High-Voltage Module",
-      "MP-300 Capacitors",
-      "Overcharge"
+      "Tes'Lin's Overdrive",
+      "Observer Drones",
+      "Shield Drones",
+      "High-Voltage Module"
     ],
     "equipment": {
       "1": [
@@ -7074,10 +7074,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/51.png",
     "skills": [
-      "Soul Radiance",
-      "Void Glares",
-      "Black Sun",
-      "Abyss Energy"
+      "Deadly Ray",
+      "Spiritual Power",
+      "Crimson Mist",
+      "Soaring Might"
     ],
     "equipment": {
       "1": [
@@ -7218,10 +7218,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/52.png",
     "skills": [
-      "Desirable Burden",
-      "Mirage of Truth",
-      "Illusory Alliance",
-      "Patient Malice"
+      "Careless Wish",
+      "Fair Deal",
+      "Genie’s Patronage",
+      "Endurance Test"
     ],
     "equipment": {
       "1": [
@@ -7362,10 +7362,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/53.png",
     "skills": [
+      "Blacksmith Mastery",
       "Runic Shield",
-      "Blacksmith's Mastery",
-      "Dragon's Breath",
-      "Hardened Scales"
+      "Runic Blade",
+      "Knowledge of Flaws"
     ],
     "equipment": {
       "1": [
@@ -7506,10 +7506,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/54.png",
     "skills": [
-      "Bite of the Soul",
-      "Exposed Soul",
-      "Demonic Pact",
-      "Otherworldly Bloom"
+      "Soul Burning",
+      "Otherworldly Creature",
+      "Mysterious Pact",
+      "Inner Fire"
     ],
     "equipment": {
       "1": [
@@ -7650,10 +7650,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/55.png",
     "skills": [
-      "Spore Cloud",
-      "Mycological Symbiosis",
-      "Fungal Bloom",
-      "Endless Grove"
+      "Perfect Copy",
+      "Branching Mycelium",
+      "Rotting Seeds",
+      "Wild Growth"
     ],
     "equipment": {
       "1": [
@@ -7794,10 +7794,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/56.png",
     "skills": [
-      "Nine Lives",
-      "Copycat",
-      "Defensive Protocol",
-      "Energy Core"
+      "Meowsterpiece of Defense",
+      "Copycat Device",
+      "Nine-Lives Engine",
+      "Purrfect Reflexes"
     ],
     "equipment": {
       "1": [
@@ -7938,10 +7938,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/57.png",
     "skills": [
-      "Phoenix Flight",
-      "Flame Whirlwind",
-      "Burning Blood",
-      "Fiery Heart"
+      "Phoenix's Fury",
+      "Acrobatics",
+      "Retaliatory Strike",
+      "Inner Flame"
     ],
     "equipment": {
       "1": [
@@ -8082,10 +8082,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/58.png",
     "skills": [
-      "Flame Transfer",
-      "Phoenix Embrace",
-      "Ignited Souls",
-      "Bonds of Fire"
+      "Phoenix Ritual",
+      "Fire Embrace",
+      "Bonds of Fire",
+      "Flame Shield"
     ],
     "equipment": {
       "1": [
@@ -8226,10 +8226,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/59.png",
     "skills": [
-      "Breath of Depths",
-      "Torrent of Water",
-      "Abyssal Surge",
-      "Tidal Dominance"
+      "Hydrokinesis",
+      "Tidal Wave",
+      "Refluence",
+      "Elemental Surge"
     ],
     "equipment": {
       "1": [
@@ -8370,10 +8370,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/60.png",
     "skills": [
-      "Labyrinth of Mirrors",
-      "Radiant Prism",
-      "Mirage Dance",
-      "Mirror Shards"
+      "Distortion of Fate",
+      "Favorite of the Empress",
+      "Moment of Concentration",
+      "Imperial Guard"
     ],
     "equipment": {
       "1": [
@@ -8514,10 +8514,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/61.png",
     "skills": [
-      "Wild Hunt",
-      "Huntress Trap",
-      "Primeval Fury",
-      "Pack Leader"
+      "Shieldbreaker",
+      "Hunting",
+      "Overwhelming",
+      "Brutal Onslaught"
     ],
     "equipment": {
       "1": [
@@ -8658,10 +8658,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/62.png",
     "skills": [
-      "Solar Flare",
-      "Sun Ray",
-      "Dawn Blessing",
-      "Daylight"
+      "Curse of the Ancient God",
+      "Halo",
+      "Mark of the Ancient God",
+      "Blessing of the Ancient God"
     ],
     "equipment": {
       "1": [
@@ -8802,10 +8802,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/63.png",
     "skills": [
-      "Dual Pistols",
-      "Ancient Relic",
-      "Acrobatics",
-      "Tomb Raider"
+      "Power of the Tombs",
+      "Critical Thinking",
+      "Steady Shot",
+      "Lost Knowledge"
     ],
     "equipment": {
       "1": [
@@ -8946,10 +8946,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/64.png",
     "skills": [
-      "Magic Tome",
-      "Spell Scribe",
-      "Arcane Glyph",
-      "Ancient Runes"
+      "Inkblot",
+      "Ancient Scriptures",
+      "Ink Copy",
+      "Curse of Knowledge"
     ],
     "equipment": {
       "1": [
@@ -9090,10 +9090,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/65.png",
     "skills": [
-      "Time Dilation",
-      "Temporal Rift",
-      "Time Stop",
-      "Chrono Shift"
+      "Chronostasis",
+      "Withering",
+      "Temporal Anomaly",
+      "Time Paradox"
     ],
     "equipment": {
       "1": [
@@ -9234,10 +9234,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/66.png",
     "skills": [
-      "Turtle Power",
-      "Shell Shock",
-      "Pizza Time",
-      "Sewer Strike"
+      "Cowabunga",
+      "Donnie's Tactics",
+      "Raph's Fury",
+      "Mikey's Optimism"
     ],
     "equipment": {
       "1": [
@@ -9378,10 +9378,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/67.png",
     "skills": [
-      "North Star",
-      "Aurora Borealis",
-      "Polar Wind",
-      "Frost Nova"
+      "Pulsing Comet",
+      "Glacial Fortress",
+      "Shooting Star",
+      "Aurora Borealis"
     ],
     "equipment": {
       "1": [
@@ -9522,10 +9522,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/68.png",
     "skills": [
-      "Sweet Melody",
-      "Fruit Punch",
-      "Sugar Rush",
-      "Sweetness"
+      "Theater of Pain",
+      "Harlequin's Punishment",
+      "The Final Act",
+      "Stage Presence"
     ],
     "equipment": {
       "1": [
@@ -9666,10 +9666,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/69.png",
     "skills": [
-      "Golden Goose",
-      "Egg Drop",
-      "Honk of War",
-      "Feathers"
+      "Under the Wing",
+      "Feather Squad",
+      "Beak Peak",
+      "Honkageddon"
     ],
     "equipment": {
       "1": [
@@ -9810,10 +9810,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/70.png",
     "skills": [
-      "Dream Weaver",
-      "Nightmare",
-      "Sleepwalker",
-      "Lullaby"
+      "Lullaby Veil",
+      "Drowsy Blessing",
+      "Curse of the Wool",
+      "Silence of the Sheep"
     ],
     "equipment": {
       "1": [
@@ -9954,10 +9954,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/71.png",
     "skills": [
-      "Lightning Strike",
-      "Electric Arc",
-      "Thunder Shield",
-      "Overload"
+      "Pain’s Embrace",
+      "Field of Lightning",
+      "Oath of Protection",
+      "Immortal Shell"
     ],
     "equipment": {
       "1": [
@@ -10098,10 +10098,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/72.png",
     "skills": [
-      "Bear Hug",
-      "Forest Roar",
-      "Primal Might",
-      "Hibernation"
+      "Roar of Nature",
+      "Guardian Punch",
+      "Bear Cuddle",
+      "Living Heart"
     ],
     "equipment": {
       "1": [
@@ -10242,10 +10242,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/73.png",
     "skills": [
-      "Blood Drain",
-      "Dark Mist",
-      "Crimson Surge",
-      "Vampiric Aura"
+      "Rising Tornado",
+      "Shatter Strike",
+      "Power Charge",
+      "Final Verdict"
     ],
     "equipment": {
       "1": [
@@ -10386,10 +10386,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/74.png",
     "skills": [
-      "Cat Scratch",
-      "Agile Leap",
-      "Feline Grace",
-      "Nine Lives"
+      "Lightning Strike",
+      "Veil of Insight",
+      "Blind Fury",
+      "Gift of the Storm"
     ],
     "equipment": {
       "1": [
@@ -10530,10 +10530,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/75.png",
     "skills": [
-      "Flame Candle",
-      "Melt",
-      "Hot Wax",
-      "Incinerate"
+      "Lava Kiss",
+      "Sweet Torture",
+      "Friendly Fire",
+      "Purge by Pain"
     ],
     "equipment": {
       "1": [
@@ -10674,10 +10674,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/76.png",
     "skills": [
-      "Raven Call",
-      "Feather Storm",
-      "Shadow Wings",
-      "Dark Omen"
+      "Silent Judgment",
+      "Holy Grenade",
+      "Swift Retribution",
+      "Final Verdict"
     ],
     "equipment": {
       "1": [
@@ -10818,10 +10818,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/77.png",
     "skills": [
-      "Mother Nature",
-      "Seed of Life",
-      "Healing Rain",
-      "Bloom"
+      "Impossible Shot",
+      "Focusing Scope",
+      "Piercing Shot",
+      "Marksmen Unity"
     ],
     "equipment": {
       "1": [
@@ -10962,10 +10962,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/78.png",
     "skills": [
-      "Forest Sentinel",
-      "Root Grasp",
-      "Ancient Bark",
-      "Woodland Whisper"
+      "Crown of Wrath",
+      "Bark Renewal",
+      "Deepwood Might",
+      "Unbowed Oak"
     ],
     "equipment": {
       "1": [
@@ -11106,10 +11106,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/79.png",
     "skills": [
-      "Lion Heart",
-      "Regal Roar",
-      "Golden Mane",
-      "Pride Leader"
+      "Blades of Shadow",
+      "Predator Jump",
+      "Royal Roar",
+      "Mark of Fate"
     ],
     "equipment": {
       "1": [
@@ -11250,9 +11250,9 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/500.png",
     "skills": [
-      "Ode to Murder",
-      "Danse Macabre",
-      "Ballad of Clean Hands",
+      "Ballad of Tenacity",
+      "Hunter's Tune",
+      "Curse Song",
       "Rhythm of War"
     ],
     "equipment": {
@@ -11395,7 +11395,7 @@ export const heroMetadata: HeroMetadataDict = {
     "avatarFile": "assets/heroes/501.png",
     "skills": [
       "Strike of the Damned",
-      "Morass of Souls",
+      "Unity of the Damned",
       "Altar of Souls",
       "Royal Defense"
     ],
@@ -11540,7 +11540,7 @@ export const heroMetadata: HeroMetadataDict = {
     "skills": [
       "Army of Graven",
       "Bone Armor",
-      "Moonlight",
+      "Empathy of Eternity",
       "Necromancy"
     ],
     "equipment": {
@@ -11682,10 +11682,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/503.png",
     "skills": [
-      "Duality of Nature",
-      "Rune of Earth",
-      "Rune of Water",
-      "Harmony of Forest"
+      "Runes of Ice",
+      "Rune of Life",
+      "Rune of Fire",
+      "Rune of Earth"
     ],
     "equipment": {
       "1": [
@@ -11826,10 +11826,10 @@ export const heroMetadata: HeroMetadataDict = {
     "hasAvatar": true,
     "avatarFile": "assets/heroes/504.png",
     "skills": [
-      "Blessed Vanguard",
+      "Purifier's Wrath",
       "Righteous Zeal",
-      "Purifying Flames",
-      "Inquisitor's Resolve"
+      "Judge of Sorcerers",
+      "Blessed Vanguard"
     ],
     "equipment": {
       "1": [

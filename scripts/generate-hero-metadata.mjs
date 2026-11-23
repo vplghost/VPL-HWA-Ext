@@ -86,6 +86,13 @@ const roleNames = {
   back: 'Back'
 };
 
+let locale = {};
+try {
+  locale = JSON.parse(await readFile(join(root, 'temp/items-current-en.json'), 'utf8'));
+} catch (e) {
+  console.warn('Could not read temp/items-current-en.json:', e.message);
+}
+
 const HERO_SKILLS = {
   1: ['Crystal of Selias', 'Crystalline Cataclysm', 'Piercing Light', 'Rainbow Halo'],
   2: ['Iron Sky', 'Unstoppable Charge', 'Retaliation', "Harun's Pride"],
@@ -234,7 +241,19 @@ for (const [id, h] of playableHeroes) {
     }
   }
 
-  const skills = HERO_SKILLS[id] || null;
+  let skills = null;
+  if (h.skill) {
+    const sObj = Array.isArray(h.skill)
+      ? { 1: h.skill[1], 2: h.skill[2], 3: h.skill[3], 4: h.skill[4] }
+      : h.skill;
+    const s1 = locale['LIB_SKILL_' + sObj['1']];
+    const s2 = locale['LIB_SKILL_' + sObj['2']];
+    const s3 = locale['LIB_SKILL_' + sObj['3']];
+    const s4 = locale['LIB_SKILL_' + sObj['4']];
+    if (s1 && s2 && s3 && s4) skills = [s1, s2, s3, s4];
+  }
+  if (!skills) skills = HERO_SKILLS[id] || null;
+
   metadata[id] = {
     name: heroNames[id] || `Hero #${id}`,
     role: roleNames[h.role] || 'Unknown',

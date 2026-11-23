@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.224 — 2026-11-24
+
+### Fixed
+
+- **Synchronize Hero & Titan Skill Names with Latest Client Data (`heroMetadata.ts`, `titanMetadata.ts`, `scripts/`)**:
+  - **Fresh Client Extraction**: Downloaded and unpacked the latest game client data files from CDN (`locale/en.json.gz` and `splitlib.json.zip`).
+  - **Titans Skill Alignment**: Completely updated skill names across all 30 Titans in `src/data/titanMetadata.ts` to match in-game abilities (e.g. Sigurd `Icy Aegis`, Angus `Anger of the Earth`, Moloch `Crushing Blow`, Vulcan `Erupting Rage`, Ignis `Burning Blood`, Araji `Incinerating Ray` / `Herald of Flame`, Eden `Burden of Creation` / `Subterranean Prison`).
+  - **Heroes Skill Alignment**: Updated 259 skill names across 83 playable heroes in `src/data/heroMetadata.ts`, eliminating stale placeholders on newer heroes (Folio, Tempus, Polaris, Peech, Guus, Somna, Electra, Byrna, Drayne, Miu, Kendle, Crow, Eva, Wodryn, Leonel).
+  - **Dynamic Generator Automation**: Updated `scripts/generate-hero-metadata.mjs` and `scripts/generate-titan-metadata.mjs` to dynamically map skills from `hero.skill` and `LIB_SKILL_<id>` rather than relying on stale hardcoded dictionaries.
+
 ## 0.11.223 — 2026-11-24
 
 ### Added

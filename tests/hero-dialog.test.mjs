@@ -234,7 +234,7 @@ test('renderHeroDialog renders hero profile, stats, skills and upgrade buttons',
   // Verify skill names are displayed instead of raw skill IDs
   assert.match(bodyEl.textContent, /Army of Graven/);
   assert.match(bodyEl.textContent, /Bone Armor/);
-  assert.match(bodyEl.textContent, /Moonlight/);
+  assert.match(bodyEl.textContent, /Empathy of Eternity/);
   assert.match(bodyEl.textContent, /Necromancy/);
   assert.doesNotMatch(bodyEl.textContent, /#10226/);
   assert.doesNotMatch(bodyEl.textContent, /#11014/);
