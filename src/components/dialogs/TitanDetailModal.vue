@@ -30,6 +30,7 @@ import {
   getTitanArtifactLevelCost,
   getTitanArtifactEvolveCost,
 } from '@/src/data/titanMetadata';
+import { skinStats } from '@/src/data/heroMetadata';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -467,32 +468,52 @@ export interface TitanSkinItem {
   skinId: string;
   name: string;
   level: number;
+  statKey: string;
+  statLabel: string;
 }
 
 const detailedSkins = computed<TitanSkinItem[]>(() => {
   const titan = activeTitan.value;
   const skinsObj = titan?.skins || {};
   const entries = Object.entries(skinsObj);
+  const isTank = meta.value?.role === 'Tank';
+
+  const resolveStat = (sId: string, idx: number) => {
+    let statKey = skinStats[sId];
+    if (!statKey) {
+      if (idx === 0) statKey = isTank ? 'HP' : 'PA';
+      else if (idx === 1) statKey = isTank ? 'PA' : 'HP';
+      else statKey = isTank ? 'HP' : 'PA';
+    }
+    const statLabel = statKey === 'HP' ? 'Health' : statKey === 'PA' ? 'Physical Attack' : statKey;
+    return { statKey, statLabel };
+  };
 
   if (entries.length === 0) {
     const defaultId = String(titan?.currentSkin || 10001);
+    const { statKey, statLabel } = resolveStat(defaultId, 0);
     return [
       {
         skinId: defaultId,
         name: 'Default Skin',
         level: 1,
+        statKey,
+        statLabel,
       },
     ];
   }
 
   return entries.map(([sId, lvl], idx) => {
     let name = idx === 0 ? 'Default Skin' : `Skin #${sId}`;
-    if (idx === 1) name = 'Champion Skin';
-    else if (idx === 2) name = 'Primordial Skin';
+    if (idx === 1) name = 'Primordial Skin';
+    else if (idx === 2) name = 'Biomech Skin';
+    const { statKey, statLabel } = resolveStat(sId, idx);
     return {
       skinId: sId,
       name,
       level: Number(lvl) || 1,
+      statKey,
+      statLabel,
     };
   });
 });
@@ -945,8 +966,16 @@ const skillsList = computed(() => {
                 class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 p-2.5 flex items-center justify-between gap-2"
               >
                 <div class="min-w-0 flex-1">
-                  <div class="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                    {{ skin.name }}
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                      {{ skin.name }}
+                    </span>
+                    <span
+                      class="px-1.5 py-0.5 rounded text-3xs font-bold shrink-0"
+                      :class="skin.statKey === 'HP' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300'"
+                    >
+                      {{ skin.statLabel }}
+                    </span>
                   </div>
                   <div class="text-2xs text-slate-500 dark:text-slate-400">
                     Level: <span class="font-bold text-slate-700 dark:text-slate-300">{{ skin.level }} / 60</span>

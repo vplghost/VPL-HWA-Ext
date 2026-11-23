@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.226 — 2026-11-24
+
+### Fixed
+
+- **Correct Hero and Titan Skin Stat Mappings (`heroMetadata.ts`, `TitanDetailModal.vue`, `HeroHoverCard.vue`)**:
+  - **Protobuf Stat Decoding & Alignment**: Decoded `temp/splitlib/skin.pb` to fix stat ID mappings: resolved `statId === 9` as Health (`HP`) instead of Armor, `statId === 7` as Armor (`Arm`) instead of Magic Defense, and main stat alignments (`Int` for Iris and Xe'sha; `Str` for Corvus, Aurora, Galahad, Astaroth).
+  - **Titan Skin Statistics Ground Truth**: Verified and corrected all 30 Titans — Tank Titans (Sigurd, Moloch, Angus, Brustar, Rigel, Pallant) have Default Skin Health (`HP`), Primordial Physical Attack (`PA`), and Biomech Health (`HP`), while Non-Tank Titans have Default Physical Attack (`PA`), Primordial Health (`HP`), and Biomech Physical Attack (`PA`).
+  - **Purchased Hero Skins Rectified**: Updated 14+ hero skins in-game (Cleaver Barbarian, Aurora Spring, Astaroth Cybernetic, Ishmael Masquerade, Lilith Winter, Martha Masquerade, Rufus Angel/Winter, Ziri Cybernetic/Champion, etc.) from `Arm` to `HP`.
+  - **Titan Detail Dialog Skin Stat Badges**: Added `statKey` and `statLabel` badges with color accents (Emerald for `Health`, Rose for `Physical Attack`) to each skin card in `TitanDetailModal.vue`.
+  - **Synchronized Generators & Tests**: Updated `scripts/sync-skin-stats.mjs`, `scripts/generate-hero-stats.mjs`, and aligned assertions in `tests/hero-titan-typed-data.test.mjs`, `tests/popup-data.test.mjs`, and `tests/popup-hero-view.test.mjs`.
+
 ## 0.11.224 — 2026-11-24
 
 ### Fixed

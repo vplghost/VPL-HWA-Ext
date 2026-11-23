@@ -486,8 +486,8 @@ test('createTitanInline renders enriched hover card with skills, skins, and arti
   assert.ok(card.textContent.includes('Tank'), 'Should mention Tank');
   assert.ok(card.textContent.includes('Water'), 'Should mention Water');
   assert.ok(card.textContent.includes('S1: 45'), 'Should display skill level');
-  assert.ok(card.textContent.includes('Arm: 20'), 'Should display skin 10001 with Armor stat');
-  assert.ok(card.textContent.includes('MD: 10'), 'Should display skin 10013 with MD stat');
+  assert.ok(card.textContent.includes('HP: 20'), 'Should display skin 10001 with Health stat');
+  assert.ok(card.textContent.includes('PA: 10'), 'Should display skin 10013 with Physical Attack stat');
   assert.ok(card.textContent.includes('Wpn: 3★ Lv.20'), 'Should display weapon artifact');
   assert.ok(card.textContent.includes('Crown: 1★ Lv.15'), 'Should display crown artifact');
   assert.ok(card.textContent.includes('Seal: 2★ Lv.20'), 'Should display seal artifact');

@@ -927,9 +927,9 @@ test('exportTableData enriches titans with structured artifacts and skins', () =
   assert.equal(titan.artifacts[0].isUpgradable, true);
   assert.equal(titan.skins.length, 2);
   assert.equal(titan.skins[0].skinId, 10001);
-  assert.equal(titan.skins[0].stat, 'Arm');
+  assert.equal(titan.skins[0].stat, 'HP');
   assert.equal(titan.skins[0].isCurrent, true);
-  assert.equal(titan.skins[1].stat, 'MD');
+  assert.equal(titan.skins[1].stat, 'PA');
   assert.equal(titan.skins[1].isCurrent, false);
 });
 

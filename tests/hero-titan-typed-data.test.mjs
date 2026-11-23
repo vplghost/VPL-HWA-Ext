@@ -36,7 +36,7 @@ import { resolveHeroName } from '../src/utils/marchTooltip.ts';
 test('heroMetadata exports complete typed data and helpers with 100% parity', () => {
   assert.equal(Object.keys(heroMetadata).length, 83, 'Should contain 83 heroes');
   assert.equal(Object.keys(heroGlyphs).length, 117, 'Should contain 117 hero glyph definitions');
-  assert.equal(Object.keys(skinStats).length, 551, 'Should contain 551 skin stat definitions');
+  assert.equal(Object.keys(skinStats).length, 553, 'Should contain 553 skin stat definitions');
   assert.ok(Object.keys(gearCraftData).length > 0, 'Should contain gear craft recipes');
   assert.ok(Object.keys(scrollCraftData).length > 0, 'Should contain scroll craft recipes');
 

@@ -10,6 +10,7 @@ import {
   starGlowClass,
 } from '@/src/utils/metadata';
 import { skinStats, getHeroGlyphs, getHeroName, heroMetadata } from '@/src/data/heroMetadata';
+import { getHeroMainStat } from '@/src/utils/skinHelper';
 import { getHeroArtifactTierStyle } from '@/src/utils/popupData';
 import { getItemIcon } from '@/src/utils/itemResources';
 import { formatNumber } from '@/src/utils/formatters';
@@ -148,9 +149,9 @@ const skinsList = computed(() => {
   const statsMap = (typeof skinStats !== 'undefined' ? skinStats : undefined) || {};
   return entries.map(([skinId, level]) => {
     let stat = statsMap[skinId];
-    if (!stat || stat === 'MAIN' || Number(skinId) === Number(props.hero?.baseSkinId) || (Number(skinId) <= 100 && !skinStats[skinId])) {
-      const mainStat = meta.value?.class === 'Marksman' ? 'Agi' : meta.value?.role === 'Tank' || meta.value?.class === 'Warrior' ? 'Str' : 'Int';
-      stat = mainStat;
+    if (!stat || stat === 'MAIN') {
+      const mStat = getHeroMainStat(props.hero?.id || props.heroId);
+      stat = mStat === 'strength' ? 'Str' : mStat === 'agility' ? 'Agi' : 'Int';
     }
     if (stat === 'Dodge') stat = 'Ddg';
     return {
