@@ -1515,7 +1515,7 @@ function handleSoulStoneFarm() {
                 </div>
 
                 <!-- Skin Stone Chest (51) -->
-                <div class="flex items-center gap-1" :title="`Skin Stone Chest (150 stones each): ${formatNumber(ownedSmallSkinChests)}`">
+                <div class="flex items-center gap-1" :title="`Skin Stone Chest (10 stones each): ${formatNumber(ownedSmallSkinChests)}`">
                   <img :src="getAssetUrl('assets/items/consumable/51.png')" alt="Skin Stone Chest" class="size-4.5 object-contain" />
                   <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedSmallSkinChests) }}</span>
                 </div>
