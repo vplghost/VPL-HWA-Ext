@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.11.214 — 2026-11-23
+
+### Added
+
+- **Frontier (Eternal Story) Activity & Automation Engine (`frontierService.ts`, `FrontierModal.vue`, `ActivityGoals.vue`, `rpcCache.ts`)**:
+  - **Full RPC & Data Integration**: Added extraction and merge support for `eternalStory_getState`, `eternalStory_autoFight`, `eternalStory_getChest`, `eternalStory_collectChest`, and `battle_teamSet`. Automatically tracks current stage, enemy team, AFK chest, and daily cleared stages.
+  - **Frontier Detail Modal (`FrontierModal.vue`)**:
+    - **Lineup & Stage Tab**: Displays full defender lineup with level, stars, color tier, talisman info, and power metrics. Provides interactive player squad selector with +/- power comparison.
+    - **Team Preset Picker**: Easily loads hero lineups from custom teams (`useAccountTeams`) or server-saved presets (`teamGetAll.data` like Arena, Tower, Dungeon, Raid, etc.).
+    - **AFK Chest Collector**: Collects accumulated Frontier Coins directly from the dialog header with live percentage tracking.
+    - **Automation & Simulation Tab**: Supports single-stage testing and full continuous auto-progression.
+    - **WASM Pre-Battle Simulation**: Simulates combat through Unity WebAssembly engine (`simulateBattleWithUnity`) before dispatching to server. Safely aborts if a defeat is predicted, preventing unnecessary server-recorded losses.
+    - **Configurable Defeat Threshold**: Adjustable maximum consecutive defeats before stopping (`1`, `5`, or `10` defeats).
+    - **Smart Team Rotation**: Optional Round-Robin rotation across multiple chosen custom teams on defeat to bypass difficult stages.
+    - **Live Combat Log**: Logs every battle attempt, simulation prediction, server outcome, and coin rewards.
+  - **Dashboard Integration**: Embedded Frontier activity card in `ActivityGoals.vue` showing stage position, world, enemy power, cleared stages count, and quick modal access. Removed redundant standalone card from Dashboard to preserve a streamlined layout.
+
+### Fixed
+
+- **Dungeon Simulation Retreat Flow (`dungeonAutomationRunner.ts`, `DungeonSimModal.vue`)**:
+  - Enforced strict retreat flow on unsafe battle outcomes: when a battle outcome results in defeat, casualties (< 3 stars), or critical HP loss (< 20%), the runner safely clears active battle and calls `dungeonGetInfo` without submitting `dungeonEndBattle`, preventing titan loss.
+- **Troop Promotion Dashboard Accounting (`TroopsOverview.vue`, `activityStats.ts`)**:
+  - Included promoting troops in overall troop strength, hospital, and training calculations.
+
+### Changed
+
+- **Build Pipeline & Skills Automation (`scripts/build.mjs`, `ext-build`, `ext-backlog`)**:
+  - Implemented dual-build pipeline compiling both clean Production (`dist/`, debug bridge disabled) and Debug / Unpacked (`.output/chrome-mv3`, native messaging bridge enabled).
+  - Standardized automated changelog synchronization from commit history in `ext-build`.
+
 ## 0.11.134 — 2026-11-20
 
 ### Fixed

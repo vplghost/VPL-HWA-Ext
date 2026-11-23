@@ -145,15 +145,14 @@ test('frontierActivityState computes correct stage, detail, and pending state', 
   assert.ok(state.detail.includes('Cleared: 3 today'));
 });
 
-test('FrontierCard and FrontierModal components exist with required UI controls and English localization', async () => {
-  const cardSrc = await readFile(resolve(root, 'src/components/dashboard/FrontierCard.vue'), 'utf8');
-  assert.ok(cardSrc.includes('Frontier'), 'Card should include Frontier title');
-  assert.ok(cardSrc.includes('Target Stage'), 'Card should display Target Stage in English');
-  assert.ok(cardSrc.includes('Enemy Power'), 'Card should display Enemy Power in English');
-  assert.ok(cardSrc.includes('Cleared Today'), 'Card should display Cleared Today in English');
-  assert.ok(cardSrc.includes('Details & Auto Battle'), 'Card should have Details & Auto Battle button');
-  assert.ok(cardSrc.includes('handleCollectChest'), 'Card should have quick chest collect');
-  assert.ok(cardSrc.includes('handleOpenModal'), 'Card should have open modal trigger');
+test('Frontier is integrated in ActivityGoals and FrontierModal has full UI controls with English localization', async () => {
+  const dashSrc = await readFile(resolve(root, 'src/components/dashboard/DashboardTab.vue'), 'utf8');
+  assert.ok(!dashSrc.includes('FrontierCard'), 'DashboardTab should not render standalone FrontierCard');
+  assert.ok(dashSrc.includes('ActivityGoals'), 'DashboardTab should render ActivityGoals');
+
+  const activitySrc = await readFile(resolve(root, 'src/components/dashboard/ActivityGoals.vue'), 'utf8');
+  assert.ok(activitySrc.includes('frontierActivityState'), 'ActivityGoals should use frontierActivityState');
+  assert.ok(activitySrc.includes("openModal('frontier')"), 'ActivityGoals should open frontier modal on click');
 
   const modalSrc = await readFile(resolve(root, 'src/components/dialogs/FrontierModal.vue'), 'utf8');
   assert.ok(modalSrc.includes('ModalDialog'), 'Modal should use ModalDialog');
@@ -173,7 +172,4 @@ test('FrontierCard and FrontierModal components exist with required UI controls 
 
   const appSrc = await readFile(resolve(root, 'entrypoints/popup/App.vue'), 'utf8');
   assert.ok(appSrc.includes('FrontierModal'), 'App.vue should mount FrontierModal');
-
-  const activitySrc = await readFile(resolve(root, 'src/components/dashboard/ActivityGoals.vue'), 'utf8');
-  assert.ok(activitySrc.includes('frontierActivityState'), 'ActivityGoals should use frontierActivityState');
 });
