@@ -251,6 +251,7 @@ async function startAutomation() {
         savedLineups,
         customTeams: customTeams.value,
         safetyThresholdPct: 20,
+        shouldStop: () => autoStopRequested.value,
       });
 
       if (step.stopped) {

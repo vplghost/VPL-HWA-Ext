@@ -2,6 +2,7 @@ import { getTitanMetadata } from '../../utils/metadata.ts';
 import {
   simulateBattleWithUnity,
   evaluateDoorSafetyAndLoss,
+  calculateHpLossMetrics,
   isTitanEligibleForDoor,
   type DoorEvaluationResult,
   type SimResultPayload,
@@ -14,6 +15,7 @@ export interface DungeonAutomationOptions {
   savedLineups?: Record<string, number[]>;
   customTeams?: Array<{ id: string; name: string; type?: string; heroIds: number[] }>;
   safetyThresholdPct?: number; // default: 20
+  shouldStop?: () => boolean;
 }
 
 export interface DungeonAutomationStepResult {
@@ -221,26 +223,63 @@ export async function executeDungeonAutomationStep(
   try {
     outcome = await simulateBattleWithUnity(startPayload, seed);
   } catch (err: any) {
+    if (cache?.value?.dungeonStatus?.data) {
+      cache.value.dungeonStatus.data.activeBattle = null;
+    }
+    await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+
     const phasePrefix = err?.detail?.phase ? ` at [${err.detail.phase}]` : '';
     return {
       stopped: true,
-      stopReason: `Unity battle simulation failed${phasePrefix}: ${err.message || String(err)}. Aborted to protect titans.`,
+      stopReason: `Unity battle simulation failed${phasePrefix}: ${err.message || String(err)}. Battle retreated without loss.`,
       chosenEvaluation: bestDoor,
       evaluations,
     };
   }
 
-  // Abort if battle was lost or less than 3 stars to avoid titan casualty
-  if (!outcome.win || outcome.stars < 3) {
+  // Evaluate post-battle titan health
+  const frontlineId = bestDoor.teamIds[0];
+  const metrics = calculateHpLossMetrics(outcome?.attackers || {}, frontlineId, safetyThresholdPct);
+
+  const userRequestedStop = typeof options.shouldStop === 'function' ? options.shouldStop() : false;
+  const isLoss = !outcome.win;
+  const hasCasualty = outcome.stars < 3;
+  const isUnsafeHp = metrics.hasCriticalHp;
+
+  // Retreat and abort if battle was lost, titan casualty occurred, health fell below safety threshold, or stop requested
+  if (userRequestedStop || isLoss || hasCasualty || isUnsafeHp) {
+    // RETREAT FLOW: DO NOT SEND dungeonEndBattle!
+    // Discarding the battle keeps titans 100% preserved on the game server without any damage or casualty.
+    if (cache?.value?.dungeonStatus?.data) {
+      cache.value.dungeonStatus.data.activeBattle = null;
+    }
+    await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+
+    let stopReason = '';
+    if (userRequestedStop) {
+      stopReason = 'Automation stopped by user. Current battle retreated without loss.';
+    } else if (isLoss) {
+      stopReason = 'Unity simulation predicted defeat. Battle retreated without loss.';
+    } else if (hasCasualty) {
+      stopReason = `Unity simulation predicted titan casualty (${outcome.stars} stars). Battle retreated without loss.`;
+    } else {
+      stopReason = `Titan health would fall to ${metrics.minFinalHpPct.toFixed(1)}% (below ${safetyThresholdPct}% safety threshold). Battle retreated without loss.`;
+    }
+
     return {
       stopped: true,
-      stopReason: `Unity simulation predicted defeat or non-3-star outcome (${outcome.stars} stars). Battle aborted without loss.`,
-      chosenEvaluation: bestDoor,
+      stopReason,
+      chosenEvaluation: {
+        ...bestDoor,
+        tankLossPct: metrics.tankLossPct,
+        teamLossPct: metrics.teamLossPct,
+        minHpPct: metrics.minFinalHpPct,
+      },
       evaluations,
     };
   }
 
-  // 3. End battle
+  // 3. End battle - only submitted when verified win, 3 stars, and all titans stay above safety threshold
   const endRes = await dispatchRpc([
     {
       name: 'dungeonEndBattle',
@@ -312,7 +351,12 @@ export async function executeDungeonAutomationStep(
     floorPassed: floorNumber,
     doorIdx: bestDoor.doorIdx,
     doorElement: doorElem,
-    chosenEvaluation: bestDoor,
+    chosenEvaluation: {
+      ...bestDoor,
+      tankLossPct: metrics.tankLossPct,
+      teamLossPct: metrics.teamLossPct,
+      minHpPct: metrics.minFinalHpPct,
+    },
     evaluations,
   };
 }

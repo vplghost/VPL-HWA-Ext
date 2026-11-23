@@ -350,8 +350,17 @@ watch(
   { immediate: true }
 );
 
-function closeModal() {
+async function closeModal() {
   if (isSimulating.value || isSubmitting.value) return;
+  if (simResult.value) {
+    if (cache.value?.dungeonStatus?.data) {
+      cache.value.dungeonStatus.data.activeBattle = null;
+    }
+    try {
+      await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
+    } catch (_) {}
+    simResult.value = null;
+  }
   emit('update:modelValue', false);
 }
 

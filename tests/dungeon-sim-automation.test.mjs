@@ -411,5 +411,135 @@ describe('Dungeon Simulator & Automation Engine', () => {
       assert.match(step.stopReason, /at \[EXECUTE_BATTLE\]/);
       assert.match(step.stopReason, /IL2CPP managed exception/);
     });
+
+    it('retreats and never submits dungeonEndBattle when post-battle HP drops below safetyThresholdPct', async () => {
+      const dispatchedCalls = [];
+      const mockCache = {
+        value: {
+          dungeonStatus: {
+            data: {
+              floorNumber: 70,
+              currentFloorDoors: [{ attackerType: 'water', power: 300000 }],
+              activeBattle: { teamNum: 0 },
+              states: {
+                titans: {
+                  '4000': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4001': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4002': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4003': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4004': { hp: 1000000, maxHp: 1000000, isDead: false },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const dispatchRpc = async (calls) => {
+        dispatchedCalls.push(...calls);
+        if (calls[0]?.name === 'dungeonStartBattle') {
+          return { results: [{ result: { response: { seed: 99999 } } }] };
+        }
+        return { results: [] };
+      };
+
+      // Mock Unity simulation: 3 stars win, BUT frontline tank took 90% loss (10% HP remaining < 20% safety threshold)
+      globalThis.window = {
+        __hwaSimulateBattle: async () => ({
+          win: true,
+          stars: 3,
+          duration: 15,
+          seed: 99999,
+          attackers: {
+            '4000': { hp: 100000, maxHp: 1000000, isDead: false }, // 10% HP
+            '4001': { hp: 900000, maxHp: 1000000, isDead: false },
+            '4002': { hp: 900000, maxHp: 1000000, isDead: false },
+            '4003': { hp: 900000, maxHp: 1000000, isDead: false },
+            '4004': { hp: 900000, maxHp: 1000000, isDead: false },
+          },
+          defenders: {},
+          endArgs: {
+            result: { win: true, stars: 3 },
+            progress: [{ duration: 15 }],
+          },
+        }),
+      };
+
+      const step = await executeDungeonAutomationStep({
+        cache: mockCache,
+        dispatchRpc,
+        safetyThresholdPct: 20,
+      });
+
+      // Verification of retreat flow:
+      assert.equal(step.stopped, true);
+      assert.match(step.stopReason, /below 20% safety threshold/);
+      assert.match(step.stopReason, /Battle retreated without loss/);
+
+      // CRITICAL: dungeonEndBattle must NEVER be dispatched!
+      assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonEndBattle'), false, 'dungeonEndBattle must NOT be sent to server');
+      // dungeonGetInfo must be called to sync/confirm untouched state
+      assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonGetInfo'), true, 'dungeonGetInfo must be called');
+      // activeBattle must be cleared in cache
+      assert.equal(mockCache.value.dungeonStatus.data.activeBattle, null);
+    });
+
+    it('retreats immediately when user requested stop and does not submit dungeonEndBattle', async () => {
+      const dispatchedCalls = [];
+      const mockCache = {
+        value: {
+          dungeonStatus: {
+            data: {
+              floorNumber: 71,
+              currentFloorDoors: [{ attackerType: 'water', power: 300000 }],
+              activeBattle: { teamNum: 0 },
+              states: {
+                titans: {
+                  '4000': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4001': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4002': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4003': { hp: 1000000, maxHp: 1000000, isDead: false },
+                  '4004': { hp: 1000000, maxHp: 1000000, isDead: false },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const dispatchRpc = async (calls) => {
+        dispatchedCalls.push(...calls);
+        if (calls[0]?.name === 'dungeonStartBattle') {
+          return { results: [{ result: { response: { seed: 88888 } } }] };
+        }
+        return { results: [] };
+      };
+
+      globalThis.window = {
+        __hwaSimulateBattle: async () => ({
+          win: true,
+          stars: 3,
+          duration: 10,
+          seed: 88888,
+          attackers: {
+            '4000': { hp: 1000000, maxHp: 1000000, isDead: false },
+          },
+          defenders: {},
+          endArgs: { result: { win: true, stars: 3 } },
+        }),
+      };
+
+      const step = await executeDungeonAutomationStep({
+        cache: mockCache,
+        dispatchRpc,
+        safetyThresholdPct: 20,
+        shouldStop: () => true, // User clicked stop during battle simulation
+      });
+
+      assert.equal(step.stopped, true);
+      assert.match(step.stopReason, /Automation stopped by user/);
+      assert.equal(dispatchedCalls.some((c) => c.name === 'dungeonEndBattle'), false);
+      assert.equal(mockCache.value.dungeonStatus.data.activeBattle, null);
+    });
   });
 });
