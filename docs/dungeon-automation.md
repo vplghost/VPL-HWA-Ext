@@ -149,6 +149,22 @@ flowchart TD
 3. **Thất bại hoặc mất kết nối tab / Rời khỏi giao diện Dungeon**:
    - Nếu server báo lỗi, tab game bị đóng, hoặc giao diện Dungeon chưa được mở.
 
+### 5.4. Cơ Chế Lưu Checkpoint Thông Minh & Xử Lý Tầng Không Cửa (Zero-Door Floor)
+
+Trong quá trình leo hầm ngục, các tầng checkpoint (thường tại mốc chia hết cho 10, ví dụ tầng 10, 20, 30...) không có cửa chiến đấu mà là điểm dừng kích hoạt đòn bẩy checkpoint (`saveFloor`):
+1. **Phát hiện tầng Checkpoint (Lever Floor)**:
+   - Khi `currentFloorDoors.length === 0`: Runner kiểm tra điều kiện mốc lưu. Nếu đang ở tầng checkpoint, thay vì coi là không còn cửa và dừng lại, runner tự động kích hoạt `dungeonSaveProgress`.
+   - Sau khi lưu tiến trình thành công, runner chờ 2 giây để hoạt ảnh gạt cần và mở cổng hoàn tất, sau đó tiếp tục bước sang tầng kế tiếp.
+2. **Tín hiệu lưu Checkpoint đa nguồn (Multi-signal Checkpoint Detection)**:
+   - Kiểm tra kết hợp nhiều điều kiện:
+     - `saveFloor > respawnFloor`: Điểm lưu mới cao hơn điểm hồi sinh hiện tại.
+     - `readyToSave === true`: Cờ từ `PlayerDungeonManager` trong Unity WebAssembly engine.
+     - `nextFloor - 1 === respawnFloor`: Tầng tiếp theo vừa vượt qua mốc lưu.
+     - `floorNumber % 10 === 0`: Mốc tầng checkpoint định kỳ.
+3. **Đồng bộ trạng thái trực tiếp qua Unity Engine (Live State Sync)**:
+   - Khi Debug Bridge hoạt động, runner gọi `getLiveDungeonState()` để đối chiếu trực tiếp `floorNumber`, `saveFloor`, `respawnFloor` từ bộ nhớ C# IL2CPP với dữ liệu RPC snapshot, loại bỏ hoàn toàn hiện tượng lệch trạng thái (desync) do độ trễ mạng.
+
+
 ---
 
 ## 6. Giao Diện Tùy Chỉnh Trực Quan Trong Dungeon Dialog (Visual Strategy Customization)
