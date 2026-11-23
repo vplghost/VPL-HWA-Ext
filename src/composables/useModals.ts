@@ -21,7 +21,8 @@ export type ModalName =
   | 'guildChat'
   | 'log'
   | 'chest'
-  | 'frontier';
+  | 'frontier'
+  | 'marchDetail';
 
 const modalState = reactive<Record<ModalName, boolean>>({
   building: false,
@@ -45,6 +46,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   log: false,
   chest: false,
   frontier: false,
+  marchDetail: false,
 });
 
 const modalContext = reactive<{
@@ -59,6 +61,7 @@ const modalContext = reactive<{
   selectedChestId?: number | string | null;
   selectedChestCategory?: string | null;
   campaignFarmMode?: 'gear' | 'hero' | 'soul';
+  selectedMarchId?: string | number | null;
 }>({});
 
 const modalStack = reactive<string[]>([]);
@@ -110,6 +113,7 @@ export function useModals() {
     selectedChestId?: number | string | null;
     selectedChestCategory?: string | null;
     campaignFarmMode?: 'gear' | 'hero' | 'soul';
+    selectedMarchId?: string | number | null;
   }) {
     if (context) {
       if (context.selectedHero !== undefined) modalContext.selectedHero = context.selectedHero;
@@ -127,6 +131,7 @@ export function useModals() {
       if (context.selectedChestId !== undefined) modalContext.selectedChestId = context.selectedChestId;
       if (context.selectedChestCategory !== undefined) modalContext.selectedChestCategory = context.selectedChestCategory;
       if (context.campaignFarmMode !== undefined) modalContext.campaignFarmMode = context.campaignFarmMode;
+      if (context.selectedMarchId !== undefined) modalContext.selectedMarchId = context.selectedMarchId;
     }
     registerModalOpen(name);
     modalState[name] = true;

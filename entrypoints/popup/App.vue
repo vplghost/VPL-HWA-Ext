@@ -36,6 +36,7 @@ import GuildVersusModal from '@/src/components/dialogs/GuildVersusModal.vue';
 import GuildChatPanel from '@/src/components/common/GuildChatPanel.vue';
 import ChestModal from '@/src/components/dialogs/ChestModal.vue';
 import FrontierModal from '@/src/components/dialogs/FrontierModal.vue';
+import MarchDetailModal from '@/src/components/dialogs/MarchDetailModal.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -99,6 +100,10 @@ const { modalState, modalContext } = useModals();
         :initial-category="modalContext.selectedChestCategory"
       />
       <FrontierModal v-model="modalState.frontier" />
+      <MarchDetailModal
+        v-model="modalState.marchDetail"
+        :initial-march-id="modalContext.selectedMarchId"
+      />
     </div>
   </div>
 </template>

@@ -198,8 +198,8 @@ test('dashboard queue SFC reacts to snapshots, countdown expiry and march dialog
   view.clock.value += 1000;
   assert.equal(view.queueGroups.value[0].rows[0].state, 'ready');
   assert.equal(view.marches.value.length, 0);
-  for (const kind of ['gather', 'raid', 'monster', 'other']) view.handleMarchClick(kind);
-  assert.deepEqual(view.opened, ['gathering', 'raid', 'monster']);
+  for (const item of [{ id: 1, category: 'gather' }, { id: 2, category: 'raid' }, { id: 3, category: 'monster' }]) view.handleMarchClick(item);
+  assert.deepEqual(view.opened, ['marchDetail', 'marchDetail', 'marchDetail']);
 });
 
 test('daily activity SFC reacts to exhaustion, new attempts and day rollover', async () => {

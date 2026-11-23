@@ -39,10 +39,9 @@ const queueGroups = computed(() => [
 const marches = computed(() => dashboardMarches(cache.value, now.value));
 const marchesKnown = computed(() => cache.value.marchStatus?.data?.marches != null);
 
-function handleMarchClick(category: string) {
-  if (category === 'raid') openModal('raid');
-  else if (category === 'gather') openModal('gathering');
-  else if (category === 'monster') openModal('monster');
+function handleMarchClick(m: any) {
+  const marchId = m?.id ?? m?.march?.id ?? m?.march?.squadId ?? m?.march?.marchId;
+  openModal('marchDetail', { selectedMarchId: marchId });
 }
 </script>
 
@@ -299,9 +298,8 @@ function handleMarchClick(category: string) {
         >
           <button
             type="button"
-            class="w-full h-[76px] p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-left transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700/60 flex flex-col justify-between"
-            :class="{ 'cursor-pointer': m.category !== 'other' }"
-            @click="handleMarchClick(m.category)"
+            class="w-full h-[76px] p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-left transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700/60 flex flex-col justify-between cursor-pointer"
+            @click="handleMarchClick(m)"
           >
             <!-- Line 1: March Icon & Title on Left, Timer Badge on Right -->
             <div class="flex items-center justify-between gap-2">

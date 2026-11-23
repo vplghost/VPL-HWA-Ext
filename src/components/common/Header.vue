@@ -255,10 +255,8 @@ const activeMarches = computed(() => {
 });
 
 function handleMarchClick(march: any) {
-  const info = getMarchBadgeInfo(march, now.value, cache.value);
-  if (info.category === 'raid') openModal('raid');
-  else if (info.category === 'gather') openModal('gathering');
-  else if (info.category === 'monster') openModal('monster');
+  const marchId = march?.id ?? march?.squadId ?? march?.marchId;
+  openModal('marchDetail', { selectedMarchId: marchId });
 }
 
 const isRaidQueueRunning = computed(() => {

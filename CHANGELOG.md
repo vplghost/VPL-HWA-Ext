@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.219 — 2026-11-23
+
+### Added
+
+- **Dedicated March Detail Dialog (`MarchDetailModal.vue`, `useModals.ts`, `App.vue`)**:
+  - Built dedicated `MarchDetailModal` decoupled from automation dialogs (`raid`, `gathering`, `monster`).
+  - **Pill / Tab Switcher**: Top horizontal tabs allowing quick switching between all active marches with live countdowns and icons.
+  - **Overview & Live Countdown**: Real-time status badge (Returning, In battle, Preparing rally, Gathering, Traveling), duration countdown, expected completion time, and progress bar.
+  - **Deployed Squad Heroes**: Renders deployed heroes (up to 5) with avatar, level, star rating, and power metrics, including total squad power.
+  - **Troop Composition Breakdown**: Detailed unit breakdown by troop type (Infantry 🛡️, Spearmen 🗡️, Marksmen 🏹), tier (Tier 1-9), unit count, and capacity percentage.
+  - **March Recall Action**: Recall button for gathering squads (`stopMineGathering:mine`) and rally cancellation for leader before departure (`cancelRally:rally`).
+  - **Dashboard & Header Integration**: Decoupled click navigation on active march cards in `QueuesOverview.vue` and march badges in `Header.vue` to open `MarchDetailModal`.
+
 ## 0.11.217 — 2026-11-23
 
 ### Added
