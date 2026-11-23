@@ -32,4 +32,9 @@ export default defineBackground(async () => {
 
   // Setup standardized background runtime orchestrator
   setupBackgroundRuntime();
+
+  if (import.meta.env.VITE_DEBUG_BRIDGE === 'true') {
+    const { setupDebugBridge } = await import('../src/background/debugBridge.ts');
+    setupDebugBridge();
+  }
 });

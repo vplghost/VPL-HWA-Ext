@@ -27,3 +27,13 @@ node_modules/
 
 # hwa-sim large downloaded binaries
 /hwa-sim/downloads/
+
+# Environment files
+.env.local
+
+# Debug bridge local runtime logs and symbols
+.debug-bridge/
+debug-bridge/symbols.json
+debug-bridge/com.local.wxt_unity_bridge.json
+
+

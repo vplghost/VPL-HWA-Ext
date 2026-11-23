@@ -1,7 +1,16 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
+import { loadEnv } from 'vite';
 import { readdir } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
+
+const env = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), '');
+const isDebugBridge = (process.env.VITE_DEBUG_BRIDGE ?? env.VITE_DEBUG_BRIDGE) === 'true';
+
+const manifestPermissions: string[] = ['storage', 'unlimitedStorage', 'tabs', 'alarms'];
+if (isDebugBridge) {
+  manifestPermissions.push('nativeMessaging', 'declarativeNetRequest');
+}
 
 // Keep the established classic worker/MAIN-world contracts as WXT public assets.
 // The popup, background, and content scripts are compiled from entrypoints; never ship legacy scripts.
@@ -38,7 +47,7 @@ export default defineConfig({
   manifest: {
     name: 'HWA Helper',
     description: 'Personal page tweaks and API profiling for Hero Wars: Alliance',
-    permissions: ['storage', 'unlimitedStorage', 'tabs', 'alarms'],
+    permissions: manifestPermissions,
     host_permissions: [
       'https://*.hero-wars-alliance.com/*',
       'https://hero-wars-alliance.com/*',
