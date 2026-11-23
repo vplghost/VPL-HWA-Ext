@@ -1,11 +1,11 @@
 ---
 name: ext-build
-description: Nâng version extension (build/patch, minor, major), thực hiện build (mặc định unpacked hỗ trợ native messaging, hoặc production), chạy test xác thực và commit thay đổi bằng kn-commit.
+description: Nâng version extension (build/patch, minor, major), thực hiện build đồng thời cả bản Debug/Unpacked (.output/chrome-mv3) và bản Production (dist/), chạy test xác thực và commit thay đổi bằng kn-commit.
 ---
 
 # Extension Version Bumping & Build Workflow (ext-build)
 
-Skill này chuẩn hóa quy trình 4 bước để **nâng phiên bản**, **biên dịch extension (build)**, **kiểm thử chất lượng**, và **commit** thay đổi vào Git repository theo chuẩn `kn-commit`.
+Skill này chuẩn hóa quy trình 4 bước để **nâng phiên bản**, **biên dịch đồng bộ extension cho cả 2 môi trường (Debug Unpacked và Production)**, **kiểm thử chất lượng**, và **commit** thay đổi vào Git repository theo chuẩn `kn-commit`.
 
 ```mermaid
 flowchart TD
@@ -19,27 +19,33 @@ flowchart TD
     E --> F
     
     F --> G["Chạy bump-version.mjs"]
-    G --> H{"Chế độ Build"}
-    H -- "Mặc định (Unpacked + Native Messaging)" --> I["VITE_DEBUG_BRIDGE=true<br/>npm run build -> dist/"]
-    H -- "Yêu cầu Production" --> J["VITE_DEBUG_BRIDGE=false<br/>npm run build -> dist/"]
+    G --> H["Lệnh Build kép: npm run build"]
+    H --> I["Mục tiêu 1: Production (dist/)<br/>VITE_DEBUG_BRIDGE=false"]
+    H --> J["Mục tiêu 2: Debug / Unpacked (.output/chrome-mv3)<br/>VITE_DEBUG_BRIDGE=true"]
     
-    I --> K["Xác thực: npm test & dist validation"]
+    I --> K["Xác thực: npm test & xác thực cả 2 thư mục"]
     J --> K
     K --> L["Tạo Commit theo chuẩn kn-commit"]
 ```
 
 ---
 
-## 1. Nguyên Tắc Cốt Lõi
+## 1. Nguyên Tắc Cốt Lõi & Thống Nhất Thư Mục
 
-1. **Mặc định nâng build/patch version**:
+1. **Quy định thư mục đầu ra**:
+   - **`.output/chrome-mv3`**: Dành riêng cho bản **Debug / Unpacked mặc định**. Bản này kích hoạt cờ `VITE_DEBUG_BRIDGE=true`, bổ sung quyền `nativeMessaging` và `declarativeNetRequest` để kết nối Native Messaging Bridge (`debug-bridge/host.js`) phục vụ việc kiểm thử, telemetry và can thiệp engine trực tiếp. Khi nạp extension vào Chrome (`chrome://extensions` -> Load unpacked), luôn trỏ vào thư mục này.
+   - **`dist/`**: Dành riêng cho bản **Production**. Bản này luôn tắt cờ `VITE_DEBUG_BRIDGE=false`, loại bỏ hoàn toàn code debug và quyền `nativeMessaging` để bảo đảm tính an toàn khi đóng gói / phân phối.
+2. **Quy trình Build kép (Dual-Build Pipeline)**:
+   - Lệnh `npm run build` (thực thi `scripts/build.mjs`) tự động xây dựng đồng thời cả 2 mục tiêu:
+     1. Build Production sạch và copy vào thư mục `dist/`.
+     2. Build Debug / Unpacked hoàn chỉnh tại `.output/chrome-mv3`.
+   - Tránh triệt để tình trạng lệch phiên bản (mismatch/dị bản) giữa môi trường dev và production.
+3. **Mặc định nâng build/patch version**:
    - Trừ khi người dùng nêu rõ từ khóa "minor" hoặc "major", luôn nâng build version (`patch`, ví dụ: `0.11.203` -> `0.11.204`).
-2. **Mặc định build bản Unpacked hỗ trợ Native Messaging**:
-   - Trừ khi người dùng nhấn mạnh "bản production" hoặc "release sạch không có debug bridge", bản build mặc định luôn kích hoạt cờ `VITE_DEBUG_BRIDGE=true` để phục vụ kết nối với Native Messaging Bridge (`debug-bridge/host.js`) cho việc gỡ lỗi, kiểm thử và hook IL2CPP.
-3. **Đồng bộ tuyệt đối phiên bản**:
-   - Bộ 3 tệp `package.json`, `package-lock.json`, và `extension/manifest.json` phải luôn khớp version chính xác trước và sau khi bump.
-4. **Quy trình Commit tuân thủ `kn-commit`**:
-   - Chỉ commit khi toàn bộ kiểm thử `npm test` thành công (`0` fail) và bản build được xác thực hợp lệ qua `scripts/validate-extension.mjs`.
+4. **Đồng bộ tuyệt đối phiên bản**:
+   - Bộ 3 tệp `package.json`, `package-lock.json`, và `extension/manifest.json` (cùng các manifest trong `dist/` và `.output/chrome-mv3/`) luôn được đồng bộ cùng một số phiên bản.
+5. **Quy trình Commit tuân thủ `kn-commit`**:
+   - Chỉ commit khi toàn bộ kiểm thử `npm test` thành công (`0` fail) và cả 2 bản build đều được xác thực hợp lệ.
 
 ---
 
@@ -48,7 +54,7 @@ flowchart TD
 ### Bước 1: Xác định loại Version Bump & Kiểm Tra Đồng Bộ
 
 1. **Xác định mục tiêu nâng version**:
-   - **`patch`** (Mặc định): Áp dụng cho các bản cập nhật tính năng định kỳ, sửa lỗi, hoàn thiện logic (vd: `0.11.203` -> `0.11.204`).
+   - **`patch`** (Mặc định): Áp dụng cho các bản cập nhật định kỳ, sửa lỗi, hoàn thiện logic (vd: `0.11.203` -> `0.11.204`).
    - **`minor`**: Khi người dùng yêu cầu nâng minor hoặc có thay đổi lớn về tính năng (vd: `0.11.203` -> `0.12.0`).
    - **`major`**: Khi người dùng yêu cầu nâng major hoặc thay đổi kiến trúc phá vỡ tương thích (vd: `0.11.203` -> `1.0.0`).
 
@@ -70,29 +76,24 @@ flowchart TD
 
 ---
 
-### Bước 2: Thực Hiện Build Extension
+### Bước 2: Thực Hiện Build Đồng Bộ 2 Thư Mục
 
-#### Chế độ 1: Mặc định (Unpacked + Native Messaging Bridge)
-- **Mục đích**: Tạo bản unpacked để nạp trực tiếp vào Chrome (`chrome://extensions` -> Load unpacked trỏ vào thư mục `dist/` hoặc `.output/chrome-mv3`), đồng thời cấp quyền `nativeMessaging` để giao tiếp với `debug-bridge/host.bat`.
-- **Cấu hình**: Đảm bảo `VITE_DEBUG_BRIDGE=true` (trong `.env.local` hoặc đặt biến môi trường).
-- **Thực thi lệnh**:
-  ```powershell
-  $env:VITE_DEBUG_BRIDGE="true"
-  npm run build
-  ```
-- **Kiểm tra đầu ra**:
-  - Tệp `dist/manifest.json` phải tồn tại và mục `"permissions"` chứa `"nativeMessaging"`, `"declarativeNetRequest"`.
-  - Tệp `dist/.build-info` xác nhận build thành công từ WXT.
+Chạy lệnh build chính của dự án:
+```powershell
+npm run build
+```
 
-#### Chế độ 2: Production (Chỉ khi người dùng yêu cầu cụ thể)
-- **Mục đích**: Bản phát hành chính thức, loại bỏ hoàn toàn code gỡ lỗi và quyền `nativeMessaging`.
-- **Thực thi lệnh**:
-  ```powershell
-  $env:VITE_DEBUG_BRIDGE="false"
-  npm run build
-  ```
-- **Kiểm tra đầu ra**:
-  - `dist/manifest.json` KHÔNG chứa quyền `"nativeMessaging"`.
+Script `scripts/build.mjs` sẽ tự động thực thi tuần tự:
+1. **Giai đoạn 1 (Production)**:
+   - Biên dịch WXT với `VITE_DEBUG_BRIDGE=false`.
+   - Xác thực artifact qua `scripts/validate-extension.mjs`.
+   - Làm sạch và ghi đè sang thư mục `dist/`.
+   - Tạo `dist/.build-info` xác nhận bản production.
+2. **Giai đoạn 2 (Debug / Unpacked)**:
+   - Biên dịch WXT với `VITE_DEBUG_BRIDGE=true`.
+   - Xác thực artifact với các quyền mở rộng.
+   - Giữ nguyên tại `.output/chrome-mv3/` cho Chrome Load Unpacked.
+   - Tạo `.output/chrome-mv3/.build-info` xác nhận bản debug.
 
 ---
 
@@ -103,7 +104,9 @@ Chạy kiểm thử toàn bộ dự án để bảo đảm không có regression
 npm test
 ```
 - Kiểm tra toàn bộ test suites đều pass (`fail: 0`).
-- Xác nhận các script artifact và CSS được đóng gói đầy đủ.
+- Kiểm tra xác nhận:
+  - `dist/manifest.json`: KHÔNG chứa quyền `nativeMessaging`.
+  - `.output/chrome-mv3/manifest.json`: Chứa quyền `nativeMessaging`.
 
 ---
 
@@ -121,23 +124,20 @@ npm test
 2. **Xây dựng Commit Message (Conventional Commits)**:
    - **Type**: `chore` (hoặc `build`)
    - **Scope**: `release`
-   - **Tiêu đề**: `chore(release): bump version to <NEW_VERSION> and build unpacked`
+   - **Tiêu đề**: `chore(release): bump version to <NEW_VERSION> and dual-build [dist, .output]`
    - **Body mẫu**:
      ```markdown
-     chore(release): bump version to 0.11.204 and build unpacked
+     chore(release): bump version to 0.11.204 and dual-build [dist, .output]
 
      - Bump extension version from 0.11.203 to 0.11.204 (patch)
-     - Build unpacked extension with native messaging bridge enabled
-     - Validate test suite (1175 tests pass) and verify artifact integrity
+     - Build clean production extension in dist/ (debug bridge disabled)
+     - Build unpacked debug extension in .output/chrome-mv3 (native messaging bridge enabled)
+     - Validate test suite (1175 tests pass) and verify artifacts
      ```
 
 3. **Xác nhận & Commit**:
    - Trình bày thông điệp commit và kết quả kiểm thử cho người dùng.
-   - Khi nhận được xác nhận, chạy commit:
-     ```powershell
-     git commit -m "chore(release): bump version to <NEW_VERSION> and build unpacked" -m "- Bump extension version to <NEW_VERSION>" -m "- Build unpacked extension with native messaging bridge enabled"
-     ```
-   - Kiểm tra `git log -1` để hoàn tất.
+   - Khi nhận được xác nhận, chạy commit và kiểm tra `git log -1`.
 
 ---
 
@@ -148,7 +148,7 @@ npm test
 | **Bump Patch (mặc định)** | `node scripts/bump-version.mjs patch` |
 | **Bump Minor** | `node scripts/bump-version.mjs minor` |
 | **Bump Major** | `node scripts/bump-version.mjs major` |
-| **Build Unpacked (Native Bridge)** | `$env:VITE_DEBUG_BRIDGE="true"; npm run build` |
-| **Build Production** | `$env:VITE_DEBUG_BRIDGE="false"; npm run build` |
+| **Build Kép (Production `dist` & Debug `.output`)** | `npm run build` |
 | **Chạy Tests** | `npm test` |
-| **Kiểm tra manifest quyền bridge** | `Select-String -Path "dist/manifest.json" -Pattern "nativeMessaging"` |
+| **Kiểm tra quyền Debug Bridge** | `Select-String -Path ".output/chrome-mv3/manifest.json" -Pattern "nativeMessaging"` |
+| **Kiểm tra quyền Production sạch** | `Select-String -Path "dist/manifest.json" -Pattern "nativeMessaging"` (phải rỗng) |

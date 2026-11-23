@@ -568,7 +568,9 @@ export function installInterceptor(customWindow?: any): void {
   }
 
   function setupWasmSimulationBridge(instance: any) {
-    if (win.__hwaSimulateBattle) return;
+    let cachedPlayKlass = 0;
+    let cachedLazyKlass = 0;
+    let cachedStringClass = 0;
 
     win.__hwaSimulateBattle = async function (rawBattle: any, seed: number) {
       let currentPhase = 'INIT_BRIDGE';
@@ -692,7 +694,7 @@ export function installInterceptor(customWindow?: any): void {
         const cLen = className.length;
         for (let i = 1024; i < maxScan - 64; i += 4) {
           const candKlass = u32[i >>> 2];
-          if (candKlass > 65536 && candKlass < memory.buffer.byteLength) {
+          if (candKlass > 65536 && candKlass < memory.buffer.byteLength && (candKlass % 4 === 0)) {
             const namePtr = u32[(candKlass + 8) >>> 2];
             if (namePtr > 65536 && namePtr + cLen < memory.buffer.byteLength) {
               let match = true;
@@ -751,35 +753,39 @@ export function installInterceptor(customWindow?: any): void {
 
         // Step 1: Learn String class pointer
         currentPhase = 'LEARN_STRING_CLASS';
-        let stringClassPtr = 0;
+        let stringClassPtr = cachedStringClass;
 
-        // Try getting stringClass from managed instances via Object.ToString
-        const probeObjects = [
-          () => callTableFn(sym.Presets_clanWarReplay, 1, 0),
-          () => callTableFn(sym.Presets_clanWarReplay, 0, 0),
-          () => callTableFn(sym.Presets_tower, 0, 0),
-          () => callTableFn(sym.Presets_createReplay, 0, 0),
-        ];
+        if (!stringClassPtr) {
+          // Try getting stringClass from managed instances via Object.ToString
+          const probeObjects = [
+            () => callTableFn(sym.Presets_clanWarReplay, 1, 0),
+            () => callTableFn(sym.Presets_clanWarReplay, 0, 0),
+            () => callTableFn(sym.Presets_tower, 0, 0),
+            () => callTableFn(sym.Presets_createReplay, 0, 0),
+          ];
 
-        for (const probeFn of probeObjects) {
-          try {
-            const probePtr = probeFn();
-            if (probePtr > 0) {
-              const strSamplePtr = invokePtr('Object_ToString', probePtr);
-              if (strSamplePtr > 0) {
-                const kPtr = heap.u32[strSamplePtr >>> 2];
-                if (kPtr > 65536 && kPtr < memory.buffer.byteLength) {
-                  stringClassPtr = kPtr;
-                  break;
+          for (const probeFn of probeObjects) {
+            try {
+              const probePtr = probeFn();
+              if (probePtr > 0) {
+                const strSamplePtr = invokePtr('Object_ToString', probePtr);
+                if (strSamplePtr > 0) {
+                  const kPtr = heap.u32[strSamplePtr >>> 2];
+                  if (kPtr > 65536 && kPtr < memory.buffer.byteLength && (kPtr % 4 === 0)) {
+                    stringClassPtr = kPtr;
+                    break;
+                  }
                 }
               }
-            }
-          } catch (_) {}
-        }
+            } catch (_) {}
+          }
 
-        // If not found from live objects, scan heap memory for System.String instances
-        if (!stringClassPtr) {
-          stringClassPtr = findStringClassFromHeap();
+          // If not found from live objects, scan heap memory for System.String instances
+          if (!stringClassPtr) {
+            stringClassPtr = findStringClassFromHeap();
+          }
+
+          if (stringClassPtr) cachedStringClass = stringClassPtr;
         }
 
         if (!stringClassPtr) {
@@ -916,8 +922,16 @@ export function installInterceptor(customWindow?: any): void {
         if (!jsonNodePtr) throw new Error('JSON_Parse returned null for rawBattle payload');
 
         currentPhase = 'CONVERT_LAZY_DATA_OBJECT';
-        let lazyKlass = heap.u32[0x15aacd4 >>> 2];
-        if (!lazyKlass) lazyKlass = findClassByName('LazyDataObject');
+        let lazyKlass = cachedLazyKlass;
+        if (!lazyKlass) {
+          const cand = heap.u32[0x15aacd4 >>> 2];
+          if (cand > 65536 && cand < memory.buffer.byteLength && (cand % 4 === 0)) {
+            lazyKlass = cand;
+          } else {
+            lazyKlass = findClassByName('LazyDataObject');
+          }
+          if (lazyKlass) cachedLazyKlass = lazyKlass;
+        }
         if (!lazyKlass) throw new Error('LazyDataObject Il2CppClass descriptor not found');
 
         lazyDataPtr = malloc(128) >>> 0;
@@ -927,8 +941,18 @@ export function installInterceptor(customWindow?: any): void {
 
         // Step 4: Allocate BattleInstantPlay
         currentPhase = 'ALLOC_PLAY_OBJECT';
-        let playKlass = heap.u32[0x159ffd0 >>> 2];
-        if (!playKlass) playKlass = findClassByName('BattleInstantPlay');
+        let playKlass = cachedPlayKlass;
+        if (!playKlass) {
+          playKlass = findClassByName('BattleInstantPlay');
+          if (playKlass) cachedPlayKlass = playKlass;
+        }
+        if (!playKlass) {
+          const cand = heap.u32[0x159ffd0 >>> 2];
+          if (cand > 65536 && cand < memory.buffer.byteLength && (cand % 4 === 0)) {
+            playKlass = cand;
+            cachedPlayKlass = playKlass;
+          }
+        }
         if (!playKlass) throw new Error('BattleInstantPlay Il2CppClass descriptor not found');
 
         playPtr = malloc(1024) >>> 0;

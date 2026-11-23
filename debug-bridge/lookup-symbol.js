@@ -41,7 +41,7 @@ function main() {
     limit = parseInt(args[limitIdx + 1], 10) || 50;
   }
 
-  const queryArg = args.find((a) => !a.startsWith('--') && a !== args[limitIdx + 1]);
+  const queryArg = args.find((a) => !a.startsWith('--') && (limitIdx === -1 || a !== args[limitIdx + 1]));
 
   if (!fs.existsSync(SYMBOLS_FILE)) {
     console.error(`[Error] symbols.json not found at: ${SYMBOLS_FILE}`);

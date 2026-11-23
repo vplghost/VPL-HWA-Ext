@@ -64,10 +64,29 @@ async function runBatchSim() {
         return s;
       };
 
+      const findClassByName = (className) => {
+        const maxScan = Math.min(mod.HEAPU8.buffer.byteLength, 256 * 1024 * 1024);
+        const cLen = className.length;
+        for (let i = 1024; i < maxScan - 64; i += 4) {
+          const candKlass = u32[i >> 2];
+          if (candKlass > 65536 && candKlass < mod.HEAPU8.buffer.byteLength && (candKlass % 4 === 0)) {
+            const namePtr = u32[(candKlass + 8) >> 2];
+            if (namePtr > 65536 && namePtr + cLen < mod.HEAPU8.buffer.byteLength) {
+              let match = true;
+              for (let c = 0; c < cLen; c++) {
+                if (u8[namePtr + c] !== className.charCodeAt(c)) { match = false; break; }
+              }
+              if (match && u8[namePtr + cLen] === 0) return candKlass;
+            }
+          }
+        }
+        return 0;
+      };
+
       const u32 = new Uint32Array(mod.HEAPU8.buffer);
       const u8 = new Uint8Array(mod.HEAPU8.buffer);
-      const lazyKlass = u32[0x15aacd4 >> 2];
-      const playKlass = u32[0x159ffd0 >> 2];
+      const lazyKlass = u32[0x15aacd4 >> 2] || findClassByName('LazyDataObject');
+      const playKlass = findClassByName('BattleInstantPlay');
 
       const results = [];
       const battlesList = payload.battles || payload.payload?.battles;

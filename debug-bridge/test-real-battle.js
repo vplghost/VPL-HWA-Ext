@@ -87,8 +87,31 @@ async function testRealBattle() {
         table.get(sym.LazyDataObject_ctor)(lazyPtr, jsonNodePtr, 0);
         steps.push({ currentStep, lazyPtr: '0x' + lazyPtr.toString(16) });
 
+        const findClassByName = (className) => {
+          const maxScan = Math.min(mod.HEAPU8.buffer.byteLength, 256 * 1024 * 1024);
+          const cLen = className.length;
+          for (let i = 1024; i < maxScan - 64; i += 4) {
+            const candKlass = u32[i >> 2];
+            if (candKlass > 65536 && candKlass < mod.HEAPU8.buffer.byteLength && (candKlass % 4 === 0)) {
+              const namePtr = u32[(candKlass + 8) >> 2];
+              if (namePtr > 65536 && namePtr + cLen < mod.HEAPU8.buffer.byteLength) {
+                let match = true;
+                for (let c = 0; c < cLen; c++) {
+                  if (u8[namePtr + c] !== className.charCodeAt(c)) { match = false; break; }
+                }
+                if (match && u8[namePtr + cLen] === 0) return candKlass;
+              }
+            }
+          }
+          return 0;
+        };
+
         currentStep = 'Play allocation';
-        const playKlass = u32[0x159ffd0 >> 2];
+        let playKlass = findClassByName('BattleInstantPlay');
+        if (!playKlass) {
+          const cand = u32[0x159ffd0 >> 2];
+          if (cand > 65536 && cand % 4 === 0) playKlass = cand;
+        }
         const playPtr = malloc(1024) >>> 0;
         u8.fill(0, playPtr, playPtr + 1024);
         u32[playPtr >> 2] = playKlass;
