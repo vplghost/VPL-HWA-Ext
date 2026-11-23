@@ -606,51 +606,43 @@ export function installInterceptor(customWindow?: any): void {
       }
 
       const sym = {
-        Play_ctor: 11594,
-        Play_start: 469995,
-        Play_get_result: 469999,
-        Play_createBattleData: 175082,
-        Play_executeBattle: 175078,
-        Play_createResult: 175081,
-        Play_dispose: 175079,
-        Presets_replay: 14054,
-        Presets_manual: 35515,
-        Presets_manualRaid: 35516,
-        Presets_arena: 35517,
-        Presets_clanWarReplay: 174207,
-        Presets_challengeAuto: 174208,
-        Presets_arenaReplay: 174209,
-        Presets_tower: 468118,
-        Presets_titanArenaReplay: 468119,
-        Presets_titanArenaRaid: 468120,
-        Presets_titanArenaManual: 468121,
-        Presets_createReplay: 468122,
-        Presets_clanWar: 468123,
-        Presets_clanBoss: 468124,
-        Presets_challengeReplayAuto: 468125,
-        Presets_get_isReplay: 468101,
-        BattlePresets_ctorDefault: 14053,
-        BattlePresets_ctor5: 6579,
-        BattleData_serializeResult: 49386,
-        BattleData_getStars: 28182,
-        JSON_Parse: 1763,
-        DataObject_fromObject: 15292,
-        Type_GetType: 38793,
-        GetUninitializedObject: 26825,
-        Object_ToString: 16323,
-        GCHandle_Alloc: 2129,
-        GCHandle_FreeHandle: 1845
+        Play_ctor: 291996,
+        Play_start: 292005,
+        Play_get_result: 291998,
+        Play_createBattleData: 291995,
+        Play_executeBattle: 292008,
+        Play_createResult: 292009,
+        Play_dispose: 291997,
+        Presets_replay: 291684,
+        Presets_manual: 291686,
+        Presets_manualRaid: 291685,
+        Presets_arena: 291682,
+        Presets_clanWarReplay: 291679,
+        Presets_challengeAuto: 291672,
+        Presets_arenaReplay: 291683,
+        Presets_tower: 291680,
+        Presets_titanArenaReplay: 291676,
+        Presets_titanArenaRaid: 291677,
+        Presets_titanArenaManual: 291674,
+        Presets_createReplay: 291681,
+        Presets_clanWar: 291678,
+        Presets_clanBoss: 291675,
+        Presets_challengeReplayAuto: 291673,
+        Presets_get_isReplay: 291658,
+        BattlePresets_ctorDefault: 291654,
+        BattlePresets_ctor5: 291655,
+        BattleData_serializeResult: 274041,
+        BattleData_getStars: 274030,
+        JSON_Parse: 133378,
+        DataObject_fromObject: 274837,
+        LazyDataObject_ctor: 274399,
+        Object_ToString: 337342,
+        MultiBattleResult_get_victory: 291573,
+        MultiBattleResult_get_stars: 291577,
+        MultiBattleResult_get_progress: 291578,
+        MultiBattleResult_get_result: 291576,
+        DataObject_asJson: 274798
       };
-
-      const fn = (name: keyof typeof sym) => {
-        const idx = sym[name];
-        const func = table.get(idx);
-        if (typeof func !== 'function') throw new Error(`Unity engine function '${name}' (index ${idx}) not available in WASM table`);
-        return func;
-      };
-
-      const invoke = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0);
-      const invokePtr = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0) >>> 0;
 
       // Safe caller that pads arguments to match exact WebAssembly function signature length
       const callTableFn = (index: number, ...args: any[]): number => {
@@ -662,6 +654,16 @@ export function installInterceptor(customWindow?: any): void {
           callArgs.push(0);
         }
         return (func(...callArgs) >>> 0);
+      };
+
+      const invoke = (name: keyof typeof sym, ...args: any[]) => {
+        const idx = sym[name];
+        return callTableFn(idx, ...args);
+      };
+
+      const invokePtr = (name: keyof typeof sym, ...args: any[]) => {
+        const idx = sym[name];
+        return callTableFn(idx, ...args) >>> 0;
       };
 
       // Read string from IL2CPP System.String pointer
@@ -680,6 +682,31 @@ export function installInterceptor(customWindow?: any): void {
       let hPlay = 0;
       let hPresets = 0;
       let playPtr = 0;
+      let lazyDataPtr = 0;
+
+      // Dynamic Il2CppClass lookup by matching class name in metadata
+      const findClassByName = (className: string): number => {
+        const maxScan = Math.min(memory.buffer.byteLength, 256 * 1024 * 1024);
+        const u32 = heap.u32;
+        const u8 = heap.u8;
+        const cLen = className.length;
+        for (let i = 1024; i < maxScan - 64; i += 4) {
+          const candKlass = u32[i >>> 2];
+          if (candKlass > 65536 && candKlass < memory.buffer.byteLength) {
+            const namePtr = u32[(candKlass + 8) >>> 2];
+            if (namePtr > 65536 && namePtr + cLen < memory.buffer.byteLength) {
+              let match = true;
+              for (let c = 0; c < cLen; c++) {
+                if (u8[namePtr + c] !== className.charCodeAt(c)) { match = false; break; }
+              }
+              if (match && u8[namePtr + cLen] === 0) {
+                return candKlass;
+              }
+            }
+          }
+        }
+        return 0;
+      };
 
       try {
         // Helper: scan linear memory for IL2CPP System.String descriptor
@@ -875,7 +902,7 @@ export function installInterceptor(customWindow?: any): void {
           throw new Error(`Failed to create BattlePresets for simulation (isTitan: ${isTitan}). Candidates: [${candidateErrors.join('; ')}]`);
         }
 
-        // Step 3: Serialize and parse JSON input into game data structure
+        // Step 3: Serialize and parse JSON input into LazyDataObject
         currentPhase = 'PARSE_JSON_INPUT';
         const normalizedSeed = seed >>> 0;
         const rawJson = JSON.stringify(Object.assign({}, rawBattle, { seed: normalizedSeed }));
@@ -888,66 +915,62 @@ export function installInterceptor(customWindow?: any): void {
         }
         if (!jsonNodePtr) throw new Error('JSON_Parse returned null for rawBattle payload');
 
-        currentPhase = 'CONVERT_DATA_OBJECT';
-        const dataObjPtr = invokePtr('DataObject_fromObject', jsonNodePtr);
-        if (!dataObjPtr) throw new Error('DataObject_fromObject returned null');
+        currentPhase = 'CONVERT_LAZY_DATA_OBJECT';
+        let lazyKlass = heap.u32[0x15aacd4 >>> 2];
+        if (!lazyKlass) lazyKlass = findClassByName('LazyDataObject');
+        if (!lazyKlass) throw new Error('LazyDataObject Il2CppClass descriptor not found');
+
+        lazyDataPtr = malloc(128) >>> 0;
+        heap.u8.fill(0, lazyDataPtr, lazyDataPtr + 128);
+        heap.u32[lazyDataPtr >>> 2] = lazyKlass;
+        invoke('LazyDataObject_ctor', lazyDataPtr, jsonNodePtr, 0);
 
         // Step 4: Allocate BattleInstantPlay
-        currentPhase = 'RESOLVE_PLAY_TYPE';
-        const playTypeNamePtr = forgeString('BattleInstantPlay');
-        let playTypePtr = 0;
-        try {
-          playTypePtr = invokePtr('Type_GetType', playTypeNamePtr);
-        } finally {
-          free(playTypeNamePtr);
-        }
-        if (!playTypePtr) throw new Error('BattleInstantPlay type not found in Unity IL2CPP runtime');
-
         currentPhase = 'ALLOC_PLAY_OBJECT';
-        playPtr = invokePtr('GetUninitializedObject', playTypePtr);
-        if (!playPtr) throw new Error('Could not instantiate BattleInstantPlay object');
+        let playKlass = heap.u32[0x159ffd0 >>> 2];
+        if (!playKlass) playKlass = findClassByName('BattleInstantPlay');
+        if (!playKlass) throw new Error('BattleInstantPlay Il2CppClass descriptor not found');
 
-        hPlay = invokePtr('GCHandle_Alloc', playPtr);
-        hPresets = invokePtr('GCHandle_Alloc', presetPtr);
+        playPtr = malloc(1024) >>> 0;
+        heap.u8.fill(0, playPtr, playPtr + 1024);
+        heap.u32[playPtr >>> 2] = playKlass;
 
-        // Step 5: Construct BattleInstantPlay(dataObj, presets, 0, 0, 0)
+        // Step 5: Construct BattleInstantPlay(lazyDataObj, presets, 0, 0, 0, 0)
         currentPhase = 'CONSTRUCT_BATTLE_PLAY';
-        invoke('Play_ctor', playPtr, dataObjPtr, presetPtr, 0, 0, 0);
+        invoke('Play_ctor', playPtr, lazyDataPtr, presetPtr, 0, 0, 0, 0);
 
         // Step 6: Start battle execution loop
         currentPhase = 'START_BATTLE_PLAY';
-        invoke('Play_start', playPtr);
+        invoke('Play_start', playPtr, 0);
 
         // Step 7: Await completion via Play_get_result polling
         currentPhase = 'WAIT_BATTLE_RESULT';
         let resultHandle = 0;
         const startWait = Date.now();
         while (!resultHandle && Date.now() - startWait < 5000) {
-          resultHandle = invokePtr('Play_get_result', playPtr);
+          resultHandle = invokePtr('Play_get_result', playPtr, 0);
           if (!resultHandle) {
             await new Promise((resolve) => setTimeout(resolve, 5));
           }
         }
+        if (!resultHandle) throw new Error('Simulation timed out waiting for MultiBattleResult');
 
-        // Step 8: Create battle data and execute physics & AI simulation
-        currentPhase = 'CREATE_BATTLE_DATA';
-        const battleDataPtr = invokePtr('Play_createBattleData', playPtr, dataObjPtr, 1);
-        if (!battleDataPtr) throw new Error('Play_createBattleData returned null');
-
-        currentPhase = 'EXECUTE_BATTLE';
-        invoke('Play_executeBattle', playPtr);
-
-        currentPhase = 'CREATE_RESULT';
-        invoke('Play_createResult', playPtr);
-
-        currentPhase = 'SERIALIZE_RESULT';
-        const resultStrPtr = invokePtr('BattleData_serializeResult', battleDataPtr);
-        const resultJsonStr = readString(resultStrPtr);
-        if (!resultJsonStr) throw new Error('BattleData_serializeResult returned empty string');
-
-        const parsedProgress = JSON.parse(resultJsonStr);
-        const stars = Number(invoke('BattleData_getStars', battleDataPtr)) || 0;
-        const win = stars > 0;
+        // Step 8: Extract victory, stars, and progress from MultiBattleResult
+        currentPhase = 'EXTRACT_BATTLE_RESULT';
+        const win = Boolean(invoke('MultiBattleResult_get_victory', resultHandle, 0));
+        const stars = Number(invoke('MultiBattleResult_get_stars', resultHandle, 0)) || 0;
+        const progressListPtr = invokePtr('MultiBattleResult_get_progress', resultHandle, 0);
+        let parsedProgress: any = null;
+        if (progressListPtr) {
+          const pStrPtr = invokePtr('DataObject_asJson', progressListPtr, 0);
+          const pJsonStr = readString(pStrPtr);
+          if (pJsonStr) {
+            try {
+              const pObj = JSON.parse(pJsonStr);
+              parsedProgress = Array.isArray(pObj) ? pObj[0] : pObj;
+            } catch (_) {}
+          }
+        }
 
         // Map attackers and defenders state from progress
         const attackersOut: Record<string, any> = {};
@@ -1006,196 +1029,11 @@ export function installInterceptor(customWindow?: any): void {
         (enrichedError as any).errorDetail = errorDetail;
         throw enrichedError;
       } finally {
-        try { if (playPtr) invoke('Play_dispose', playPtr); } catch (_) {}
-        try { if (hPlay) invoke('GCHandle_FreeHandle', hPlay); } catch (_) {}
-        try { if (hPresets) invoke('GCHandle_FreeHandle', hPresets); } catch (_) {}
+        try { if (playPtr) invoke('Play_dispose', playPtr, 0); } catch (_) {}
+        try { if (playPtr) free(playPtr); } catch (_) {}
+        try { if (lazyDataPtr) free(lazyDataPtr); } catch (_) {}
       }
     };
-    win.__hwaTestWasmEngine = testWasmEngineProbe;
-
-  async function testWasmEngineCall(targetInst?: any) {
-    let currentPhase = 'INIT_BRIDGE';
-    try {
-      const activeInst = targetInst || activeUnityInstance || findActiveUnityInstance(win, doc);
-      if (!activeInst) {
-        throw new Error('Unity game instance not found. Make sure the game is loaded in this tab.');
-      }
-
-      currentPhase = 'INSPECT_MODULE';
-      const mod = activeInst?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule || activeInst;
-      const asm = mod?.asm || mod;
-      if (!asm) {
-        throw new Error('Unity WebAssembly asm not found in game engine instance');
-      }
-
-      const values = Object.values(asm);
-      const table = (values.find((v: any) => v instanceof WebAssembly.Table) || (mod as any).wasmTable) as WebAssembly.Table | undefined;
-      const memory = (values.find((v: any) => v instanceof WebAssembly.Memory) || (mod as any).wasmMemory) as WebAssembly.Memory | undefined;
-
-      if (!table || !memory) {
-        throw new Error('WASM table or memory not accessible in Unity engine');
-      }
-
-      currentPhase = 'MEMORY_PRIMITIVES';
-      const malloc = (asm as any).Ol || (asm as any).malloc || (asm as any)._malloc;
-      const free = (asm as any).Pl || (asm as any).free || (asm as any)._free;
-      if (typeof malloc !== 'function' || typeof free !== 'function') {
-        throw new Error('WASM malloc/free memory primitives not found');
-      }
-
-      const heap = {
-        buffer: memory.buffer,
-        u8: new Uint8Array(memory.buffer),
-        u16: new Uint16Array(memory.buffer),
-        i32: new Int32Array(memory.buffer),
-        u32: new Uint32Array(memory.buffer)
-      };
-
-      const sym = {
-        JSON_Parse: 1763,
-        Type_GetType: 38793,
-        Object_ToString: 16323,
-        Presets_clanWarReplay: 174207,
-      };
-
-      const fn = (name: keyof typeof sym) => {
-        const idx = sym[name];
-        const func = table.get(idx);
-        if (typeof func !== 'function') throw new Error(`Unity engine function '${name}' (index ${idx}) not available in WASM table`);
-        return func;
-      };
-
-      const invokePtr = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0) >>> 0;
-
-      const callTableFn = (index: number, ...args: any[]): number => {
-        const func = table.get(index);
-        if (typeof func !== 'function') return 0;
-        const requiredLen = func.length;
-        const callArgs = args.slice(0, requiredLen);
-        while (callArgs.length < requiredLen) {
-          callArgs.push(0);
-        }
-        return (func(...callArgs) >>> 0);
-      };
-
-      // Step 1: Learn String class pointer
-      currentPhase = 'RESOLVE_STRING_CLASS';
-      let stringClassPtr = 0;
-      const probeObjects = [
-        () => callTableFn(sym.Presets_clanWarReplay, 1, 0),
-        () => callTableFn(sym.Presets_clanWarReplay, 0, 0),
-      ];
-      for (const probeFn of probeObjects) {
-        try {
-          const probePtr = probeFn();
-          if (probePtr > 0) {
-            const strSamplePtr = invokePtr('Object_ToString', probePtr);
-            if (strSamplePtr > 0) {
-              const kPtr = heap.u32[strSamplePtr >>> 2];
-              if (kPtr > 65536 && kPtr < memory.buffer.byteLength) {
-                stringClassPtr = kPtr;
-                break;
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (!stringClassPtr) {
-        const targetWords = ['BattleInstantPlay', 'BattlePresets', 'BattleData', 'dungeon', 'titan'];
-        const maxScan = Math.min(memory.buffer.byteLength, 256 * 1024 * 1024);
-        const u16 = heap.u16;
-        for (const word of targetWords) {
-          const wLen = word.length;
-          const firstCode = word.charCodeAt(0);
-          const u16Limit = (maxScan - (16 + wLen * 2)) >>> 1;
-          for (let i = 8; i < u16Limit && !stringClassPtr; i += 2) {
-            if (u16[i] === firstCode) {
-              let match = true;
-              for (let j = 1; j < wLen; j++) {
-                if (u16[i + j] !== word.charCodeAt(j)) { match = false; break; }
-              }
-              if (match) {
-                const strPtr = (i * 2) - 12;
-                if (strPtr >= 1024 && strPtr + 16 < memory.buffer.byteLength) {
-                  const rLen = heap.i32[(strPtr + 8) >>> 2];
-                  const sync = heap.u32[(strPtr + 4) >>> 2];
-                  const candKlass = heap.u32[strPtr >>> 2];
-                  if (rLen === wLen && sync === 0 && candKlass > 65536 && candKlass < memory.buffer.byteLength) {
-                    stringClassPtr = candKlass;
-                    break;
-                  }
-                }
-              }
-            }
-          }
-          if (stringClassPtr) break;
-        }
-      }
-
-      if (!stringClassPtr) {
-        throw new Error('Could not resolve IL2CPP String class descriptor from live objects or heap scan');
-      }
-
-      const forgeString = (str: string): number => {
-        const len = str.length;
-        const ptr = malloc(16 + 2 * len) >>> 0;
-        if (!ptr) throw new Error('malloc failed for forgeString');
-        heap.u32[ptr >>> 2] = stringClassPtr;
-        heap.u32[(ptr + 4) >>> 2] = 0;
-        heap.i32[(ptr + 8) >>> 2] = len;
-        const u16Start = (ptr + 12) >>> 1;
-        for (let i = 0; i < len; i++) {
-          heap.u16[u16Start + i] = str.charCodeAt(i);
-        }
-        heap.u16[u16Start + len] = 0;
-        return ptr;
-      };
-
-      // Step 2: Live function execution probe (calling JSON_Parse with small test JSON)
-      currentPhase = 'EXECUTE_JSON_PARSE_PROBE';
-      const testJson = '{"diagnostic_check":1}';
-      const testJsonPtr = forgeString(testJson);
-      let jsonNodePtr = 0;
-      try {
-        jsonNodePtr = invokePtr('JSON_Parse', testJsonPtr);
-      } finally {
-        try { free(testJsonPtr); } catch (_) {}
-      }
-
-      if (!jsonNodePtr) {
-        throw new Error('Unity JSON_Parse returned null/zero pointer for test JSON');
-      }
-
-      // Step 3: Type_GetType probe
-      currentPhase = 'EXECUTE_TYPE_GET_PROBE';
-      const typeName = 'BattleInstantPlay';
-      const typeNamePtr = forgeString(typeName);
-      let typePtr = 0;
-      try {
-        typePtr = invokePtr('Type_GetType', typeNamePtr);
-      } finally {
-        try { free(typeNamePtr); } catch (_) {}
-      }
-
-      return {
-        ok: true,
-        jsonNodePtr: `0x${jsonNodePtr.toString(16)}`,
-        typePtr: `0x${typePtr.toString(16)}`,
-        stringClass: `0x${stringClassPtr.toString(16)}`,
-        message: 'Unity Engine basic functions (JSON_Parse, Type_GetType) executed successfully without traps',
-        timestamp: new Date().toISOString()
-      };
-    } catch (err: any) {
-      const errorDetail = describeWasmException(err, currentPhase, { kind: 'live_call_probe' });
-      const enriched = new Error(errorDetail.message);
-      (enriched as any).errorDetail = errorDetail;
-      (enriched as any)._phase = currentPhase;
-      throw enriched;
-    }
-  }
-
-  win.__hwaTestWasmCall = testWasmEngineCall;
   }
 
   async function testWasmEngineProbe(targetInst?: any) {
@@ -1276,16 +1114,16 @@ export function installInterceptor(customWindow?: any): void {
 
       currentPhase = 'VERIFY_TABLE_SYMBOLS';
       const sym = {
-        Play_ctor: 11594,
-        Play_start: 469995,
-        Play_get_result: 469999,
-        Play_createBattleData: 175082,
-        Play_executeBattle: 175078,
-        Play_createResult: 175081,
-        Play_dispose: 175079,
-        BattleData_serializeResult: 49386,
-        JSON_Parse: 1763,
-        Object_ToString: 16323,
+        Play_ctor: 291996,
+        Play_start: 292005,
+        Play_get_result: 291998,
+        Play_createBattleData: 291995,
+        Play_executeBattle: 292008,
+        Play_createResult: 292009,
+        Play_dispose: 291997,
+        BattleData_serializeResult: 274041,
+        JSON_Parse: 133378,
+        Object_ToString: 337342,
       };
       const verifiedSyms: string[] = [];
       for (const [sName, sIdx] of Object.entries(sym)) {
@@ -1312,11 +1150,11 @@ export function installInterceptor(customWindow?: any): void {
       };
 
       const presetCandidates = [
-        { name: 'clanWarReplay(0,0)', idx: 174207, args: [0, 0] },
-        { name: 'clanWarReplay(1,0)', idx: 174207, args: [1, 0] },
-        { name: 'replay(0,1,0)', idx: 14054, args: [0, 1, 0] },
-        { name: 'createReplay(0)', idx: 468122, args: [0] },
-        { name: 'tower(0)', idx: 468118, args: [0] },
+        { name: 'clanWarReplay(0,0)', idx: 291679, args: [0, 0] },
+        { name: 'clanWarReplay(1,0)', idx: 291679, args: [1, 0] },
+        { name: 'replay(0,1,0)', idx: 291684, args: [0, 1, 0] },
+        { name: 'createReplay(0)', idx: 291681, args: [0] },
+        { name: 'tower(0)', idx: 291680, args: [0] },
       ];
       const verifiedPresets: string[] = [];
       let probedStringClass = 0;
@@ -1450,20 +1288,11 @@ export function installInterceptor(customWindow?: any): void {
       };
 
       const sym = {
-        JSON_Parse: 1763,
-        Type_GetType: 38793,
-        Object_ToString: 16323,
-        Presets_clanWarReplay: 174207,
+        JSON_Parse: 133378,
+        LazyDataObject_ctor: 274399,
+        Object_ToString: 337342,
+        Presets_clanWarReplay: 291679,
       };
-
-      const fn = (name: keyof typeof sym) => {
-        const idx = sym[name];
-        const func = table.get(idx);
-        if (typeof func !== 'function') throw new Error(`Unity engine function '${name}' (index ${idx}) not available in WASM table`);
-        return func;
-      };
-
-      const invokePtr = (name: keyof typeof sym, ...args: any[]) => fn(name)(...args, 0) >>> 0;
 
       const callTableFn = (index: number, ...args: any[]): number => {
         const func = table.get(index);
@@ -1474,6 +1303,11 @@ export function installInterceptor(customWindow?: any): void {
           callArgs.push(0);
         }
         return (func(...callArgs) >>> 0);
+      };
+
+      const invokePtr = (name: keyof typeof sym, ...args: any[]) => {
+        const idx = sym[name];
+        return callTableFn(idx, ...args) >>> 0;
       };
 
       // Step 1: Learn String class pointer
@@ -1565,23 +1399,27 @@ export function installInterceptor(customWindow?: any): void {
         throw new Error('Unity JSON_Parse returned null/zero pointer for test JSON');
       }
 
-      // Step 3: Type_GetType probe
-      currentPhase = 'EXECUTE_TYPE_GET_PROBE';
-      const typeName = 'BattleInstantPlay';
-      const typeNamePtr = forgeString(typeName);
-      let typePtr = 0;
+      // Step 3: LazyDataObject construction probe
+      currentPhase = 'EXECUTE_LAZY_DATA_OBJECT_PROBE';
+      let lazyObjPtr = 0;
+      const lazyKlass = heap.u32[0x15aacd4 >>> 2];
       try {
-        typePtr = invokePtr('Type_GetType', typeNamePtr);
+        if (lazyKlass > 0) {
+          lazyObjPtr = malloc(128) >>> 0;
+          heap.u8.fill(0, lazyObjPtr, lazyObjPtr + 128);
+          heap.u32[lazyObjPtr >>> 2] = lazyKlass;
+          callTableFn(sym.LazyDataObject_ctor, lazyObjPtr, jsonNodePtr, 0);
+        }
       } finally {
-        try { free(typeNamePtr); } catch (_) {}
+        if (lazyObjPtr) try { free(lazyObjPtr); } catch (_) {}
       }
 
       return {
         ok: true,
         jsonNodePtr: `0x${jsonNodePtr.toString(16)}`,
-        typePtr: `0x${typePtr.toString(16)}`,
+        lazyObjKlass: lazyKlass > 0 ? `0x${lazyKlass.toString(16)}` : 'N/A',
         stringClass: `0x${stringClassPtr.toString(16)}`,
-        message: 'Unity Engine basic functions (JSON_Parse, Type_GetType) executed successfully without traps',
+        message: 'Unity Engine basic functions (JSON_Parse, LazyDataObject) executed successfully without traps',
         timestamp: new Date().toISOString()
       };
     } catch (err: any) {

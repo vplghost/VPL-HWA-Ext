@@ -146,3 +146,64 @@ Endpoint `POST /chain` của Native Host nhận mảng các bước và thực t
     ]
   }
   ```
+
+---
+
+## 6. Phân Biệt Function Index vs Table Index Trong WebAssembly & IL2CPP
+
+Một phát hiện cốt lõi trong quá trình reverse engineering engine Unity WebGL:
+1. **WASM Function Index (Code Section)**:
+   - Các chỉ số hàm trong file `symbols.json` (từ 0 đến 486,915) đại diện cho chỉ số thứ tự của các hàm trong Code Section (Section 10) của WebAssembly.
+   - Các stack trace của V8/Chrome (e.g. `wasm-function[1281]`) cũng tham chiếu đến Function Index này.
+2. **WebAssembly Table Index (Function Table)**:
+   - `WebAssembly.Table` là bảng con trỏ hàm gián tiếp runtime được nạp qua Element Section (Section 9) của file WASM.
+   - Trong `build.wasm` của Hero Wars Alliance, Element Segment 0 bắt đầu từ offset `1` và nạp `805,597` con trỏ hàm.
+   - **Do đó, `table.get(funcIdx)` là SAI nếu truyền trực tiếp `funcIdx` từ `symbols.json`!** Cần phải ánh xạ từ Function Index sang Table Index thông qua Element Section.
+   - Công cụ giải mã: `debug-bridge/resolve-symbols-table.js`.
+
+### Bảng Ánh Xạ Ký Hiệu Giả Lập Trận Đánh (Battle Simulation Symbols)
+
+| Tên Logic | Func Index | Table Index | Tham Số WASM | Tên Hàm IL2CPP Gốc |
+| :--- | :--- | :--- | :--- | :--- |
+| **Play_ctor** | 11594 | **291996** | `(i32, i32, i32, i32, i32, i32, i32) -> ()` | `BattleInstantPlay__ctor` |
+| **Play_start** | 469995 | **292005** | `(i32, i32) -> ()` | `BattleInstantPlay_start` |
+| **Play_get_result** | 469999 | **291998** | `(i32, i32) -> (i32)` | `BattleInstantPlay_get_result` |
+| **Play_dispose** | 175079 | **291997** | `(i32, i32) -> ()` | `BattleInstantPlay_dispose` |
+| **Presets_clanWarReplay** | 174207 | **291679** | `(i32, i32) -> (i32)` | `BattlePresetsFactory_clanWarReplay` |
+| **JSON_Parse** | 1763 | **133378** | `(i32, i32) -> (i32)` | `JSONNode_Parse` |
+| **LazyDataObject_ctor** | 18539 | **274399** | `(i32, i32, i32) -> ()` | `LazyDataObject__ctor` |
+| **MultiBattleResult_get_victory** | 351002 | **291573** | `(i32, i32) -> (i32)` | `MultiBattleResult_get_victory` |
+| **MultiBattleResult_get_stars** | 351004 | **291577** | `(i32, i32) -> (i32)` | `MultiBattleResult_get_stars` |
+| **MultiBattleResult_get_progress** | 351007 | **291578** | `(i32, i32) -> (i32)` | `MultiBattleResult_get_progress` |
+| **MultiBattleResult_get_result** | 351006 | **291576** | `(i32, i32) -> (i32)` | `MultiBattleResult_get_result` |
+| **DataObject_asJson** | 1833 | **274798** | `(i32, i32) -> (i32)` | `DataObject_asJson` |
+| **Object_ToString** | 16323 | **337342** | `(i32, i32) -> (i32)` | `Object_ToString` |
+
+---
+
+## 7. Kiến Trúc Giả Lập Trận Đánh Hoàn Chỉnh (Battle Simulation Pipeline)
+
+Quy trình chuẩn để thực thi một trận giả lập Dungeon / Titan / Hero trực tiếp qua Unity Engine mà không gặp WebAssembly execution trap hay exception:
+
+1. **Chuẩn bị Presets (`presetPtr`)**:
+   - Titan battle: `callTableFn(sym.Presets_clanWarReplay, 0, 0)` -> trả về con trỏ `BattlePresets` cho Titan.
+   - Hero battle: `callTableFn(sym.Presets_clanWarReplay, 1, 0)` -> trả về con trỏ `BattlePresets` cho Hero.
+2. **Chuyển đổi Battle JSON sang `LazyDataObject`**:
+   - `forgeString(JSON.stringify(rawBattle))` -> cấp phát chuỗi `System.String` trong heap.
+   - `jsonNodePtr = callTableFn(sym.JSON_Parse, rawJsonStrPtr, 0)` -> trả về `SimpleJSON.JSONObject`.
+   - Cấp phát 128 bytes trong heap, gán `lazyKlass` (`0x15aacd4` hoặc quét metadata tìm `LazyDataObject`).
+   - Gọi `callTableFn(sym.LazyDataObject_ctor, lazyPtr, jsonNodePtr, 0)` -> đối tượng `LazyDataObject` hoàn chỉnh.
+3. **Khởi tạo và chạy `BattleInstantPlay`**:
+   - Cấp phát 1024 bytes trong heap, gán `playKlass` (`0x159ffd0` hoặc quét metadata tìm `BattleInstantPlay`).
+   - Khởi tạo: `callTableFn(sym.Play_ctor, playPtr, lazyPtr, presetPtr, 0, 0, 0, 0)`.
+   - Khởi chạy vòng lặp giả lập: `callTableFn(sym.Play_start, playPtr, 0)`.
+4. **Lấy kết quả từ `MultiBattleResult`**:
+   - Polling `resultHandle = callTableFn(sym.Play_get_result, playPtr, 0)`.
+   - Kết quả trả về là đối tượng `game.battle.controller.MultiBattleResult`.
+   - Thắng/thua: `MultiBattleResult_get_victory(resultHandle, 0)`.
+   - Số sao: `MultiBattleResult_get_stars(resultHandle, 0)`.
+   - Tiến trình chi tiết (máu, năng lượng từng hero/titan): `MultiBattleResult_get_progress(resultHandle, 0)`.
+   - Tuần tự hóa JSON: `progressJson = readString(callTableFn(sym.DataObject_asJson, progressListPtr, 0))`.
+5. **Dọn dẹp tài nguyên**:
+   - `callTableFn(sym.Play_dispose, playPtr, 0)`.
+   - Giải phóng bộ nhớ `free(playPtr)` và `free(lazyPtr)`.
