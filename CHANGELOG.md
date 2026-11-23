@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.223 — 2026-11-24
+
+### Added
+
+- **Legends Draft WebAssembly Reverse Engineering & Cipher Decoding Dossier (`docs/LEGENDS-DRAFT-DECODING.md`, `temp/legend_draft/`)**:
+  - **Cipher Algorithm Decoded**: Unveiled game client's Stream XOR Cipher decryption logic (`game.command.encrypt.DraftsXORCipher` and `BaseXORCipher`). Payloads are Base64-decoded into 7-bit ASCII strings and XOR-decrypted via a dual-key stream: $P[i] = S[i] \oplus \text{constKey}[i \pmod{64}] \oplus \text{sessionKey}[i \pmod{L_2}]$ yielding clean `DraftsDto` JSON.
+  - **WASM Table Indices & Entrypoints Discovered**: Resolved exact IL2CPP function table indices in `build.wasm`: `BaseXORCipher_decrypt` at table **`330804`**, `BaseXORCipher_cipher` at table **`330805`**, `DraftsLegacyDataParser_init` at table **`232520`**, `DraftsLegacyDataParser_parseModel` at table **`232521`**, and `DraftsLegacyDataParser_parseHeroes` at table **`232524`**.
+  - **Historical Tracking Data Aggregation**: Extracted and normalized 15 full draft matches from historical RPC and telemetry traces into structured JSON datasets (`temp/legend_draft/match_*.json`) with master index `draft_samples_index.json`, providing ground truth candidate pools across all 5 draft pick stages.
+  - **Candidate Hero Extraction Architecture**: Designed non-invasive hook mechanism on WASM table entry `330804` via `src/content/interceptor.ts` and Native Bridge, enabling 100% reliable extraction of the 15 candidate heroes during live matches without server key spoofing.
+
 ## 0.11.222 — 2026-11-23
 
 ### Refactored
