@@ -14,6 +14,8 @@ import {
   calcTeamPower,
   runPvpOptimizationSession,
   PVP_OPTIMIZER_STORAGE_KEY,
+  PVP_OPTIMIZER_POOL_CONFIG_KEY,
+  type PvpPoolMode,
   type PvpSearchMode,
   type PvpLeaderboardEntry,
   type PvpOptimizationProgress,
@@ -98,7 +100,10 @@ const savedTeamPresets = computed<SavedTeamPreset[]>(() => {
 });
 
 // Seed team & options
+const poolMode = ref<PvpPoolMode>('auto-power');
 const seedHeroIds = ref<number[]>([]);
+const customPoolHeroIds = ref<number[]>([]);
+const customPoolSearch = ref('');
 const lockedHeroIds = ref<number[]>([]);
 const topN = ref<number>(15);
 const minPowerPctOfMax = ref<number>(55);
@@ -108,6 +113,89 @@ const searchMode = ref<PvpSearchMode>('one-swap');
 const symmetricMatch = ref<boolean>(true);
 const earlyExit = ref<boolean>(true);
 const maxMatchups = ref<number>(80);
+
+const effectiveSeedHeroIds = computed<number[]>(() =>
+  poolMode.value === 'custom-pool' ? customPoolHeroIds.value.slice(0, 5) : seedHeroIds.value
+);
+
+const filteredCustomPickerHeroes = computed(() => {
+  const q = customPoolSearch.value.trim().toLowerCase();
+  const list = pickerHeroes.value;
+  if (!q) return list;
+  return list.filter((h) => getHeroName(h.id).toLowerCase().includes(q) || String(h.id) === q);
+});
+
+async function persistPoolConfig() {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local?.set) return;
+  const key = accountId.value ? `${PVP_OPTIMIZER_POOL_CONFIG_KEY}:${accountId.value}` : PVP_OPTIMIZER_POOL_CONFIG_KEY;
+  await chrome.storage.local.set({
+    [key]: { poolMode: poolMode.value, customPoolHeroIds: [...customPoolHeroIds.value] },
+  }).catch(() => {});
+}
+
+async function loadPoolConfig() {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local?.get) return;
+  const key = accountId.value ? `${PVP_OPTIMIZER_POOL_CONFIG_KEY}:${accountId.value}` : PVP_OPTIMIZER_POOL_CONFIG_KEY;
+  try {
+    const res = await chrome.storage.local.get(key);
+    const cfg = res?.[key];
+    if (cfg?.poolMode === 'custom-pool' || cfg?.poolMode === 'auto-power') {
+      poolMode.value = cfg.poolMode;
+    }
+    if (Array.isArray(cfg?.customPoolHeroIds)) {
+      customPoolHeroIds.value = cfg.customPoolHeroIds.map(Number).filter((id: number) => id > 0);
+    }
+  } catch (_) {}
+}
+
+function setPoolMode(mode: PvpPoolMode) {
+  if (isRunning.value) return;
+  poolMode.value = mode;
+  if (mode === 'custom-pool' && customPoolHeroIds.value.length === 0 && seedHeroIds.value.length === 5) {
+    customPoolHeroIds.value = [...seedHeroIds.value];
+  }
+  void persistPoolConfig();
+}
+
+function toggleCustomPoolHero(id: number) {
+  if (isRunning.value) return;
+  const idx = customPoolHeroIds.value.indexOf(id);
+  if (idx >= 0) {
+    customPoolHeroIds.value.splice(idx, 1);
+    const lockIdx = lockedHeroIds.value.indexOf(id);
+    if (lockIdx >= 0) lockedHeroIds.value.splice(lockIdx, 1);
+  } else {
+    customPoolHeroIds.value.push(id);
+  }
+  void persistPoolConfig();
+}
+
+function addTopHeroesToCustomPool(count: number) {
+  if (isRunning.value) return;
+  const existing = new Set(customPoolHeroIds.value);
+  for (const h of pickerHeroes.value) {
+    if (customPoolHeroIds.value.length >= count) break;
+    if (!existing.has(h.id)) {
+      customPoolHeroIds.value.push(h.id);
+      existing.add(h.id);
+    }
+  }
+  void persistPoolConfig();
+}
+
+function loadPresetAsCustomSeed(heroIds: number[]) {
+  if (isRunning.value || heroIds.length !== 5) return;
+  const rest = customPoolHeroIds.value.filter((id) => !heroIds.includes(id));
+  customPoolHeroIds.value = [...heroIds, ...rest];
+  void persistPoolConfig();
+}
+
+function clearCustomPool() {
+  if (isRunning.value) return;
+  customPoolHeroIds.value = [];
+  lockedHeroIds.value = [];
+  void persistPoolConfig();
+}
 
 // Run state
 const isRunning = ref(false);
@@ -147,7 +235,9 @@ async function loadSavedResult() {
 }
 
 const prunedPool = computed(() =>
-  pruneHeroPool(rawHeroes.value, seedHeroIds.value, {
+  pruneHeroPool(rawHeroes.value, effectiveSeedHeroIds.value, {
+    poolMode: poolMode.value,
+    customPoolHeroIds: customPoolHeroIds.value,
     topN: topN.value,
     minPowerPctOfMax: minPowerPctOfMax.value,
     minPowerPctOfSeedMin: minPowerPctOfSeedMin.value,
@@ -156,18 +246,18 @@ const prunedPool = computed(() =>
 );
 
 const estimatedGen1Matchups = computed(() => {
-  if (seedHeroIds.value.length !== 5) return 0;
-  const seedPower = calcTeamPower(seedHeroIds.value, heroPoolMap.value);
+  if (effectiveSeedHeroIds.value.length !== 5) return 0;
+  const seedPower = calcTeamPower(effectiveSeedHeroIds.value, heroPoolMap.value);
   const cands = generateOneSwapCandidates(
-    seedHeroIds.value,
+    effectiveSeedHeroIds.value,
     prunedPool.value.map((h) => h.id),
     heroPoolMap.value,
     {
       lockedHeroIds: lockedHeroIds.value,
-      minTeamPower: seedPower * (minTeamPowerPctOfSeed.value / 100),
+      minTeamPower: poolMode.value === 'custom-pool' ? 0 : seedPower * (minTeamPowerPctOfSeed.value / 100),
     }
   );
-  return Math.min(maxMatchups.value, cands.length);
+  return poolMode.value === 'custom-pool' ? cands.length : Math.min(maxMatchups.value, cands.length);
 });
 
 function toggleLockHero(id: number) {
@@ -181,7 +271,12 @@ function toggleLockHero(id: number) {
 
 async function startOptimization() {
   if (isRunning.value) return;
-  if (seedHeroIds.value.length !== 5) {
+  if (poolMode.value === 'custom-pool') {
+    if (customPoolHeroIds.value.length < 6) {
+      errorMessage.value = 'Select at least 6 heroes in Custom Pool mode (first 5 = Seed Team, remaining = Bench).';
+      return;
+    }
+  } else if (seedHeroIds.value.length !== 5) {
     errorMessage.value = 'Please select exactly 5 heroes for the Seed Team.';
     return;
   }
@@ -192,17 +287,20 @@ async function startOptimization() {
   statusMessage.value = 'Starting local Unity WASM tournament...';
   progress.value = null;
   addLog(
-    `Started PvP Optimizer (${searchMode.value}, pool=${prunedPool.value.length}, ${symmetricMatch.value ? '5+5 symmetric' : '10 atk'})`,
+    `Started PvP Optimizer (${searchMode.value}, mode=${poolMode.value}, pool=${prunedPool.value.length}, ${symmetricMatch.value ? '5+5 symmetric' : '10 atk'})`,
     'info'
   );
 
   try {
     const result = await runPvpOptimizationSession({
       rawHeroes: rawHeroes.value,
-      seedHeroIds: seedHeroIds.value,
+      seedHeroIds: effectiveSeedHeroIds.value,
       simulateFn: simulateBattleWithUnity,
       searchMode: searchMode.value,
       filterOptions: {
+        poolMode: poolMode.value,
+        customPoolHeroIds: customPoolHeroIds.value,
+        ensureFullPoolCoverage: poolMode.value === 'custom-pool',
         topN: topN.value,
         minPowerPctOfMax: minPowerPctOfMax.value,
         minPowerPctOfSeedMin: minPowerPctOfSeedMin.value,
@@ -280,6 +378,7 @@ watch(
     if (open) {
       initDefaultSeed();
       void loadSavedResult();
+      void loadPoolConfig();
     }
   }
 );
@@ -295,39 +394,173 @@ watch(
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div id="pvp-optimizer-modal" class="space-y-4 text-xs">
-      <!-- Seed Team Selection -->
+      <!-- Seed Team & Pool Selection -->
       <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2.5">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h4 class="font-bold text-slate-900 dark:text-slate-100">1. Seed Team (Your Benchmark 5-Hero Squad)</h4>
-            <p class="text-[11px] text-slate-500">Pick your current strongest PvP squad. Candidates fight 10 local Unity WASM rounds (0 RPCs).</p>
+            <h4 class="font-bold text-slate-900 dark:text-slate-100">
+              1. {{ poolMode === 'custom-pool' ? 'Custom Hero Pool (First 5 = Seed Team)' : 'Seed Team (Your Benchmark 5-Hero Squad)' }}
+            </h4>
+            <p class="text-[11px] text-slate-500">
+              {{
+                poolMode === 'custom-pool'
+                  ? 'Pick your exact hero pool in order. Heroes #1–#5 form the Seed Team; all remaining picked heroes (#6–#N) are guaranteed to be tested.'
+                  : 'Pick your current strongest PvP squad. Candidates fight 10 local Unity WASM rounds (0 RPCs).'
+              }}
+            </p>
           </div>
-          <div v-if="seedHeroIds.length === 5" class="flex items-center gap-1 flex-wrap">
-            <span class="text-[10px] text-slate-500 mr-1">Lock Core:</span>
+          <div id="pvp-pool-mode-toggle" class="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 overflow-hidden text-[11px] font-semibold">
             <button
-              v-for="id in seedHeroIds"
-              :key="'lock-' + id"
+              id="btn-pvp-mode-auto"
               type="button"
               :disabled="isRunning"
-              class="cursor-pointer px-1.5 py-0.5 rounded border text-[10px] font-medium transition-colors"
-              :class="
-                lockedHeroIds.includes(id)
-                  ? 'bg-amber-100 border-amber-400 text-amber-900 dark:bg-amber-950/50 dark:border-amber-700 dark:text-amber-300'
-                  : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
-              "
-              @click="toggleLockHero(id)"
+              class="cursor-pointer px-2.5 py-1 transition"
+              :class="poolMode === 'auto-power' ? 'bg-indigo-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'"
+              @click="setPoolMode('auto-power')"
             >
-              {{ lockedHeroIds.includes(id) ? '🔒' : '🔓' }} {{ getHeroName(id) }}
+              ⚡ Auto Pool
+            </button>
+            <button
+              id="btn-pvp-mode-custom"
+              type="button"
+              :disabled="isRunning"
+              class="cursor-pointer px-2.5 py-1 transition"
+              :class="poolMode === 'custom-pool' ? 'bg-indigo-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'"
+              @click="setPoolMode('custom-pool')"
+            >
+              🎯 Custom Pool
             </button>
           </div>
         </div>
 
+        <div v-if="effectiveSeedHeroIds.length === 5" class="flex items-center gap-1 flex-wrap">
+          <span class="text-[10px] text-slate-500 mr-1">Lock Core:</span>
+          <button
+            v-for="id in effectiveSeedHeroIds"
+            :key="'lock-' + id"
+            type="button"
+            :disabled="isRunning"
+            class="cursor-pointer px-1.5 py-0.5 rounded border text-[10px] font-medium transition-colors"
+            :class="
+              lockedHeroIds.includes(id)
+                ? 'bg-amber-100 border-amber-400 text-amber-900 dark:bg-amber-950/50 dark:border-amber-700 dark:text-amber-300'
+                : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
+            "
+            @click="toggleLockHero(id)"
+          >
+            {{ lockedHeroIds.includes(id) ? '🔒' : '🔓' }} {{ getHeroName(id) }}
+          </button>
+        </div>
+
         <HeroTeamPicker
+          v-if="poolMode === 'auto-power'"
           v-model="seedHeroIds"
           :heroes="pickerHeroes"
           :saved-teams="savedTeamPresets"
           :disabled="isRunning"
         />
+
+        <!-- Custom Pool Picker (Pick Order: #1..#5 Seed, #6..#N Bench) -->
+        <div v-else id="pvp-custom-pool-picker" class="space-y-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                :disabled="isRunning"
+                class="cursor-pointer px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[11px] font-semibold"
+                @click="addTopHeroesToCustomPool(10)"
+              >
+                + Top 10
+              </button>
+              <button
+                type="button"
+                :disabled="isRunning"
+                class="cursor-pointer px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[11px] font-semibold"
+                @click="addTopHeroesToCustomPool(15)"
+              >
+                + Top 15
+              </button>
+              <button
+                v-for="preset in savedTeamPresets.slice(0, 2)"
+                :key="preset.id"
+                type="button"
+                :disabled="isRunning"
+                class="cursor-pointer px-2 py-1 rounded bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold"
+                @click="loadPresetAsCustomSeed(preset.heroIds)"
+              >
+                🌱 Seed: {{ preset.label }}
+              </button>
+              <button
+                type="button"
+                :disabled="isRunning || customPoolHeroIds.length === 0"
+                class="cursor-pointer px-2 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 text-[11px] font-semibold disabled:opacity-40"
+                @click="clearCustomPool"
+              >
+                Clear
+              </button>
+            </div>
+            <input
+              v-model="customPoolSearch"
+              type="text"
+              placeholder="Filter heroes..."
+              class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1 text-xs w-36"
+            />
+          </div>
+
+          <!-- Ordered Selected Chips -->
+          <div v-if="customPoolHeroIds.length > 0" class="flex flex-wrap gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+            <button
+              v-for="(hid, idx) in customPoolHeroIds"
+              :key="'picked-' + hid"
+              type="button"
+              :disabled="isRunning"
+              class="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition"
+              :class="idx < 5 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300' : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-700 dark:text-indigo-300'"
+              :title="idx < 5 ? 'Seed Team slot #' + (idx + 1) + ' (click to remove)' : 'Bench Hero #' + (idx + 1) + ' (click to remove)'"
+              @click="toggleCustomPoolHero(hid)"
+            >
+              <span>{{ idx < 5 ? `🌱 #${idx + 1}` : `#${idx + 1}` }}</span>
+              <span>{{ getHeroName(hid) }}</span>
+              <span class="opacity-60">✕</span>
+            </button>
+          </div>
+          <p v-else class="text-[11px] text-slate-400 italic">
+            Click heroes below to build your pool. The first 5 picked heroes become your Seed Team; pick at least 6 heroes total.
+          </p>
+
+          <!-- Hero Selection Grid -->
+          <div class="grid grid-cols-5 sm:grid-cols-8 gap-1.5 max-h-44 overflow-y-auto pr-1">
+            <button
+              v-for="hero in filteredCustomPickerHeroes"
+              :key="'cp-' + hero.id"
+              type="button"
+              :disabled="isRunning"
+              class="cursor-pointer relative flex flex-col items-center p-1 rounded-lg border text-[10px] transition"
+              :class="
+                customPoolHeroIds.indexOf(hero.id) >= 0 && customPoolHeroIds.indexOf(hero.id) < 5
+                  ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40'
+                  : customPoolHeroIds.includes(hero.id)
+                    ? 'bg-indigo-500/15 border-indigo-500'
+                    : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-400'
+              "
+              @click="toggleCustomPoolHero(hero.id)"
+            >
+              <span
+                v-if="customPoolHeroIds.includes(hero.id)"
+                class="absolute top-0.5 right-0.5 px-1 rounded text-[9px] font-bold text-white"
+                :class="customPoolHeroIds.indexOf(hero.id) < 5 ? 'bg-emerald-600' : 'bg-indigo-600'"
+              >
+                {{ customPoolHeroIds.indexOf(hero.id) + 1 }}
+              </span>
+              <div class="w-8 h-8 rounded overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-0.5">
+                <img v-if="getHeroAvatar(hero.id)" :src="getHeroAvatar(hero.id)" :alt="getHeroName(hero.id)" class="w-full h-full object-cover" loading="lazy" />
+                <span v-else class="font-bold text-slate-400">#{{ hero.id }}</span>
+              </div>
+              <span class="font-semibold truncate w-full text-center text-slate-700 dark:text-slate-200">{{ getHeroName(hero.id) }}</span>
+              <span class="text-[9px] text-slate-400">{{ Math.round(hero.power / 1000) }}k</span>
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- Pool Pruning & Search Options -->
@@ -349,9 +582,9 @@ watch(
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <label class="flex flex-col gap-1">
+          <label class="flex flex-col gap-1" :class="poolMode === 'custom-pool' ? 'opacity-50' : ''">
             <span class="text-[11px] text-slate-500">Top N Heroes</span>
-            <select v-model.number="topN" :disabled="isRunning" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1">
+            <select v-model.number="topN" :disabled="isRunning || poolMode === 'custom-pool'" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1">
               <option :value="10">Top 10 (Fastest)</option>
               <option :value="15">Top 15 (Recommended)</option>
               <option :value="20">Top 20</option>
@@ -359,9 +592,9 @@ watch(
             </select>
           </label>
 
-          <label class="flex flex-col gap-1">
+          <label class="flex flex-col gap-1" :class="poolMode === 'custom-pool' ? 'opacity-50' : ''">
             <span class="text-[11px] text-slate-500">Min Power (% of #1 Hero)</span>
-            <select v-model.number="minPowerPctOfMax" :disabled="isRunning" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1">
+            <select v-model.number="minPowerPctOfMax" :disabled="isRunning || poolMode === 'custom-pool'" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1">
               <option :value="40">40%</option>
               <option :value="55">55% (Default)</option>
               <option :value="70">70%</option>

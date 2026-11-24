@@ -309,3 +309,43 @@ test('rpcCache passively accumulates battleHeroStatsCache, battleEnvelopeTemplat
   assert.equal(state.battleHeroStatsCache?.data?.['16']?.hp, 92217, 'Must preserve previously hydrated hero #16');
   assert.equal(state.battleHeroStatsCache?.data?.['54']?.hp, 85000, 'Must accumulate newly hydrated hero #54');
 });
+
+test('Custom Hero Pool mode uses first 5 picked heroes as Seed and tests 100% of picked pool regardless of low power', async () => {
+  // Include very weak heroes #9 (60k) and #10 (25k) that auto-power mode would prune!
+  const customPicks = [1, 2, 3, 4, 5, 9, 10];
+  const pruned = pruneHeroPool(MOCK_HEROES, [], {
+    poolMode: 'custom-pool',
+    customPoolHeroIds: customPicks,
+    topN: 5,
+    minPowerPctOfMax: 90,
+  });
+  assert.deepEqual(pruned.map((h) => h.id), customPicks, 'Custom pool must keep 100% of picked heroes in exact pick order');
+
+  const session = await runPvpOptimizationSession({
+    rawHeroes: MOCK_HEROES,
+    seedHeroIds: [], // auto-derived from first 5 of customPoolHeroIds
+    simulateFn: async (battle) => {
+      const atkHas10 = '10' in battle.attackers;
+      return { win: atkHas10, stars: 3, duration: 20 };
+    },
+    searchMode: 'one-swap',
+    filterOptions: {
+      poolMode: 'custom-pool',
+      customPoolHeroIds: customPicks,
+      minTeamPowerPctOfSeed: 99, // must be bypassed in custom-pool mode
+    },
+    matchOptions: { rounds: 4, symmetric: true, earlyExit: false },
+    maxMatchups: 3, // smaller than Gen-1 count (10) -> must auto-expand to cover 100% of pool
+  });
+
+  assert.equal(session.poolMode, 'custom-pool');
+  assert.deepEqual(session.seedHeroIds, [1, 2, 3, 4, 5]);
+  assert.equal(session.poolCoveragePct, 100, 'Every picked hero in custom pool must be tested');
+  assert.ok(session.testedHeroIds?.includes(9), 'Weak picked hero #9 must be tested');
+  assert.ok(session.testedHeroIds?.includes(10), 'Weak picked hero #10 must be tested');
+  assert.ok(session.totalMatchups >= 10, 'All 5x2=10 Gen-1 custom-pool matchups must run');
+
+  const modalSrc = fs.readFileSync(path.join(ROOT, 'src', 'components', 'dialogs', 'PvpTeamOptimizerModal.vue'), 'utf8');
+  assert.match(modalSrc, /id="pvp-pool-mode-toggle"/);
+  assert.match(modalSrc, /id="pvp-custom-pool-picker"/);
+});

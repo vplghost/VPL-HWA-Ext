@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.277 — 2026-11-24
+
+### Added
+
+- **PvP Team Optimizer Custom Hero Pool Mode (`pvpTeamOptimizer.ts`, `PvpTeamOptimizerModal.vue`, `tests/pvp-team-optimizer.test.mjs`)**:
+  - Added `poolMode: 'auto-power' | 'custom-pool'`, `customPoolHeroIds`, and `ensureFullPoolCoverage` to `PvpOptimizerFilterOptions` in `src/services/pvpTeamOptimizer.ts`.
+  - In `custom-pool` mode, `pruneHeroPool()` preserves 100% of picked heroes in exact pick order (bypassing power filters), `runPvpOptimizationSession()` derives the first 5 picked heroes (`#1`–`#5`) as the Seed Team, bypasses `minTeamPowerPctOfSeed`, auto-expands `maxMatchups` to guarantee 100% Gen-1 coverage of all picked bench heroes (`#6`–`#N`), and reports `poolMode`, `testedHeroIds`, and `poolCoveragePct`.
+  - Added `#pvp-pool-mode-toggle` (`Auto Pool` vs `Custom Pool`) and `#pvp-custom-pool-picker` in `src/components/dialogs/PvpTeamOptimizerModal.vue` with ordered Seed (`#1..#5`) & Bench (`#6..#N`) chips, `Lock Core` support on the effective seed, quick actions (`+ Top 10`, `+ Top 15`, Seed presets, `Clear`, search filter), disabled power filter dropdowns when in Custom Pool mode, and `pvpOptimizerPoolConfig` persistence in `chrome.storage.local`.
+
 ## 0.11.275 — 2026-11-24
 
 ### Added

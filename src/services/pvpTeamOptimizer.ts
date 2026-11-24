@@ -13,9 +13,12 @@ import {
 export { DEFAULT_ARENA_BATTLE_FEATURES, DEFAULT_ARENA_BATTLE_EFFECTS };
 
 export const PVP_OPTIMIZER_STORAGE_KEY = 'pvpOptimizerLastResult';
+export const PVP_OPTIMIZER_POOL_CONFIG_KEY = 'pvpOptimizerPoolConfig';
 export const DEFAULT_PVP_MATCH_ROUNDS = 10;
 export const BASE_ELO = 1500;
 export const ELO_K_FACTOR = 32;
+
+export type PvpPoolMode = 'auto-power' | 'custom-pool';
 
 export interface BattleEnvelopeTemplate {
   userId?: string | number;
@@ -35,6 +38,9 @@ export interface PvpHeroSnapshot {
 }
 
 export interface PvpOptimizerFilterOptions {
+  poolMode?: PvpPoolMode;        // default: 'auto-power'
+  customPoolHeroIds?: number[];  // ordered picks: [0..4] = Seed Team, [5..N-1] = mandatory Bench
+  ensureFullPoolCoverage?: boolean; // default: true in custom-pool mode
   topN?: number;                 // default: 15
   minPower?: number;             // default: 0
   minPowerPctOfMax?: number;     // default: 55
@@ -97,7 +103,10 @@ export interface PvpOptimizationSessionResult {
   seedKey: string;
   seedHeroIds: number[];
   searchMode: PvpSearchMode;
+  poolMode?: PvpPoolMode;
   poolSize: number;
+  testedHeroIds?: number[];
+  poolCoveragePct?: number;
   totalMatchups: number;
   aborted: boolean;
   leaderboard: PvpLeaderboardEntry[];
@@ -150,6 +159,24 @@ export function pruneHeroPool(
   options: PvpOptimizerFilterOptions = {}
 ): PvpHeroSnapshot[] {
   const heroMap = buildHeroPoolMap(rawHeroes);
+  if (heroMap.size === 0) return [];
+
+  // Custom Pool mode: preserve 100% of user-picked heroes in pick order (bypass all power filters)
+  if (options.poolMode === 'custom-pool' && Array.isArray(options.customPoolHeroIds)) {
+    const picked: PvpHeroSnapshot[] = [];
+    const seen = new Set<number>();
+    for (const rawId of options.customPoolHeroIds) {
+      const id = Number(rawId);
+      if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+      const snap = heroMap.get(id);
+      if (snap) {
+        picked.push(snap);
+        seen.add(id);
+      }
+    }
+    return picked;
+  }
+
   const all = Array.from(heroMap.values()).sort((a, b) => b.power - a.power);
   if (all.length === 0) return [];
 
@@ -508,17 +535,26 @@ export async function runPvpOptimizationSession(params: {
   onProgress?: (progress: PvpOptimizationProgress) => void;
 }): Promise<PvpOptimizationSessionResult> {
   const searchMode: PvpSearchMode = params.searchMode || 'one-swap';
+  const poolMode: PvpPoolMode = params.filterOptions?.poolMode === 'custom-pool' ? 'custom-pool' : 'auto-power';
   const heroMap = buildHeroPoolMap(params.rawHeroes);
-  const seedIds = params.seedHeroIds.map(Number).filter((id) => id > 0).slice(0, 5);
+
+  const customPicks = Array.isArray(params.filterOptions?.customPoolHeroIds)
+    ? params.filterOptions!.customPoolHeroIds.map(Number).filter((id) => id > 0 && heroMap.has(id))
+    : [];
+  const seedIds =
+    poolMode === 'custom-pool' && customPicks.length >= 5
+      ? customPicks.slice(0, 5)
+      : params.seedHeroIds.map(Number).filter((id) => id > 0).slice(0, 5);
   const seedK = teamKey(seedIds);
   const seedPower = calcTeamPower(seedIds, heroMap);
 
   const pool = pruneHeroPool(params.rawHeroes, seedIds, params.filterOptions);
   const poolIds = pool.map((h) => h.id);
 
-  const minTeamPowerPct = Math.max(0, Number(params.filterOptions?.minTeamPowerPctOfSeed ?? 85));
+  // In custom-pool mode, never drop candidate teams due to power thresholds
+  const minTeamPowerPct = poolMode === 'custom-pool' ? 0 : Math.max(0, Number(params.filterOptions?.minTeamPowerPctOfSeed ?? 85));
   const minTeamPower = seedPower * (minTeamPowerPct / 100);
-  const maxMatchups = Math.max(1, Number(params.maxMatchups ?? 120));
+  const requestedMaxMatchups = Math.max(1, Number(params.maxMatchups ?? 120));
   const beamWidth = Math.max(1, Math.min(8, Number(params.beamWidth ?? 3)));
   const roundRobinTopK = Math.max(2, Math.min(10, Number(params.roundRobinTopK ?? 6)));
 
@@ -557,8 +593,11 @@ export async function runPvpOptimizationSession(params: {
 
   let completedMatchups = 0;
   let aborted = false;
+  const testedHeroSet = new Set<number>(seedIds);
 
   const recordMatch = (res: PvpMatchResult) => {
+    for (const id of res.teamAIds) testedHeroSet.add(Number(id));
+    for (const id of res.teamBIds) testedHeroSet.add(Number(id));
     const eA = ensureEntry(res.teamAIds);
     const eB = ensureEntry(res.teamBIds);
 
@@ -607,6 +646,12 @@ export async function runPvpOptimizationSession(params: {
     visitedKeys: visitedTeams,
     minTeamPower,
   });
+
+  // In custom-pool mode (ensureFullPoolCoverage !== false), guarantee every picked bench hero is tested
+  const ensureFullCoverage = poolMode === 'custom-pool' && params.filterOptions?.ensureFullPoolCoverage !== false;
+  const maxMatchups = ensureFullCoverage
+    ? Math.max(requestedMaxMatchups, gen1Candidates.length)
+    : requestedMaxMatchups;
 
   const plannedTotal = Math.min(maxMatchups, gen1Candidates.length);
   for (const cand of gen1Candidates) {
@@ -728,11 +773,18 @@ export async function runPvpOptimizationSession(params: {
     currentLeaderWinRateVsSeed: finalBoard[0]?.winRateVsSeedPct ?? null,
   });
 
+  const testedHeroIds = [...testedHeroSet].filter((id) => id > 0);
+  const coveredPoolCount = poolIds.filter((id) => testedHeroSet.has(id)).length;
+  const poolCoveragePct = poolIds.length > 0 ? Math.round((coveredPoolCount / poolIds.length) * 100) : 100;
+
   return {
     seedKey: seedK,
     seedHeroIds: seedIds,
     searchMode,
+    poolMode,
     poolSize: pool.length,
+    testedHeroIds,
+    poolCoveragePct,
     totalMatchups: completedMatchups,
     aborted,
     leaderboard: finalBoard,
