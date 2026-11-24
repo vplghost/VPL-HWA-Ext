@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.240 — 2026-11-24
+
+### Changed
+
+- **Enhanced `ext-backlog` Workflow (`.agents/skills/ext-backlog/SKILL.md`)**:
+  - Updated completed backlog file naming to `done.<encoded_timestamp>.<old_filename>` using an inverted base36 timestamp (`EPOCH_2100 = 4102444800`, 7-char zero-padded) so the most recently completed files sort to the top.
+  - Required ISO 8601 completion timestamp in `# Kết quả` and oldest-first sequential processing sorted by `CreationTime`.
+  - Added `continue` option (including Vietnamese/English synonyms such as `liên tục`, `tiếp tục`, `cho đến hết`, `all`, ...) to auto-approve commits and keep processing remaining backlogs sequentially.
+
 ## 0.11.238 — 2026-11-24
 
 ### Fixed
