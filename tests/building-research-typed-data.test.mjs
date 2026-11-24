@@ -68,6 +68,9 @@ test('buildingData exports complete data and typed helpers with 100% parity', ()
   // Typed helper
   assert.ok(buildingDataHelper);
   assert.equal(buildingDataHelper.getBuildingLevelData, getBuildingLevelData);
+  for (const sentinelId of [187, 188, 189, 190, 191, 192]) {
+    assert.ok(buildingDataHelper.standaloneBuildingIds.has(sentinelId), `STANDALONE_BUILDING_IDS must include Sentinel #${sentinelId}`);
+  }
 });
 
 test('researchData exports complete data and typed helpers with 100% parity', () => {

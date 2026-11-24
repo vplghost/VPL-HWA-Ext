@@ -50,6 +50,7 @@ let timer: number | null = null;
 const nextBuildingFilterQuery = ref('');
 const nextBuildingSortOrder = ref<'level-desc' | 'level-asc' | 'time-asc' | 'time-desc' | 'name-asc'>('level-desc');
 const buildingSearchQuery = ref('');
+const showUnbuiltBuildings = ref(false);
 
 // Storage-backed auto-queue
 interface BuildingQueueItem {
@@ -315,8 +316,12 @@ const allBuildingsList = computed(() => {
 
   const names = nameData;
   const allDict = names?.names?.building || {};
-  for (const key of Object.keys(allDict)) {
-    const bId = Number(key);
+  const allKnownIds = new Set<number>([
+    ...Object.keys(allDict).map(Number),
+    ...Object.keys(buildingLevelsData || {}).map(Number),
+  ]);
+  for (const bId of allKnownIds) {
+    if (!Number.isFinite(bId) || bId <= 0) continue;
     if (!buildingMap.has(bId)) {
       buildingMap.set(bId, {
         id: bId,
@@ -529,12 +534,18 @@ const builtBuildingsCount = computed(() => {
   return allBuildingsList.value.filter((b) => b.isBuilt).length;
 });
 
+const unbuiltStandaloneCount = computed(() => {
+  return allBuildingsList.value.filter(
+    (b) => !b.isBuilt && bHelper.standaloneBuildingIds?.has(Number(b.id))
+  ).length;
+});
+
 const filteredBuildingDirectory = computed(() => {
   const query = buildingSearchQuery.value.toLowerCase().trim();
   return allBuildingsList.value
     .filter((b: any) => {
       if (!bHelper.standaloneBuildingIds?.has(Number(b.id))) return false;
-      if (!query) return b.isBuilt;
+      if (!query) return showUnbuiltBuildings.value ? true : b.isBuilt;
       const name = getBuildingName(b.id).toLowerCase();
       const idStr = String(b.id);
       return name.includes(query) || idStr.includes(query);
@@ -1066,18 +1077,32 @@ async function refreshBuildings() {
                 <span>🏛️</span> All City Buildings
               </h3>
               <p id="building-count-subtitle" class="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">
-                {{ buildingSearchQuery ? `${filteredBuildingDirectory.length} matching "${buildingSearchQuery}" (${builtBuildingsCount} built)` : `${builtBuildingsCount} built buildings` }}
+                {{ buildingSearchQuery ? `${filteredBuildingDirectory.length} matching "${buildingSearchQuery}" (${builtBuildingsCount} built)` : `${builtBuildingsCount} built buildings${unbuiltStandaloneCount > 0 ? ` · ${unbuiltStandaloneCount} unbuilt` : ''}` }}
               </p>
             </div>
 
-            <div class="w-full sm:w-64">
-              <input
-                id="building-search-input"
-                v-model="buildingSearchQuery"
-                type="search"
-                placeholder="Search buildings or ID..."
-                class="h-8 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
-              />
+            <div class="flex items-center gap-2 flex-wrap">
+              <label
+                v-if="unbuiltStandaloneCount > 0"
+                class="inline-flex items-center gap-1.5 text-2xs text-slate-600 dark:text-slate-300 cursor-pointer select-none"
+              >
+                <input
+                  id="building-show-unbuilt-toggle"
+                  v-model="showUnbuiltBuildings"
+                  type="checkbox"
+                  class="rounded border-slate-300 dark:border-slate-600"
+                />
+                <span>Show Unbuilt ({{ unbuiltStandaloneCount }})</span>
+              </label>
+              <div class="w-full sm:w-64">
+                <input
+                  id="building-search-input"
+                  v-model="buildingSearchQuery"
+                  type="search"
+                  placeholder="Search buildings or ID..."
+                  class="h-8 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
+                />
+              </div>
             </div>
           </div>
 

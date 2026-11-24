@@ -105,6 +105,7 @@ export function normalizeQueuedDuration<T extends Partial<BuildingQueueItem>>(it
 export const STANDALONE_BUILDING_IDS = new Set<number>([
   20, 21, 22, 26, 29, 31, 33, 34, 35, 36, 37, 38, 39,
   40, 41, 42, 43, 162, 163, 165, 170, 171, 172, 173, 174, 175, 182, 183, 184,
+  187, 188, 189, 190, 191, 192,
 ]);
 
 export const BUILDING_RESEARCH_REQUIREMENTS: Record<number, number> = {

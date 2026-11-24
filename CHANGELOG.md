@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.293 — 2026-11-25
+
+### Fixed
+
+- **Building Modal Visibility for New Sentinel Buildings (`buildingData.ts`, `BuildingModal.vue`, `scripts/sync-city-trees.mjs`, `tests/building-research-typed-data.test.mjs`)**:
+  - Added Sentinel buildings `187`–`192` to `STANDALONE_BUILDING_IDS` in `src/data/buildingData.ts` and updated `scripts/sync-city-trees.mjs` to auto-append any newly discovered multi-level `buildingType === 'building'` IDs so future building hotfixes appear automatically in both **Next Candidates** and **All City Buildings**.
+  - Updated `BuildingModal.vue` to include all `buildingLevelsData` IDs in `allBuildingsList` and added a **Show Unbuilt** toggle (`#building-show-unbuilt-toggle`) with unbuilt count next to `#building-search-input`.
+
 ## 0.11.291 — 2026-11-25
 
 ### Added

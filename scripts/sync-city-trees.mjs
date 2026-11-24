@@ -230,6 +230,19 @@ async function main() {
         `export const legacyBuildingDurations: Record<string | number, Record<string | number, number>> = ${JSON.stringify(legacyDurations)};`
       );
     }
+    // Auto-append any newly discovered upgradeable standalone buildings (`buildingType === 'building'` with >1 levels)
+    if (fetched.building) {
+      const bItems = Array.isArray(fetched.building) ? fetched.building : Object.values(fetched.building);
+      const discoveredStandalone = bItems
+        .filter((x) => x?.buildingType === 'building' && Object.keys(buildingLevels[String(x.id)] || {}).length > 1)
+        .map((x) => Number(x.id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+      bSrc = bSrc.replace(/export const STANDALONE_BUILDING_IDS = new Set<number>\(\[([\s\S]*?)\]\);/, (match, inner) => {
+        const existingIds = (inner.match(/\d+/g) || []).map(Number);
+        const mergedIds = [...new Set([...existingIds, ...discoveredStandalone])].sort((a, b) => a - b);
+        return `export const STANDALONE_BUILDING_IDS = new Set<number>([\n  ${mergedIds.join(', ')},\n]);`;
+      });
+    }
     await writeFile(bPath, bSrc, 'utf8');
     console.log(`✓ Updated src/data/buildingData.ts (${Object.keys(buildingLevels).length} buildings)`);
   }
