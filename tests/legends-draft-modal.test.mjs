@@ -44,13 +44,11 @@ test('formatDraftPhase accurately formats draft stages', () => {
 
   const stage2 = formatDraftPhase(2);
   assert.equal(stage2.phase, 'defense');
-  assert.ok(stage2.label.includes('Phòng Thủ'));
-  assert.ok(stage2.label.includes('Defense Phase'));
+  assert.ok(stage2.label.includes('Round 1: Defense Phase'));
 
   const stage4 = formatDraftPhase(4);
   assert.equal(stage4.phase, 'attack');
-  assert.ok(stage4.label.includes('Tấn Công'));
-  assert.ok(stage4.label.includes('Attack Phase'));
+  assert.ok(stage4.label.includes('Round 2: Attack Phase'));
 
   const stage5 = formatDraftPhase(5);
   assert.equal(stage5.phase, 'ready');
@@ -205,13 +203,34 @@ test('useDraft rebinds state as a new session when new match is received', async
   assert.equal(draftSession.errorDetail, 'Stack trace info');
 });
 
-test('LegendsDraftModal template contains 15 hero candidates grid and close button', async () => {
+test('LegendsDraftModal template uses unified English labels, diagnostics copy button, and 15-hero grid', async () => {
   const modalSrc = await readFile(resolve(root, 'src/components/dialogs/LegendsDraftModal.vue'), 'utf8');
   assert.ok(modalSrc.includes('Legends Draft'), 'Modal title must mention Legends Draft');
-  assert.ok(modalSrc.includes('15 Tướng Ứng Viên'), 'Must state 15 candidate heroes');
-  assert.ok(modalSrc.includes('Table Hook #330804'), 'Must mention WASM Table Hook #330804');
-  assert.ok(modalSrc.includes('Lỗi Giải Mã Dữ Liệu Draft'), 'Must contain error reporting section');
-  assert.ok(modalSrc.includes('Đóng'), 'Must contain close button');
+  assert.ok(modalSrc.includes('15 Candidate Heroes'), 'Must state 15 Candidate Heroes in English');
+  assert.ok(modalSrc.includes('Draft Decryption Error'), 'Must contain English error reporting section');
+  assert.ok(modalSrc.includes('id="btn-copy-draft-diagnostics"'), 'Must include #btn-copy-draft-diagnostics button');
+  assert.ok(modalSrc.includes('id="draft-diagnostics-panel"'), 'Must include #draft-diagnostics-panel');
+  assert.ok(modalSrc.includes('Close'), 'Must contain English Close button');
+  assert.ok(!/Chưa có dữ liệu|Hoàn tất trận đấu|Đối thủ:|Tướng Ứng Viên/.test(modalSrc), 'Must not contain Vietnamese UI strings');
+});
+
+test('extractDraftHeroSteps normalizes array and object-shaped candidate pools', async () => {
+  const { extractDraftHeroSteps } = await import('../src/utils/draftHelper.ts');
+  assert.deepEqual(
+    extractDraftHeroSteps({ playerTeam: { heroes: [[1, 2, 3], [4, 5, 6]] } }),
+    [[1, 2, 3], [4, 5, 6]]
+  );
+  assert.deepEqual(
+    extractDraftHeroSteps({ playerTeam: { heroes: { '0': [{ id: 11 }, { heroId: 12 }], '1': [21, 22] } } }),
+    [[11, 12], [21, 22]]
+  );
+});
+
+test('interceptor decrypts Legends Draft via DraftsXORCipher heap keys without invalid WebAssembly.Table.set', async () => {
+  const interceptorSrc = await readFile(resolve(root, 'src/content/interceptor.ts'), 'utf8');
+  assert.ok(!interceptorSrc.includes('table.set(TABLE_INDEX_DRAFT_DECRYPT'), 'Must not call invalid WebAssembly.Table.set with JS function');
+  assert.ok(interceptorSrc.includes('readDraftCipherKeysFromUnity'), 'Must read DraftsXORCipher keys from Unity WASM heap');
+  assert.ok(interceptorSrc.includes('decryptDraftPayloadFromUnity'), 'Must decrypt draft ciphertext directly on RPC response');
 });
 
 test('FabDial includes #legend-draft-fab shortcut opening legendsDraft modal', async () => {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.246 — 2026-11-24
+
+### Fixed
+
+- **Legends Draft 15-Hero Decryption, Unified English UI & Error Diagnostics (`interceptor.ts`, `LegendsDraftModal.vue`, `draftHelper.ts`, `useDraft.ts`, `backgroundRuntime.ts`, `SettingsTab.vue`)**:
+  - Replaced invalid `WebAssembly.Table.set(330804, jsFn)` hook (which threw a silently swallowed `TypeError` in Chrome V8) with `readDraftCipherKeysFromUnity()` + `decryptDraftPayloadFromUnity()`, reading `dynamicKey` (`+8`) and `constKey` (`+12`) directly from the live `DraftsXORCipher` instance in Unity WASM heap with fallback to `lastRpcHeaders` / `webglAuth` session keys.
+  - Standardized 100% of Legends Draft UI labels, phase descriptions, and SettingsTab text to English.
+  - Added structured decryption error reporting (`draft-decrypt-error`), collapsible `#draft-diagnostics-panel`, and 1-click `#btn-copy-draft-diagnostics` in `LegendsDraftModal.vue`.
+
 ## 0.11.244 — 2026-11-24
 
 ### Fixed

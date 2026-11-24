@@ -4047,13 +4047,18 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
 
           if (message.kind === 'draft-decrypted') {
             const dto = message.data?.draft;
+            const rawSteps = dto?.playerTeam?.heroes ?? dto?.heroes ?? dto?.steps;
+            const heroSteps = Array.isArray(rawSteps)
+              ? rawSteps
+              : (rawSteps && typeof rawSteps === 'object' ? Object.values(rawSteps) : null);
             session = {
               ...session,
-              heroSteps: dto?.playerTeam?.heroes || session.heroSteps || [],
+              heroSteps: (heroSteps && heroSteps.length > 0) ? heroSteps : (session.heroSteps || []),
               chosenDefenceHeroes: dto?.chosenDefenceHeroes || session.chosenDefenceHeroes || [],
               chosenAttackHeroes: dto?.chosenAttackHeroes || session.chosenAttackHeroes || [],
               stageFinishTs: dto?.stageFinishTs || session.stageFinishTs,
               gameTimeTs: dto?.gameTimeTs || session.gameTimeTs,
+              rawDecrypted: message.data?.raw || session.rawDecrypted || null,
               error: null,
               errorDetail: null,
               updatedAt: Date.now()
@@ -4109,6 +4114,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
               ...session,
               error: message.data?.error || 'Decryption error',
               errorDetail: message.data?.detail || null,
+              rawDecrypted: message.data?.raw || session.rawDecrypted || null,
               updatedAt: Date.now()
             };
             shouldAutoOpen = true;

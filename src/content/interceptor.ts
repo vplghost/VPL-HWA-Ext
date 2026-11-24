@@ -536,71 +536,257 @@ export function installInterceptor(customWindow?: any): void {
     tryHookWasmDraftCipher(instance);
   }
 
-  function tryHookWasmDraftCipher(instance?: any) {
+  let cachedDraftCipherKlass = 0;
+  let cachedDraftCipherInst = 0;
+  const DRAFT_CONST_KEYS = [
+    '307E8FB4B733591B75D74EA13946882BA59FAA3274CF815A2B8788E76403BD0F',
+    '268EA1F1B979AC33218CEF1225D1F835EA88D2C1233B8D6AFA0277FC8E30684B'
+  ];
+
+  function xorDecryptDraftBase64(base64Payload: string, dynamicKey: string, constKey: string): string | null {
+    if (!base64Payload || !dynamicKey || !constKey) return null;
+    try {
+      const rawDecoded = typeof atob === 'function' ? atob(base64Payload) : '';
+      if (!rawDecoded) return null;
+      const cLen = constKey.length;
+      const dLen = dynamicKey.length;
+      const chars: string[] = new Array(rawDecoded.length);
+      for (let i = 0; i < rawDecoded.length; i++) {
+        chars[i] = String.fromCharCode(
+          rawDecoded.charCodeAt(i) ^ constKey.charCodeAt(i % cLen) ^ dynamicKey.charCodeAt(i % dLen)
+        );
+      }
+      return chars.join('');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function readDraftCipherKeysFromUnity(instance?: any): {
+    unityReady: boolean;
+    cipherClassFound: boolean;
+    cipherInstanceFound: boolean;
+    dynamicKey: string | null;
+    constKey: string | null;
+    error?: string;
+  } {
+    const out = {
+      unityReady: false,
+      cipherClassFound: false,
+      cipherInstanceFound: false,
+      dynamicKey: null as string | null,
+      constKey: null as string | null,
+      error: undefined as string | undefined
+    };
     try {
       const activeInst = instance || activeUnityInstance || findActiveUnityInstance(win, doc);
-      if (!activeInst) return;
       const mod = activeInst?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule || activeInst;
       const asm = mod?.asm || mod;
-      if (!asm) return;
-      const values = Object.values(asm);
-      const table = (values.find((v: any) => v instanceof WebAssembly.Table) || (mod as any).wasmTable) as WebAssembly.Table | undefined;
-      const memory = (values.find((v: any) => v instanceof WebAssembly.Memory) || (mod as any).wasmMemory) as WebAssembly.Memory | undefined;
-      if (!table || !memory) return;
+      const memory = (asm ? Object.values(asm).find((v: any) => v instanceof WebAssembly.Memory) : null) || (mod as any)?.wasmMemory;
+      if (!memory?.buffer) {
+        out.error = 'Unity WebAssembly memory not ready';
+        return out;
+      }
+      out.unityReady = true;
 
-      const TABLE_INDEX_DRAFT_DECRYPT = 330804;
-      if (table.length <= TABLE_INDEX_DRAFT_DECRYPT) return;
+      const buf = memory.buffer as ArrayBuffer;
+      const byteLen = buf.byteLength;
+      const u32 = new Uint32Array(buf);
+      const i32 = new Int32Array(buf);
+      const u8 = new Uint8Array(buf);
+      const u16 = new Uint16Array(buf);
 
-      const originalDecrypt = table.get(TABLE_INDEX_DRAFT_DECRYPT);
-      if (typeof originalDecrypt !== 'function' || (originalDecrypt as any).__hwaHooked) return;
+      const readCStr = (p: number): string => {
+        if (!p || p < 65536 || p >= byteLen) return '';
+        let s = '';
+        for (let i = 0; i < 64 && p + i < byteLen; i++) {
+          const ch = u8[p + i];
+          if (ch === 0) break;
+          s += String.fromCharCode(ch);
+        }
+        return s;
+      };
 
-      const hookedDecrypt = function (...args: any[]) {
-        const resultPtr = originalDecrypt.apply(this, args);
-        try {
-          if (resultPtr && memory?.buffer) {
-            const heapI32 = new Int32Array(memory.buffer);
-            const len = heapI32[(resultPtr + 8) >>> 2];
-            if (len > 10 && len < 2000000) {
-              const u16Start = (resultPtr + 12) >>> 1;
-              const heapU16 = new Uint16Array(memory.buffer);
-              let s = '';
-              for (let i = 0; i < len; i += 8192) {
-                s += String.fromCharCode.apply(null, Array.from(heapU16.subarray(u16Start + i, u16Start + Math.min(len, i + 8192))));
+      const readIl2CppStr = (p: number): string | null => {
+        if (!p || p < 65536 || p + 16 >= byteLen || (p % 4 !== 0)) return null;
+        const len = i32[(p + 8) >>> 2];
+        if (len <= 0 || len > 4096 || p + 12 + len * 2 > byteLen) return null;
+        const start = (p + 12) >>> 1;
+        let s = '';
+        for (let i = 0; i < len; i++) {
+          const code = u16[start + i];
+          if (code === 0 || code > 127) return null;
+          s += String.fromCharCode(code);
+        }
+        return s;
+      };
+
+      // 1. Resolve DraftsXORCipher Il2CppClass* (cached)
+      let cipherKlass = cachedDraftCipherKlass;
+      if (cipherKlass > 65536 && cipherKlass < byteLen && (cipherKlass % 4 === 0)) {
+        if (readCStr(u32[(cipherKlass + 8) >>> 2]) !== 'DraftsXORCipher') cipherKlass = 0;
+      } else {
+        cipherKlass = 0;
+      }
+      if (!cipherKlass) {
+        const target = 'DraftsXORCipher';
+        const tLen = target.length;
+        const maxScan = Math.min(byteLen, 256 * 1024 * 1024);
+        for (let i = 1024; i < maxScan - 64; i += 4) {
+          const cand = u32[i >>> 2];
+          if (cand > 65536 && cand < byteLen && (cand % 4 === 0)) {
+            const namePtr = u32[(cand + 8) >>> 2];
+            if (namePtr > 65536 && namePtr + tLen < byteLen && u8[namePtr] === 68 /* 'D' */) {
+              let match = true;
+              for (let c = 1; c < tLen; c++) {
+                if (u8[namePtr + c] !== target.charCodeAt(c)) { match = false; break; }
               }
-              if (s.startsWith('{') && (s.includes('"playerTeam"') || s.includes('"heroes"') || s.includes('"chosenDefenceHeroes"'))) {
-                try {
-                  const draftDto = JSON.parse(s);
-                  win.postMessage({
-                    source: 'hwa-helper-api',
-                    kind: 'draft-decrypted',
-                    draft: draftDto,
-                    raw: s
-                  }, loc.origin);
-                } catch (parseErr: any) {
-                  win.postMessage({
-                    source: 'hwa-helper-api',
-                    kind: 'draft-decrypt-error',
-                    error: `JSON parse error: ${parseErr?.message || parseErr}`,
-                    detail: parseErr?.stack,
-                    raw: s
-                  }, loc.origin);
-                }
+              if (match && u8[namePtr + tLen] === 0) {
+                cipherKlass = cand;
+                cachedDraftCipherKlass = cand;
+                break;
               }
             }
           }
-        } catch (hookErr: any) {
-          console.warn('[HWA-Helper] Error in draft decrypt hook:', hookErr);
-          win.postMessage({
-            source: 'hwa-helper-api',
-            kind: 'draft-decrypt-error',
-            error: `Memory read error: ${hookErr?.message || hookErr}`,
-            detail: hookErr?.stack
-          }, loc.origin);
         }
-        return resultPtr;
+      }
+      if (!cipherKlass) {
+        out.error = 'DraftsXORCipher Il2CppClass not found in WASM memory';
+        return out;
+      }
+      out.cipherClassFound = true;
+
+      // 2. Locate live DraftsXORCipher instance (+8: dynamicKey, +12: constKey)
+      const tryReadInstance = (instPtr: number): boolean => {
+        if (instPtr < 65536 || instPtr + 20 >= byteLen || (instPtr % 4 !== 0)) return false;
+        if (u32[instPtr >>> 2] !== cipherKlass || u32[(instPtr + 4) >>> 2] !== 0) return false;
+        const dk = readIl2CppStr(u32[(instPtr + 8) >>> 2]);
+        const ck = readIl2CppStr(u32[(instPtr + 12) >>> 2]);
+        if (dk && ck && ck.length >= 32) {
+          out.cipherInstanceFound = true;
+          out.dynamicKey = dk;
+          out.constKey = ck;
+          cachedDraftCipherInst = instPtr;
+          return true;
+        }
+        return false;
       };
-      (hookedDecrypt as any).__hwaHooked = true;
-      table.set(TABLE_INDEX_DRAFT_DECRYPT, hookedDecrypt);
+
+      if (cachedDraftCipherInst && tryReadInstance(cachedDraftCipherInst)) {
+        return out;
+      }
+      cachedDraftCipherInst = 0;
+
+      for (let addr = 65536; addr < byteLen - 20; addr += 4) {
+        if (u32[addr >>> 2] === cipherKlass && u32[(addr + 4) >>> 2] === 0) {
+          if (tryReadInstance(addr)) return out;
+        }
+      }
+      out.error = 'DraftsXORCipher instance not yet initialized in WASM heap';
+      return out;
+    } catch (err: any) {
+      out.error = String(err?.message || err);
+      return out;
+    }
+  }
+
+  function decryptDraftPayloadFromUnity(base64Payload: string, meta?: { stageId?: any; matchId?: any }) {
+    if (!base64Payload || typeof base64Payload !== 'string') return;
+    const stageId = meta?.stageId != null ? Number(meta.stageId) : null;
+    const matchId = meta?.matchId != null ? Number(meta.matchId) : null;
+    const isActiveCipherStage = stageId === 2 || stageId === 4 || base64Payload.length > 128;
+
+    const unityKeys = readDraftCipherKeysFromUnity();
+    const candidates: Array<{ method: string; dynamicKey: string; constKey: string }> = [];
+
+    if (unityKeys.dynamicKey && unityKeys.constKey) {
+      candidates.push({
+        method: 'wasm-heap-DraftsXORCipher',
+        dynamicKey: unityKeys.dynamicKey,
+        constKey: unityKeys.constKey
+      });
+    }
+
+    // Fallback: captured auth session/token headers with known const keys
+    const sessionKeys: string[] = [];
+    try {
+      const hdrs = lastRpcHeaders || null;
+      if (hdrs && typeof hdrs === 'object') {
+        for (const [k, v] of Object.entries(hdrs)) {
+          const lk = k.toLowerCase();
+          if ((lk === 'x-auth-session-id' || lk === 'x-auth-token') && typeof v === 'string' && v.length >= 8) {
+            sessionKeys.push(v);
+          }
+        }
+      }
+      if (typeof win.webglAuth?.accessToken === 'string' && win.webglAuth.accessToken.length >= 8) {
+        sessionKeys.push(win.webglAuth.accessToken);
+      }
+    } catch (_) {}
+
+    for (const sk of [...new Set(sessionKeys)]) {
+      for (const ck of DRAFT_CONST_KEYS) {
+        candidates.push({ method: 'session-header-xor', dynamicKey: sk, constKey: ck });
+      }
+    }
+
+    let lastDecryptedSample: string | null = null;
+    let lastError = unityKeys.error || 'No valid decryption key available';
+
+    for (const cand of candidates) {
+      const plaintext = xorDecryptDraftBase64(base64Payload, cand.dynamicKey, cand.constKey);
+      if (!plaintext) continue;
+      lastDecryptedSample = plaintext.slice(0, 300);
+      if (plaintext.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(plaintext);
+          if (parsed && typeof parsed === 'object') {
+            win.postMessage({
+              source: 'hwa-helper-api',
+              kind: 'draft-decrypted',
+              draft: parsed,
+              raw: plaintext,
+              method: cand.method,
+              stageId,
+              matchId
+            }, loc.origin);
+            return;
+          }
+        } catch (parseErr: any) {
+          lastError = `JSON parse error (${cand.method}): ${parseErr?.message || parseErr}`;
+        }
+      } else {
+        lastError = `XOR output did not start with '{' (${cand.method})`;
+      }
+    }
+
+    if (isActiveCipherStage) {
+      const detail = JSON.stringify({
+        stageId,
+        matchId,
+        cipherLen: base64Payload.length,
+        unityReady: unityKeys.unityReady,
+        cipherClassFound: unityKeys.cipherClassFound,
+        cipherInstanceFound: unityKeys.cipherInstanceFound,
+        hasDynamicKey: Boolean(unityKeys.dynamicKey),
+        hasConstKey: Boolean(unityKeys.constKey),
+        sessionHeaderCandidates: sessionKeys.length,
+        lastError
+      });
+      win.postMessage({
+        source: 'hwa-helper-api',
+        kind: 'draft-decrypt-error',
+        error: `Unable to decrypt Legends Draft payload${stageId != null ? ` (Stage ${stageId})` : ''}`,
+        detail,
+        raw: lastDecryptedSample || base64Payload.slice(0, 160)
+      }, loc.origin);
+    }
+  }
+
+  function tryHookWasmDraftCipher(instance?: any) {
+    // Prime DraftsXORCipher class/instance discovery once Unity is ready (zero table.set mutation)
+    try {
+      readDraftCipherKeysFromUnity(instance);
     } catch (_) {}
   }
 
@@ -648,6 +834,11 @@ export function installInterceptor(customWindow?: any): void {
             args: matchedCall?.args || null,
             response: resp
           }, loc.origin);
+
+          if (typeof resp?.draft === 'string' && resp.draft.length > 0) {
+            // Defer slightly so Unity can instantiate DraftsXORCipher on first draft open if needed
+            decryptDraftPayloadFromUnity(resp.draft, { stageId: resp.stageId, matchId: resp.matchId });
+          }
         }
       }
     } catch (_) {}

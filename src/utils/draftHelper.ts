@@ -56,7 +56,7 @@ export function parseDraftDto(jsonStr: string): { ok: boolean; draft?: DraftDto;
 }
 
 /**
- * Format stage ID into friendly phase description, badge styling, and label
+ * Format stage ID into friendly phase description, badge styling, and label (English)
  */
 export function formatDraftPhase(stageId: number | null): {
   phase: DraftSessionData['phase'];
@@ -68,53 +68,75 @@ export function formatDraftPhase(stageId: number | null): {
     case 1:
       return {
         phase: 'idle',
-        label: 'Đang tìm đối thủ (Matchmaking)',
+        label: 'Searching for Opponent (Matchmaking)',
         badgeCls: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
         icon: '🔍'
       };
     case 2:
       return {
         phase: 'defense',
-        label: 'Lượt 1: Phòng Thủ (Defense Phase)',
+        label: 'Round 1: Defense Phase',
         badgeCls: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
         icon: '🛡️'
       };
     case 3:
       return {
         phase: 'defense',
-        label: 'Đã gửi đội hình Thủ (Defense Submitted)',
+        label: 'Defense Team Submitted',
         badgeCls: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20',
         icon: '⏳'
       };
     case 4:
       return {
         phase: 'attack',
-        label: 'Lượt 2: Tấn Công (Attack Phase)',
+        label: 'Round 2: Attack Phase',
         badgeCls: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
         icon: '⚔️'
       };
     case 5:
       return {
         phase: 'ready',
-        label: 'Sẵn sàng chiến đấu (Ready for Battle)',
+        label: 'Ready for Battle',
         badgeCls: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
         icon: '⚡'
       };
     case 7:
       return {
         phase: 'result',
-        label: 'Hoàn tất trận đấu (Match Finished)',
+        label: 'Match Finished',
         badgeCls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
         icon: '🏆'
       };
     default:
       return {
         phase: 'idle',
-        label: 'Chờ phiên mới (Idle)',
+        label: 'Waiting for New Session (Idle)',
         badgeCls: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
         icon: '💤'
       };
   }
+}
+
+/**
+ * Extract 5x3 candidate hero IDs matrix from flexible decrypted DraftDto structures
+ */
+export function extractDraftHeroSteps(dto: any): number[][] {
+  if (!dto || typeof dto !== 'object') return [];
+  const rawSteps = dto.playerTeam?.heroes ?? dto.heroes ?? dto.steps ?? null;
+  if (!rawSteps) return [];
+  const stepList = Array.isArray(rawSteps)
+    ? rawSteps
+    : (typeof rawSteps === 'object' ? Object.values(rawSteps) : []);
+  return stepList
+    .map((step: any) => {
+      const items = Array.isArray(step)
+        ? step
+        : (step && typeof step === 'object' ? Object.values(step) : []);
+      return items
+        .map((item: any) => Number(typeof item === 'object' && item !== null ? (item.id ?? item.heroId) : item))
+        .filter((id: number) => Number.isFinite(id) && id > 0);
+    })
+    .filter((step: number[]) => step.length > 0);
 }
 
 /**

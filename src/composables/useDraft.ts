@@ -1,13 +1,13 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import type { DraftSessionData, DraftDto, DraftEnemyUser } from '../types/game/draft.ts';
-import { formatDraftPhase, parseDraftDto } from '../utils/draftHelper.ts';
+import { formatDraftPhase, parseDraftDto, extractDraftHeroSteps } from '../utils/draftHelper.ts';
 import { useModals } from './useModals.ts';
 
 const createDefaultSession = (): DraftSessionData => ({
   matchId: null,
   stageId: null,
   phase: 'idle',
-  phaseLabel: 'Chờ phiên mới',
+  phaseLabel: 'Waiting for New Session (Idle)',
   stageFinishTs: null,
   gameTimeTs: null,
   userRating: null,
@@ -65,8 +65,9 @@ export function useDraft() {
   function bindDecryptedData(dto: DraftDto, rawText?: string) {
     if (!dto) return;
 
-    if (Array.isArray(dto.playerTeam?.heroes) && dto.playerTeam.heroes.length > 0) {
-      draftSession.heroSteps = dto.playerTeam.heroes;
+    const extractedSteps = extractDraftHeroSteps(dto);
+    if (extractedSteps.length > 0) {
+      draftSession.heroSteps = extractedSteps;
     }
     if (Array.isArray(dto.chosenDefenceHeroes)) {
       draftSession.chosenDefenceHeroes = [...dto.chosenDefenceHeroes];

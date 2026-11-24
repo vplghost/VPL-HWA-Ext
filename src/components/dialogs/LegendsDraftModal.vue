@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
-import BaseTooltip from '@/src/components/common/BaseTooltip.vue';
 import { useDraft } from '@/src/composables/useDraft';
 import { buildCandidateMatrix, formatDraftPhase } from '@/src/utils/draftHelper';
 import type { DraftHeroCandidate } from '@/src/types/game/draft';
@@ -14,11 +13,12 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { draftSession, autoOpenDraft, saveAutoOpen, resetDraft } = useDraft();
+const { draftSession } = useDraft();
 
 const now = ref(Math.floor(Date.now() / 1000));
 let countdownTimer: any = null;
-const showRawPayload = ref(false);
+const showDiagnostics = ref(false);
+const copiedDiagnostics = ref(false);
 
 onMounted(() => {
   countdownTimer = setInterval(() => {
@@ -58,6 +58,34 @@ const candidateColumns = computed<DraftHeroCandidate[][]>(() => {
   }
   return buildCandidateMatrix(draftSession.heroSteps, activePickedIds.value);
 });
+
+const totalCandidateCount = computed(() =>
+  candidateColumns.value.reduce((sum, col) => sum + col.length, 0)
+);
+
+const diagnosticReport = computed(() => ({
+  timestamp: new Date().toISOString(),
+  matchId: draftSession.matchId,
+  stageId: draftSession.stageId,
+  phase: draftSession.phase,
+  candidateCount: totalCandidateCount.value,
+  cipherLength: draftSession.rawCiphertext?.length || 0,
+  cipherSample: draftSession.rawCiphertext ? draftSession.rawCiphertext.slice(0, 120) : null,
+  error: draftSession.error || null,
+  errorDetail: draftSession.errorDetail || null,
+  rawDecryptedSample: draftSession.rawDecrypted ? draftSession.rawDecrypted.slice(0, 400) : null,
+  updatedAt: draftSession.updatedAt ? new Date(draftSession.updatedAt).toISOString() : null,
+}));
+
+async function copyDiagnostics() {
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(diagnosticReport.value, null, 2));
+    copiedDiagnostics.value = true;
+    setTimeout(() => {
+      copiedDiagnostics.value = false;
+    }, 2000);
+  } catch (_) {}
+}
 
 function getAvatarUrl(file: string | undefined): string {
   if (!file) return '';
@@ -101,7 +129,7 @@ function close() {
 <template>
   <ModalDialog
     :model-value="modelValue"
-    title="Legends Draft — Phân Tích & Dự Đoán Đội Hình"
+    title="Legends Draft — Candidate Pool & Match Tracker"
     icon="🏆"
     max-width="max-w-6xl"
     modal-name="legendsDraft"
@@ -124,7 +152,7 @@ function close() {
             v-if="draftSession.matchId"
             class="px-2.5 py-1 text-xs font-mono font-medium rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700"
           >
-            Trận #{{ draftSession.matchId }}
+            Match #{{ draftSession.matchId }}
           </span>
 
           <span
@@ -143,8 +171,8 @@ function close() {
             v-if="draftSession.enemyUser"
             class="flex items-center gap-2 px-3 py-1 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-medium"
           >
-            <span class="text-slate-400 dark:text-slate-500 font-normal">Đối thủ:</span>
-            <span class="font-bold">{{ draftSession.enemyUser.name || 'Đối thủ ẩn danh' }}</span>
+            <span class="text-slate-400 dark:text-slate-500 font-normal">Opponent:</span>
+            <span class="font-bold">{{ draftSession.enemyUser.name || 'Unknown Opponent' }}</span>
             <span v-if="draftSession.enemyUser.level" class="text-xs opacity-75">Lv.{{ draftSession.enemyUser.level }}</span>
             <span v-if="draftSession.enemyUser.clanTitle" class="text-xs opacity-75">[{{ draftSession.enemyUser.clanTitle }}]</span>
           </div>
@@ -155,7 +183,7 @@ function close() {
             class="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-mono font-bold"
             :class="remainingSeconds <= 15 ? 'bg-red-500/20 text-red-500 animate-pulse' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200'"
           >
-            <span>⏱️ Còn lại:</span>
+            <span>⏱️ Remaining:</span>
             <span>{{ remainingSeconds }}s</span>
           </div>
         </div>
@@ -164,38 +192,65 @@ function close() {
       <!-- Decoding Error Alert (if any) -->
       <div
         v-if="draftSession.error"
+        id="draft-error-alert"
         class="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 flex flex-col gap-2"
       >
-        <div class="flex items-center justify-between font-semibold">
+        <div class="flex flex-wrap items-center justify-between gap-2 font-semibold">
           <div class="flex items-center gap-1.5">
             <span>⚠️</span>
-            <span>Lỗi Giải Mã Dữ Liệu Draft:</span>
+            <span>Draft Decryption Error:</span>
             <span>{{ draftSession.error }}</span>
           </div>
-          <button
-            class="text-xs underline hover:opacity-80"
-            @click="showRawPayload = !showRawPayload"
-          >
-            {{ showRawPayload ? 'Ẩn thông tin kỹ thuật' : 'Xem chi tiết giải mã' }}
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              id="btn-copy-draft-diagnostics"
+              type="button"
+              class="cursor-pointer px-2.5 py-1 text-xs font-semibold rounded bg-red-600/20 hover:bg-red-600/30 text-red-700 dark:text-red-300 transition"
+              @click="copyDiagnostics"
+            >
+              {{ copiedDiagnostics ? '✓ Copied' : 'Copy Diagnostics' }}
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer text-xs underline hover:opacity-80"
+              @click="showDiagnostics = !showDiagnostics"
+            >
+              {{ showDiagnostics ? 'Hide Technical Details' : 'Show Technical Details' }}
+            </button>
+          </div>
         </div>
-        <p v-if="draftSession.errorDetail" class="text-xs opacity-90 font-mono">
+        <p v-if="draftSession.errorDetail" class="text-xs opacity-90 font-mono break-all">
           {{ draftSession.errorDetail }}
         </p>
-        <div v-if="showRawPayload && draftSession.rawDecrypted" class="mt-2 p-2 bg-slate-950 rounded text-slate-200 font-mono text-[11px] overflow-auto max-h-48 whitespace-pre-wrap">
-          {{ draftSession.rawDecrypted }}
+      </div>
+
+      <!-- Collapsible Technical Diagnostics Panel -->
+      <div
+        v-if="showDiagnostics"
+        id="draft-diagnostics-panel"
+        class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 font-mono text-[11px] flex flex-col gap-2"
+      >
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-slate-300">Legends Draft Diagnostics Snapshot</span>
+          <button
+            type="button"
+            class="cursor-pointer px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px]"
+            @click="copyDiagnostics"
+          >
+            {{ copiedDiagnostics ? '✓ Copied JSON' : 'Copy JSON' }}
+          </button>
         </div>
+        <pre class="overflow-auto max-h-56 whitespace-pre-wrap break-all">{{ JSON.stringify(diagnosticReport, null, 2) }}</pre>
       </div>
 
       <!-- Main 15 Candidates Matrix: 5 Pick Columns x 3 Candidate Rows -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span>🃏 15 Tướng Ứng Viên (5 Lượt Chọn × 3 Thẻ Bài)</span>
-            <span class="text-[10px] font-normal normal-case text-slate-400">(Table Hook #330804)</span>
+            <span>🃏 15 Candidate Heroes (5 Pick Rounds × 3 Cards)</span>
           </h3>
           <span class="text-xs text-slate-400 dark:text-slate-500">
-            {{ candidateColumns.length > 0 ? 'Đã tải 15/15 ứng viên' : 'Chờ dữ liệu draft...' }}
+            {{ candidateColumns.length > 0 ? `Loaded ${totalCandidateCount}/15 candidates` : 'Waiting for draft payload...' }}
           </span>
         </div>
 
@@ -212,7 +267,7 @@ function close() {
             <!-- Column Step Header -->
             <div class="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-slate-800">
               <span class="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Lượt {{ colIdx + 1 }}
+                Round {{ colIdx + 1 }}
               </span>
               <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-500">
                 Pick #{{ colIdx + 1 }}
@@ -236,7 +291,7 @@ function close() {
                   v-if="hero.picked"
                   class="absolute -top-1.5 -right-1 px-1.5 py-0.2 text-[9px] font-bold tracking-tight bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full shadow-xs"
                 >
-                  ✓ ĐÃ CHỌN
+                  ✓ PICKED
                 </div>
 
                 <!-- Hero Avatar -->
@@ -292,27 +347,37 @@ function close() {
         >
           <span class="text-3xl mb-2">🃏</span>
           <p class="font-semibold text-slate-700 dark:text-slate-200">
-            Chưa có dữ liệu phiên Legend Draft
+            No Legends Draft candidate data yet
           </p>
           <p class="text-xs text-slate-500 max-w-md mt-1">
-            Khi bạn bắt đầu một trận Legend Draft trong game, tiện ích sẽ tự động bắt gói tin, giải mã native qua WASM Table Hook #330804 và hiển thị đầy đủ 15 tướng ứng viên tại đây.
+            Start a Legends Draft match in game to automatically capture RPC/MQTT packets, decrypt the 15-hero candidate pool via DraftsXORCipher, and display all 5 pick rounds here.
           </p>
         </div>
       </div>
 
       <!-- Footer & Controls -->
       <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800 mt-2">
-        <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>Native Bridge: Table Index 330804 (BaseXORCipher_decrypt)</span>
+        <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block w-2 h-2 rounded-full" :class="draftSession.error ? 'bg-red-500' : 'bg-emerald-500'"></span>
+            <span>Decoder: DraftsXORCipher (WASM Heap + Session Key)</span>
+          </span>
+          <button
+            type="button"
+            class="cursor-pointer text-xs underline text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+            @click="showDiagnostics = !showDiagnostics"
+          >
+            {{ showDiagnostics ? 'Hide Diagnostics' : 'Diagnostics' }}
+          </button>
         </div>
 
         <div class="flex items-center gap-2">
           <button
-            class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+            type="button"
+            class="cursor-pointer px-4 py-1.5 text-xs font-semibold rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
             @click="close"
           >
-            Đóng
+            Close
           </button>
         </div>
       </div>

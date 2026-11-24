@@ -601,10 +601,10 @@ async function toggleRecording() {
           type="checkbox"
           @change="saveDraftAutoOpen(autoOpenDraft)"
         />
-        Tự động mở Draft Dialog khi nhận được tín hiệu trận đấu (Auto-open Legends Draft Dialog)
+        Auto-open Legends Draft dialog when a draft match starts
       </label>
       <p class="text-xs text-slate-500">
-        Tự động mở cửa sổ 15 tướng ứng viên khi game gửi tín hiệu bắt đầu hoặc chuyển vòng chọn trong Legends Draft (giải mã trực tiếp qua WASM Table Hook #330804).
+        Automatically opens the 15-hero candidate dialog when the game signals a Legends Draft match start or round transition (decrypted from DraftsXORCipher / session key).
       </p>
     </section>
 
