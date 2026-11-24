@@ -240,3 +240,88 @@ test('drainPending flushes any pending debounced writes', async () => {
   assert.equal(env.setCalls.filter((c) => 'rpcCache' in c || 'guildChat' in c).length, 1);
   assert.equal(env.local.guildChat.data.messages[0].data.text, 'drain test');
 });
+
+
+test('api-record-batch merges multiple packets in one pass and emits immediate rpc-cache-delta to UI', async () => {
+  let listener;
+  const local = {};
+  const setCalls = [];
+  const runtimeMessages = [];
+
+  const chromeMock = {
+    alarms: {
+      get: (_name, cb) => cb(null),
+      create: () => {},
+      onAlarm: { addListener: () => {} }
+    },
+    tabs: {
+      onRemoved: { addListener: () => {} },
+      query: (_filter, cb) => cb([]),
+      reload: () => {},
+      sendMessage: async () => {}
+    },
+    runtime: {
+      id: 'test-extension',
+      getManifest: () => ({ version: '0.11.233' }),
+      onMessage: { addListener: (cb) => { listener = cb; } },
+      onInstalled: { addListener: () => {} },
+      sendMessage: async (msg) => { runtimeMessages.push(msg); }
+    },
+    storage: {
+      local: {
+        get: async (keys) => {
+          if (!keys) return { ...local };
+          const list = Array.isArray(keys) ? keys : [keys];
+          return Object.fromEntries(list.filter((k) => Object.hasOwn(local, k)).map((k) => [k, local[k]]));
+        },
+        set: async (value) => {
+          setCalls.push({ ...value });
+          Object.assign(local, value);
+        },
+        remove: async (keys) => {
+          const list = Array.isArray(keys) ? keys : [keys];
+          for (const k of list) delete local[k];
+        }
+      },
+      session: {
+        get: async () => ({}),
+        set: async () => {},
+        remove: async () => {}
+      }
+    }
+  };
+
+  const bg = setupBackgroundRuntime({ chrome: chromeMock, rpcDebounceMs: 100 });
+  const nowSec = Math.floor(Date.now() / 1000);
+  const batch = [1, 2, 3, 4].map((i) =>
+    makeSocketRecord(
+      'chatMessage',
+      {
+        id: 500 + i,
+        userId: 7,
+        chatType: 'clan',
+        messageType: 'text',
+        ctime: nowSec + i,
+        data: { text: `batch msg #${i}` },
+        user: { id: '7', name: 'Member' }
+      },
+      new Date(Date.now() + i * 5).toISOString()
+    )
+  );
+
+  await new Promise((resolve) =>
+    listener({ kind: 'api-record-batch', records: batch }, gameSender, resolve)
+  );
+
+  // Instant UI delta must be emitted immediately (before disk debounce!)
+  const deltaMsg = runtimeMessages.find((m) => m?.kind === 'rpc-cache-delta');
+  assert.ok(deltaMsg, 'Must broadcast rpc-cache-delta immediately to open UI');
+  assert.equal(deltaMsg.delta.guildChat.data.messages.length, 4);
+
+  // Disk write is still debounced until flush
+  assert.equal(setCalls.filter((c) => 'guildChat' in c).length, 0);
+
+  await bg.flushRpcCache();
+  assert.equal(setCalls.filter((c) => 'guildChat' in c).length, 1);
+  assert.equal(local.guildChat.data.messages.length, 4);
+});

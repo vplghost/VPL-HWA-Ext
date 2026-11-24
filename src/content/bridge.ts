@@ -167,6 +167,47 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   let updateButtonsRecordingState: (() => void) | null = null;
   let onLocalRecordLogged: ((type: 'api' | 'interaction') => void) | null = null;
 
+  const API_RECORD_BATCH_MS = 40;
+  const API_RECORD_BATCH_MAX = 16;
+  let apiRecordQueue: any[] = [];
+  let apiRecordFlushTimer: any = null;
+
+  function flushApiRecordBatch() {
+    if (apiRecordFlushTimer) {
+      timeoutManager.clearBridgeTimeout(apiRecordFlushTimer);
+      apiRecordFlushTimer = null;
+    }
+    if (!apiRecordQueue.length) return;
+    const batch = apiRecordQueue;
+    apiRecordQueue = [];
+    if (batch.length === 1) {
+      sendBridgeMessage({ kind: 'api-record', record: batch[0] });
+    } else {
+      sendBridgeMessage({ kind: 'api-record-batch', records: batch });
+    }
+  }
+
+  function enqueueApiRecord(record: any) {
+    if (!record) return;
+    const isUrgent = Boolean(record.userAction || record.direct);
+    const hasTimer = typeof win.setTimeout === 'function';
+    if (!hasTimer) {
+      sendBridgeMessage({ kind: 'api-record', record });
+      return;
+    }
+    apiRecordQueue.push(record);
+    if (isUrgent || apiRecordQueue.length >= API_RECORD_BATCH_MAX) {
+      flushApiRecordBatch();
+      return;
+    }
+    if (!apiRecordFlushTimer) {
+      apiRecordFlushTimer = timeoutManager.bridgeTimeout(() => {
+        apiRecordFlushTimer = null;
+        flushApiRecordBatch();
+      }, API_RECORD_BATCH_MS);
+    }
+  }
+
   function sendControl() {
     if (!currentSettings) return;
     const payload = createControlPayload(currentSettings, popupRpcEnabled, socketRefreshMode, recordingActive);
@@ -350,21 +391,27 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     if (event.data.kind !== 'api-record') return;
     onLocalRecordLogged?.('api');
 
-    try {
-      const calls = JSON.parse(event.data.record?.requestBody || '{}').calls || [];
-      const results = JSON.parse(event.data.record?.responseBody || '{}').results || [];
-      for (const call of calls) {
-        if (['userGetInfo', 'mobileLogin', 'user_getInfo', 'user_getClanInfo'].includes(call.name)) {
-          const result = results.find((row: any) => row.ident === call.ident)?.result;
-          const id = result?.response?.id ?? result?.response?.userId ?? result?.response?.user?.id;
-          if (!result?.error && Number.isFinite(Number(id)) && Number(id) > 0) {
-            freeSpinAccountId = String(id);
+    const rec = event.data.record;
+    if (
+      typeof rec?.requestBody === 'string' &&
+      /(?:userGetInfo|mobileLogin|user_getInfo|user_getClanInfo)/.test(rec.requestBody)
+    ) {
+      try {
+        const calls = JSON.parse(rec.requestBody).calls || [];
+        const results = JSON.parse(rec.responseBody || '{}').results || [];
+        for (const call of calls) {
+          if (['userGetInfo', 'mobileLogin', 'user_getInfo', 'user_getClanInfo'].includes(call.name)) {
+            const result = results.find((row: any) => row.ident === call.ident)?.result;
+            const id = result?.response?.id ?? result?.response?.userId ?? result?.response?.user?.id;
+            if (!result?.error && Number.isFinite(Number(id)) && Number(id) > 0) {
+              freeSpinAccountId = String(id);
+            }
           }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
-    sendBridgeMessage({ kind: 'api-record', record: event.data.record });
+    enqueueApiRecord(rec);
   });
 
   // Background runtime listeners

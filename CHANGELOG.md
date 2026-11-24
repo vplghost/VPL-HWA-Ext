@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.11.234 — 2026-11-24
+
+### Changed
+
+- **Low-Latency Game-to-Extension Message Batching & Partitioned Storage (`bridge.ts`, `backgroundRuntime.ts`, `useRpcCache.ts`)**:
+  - Added 40ms / 16-record micro-batching (`api-record-batch`) in `bridge.ts` with immediate flush for urgent user actions and guarded account-ID JSON parsing.
+  - Added in-memory `rpcCache` hot cache and dirty-partition flushing (`cache:world`, `cache:roster`, `guildChat`, `rpcCache`) in `backgroundRuntime.ts`, cutting default passive debounce from `300ms` to `100ms` and eliminating repeated multi-MB disk reads/writes.
+  - Added instant `rpc-cache-delta` push from background to `useRpcCache.ts` so open UI updates in `<50ms` without waiting for disk flush.
+- **Workflow Standardization (`.agents/skills/ext-backlog/SKILL.md`)**:
+  - Updated `ext-backlog` Step 6 to delegate release, dual-build, changelog, and commit flow to `ext-build` (which integrates `kn-commit`).
+
+### Fixed
+
+- **Troop Training Capacity with Personal Research Bonuses (`troops.ts`, `useTroopTraining.ts`, `backgroundRuntime.ts`)**:
+  - Added permanent `Camp Expansion I–VII` research bonuses (IDs `3, 59, 90, 125, 158, 189, 492`, up to `+178` batch capacity) to `getBuildingTrainingCapacity` and synced `personalResearch` summary during troop refreshes.
+- **Troop Healing Duration ValidationError (`troops.ts`, `useTroopTraining.ts`)**:
+  - Replaced hardcoded `8000ms`/unit duration with exact per-tier `UNIT_HEALING_DURATION_MS_BY_LEVEL` table from `unitHealing` config (Lv.1=1s … Lv.7=8s, Lv.8=11s, Lv.9=13s, Lv.10=15s) and surfaced RPC `errorCode` failures in `healStatus`.
+- **Game Window Recorder Persistence, Stop Stability & Export Speed (`backgroundRuntime.ts`, `bridge.ts`)**:
+  - Persisted API and interaction records across MV3 Service Worker restarts and added `ensureRecordingHydrated` so logs and recording state survive SW sleep.
+  - Eliminated `chrome.storage.local.get(null)` full-storage scans in `interactionEntries`/`clearInteractions` and decoupled `record-export` from the `pending` queue.
+  - Guarded Record/Stop button toggle race conditions in `bridge.ts` and deferred `URL.revokeObjectURL`.
+- **Auto Troop Training Triggers & RPC Dispatch (`backgroundRuntime.ts`, `troops.ts`, `SettingsTab.vue`, `useTroopTraining.ts`)**:
+  - Resolved active Hero Wars game tab instead of extension sender tab in `auto-train-tick`, added `api-record`/`storage.onChanged`/`hwa-troop-train-wake` triggers, auto-refreshed missing/stale cache, removed hardcoded Lv.7 default in SettingsTab, and surfaced live `autoTrainState` diagnostics.
+
 ## 0.11.228 — 2026-11-24
 
 ### Added

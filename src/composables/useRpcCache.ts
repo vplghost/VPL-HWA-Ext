@@ -55,10 +55,21 @@ function handleStorageChange(changes: { [key: string]: chrome.storage.StorageCha
   }
 }
 
+function handleRuntimeMessage(message: any) {
+  if (message?.kind === 'rpc-cache-delta' && message.delta && typeof message.delta === 'object') {
+    revisions.set('local:rpcCache', (revisions.get('local:rpcCache') || 0) + 1);
+    cache.value = {
+      ...(cache.value || {}),
+      ...message.delta
+    };
+  }
+}
+
 function ensureStorageListener() {
   if (listenerAttached) return;
   if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener(handleStorageChange);
+    chrome.runtime?.onMessage?.addListener?.(handleRuntimeMessage);
     listenerAttached = true;
   }
 }

@@ -91,9 +91,15 @@ async function ensureRecordingHydrated(customChrome?: any) {
 }
 
 const isNodeTest = typeof process !== 'undefined' && Boolean(process.env?.NODE_TEST_CONTEXT);
-let activeRpcDebounceMs = isNodeTest ? 0 : 300;
+let activeRpcDebounceMs = isNodeTest ? 0 : 100;
+let inMemoryRpcCache: Record<string, any> | null = null;
 let pendingRpcCacheToSave: any = null;
 let pendingGuildChatToSave: any = null;
+let dirtyRpcCore = false;
+let dirtyRpcWorld = false;
+let dirtyRpcRoster = false;
+let dirtyGuildChat = false;
+let isFlushingRpcCache = false;
 let rpcFlushTimer: any = null;
 let lastStorageChrome: any = null;
 
@@ -157,27 +163,47 @@ export async function flushRpcCacheImmediate(customChrome?: any): Promise<void> 
 
   const rpc = pendingRpcCacheToSave;
   const chat = pendingGuildChatToSave;
+  const writeCore = dirtyRpcCore;
+  const writeWorld = dirtyRpcWorld;
+  const writeRoster = dirtyRpcRoster;
+  const writeChat = dirtyGuildChat;
   pendingRpcCacheToSave = null;
   pendingGuildChatToSave = null;
+  dirtyRpcCore = false;
+  dirtyRpcWorld = false;
+  dirtyRpcRoster = false;
+  dirtyGuildChat = false;
 
   const writes: Record<string, any> = {};
-  if (chat) writes.guildChat = chat;
+  if (chat && writeChat) writes.guildChat = chat;
   if (rpc) {
-    const worldSlice: any = {};
-    if (rpc.marchStatus) worldSlice.marchStatus = rpc.marchStatus;
-    if (rpc.mineMap) worldSlice.mineMap = rpc.mineMap;
-    if (Object.keys(worldSlice).length > 0) writes['cache:world'] = worldSlice;
+    if (writeWorld || isNodeTest) {
+      const worldSlice: any = {};
+      if (rpc.marchStatus) worldSlice.marchStatus = rpc.marchStatus;
+      if (rpc.mineMap) worldSlice.mineMap = rpc.mineMap;
+      if (Object.keys(worldSlice).length > 0) writes['cache:world'] = worldSlice;
+    }
 
-    const rosterSlice: any = {};
-    if (rpc.heroGetAll) rosterSlice.heroGetAll = rpc.heroGetAll;
-    if (rpc.titanGetAll) rosterSlice.titanGetAll = rpc.titanGetAll;
-    if (rpc.inventoryGet) rosterSlice.inventoryGet = rpc.inventoryGet;
-    if (Object.keys(rosterSlice).length > 0) writes['cache:roster'] = rosterSlice;
+    if (writeRoster || isNodeTest) {
+      const rosterSlice: any = {};
+      if (rpc.heroGetAll) rosterSlice.heroGetAll = rpc.heroGetAll;
+      if (rpc.titanGetAll) rosterSlice.titanGetAll = rpc.titanGetAll;
+      if (rpc.inventoryGet) rosterSlice.inventoryGet = rpc.inventoryGet;
+      if (Object.keys(rosterSlice).length > 0) writes['cache:roster'] = rosterSlice;
+    }
 
-    writes.rpcCache = rpc;
+    if (writeCore || isNodeTest) {
+      writes.rpcCache = rpc;
+    }
   }
 
-  await cr.storage.local.set(writes).catch(() => {});
+  if (Object.keys(writes).length === 0) return;
+  isFlushingRpcCache = true;
+  try {
+    await cr.storage.local.set(writes).catch(() => {});
+  } finally {
+    isFlushingRpcCache = false;
+  }
 }
 
 export function scheduleRpcDebounceFlush(cr: any, delayMs = activeRpcDebounceMs) {
@@ -2845,6 +2871,14 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
   inMemoryApiRecords = [];
   inMemoryInteractions = [];
   recordStateHydrated = false;
+  inMemoryRpcCache = null;
+  pendingRpcCacheToSave = null;
+  pendingGuildChatToSave = null;
+  dirtyRpcCore = false;
+  dirtyRpcWorld = false;
+  dirtyRpcRoster = false;
+  dirtyGuildChat = false;
+  isFlushingRpcCache = false;
   inMemoryRecordState = {
     active: false,
     nextIndex: 0,
@@ -2992,6 +3026,13 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
 
   // Storage onChanged listener
   cr.storage?.onChanged?.addListener?.((changes: any, area: string) => {
+    if (
+      area === 'local' &&
+      !isFlushingRpcCache &&
+      ['rpcCache', 'cache:world', 'cache:roster', 'guildChat'].some((key) => key in changes)
+    ) {
+      inMemoryRpcCache = null;
+    }
     if (area === 'local' && ['autoFreeSpinEnabled', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       pending = pending.then(() => runFreeSpin(false, null, null, cr)).catch(() => {});
     }
@@ -4051,66 +4092,97 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       sendResponse?.({ ok: true });
       return true;
     }
-    if (message?.kind !== 'api-record' || !isGameUrl(sender.url)) return;
-    const record = normalize(message.record);
-    if (!record) {
+    const isSingleApi = message?.kind === 'api-record';
+    const isBatchApi = message?.kind === 'api-record-batch' && Array.isArray(message.records);
+    if ((!isSingleApi && !isBatchApi) || !isGameUrl(sender.url)) return;
+    const rawRecords = isBatchApi ? message.records : [message.record];
+    const records = rawRecords.map((r: any) => normalize(r)).filter(Boolean);
+    if (records.length === 0) {
       sendResponse?.({ saved: false, cached: false });
       return;
     }
-    if (record.responseBody && record.responseBody.includes('"version"')) {
-      try {
-        const parsed = JSON.parse(record.responseBody);
-        const ver = parsed?.results?.find((r: any) => r.result?.response?.version)?.result?.response?.version;
-        if (ver) {
-          cr.storage?.session?.set?.({ cachedGameVersion: String(ver) })?.catch?.(() => {});
-          cr.storage?.local?.set?.({ cachedGameVersion: String(ver) })?.catch?.(() => {});
-        }
-      } catch (_) {}
-    }
-    if (record.requestBody && record.requestBody.includes('"appVersion"')) {
-      try {
-        const match = record.requestBody.match(/"appVersion"\s*:\s*"([^"]+)"/);
-        if (match?.[1]) {
-          cr.storage?.session?.set?.({ cachedGameVersion: match[1] })?.catch?.(() => {});
-          cr.storage?.local?.set?.({ cachedGameVersion: match[1] })?.catch?.(() => {});
-        }
-      } catch (_) {}
+    const record = records[records.length - 1];
+    for (const rec of records) {
+      if (rec.responseBody && rec.responseBody.includes('"version"')) {
+        try {
+          const parsed = JSON.parse(rec.responseBody);
+          const ver = parsed?.results?.find((r: any) => r.result?.response?.version)?.result?.response?.version;
+          if (ver) {
+            cr.storage?.session?.set?.({ cachedGameVersion: String(ver) })?.catch?.(() => {});
+            cr.storage?.local?.set?.({ cachedGameVersion: String(ver) })?.catch?.(() => {});
+          }
+        } catch (_) {}
+      }
+      if (rec.requestBody && rec.requestBody.includes('"appVersion"')) {
+        try {
+          const match = rec.requestBody.match(/"appVersion"\s*:\s*"([^"]+)"/);
+          if (match?.[1]) {
+            cr.storage?.session?.set?.({ cachedGameVersion: match[1] })?.catch?.(() => {});
+            cr.storage?.local?.set?.({ cachedGameVersion: match[1] })?.catch?.(() => {});
+          }
+        } catch (_) {}
+      }
     }
     pending = pending.then(async () => {
-      const stored =
-        (await cr.storage?.local?.get([
-          'rpcCache',
-          'guildChat',
-          'cache:world',
-          'cache:roster',
-          'captureSettings',
-          'popupRpcEnabled',
-          'socketRefreshMode',
-          'priorityAutoJoin',
-          'troopCapacitySettings',
-          'raidPreferences',
-          'customTeams',
-          'autoGatherSettings',
-          'smartGatherState',
-          'raidQueue',
-          'monsterQueue'
-        ])) || {};
-      const currentCache = {
-        ...(stored.rpcCache || {}),
-        ...(stored['cache:world'] || {}),
-        ...(stored['cache:roster'] || {}),
-        ...(pendingRpcCacheToSave || {}),
-        ...(stored.guildChat ? { guildChat: stored.guildChat } : {}),
-        ...(pendingGuildChatToSave ? { guildChat: pendingGuildChatToSave } : {})
-      };
+      const settingsKeys = [
+        'captureSettings',
+        'popupRpcEnabled',
+        'socketRefreshMode',
+        'priorityAutoJoin',
+        'troopCapacitySettings',
+        'raidPreferences',
+        'customTeams',
+        'autoGatherSettings',
+        'smartGatherState',
+        'raidQueue',
+        'monsterQueue'
+      ];
+      const useHotCache = !isNodeTest && inMemoryRpcCache !== null;
+      const keysToRead = useHotCache
+        ? settingsKeys
+        : ['rpcCache', 'guildChat', 'cache:world', 'cache:roster', ...settingsKeys];
+      const stored = (await cr.storage?.local?.get(keysToRead)) || {};
+      const currentCache = useHotCache
+        ? {
+            ...inMemoryRpcCache,
+            ...(pendingRpcCacheToSave || {}),
+            ...(pendingGuildChatToSave ? { guildChat: pendingGuildChatToSave } : {})
+          }
+        : {
+            ...(stored.rpcCache || {}),
+            ...(stored['cache:world'] || {}),
+            ...(stored['cache:roster'] || {}),
+            ...(pendingRpcCacheToSave || {}),
+            ...(stored.guildChat ? { guildChat: stored.guildChat } : {}),
+            ...(pendingGuildChatToSave ? { guildChat: pendingGuildChatToSave } : {})
+          };
       if (stored.captureSettings?.interceptEnabled === false) return { saved: false, cached: false };
-      if (record.requestBody && /"name"\s*:\s*"(?:mobileLogin|userLogin)"/.test(record.requestBody)) {
+      if (records.some((r: any) => r.requestBody && /"name"\s*:\s*"(?:mobileLogin|userLogin)"/.test(r.requestBody))) {
         await cr.storage?.session?.remove('raidEnergyWatch');
       }
-      const cacheResult = rpcCacheService.merge(currentCache, [record]);
-      observeMarchReads(record, cacheResult.cache);
-      const isPassive = isPassiveEvent(record);
+      const cacheResult = rpcCacheService.merge(currentCache, records);
+      inMemoryRpcCache = cacheResult.cache;
+      for (const rec of records) {
+        observeMarchReads(rec, cacheResult.cache);
+      }
+      const isPassive = records.every((r: any) => isPassiveEvent(r));
       if (cacheResult.changed) {
+        const delta: Record<string, any> = {};
+        const WORLD_KEYS = new Set(['marchStatus', 'mineMap']);
+        const ROSTER_KEYS = new Set(['heroGetAll', 'titanGetAll', 'inventoryGet']);
+        for (const k of Object.keys(cacheResult.cache)) {
+          if (cacheResult.cache[k] !== currentCache[k]) {
+            delta[k] = cacheResult.cache[k];
+            if (k === 'guildChat') dirtyGuildChat = true;
+            else if (WORLD_KEYS.has(k)) dirtyRpcWorld = true;
+            else if (ROSTER_KEYS.has(k)) dirtyRpcRoster = true;
+            else dirtyRpcCore = true;
+          }
+        }
+        if (Object.keys(delta).length > 0) {
+          cr.runtime?.sendMessage?.({ kind: 'rpc-cache-delta', delta })?.catch?.(() => {});
+        }
+
         const nextChat = cacheResult.cache.guildChat;
         const prevChat = currentCache.guildChat;
         const chatChanged = Boolean(nextChat && nextChat !== prevChat);
@@ -4127,6 +4199,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         pendingRpcCacheToSave = rpcToSave;
         if (chatChanged) {
           pendingGuildChatToSave = nextChat;
+          dirtyGuildChat = true;
         }
 
         if (isPassive && activeRpcDebounceMs > 0) {
@@ -4393,16 +4466,19 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         if (active) inMemoryRecordState.active = true;
       }
       if (!active) return { saved: false, cached: cacheResult.changed };
-      const recordIdx = Math.max(inMemoryApiRecords.length, inMemoryRecordState.nextIndex || 0);
-      inMemoryApiRecords.push(record);
-      inMemoryRecordState.nextIndex = recordIdx + 1;
+      const startIdx = Math.max(inMemoryApiRecords.length, inMemoryRecordState.nextIndex || 0);
+      const sessionWrites: Record<string, any> = {};
+      for (let i = 0; i < records.length; i++) {
+        const rec = records[i];
+        inMemoryApiRecords.push(rec);
+        sessionWrites[`${RECORD_PREFIX}${startIdx + i}`] = rec;
+      }
+      inMemoryRecordState.nextIndex = startIdx + records.length;
+      sessionWrites[RECORD_STATE_KEY] = { ...inMemoryRecordState, active: true };
 
       if (cr?.storage?.session?.set) {
         try {
-          await cr.storage.session.set({
-            [`${RECORD_PREFIX}${recordIdx}`]: record,
-            [RECORD_STATE_KEY]: { ...inMemoryRecordState, active: true }
-          });
+          await cr.storage.session.set(sessionWrites);
         } catch (error) {
           inMemoryRecordState.active = false;
           inMemoryRecordState.error = 'Session storage is full. Export the current log.';
@@ -4414,13 +4490,14 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           return { saved: false, cached: cacheResult.changed, error: String(error) };
         }
       }
+      const lastIdx = startIdx + records.length - 1;
       cr.runtime?.sendMessage?.({
         kind: 'record-tick',
         count: inMemoryApiRecords.length,
         interactionCount: inMemoryInteractions.length,
         active: true,
         latestEntry: {
-          id: `record:${recordIdx}`,
+          id: `record:${lastIdx}`,
           ...record
         }
       })?.catch?.(() => {});
