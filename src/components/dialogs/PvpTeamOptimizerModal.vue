@@ -100,10 +100,13 @@ const savedTeamPresets = computed<SavedTeamPreset[]>(() => {
 });
 
 // Seed team & options
+type PvpHeroSortMode = 'power-desc' | 'power-asc' | 'name-asc' | 'level-desc' | 'star-desc' | 'picked-first';
+const VALID_HERO_SORT_MODES = new Set<PvpHeroSortMode>(['power-desc', 'power-asc', 'name-asc', 'level-desc', 'star-desc', 'picked-first']);
 const poolMode = ref<PvpPoolMode>('auto-power');
 const seedHeroIds = ref<number[]>([]);
 const customPoolHeroIds = ref<number[]>([]);
 const customPoolSearch = ref('');
+const heroSortBy = ref<PvpHeroSortMode>('power-desc');
 const lockedHeroIds = ref<number[]>([]);
 const topN = ref<number>(15);
 const minPowerPctOfMax = ref<number>(55);
@@ -118,9 +121,50 @@ const effectiveSeedHeroIds = computed<number[]>(() =>
   poolMode.value === 'custom-pool' ? customPoolHeroIds.value.slice(0, 5) : seedHeroIds.value
 );
 
+const canStartOptimization = computed<boolean>(() =>
+  poolMode.value === 'custom-pool'
+    ? customPoolHeroIds.value.length >= 6
+    : seedHeroIds.value.length === 5
+);
+
+const startButtonDisabledTitle = computed<string>(() => {
+  if (canStartOptimization.value) return '';
+  return poolMode.value === 'custom-pool'
+    ? 'Pick at least 6 heroes (5 Seed + 1 Bench) to start'
+    : 'Select exactly 5 Seed heroes to start';
+});
+
+const sortedPickerHeroes = computed(() => {
+  const list = [...pickerHeroes.value];
+  const mode = heroSortBy.value;
+  const pickedOrder = poolMode.value === 'custom-pool' ? customPoolHeroIds.value : seedHeroIds.value;
+  const pickedIdx = new Map<number, number>();
+  pickedOrder.forEach((id, idx) => pickedIdx.set(id, idx));
+
+  return list.sort((a, b) => {
+    if (mode === 'picked-first') {
+      const ia = pickedIdx.has(a.id) ? pickedIdx.get(a.id)! : Number.MAX_SAFE_INTEGER;
+      const ib = pickedIdx.has(b.id) ? pickedIdx.get(b.id)! : Number.MAX_SAFE_INTEGER;
+      if (ia !== ib) return ia - ib;
+      return (b.power || 0) - (a.power || 0);
+    }
+    if (mode === 'power-asc') return (a.power || 0) - (b.power || 0);
+    if (mode === 'name-asc') return getHeroName(a.id).localeCompare(getHeroName(b.id));
+    if (mode === 'level-desc') {
+      const diff = (b.level || 0) - (a.level || 0);
+      return diff !== 0 ? diff : (b.power || 0) - (a.power || 0);
+    }
+    if (mode === 'star-desc') {
+      const diff = (b.star || 0) - (a.star || 0);
+      return diff !== 0 ? diff : (b.power || 0) - (a.power || 0);
+    }
+    return (b.power || 0) - (a.power || 0);
+  });
+});
+
 const filteredCustomPickerHeroes = computed(() => {
   const q = customPoolSearch.value.trim().toLowerCase();
-  const list = pickerHeroes.value;
+  const list = sortedPickerHeroes.value;
   if (!q) return list;
   return list.filter((h) => getHeroName(h.id).toLowerCase().includes(q) || String(h.id) === q);
 });
@@ -129,7 +173,7 @@ async function persistPoolConfig() {
   if (typeof chrome === 'undefined' || !chrome.storage?.local?.set) return;
   const key = accountId.value ? `${PVP_OPTIMIZER_POOL_CONFIG_KEY}:${accountId.value}` : PVP_OPTIMIZER_POOL_CONFIG_KEY;
   await chrome.storage.local.set({
-    [key]: { poolMode: poolMode.value, customPoolHeroIds: [...customPoolHeroIds.value] },
+    [key]: { poolMode: poolMode.value, customPoolHeroIds: [...customPoolHeroIds.value], heroSortBy: heroSortBy.value },
   }).catch(() => {});
 }
 
@@ -144,6 +188,9 @@ async function loadPoolConfig() {
     }
     if (Array.isArray(cfg?.customPoolHeroIds)) {
       customPoolHeroIds.value = cfg.customPoolHeroIds.map(Number).filter((id: number) => id > 0);
+    }
+    if (VALID_HERO_SORT_MODES.has(cfg?.heroSortBy)) {
+      heroSortBy.value = cfg.heroSortBy;
     }
   } catch (_) {}
 }
@@ -187,7 +234,14 @@ function loadPresetAsCustomSeed(heroIds: number[]) {
   if (isRunning.value || heroIds.length !== 5) return;
   const rest = customPoolHeroIds.value.filter((id) => !heroIds.includes(id));
   customPoolHeroIds.value = [...heroIds, ...rest];
+  lockedHeroIds.value = lockedHeroIds.value.filter((id) => heroIds.includes(id));
   void persistPoolConfig();
+}
+
+function promoteLeaderboardTeamToCustomSeed(heroIds: number[]) {
+  if (isRunning.value || heroIds.length !== 5) return;
+  loadPresetAsCustomSeed(heroIds);
+  addLog('info', `Promoted team [${heroIds.map((id) => getHeroName(id)).join(', ')}] to Seed (#1-#5) in Custom Pool.`);
 }
 
 function clearCustomPool() {
@@ -455,7 +509,7 @@ watch(
         <HeroTeamPicker
           v-if="poolMode === 'auto-power'"
           v-model="seedHeroIds"
-          :heroes="pickerHeroes"
+          :heroes="sortedPickerHeroes"
           :saved-teams="savedTeamPresets"
           :disabled="isRunning"
         />
@@ -499,12 +553,28 @@ watch(
                 Clear
               </button>
             </div>
-            <input
-              v-model="customPoolSearch"
-              type="text"
-              placeholder="Filter heroes..."
-              class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1 text-xs w-36"
-            />
+            <div class="flex items-center gap-1.5">
+              <select
+                id="pvp-hero-sort-select"
+                v-model="heroSortBy"
+                :disabled="isRunning"
+                class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1 text-xs"
+                @change="persistPoolConfig"
+              >
+                <option value="power-desc">Sort: Power (High → Low)</option>
+                <option value="power-asc">Sort: Power (Low → High)</option>
+                <option value="name-asc">Sort: Name (A → Z)</option>
+                <option value="level-desc">Sort: Level (High → Low)</option>
+                <option value="star-desc">Sort: Stars (High → Low)</option>
+                <option value="picked-first">Sort: Picked First</option>
+              </select>
+              <input
+                v-model="customPoolSearch"
+                type="text"
+                placeholder="Filter heroes..."
+                class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1 text-xs w-36"
+              />
+            </div>
           </div>
 
           <!-- Ordered Selected Chips -->
@@ -638,7 +708,8 @@ watch(
               v-if="!isRunning"
               id="btn-start-pvp-optimizer"
               type="button"
-              :disabled="seedHeroIds.length !== 5"
+              :disabled="!canStartOptimization"
+              :title="startButtonDisabledTitle"
               class="cursor-pointer rounded-lg px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold disabled:opacity-50"
               @click="startOptimization"
             >
@@ -746,13 +817,26 @@ watch(
                   {{ entry.overallWinRatePct }}% ({{ entry.totalWins }}/{{ entry.totalRounds }})
                 </td>
                 <td class="py-2 px-2.5 text-right">
-                  <button
-                    type="button"
-                    class="cursor-pointer px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold"
-                    @click="saveEntryAsCustomTeam(entry, idx + 1)"
-                  >
-                    Save Team
-                  </button>
+                  <div class="inline-flex items-center gap-1.5">
+                    <button
+                      v-if="poolMode === 'custom-pool' && !entry.isSeed && entry.heroIds.length === 5"
+                      type="button"
+                      data-action="set-leaderboard-seed"
+                      :disabled="isRunning"
+                      class="cursor-pointer px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold disabled:opacity-40"
+                      title="Move these 5 heroes to Seed (#1-#5) while keeping all other pool heroes"
+                      @click="promoteLeaderboardTeamToCustomSeed(entry.heroIds)"
+                    >
+                      🌱 Set as Seed
+                    </button>
+                    <button
+                      type="button"
+                      class="cursor-pointer px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold"
+                      @click="saveEntryAsCustomTeam(entry, idx + 1)"
+                    >
+                      Save Team
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>

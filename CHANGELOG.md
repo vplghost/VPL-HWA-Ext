@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.285 — 2026-11-24
+
+### Fixed & Improved
+
+- **PvP Team Optimizer Custom Pool Start Button, Hero Sort & Leaderboard Seed Promotion (`PvpTeamOptimizerModal.vue`, `tests/pvp-team-optimizer.test.mjs`)**:
+  - Fixed `#btn-start-pvp-optimizer` remaining disabled in Custom Pool mode when Auto Pool `seedHeroIds` was empty by replacing `:disabled="seedHeroIds.length !== 5"` with mode-aware `canStartOptimization` (`customPoolHeroIds.length >= 6` in Custom Pool, `seedHeroIds.length === 5` in Auto Pool) plus an explanatory disabled tooltip.
+  - Added `#pvp-hero-sort-select` dropdown supporting 6 sort modes (`Power High → Low`, `Power Low → High`, `Name A → Z`, `Level High → Low`, `Stars High → Low`, `Picked First`), persisted in `pvpOptimizerPoolConfig` while keeping `+ Top 10` / `+ Top 15` strictly power-ranked.
+  - Added **🌱 Set as Seed** (`data-action="set-leaderboard-seed"`) on non-seed Leaderboard rows in Custom Pool mode to promote any 5-hero team to `#1`–`#5` (Seed) while preserving all remaining bench heroes and pruning stale core locks.
+
 ## 0.11.283 — 2026-11-24
 
 ### Fixed

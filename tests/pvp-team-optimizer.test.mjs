@@ -348,4 +348,8 @@ test('Custom Hero Pool mode uses first 5 picked heroes as Seed and tests 100% of
   const modalSrc = fs.readFileSync(path.join(ROOT, 'src', 'components', 'dialogs', 'PvpTeamOptimizerModal.vue'), 'utf8');
   assert.match(modalSrc, /id="pvp-pool-mode-toggle"/);
   assert.match(modalSrc, /id="pvp-custom-pool-picker"/);
+  assert.match(modalSrc, /:disabled="!canStartOptimization"/, 'Start button must use canStartOptimization instead of seedHeroIds.length !== 5');
+  assert.doesNotMatch(modalSrc, /:disabled="seedHeroIds\.length !== 5"/, 'Start button must not hardcode Auto Pool seedHeroIds length');
+  assert.match(modalSrc, /id="pvp-hero-sort-select"/, 'Modal must expose #pvp-hero-sort-select dropdown');
+  assert.match(modalSrc, /data-action="set-leaderboard-seed"/, 'Leaderboard must expose Set as Seed button for Custom Pool mode');
 });
