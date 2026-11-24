@@ -12,6 +12,7 @@ import {
   isCampBuildingUpgrading,
   buildAutoTrainCalls,
   calculateHealingDurationMs,
+  calculateTrainingDurationMs,
 } from '../utils/troops.ts';
 import type { TroopTrainSettings, TroopUnitState } from '@/src/types';
 
@@ -293,6 +294,7 @@ export function useTroopTraining() {
       await dispatchRpc([
         { name: 'getSummary', feature: 'building' },
         { name: 'getSummary', feature: 'personalResearch' },
+        { name: 'getSummary', feature: 'bonus' },
         { name: 'getUnitSummary', feature: 'unit' },
         { name: 'getTrainings', feature: 'unit' },
         { name: 'getHealing', feature: 'unit' },
@@ -329,7 +331,9 @@ export function useTroopTraining() {
     if (count <= 0) return;
 
     const targetUnitId = type === 0 ? chosenLevel : (type === 1 ? 10 + chosenLevel : 20 + chosenLevel);
-    const duration = Math.max(10000, Math.round(count * 46342));
+    const duration = typeof calculateTrainingDurationMs === 'function'
+      ? calculateTrainingDurationMs(targetUnitId, count, cache.value)
+      : Math.max(10000, Math.round(count * 46342));
     const startDate = Date.now();
 
     await dispatchRpc([

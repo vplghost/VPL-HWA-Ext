@@ -694,6 +694,7 @@ export async function advanceTroopTraining(tabId?: number, customChrome?: any, o
         const refreshCalls = [
           { name: 'getSummary', feature: 'building', args: {} },
           { name: 'getSummary', feature: 'personalResearch', args: {} },
+          { name: 'getSummary', feature: 'bonus', args: {} },
           { name: 'getUnitSummary', feature: 'unit', args: {} },
           { name: 'getTrainings', feature: 'unit', args: {} },
           { name: 'getHealing', feature: 'unit', args: {} },
@@ -757,7 +758,9 @@ export async function advanceTroopTraining(tabId?: number, customChrome?: any, o
       return { ok: false, error: errMsg };
     }
     const rpcErr = Array.isArray(resp?.results)
-      ? resp.results.find((r: any) => r?.error)?.error
+      ? resp.results
+          .map((r: any) => r?.error || r?.result?.response?.errorCode || r?.result?.response?.error)
+          .find(Boolean)
       : null;
     if (rpcErr) {
       const errMsg = typeof rpcErr === 'string' ? rpcErr : (rpcErr?.description || rpcErr?.name || JSON.stringify(rpcErr));
@@ -4312,6 +4315,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         let calls = passiveMarchReads(cacheResult.cache, [
           { name: 'getSummary', feature: 'building' },
           { name: 'getSummary', feature: 'personalResearch' },
+          { name: 'getSummary', feature: 'bonus' },
           { name: 'getMarches', feature: 'march' },
           { name: 'getUnitSummary', feature: 'unit' },
           { name: 'getTrainings', feature: 'unit' },

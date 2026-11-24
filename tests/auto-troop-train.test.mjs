@@ -6,6 +6,8 @@ import {
   RESEARCH_TRAINING_CAPACITY_BY_ID,
   getResearchTrainingCapacityBonus,
   getBuildingTrainingCapacity,
+  getTrainingSpeedBonusPct,
+  calculateTrainingDurationMs,
   getUnlockedTroopLevels,
   isCampBuildingUpgrading,
   buildAutoTrainCalls,
@@ -40,11 +42,12 @@ test('getBuildingTrainingCapacity resolves correct capacity from camp building l
       },
     },
   };
-  assert.equal(getBuildingTrainingCapacity(0, cacheLvl3), 17);
-  assert.equal(getBuildingTrainingCapacity(1, cacheLvl3), 22);
-  assert.equal(getBuildingTrainingCapacity(2, cacheLvl3), 26);
+  // Shared training capacity sums ALL 3 camps: 17 (Lv.1) + 22 (Lv.2) + 26 (Lv.3) = 65
+  assert.equal(getBuildingTrainingCapacity(0, cacheLvl3), 65);
+  assert.equal(getBuildingTrainingCapacity(1, cacheLvl3), 65);
+  assert.equal(getBuildingTrainingCapacity(2, cacheLvl3), 65);
 
-  // Keyed object format from getSummary:building
+  // Keyed object format from getSummary:building (Camp 41 Lv.10=56 + Camp 42 Lv.5=35 = 91)
   const cacheKeyed = {
     'getSummary:building': {
       data: {
@@ -55,9 +58,9 @@ test('getBuildingTrainingCapacity resolves correct capacity from camp building l
       },
     },
   };
-  assert.equal(getBuildingTrainingCapacity(0, cacheKeyed), 26); // Default 26 when building 40 missing
-  assert.equal(getBuildingTrainingCapacity(1, cacheKeyed), 35);
-  assert.equal(getBuildingTrainingCapacity(2, cacheKeyed), 56);
+  assert.equal(getBuildingTrainingCapacity(0, cacheKeyed), 91);
+  assert.equal(getBuildingTrainingCapacity(1, cacheKeyed), 91);
+  assert.equal(getBuildingTrainingCapacity(2, cacheKeyed), 91);
 });
 
 test('getUnlockedTroopLevels restricts options to unlocked player tiers', () => {
@@ -696,17 +699,19 @@ test('advanceTroopTraining refreshes missing cache and schedules wake alarm when
 });
 
 
-test('getBuildingTrainingCapacity includes permanent Personal Research Camp Expansion bonuses', () => {
-  // Player completed Camp Expansion I-IV max + V Lv.1: 7 + 15 + 23 + 30 + 11 = +86
+test('getBuildingTrainingCapacity sums all 3 camps + Personal Research Camp Expansion bonuses (512 exact)', () => {
+  // Real player state from 202611241126_fresh_reload:
+  // Camp 40 Lv.22 (142) + Camp 41 Lv.22 (142) + Camp 42 Lv.22 (142) = 426
+  // + Camp Expansion I-IV max + V Lv.1 (7 + 15 + 23 + 30 + 11 = +86) => 512!
   const cache = {
     buildingStatus: {
       data: {
         buildings: [
-          { buildingId: 40, level: 21 }, // Infantry Camp Lv.21 = 134
-          { buildingId: 41, level: 22 }, // Marksmen Camp Lv.22 = 142
-          { buildingId: 42, level: 21 }, // Spearmen Camp Lv.21 = 134
+          { buildingId: 40, level: 22 }, // 142
+          { buildingId: 41, level: 22 }, // 142
+          { buildingId: 42, level: 22 }, // 142
           { buildingId: 182, level: 20 },
-          { buildingId: 183, level: 14 },
+          { buildingId: 183, level: 15 },
         ],
       },
     },
@@ -718,12 +723,15 @@ test('getBuildingTrainingCapacity includes permanent Personal Research Camp Expa
           { researchId: 90, level: 3 },  // +23
           { researchId: 125, level: 3 }, // +30
           { researchId: 158, level: 1 }, // +11
-          { researchId: 6, level: 3 },   // trainingSpeed, not capacity -> +0
+          { researchId: 6, level: 3 },   // trainingSpeed +7.4%
+          { researchId: 62, level: 3 },  // trainingSpeed +15.2%
+          { researchId: 93, level: 3 },  // trainingSpeed +22.6%
+          { researchId: 128, level: 2 }, // trainingSpeed +18%
         ],
       },
     },
     'getUnitSummary:unit': {
-      data: { available: [{ unitId: 7, count: 100 }] },
+      data: { available: [{ unitId: 27, count: 100 }] },
     },
     'getTrainings:unit': {
       data: { trainingQueues: [], upgradeQueues: [] },
@@ -731,16 +739,37 @@ test('getBuildingTrainingCapacity includes permanent Personal Research Camp Expa
   };
 
   assert.equal(getResearchTrainingCapacityBonus(cache), 86);
-  assert.equal(getBuildingTrainingCapacity(0, cache), 134 + 86); // 220
-  assert.equal(getBuildingTrainingCapacity(1, cache), 134 + 86); // 220
-  assert.equal(getBuildingTrainingCapacity(2, cache), 142 + 86); // 228
+  assert.equal(getBuildingTrainingCapacity(0, cache), 512);
+  assert.equal(getBuildingTrainingCapacity(1, cache), 512);
+  assert.equal(getBuildingTrainingCapacity(2, cache), 512);
 
-  // Verify buildAutoTrainCalls uses the combined capacity (220 / 228)
-  const plan = buildAutoTrainCalls(cache, { autoTrainEnabled: true, trainLevels: { 0: 7, 1: 7, 2: 7 } }, 1000000);
-  const inf = plan.actions.find((a) => a.type === 0 && a.action === 'train');
+  // Verify buildAutoTrainCalls uses 512 batch capacity and speed-adjusted duration
+  const plan = buildAutoTrainCalls(cache, { autoTrainEnabled: true, trainLevels: { 2: 7 } }, 1000000);
   const mks = plan.actions.find((a) => a.type === 2 && a.action === 'train');
-  assert.equal(inf?.count, 220);
-  assert.equal(mks?.count, 228);
+  assert.equal(mks?.count, 512);
+
+  // Speed without clan bonus: 3 * 5.8% (camps) + 63.2% (researches) = 80.6%
+  assert.equal(getTrainingSpeedBonusPct(cache), 80.6);
+  const durNoClan = calculateTrainingDurationMs(27, 228, cache);
+  assert.equal(durNoClan, Math.ceil(83000 / 1.806) * 228);
+
+  // With productionBonusStatus (including Clan Fortress Lv.4 5523 x2 = +20% -> total 100.6%)
+  const bonusCache = {
+    productionBonusStatus: {
+      data: {
+        bonuses: [
+          [5523, 2], // +20% trainingSpeed
+          [2852, 1], // +9%
+          [2853, 1], // +9%
+          [2833, 1], [2834, 1], [2835, 1], // +22.6%
+          [2817, 1], [2818, 1], [2819, 1], // +15.2%
+          [2800, 1], [2801, 1], [2802, 1], // +7.4%
+        ],
+      },
+    },
+  };
+  assert.equal(getTrainingSpeedBonusPct(bonusCache), 83.2);
+  assert.equal(calculateTrainingDurationMs(27, 10, bonusCache), Math.ceil(83000 / 1.832) * 10);
 
   // Max Camp Expansion I-VII sum check: 7 + 15 + 23 + 30 + 37 + 46 + 20 = 178
   const maxCache = {

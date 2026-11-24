@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.236 — 2026-11-24
+
+### Fixed
+
+- **Shared 3-Camp Training Capacity (`512`) & Speed-Adjusted `startTraining` Duration (`troops.ts`, `troopTrainingBonusData.ts`, `useTroopTraining.ts`, `backgroundRuntime.ts`)**:
+  - Updated `getBuildingTrainingCapacity` to compute shared `trainingCapacity` from `productionBonusStatus` (`getSummary:bonus`) or fallback to summing all 3 Camp buildings (`40 + 41 + 42`) plus Personal Research `Camp Expansion I–VII` bonuses (`142×3 + 86 = 512` exact match).
+  - Replaced hardcoded `46342ms`/unit `startTraining` duration with exact `calculateTrainingDurationMs(unitId, count, cache)` using `unitTraining` base durations (Lv.1–9) divided by `(1 + trainingSpeedPct / 100)` across camps, researches, and clan fortress bonuses, eliminating server `ValidationError`.
+  - Added `{ name: 'getSummary', feature: 'bonus' }` to troop refresh/auto-train sync and captured `result.response.errorCode` in `advanceTroopTraining` diagnostics.
+
 ## 0.11.234 — 2026-11-24
 
 ### Changed

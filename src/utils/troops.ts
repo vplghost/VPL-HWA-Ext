@@ -1,4 +1,12 @@
 import { DRILL_GROUND_BUILDING_IDS, DRILL_GROUND_LIMIT_BY_LEVEL } from './troopLimitData.ts';
+import {
+  UNIT_TRAINING_BASE_DURATION_MS_BY_LEVEL,
+  CAMP_TRAINING_SPEED_PCT_BY_LEVEL,
+  RESEARCH_TRAINING_SPEED_PCT_BY_ID,
+  TRAINING_CAPACITY_ABS_BONUS_BY_ID,
+  TRAINING_CAPACITY_PCT_BONUS_BY_ID,
+  TRAINING_SPEED_PCT_BONUS_BY_ID,
+} from './troopTrainingBonusData.ts';
 import type { TroopTrainSettings } from '../types/index.ts';
 
 export function getTroopType(unitId: number | string): { type: 0 | 1 | 2; level: number } | null {
@@ -181,29 +189,120 @@ export function getResearchTrainingCapacityBonus(cache: any): number {
 }
 
 /**
- * Resolve total training batch capacity for corresponding camp building (Camps 40, 41, 42)
- * plus permanent bonuses from completed Personal Researches.
+ * Resolve total training batch capacity shared across all 3 Camp buildings (Camps 40, 41, 42)
+ * plus permanent bonuses from Personal Researches (and active bonus summary when present).
  */
-export function getBuildingTrainingCapacity(type: number, cache: any): number {
+export function getBuildingTrainingCapacity(_type: number, cache: any): number {
+  // 1. Authoritative bonus summary (`getSummary:bonus` -> `productionBonusStatus`)
+  const activeBonuses = cache?.productionBonusStatus?.data?.bonuses;
+  if (Array.isArray(activeBonuses) && activeBonuses.length > 0) {
+    let absSum = 0;
+    let pctSum = 0;
+    for (const entry of activeBonuses) {
+      const id = Array.isArray(entry) ? Number(entry[0]) : Number(entry?.id ?? entry);
+      const count = Array.isArray(entry) ? Number(entry[1] ?? 1) : Number(entry?.counter ?? 1);
+      if (!Number.isInteger(id) || !Number.isFinite(count) || count <= 0) continue;
+      if (TRAINING_CAPACITY_ABS_BONUS_BY_ID[id]) absSum += TRAINING_CAPACITY_ABS_BONUS_BY_ID[id] * count;
+      if (TRAINING_CAPACITY_PCT_BONUS_BY_ID[id]) pctSum += TRAINING_CAPACITY_PCT_BONUS_BY_ID[id] * count;
+    }
+    if (absSum > 0) {
+      return pctSum > 0 ? Math.floor(absSum * (1 + pctSum / 100)) : absSum;
+    }
+  }
+
+  // 2. Fallback: sum all 3 Camp buildings (40, 41, 42) + Personal Research Camp Expansion bonuses
   const researchBonus = getResearchTrainingCapacityBonus(cache);
-  if (!Number.isInteger(type) || type < 0 || type > 2) return 26 + researchBonus;
-  const targetBuildingId = CAMP_BUILDING_IDS[type];
   const raw = extractBuildingsRaw(cache);
   if (!raw || typeof raw !== 'object') return 26 + researchBonus;
 
+  const campIds = new Set(Object.values(CAMP_BUILDING_IDS));
+  const capByCamp = new Map<number, number>();
   for (const [key, value] of Object.entries(raw)) {
     const b: any = value;
     const id = Number(b?.buildingId ?? b?.id ?? (!Array.isArray(raw) ? key : NaN));
-    if (id !== targetBuildingId) continue;
+    if (!campIds.has(id)) continue;
     const rawLevel = typeof b === 'number' ? b : b?.level;
     const level = Number(rawLevel);
-    if (!Number.isInteger(level) || level <= 0) return 17 + researchBonus;
-    if (level >= CAMP_TRAINING_CAPACITY_BY_LEVEL.length) {
-      return CAMP_TRAINING_CAPACITY_BY_LEVEL[CAMP_TRAINING_CAPACITY_BY_LEVEL.length - 1] + researchBonus;
+    if (!Number.isInteger(level) || level <= 0) {
+      capByCamp.set(id, 17);
+      continue;
     }
-    return CAMP_TRAINING_CAPACITY_BY_LEVEL[level] + researchBonus;
+    const clamped = Math.min(level, CAMP_TRAINING_CAPACITY_BY_LEVEL.length - 1);
+    capByCamp.set(id, CAMP_TRAINING_CAPACITY_BY_LEVEL[clamped]);
   }
-  return 26 + researchBonus;
+  if (capByCamp.size === 0) return 26 + researchBonus;
+
+  let totalBuildingCap = 0;
+  for (const cap of capByCamp.values()) totalBuildingCap += cap;
+  return totalBuildingCap + researchBonus;
+}
+
+/**
+ * Computes total `trainingSpeed` percentage bonus from active `productionBonusStatus`
+ * (including camps, personal researches, clan fortress, and temp buffs), or falls back
+ * to summing all 3 camps + completed personal researches.
+ */
+export function getTrainingSpeedBonusPct(cache: any): number {
+  const activeBonuses = cache?.productionBonusStatus?.data?.bonuses;
+  if (Array.isArray(activeBonuses) && activeBonuses.length > 0) {
+    let pct = 0;
+    for (const entry of activeBonuses) {
+      const id = Array.isArray(entry) ? Number(entry[0]) : Number(entry?.id ?? entry);
+      const count = Array.isArray(entry) ? Number(entry[1] ?? 1) : Number(entry?.counter ?? 1);
+      if (!Number.isInteger(id) || !Number.isFinite(count) || count <= 0) continue;
+      if (TRAINING_SPEED_PCT_BONUS_BY_ID[id]) {
+        pct += TRAINING_SPEED_PCT_BONUS_BY_ID[id] * count;
+      }
+    }
+    if (pct > 0) return Math.round(pct * 1000) / 1000;
+  }
+
+  let pct = 0;
+  const raw = extractBuildingsRaw(cache);
+  if (raw && typeof raw === 'object') {
+    const campIds = new Set(Object.values(CAMP_BUILDING_IDS));
+    const spdByCamp = new Map<number, number>();
+    for (const [key, value] of Object.entries(raw)) {
+      const b: any = value;
+      const id = Number(b?.buildingId ?? b?.id ?? (!Array.isArray(raw) ? key : NaN));
+      if (!campIds.has(id)) continue;
+      const level = Number(typeof b === 'number' ? b : b?.level);
+      if (!Number.isInteger(level) || level <= 0) continue;
+      const clamped = Math.min(level, CAMP_TRAINING_SPEED_PCT_BY_LEVEL.length - 1);
+      spdByCamp.set(id, CAMP_TRAINING_SPEED_PCT_BY_LEVEL[clamped]);
+    }
+    for (const val of spdByCamp.values()) pct += val;
+  }
+
+  const completed = extractCompletedResearches(cache);
+  const maxByRes = new Map<number, number>();
+  for (const item of completed) {
+    const rId = Number(item?.researchId ?? item?.id);
+    const level = Number(item?.level);
+    if (!Number.isInteger(rId) || !Number.isInteger(level) || level <= 0) continue;
+    const table = RESEARCH_TRAINING_SPEED_PCT_BY_ID[rId];
+    if (!table) continue;
+    const val = table[Math.min(level, table.length - 1)] || 0;
+    if (val > (maxByRes.get(rId) || 0)) maxByRes.set(rId, val);
+  }
+  for (const val of maxByRes.values()) pct += val;
+
+  return Math.round(pct * 1000) / 1000;
+}
+
+/**
+ * Calculates accurate `startTraining` duration (ms) from `unitTraining` base duration
+ * divided by `(1 + trainingSpeedPct / 100)`.
+ */
+export function calculateTrainingDurationMs(unitId: number | string, count: number, cache?: any): number {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n <= 0) return 0;
+  const info = getTroopType(unitId);
+  const level = info?.level ?? 7;
+  const baseMs = UNIT_TRAINING_BASE_DURATION_MS_BY_LEVEL[level] ?? 83000;
+  const speedPct = getTrainingSpeedBonusPct(cache);
+  const perUnitMs = Math.ceil(baseMs / (1 + speedPct / 100));
+  return Math.max(1000, perUnitMs * n);
 }
 
 /**
@@ -434,7 +533,7 @@ export function buildAutoTrainCalls(cache: any, settings: TroopTrainSettings, no
       : unlocked[unlocked.length - 1];
 
     const targetUnitId = type === 0 ? chosenLevel : (type === 1 ? 10 + chosenLevel : 20 + chosenLevel);
-    const duration = Math.max(10000, Math.round(count * 46342));
+    const duration = calculateTrainingDurationMs(targetUnitId, count, cache);
     const startDate = now;
 
     result.calls.push({
