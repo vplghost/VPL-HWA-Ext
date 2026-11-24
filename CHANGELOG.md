@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.248 — 2026-11-24
+
+### Changed
+
+- **`ext-backlog` Log Archival Cleanup (`.agents/skills/ext-backlog/SKILL.md`)**:
+  - Added an automatic log cleanup step right before backlog renaming in Step 5 to move user-provided log files into a sibling `archived/` subdirectory (e.g., `temp/tracking-data/archived/`).
+
 ## 0.11.246 — 2026-11-24
 
 ### Fixed

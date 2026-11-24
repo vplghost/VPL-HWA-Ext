@@ -99,8 +99,8 @@ test('chestHelper accurately detects openable chests, choice options, and aggreg
   assert.equal(choices62[4].reward.amount, 1);
 
   // 4. Test drop aggregation from live game record hwa-game-record-202611200058_chest_opening.json
-  const logPath = join(root, 'temp/tracking-data/hwa-game-record-202611200058_chest_opening.json');
-  const logRaw = await readFile(logPath, 'utf8');
+  const { readTrackingLog } = await import('./helpers/trackingLog.mjs');
+  const logRaw = await readTrackingLog('hwa-game-record-202611200058_chest_opening.json');
   const logData = JSON.parse(logRaw);
   const rpcs = (logData.timeline || []).filter(
     (t) => t.transport === 'fetch' && t.endpoint?.includes('/api/rpc') && t.requestBody?.includes('inventory_use')
@@ -134,8 +134,8 @@ test('chestHelper accurately detects openable chests, choice options, and aggreg
 });
 
 test('rpcCache accurately extracts and merges inventory_use chest opening from live tracking data', async () => {
-  const logPath = join(root, 'temp/tracking-data/hwa-game-record-202611200058_chest_opening.json');
-  const logRaw = await readFile(logPath, 'utf8');
+  const { readTrackingLog } = await import('./helpers/trackingLog.mjs');
+  const logRaw = await readTrackingLog('hwa-game-record-202611200058_chest_opening.json');
   const logData = JSON.parse(logRaw);
   const rpcs = (logData.timeline || []).filter(
     (t) => t.transport === 'fetch' && t.endpoint?.includes('/api/rpc')

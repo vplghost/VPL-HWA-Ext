@@ -180,8 +180,8 @@ test('normalizeAutoClaim excludes eventQuests and battlePass to prevent Dashboar
 });
 
 test('resolveClaimableEventQuests does not falsely identify unverified inProgress quests as claimable in real log', async () => {
-  const { readFile } = await import('node:fs/promises');
-  const logRaw = await readFile(new URL('../temp/tracking-data/hwa-game-record-202611181054_events.json', import.meta.url), 'utf8');
+  const { readTrackingLog } = await import('./helpers/trackingLog.mjs');
+  const logRaw = await readTrackingLog('hwa-game-record-202611181054_events.json');
   const logData = JSON.parse(logRaw);
   const res27 = JSON.parse(logData.timeline[27].responseBody);
   const sQuest = res27.results.find((r) => r.result?.response?.events)?.result?.response;

@@ -1,6 +1,6 @@
 ---
 name: ext-backlog
-description: Quy trình tự động xử lý backlog tệp (mặc định temp/backlogs) theo thứ tự thời gian tạo (cũ trước, mới sau), tạo task Knowns, điều tra & sửa lỗi tuần tự, xác thực, ghi nhận kết quả kèm thời gian ISO, đổi tên tệp hoàn tất theo timestamp đảo ngược base36 (done.<encoded_timestamp>.<old_filename>), phát hành/commit đồng bộ qua skill ext-build (đã bao gồm kn-commit), và hỗ trợ chế độ chạy liên tục (continue).
+description: Quy trình tự động xử lý backlog tệp (mặc định temp/backlogs) theo thứ tự thời gian tạo (cũ trước, mới sau), tạo task Knowns, điều tra & sửa lỗi tuần tự, xác thực, ghi nhận kết quả kèm thời gian ISO, dọn dẹp/lưu trữ tệp log xuống thư mục con archived, đổi tên tệp hoàn tất theo timestamp đảo ngược base36 (done.<encoded_timestamp>.<old_filename>), phát hành/commit đồng bộ qua skill ext-build (đã bao gồm kn-commit), và hỗ trợ chế độ chạy liên tục (continue).
 ---
 
 # Extension Backlog Processing Workflow (ext-backlog)
@@ -19,7 +19,8 @@ flowchart TD
     G --> H["Kiểm thử xác thực bản vá:<br/>1. Bridge Test (nếu có)<br/>2. npm test"]
     
     H --> I["Ghi nhận '# Kết quả' (kèm thời gian ISO)<br/>ngay dưới '# Mô tả'"]
-    I --> J["Đổi tên tệp:<br/>[old_filename] -> done.[encoded_timestamp].[old_filename]"]
+    I --> I2["Dọn dẹp log (nếu có):<br/>Move tệp log vào thư mục con archived/"]
+    I2 --> J["Đổi tên tệp:<br/>[old_filename] -> done.[encoded_timestamp].[old_filename]"]
     J --> K["Đánh dấu task Knowns: knowns task edit -s done"]
     K --> L["Thực thi skill ext-build<br/>(Bump version + Dual-build + Test + CHANGELOG + kn-commit)"]
     L --> M{"Option continue = true?"}
@@ -121,7 +122,7 @@ Thực hiện kiểm thử theo 3 cấp độ trước khi hoàn tất:
 
 ---
 
-### Bước 5: Ghi Nhận Kết Quả (Kèm Thời Gian ISO) & Đổi Tên Tệp Theo Inverted Base36 Timestamp
+### Bước 5: Ghi Nhận Kết Quả (Kèm Thời Gian ISO), Dọn Dẹp Log & Đổi Tên Tệp Theo Inverted Base36 Timestamp
 
 1. **Ghi nhận nội dung `# Kết quả`**:
    - Mở tệp backlog gốc.
@@ -138,7 +139,20 @@ Thực hiện kiểm thử theo 3 cấp độ trước khi hoàn tất:
        - [Kết quả npm test: số lượng test pass]
        - [Kết quả build extension ra thư mục dist/ và .output/chrome-mv3/]
      ```
-2. **Đổi tên tệp backlog theo quy tắc `done.[encoded_timestamp].[old_filename]`**:
+2. **Dọn dẹp & lưu trữ tệp log người dùng cung cấp (trước khi đổi tên tệp backlog)**:
+   - Nếu trong quá trình điều tra có sử dụng các tệp log do người dùng cung cấp (ví dụ trong `temp/tracking-data/`, `temp/legend_draft/`, hoặc bất kỳ thư mục `temp/<folder>/` nào), **bắt buộc di chuyển các tệp log đó xuống 1 cấp thư mục con `archived`** ngay bên trong thư mục chứa log đó (ví dụ: `temp/tracking-data/<log>.json` -> `temp/tracking-data/archived/<log>.json`, `temp/legend_draft/<log>.json` -> `temp/legend_draft/archived/<log>.json`) để tránh tràn lan.
+   - Bỏ qua các tệp đã nằm trong thư mục `archived` (hoặc `acrhive`) hoặc không thuộc `temp/`.
+   - **Lệnh thực thi chuẩn (PowerShell)**:
+     ```powershell
+     $logPath = "<đường_dẫn_file_log>"
+     if (Test-Path $logPath) {
+       $parentDir = Split-Path -Path $logPath -Parent
+       $archiveDir = Join-Path $parentDir "archived"
+       if (-not (Test-Path $archiveDir)) { New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null }
+       Move-Item -Path $logPath -Destination $archiveDir -Force
+     }
+     ```
+3. **Đổi tên tệp backlog theo quy tắc `done.[encoded_timestamp].[old_filename]`**:
    - **Mục đích**: Khi sắp xếp tệp theo tên (OS alphabetical sort), các tệp hoàn thành **mới nhất** luôn nằm **trên cùng**.
    - **Công thức tính `encoded_timestamp`**:
      - `EPOCH_2100 = 4102444800` (tương ứng `2100-01-01T00:00:00Z` tính bằng giây).
@@ -152,7 +166,7 @@ Thực hiện kiểm thử theo 3 cấp độ trước khi hoàn tất:
      $enc = node -e "const E=4102444800; const inv=Math.max(0, E-Math.floor(Date.now()/1000)); console.log(inv.toString(36).padStart(7,'0'));"
      Move-Item "temp/backlogs/$oldName" "temp/backlogs/done.$enc.$oldName"
      ```
-3. **Cập nhật Task Knowns hoàn tất**:
+4. **Cập nhật Task Knowns hoàn tất**:
    ```powershell
    knowns task edit <TASK_ID> -s done
    ```
@@ -187,6 +201,7 @@ Thay vì chỉ gọi riêng `kn-commit`, **bắt buộc áp dụng trọn vẹn 
 | **Tạo task Knowns** | `knowns task create "<Tiêu đề>" --plain` |
 | **Chuyển task in-progress** | `knowns task edit <TASK_ID> -s in-progress` |
 | **Chuyển task hoàn tất** | `knowns task edit <TASK_ID> -s done` |
+| **Lưu trữ tệp log vào `archived/`** | `$p = Split-Path "<log>" -Parent; $a = Join-Path $p "archived"; New-Item -ItemType Directory -Path $a -Force \| Out-Null; Move-Item "<log>" $a -Force` |
 | **Phát sinh `encoded_timestamp` & đổi tên xong** | `$enc = node -e "console.log(Math.max(0,4102444800-Math.floor(Date.now()/1000)).toString(36).padStart(7,'0'))"; Move-Item "temp/backlogs/<file>.md" "temp/backlogs/done.$enc.<file>.md"` |
 | **Lấy thời gian ISO hiện tại** | `node -e "console.log(new Date().toISOString())"` |
 | **Chạy kiểm thử nhanh** | `npm test` |

@@ -261,7 +261,8 @@ test('dungeonAutomation respects door priority ordering', () => {
 });
 
 test('replaying sample tracking file verify startBattle, endBattle and saveProgress lifecycle', async () => {
-  const raw = JSON.parse(await readFile(new URL('../temp/tracking-data/hwa-game-record-202611091315_dungeon.json', import.meta.url), 'utf8'));
+  const { readTrackingLog } = await import('./helpers/trackingLog.mjs');
+  const raw = JSON.parse(await readTrackingLog('hwa-game-record-202611091315_dungeon.json'));
   let currentCache = {};
   let startBattleCount = 0;
   let endBattleCount = 0;

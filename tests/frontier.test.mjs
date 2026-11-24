@@ -13,7 +13,8 @@ import { frontierActivityState } from '../src/composables/activityState.ts';
 const root = resolve(process.cwd());
 
 test('Frontier tracking data extraction and RPC cache integration', async () => {
-  const raw = await readFile(resolve(root, 'temp/tracking-data/hwa-game-record-202611231422_frontier.json'), 'utf8');
+  const { readTrackingLog } = await import('./helpers/trackingLog.mjs');
+  const raw = await readTrackingLog('hwa-game-record-202611231422_frontier.json');
   const recordFile = JSON.parse(raw);
 
   let currentCache = {};

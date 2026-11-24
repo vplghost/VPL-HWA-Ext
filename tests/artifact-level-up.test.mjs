@@ -131,8 +131,8 @@ test('getArtifactUpgradePlan generates complete plan for +1, milestone delta, an
 });
 
 test('rpcCache accurately extracts and merges artifact_levelUp from game tracking data', async () => {
-  const filePath = join(root, 'temp/tracking-data/hwa-game-record-202611192352_artifacts_level_up.json');
-  const raw = await readFile(filePath, 'utf8');
+  const { readTrackingLog } = await import('./helpers/trackingLog.mjs');
+  const raw = await readTrackingLog('hwa-game-record-202611192352_artifacts_level_up.json');
   const recordData = JSON.parse(raw);
 
   // Prepare initial cache state with hero 501 at level 13 weapon, 17 book
@@ -180,8 +180,7 @@ test('rpcCache accurately extracts and merges artifact_levelUp from game trackin
   assert.equal(cache.inventoryGet.data.consumable[34], 300 - 240);
 
   // Now test weapon level up with slotId: 0 from hwa-game-record-202611200026_hero_weapon_raise.json
-  const weaponRecordPath = join(root, 'temp/tracking-data/hwa-game-record-202611200026_hero_weapon_raise.json');
-  const weaponRaw = await readFile(weaponRecordPath, 'utf8');
+  const weaponRaw = await readTrackingLog('hwa-game-record-202611200026_hero_weapon_raise.json');
   const weaponRecordData = JSON.parse(weaponRaw);
   const weaponRpcRecords = (weaponRecordData.timeline || []).filter(item => item.transport === 'fetch' && item.endpoint.includes('/api/rpc'));
 
