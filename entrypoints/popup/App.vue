@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import Header from '@/src/components/common/Header.vue';
+import ActiveAutomationStrip from '@/src/components/common/ActiveAutomationStrip.vue';
 import TabNav from '@/src/components/common/TabNav.vue';
 import FabDial from '@/src/components/common/FabDial.vue';
 import DashboardTab from '@/src/components/dashboard/DashboardTab.vue';
@@ -49,6 +50,9 @@ const { modalState, modalContext } = useModals();
     <div class="w-full max-w-7xl 2xl:max-w-screen-2xl min-h-screen p-2.5 sm:p-4 md:p-5 flex flex-col gap-3 flex-1 min-h-0">
       <!-- Top Header -->
       <Header />
+
+      <!-- Active Automation Hub Strip (auto-hides when idle) -->
+      <ActiveAutomationStrip />
 
       <!-- Navigation Tabs -->
       <TabNav v-model="activeTab" />

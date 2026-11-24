@@ -85,7 +85,7 @@ const activities = computed<ActivityRow[]>(() => {
 
   rows.push(expeditionActivity(cache.value, now.value));
 
-  // Frontier (Ải Viễn Chinh)
+  // Frontier (Eternal Story)
   rows.push({
     id: 'frontier',
     title: 'Frontier',

@@ -1099,7 +1099,7 @@ async function toggleRecording() {
               class="cursor-pointer px-2 py-0.5 rounded border border-rose-300 dark:border-rose-700 bg-white/60 dark:bg-slate-900/60 hover:bg-white text-[10px] font-semibold"
               @click="showWasmDiagnostics = !showWasmDiagnostics"
             >
-              {{ showWasmDiagnostics ? 'Ẩn chi tiết' : 'Xem chẩn đoán' }}
+              {{ showWasmDiagnostics ? 'Hide Details' : 'Show Diagnostics' }}
             </button>
           </div>
           <p id="engine-wasm-test-result" class="font-mono text-[11px] break-words">{{ wasmTestError }}</p>
@@ -1135,7 +1135,7 @@ async function toggleRecording() {
               class="cursor-pointer px-2 py-0.5 rounded border border-rose-300 dark:border-rose-700 bg-white/60 dark:bg-slate-900/60 hover:bg-white text-[10px] font-semibold"
               @click="showWasmCallDiagnostics = !showWasmCallDiagnostics"
             >
-              {{ showWasmCallDiagnostics ? 'Ẩn chi tiết' : 'Xem chẩn đoán' }}
+              {{ showWasmCallDiagnostics ? 'Hide Details' : 'Show Diagnostics' }}
             </button>
           </div>
           <p id="engine-wasm-call-result" class="font-mono text-[11px] break-words">{{ wasmCallError }}</p>

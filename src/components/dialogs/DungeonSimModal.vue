@@ -551,7 +551,7 @@ async function handleSubmitOfficial() {
               <div class="flex items-start gap-2 min-w-0">
                 <span class="text-base leading-none mt-0.5">⚠️</span>
                 <div>
-                  <div class="font-bold text-xs leading-snug">Giả lập Unity Engine gặp lỗi</div>
+                  <div class="font-bold text-xs leading-snug">Unity Engine Simulation Error</div>
                   <div class="text-2xs opacity-90 mt-0.5 break-words font-mono">{{ errorMessage }}</div>
                 </div>
               </div>
@@ -562,14 +562,14 @@ async function handleSubmitOfficial() {
                   :disabled="isSimulating"
                   @click="handleSimulateBattle"
                 >
-                  🔄 Thử lại
+                  🔄 Retry
                 </button>
                 <button
                   type="button"
                   class="cursor-pointer px-2 py-1 rounded border border-rose-300 dark:border-rose-700 bg-white/60 dark:bg-slate-900/60 hover:bg-white text-[11px] font-semibold transition-colors"
                   @click="showDiagnostics = !showDiagnostics"
                 >
-                  {{ showDiagnostics ? 'Ẩn chẩn đoán' : 'Chẩn đoán lỗi' }}
+                  {{ showDiagnostics ? 'Hide Diagnostics' : 'Show Diagnostics' }}
                 </button>
               </div>
             </div>
@@ -577,13 +577,13 @@ async function handleSubmitOfficial() {
             <!-- Detailed Diagnostics Accordion -->
             <div v-if="showDiagnostics" class="pt-2 border-t border-rose-200/60 dark:border-rose-900/40 space-y-2 text-2xs">
               <div class="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                <span class="font-semibold">Chi tiết kỹ thuật & Ngữ cảnh trận đấu:</span>
+                <span class="font-semibold">Technical Details & Battle Context:</span>
                 <button
                   type="button"
                   class="cursor-pointer px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold"
                   @click="copyDiagnostics"
                 >
-                  {{ copiedDiagnostics ? '✅ Đã chép' : '📋 Sao chép' }}
+                  {{ copiedDiagnostics ? '✅ Copied' : '📋 Copy' }}
                 </button>
               </div>
               <div class="bg-black/85 text-emerald-300 p-2.5 rounded font-mono text-[10px] leading-relaxed overflow-x-auto max-h-48 border border-black/40">

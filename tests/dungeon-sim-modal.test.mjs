@@ -55,7 +55,7 @@ test('DungeonSimModal Single File Component defines simulation controls, squad p
   assert.match(content, /showDiagnostics/, 'Must have showDiagnostics state for granular diagnostics');
   assert.match(content, /copyDiagnostics/, 'Must have copyDiagnostics action for clipboard export');
   assert.match(content, /errorDetail/, 'Must track structured errorDetail');
-  assert.match(content, /Thử lại/, 'Must have retry simulation action in error banner');
+  assert.match(content, /Retry/, 'Must have retry simulation action in error banner');
 });
 
 test('interceptor captures Unity instance and prepares Model A simulation bridge with granular error diagnostics', async () => {

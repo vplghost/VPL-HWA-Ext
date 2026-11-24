@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.258 — 2026-11-24
+
+### Added
+
+- **Active Automation Hub Strip, Shared Dialog Primitives & 100% English UI Standardization (`ActiveAutomationStrip.vue`, `useActiveAutomations.ts`, `AutomationLogPanel.vue`, `HeroTeamPicker.vue`, `DiagnosticsBanner.vue`, `App.vue`)**:
+  - Added `ActiveAutomationStrip.vue` (auto-hides when idle) between `<Header />` and `<TabNav />` in `App.vue`, displaying live status chips for active automations (`Raid`, `Monster`, `Gather`, `Train`, `Building`, `Research`, `Tower`, `Dungeon`) with click-to-open and 1-click stop (`⏹`).
+  - Added reusable shared components in `src/components/common/`: `AutomationLogPanel.vue`, `HeroTeamPicker.vue`, and `DiagnosticsBanner.vue`.
+  - Standardized remaining Vietnamese strings in `DungeonSimModal.vue`, `SettingsTab.vue`, and `ActivityGoals.vue` to English, backed by an automated regression test in `tests/active-automation-hub.test.mjs`.
+
 ## 0.11.256 — 2026-11-24
 
 ### Added
