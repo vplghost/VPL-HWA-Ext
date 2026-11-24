@@ -1026,6 +1026,76 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 skinId: call.args.skinId, token: `${call.ident}:skinUpgrade` },
               updatedAt: record.timestamp }];
           }
+          if (call.name === 'arenaFindEnemies' && result?.response) {
+            return [{
+              key: 'arenaEnemies',
+              method: call.name,
+              feature: null,
+              group: 'other',
+              data: result.response,
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'League_getInfo' && call.args?.type === 'ratingArena' && result?.response) {
+            return [{
+              key: 'arenaLeague',
+              method: call.name,
+              feature: null,
+              group: 'other',
+              data: result.response,
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'battleGetByType' && call.args?.type === 'arena' && result?.response) {
+            return [{
+              key: 'arenaReplays',
+              method: call.name,
+              feature: null,
+              group: 'other',
+              data: result.response,
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'customArena_endBattle' && result?.response) {
+            const resp = result.response;
+            const entries: any[] = [];
+            if (resp.state) {
+              entries.push({
+                key: 'arenaState',
+                method: call.name,
+                feature: null,
+                group: 'other',
+                data: { ...resp.state, enemies: resp.enemies || [] },
+                updatedAt: record.timestamp
+              });
+            }
+            if (Array.isArray(resp.enemies) && resp.enemies.length > 0) {
+              entries.push({
+                key: 'arenaEnemies',
+                method: call.name,
+                feature: null,
+                group: 'other',
+                data: { type: resp.state?.arenaType || 'NormalArena', enemies: resp.enemies },
+                updatedAt: record.timestamp
+              });
+            }
+            const tokenId = resp.replayId || call.ident || record.timestamp;
+            entries.push({
+              key: 'resourceAction',
+              method: call.name,
+              feature: null,
+              group: 'internal',
+              data: {
+                resourceKey: 'resource:refillable:6',
+                delta: -1,
+                label: 'Arena Battles',
+                requireSnapshot: true,
+                token: `arena_battle:${tokenId}`
+              },
+              updatedAt: record.timestamp
+            });
+            return entries;
+          }
           if (call.name === 'randomDraft_startBattle' || call.name === 'randomDraft_result') {
             const resp = result?.response;
             const matchId =

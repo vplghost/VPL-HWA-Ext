@@ -1199,6 +1199,14 @@ export function installInterceptor(customWindow?: any): void {
             ]
           : [];
 
+        const isArena = battleType === 'arena' || battleType.includes('arena');
+        const arenaCandidates = !isTitan && isArena
+          ? [
+              { name: 'Presets_arena(0)', fn: () => callTableFn(sym.Presets_arena, 0) },
+              { name: 'Presets_arenaReplay(0, 0, 0)', fn: () => callTableFn(sym.Presets_arenaReplay, 0, 0, 0) },
+            ]
+          : [];
+
         const candidates = isTitan
           ? [
               ...dungeonCandidates,
@@ -1229,6 +1237,7 @@ export function installInterceptor(customWindow?: any): void {
             ]
           : [
               ...dungeonCandidates,
+              ...arenaCandidates,
               // Hero priority
               { name: 'Presets_clanWarReplay(1, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 1, 0) },
               { name: 'Presets_clanWarReplay(0, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 0, 0) },

@@ -38,6 +38,7 @@ import ChestModal from '@/src/components/dialogs/ChestModal.vue';
 import FrontierModal from '@/src/components/dialogs/FrontierModal.vue';
 import MarchDetailModal from '@/src/components/dialogs/MarchDetailModal.vue';
 import LegendsDraftModal from '@/src/components/dialogs/LegendsDraftModal.vue';
+import ArenaModal from '@/src/components/dialogs/ArenaModal.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -106,6 +107,7 @@ const { modalState, modalContext } = useModals();
         :initial-march-id="modalContext.selectedMarchId"
       />
       <LegendsDraftModal v-model="modalState.legendsDraft" />
+      <ArenaModal v-model="modalState.arena" />
     </div>
   </div>
 </template>

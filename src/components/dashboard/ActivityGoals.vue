@@ -38,7 +38,7 @@ const activities = computed<ActivityRow[]>(() => {
 
   // Arena counters are independent; missing or stale counters are unknown.
   rows.push({ id: 'arena', title: 'Arena', icon: '⚔️',
-    ...arenaActivityState(cache.value, false, now.value) });
+    ...arenaActivityState(cache.value, false, now.value), isInteractive: true });
   rows.push({ id: 'grand-arena', title: 'Grand Arena', icon: '🛡️',
     ...arenaActivityState(cache.value, true, now.value) });
 
@@ -99,6 +99,7 @@ const activities = computed<ActivityRow[]>(() => {
 
 function handleActivityClick(act: ActivityRow) {
   if (act.id === 'tower') openModal('tower');
+  else if (act.id === 'arena') openModal('arena');
   else if (act.id === 'dungeon') openModal('dungeon');
   else if (act.id === 'expeditions') openModal('expeditions');
   else if (act.id === 'quests') openModal('questDetail');

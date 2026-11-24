@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.250 — 2026-11-24
+
+### Added
+
+- **Arena Dialog with Unity WASM 10-Round Simulation & Automation (`ArenaModal.vue`, `arenaService.ts`, `ActivityGoals.vue`, `useModals.ts`, `App.vue`, `rpcCache.ts`, `interceptor.ts`)**:
+  - Added interactive **Arena** modal opened directly from the Dashboard's Daily Activities & Progress Arena card.
+  - Extracted and cached full Arena data (`arenaFindEnemies`, `League_getInfo`, `battleGetByType`, `customArena_endBattle`, and free battles deduction on `resource:refillable:6`).
+  - Added `runArenaMonteCarloSim()` (10-round batched Unity WASM simulation using `Presets_arena(0)`) and **Auto Arena** loop: auto-refreshes opponents exceeding configured power ratio (default `90%`), fights when simulated win rate ≥ `80%`, and stops on defeat or when free battles reach `0`.
+
 ## 0.11.248 — 2026-11-24
 
 ### Changed
