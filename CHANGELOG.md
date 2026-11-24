@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.11.275 — 2026-11-24
+
+### Added
+
+- **Building & Research Tree Data Sync Pipeline & Runtime Hot-Overlay (`cityTreeSync.ts`, `cityTreeManifest.json`, `scripts/sync-city-trees.mjs`, `buildingData.ts`, `researchData.ts`, `nameData.ts`, `rpcCache.ts`, `SettingsTab.vue`)**:
+  - Added `src/services/cityTreeSync.ts` (`compileBuildingLevels`, `compileResearchData`, `extractStrategicNames`, `detectCityTreeDrift`, `diffCityTreeData`, `applyCityTreeOverlay`) and baseline manifest `src/data/cityTreeManifest.json` to handle silent remote-config MD5 hotfixes even when `gameVersion` does not bump.
+  - Added reusable CLI `scripts/sync-city-trees.mjs` (`npm run sync:city-trees`) supporting `--from-bridge`, `--from-log`, `--from-index`, `--dry-run`, `--force`, MD5-verified caching in `temp/remote-configs/`, and in-place updates to `buildingData.ts`, `researchData.ts`, `nameData.ts`, and `cityTreeManifest.json`.
+  - Added runtime hot-overlay hooks to `buildingData.ts`, `researchData.ts`, and `nameData.ts`, passive `remoteConfigInit` capture in `rpcCache.ts`, and the **Building & Research Tree Sync** card (`#city-tree-sync-card`) in `SettingsTab.vue`.
+
+## 0.11.274 — 2026-11-24
+
+### Fixed
+
+- **PvP Team Optimizer & Grand Arena Pre-Sim `START_BATTLE_PLAY` Memory Trap (`arenaBattleEffects.ts`, `pvpTeamOptimizer.ts`, `grandArenaService.ts`)**:
+  - Fixed `buildSyntheticArenaBattle()` and `computePairwiseWinMatrix()` to key `defenders[0]` by 1-indexed slot strings (`"1"`..`"5"`) matching live `customArena_startBattle` payloads (instead of raw hero IDs or unwrapped object).
+  - Added baseline 450-entry `DEFAULT_ARENA_BATTLE_EFFECTS` map in `src/data/arenaBattleEffects.ts` so `START_BATTLE_PLAY` never dereferences missing effect IDs even before a live Arena battle has been captured in the session.
+
 ## 0.11.272 — 2026-11-24
 
 ### Fixed & Improved

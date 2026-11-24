@@ -2409,7 +2409,23 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
         }
         if (call.name === 'remoteConfigInit' && result?.response?.index?.configs) {
           const configs = result.response.index.configs;
+          const cityTreeSubset: Record<string, { url: string; md5: string | null }> = {};
+          for (const k of ['building', 'buildingLevel', 'buildingGroups', 'personalResearch', 'personalResearchLevel', 'personalResearchType', 'strategicLocalization']) {
+            const url = typeof configs[k] === 'string' ? configs[k] : configs[k]?.url;
+            if (typeof url === 'string' && url.startsWith('http')) {
+              const m = url.match(/\/([a-f0-9]{32})\.json(?:$|\?)/i);
+              cityTreeSubset[k] = { url, md5: m ? m[1].toLowerCase() : null };
+            }
+          }
           return [
+            ...(Object.keys(cityTreeSubset).length > 0 ? [{
+              key: 'remoteConfigIndex',
+              method: call.name,
+              feature: null,
+              group: 'other',
+              data: { configs: cityTreeSubset, lang: call.args?.lang || 'en' },
+              updatedAt: record.timestamp
+            }] : []),
             {
               key: 'productionConfigStatus', method: call.name, feature: null,
               group: 'internal', data: { bonusUrl: configs.bonus?.url,

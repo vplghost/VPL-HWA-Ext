@@ -11,10 +11,22 @@ export const buildingLevelsData: BuildingLevelsDict = {"20":{"1":{"d":0},"2":{"d
 
 export const legacyBuildingDurations: Record<string | number, Record<string | number, number>> = {"20":{"16":5496,"17":6072,"18":7464,"19":10812,"20":12240,"21":18300,"22":23916,"23":35088,"24":48852,"25":66408},"40":{"22":3840,"23":6444,"24":5088,"25":8028.000000000001},"41":{"22":3840,"23":6444,"24":5088,"25":8028.000000000001},"42":{"22":3840,"23":6444,"24":5088,"25":8028.000000000001},"43":{"22":3840,"23":6444,"24":5088,"25":8028.000000000001},"162":{"23":5472,"24":4440,"25":10008},"163":{"16":5496,"17":6072,"18":7464,"19":10812,"20":12240,"21":18300,"22":23916,"23":35088,"24":48852,"25":66408},"165":{"22":3840,"23":6444,"24":5088,"25":8028.000000000001},"170":{"18":6100,"19":4228,"20":5512,"21":8352,"22":12538,"23":19736,"24":25524,"25":39052},"171":{"18":6100,"19":4228,"20":5512,"21":8352,"22":12538,"23":19736,"24":25524,"25":39052},"172":{"18":6100,"19":4228,"20":5512,"21":8352,"22":12538,"23":19736,"24":25524,"25":39052},"173":{"18":6100,"19":4228,"20":5512,"21":8352,"22":12538,"23":19736,"24":25524,"25":39052},"174":{"23":5472,"24":4440,"25":10008},"175":{"23":5472,"24":4440,"25":10008},"182":{"19":7228,"20":4802,"21":9220,"22":12058,"23":16316,"24":23248,"25":33474},"183":{"19":7228,"20":4802,"21":9220,"22":12058,"23":16316,"24":23248,"25":33474},"184":{"19":7228,"20":4802,"21":9220,"22":12058,"23":16316,"24":23248,"25":33474}};
 
+let buildingLevelsOverlay: BuildingLevelsDict | null = null;
+
+export function setBuildingLevelsOverlay(overlay: BuildingLevelsDict | null): void {
+  buildingLevelsOverlay = overlay && typeof overlay === 'object' ? overlay : null;
+}
+
+export function getBuildingLevelsOverlay(): BuildingLevelsDict | null {
+  return buildingLevelsOverlay;
+}
+
 export function getBuildingLevelData(
   buildingId: number | string,
   level: number | string
 ): BuildingLevelMeta | null {
+  const fromOverlay = (buildingLevelsOverlay?.[buildingId] as Record<string | number, BuildingLevelMeta> | undefined)?.[level];
+  if (fromOverlay) return fromOverlay;
   const b = buildingLevelsData[buildingId];
   if (!b) return null;
   return (b as Record<string | number, BuildingLevelMeta>)[level] ?? null;

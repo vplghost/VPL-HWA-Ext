@@ -118,7 +118,7 @@ test('runPvpOptimizationSession ranks Giant Killer above Seed Team and runs Top-
   const mockSim = async (battle) => {
     roundCounter++;
     const atkHas8 = '8' in battle.attackers;
-    const defHas8 = '8' in (battle.defenders?.[0] || {});
+    const defHas8 = Object.values(battle.defenders?.[0] || {}).some((h) => Number(h?.id) === 8);
     if (atkHas8 && !defHas8) return { win: roundCounter % 5 !== 0, stars: 3, duration: 18 };
     if (!atkHas8 && defHas8) return { win: roundCounter % 5 === 0, stars: 3, duration: 18 };
     return { win: roundCounter % 2 === 0, stars: 3, duration: 25 };
@@ -214,6 +214,13 @@ test('buildSyntheticArenaBattle produces CONSTRUCT_BATTLE_PLAY-compatible envelo
   assert.deepEqual(battle.battleEffects, { StatUp: 5 });
   assert.equal(battle.attackers['16'].hp, 92217, 'Must prefer exact server-hydrated HP');
   assert.ok(battle.attackers['2'].hp > 0 && battle.attackers['2'].artifacts.length === 3, 'Fallback hero must have valid non-zero C# fields');
+  assert.deepEqual(Object.keys(battle.defenders[0]), ['1', '2'], 'defenders[0] MUST be keyed by 1-indexed slot ("1".."5")');
+  assert.equal(battle.defenders[0]['1'].id, 3);
+  assert.equal(battle.defenders[0]['2'].id, 4);
+
+  // When battleTemplate is omitted, must populate full 450-entry DEFAULT_ARENA_BATTLE_EFFECTS
+  const defaultBattle = buildSyntheticArenaBattle([16], [2], { '16': { id: 16, power: 50000 }, '2': { id: 2, power: 40000 } }, 999);
+  assert.ok(Object.keys(defaultBattle.battleEffects).length >= 400, 'Must include baseline battleEffects map');
 
   const normFallback = normalizeBattleHero(99, undefined, { id: 99, level: 80, power: 25000 });
   assert.equal(normFallback.GlobalAttack, 100);

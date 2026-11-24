@@ -2711,8 +2711,19 @@ const itemGroups: Record<string, string> = {
   patron: 'patron'
 };
 
+let cityNameOverlay: { building?: Record<string, string>; research?: Record<string, string> } | null = null;
+
+export function setCityNameOverlay(
+  overlay: { building?: Record<string, string>; research?: Record<string, string> } | null
+): void {
+  cityNameOverlay = overlay;
+}
+
 export function lookupName(group: string, id: string | number): string | null {
   const strId = String(id);
+  if ((group === 'building' || group === 'research') && cityNameOverlay?.[group] && Object.hasOwn(cityNameOverlay[group]!, strId)) {
+    return cityNameOverlay[group]![strId] ?? null;
+  }
   const localNames = nameData.names?.[group];
   if (localNames && Object.hasOwn(localNames, strId)) {
     return localNames[strId] ?? null;

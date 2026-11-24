@@ -11,7 +11,7 @@
  *   locally via `buildSyntheticArenaBattle()` before dispatching `customArena_startBattle`.
  */
 import { extractArenaEnemyList } from './arenaService.ts';
-import { buildSyntheticArenaBattle, type PvpHeroSnapshot } from './pvpTeamOptimizer.ts';
+import { buildSyntheticArenaBattle, normalizeBattleHero, type PvpHeroSnapshot } from './pvpTeamOptimizer.ts';
 
 export const GRAND_ARENA_INTEL_STORAGE_KEY = 'grandArenaIntelCache';
 export const GRAND_ARENA_INTEL_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -241,19 +241,19 @@ export async function computePairwiseWinMatrix(
         mergedPool,
         (baseSeed + Math.imul(i * 7 + j + 1, 2654435761)) >>> 0
       );
-      // Replace defender entries with actual enemy hero snapshots so opponent stats aren't overwritten by player's own hero of same ID
+      // Replace defender entries with actual enemy hero snapshots keyed by 1-indexed slot ("1".."5")
       const defMap: Record<string, any> = {};
-      for (const h of defTeam) {
-        defMap[String(h.id)] = {
-          ...(battle.defenders?.[String(h.id)] || {}),
+      for (let dIdx = 0; dIdx < defTeam.length; dIdx++) {
+        const h = defTeam[dIdx];
+        defMap[String(dIdx + 1)] = normalizeBattleHero(h.id, undefined, {
           id: h.id,
           level: h.level || 90,
           color: h.color || 9,
           star: h.star || 5,
           power: h.power || 30000,
-        };
+        });
       }
-      battle.defenders = defMap;
+      battle.defenders = [defMap];
 
       let wins = 0;
       for (let r = 0; r < rounds; r++) {

@@ -11,10 +11,25 @@ import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import { useDraft } from '@/src/composables/useDraft';
 import { TROOP_DEFS, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
 import { DEFAULT_WASM_PROFILE_VERSION } from '@/src/data/wasmSymbols';
+import cityTreeManifest from '@/src/data/cityTreeManifest.json';
+import { buildingLevelsData } from '@/src/data/buildingData';
+import { researchData } from '@/src/data/researchData';
+import {
+  CITY_TREE_CONFIG_KEYS,
+  CITY_TREE_OVERLAY_STORAGE_KEY,
+  extractRemoteConfigSubset,
+  compileBuildingLevels,
+  compileResearchData,
+  extractStrategicNames,
+  detectCityTreeDrift,
+  applyCityTreeOverlay,
+  type CityTreeManifest,
+  type CityTreeOverlay,
+} from '@/src/services/cityTreeSync';
 import type { ThemeMode, TroopTrainSettings } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
-const { recordingState, cache, updateRecordingState } = useRpcCache();
+const { recordingState, cache, updateRecordingState, dispatchRpc } = useRpcCache();
 const isTogglingRecording = ref(false);
 const { autoClaimSettings, priorityAutoJoin, teams: autoJoinTeams, pending: pendingClaims, selectedCount, busy: claimBusy, message: claimMessage, saveAutoClaim, savePriorityJoin, claimRewards } = usePopupAutomation(cache);
 const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab, gameEngineStatus, checkStatus } = useGameConnection();
@@ -31,6 +46,126 @@ const wasmCallResult = ref<any>(null);
 const wasmCallError = ref<string | null>(null);
 const wasmCallErrorDetail = ref<any>(null);
 const showWasmCallDiagnostics = ref(false);
+
+// Building & Research Tree Sync (Silent Hotfix Overlay)
+const cityTreeOverlay = ref<CityTreeOverlay | null>(null);
+const cityTreeSyncPending = ref(false);
+const cityTreeSyncMessage = ref('');
+const cityTreeSyncError = ref('');
+
+const knownBuildingIds = computed(() => {
+  const ids = new Set<number>(Object.keys(buildingLevelsData).map(Number));
+  if (cityTreeOverlay.value?.buildingLevels) {
+    for (const k of Object.keys(cityTreeOverlay.value.buildingLevels)) ids.add(Number(k));
+  }
+  return ids;
+});
+
+const knownResearchIds = computed(() => {
+  const ids = new Set<number>(Object.keys(researchData).map(Number));
+  if (cityTreeOverlay.value?.researchData) {
+    for (const k of Object.keys(cityTreeOverlay.value.researchData)) ids.add(Number(k));
+  }
+  return ids;
+});
+
+const cityTreeDrift = computed(() => {
+  const activeManifest = (cityTreeOverlay.value?.manifest || cityTreeManifest) as CityTreeManifest;
+  const remoteConfigs = cache.value?.remoteConfigIndex?.data?.configs || {};
+  const rawBuildings = cache.value?.['getSummary:building']?.data?.buildings || cache.value?.buildingStatus?.data?.buildings;
+  const bList = Array.isArray(rawBuildings) ? rawBuildings : (rawBuildings && typeof rawBuildings === 'object' ? Object.values(rawBuildings) : []);
+  const liveBuildingIds = bList.map((b: any) => Number(b?.buildingId ?? b?.id)).filter((n: number) => Number.isInteger(n) && n > 0);
+  const rawRes = cache.value?.['getSummary:personalResearch']?.data?.completedResearches;
+  const rList = Array.isArray(rawRes) ? rawRes : [];
+  const liveResearchIds = rList.map((r: any) => Number(r?.researchId ?? r?.id ?? r)).filter((n: number) => Number.isInteger(n) && n > 0);
+  return detectCityTreeDrift({
+    remoteConfigIndex: remoteConfigs,
+    manifest: activeManifest,
+    liveBuildingIds,
+    liveResearchIds,
+    knownBuildingIds: knownBuildingIds.value,
+    knownResearchIds: knownResearchIds.value,
+  });
+});
+
+async function syncCityTrees() {
+  cityTreeSyncPending.value = true;
+  cityTreeSyncMessage.value = '';
+  cityTreeSyncError.value = '';
+  try {
+    let remoteConfigs = cache.value?.remoteConfigIndex?.data?.configs;
+    if (!remoteConfigs || !remoteConfigs.buildingLevel) {
+      const rpcRes = await dispatchRpc([{ name: 'remoteConfigInit', args: { lang: 'en' } }]);
+      const resp = rpcRes?.results?.[0]?.result?.response;
+      remoteConfigs = extractRemoteConfigSubset(resp?.index?.configs || resp?.configs);
+    }
+    if (!remoteConfigs || Object.keys(remoteConfigs).length === 0) {
+      throw new Error('Could not obtain remoteConfigInit index. Open the game tab and try again.');
+    }
+
+    const fetched: Record<string, any> = {};
+    await Promise.all(
+      CITY_TREE_CONFIG_KEYS.map(async (key) => {
+        const entry = remoteConfigs?.[key];
+        if (!entry?.url) return;
+        const resp = await fetch(entry.url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status} fetching ${key}`);
+        fetched[key] = await resp.json();
+      })
+    );
+
+    const { buildingLevels } = fetched.buildingLevel
+      ? compileBuildingLevels(fetched.buildingLevel)
+      : { buildingLevels: undefined };
+    const compiledResearch = fetched.personalResearchLevel
+      ? compileResearchData(fetched.personalResearch, fetched.personalResearchLevel, fetched.personalResearchType)
+      : undefined;
+    const { buildingNames, researchNames } = fetched.strategicLocalization
+      ? extractStrategicNames(fetched.building, fetched.personalResearch, fetched.strategicLocalization)
+      : { buildingNames: {}, researchNames: {} };
+
+    const overlay: CityTreeOverlay = {
+      updatedAt: new Date().toISOString(),
+      manifest: { updatedAt: new Date().toISOString(), configs: remoteConfigs },
+      buildingLevels,
+      researchData: compiledResearch,
+      buildingNames,
+      researchNames,
+    };
+    applyCityTreeOverlay(overlay);
+    cityTreeOverlay.value = overlay;
+    if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+      await chrome.storage.local.set({ [CITY_TREE_OVERLAY_STORAGE_KEY]: overlay });
+    }
+    cityTreeSyncMessage.value = `Synced ${Object.keys(buildingLevels || {}).length} buildings and ${Object.keys(compiledResearch || {}).length} researches to runtime overlay.`;
+  } catch (err: any) {
+    cityTreeSyncError.value = err?.message || String(err);
+  } finally {
+    cityTreeSyncPending.value = false;
+  }
+}
+
+function exportRemoteConfigIndex() {
+  const configs = cache.value?.remoteConfigIndex?.data?.configs || cityTreeOverlay.value?.manifest?.configs || cityTreeManifest.configs;
+  const payload = JSON.stringify({ exportedAt: new Date().toISOString(), configs }, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'remote-config-index.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  cityTreeSyncMessage.value = 'Exported remote-config-index.json (use with: npm run sync:city-trees -- --from-index <file>).';
+}
+
+async function clearCityTreeOverlay() {
+  applyCityTreeOverlay(null);
+  cityTreeOverlay.value = null;
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.remove) {
+    await chrome.storage.local.remove(CITY_TREE_OVERLAY_STORAGE_KEY);
+  }
+  cityTreeSyncMessage.value = 'Cleared runtime overlay; reverted to bundled static tree data.';
+}
 
 // WASM Symbol Profile & Override
 const wasmProfileVersion = DEFAULT_WASM_PROFILE_VERSION;
@@ -322,7 +457,12 @@ onMounted(async () => {
         'tabConfig',
         'wasmSymbolOverrides',
         'cachedGameVersion',
+        CITY_TREE_OVERLAY_STORAGE_KEY,
       ]);
+      if (stored[CITY_TREE_OVERLAY_STORAGE_KEY]) {
+        cityTreeOverlay.value = stored[CITY_TREE_OVERLAY_STORAGE_KEY];
+        applyCityTreeOverlay(stored[CITY_TREE_OVERLAY_STORAGE_KEY]);
+      }
       if (stored.cachedGameVersion) {
         cachedGameVersion.value = String(stored.cachedGameVersion);
       }
@@ -1258,6 +1398,69 @@ async function toggleRecording() {
 
       <p v-if="storageCompactMessage" role="status" class="text-xs text-emerald-600 dark:text-emerald-400">
         {{ storageCompactMessage }}
+      </p>
+    </section>
+
+    <!-- Building & Research Tree Data Sync -->
+    <section
+      id="city-tree-sync-card"
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+            <span>🌳</span> Building &amp; Research Tree Sync
+          </h3>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400">
+            Sync remote-config building &amp; research trees on demand when silent server hotfixes arrive without a client version bump.
+          </p>
+        </div>
+        <span
+          id="city-tree-drift-badge"
+          class="px-2 py-0.5 rounded-full text-[10px] font-semibold border"
+          :class="cityTreeDrift.hasDrift ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'"
+        >
+          {{ cityTreeDrift.summary }}
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          id="btn-sync-city-trees"
+          type="button"
+          :disabled="cityTreeSyncPending"
+          class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs disabled:opacity-50 transition"
+          @click="syncCityTrees"
+        >
+          {{ cityTreeSyncPending ? 'Syncing...' : '↻ Sync Tree Data Now' }}
+        </button>
+        <button
+          id="btn-export-remote-config-index"
+          type="button"
+          class="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition"
+          @click="exportRemoteConfigIndex"
+        >
+          ⬇ Export Config Index
+        </button>
+        <button
+          v-if="cityTreeOverlay"
+          id="btn-clear-city-tree-overlay"
+          type="button"
+          class="cursor-pointer px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 font-semibold text-xs transition"
+          @click="clearCityTreeOverlay"
+        >
+          ✕ Reset Overlay
+        </button>
+      </div>
+
+      <p v-if="cityTreeSyncError" class="text-xs text-rose-600 dark:text-rose-400">
+        ⚠️ {{ cityTreeSyncError }}
+      </p>
+      <p v-else-if="cityTreeSyncMessage" role="status" class="text-xs text-emerald-600 dark:text-emerald-400">
+        {{ cityTreeSyncMessage }}
+      </p>
+      <p v-if="cityTreeOverlay" class="text-[11px] text-slate-500 dark:text-slate-400">
+        Active runtime overlay updated: {{ cityTreeOverlay.updatedAt }}
       </p>
     </section>
 

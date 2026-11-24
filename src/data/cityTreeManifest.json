@@ -1,0 +1,33 @@
+{
+  "updatedAt": "2026-11-21T04:22:53.975Z",
+  "configs": {
+    "building": {
+      "md5": "0dee21454ed4e7330c4aa536861a3a4f",
+      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/building/0dee21454ed4e7330c4aa536861a3a4f.json"
+    },
+    "buildingLevel": {
+      "md5": "f7c453c6bdcbf838cdad7784da97be10",
+      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/buildingLevel/f7c453c6bdcbf838cdad7784da97be10.json"
+    },
+    "buildingGroups": {
+      "md5": "0554fcd11555c4706c0b440138c16779",
+      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/buildingGroups/0554fcd11555c4706c0b440138c16779.json"
+    },
+    "personalResearch": {
+      "md5": "425c231329ff4019db45b26d11344492",
+      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/personalResearch/425c231329ff4019db45b26d11344492.json"
+    },
+    "personalResearchLevel": {
+      "md5": "b587adca0646f9a24abf202da822c321",
+      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/personalResearchLevel/b587adca0646f9a24abf202da822c321.json"
+    },
+    "personalResearchType": {
+      "md5": "2e86de14b4b42786d2d2db7f848a0c3f",
+      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/personalResearchType/2e86de14b4b42786d2d2db7f848a0c3f.json"
+    },
+    "strategicLocalization": {
+      "md5": "5987ba26eadb03754697acb5494551a4",
+      "url": "https://hwmb-remote-config-cdn.nextersglobal.com/config/strategicLocalization_en/5987ba26eadb03754697acb5494551a4.json"
+    }
+  }
+}

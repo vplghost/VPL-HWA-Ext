@@ -5,21 +5,17 @@
  * zero server RPCs, power-based hero pruning, early-exit screening, and Elo rating.
  */
 
+import {
+  DEFAULT_ARENA_BATTLE_FEATURES,
+  DEFAULT_ARENA_BATTLE_EFFECTS,
+} from '../data/arenaBattleEffects.ts';
+
+export { DEFAULT_ARENA_BATTLE_FEATURES, DEFAULT_ARENA_BATTLE_EFFECTS };
+
 export const PVP_OPTIMIZER_STORAGE_KEY = 'pvpOptimizerLastResult';
 export const DEFAULT_PVP_MATCH_ROUNDS = 10;
 export const BASE_ELO = 1500;
 export const ELO_K_FACTOR = 32;
-
-export const DEFAULT_ARENA_BATTLE_FEATURES: readonly string[] = [
-  'battleFeature_202',
-  'battleFeature_204',
-  'battleFeature_207',
-  'battleFeature_208',
-  'battleFeature_209',
-  'battleFeature_212',
-  'battleFeature_213',
-  'battleFeature_214',
-];
 
 export interface BattleEnvelopeTemplate {
   userId?: string | number;
@@ -364,11 +360,16 @@ export function buildSyntheticArenaBattle(
     attackers[String(nId)] = normalizeBattleHero(nId, hydrated[String(nId)], lookupHero(heroMap, nId));
   }
   const defenders: Record<string, any> = {};
-  for (const id of defenderIds) {
-    const nId = Number(id);
-    defenders[String(nId)] = normalizeBattleHero(nId, hydrated[String(nId)], lookupHero(heroMap, nId));
+  for (let idx = 0; idx < defenderIds.length; idx++) {
+    const nId = Number(defenderIds[idx]);
+    // Live customArena_startBattle keys defenders[0] by 1-indexed slot ("1".."5"), while hero.id holds the hero ID
+    defenders[String(idx + 1)] = normalizeBattleHero(nId, hydrated[String(nId)], lookupHero(heroMap, nId));
   }
   const tpl = opts.battleTemplate;
+  const tplEffects =
+    tpl?.battleEffects && typeof tpl.battleEffects === 'object' && Object.keys(tpl.battleEffects).length > 0
+      ? tpl.battleEffects
+      : DEFAULT_ARENA_BATTLE_EFFECTS;
   return {
     userId: String(opts.userId ?? tpl?.userId ?? '1'),
     typeId: 1,
@@ -381,10 +382,7 @@ export function buildSyntheticArenaBattle(
       Array.isArray(tpl?.battleFeatures) && tpl.battleFeatures.length > 0
         ? [...tpl.battleFeatures]
         : [...DEFAULT_ARENA_BATTLE_FEATURES],
-    battleEffects:
-      tpl?.battleEffects && typeof tpl.battleEffects === 'object'
-        ? tpl.battleEffects
-        : {},
+    battleEffects: tplEffects,
     attackers,
     defenders: [defenders],
   };
