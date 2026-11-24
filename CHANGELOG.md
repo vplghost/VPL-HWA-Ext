@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.256 — 2026-11-24
+
+### Added
+
+- **Typed `RuntimeEventBus`, `ResourceLockManager` & Modular Background Handlers (`eventBus.ts`, `resourceLock.ts`, `draftHandler.ts`, `queueDispatcher.ts`, `backgroundRuntime.ts`)**:
+  - Added `RuntimeEventBus` (`src/background/eventBus.ts`) to dispatch every record in `api-record-batch` sequentially by RPC/MQTT topic with a single source-of-truth `liveCache` (eliminating stale disk reads in `updateRaidQueue` and `updateMonsterQueue`).
+  - Added `ResourceLockManager` (`src/background/resourceLock.ts`) with TTL auto-expiry to coordinate hero squad and march slot reservations across parallel automations (`raidQueue`, `monsterQueue`, `autoGather`) and persist `activeResourceLocks`.
+  - Extracted `src/background/handlers/draftHandler.ts` and `src/background/handlers/queueDispatcher.ts` out of `backgroundRuntime.ts` while preserving full backwards compatibility.
+
 ## 0.11.254 — 2026-11-24
 
 ### Added

@@ -31,6 +31,10 @@ import { extractDraftHeroSteps, extractDraftSwapHeroIds, extractDraftHeroDetails
 import { getRecorderStore } from './storage/recorderDb.ts';
 import { pruneRpcCache } from '../core/cache/cachePruner.ts';
 import { runtimeTelemetry, collectStorageTelemetry } from './telemetry.ts';
+import { createRuntimeEventBus } from './eventBus.ts';
+import { resourceLockManager } from './resourceLock.ts';
+import { handleDraftMessage, DRAFT_MESSAGE_KINDS } from './handlers/draftHandler.ts';
+import { registerQueueListeners } from './handlers/queueDispatcher.ts';
 
 export const RECORD_STATE_KEY = 'recordingState';
 export const RECORD_PREFIX = 'record:';
@@ -1492,18 +1496,19 @@ export async function saveMonsterTransition(transition: any, stored: any, custom
   return state;
 }
 
-export async function updateMonsterQueue(record: any, tabId: number, customChrome?: any) {
+export async function updateMonsterQueue(record: any, tabId: number, customChrome?: any, liveCache?: Record<string, any>) {
   const cr = getActiveChrome(customChrome);
   const stored =
     (await cr?.storage?.local?.get([
       'monsterQueue',
-      'rpcCache',
+      ...(liveCache ? [] : ['rpcCache']),
       'popupRpcEnabled',
       'socketRefreshMode',
       'captureSettings',
       'troopCapacitySettings',
       'smartGatherState'
     ])) || {};
+  if (liveCache) stored.rpcCache = liveCache;
   if (stored.monsterQueue?.phase === 'waiting_gather' && stored.monsterQueue.tabId === tabId)
     return advanceGatherQueue('monster', record, stored, tabId, cr);
   if (monsterQueueService.terminal(stored.monsterQueue) || stored.monsterQueue.tabId !== tabId) return stored.monsterQueue;
@@ -4102,107 +4107,9 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       sendResponse({ ok: true });
       return true;
     }
-    if (['draft-decrypted', 'draft-decrypt-error', 'draft-rpc-event', 'draft-mqtt-event'].includes(message?.kind)) {
-      try {
-        cr.storage?.local?.get(['autoOpenDraftDialog', 'legendsDraftSession'], (stored: any) => {
-          const autoOpen = stored?.autoOpenDraftDialog !== false;
-          let session = stored?.legendsDraftSession || {};
-          let shouldAutoOpen = false;
-
-          if (message.kind === 'draft-decrypted') {
-            const dto = message.data?.draft;
-            const heroSteps = extractDraftHeroSteps(dto);
-            const swapHeroIds = extractDraftSwapHeroIds(dto);
-            const heroDetails = extractDraftHeroDetails(dto);
-            session = {
-              ...session,
-              heroSteps: heroSteps.length > 0 ? heroSteps : (session.heroSteps || []),
-              swapHeroIds: (swapHeroIds.length > 0 || (dto && 'swap' in dto)) ? swapHeroIds : (session.swapHeroIds || []),
-              heroDetails: Object.keys(heroDetails).length > 0
-                ? { ...(session.heroDetails || {}), ...heroDetails }
-                : (session.heroDetails || {}),
-              chosenDefenceHeroes: dto?.chosenDefenceHeroes || session.chosenDefenceHeroes || [],
-              chosenAttackHeroes: dto?.chosenAttackHeroes || session.chosenAttackHeroes || [],
-              stageFinishTs: dto?.stageFinishTs || session.stageFinishTs,
-              gameTimeTs: dto?.gameTimeTs || session.gameTimeTs,
-              rawDecrypted: message.data?.raw || session.rawDecrypted || null,
-              error: null,
-              errorDetail: null,
-              updatedAt: Date.now()
-            };
-            shouldAutoOpen = true;
-          } else if (message.kind === 'draft-rpc-event') {
-            const action = String(message.data?.action || '');
-            const resp = message.data?.response;
-            if (action === 'randomDraft_register') {
-              session = {
-                ...session,
-                stageId: 1,
-                error: null,
-                errorDetail: null,
-                updatedAt: Date.now()
-              };
-              shouldAutoOpen = true;
-            }
-            if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
-              if (resp.matchId != null && resp.matchId !== session.matchId) {
-                session.heroSteps = [];
-                session.swapHeroIds = [];
-                session.heroDetails = {};
-                session.chosenDefenceHeroes = [];
-                session.chosenAttackHeroes = [];
-              }
-              const nextStageId = resp.stageId != null ? Number(resp.stageId) : session.stageId;
-              session = {
-                ...session,
-                matchId: resp.matchId != null ? Number(resp.matchId) : session.matchId,
-                stageId: nextStageId,
-                stageFinishTs: resp.stageFinishTs != null ? Number(resp.stageFinishTs) : session.stageFinishTs,
-                userRating: resp.rating?.userRating != null ? Number(resp.rating.userRating) : session.userRating,
-                enemyRating: resp.rating?.enemyRating != null ? Number(resp.rating.enemyRating) : session.enemyRating,
-                enemyUser: resp.enemyUser ? { ...resp.enemyUser } : session.enemyUser,
-                rawCiphertext: resp.draft || session.rawCiphertext,
-                updatedAt: Date.now()
-              };
-              if (nextStageId != null && [1, 2, 3, 4, 5].includes(nextStageId)) {
-                shouldAutoOpen = true;
-              }
-            }
-          } else if (message.kind === 'draft-mqtt-event') {
-            const eventType = String(message.data?.eventType || '');
-            session = {
-              ...session,
-              lastMqttEventType: eventType || 'randomDraft_statusChanged',
-              updatedAt: Date.now()
-            };
-            if (!eventType || eventType.startsWith('randomDraft_')) {
-              shouldAutoOpen = true;
-            }
-          } else if (message.kind === 'draft-decrypt-error') {
-            session = {
-              ...session,
-              error: message.data?.error || 'Decryption error',
-              errorDetail: message.data?.detail || null,
-              rawDecrypted: message.data?.raw || session.rawDecrypted || null,
-              updatedAt: Date.now()
-            };
-            shouldAutoOpen = true;
-          }
-
-          if (autoOpen && shouldAutoOpen) {
-            session = {
-              ...session,
-              autoOpenNonce: Date.now()
-            };
-          }
-
-          cr.storage?.local?.set?.({ legendsDraftSession: session })?.catch?.(() => {});
-
-          if (autoOpen && shouldAutoOpen) {
-            cr.runtime?.sendMessage?.({ kind: 'open-draft-dialog', session })?.catch?.(() => {});
-          }
-        });
-      } catch (_) {}
+    // Delegates 'draft-decrypted', 'draft-decrypt-error', 'draft-rpc-event', 'draft-mqtt-event' (stamps autoOpenNonce)
+    if (DRAFT_MESSAGE_KINDS.has(message?.kind)) {
+      handleDraftMessage(message, cr);
       sendResponse?.({ ok: true });
       return true;
     }
@@ -4329,13 +4236,23 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         eventCatalogService.syncRemoteEventCatalog(cacheResult.cache.remoteConfigStatus.data, cr.storage.local).catch(() => {});
       }
       if (sender.tab?.id) {
+        const runtimeEventBus = createRuntimeEventBus();
+        registerQueueListeners(runtimeEventBus, {
+          updateRaidQueue,
+          updateMonsterQueue,
+          updateTowerRun,
+          updateDungeonRun,
+          advanceBuildingQueue,
+          advanceResearchQueue,
+        });
+        const dispatchNow = Date.now();
         for (const rec of records) {
-          await updateRaidQueue(rec, sender.tab.id, cr, cacheResult.cache);
-          await updateMonsterQueue(rec, sender.tab.id, cr);
-          await updateTowerRun(rec, sender.tab.id, cr);
-          await updateDungeonRun(rec, sender.tab.id, cr);
-          await advanceBuildingQueue(sender.tab.id, rec, cr);
-          await advanceResearchQueue(sender.tab.id, rec, cr);
+          await runtimeEventBus.dispatchRecord(rec, {
+            tabId: sender.tab.id,
+            liveCache: cacheResult.cache,
+            chrome: cr,
+            now: dispatchNow,
+          });
         }
       }
       if (sender.tab?.id && cacheResult.changed) {
@@ -4360,6 +4277,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         }
       }
       Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue', 'customTeams', 'troopCapacitySettings']));
+      resourceLockManager.syncFromQueueStates({ raidQueue: stored.raidQueue, monsterQueue: stored.monsterQueue });
+      if (resourceLockManager.getSnapshot().length > 0) {
+        void resourceLockManager.persistSnapshot(cr);
+      }
       let defenseHold = false;
       let evaluatedDefense: any = null;
       if (sender.tab?.id && stored.autoGatherSettings?.enabled && stored.autoGatherSettings?.smartEnabled) {
