@@ -28,6 +28,9 @@ import { eventCatalogService } from '../services/eventCatalogService.ts';
 import { buildAutoTrainCalls, getNextTroopTrainWakeAt, needsTroopTrainingRefresh, TROOP_DEFS } from '../utils/troops.ts';
 import { observedToday } from '../composables/activityState.ts';
 import { extractDraftHeroSteps, extractDraftSwapHeroIds, extractDraftHeroDetails } from '../utils/draftHelper.ts';
+import { getRecorderStore } from './storage/recorderDb.ts';
+import { pruneRpcCache } from '../core/cache/cachePruner.ts';
+import { runtimeTelemetry, collectStorageTelemetry } from './telemetry.ts';
 
 export const RECORD_STATE_KEY = 'recordingState';
 export const RECORD_PREFIX = 'record:';
@@ -103,6 +106,8 @@ let dirtyGuildChat = false;
 let isFlushingRpcCache = false;
 let rpcFlushTimer: any = null;
 let lastStorageChrome: any = null;
+let lastAutoPruneAt = 0;
+const AUTO_PRUNE_INTERVAL_MS = 5 * 60_000;
 
 export function setRpcDebounceMs(ms: number) {
   activeRpcDebounceMs = Math.max(0, ms);
@@ -194,14 +199,21 @@ export async function flushRpcCacheImmediate(customChrome?: any): Promise<void> 
     }
 
     if (writeCore || isNodeTest) {
+      const nowMs = Date.now();
+      if (!isNodeTest && nowMs - lastAutoPruneAt >= AUTO_PRUNE_INTERVAL_MS) {
+        lastAutoPruneAt = nowMs;
+        pruneRpcCache(rpc, nowMs);
+      }
       writes.rpcCache = rpc;
     }
   }
 
   if (Object.keys(writes).length === 0) return;
   isFlushingRpcCache = true;
+  const flushStart = Date.now();
   try {
     await cr.storage.local.set(writes).catch(() => {});
+    runtimeTelemetry.recordFlush(Date.now() - flushStart);
   } finally {
     isFlushingRpcCache = false;
   }
@@ -2690,6 +2702,13 @@ export async function recordedEntries(customChrome?: any): Promise<[string, any]
   if (inMemoryApiRecords.length > 0) {
     return inMemoryApiRecords.map((r, i) => [`${RECORD_PREFIX}${i}`, r]);
   }
+  try {
+    const idb = await getRecorderStore().exportAll();
+    if (idb.records.length > 0) {
+      inMemoryApiRecords = idb.records;
+      return idb.records.map((r, i) => [`${RECORD_PREFIX}${i}`, r]);
+    }
+  } catch (_) {}
   const cr = getActiveChrome(customChrome);
   const stored = (await cr?.storage?.session?.get?.(null)?.catch?.(() => ({}))) || {};
   return Object.entries(stored)
@@ -2700,6 +2719,7 @@ export async function recordedEntries(customChrome?: any): Promise<[string, any]
 export async function clearRecorded(customChrome?: any) {
   const prevCount = Math.max(inMemoryApiRecords.length, inMemoryRecordState.nextIndex || 0);
   inMemoryApiRecords = [];
+  await getRecorderStore().clear().catch(() => {});
   const cr = getActiveChrome(customChrome);
   if (prevCount > 0 && cr?.storage?.session?.remove) {
     const keys: string[] = [];
@@ -2717,6 +2737,13 @@ export async function interactionEntries(customChrome?: any): Promise<[string, a
   if (inMemoryInteractions.length > 0) {
     return inMemoryInteractions.map((r, i) => [`${INTERACTION_PREFIX}${i}`, r]);
   }
+  try {
+    const idb = await getRecorderStore().exportAll();
+    if (idb.interactions.length > 0) {
+      inMemoryInteractions = idb.interactions;
+      return idb.interactions.map((r, i) => [`${INTERACTION_PREFIX}${i}`, r]);
+    }
+  } catch (_) {}
   const count = Number(inMemoryRecordState.nextInteractionIndex) || 0;
   if (count <= 0) return [];
   const cr = getActiveChrome(customChrome);
@@ -2844,10 +2871,15 @@ export async function saveInteraction(entry: any, cr: any): Promise<any> {
   }
   inMemoryInteractions.push(entry);
   inMemoryRecordState.nextInteractionIndex = index + 1;
-  if (cr?.storage?.local?.set) {
+  try {
+    await getRecorderStore().appendInteraction(entry);
+  } catch (_) {}
+  if (cr?.storage?.session?.set) {
+    await cr.storage.session.set({ [RECORD_STATE_KEY]: { ...inMemoryRecordState, active: true } }).catch(() => {});
+  }
+  if (cr?.storage?.local?.set && getRecorderStore().backend === 'memory' && isNodeTest) {
     try {
       await cr.storage.local.set({ [`${INTERACTION_PREFIX}${index}`]: entry });
-      await cr.storage.session?.set?.({ [RECORD_STATE_KEY]: { ...inMemoryRecordState, active: true } });
     } catch (error) {
       inMemoryRecordState.active = false;
       inMemoryRecordState.error = 'Local interaction storage is full. Export the current log.';
@@ -3624,6 +3656,37 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       handleControl(mappedKind, cr).then(sendResponse, (error) => sendResponse({ error: String(error) }));
       return true;
     }
+    if (message?.kind === 'get-storage-telemetry' && isAllowedOrigin) {
+      collectStorageTelemetry(cr, getRecorderStore())
+        .then(sendResponse, (error) => sendResponse({ error: String(error) }));
+      return true;
+    }
+    if (message?.kind === 'compact-storage-cache' && isAllowedOrigin) {
+      (async () => {
+        const allLocal: Record<string, any> = (await cr?.storage?.local?.get?.(null)?.catch?.(() => ({}))) || {};
+        const cache = inMemoryRpcCache ? { ...inMemoryRpcCache } : { ...(allLocal.rpcCache || {}) };
+        const pruneRes = pruneRpcCache(cache, Date.now());
+        if (pruneRes.changed) {
+          inMemoryRpcCache = cache;
+          await cr?.storage?.local?.set?.({ rpcCache: cache })?.catch?.(() => {});
+        }
+        const legacyKeys = Object.keys(allLocal).filter(
+          (k) => k.startsWith(RECORD_PREFIX) || k.startsWith(INTERACTION_PREFIX)
+        );
+        if (legacyKeys.length > 0) {
+          await cr?.storage?.local?.remove?.(legacyKeys)?.catch?.(() => {});
+        }
+        const snapshot = await collectStorageTelemetry(cr, getRecorderStore());
+        return {
+          ok: true,
+          removedCount: pruneRes.removedCount,
+          details: pruneRes.details,
+          legacyKeysRemoved: legacyKeys.length,
+          snapshot,
+        };
+      })().then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
+      return true;
+    }
     if (message?.kind === 'record-status' && isAllowedOrigin) {
       ensureRecordingHydrated(cr)
         .then(() => {
@@ -4153,6 +4216,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       return;
     }
     const record = records[records.length - 1];
+    runtimeTelemetry.recordBridgeLatency(record?.timestamp);
     for (const rec of records) {
       if (rec.responseBody && rec.responseBody.includes('"version"')) {
         try {
@@ -4527,8 +4591,9 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       for (let i = 0; i < records.length; i++) {
         const rec = records[i];
         inMemoryApiRecords.push(rec);
-        sessionWrites[`${RECORD_PREFIX}${startIdx + i}`] = rec;
+        if (isNodeTest) sessionWrites[`${RECORD_PREFIX}${startIdx + i}`] = rec;
       }
+      await getRecorderStore().appendApiRecords(records).catch(() => {});
       inMemoryRecordState.nextIndex = startIdx + records.length;
       sessionWrites[RECORD_STATE_KEY] = { ...inMemoryRecordState, active: true };
 

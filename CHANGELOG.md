@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.254 — 2026-11-24
+
+### Added
+
+- **IndexedDB Recorder Offload, `rpcCache` TTL Auto-Pruning & Storage/Latency Telemetry (`recorderDb.ts`, `cachePruner.ts`, `telemetry.ts`, `backgroundRuntime.ts`, `SettingsTab.vue`)**:
+  - Offloaded Game Window Recorder `apiEntries` and `interactionEntries` to IndexedDB (`hwaRecorderDb`) with an automatic `InMemoryRecorderStore` fallback for Node.js tests, keeping `chrome.storage.local` free from multi-MB recording dumps.
+  - Added `pruneRpcCache()` (`CACHE_PRUNE_LIMITS`) to automatically cap and expire stale history partitions (`resourceActionHistory`, `createdRalliesHistory`, `brigandCampHistory`, `guildChat`, `battleReports`).
+  - Added `RuntimeTelemetryTracker` + `collectStorageTelemetry()` and a **Storage & Runtime Telemetry** card (`#storage-telemetry-card`) in `SettingsTab.vue` showing 10 MB quota usage (warning at ≥ 70%), partition breakdown, Avg/P95 bridge latency, disk flushes/min, and a 1-click **Compact Cache** action.
+
 ## 0.11.252 — 2026-11-24
 
 ### Added

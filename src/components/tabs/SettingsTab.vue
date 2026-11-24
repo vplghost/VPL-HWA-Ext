@@ -88,6 +88,52 @@ async function resetWasmOverride() {
   wasmOverrideActive.value = false;
   wasmOverrideStatus.value = `Reset to built-in WASM profile v${wasmProfileVersion}.`;
 }
+
+// Storage & Runtime Telemetry (P1-03)
+const storageTelemetry = ref<any>(null);
+const storageTelemetryLoading = ref(false);
+const storageCompactPending = ref(false);
+const storageCompactMessage = ref('');
+
+function formatBytes(bytes: number | undefined): string {
+  const b = Number(bytes) || 0;
+  if (b >= 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+  if (b >= 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${b} B`;
+}
+
+async function refreshStorageTelemetry() {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  storageTelemetryLoading.value = true;
+  try {
+    const res = await chrome.runtime.sendMessage({ kind: 'get-storage-telemetry' });
+    if (res && typeof res === 'object' && !res.error) {
+      storageTelemetry.value = res;
+    }
+  } catch (_) {
+  } finally {
+    storageTelemetryLoading.value = false;
+  }
+}
+
+async function compactStorageCache() {
+  if (storageCompactPending.value || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  storageCompactPending.value = true;
+  storageCompactMessage.value = '';
+  try {
+    const res = await chrome.runtime.sendMessage({ kind: 'compact-storage-cache' });
+    if (res?.ok) {
+      storageCompactMessage.value = `Compacted cache (${res.removedCount || 0} stale entries pruned, ${res.legacyKeysRemoved || 0} legacy recorder keys removed).`;
+      if (res.snapshot) storageTelemetry.value = res.snapshot;
+    } else {
+      storageCompactMessage.value = res?.error || 'Compact cache failed.';
+    }
+  } catch (err: any) {
+    storageCompactMessage.value = err?.message || String(err);
+  } finally {
+    storageCompactPending.value = false;
+  }
+}
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
 const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
@@ -317,6 +363,7 @@ onMounted(async () => {
         tabSettings.value = result;
       }
       await loadTroopTrainSettings();
+      void refreshStorageTelemetry();
     } catch (_) {}
   }
   if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
@@ -1101,6 +1148,119 @@ async function toggleRecording() {
         </div>
       </div>
     </section>
+    <!-- Storage & Runtime Telemetry -->
+    <section
+      id="storage-telemetry-card"
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3"
+    >
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+            <span>💾</span> Storage & Runtime Telemetry
+          </h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            Chrome storage partition usage, IndexedDB recorder offload, and bridge-to-background latency.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            id="btn-refresh-telemetry"
+            type="button"
+            :disabled="storageTelemetryLoading"
+            class="cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 disabled:opacity-50"
+            @click="refreshStorageTelemetry"
+          >
+            {{ storageTelemetryLoading ? 'Refreshing...' : 'Refresh' }}
+          </button>
+          <button
+            id="btn-compact-cache"
+            type="button"
+            :disabled="storageCompactPending"
+            class="cursor-pointer rounded-md bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+            @click="compactStorageCache"
+          >
+            {{ storageCompactPending ? 'Compacting...' : 'Compact Cache' }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="storageTelemetry" class="space-y-2.5 text-xs">
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-slate-700 dark:text-slate-300">
+              chrome.storage.local Quota
+            </span>
+            <span class="font-mono">
+              {{ formatBytes(storageTelemetry.storageUsedBytes) }} / {{ formatBytes(storageTelemetry.storageQuotaBytes) }}
+              ({{ storageTelemetry.storageUsagePct }}%)
+              <span
+                v-if="storageTelemetry.quotaWarning"
+                id="storage-quota-warning"
+                class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+              >
+                High Usage
+              </span>
+            </span>
+          </div>
+          <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+            <div
+              class="h-full transition-all"
+              :class="
+                storageTelemetry.storageUsagePct >= 85
+                  ? 'bg-rose-500'
+                  : storageTelemetry.storageUsagePct >= 70
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+              "
+              :style="{ width: Math.min(100, storageTelemetry.storageUsagePct || 0) + '%' }"
+            ></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div class="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 p-2">
+            <div class="text-[10px] text-slate-500">Avg / P95 Latency</div>
+            <div class="font-mono font-bold text-slate-800 dark:text-slate-100">
+              {{ storageTelemetry.avgBridgeLatencyMs }}ms / {{ storageTelemetry.p95BridgeLatencyMs }}ms
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 p-2">
+            <div class="text-[10px] text-slate-500">Disk Flushes / min</div>
+            <div class="font-mono font-bold text-slate-800 dark:text-slate-100">
+              {{ storageTelemetry.flushesPerMinute }} ({{ storageTelemetry.avgFlushDurationMs }}ms avg)
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 p-2">
+            <div class="text-[10px] text-slate-500">Recorder Store</div>
+            <div class="font-mono font-bold text-slate-800 dark:text-slate-100 uppercase">
+              {{ storageTelemetry.recorderBackend }}
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 p-2">
+            <div class="text-[10px] text-slate-500">Recorded Entries</div>
+            <div class="font-mono font-bold text-slate-800 dark:text-slate-100">
+              {{ storageTelemetry.recorderCounts?.apiCount || 0 }} API · {{ storageTelemetry.recorderCounts?.interactionCount || 0 }} UI
+            </div>
+          </div>
+        </div>
+
+        <div v-if="storageTelemetry.partitions?.length" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
+          <div
+            v-for="part in storageTelemetry.partitions"
+            :key="part.name"
+            class="flex items-center justify-between px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/70 font-mono text-[11px]"
+          >
+            <span class="truncate text-slate-600 dark:text-slate-300">{{ part.name }}</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-100">{{ formatBytes(part.bytes) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <p v-if="storageCompactMessage" role="status" class="text-xs text-emerald-600 dark:text-emerald-400">
+        {{ storageCompactMessage }}
+      </p>
+    </section>
+
     <!-- Session Profiling & Recording -->
     <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xs">
       <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
