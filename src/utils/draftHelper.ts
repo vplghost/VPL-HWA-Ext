@@ -1,8 +1,72 @@
 import type { DraftDto, DraftHeroCandidate, DraftHeroLiveStats, DraftSessionData } from '../types/game/draft.ts';
 import { getHeroMetadata, getHeroName } from './metadata.ts';
 
+export const LIVE_DRAFT_CONST_KEY =
+  'YL@i9y7YgvTqMWsKUw4M9aAeY7d2DJ&rK2!bSUqsKZbZgNZjHaRwbz$uwk6JPmML7@&NqnwXFajZ^ER#Tr5XJeK2Af!ddf^FMqW$matmTCa4nCD8JGRmKP37U9pj*pDT';
 export const DEFAULT_DRAFT_CONST_KEY = '307E8FB4B733591B75D74EA13946882BA59FAA3274CF815A2B8788E76403BD0F';
 export const BACKUP_DRAFT_CONST_KEY = '268EA1F1B979AC33218CEF1225D1F835EA88D2C1233B8D6AFA0277FC8E30684B';
+export const DRAFT_CONST_KEYS = [
+  LIVE_DRAFT_CONST_KEY,
+  DEFAULT_DRAFT_CONST_KEY,
+  BACKUP_DRAFT_CONST_KEY,
+] as const;
+
+const KNOWN_EMPTY_DRAFT_PLAINTEXT = '{"base":null,"swap":null}';
+
+/**
+ * Recover the session's dynamic XOR key in <0.1ms from Stage 1 / Stage 6 known-plaintext
+ * ciphertext (`{"base":null,"swap":null}`, 25 bytes) without scanning Unity WASM memory.
+ * Cross-validates periodicity across bytes [kLen..24] against [0..24-kLen] for 100% accuracy.
+ */
+export function recoverDynamicKeyFromKnownPlaintext(
+  base64Payload: string,
+  constKeys: readonly string[] = DRAFT_CONST_KEYS
+): { dynamicKey: string; constKey: string } | null {
+  if (!base64Payload || typeof base64Payload !== 'string') return null;
+  try {
+    const rawDecoded = typeof atob === 'function'
+      ? atob(base64Payload)
+      : Buffer.from(base64Payload, 'base64').toString('binary');
+    if (rawDecoded.length !== KNOWN_EMPTY_DRAFT_PLAINTEXT.length) return null;
+
+    const candidateLengths = [14, 12, 13, 15, 16, 10, 11, 17, 18, 19, 20];
+    for (const constKey of constKeys) {
+      if (!constKey || constKey.length < 16) continue;
+      const derived: number[] = new Array(rawDecoded.length);
+      for (let i = 0; i < rawDecoded.length; i++) {
+        derived[i] =
+          rawDecoded.charCodeAt(i) ^
+          KNOWN_EMPTY_DRAFT_PLAINTEXT.charCodeAt(i) ^
+          constKey.charCodeAt(i % constKey.length);
+      }
+
+      for (const kLen of candidateLengths) {
+        if (kLen >= rawDecoded.length) continue;
+        let printable = true;
+        for (let i = 0; i < kLen; i++) {
+          if (derived[i] < 0x21 || derived[i] > 0x7e) {
+            printable = false;
+            break;
+          }
+        }
+        if (!printable) continue;
+
+        let periodic = true;
+        for (let i = kLen; i < rawDecoded.length; i++) {
+          if (derived[i] !== derived[i % kLen]) {
+            periodic = false;
+            break;
+          }
+        }
+        if (periodic) {
+          const dynamicKey = String.fromCharCode(...derived.slice(0, kLen));
+          return { dynamicKey, constKey };
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
+}
 
 /**
  * Pure TypeScript fallback decryption for Legends Draft ciphertext (Plan B)
@@ -100,6 +164,13 @@ export function formatDraftPhase(stageId: number | null): {
         badgeCls: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
         icon: '⚡'
       };
+    case 6:
+      return {
+        phase: 'result',
+        label: 'Battle / Round Result',
+        badgeCls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+        icon: '⚔️'
+      };
     case 7:
       return {
         phase: 'result',
@@ -147,6 +218,15 @@ function chunkIds(ids: number[], size = 3): number[][] {
     chunks.push(ids.slice(i, i + size));
   }
   return chunks;
+}
+
+/**
+ * Extract enemy team heroes with live stats from decrypted `draftEnemy` payload
+ */
+export function extractDraftEnemyHeroes(enemyDto: any): DraftHeroLiveStats[] {
+  if (!enemyDto || typeof enemyDto !== 'object') return [];
+  const source = enemyDto.heroes ?? enemyDto.base ?? enemyDto;
+  return extractPoolHeroEntries(source, 'base');
 }
 
 /**

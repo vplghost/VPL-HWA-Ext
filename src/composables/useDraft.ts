@@ -6,6 +6,7 @@ import {
   extractDraftHeroSteps,
   extractDraftSwapHeroIds,
   extractDraftHeroDetails,
+  extractDraftEnemyHeroes,
 } from '../utils/draftHelper.ts';
 import { useModals } from './useModals.ts';
 
@@ -22,10 +23,13 @@ const createDefaultSession = (): DraftSessionData => ({
   heroSteps: [],
   swapHeroIds: [],
   heroDetails: {},
+  enemyHeroes: [],
   chosenDefenceHeroes: [],
   chosenAttackHeroes: [],
   rawCiphertext: null,
+  rawEnemyCiphertext: null,
   rawDecrypted: null,
+  decryptMethod: null,
   error: null,
   errorDetail: null,
   updatedAt: Date.now()
@@ -70,20 +74,26 @@ export function useDraft() {
   /**
    * Bind decrypted data (e.g. from Native WASM Table Index 330804 Hook)
    */
-  function bindDecryptedData(dto: DraftDto, rawText?: string) {
+  function bindDecryptedData(
+    dto: DraftDto,
+    rawText?: string,
+    extra?: { enemyDraft?: any; method?: string | null; stageId?: number | null; matchId?: number | null }
+  ) {
     if (!dto) return;
 
     const extractedSteps = extractDraftHeroSteps(dto);
-    if (extractedSteps.length > 0) {
+    const hasCandidates = extractedSteps.length > 0;
+    if (hasCandidates) {
       draftSession.heroSteps = extractedSteps;
-    }
-    const extractedSwaps = extractDraftSwapHeroIds(dto);
-    if (extractedSwaps.length > 0 || (dto && ('swap' in dto))) {
-      draftSession.swapHeroIds = extractedSwaps;
+      draftSession.swapHeroIds = extractDraftSwapHeroIds(dto);
     }
     const extractedDetails = extractDraftHeroDetails(dto);
     if (Object.keys(extractedDetails).length > 0) {
       draftSession.heroDetails = { ...(draftSession.heroDetails || {}), ...extractedDetails };
+    }
+    const extractedEnemy = extractDraftEnemyHeroes(extra?.enemyDraft);
+    if (extractedEnemy.length > 0) {
+      draftSession.enemyHeroes = extractedEnemy;
     }
     if (Array.isArray(dto.chosenDefenceHeroes)) {
       draftSession.chosenDefenceHeroes = [...dto.chosenDefenceHeroes];
@@ -100,6 +110,9 @@ export function useDraft() {
     if (rawText) {
       draftSession.rawDecrypted = rawText;
     }
+    if (extra?.method) {
+      draftSession.decryptMethod = extra.method;
+    }
 
     // Clear previous errors if decrypt succeeded
     draftSession.error = null;
@@ -108,16 +121,16 @@ export function useDraft() {
 
     persistSession();
 
-    if (autoOpenDraft.value) {
+    if (autoOpenDraft.value && (hasCandidates || extractedEnemy.length > 0)) {
       openModal('legendsDraft');
     }
   }
 
   /**
-   * Bind RPC event (e.g. randomDraft_getInfo / randomDraft_register response)
+   * Bind RPC event (e.g. randomDraft_getInfo / randomDraft_register / saveDefence / saveAttack)
    */
-  function bindRpcEvent(resp: any, action?: string) {
-    if (!resp && action !== 'randomDraft_register') return;
+  function bindRpcEvent(resp: any, action?: string, args?: any) {
+    if (!resp && action !== 'randomDraft_register' && action !== 'randomDraft_saveDefence' && action !== 'randomDraft_saveAttack') return;
 
     if (action === 'randomDraft_register') {
       draftSession.stageId = 1;
@@ -126,14 +139,21 @@ export function useDraft() {
       draftSession.phaseLabel = phaseInfo.label;
       draftSession.error = null;
       draftSession.errorDetail = null;
+    } else if (action === 'randomDraft_saveDefence' && Array.isArray(args?.heroes)) {
+      const picked = args.heroes.map((v: any) => Number(v)).filter((n: number) => Number.isFinite(n) && n > 0);
+      if (picked.length > 0) draftSession.chosenDefenceHeroes = picked;
+    } else if (action === 'randomDraft_saveAttack' && Array.isArray(args?.heroes)) {
+      const picked = args.heroes.map((v: any) => Number(v)).filter((n: number) => Number.isFinite(n) && n > 0);
+      if (picked.length > 0) draftSession.chosenAttackHeroes = picked;
     }
 
     if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
       // If new match detected, reset steps as new session
-      if (resp.matchId != null && resp.matchId !== draftSession.matchId) {
+      if (resp.matchId != null && Number(resp.matchId) !== Number(draftSession.matchId)) {
         draftSession.heroSteps = [];
         draftSession.swapHeroIds = [];
         draftSession.heroDetails = {};
+        draftSession.enemyHeroes = [];
         draftSession.chosenDefenceHeroes = [];
         draftSession.chosenAttackHeroes = [];
         draftSession.error = null;
@@ -170,6 +190,9 @@ export function useDraft() {
       if (resp.draft) {
         draftSession.rawCiphertext = resp.draft;
       }
+      if (resp.draftEnemy) {
+        draftSession.rawEnemyCiphertext = resp.draftEnemy;
+      }
     }
 
     draftSession.updatedAt = Date.now();
@@ -200,6 +223,19 @@ export function useDraft() {
   function resetDraft() {
     Object.assign(draftSession, createDefaultSession());
     persistSession();
+  }
+
+  function retryDecrypt() {
+    if (!draftSession.rawCiphertext) return;
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({
+        kind: 'retry-draft-decrypt',
+        ciphertext: draftSession.rawCiphertext,
+        enemyCiphertext: draftSession.rawEnemyCiphertext || null,
+        stageId: draftSession.stageId,
+        matchId: draftSession.matchId
+      }).catch?.(() => {});
+    }
   }
 
   // Setup runtime listeners once
@@ -240,9 +276,14 @@ export function useDraft() {
         }
         openModal('legendsDraft');
       } else if (message?.kind === 'draft-decrypted') {
-        bindDecryptedData(message.data?.draft, message.data?.raw);
+        bindDecryptedData(message.data?.draft, message.data?.raw, {
+          enemyDraft: message.data?.enemyDraft,
+          method: message.data?.method,
+          stageId: message.data?.stageId,
+          matchId: message.data?.matchId,
+        });
       } else if (message?.kind === 'draft-rpc-event') {
-        bindRpcEvent(message.data?.response, message.data?.action);
+        bindRpcEvent(message.data?.response, message.data?.action, message.data?.args);
       } else if (message?.kind === 'draft-mqtt-event') {
         draftSession.updatedAt = Date.now();
         if (autoOpenDraft.value) {
@@ -266,6 +307,7 @@ export function useDraft() {
     bindRpcEvent,
     bindError,
     resetDraft,
+    retryDecrypt,
     loadSettings
   };
 }

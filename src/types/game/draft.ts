@@ -57,10 +57,13 @@ export interface DraftSessionData {
   heroSteps: number[][]; // 5 columns (rounds 1-5), each with 3 hero IDs
   swapHeroIds?: number[]; // Optional swap pool hero IDs from decrypted { base, swap } payload
   heroDetails?: Record<number, DraftHeroLiveStats>; // Per-hero live stats (power, star, level, color)
+  enemyHeroes?: DraftHeroLiveStats[]; // Decrypted enemy team heroes from draftEnemy (Stage 2 / Stage 4)
   chosenDefenceHeroes: number[];
   chosenAttackHeroes: number[];
   rawCiphertext?: string | null;
+  rawEnemyCiphertext?: string | null;
   rawDecrypted?: string | null;
+  decryptMethod?: string | null;
   error?: string | null;
   errorDetail?: string | null;
   updatedAt: number;

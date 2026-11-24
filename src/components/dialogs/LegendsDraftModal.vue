@@ -13,12 +13,21 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
 }>();
 
-const { draftSession } = useDraft();
+const { draftSession, retryDecrypt } = useDraft();
 
 const now = ref(Math.floor(Date.now() / 1000));
 let countdownTimer: any = null;
 const showDiagnostics = ref(false);
 const copiedDiagnostics = ref(false);
+const retryingDecrypt = ref(false);
+
+function handleRetryDecrypt() {
+  retryingDecrypt.value = true;
+  retryDecrypt();
+  setTimeout(() => {
+    retryingDecrypt.value = false;
+  }, 1500);
+}
 
 onMounted(() => {
   countdownTimer = setInterval(() => {
@@ -67,6 +76,19 @@ const swapCandidates = computed<DraftHeroCandidate[]>(() => {
   return draftSession.swapHeroIds.map((id) => buildDraftHeroCandidate(id, pickedSet, draftSession.heroDetails));
 });
 
+const enemyCandidates = computed<DraftHeroCandidate[]>(() => {
+  if (!Array.isArray(draftSession.enemyHeroes) || draftSession.enemyHeroes.length === 0) {
+    return [];
+  }
+  const detailsMap: Record<number, any> = {};
+  for (const h of draftSession.enemyHeroes) {
+    if (h?.id) detailsMap[h.id] = h;
+  }
+  return draftSession.enemyHeroes
+    .filter((h) => Number.isFinite(h?.id) && h.id > 0)
+    .map((h) => buildDraftHeroCandidate(h.id, new Set(), detailsMap));
+});
+
 const totalCandidateCount = computed(() =>
   candidateColumns.value.reduce((sum, col) => sum + col.length, 0) + swapCandidates.value.length
 );
@@ -83,7 +105,10 @@ const diagnosticReport = computed(() => ({
   stageId: draftSession.stageId,
   phase: draftSession.phase,
   candidateCount: totalCandidateCount.value,
+  enemyHeroCount: enemyCandidates.value.length,
+  decryptMethod: draftSession.decryptMethod || null,
   cipherLength: draftSession.rawCiphertext?.length || 0,
+  enemyCipherLength: draftSession.rawEnemyCiphertext?.length || 0,
   cipherSample: draftSession.rawCiphertext ? draftSession.rawCiphertext.slice(0, 120) : null,
   error: draftSession.error || null,
   errorDetail: draftSession.errorDetail || null,
@@ -263,9 +288,21 @@ function close() {
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <span>🃏 15 Candidate Heroes (5 Pick Rounds × 3 Cards)</span>
           </h3>
-          <span class="text-xs text-slate-400 dark:text-slate-500">
-            {{ candidateColumns.length > 0 ? `Loaded ${totalCandidateCount} candidates${swapCandidates.length > 0 ? ` (${swapCandidates.length} swap)` : ''}` : 'Waiting for draft payload...' }}
-          </span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 dark:text-slate-500">
+              {{ candidateColumns.length > 0 ? `Loaded ${totalCandidateCount} candidates${swapCandidates.length > 0 ? ` (${swapCandidates.length} swap)` : ''}` : 'Waiting for draft payload...' }}
+            </span>
+            <button
+              v-if="draftSession.rawCiphertext && candidateColumns.length === 0"
+              id="draft-retry-decrypt-btn"
+              type="button"
+              :disabled="retryingDecrypt"
+              class="cursor-pointer px-2 py-0.5 text-[11px] font-semibold rounded bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 border border-indigo-500/30 transition disabled:opacity-50"
+              @click="handleRetryDecrypt"
+            >
+              {{ retryingDecrypt ? 'Retrying...' : '↻ Retry Decrypt' }}
+            </button>
+          </div>
         </div>
 
         <!-- 5 Columns Grid -->
@@ -400,6 +437,46 @@ function close() {
               class="relative flex items-center gap-2 p-2 rounded-lg border bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
             >
               <div class="relative w-9 h-9 shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <img
+                  v-if="hero.avatarFile"
+                  :src="getAvatarUrl(hero.avatarFile)"
+                  :alt="hero.name"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                <span v-else class="text-xs font-bold text-slate-400">#{{ hero.id }}</span>
+              </div>
+              <div class="flex flex-col min-w-0 flex-1">
+                <span class="font-bold text-xs truncate text-slate-800 dark:text-slate-100" :title="hero.name">
+                  {{ hero.name }}
+                </span>
+                <div class="flex items-center gap-1 text-[10px] text-slate-400">
+                  <span v-if="hero.star" class="font-semibold text-amber-500">★{{ hero.star }}</span>
+                  <span v-if="hero.power" class="font-mono">{{ formatHeroPower(hero.power) }}</span>
+                  <span v-else-if="hero.class" class="truncate">{{ hero.class }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Enemy Team (decrypted from draftEnemy in Stage 2 / Stage 4) -->
+        <div
+          v-if="enemyCandidates.length > 0"
+          id="draft-enemy-team"
+          class="mt-2 flex flex-col gap-2 p-2.5 rounded-xl bg-rose-500/5 border border-rose-500/20"
+        >
+          <div class="flex items-center justify-between pb-1 border-b border-rose-500/20">
+            <span class="text-xs font-bold uppercase tracking-wider text-rose-400">
+              🛡️ {{ draftSession.stageId === 4 ? 'Enemy Defense Team' : 'Enemy Heroes' }} ({{ enemyCandidates.length }})
+            </span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            <div
+              v-for="hero in enemyCandidates"
+              :key="'enemy-' + hero.id"
+              class="relative flex items-center gap-2 p-2 rounded-lg border bg-white dark:bg-slate-950 border-rose-500/25"
+            >
+              <div class="relative w-9 h-9 shrink-0 rounded-lg overflow-hidden border border-rose-500/30 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                 <img
                   v-if="hero.avatarFile"
                   :src="getAvatarUrl(hero.avatarFile)"

@@ -3879,6 +3879,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         message?.kind === 'simulate-battle' ||
         message?.kind === 'test-wasm-engine' ||
         message?.kind === 'test-wasm-call' ||
+        message?.kind === 'retry-draft-decrypt' ||
         message?.kind === 'campaign-raid' ||
         message?.kind === 'craft-fragment' ||
         message?.kind === 'craft-recipe') &&
@@ -3952,7 +3953,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           cr.tabs.sendMessage(targetTab.id, forwardedMessage).catch(() => {});
           sendResponse({ ok: true, queued, error: null });
         });
-      if (message.kind === 'engine-ping' || message.kind === 'simulate-battle' || message.kind === 'test-wasm-engine' || message.kind === 'test-wasm-call') forward();
+      if (message.kind === 'engine-ping' || message.kind === 'simulate-battle' || message.kind === 'test-wasm-engine' || message.kind === 'test-wasm-call' || message.kind === 'retry-draft-decrypt') forward();
       else
         cr.storage?.local
           ?.get(['popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'claimRpcStatus', 'rpcCache'])

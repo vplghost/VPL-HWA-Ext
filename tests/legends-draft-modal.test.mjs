@@ -379,3 +379,110 @@ test('rpcCache deducts 1 Draft Chip (refillable:60) once per completed Legends D
   }]).cache;
   assert.equal(state['resource:refillable:60']?.data?.amount, 3, 'New matchId should decrement Draft Chips to 3');
 });
+
+test('P1-05: recoverDynamicKeyFromKnownPlaintext recovers live session key from Stage 1 ciphertext and decrypts live payloads', async () => {
+  const {
+    recoverDynamicKeyFromKnownPlaintext,
+    LIVE_DRAFT_CONST_KEY,
+    extractDraftEnemyHeroes,
+  } = await import('../src/utils/draftHelper.ts');
+
+  // Exact Stage 1 ciphertext from temp/tracking-data/hwa-game-record-202611242246_draft.json
+  const stage1Cipher = 'cx90Pxh9egQ7cVNRLyZRTWIwRBY4cx97Tw==';
+  const recovered = recoverDynamicKeyFromKnownPlaintext(stage1Cipher);
+  assert.ok(recovered, 'Must recover dynamic key from Stage 1 known-plaintext ciphertext');
+  assert.equal(recovered.dynamicKey, 'QqV7Raog2rkLNS');
+  assert.equal(recovered.constKey, LIVE_DRAFT_CONST_KEY);
+
+  // Verify Stage 6 phase formatting
+  const stage6 = formatDraftPhase(6);
+  assert.equal(stage6.phase, 'result');
+  assert.ok(stage6.label.includes('Result'));
+
+  // Verify extractDraftEnemyHeroes parses enemy defense team map
+  const enemyHeroes = extractDraftEnemyHeroes({
+    '55': { id: 55, level: 120, color: 16, star: 3, power: 199507 },
+    '60': { id: 60, level: 120, color: 16, star: 3, power: 187359 },
+  });
+  assert.equal(enemyHeroes.length, 2);
+  assert.equal(enemyHeroes[0].id, 55);
+  assert.equal(enemyHeroes[0].power, 199507);
+});
+
+test('P1-05: handleDraftMessage sequential queue prevents storage race and syncs saveDefence/saveAttack heroes', async () => {
+  const { handleDraftMessage, flushDraftMessageQueue } = await import('../src/background/handlers/draftHandler.ts');
+
+  const store = { autoOpenDraftDialog: false, legendsDraftSession: { matchId: 100, heroSteps: [[1, 2, 3]] } };
+  const mockChrome = {
+    storage: {
+      local: {
+        get: (keys, cb) => {
+          setTimeout(() => cb({ ...store }), 5);
+        },
+        set: (patch, cb) => {
+          setTimeout(() => {
+            Object.assign(store, patch);
+            cb?.();
+          }, 5);
+        },
+      },
+    },
+    runtime: { sendMessage: () => Promise.resolve() },
+  };
+
+  // Fire draft-rpc-event (new matchId -> resets heroSteps) and draft-decrypted back-to-back in same tick
+  handleDraftMessage({
+    kind: 'draft-rpc-event',
+    data: {
+      action: 'randomDraft_getInfo',
+      response: { matchId: 364948706, stageId: 2, draft: 'cipher_stage2', draftEnemy: 'cipher_enemy2' },
+    },
+  }, mockChrome);
+
+  handleDraftMessage({
+    kind: 'draft-decrypted',
+    data: {
+      matchId: 364948706,
+      stageId: 2,
+      method: 'known-plaintext-stage1',
+      draft: {
+        base: { '2': { id: 2, power: 180515 }, '15': { id: 15, power: 175000 }, '22': { id: 22, power: 170000 } },
+        swap: [{ id: 501, power: 190000 }],
+      },
+      enemyDraft: { '24': { id: 24, power: 193225 } },
+      raw: '{"base":{...}}',
+    },
+  }, mockChrome);
+
+  // Submit picked defense & attack teams
+  handleDraftMessage({
+    kind: 'draft-rpc-event',
+    data: { action: 'randomDraft_saveDefence', args: { heroes: [2, 15, 22, 56, 67] }, response: [] },
+  }, mockChrome);
+  handleDraftMessage({
+    kind: 'draft-rpc-event',
+    data: { action: 'randomDraft_saveAttack', args: { heroes: [71, 54, 10, 46, 16] }, response: [] },
+  }, mockChrome);
+
+  // Empty Stage 6 decrypted payload must NOT wipe active heroSteps
+  handleDraftMessage({
+    kind: 'draft-decrypted',
+    data: { matchId: 364948706, stageId: 6, draft: { base: null, swap: null }, raw: '{"base":null,"swap":null}' },
+  }, mockChrome);
+
+  await flushDraftMessageQueue();
+
+  assert.equal(store.legendsDraftSession.matchId, 364948706);
+  assert.equal(store.legendsDraftSession.heroSteps.length, 1, 'Decrypted heroSteps must survive concurrent rpc + empty Stage 6');
+  assert.deepEqual(store.legendsDraftSession.swapHeroIds, [501]);
+  assert.equal(store.legendsDraftSession.enemyHeroes.length, 1);
+  assert.equal(store.legendsDraftSession.enemyHeroes[0].id, 24);
+  assert.deepEqual(store.legendsDraftSession.chosenDefenceHeroes, [2, 15, 22, 56, 67]);
+  assert.deepEqual(store.legendsDraftSession.chosenAttackHeroes, [71, 54, 10, 46, 16]);
+  assert.equal(store.legendsDraftSession.decryptMethod, 'known-plaintext-stage1');
+
+  // Verify modal exposes #draft-enemy-team and #draft-retry-decrypt-btn
+  const modalSrc = await readFile(resolve(root, 'src/components/dialogs/LegendsDraftModal.vue'), 'utf8');
+  assert.ok(modalSrc.includes('id="draft-enemy-team"'), 'LegendsDraftModal must include #draft-enemy-team');
+  assert.ok(modalSrc.includes('id="draft-retry-decrypt-btn"'), 'LegendsDraftModal must include #draft-retry-decrypt-btn');
+});

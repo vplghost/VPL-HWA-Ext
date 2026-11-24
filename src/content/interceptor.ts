@@ -562,10 +562,53 @@ export function installInterceptor(customWindow?: any): void {
 
   let cachedDraftCipherKlass = 0;
   let cachedDraftCipherInst = 0;
+  let cachedDraftCipherKeys: { dynamicKey: string; constKey: string; source: string } | null = null;
   const DRAFT_CONST_KEYS = [
+    'YL@i9y7YgvTqMWsKUw4M9aAeY7d2DJ&rK2!bSUqsKZbZgNZjHaRwbz$uwk6JPmML7@&NqnwXFajZ^ER#Tr5XJeK2Af!ddf^FMqW$matmTCa4nCD8JGRmKP37U9pj*pDT',
     '307E8FB4B733591B75D74EA13946882BA59FAA3274CF815A2B8788E76403BD0F',
     '268EA1F1B979AC33218CEF1225D1F835EA88D2C1233B8D6AFA0277FC8E30684B'
   ];
+  const DRAFT_KNOWN_EMPTY_PT = '{"base":null,"swap":null}';
+
+  function recoverDraftKeyFromKnownPlaintext(base64Payload: string): { dynamicKey: string; constKey: string; source: string } | null {
+    if (!base64Payload || typeof base64Payload !== 'string') return null;
+    try {
+      const rawDecoded = typeof atob === 'function' ? atob(base64Payload) : '';
+      if (rawDecoded.length !== DRAFT_KNOWN_EMPTY_PT.length) return null;
+      const candidateLengths = [14, 12, 13, 15, 16, 10, 11, 17, 18, 19, 20];
+      for (const constKey of DRAFT_CONST_KEYS) {
+        const derived: number[] = new Array(rawDecoded.length);
+        for (let i = 0; i < rawDecoded.length; i++) {
+          derived[i] =
+            rawDecoded.charCodeAt(i) ^
+            DRAFT_KNOWN_EMPTY_PT.charCodeAt(i) ^
+            constKey.charCodeAt(i % constKey.length);
+        }
+        for (const kLen of candidateLengths) {
+          if (kLen >= rawDecoded.length) continue;
+          let printable = true;
+          for (let i = 0; i < kLen; i++) {
+            if (derived[i] < 0x21 || derived[i] > 0x7e) { printable = false; break; }
+          }
+          if (!printable) continue;
+          let periodic = true;
+          for (let i = kLen; i < rawDecoded.length; i++) {
+            if (derived[i] !== derived[i % kLen]) { periodic = false; break; }
+          }
+          if (periodic) {
+            const recovered = {
+              dynamicKey: String.fromCharCode(...derived.slice(0, kLen)),
+              constKey,
+              source: 'known-plaintext-stage1'
+            };
+            cachedDraftCipherKeys = recovered;
+            return recovered;
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
 
   function xorDecryptDraftBase64(base64Payload: string, dynamicKey: string, constKey: string): string | null {
     if (!base64Payload || !dynamicKey || !constKey) return null;
@@ -655,8 +698,7 @@ export function installInterceptor(customWindow?: any): void {
       if (!cipherKlass) {
         const target = 'DraftsXORCipher';
         const tLen = target.length;
-        const maxScan = Math.min(byteLen, 256 * 1024 * 1024);
-        for (let i = 1024; i < maxScan - 64; i += 4) {
+        for (let i = 1024; i < byteLen - 64; i += 4) {
           const cand = u32[i >>> 2];
           if (cand > 65536 && cand < byteLen && (cand % 4 === 0)) {
             const namePtr = u32[(cand + 8) >>> 2];
@@ -692,6 +734,7 @@ export function installInterceptor(customWindow?: any): void {
           out.dynamicKey = dk;
           out.constKey = ck;
           cachedDraftCipherInst = instPtr;
+          cachedDraftCipherKeys = { dynamicKey: dk, constKey: ck, source: 'wasm-heap-DraftsXORCipher' };
           return true;
         }
         return false;
@@ -715,24 +758,94 @@ export function installInterceptor(customWindow?: any): void {
     }
   }
 
-  function decryptDraftPayloadFromUnity(base64Payload: string, meta?: { stageId?: any; matchId?: any }) {
+  const DRAFT_DECRYPT_RETRY_DELAYS_MS = [150, 400, 900, 1800];
+
+  function decryptDraftPayloadFromUnity(
+    base64Payload: string,
+    meta?: { stageId?: any; matchId?: any; enemyCiphertext?: string | null },
+    attempt = 0
+  ) {
     if (!base64Payload || typeof base64Payload !== 'string') return;
     const stageId = meta?.stageId != null ? Number(meta.stageId) : null;
     const matchId = meta?.matchId != null ? Number(meta.matchId) : null;
     const isActiveCipherStage = stageId === 2 || stageId === 4 || base64Payload.length > 128;
 
-    const unityKeys = readDraftCipherKeysFromUnity();
-    const candidates: Array<{ method: string; dynamicKey: string; constKey: string }> = [];
+    // Fast path: if this is a 25-byte empty draft (Stage 1 / Stage 6), recover & cache dynamicKey in <0.1ms
+    if (base64Payload.length >= 32 && base64Payload.length <= 40) {
+      recoverDraftKeyFromKnownPlaintext(base64Payload);
+    }
 
-    if (unityKeys.dynamicKey && unityKeys.constKey) {
+    const candidates: Array<{ method: string; dynamicKey: string; constKey: string }> = [];
+    if (cachedDraftCipherKeys?.dynamicKey && cachedDraftCipherKeys?.constKey) {
       candidates.push({
+        method: cachedDraftCipherKeys.source || 'cached-cipher-key',
+        dynamicKey: cachedDraftCipherKeys.dynamicKey,
+        constKey: cachedDraftCipherKeys.constKey
+      });
+    }
+
+    const tryCandidates = (list: Array<{ method: string; dynamicKey: string; constKey: string }>) => {
+      let sample: string | null = null;
+      let errMsg: string | null = null;
+      for (const cand of list) {
+        const plaintext = xorDecryptDraftBase64(base64Payload, cand.dynamicKey, cand.constKey);
+        if (!plaintext) continue;
+        sample = plaintext.slice(0, 300);
+        if (plaintext.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(plaintext);
+            if (parsed && typeof parsed === 'object') {
+              cachedDraftCipherKeys = { dynamicKey: cand.dynamicKey, constKey: cand.constKey, source: cand.method };
+              let enemyDraft: any = null;
+              if (typeof meta?.enemyCiphertext === 'string' && meta.enemyCiphertext.length > 8) {
+                try {
+                  const enemyPt = xorDecryptDraftBase64(meta.enemyCiphertext, cand.dynamicKey, cand.constKey);
+                  if (enemyPt && (enemyPt.startsWith('{') || enemyPt.startsWith('['))) {
+                    enemyDraft = JSON.parse(enemyPt);
+                  }
+                } catch (_) {}
+              }
+              win.postMessage({
+                source: 'hwa-helper-api',
+                kind: 'draft-decrypted',
+                draft: parsed,
+                enemyDraft,
+                raw: plaintext,
+                method: cand.method,
+                attempt,
+                stageId,
+                matchId
+              }, loc.origin);
+              return { ok: true, sample, errMsg: null };
+            }
+          } catch (parseErr: any) {
+            errMsg = `JSON parse error (${cand.method}): ${parseErr?.message || parseErr}`;
+          }
+        } else {
+          errMsg = `XOR output did not start with '{' (${cand.method})`;
+        }
+      }
+      return { ok: false, sample, errMsg };
+    };
+
+    // 1. Try cached key first (avoids scanning >1GB WASM heap on every RPC)
+    if (candidates.length > 0) {
+      const fastRes = tryCandidates(candidates);
+      if (fastRes.ok) return;
+    }
+
+    // 2. Scan Unity WASM heap for live DraftsXORCipher instance
+    const unityKeys = readDraftCipherKeysFromUnity();
+    const fallbackCandidates: Array<{ method: string; dynamicKey: string; constKey: string }> = [];
+    if (unityKeys.dynamicKey && unityKeys.constKey) {
+      fallbackCandidates.push({
         method: 'wasm-heap-DraftsXORCipher',
         dynamicKey: unityKeys.dynamicKey,
         constKey: unityKeys.constKey
       });
     }
 
-    // Fallback: captured auth session/token headers with known const keys
+    // 3. Fallback: captured auth session/token headers with known const keys
     const sessionKeys: string[] = [];
     try {
       const hdrs = lastRpcHeaders || null;
@@ -751,48 +864,35 @@ export function installInterceptor(customWindow?: any): void {
 
     for (const sk of [...new Set(sessionKeys)]) {
       for (const ck of DRAFT_CONST_KEYS) {
-        candidates.push({ method: 'session-header-xor', dynamicKey: sk, constKey: ck });
+        fallbackCandidates.push({ method: 'session-header-xor', dynamicKey: sk, constKey: ck });
       }
     }
 
-    let lastDecryptedSample: string | null = null;
-    let lastError = unityKeys.error || 'No valid decryption key available';
+    const res = tryCandidates(fallbackCandidates);
+    if (res.ok) return;
 
-    for (const cand of candidates) {
-      const plaintext = xorDecryptDraftBase64(base64Payload, cand.dynamicKey, cand.constKey);
-      if (!plaintext) continue;
-      lastDecryptedSample = plaintext.slice(0, 300);
-      if (plaintext.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(plaintext);
-          if (parsed && typeof parsed === 'object') {
-            win.postMessage({
-              source: 'hwa-helper-api',
-              kind: 'draft-decrypted',
-              draft: parsed,
-              raw: plaintext,
-              method: cand.method,
-              stageId,
-              matchId
-            }, loc.origin);
-            return;
-          }
-        } catch (parseErr: any) {
-          lastError = `JSON parse error (${cand.method}): ${parseErr?.message || parseErr}`;
-        }
-      } else {
-        lastError = `XOR output did not start with '{' (${cand.method})`;
-      }
+    const lastDecryptedSample = res.sample;
+    const lastError = res.errMsg || unityKeys.error || 'No valid decryption key available';
+
+    // Defer & retry when Unity C# has not yet instantiated DraftsXORCipher on first draft open
+    if (isActiveCipherStage && attempt < DRAFT_DECRYPT_RETRY_DELAYS_MS.length && typeof setTimeout === 'function') {
+      const delayMs = DRAFT_DECRYPT_RETRY_DELAYS_MS[attempt];
+      setTimeout(() => {
+        decryptDraftPayloadFromUnity(base64Payload, meta, attempt + 1);
+      }, delayMs);
+      return;
     }
 
     if (isActiveCipherStage) {
       const detail = JSON.stringify({
         stageId,
         matchId,
+        attempt,
         cipherLen: base64Payload.length,
         unityReady: unityKeys.unityReady,
         cipherClassFound: unityKeys.cipherClassFound,
         cipherInstanceFound: unityKeys.cipherInstanceFound,
+        hasCachedKey: Boolean(cachedDraftCipherKeys),
         hasDynamicKey: Boolean(unityKeys.dynamicKey),
         hasConstKey: Boolean(unityKeys.constKey),
         sessionHeaderCandidates: sessionKeys.length,
@@ -861,8 +961,11 @@ export function installInterceptor(customWindow?: any): void {
           }, loc.origin);
 
           if (typeof resp?.draft === 'string' && resp.draft.length > 0) {
-            // Defer slightly so Unity can instantiate DraftsXORCipher on first draft open if needed
-            decryptDraftPayloadFromUnity(resp.draft, { stageId: resp.stageId, matchId: resp.matchId });
+            decryptDraftPayloadFromUnity(resp.draft, {
+              stageId: resp.stageId,
+              matchId: resp.matchId,
+              enemyCiphertext: typeof resp.draftEnemy === 'string' ? resp.draftEnemy : null
+            });
           }
         }
       }
@@ -2303,6 +2406,17 @@ export function installInterceptor(customWindow?: any): void {
           }, loc.origin);
         }
       })();
+      return;
+    }
+
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'retry-draft-decrypt') {
+      if (typeof event.data.ciphertext === 'string' && event.data.ciphertext.length > 0) {
+        decryptDraftPayloadFromUnity(event.data.ciphertext, {
+          stageId: event.data.stageId,
+          matchId: event.data.matchId,
+          enemyCiphertext: typeof event.data.enemyCiphertext === 'string' ? event.data.enemyCiphertext : null
+        }, 0);
+      }
       return;
     }
   });

@@ -545,6 +545,18 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         }, win.location.origin);
         return true;
       }
+      if (message?.kind === 'retry-draft-decrypt') {
+        win.postMessage({
+          source: 'hwa-helper-control',
+          kind: 'retry-draft-decrypt',
+          ciphertext: message.ciphertext || null,
+          enemyCiphertext: message.enemyCiphertext || null,
+          stageId: message.stageId ?? null,
+          matchId: message.matchId ?? null
+        }, win.location.origin);
+        sendResponse?.({ ok: true });
+        return false;
+      }
     });
   } catch (_) {}
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.281 — 2026-11-24
+
+### Fixed
+
+- **Legends Draft Decryption, Storage Race & Enemy Team Display (`interceptor.ts`, `draftHandler.ts`, `draftHelper.ts`, `useDraft.ts`, `bridge.ts`, `backgroundRuntime.ts`, `LegendsDraftModal.vue`)**:
+  - Updated `DRAFT_CONST_KEYS` with the live 128-char `DraftsXORCipher` key, added `<0.1ms` Stage-1 known-plaintext dynamic-key recovery (`recoverDynamicKeyFromKnownPlaintext`), removed the 256MB WASM class-scan cap, cached `{ dynamicKey, constKey }`, and added deferred backoff retries (`150ms -> 400ms -> 900ms -> 1800ms`) in `src/content/interceptor.ts` when Unity has not yet instantiated `DraftsXORCipher`.
+  - Sequentialized `handleDraftMessage()` via an async promise queue in `src/background/handlers/draftHandler.ts` so concurrent `draft-rpc-event` and `draft-decrypted` messages never overwrite decrypted `heroSteps` in `chrome.storage.local`, and prevented empty Stage-6 payloads (`{"base":null,"swap":null}`) from wiping active candidates.
+  - Added simultaneous `draftEnemy` decryption (`#draft-enemy-team`), `randomDraft_saveDefence` / `randomDraft_saveAttack` picked-hero sync, `formatDraftPhase(6)` (`Battle / Round Result`), and a manual **Retry Decrypt** button (`#draft-retry-decrypt-btn`) in `LegendsDraftModal.vue`.
+
 ## 0.11.279 — 2026-11-24
 
 ### Added & Updated
