@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useDraft } from '@/src/composables/useDraft';
-import { buildCandidateMatrix, formatDraftPhase } from '@/src/utils/draftHelper';
+import { buildCandidateMatrix, buildDraftHeroCandidate, formatDraftPhase } from '@/src/utils/draftHelper';
 import type { DraftHeroCandidate } from '@/src/types/game/draft';
 
 const props = defineProps<{
@@ -51,17 +51,31 @@ const activePickedIds = computed<number[]>(() => {
   return draftSession.chosenDefenceHeroes;
 });
 
-// Matrix of candidate heroes: 5 columns (rounds) x 3 choices
+// Matrix of candidate heroes: columns (rounds) x choices
 const candidateColumns = computed<DraftHeroCandidate[][]>(() => {
   if (!draftSession.heroSteps || draftSession.heroSteps.length === 0) {
     return [];
   }
-  return buildCandidateMatrix(draftSession.heroSteps, activePickedIds.value);
+  return buildCandidateMatrix(draftSession.heroSteps, activePickedIds.value, draftSession.heroDetails);
+});
+
+const swapCandidates = computed<DraftHeroCandidate[]>(() => {
+  if (!Array.isArray(draftSession.swapHeroIds) || draftSession.swapHeroIds.length === 0) {
+    return [];
+  }
+  const pickedSet = new Set(activePickedIds.value.filter((id) => Number.isFinite(id) && id > 0));
+  return draftSession.swapHeroIds.map((id) => buildDraftHeroCandidate(id, pickedSet, draftSession.heroDetails));
 });
 
 const totalCandidateCount = computed(() =>
-  candidateColumns.value.reduce((sum, col) => sum + col.length, 0)
+  candidateColumns.value.reduce((sum, col) => sum + col.length, 0) + swapCandidates.value.length
 );
+
+function formatHeroPower(power: number | undefined): string {
+  if (!power || power <= 0) return '';
+  if (power >= 1000) return `${Math.round(power / 1000)}K`;
+  return String(power);
+}
 
 const diagnosticReport = computed(() => ({
   timestamp: new Date().toISOString(),
@@ -250,7 +264,7 @@ function close() {
             <span>🃏 15 Candidate Heroes (5 Pick Rounds × 3 Cards)</span>
           </h3>
           <span class="text-xs text-slate-400 dark:text-slate-500">
-            {{ candidateColumns.length > 0 ? `Loaded ${totalCandidateCount}/15 candidates` : 'Waiting for draft payload...' }}
+            {{ candidateColumns.length > 0 ? `Loaded ${totalCandidateCount} candidates${swapCandidates.length > 0 ? ` (${swapCandidates.length} swap)` : ''}` : 'Waiting for draft payload...' }}
           </span>
         </div>
 
@@ -333,6 +347,20 @@ function close() {
                     >
                       {{ hero.role || hero.class }}
                     </span>
+
+                    <!-- Star & Power from decrypted snapshot -->
+                    <span
+                      v-if="hero.star"
+                      class="text-[10px] font-semibold text-amber-500"
+                    >
+                      ★{{ hero.star }}
+                    </span>
+                    <span
+                      v-if="hero.power"
+                      class="text-[10px] font-mono text-slate-500 dark:text-slate-400"
+                    >
+                      {{ formatHeroPower(hero.power) }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -352,6 +380,47 @@ function close() {
           <p class="text-xs text-slate-500 max-w-md mt-1">
             Start a Legends Draft match in game to automatically capture RPC/MQTT packets, decrypt the 15-hero candidate pool via DraftsXORCipher, and display all 5 pick rounds here.
           </p>
+        </div>
+
+        <!-- Swap Pool (when decrypted payload includes { swap: { ... } }) -->
+        <div
+          v-if="swapCandidates.length > 0"
+          id="draft-swap-pool"
+          class="mt-2 flex flex-col gap-2 p-2.5 rounded-xl bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800"
+        >
+          <div class="flex items-center justify-between pb-1 border-b border-slate-200 dark:border-slate-800">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+              🔄 Swap Pool ({{ swapCandidates.length }})
+            </span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            <div
+              v-for="hero in swapCandidates"
+              :key="'swap-' + hero.id"
+              class="relative flex items-center gap-2 p-2 rounded-lg border bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+            >
+              <div class="relative w-9 h-9 shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <img
+                  v-if="hero.avatarFile"
+                  :src="getAvatarUrl(hero.avatarFile)"
+                  :alt="hero.name"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                <span v-else class="text-xs font-bold text-slate-400">#{{ hero.id }}</span>
+              </div>
+              <div class="flex flex-col min-w-0 flex-1">
+                <span class="font-bold text-xs truncate text-slate-800 dark:text-slate-100" :title="hero.name">
+                  {{ hero.name }}
+                </span>
+                <div class="flex items-center gap-1 text-[10px] text-slate-400">
+                  <span v-if="hero.star" class="font-semibold text-amber-500">★{{ hero.star }}</span>
+                  <span v-if="hero.power" class="font-mono">{{ formatHeroPower(hero.power) }}</span>
+                  <span v-else-if="hero.class" class="truncate">{{ hero.class }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

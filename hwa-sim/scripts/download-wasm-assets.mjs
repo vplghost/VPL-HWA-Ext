@@ -70,14 +70,52 @@ const ASSETS_TO_DOWNLOAD = [
   }
 ];
 
-function downloadFile(asset) {
+function parseCliArgs(argv) {
+  const out = {
+    all: false,
+    coreWasmOnly: false,
+    force: false,
+    buildUrl: null,
+    symbolsUrl: null,
+    wasmUrl: null,
+  };
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--all') out.all = true;
+    else if (a === '--core-wasm-only') out.coreWasmOnly = true;
+    else if (a === '--force') out.force = true;
+    else if (a === '--build-url' && argv[i + 1]) out.buildUrl = argv[++i].replace(/\/+$/, '');
+    else if (a === '--symbols-url' && argv[i + 1]) out.symbolsUrl = argv[++i];
+    else if (a === '--wasm-url' && argv[i + 1]) out.wasmUrl = argv[++i];
+  }
+  return out;
+}
+
+function gunzipIfNeeded(srcPath, destPath) {
+  const fd = fs.openSync(srcPath, 'r');
+  const header = Buffer.alloc(2);
+  fs.readSync(fd, header, 0, 2, 0);
+  fs.closeSync(fd);
+  const isGzip = header[0] === 0x1f && header[1] === 0x8b;
+  if (!isGzip) {
+    if (srcPath !== destPath) fs.copyFileSync(srcPath, destPath);
+    return;
+  }
+  console.log(`[UNZIP] Giải nén ${path.basename(srcPath)} -> ${path.basename(destPath)}...`);
+  const compressed = fs.readFileSync(srcPath);
+  const decompressed = zlib.gunzipSync(compressed);
+  fs.writeFileSync(destPath, decompressed);
+  console.log(`[UNZIP] Hoàn tất (${(decompressed.length / 1024 / 1024).toFixed(2)} MB).`);
+}
+
+function downloadFile(asset, { force = false } = {}) {
   return new Promise((resolve, reject) => {
     const destPath = path.join(downloadsDir, asset.name);
     
     // Nếu tệp đã tồn tại và đủ kích thước, bỏ qua để tiết kiệm thời gian
-    if (fs.existsSync(destPath)) {
+    if (!force && fs.existsSync(destPath)) {
       const stats = fs.statSync(destPath);
-      if (stats.size > 0 && Math.abs(stats.size - asset.expectedBytes) < 50000) {
+      if (stats.size > 0 && (!asset.expectedBytes || Math.abs(stats.size - asset.expectedBytes) < 50000)) {
         console.log(`[SKIP] ${asset.name} đã tồn tại (${(stats.size / 1024 / 1024).toFixed(2)} MB).`);
         return resolve({ name: asset.name, status: 'skipped', path: destPath });
       }
@@ -124,26 +162,64 @@ function downloadFile(asset) {
 }
 
 async function main() {
-  const downloadAll = process.argv.includes('--all');
-  const targetAssets = downloadAll 
-    ? ASSETS_TO_DOWNLOAD 
-    : ASSETS_TO_DOWNLOAD.filter(a => a.tier === 'core');
+  const cli = parseCliArgs(process.argv);
+  const assets = ASSETS_TO_DOWNLOAD.map((a) => {
+    const next = { ...a };
+    if (cli.buildUrl && next.url.startsWith(BUILD_BASE_URL)) {
+      next.url = next.url.replace(BUILD_BASE_URL, cli.buildUrl);
+      next.expectedBytes = 0;
+    }
+    if (cli.symbolsUrl && next.name === 'symbols.json') {
+      next.url = cli.symbolsUrl;
+      next.expectedBytes = 0;
+    }
+    if (cli.wasmUrl && next.name === 'build.wasm.gz') {
+      next.url = cli.wasmUrl;
+      next.expectedBytes = 0;
+    }
+    return next;
+  });
+
+  let targetAssets;
+  if (cli.coreWasmOnly) {
+    targetAssets = assets.filter((a) => a.name === 'symbols.json' || a.name === 'build.wasm.gz');
+  } else if (cli.all) {
+    targetAssets = assets;
+  } else {
+    targetAssets = assets.filter((a) => a.tier === 'core');
+  }
+
+  const modeLabel = cli.coreWasmOnly
+    ? 'CORE WASM ONLY (Chỉ tải symbols.json & build.wasm.gz — bỏ qua build.data.gz)'
+    : cli.all
+      ? 'TOÀN BỘ (gồm cả WASM 208MB & Data 129MB)'
+      : 'CỐT LÕI (Loader, Framework, Symbols, Splitlib - Dùng cho In-Game Injection)';
 
   console.log('================================================================');
   console.log(' HWA-SIM: CÔNG CỤ TẢI TÀI NGUYÊN UNITY WASM BATTLE SIMULATOR');
   console.log('================================================================');
-  console.log(`Chế độ: ${downloadAll ? 'TOÀN BỘ (gồm cả WASM 208MB & Data 129MB)' : 'CỐT LÕI (Loader, Framework, Symbols, Splitlib - Dùng cho In-Game Injection)'}`);
+  console.log(`Chế độ: ${modeLabel}`);
   console.log(`Thư mục lưu trữ: ${downloadsDir}\n`);
 
   for (const asset of targetAssets) {
-    try {
-      await downloadFile(asset);
-    } catch (err) {
-      console.error(`[ERROR] Lỗi khi tải ${asset.name}:`, err.message);
-    }
+    await downloadFile(asset, { force: cli.force || Boolean(cli.symbolsUrl || cli.wasmUrl || cli.buildUrl) });
+  }
+
+  // Giải nén tự động cho resolver nếu có build.wasm.gz hoặc symbols.json dạng gzip
+  const wasmGz = path.join(downloadsDir, 'build.wasm.gz');
+  const wasmOut = path.join(downloadsDir, 'build.wasm');
+  if (fs.existsSync(wasmGz) && (cli.coreWasmOnly || cli.force || !fs.existsSync(wasmOut))) {
+    gunzipIfNeeded(wasmGz, wasmOut);
+  }
+  const symFile = path.join(downloadsDir, 'symbols.json');
+  if (fs.existsSync(symFile)) {
+    gunzipIfNeeded(symFile, symFile);
   }
 
   console.log('\n[HOÀN TẤT] Quá trình tải assets đã hoàn thành!');
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error('[ERROR]', err?.message || err);
+  process.exit(1);
+});

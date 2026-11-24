@@ -7,6 +7,12 @@
 import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { speedupService } from '../services/speedupService.ts';
 import { mailService } from '../services/mailService.ts';
+import {
+  getWasmProfileForVersion,
+  verifyWasmProfile,
+  type WasmSymbolOverrides,
+  type WasmProfileVerification,
+} from '../data/wasmSymbols.ts';
 
 export interface InterceptRecord {
   endpoint: string;
@@ -99,6 +105,24 @@ export function installInterceptor(customWindow?: any): void {
   let popupRpcEnabled = false;
   let rpcDispatchMode = 'direct';
   let recordingActive = false;
+  let wasmSymbolOverrides: WasmSymbolOverrides | null = null;
+  let lastWasmVerification: WasmProfileVerification | null = null;
+  let verifiedTableRef: any = null;
+
+  function getActiveWasmProfile() {
+    const liveVer = typeof win.hwaHelperGameVersion === 'string' && win.hwaHelperGameVersion
+      ? win.hwaHelperGameVersion
+      : null;
+    return getWasmProfileForVersion(liveVer, wasmSymbolOverrides);
+  }
+
+  function buildSymMap(profile = getActiveWasmProfile()): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [key, entry] of Object.entries(profile.symbols)) {
+      out[key] = entry.tableIndex;
+    }
+    return out;
+  }
   const queuedRpcCalls = new Map<string, any>();
   const queuedClaimKeys = new Set<string>();
   const queuedActionExpiry = new Map<string, number>();
@@ -656,12 +680,13 @@ export function installInterceptor(customWindow?: any): void {
       }
       out.cipherClassFound = true;
 
-      // 2. Locate live DraftsXORCipher instance (+8: dynamicKey, +12: constKey)
+      // 2. Locate live DraftsXORCipher instance (using dynamic struct offsets from wasmSymbols profile)
+      const { draftCipherDynamicKey, draftCipherConstKey } = getActiveWasmProfile().structOffsets;
       const tryReadInstance = (instPtr: number): boolean => {
-        if (instPtr < 65536 || instPtr + 20 >= byteLen || (instPtr % 4 !== 0)) return false;
+        if (instPtr < 65536 || instPtr + Math.max(draftCipherDynamicKey, draftCipherConstKey) + 8 >= byteLen || (instPtr % 4 !== 0)) return false;
         if (u32[instPtr >>> 2] !== cipherKlass || u32[(instPtr + 4) >>> 2] !== 0) return false;
-        const dk = readIl2CppStr(u32[(instPtr + 8) >>> 2]);
-        const ck = readIl2CppStr(u32[(instPtr + 12) >>> 2]);
+        const dk = readIl2CppStr(u32[(instPtr + draftCipherDynamicKey) >>> 2]);
+        const ck = readIl2CppStr(u32[(instPtr + draftCipherConstKey) >>> 2]);
         if (dk && ck && ck.length >= 32) {
           out.cipherInstanceFound = true;
           out.dynamicKey = dk;
@@ -917,46 +942,24 @@ export function installInterceptor(customWindow?: any): void {
         throw new Error('WASM malloc/free memory primitives not found');
       }
 
-      const sym = {
-        Play_ctor: 291996,
-        Play_start: 292005,
-        Play_get_result: 291998,
-        Play_createBattleData: 291995,
-        Play_executeBattle: 292008,
-        Play_createResult: 292009,
-        Play_dispose: 291997,
-        Presets_replay: 291684,
-        Presets_manual: 291686,
-        Presets_manualRaid: 291685,
-        Presets_arena: 291682,
-        Presets_clanWarReplay: 291679,
-        Presets_challengeAuto: 291672,
-        Presets_arenaReplay: 291683,
-        Presets_tower: 291680,
-        Presets_titanArenaReplay: 291676,
-        Presets_titanArenaRaid: 291677,
-        Presets_titanArenaManual: 291674,
-        Presets_createReplay: 291681,
-        Presets_clanWar: 291678,
-        Presets_clanBoss: 291675,
-        Presets_challengeReplayAuto: 291673,
-        Presets_get_isReplay: 291658,
-        BattlePresets_ctorDefault: 291654,
-        BattlePresets_ctor5: 291655,
-        BattleData_serializeResult: 274041,
-        BattleData_getStars: 274030,
-        JSON_Parse: 133378,
-        DataObject_fromObject: 274837,
-        LazyDataObject_ctor: 274399,
-        Object_ToString: 337342,
-        MultiBattleResult_get_victory: 291573,
-        MultiBattleResult_get_stars: 291577,
-        MultiBattleResult_get_progress: 291578,
-        MultiBattleResult_get_result: 291576,
-        DataObject_asJson: 274798,
-        BattleConfigStorage_get_titan: 285313,
-        BattleConfigStorage_get_tower: 285311
-      };
+      const activeProfile = getActiveWasmProfile();
+      const liveGameVer = typeof win.hwaHelperGameVersion === 'string' && win.hwaHelperGameVersion
+        ? win.hwaHelperGameVersion
+        : null;
+      if (verifiedTableRef !== table || !lastWasmVerification) {
+        lastWasmVerification = verifyWasmProfile(table, activeProfile, liveGameVer);
+        verifiedTableRef = table;
+      }
+      if (lastWasmVerification.status === 'arity_mismatch') {
+        const bad = lastWasmVerification.mismatches
+          .slice(0, 5)
+          .map((m) => `${m.key}@${m.tableIndex}(exp=${m.expectedArity},got=${m.actualArity})`)
+          .join(', ');
+        throw new Error(
+          `WASM symbol profile arity mismatch (profile=${activeProfile.gameVersion}, live=${liveGameVer || 'unknown'}): ${bad}. Run npm run wasm:sync or apply a Symbol Override in Settings.`
+        );
+      }
+      const sym = buildSymMap(activeProfile);
 
       // Safe caller that pads arguments to match exact WebAssembly function signature length
       const callTableFn = (index: number, ...args: any[]): number => {
@@ -1156,22 +1159,41 @@ export function installInterceptor(customWindow?: any): void {
             cachedBattleConfigStorage = 0;
           }
 
-          // Trigger IL2CPP ClassInit on the BattleConfigStorage holder class (0x15a3a30)
+          // Trigger IL2CPP ClassInit on the BattleConfigStorage holder class
           try { callTableFn(sym.Presets_titanArenaRaid, 0); } catch (_) {}
 
           curU32 = readU32();
           byteLen = curU32.byteLength;
-          const holderKlass = curU32[0x15a3a30 >>> 2];
+          const {
+            battleConfigHolder,
+            battleConfigStaticFieldsOff,
+            battleConfigStorageOff,
+          } = activeProfile.staticAddrs;
+          const holderKlass = battleConfigHolder > 0 && battleConfigHolder < byteLen
+            ? curU32[battleConfigHolder >>> 2]
+            : 0;
           if (holderKlass > 65536 && holderKlass < byteLen && (holderKlass % 4 === 0)) {
-            const staticFields = curU32[(holderKlass + 92) >>> 2];
-            if (staticFields > 65536 && staticFields + 116 < byteLen && (staticFields % 4 === 0)) {
-              const storagePtr = curU32[(staticFields + 112) >>> 2];
+            const staticFields = curU32[(holderKlass + battleConfigStaticFieldsOff) >>> 2];
+            if (staticFields > 65536 && staticFields + battleConfigStorageOff + 4 < byteLen && (staticFields % 4 === 0)) {
+              const storagePtr = curU32[(staticFields + battleConfigStorageOff) >>> 2];
               if (storagePtr > 65536 && storagePtr < byteLen && (storagePtr % 4 === 0)) {
                 const storageKlass = curU32[storagePtr >>> 2];
                 if (storageKlass > 65536 && storageKlass < byteLen && readCStr(curU32[(storageKlass + 8) >>> 2]) === 'BattleConfigStorage') {
                   cachedBattleConfigStorage = storagePtr;
                   return storagePtr;
                 }
+              }
+            }
+          }
+
+          // Fallback: locate BattleConfigStorage Il2CppClass and scan heap for live instance
+          const storageKlass = findClassByName('BattleConfigStorage');
+          if (storageKlass > 65536 && storageKlass < byteLen) {
+            const maxScan = Math.min(byteLen, 256 * 1024 * 1024);
+            for (let addr = 65536; addr < maxScan - 16; addr += 4) {
+              if (curU32[addr >>> 2] === storageKlass && curU32[(addr + 4) >>> 2] === 0) {
+                cachedBattleConfigStorage = addr;
+                return addr;
               }
             }
           }
@@ -1532,21 +1554,16 @@ export function installInterceptor(customWindow?: any): void {
       }
 
       currentPhase = 'VERIFY_TABLE_SYMBOLS';
-      const sym = {
-        Play_ctor: 291996,
-        Play_start: 292005,
-        Play_get_result: 291998,
-        Play_createBattleData: 291995,
-        Play_executeBattle: 292008,
-        Play_createResult: 292009,
-        Play_dispose: 291997,
-        BattleData_serializeResult: 274041,
-        JSON_Parse: 133378,
-        Object_ToString: 337342,
-      };
+      const activeProfile = getActiveWasmProfile();
+      const sym = buildSymMap(activeProfile);
+      const profileVerification = verifyWasmProfile(
+        table,
+        activeProfile,
+        typeof win.hwaHelperGameVersion === 'string' ? win.hwaHelperGameVersion : null
+      );
       const verifiedSyms: string[] = [];
       for (const [sName, sIdx] of Object.entries(sym)) {
-        if (sIdx < table.length) {
+        if (sIdx > 0 && sIdx < table.length) {
           const fn = table.get(sIdx);
           if (typeof fn === 'function') {
             verifiedSyms.push(sName);
@@ -1569,11 +1586,11 @@ export function installInterceptor(customWindow?: any): void {
       };
 
       const presetCandidates = [
-        { name: 'clanWarReplay(0,0)', idx: 291679, args: [0, 0] },
-        { name: 'clanWarReplay(1,0)', idx: 291679, args: [1, 0] },
-        { name: 'replay(0,1,0)', idx: 291684, args: [0, 1, 0] },
-        { name: 'createReplay(0)', idx: 291681, args: [0] },
-        { name: 'tower(0)', idx: 291680, args: [0] },
+        { name: 'clanWarReplay(0,0)', idx: sym.Presets_clanWarReplay, args: [0, 0] },
+        { name: 'clanWarReplay(1,0)', idx: sym.Presets_clanWarReplay, args: [1, 0] },
+        { name: 'replay(0,1,0)', idx: sym.Presets_replay, args: [0, 1, 0] },
+        { name: 'createReplay(0)', idx: sym.Presets_createReplay, args: [0] },
+        { name: 'tower(0)', idx: sym.Presets_tower, args: [0] },
       ];
       const verifiedPresets: string[] = [];
       let probedStringClass = 0;
@@ -1648,6 +1665,9 @@ export function installInterceptor(customWindow?: any): void {
         tableSize: table.length,
         memorySizeMb: Math.round(memory.buffer.byteLength / (1024 * 1024)),
         sampleString: readBack,
+        profileVersion: activeProfile.gameVersion,
+        profileStatus: profileVerification.status,
+        profileMismatches: profileVerification.mismatches.length,
         verifiedSymbolsCount: verifiedSyms.length,
         verifiedSymbols: verifiedSyms.slice(0, 5),
         stringClass: probedStringClass > 0 ? `0x${probedStringClass.toString(16)}` : 'Not found',
@@ -1706,12 +1726,7 @@ export function installInterceptor(customWindow?: any): void {
         u32: new Uint32Array(memory.buffer)
       };
 
-      const sym = {
-        JSON_Parse: 133378,
-        LazyDataObject_ctor: 274399,
-        Object_ToString: 337342,
-        Presets_clanWarReplay: 291679,
-      };
+      const sym = buildSymMap(getActiveWasmProfile());
 
       const callTableFn = (index: number, ...args: any[]): number => {
         const func = table.get(index);
@@ -1985,6 +2000,11 @@ export function installInterceptor(customWindow?: any): void {
       popupRpcEnabled = event.data.popupRpcEnabled === true;
       rpcDispatchMode = event.data.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
       recordingActive = event.data.recordingActive === true;
+      if ('wasmSymbolOverrides' in event.data) {
+        wasmSymbolOverrides = event.data.wasmSymbolOverrides || null;
+        verifiedTableRef = null;
+        lastWasmVerification = null;
+      }
       if (!captureEnabled || !popupRpcEnabled || event.data.socketRefreshMode === 'direct') {
         if (queuedClaimKeys.size) reportClaimResult(false, 'Queued claims were cancelled by Settings.');
         queuedRpcCalls.clear();

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.11.252 — 2026-11-24
+
+### Added
+
+- **Dynamic WASM Symbol Auto-Resolver, Versioned Profile, Settings Override UI & `wasm-sync` Skill (`resolve-wasm-symbols.mjs`, `wasmSymbols.ts`, `interceptor.ts`, `bridge.ts`, `SettingsTab.vue`, `wasm-sync.ps1`, `.agents/skills/wasm-sync/SKILL.md`)**:
+  - Added `hwa-sim/scripts/resolve-wasm-symbols.mjs` (`npm run wasm:sync`) to parse `build.wasm` (`Type`/`Import`/`Function`/`Element`/`Code` sections) and `symbols.json`, auto-generating typed `src/data/wasmSymbols.ts` with 36 WASM `tableIndex`/`funcIndex`/`arity` entries, `BattleConfigStorage` static addresses (`0x15a3a30`, `+92`, `+112`), and `DraftsXORCipher` struct offsets (`+8`, `+12`).
+  - Refactored `src/content/interceptor.ts` to consume `src/data/wasmSymbols.ts`, run `verifyWasmProfile()` pre-flight arity verification before `BattleInstantPlay`, fall back to `findClassByName('BattleConfigStorage')` heap scanning if static lookup misses, and support hot-patch `wasmSymbolOverrides` forwarded from `chrome.storage.local` via `src/content/bridge.ts`.
+  - Added **WASM Engine Profile** status, version-mismatch badge, and Import/Reset Symbol Override JSON editor in `src/components/tabs/SettingsTab.vue`.
+  - Added one-shot `scripts/wasm-sync.ps1` pipeline (`--core-wasm-only` selective download, resolver diff summary, test & dual-build) and `.agents/skills/wasm-sync/SKILL.md` for low-token AI updates on new game builds.
+
+### Fixed
+
+- **Legends Draft Decrypted `{ base, swap }` Hero Pool Extraction & UI Rendering (`draftHelper.ts`, `backgroundRuntime.ts`, `useDraft.ts`, `LegendsDraftModal.vue`, `draft.ts`)**:
+  - Updated `extractDraftHeroSteps()` and added `extractDraftSwapHeroIds()` / `extractDraftHeroDetails()` to parse the live `DraftsXORCipher` payload format `{ base: { [heroId]: HeroObj }, swap: { ... } }` (in addition to legacy matrix shapes), resolving `candidateCount: 0` when decryption succeeded.
+  - Wired `backgroundRuntime.ts` and `useDraft.ts` to share `draftHelper.ts` extraction, and updated `LegendsDraftModal.vue` to display hero avatars, star rating (`★`), power (`K`), and a dedicated **Swap Pool** (`#draft-swap-pool`) section.
+
 ## 0.11.250 — 2026-11-24
 
 ### Added

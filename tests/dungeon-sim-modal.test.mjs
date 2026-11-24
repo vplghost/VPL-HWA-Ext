@@ -118,8 +118,11 @@ test('backgroundRuntime and bridge forward test-wasm-engine messages with error 
 
 test('interceptor uses DungeonStartBattleRoutine BattleConfig (titan/tower + manualRaid) for dungeon battles', async () => {
   const interceptorContent = await readFile(resolve(root, 'src/content/interceptor.ts'), 'utf8');
-  assert.match(interceptorContent, /BattleConfigStorage_get_titan:\s*285313/, 'Must map BattleConfigStorage_get_titan table index');
-  assert.match(interceptorContent, /BattleConfigStorage_get_tower:\s*285311/, 'Must map BattleConfigStorage_get_tower table index');
+  const wasmSymbolsContent = await readFile(resolve(root, 'src/data/wasmSymbols.ts'), 'utf8');
+  assert.match(wasmSymbolsContent, /BattleConfigStorage_get_titan:\s*\{\s*tableIndex:\s*285313/, 'Must map BattleConfigStorage_get_titan table index in wasmSymbols.ts');
+  assert.match(wasmSymbolsContent, /BattleConfigStorage_get_tower:\s*\{\s*tableIndex:\s*285311/, 'Must map BattleConfigStorage_get_tower table index in wasmSymbols.ts');
+  assert.match(interceptorContent, /sym\.BattleConfigStorage_get_titan/, 'Must use sym.BattleConfigStorage_get_titan from wasmSymbols profile');
+  assert.match(interceptorContent, /sym\.BattleConfigStorage_get_tower/, 'Must use sym.BattleConfigStorage_get_tower from wasmSymbols profile');
   assert.match(interceptorContent, /resolveBattleConfigStorage/, 'Must dynamically resolve BattleConfigStorage singleton');
   assert.match(interceptorContent, /createDungeonPreset/, 'Must construct dungeon presets via BattleConfigStorage + Presets_manualRaid');
   assert.match(interceptorContent, /callTableFn\(sym\.Presets_manualRaid,\s*cfgPtr,\s*0,\s*0\)/, 'Must invoke Presets_manualRaid with resolved BattleConfig');

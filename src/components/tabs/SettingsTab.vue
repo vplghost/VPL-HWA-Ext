@@ -10,6 +10,7 @@ import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
 import { useDraft } from '@/src/composables/useDraft';
 import { TROOP_DEFS, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
+import { DEFAULT_WASM_PROFILE_VERSION } from '@/src/data/wasmSymbols';
 import type { ThemeMode, TroopTrainSettings } from '@/src/types';
 
 const { theme, applyTheme } = useTheme();
@@ -30,6 +31,63 @@ const wasmCallResult = ref<any>(null);
 const wasmCallError = ref<string | null>(null);
 const wasmCallErrorDetail = ref<any>(null);
 const showWasmCallDiagnostics = ref(false);
+
+// WASM Symbol Profile & Override
+const wasmProfileVersion = DEFAULT_WASM_PROFILE_VERSION;
+const cachedGameVersion = ref<string | null>(null);
+const wasmOverrideText = ref('');
+const wasmOverrideActive = ref(false);
+const wasmOverrideStatus = ref('');
+const wasmOverrideError = ref('');
+const showWasmOverrideEditor = ref(false);
+
+const liveGameVersion = computed<string | null>(() => {
+  return (
+    cachedGameVersion.value ||
+    (gameEngineStatus.value as any)?.gameVersion ||
+    (cache.value as any)?.gameVersion ||
+    null
+  );
+});
+
+const wasmVersionMismatch = computed<boolean>(() => {
+  if (!liveGameVersion.value || !wasmProfileVersion) return false;
+  return liveGameVersion.value !== wasmProfileVersion;
+});
+
+async function applyWasmOverride() {
+  wasmOverrideError.value = '';
+  wasmOverrideStatus.value = '';
+  const raw = wasmOverrideText.value.trim();
+  if (!raw) {
+    wasmOverrideError.value = 'Please paste a valid JSON object (e.g. {"symbols":{"Play_ctor":291996}}).';
+    return;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Override must be a JSON object.');
+    }
+    if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+      await chrome.storage.local.set({ wasmSymbolOverrides: parsed });
+    }
+    wasmOverrideActive.value = true;
+    wasmOverrideStatus.value = 'Symbol override saved and pushed to active game tabs.';
+  } catch (err: any) {
+    wasmOverrideError.value = `Invalid JSON: ${err?.message || String(err)}`;
+  }
+}
+
+async function resetWasmOverride() {
+  wasmOverrideError.value = '';
+  wasmOverrideStatus.value = '';
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.remove) {
+    await chrome.storage.local.remove('wasmSymbolOverrides');
+  }
+  wasmOverrideText.value = '';
+  wasmOverrideActive.value = false;
+  wasmOverrideStatus.value = `Reset to built-in WASM profile v${wasmProfileVersion}.`;
+}
 const { enabled: autoFreeSpinEnabled, status: autoFreeSpinStatus, save: saveAutoFreeSpin } = useFreeSpinAutomation();
 const { enabled: autoFrontierEnabled, status: autoFrontierStatus, save: saveAutoFrontier } = useFrontierAutomation();
 const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
@@ -216,7 +274,16 @@ onMounted(async () => {
         'mqttCaptureEnabled',
         'captureSettings',
         'tabConfig',
+        'wasmSymbolOverrides',
+        'cachedGameVersion',
       ]);
+      if (stored.cachedGameVersion) {
+        cachedGameVersion.value = String(stored.cachedGameVersion);
+      }
+      if (stored.wasmSymbolOverrides && typeof stored.wasmSymbolOverrides === 'object') {
+        wasmOverrideActive.value = true;
+        wasmOverrideText.value = JSON.stringify(stored.wasmSymbolOverrides, null, 2);
+      }
       const rawMode = stored.socketRefreshMode || stored.dispatchMode;
       dispatchMode.value = rawMode === 'piggyback' ? 'piggyback' : 'direct';
       popupRpcEnabled.value = stored.popupRpcEnabled !== false;
@@ -267,6 +334,14 @@ function handleAutoTrainStorageChange(changes: any, area: string) {
     if (changes.troopTrainSettings.newValue.trainLevels) {
       autoTrainLevels.value = { ...changes.troopTrainSettings.newValue.trainLevels };
     }
+  }
+  if (changes?.cachedGameVersion) {
+    cachedGameVersion.value = changes.cachedGameVersion.newValue ? String(changes.cachedGameVersion.newValue) : null;
+  }
+  if (changes?.wasmSymbolOverrides) {
+    const ov = changes.wasmSymbolOverrides.newValue;
+    wasmOverrideActive.value = Boolean(ov && typeof ov === 'object');
+    wasmOverrideText.value = ov ? JSON.stringify(ov, null, 2) : '';
   }
 }
 
@@ -876,7 +951,76 @@ async function toggleRecording() {
         <dt>SendMessage</dt><dd id="engine-send-message">{{ engine.sendMessage }}</dd>
         <dt>RPC authentication headers</dt><dd id="engine-rpc-headers">{{ engine.rpcHeaders }}</dd>
         <dt>Game tab extension version</dt><dd>{{ gameEngineStatus?.extensionVersion || 'Unknown' }}</dd>
+        <dt>WASM Engine Profile</dt>
+        <dd id="wasm-profile-status" class="flex items-center gap-1.5 flex-wrap">
+          <span class="font-mono text-xs">v{{ wasmProfileVersion }}</span>
+          <span v-if="liveGameVersion" class="text-xs text-slate-500">(Game: v{{ liveGameVersion }})</span>
+          <span
+            v-if="wasmVersionMismatch"
+            id="wasm-version-mismatch-badge"
+            class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+          >
+            ⚠️ Version Mismatch
+          </span>
+          <span
+            v-else-if="liveGameVersion"
+            class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+          >
+            ✓ Matched
+          </span>
+          <span
+            v-if="wasmOverrideActive"
+            id="wasm-override-active-badge"
+            class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300"
+          >
+            Override Active
+          </span>
+        </dd>
       </dl>
+
+      <!-- WASM Symbol Override Hot-Patch -->
+      <div class="pt-1 border-t border-slate-100 dark:border-slate-800 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-medium text-slate-700 dark:text-slate-300">WASM Symbol Override (Hot-Patch)</span>
+          <button
+            id="btn-toggle-wasm-override"
+            type="button"
+            class="cursor-pointer text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+            @click="showWasmOverrideEditor = !showWasmOverrideEditor"
+          >
+            {{ showWasmOverrideEditor ? 'Hide JSON Editor' : (wasmOverrideActive ? 'Edit Override JSON' : 'Import Symbol Override') }}
+          </button>
+        </div>
+        <div v-if="showWasmOverrideEditor" class="space-y-2">
+          <textarea
+            id="wasm-symbol-override-input"
+            v-model="wasmOverrideText"
+            rows="4"
+            placeholder='{"gameVersion":"1.295.0","symbols":{"Play_ctor":291996}}'
+            class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2 font-mono text-[11px] text-slate-800 dark:text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+          ></textarea>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button
+              id="btn-apply-wasm-override"
+              type="button"
+              class="cursor-pointer rounded-md px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors"
+              @click="applyWasmOverride"
+            >
+              Apply Override
+            </button>
+            <button
+              id="btn-reset-wasm-override"
+              type="button"
+              class="cursor-pointer rounded-md px-2.5 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 transition-colors"
+              @click="resetWasmOverride"
+            >
+              Reset to Default
+            </button>
+          </div>
+          <p v-if="wasmOverrideError" class="text-[11px] text-rose-600 dark:text-rose-400">{{ wasmOverrideError }}</p>
+          <p v-if="wasmOverrideStatus" class="text-[11px] text-emerald-600 dark:text-emerald-400">{{ wasmOverrideStatus }}</p>
+        </div>
+      </div>
       <div class="flex items-center gap-2 pt-1 flex-wrap">
         <button id="btn-ping-engine" type="button" :disabled="enginePingPending" @click="pingEngine" class="cursor-pointer rounded-lg px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 text-xs font-semibold transition-colors">Ping Engine</button>
         <button id="btn-test-wasm-engine" type="button" :disabled="wasmTestPending" @click="testWasmEngine" class="cursor-pointer rounded-lg px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 text-xs font-semibold transition-colors">Test WASM Engine</button>

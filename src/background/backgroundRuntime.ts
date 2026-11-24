@@ -27,6 +27,7 @@ import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { eventCatalogService } from '../services/eventCatalogService.ts';
 import { buildAutoTrainCalls, getNextTroopTrainWakeAt, needsTroopTrainingRefresh, TROOP_DEFS } from '../utils/troops.ts';
 import { observedToday } from '../composables/activityState.ts';
+import { extractDraftHeroSteps, extractDraftSwapHeroIds, extractDraftHeroDetails } from '../utils/draftHelper.ts';
 
 export const RECORD_STATE_KEY = 'recordingState';
 export const RECORD_PREFIX = 'record:';
@@ -4047,13 +4048,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
 
           if (message.kind === 'draft-decrypted') {
             const dto = message.data?.draft;
-            const rawSteps = dto?.playerTeam?.heroes ?? dto?.heroes ?? dto?.steps;
-            const heroSteps = Array.isArray(rawSteps)
-              ? rawSteps
-              : (rawSteps && typeof rawSteps === 'object' ? Object.values(rawSteps) : null);
+            const heroSteps = extractDraftHeroSteps(dto);
+            const swapHeroIds = extractDraftSwapHeroIds(dto);
+            const heroDetails = extractDraftHeroDetails(dto);
             session = {
               ...session,
-              heroSteps: (heroSteps && heroSteps.length > 0) ? heroSteps : (session.heroSteps || []),
+              heroSteps: heroSteps.length > 0 ? heroSteps : (session.heroSteps || []),
+              swapHeroIds: (swapHeroIds.length > 0 || (dto && 'swap' in dto)) ? swapHeroIds : (session.swapHeroIds || []),
+              heroDetails: Object.keys(heroDetails).length > 0
+                ? { ...(session.heroDetails || {}), ...heroDetails }
+                : (session.heroDetails || {}),
               chosenDefenceHeroes: dto?.chosenDefenceHeroes || session.chosenDefenceHeroes || [],
               chosenAttackHeroes: dto?.chosenAttackHeroes || session.chosenAttackHeroes || [],
               stageFinishTs: dto?.stageFinishTs || session.stageFinishTs,
@@ -4080,6 +4084,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
             if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
               if (resp.matchId != null && resp.matchId !== session.matchId) {
                 session.heroSteps = [];
+                session.swapHeroIds = [];
+                session.heroDetails = {};
                 session.chosenDefenceHeroes = [];
                 session.chosenAttackHeroes = [];
               }

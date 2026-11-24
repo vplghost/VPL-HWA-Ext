@@ -1,6 +1,12 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import type { DraftSessionData, DraftDto, DraftEnemyUser } from '../types/game/draft.ts';
-import { formatDraftPhase, parseDraftDto, extractDraftHeroSteps } from '../utils/draftHelper.ts';
+import {
+  formatDraftPhase,
+  parseDraftDto,
+  extractDraftHeroSteps,
+  extractDraftSwapHeroIds,
+  extractDraftHeroDetails,
+} from '../utils/draftHelper.ts';
 import { useModals } from './useModals.ts';
 
 const createDefaultSession = (): DraftSessionData => ({
@@ -14,6 +20,8 @@ const createDefaultSession = (): DraftSessionData => ({
   enemyRating: null,
   enemyUser: null,
   heroSteps: [],
+  swapHeroIds: [],
+  heroDetails: {},
   chosenDefenceHeroes: [],
   chosenAttackHeroes: [],
   rawCiphertext: null,
@@ -69,6 +77,14 @@ export function useDraft() {
     if (extractedSteps.length > 0) {
       draftSession.heroSteps = extractedSteps;
     }
+    const extractedSwaps = extractDraftSwapHeroIds(dto);
+    if (extractedSwaps.length > 0 || (dto && ('swap' in dto))) {
+      draftSession.swapHeroIds = extractedSwaps;
+    }
+    const extractedDetails = extractDraftHeroDetails(dto);
+    if (Object.keys(extractedDetails).length > 0) {
+      draftSession.heroDetails = { ...(draftSession.heroDetails || {}), ...extractedDetails };
+    }
     if (Array.isArray(dto.chosenDefenceHeroes)) {
       draftSession.chosenDefenceHeroes = [...dto.chosenDefenceHeroes];
     }
@@ -116,6 +132,8 @@ export function useDraft() {
       // If new match detected, reset steps as new session
       if (resp.matchId != null && resp.matchId !== draftSession.matchId) {
         draftSession.heroSteps = [];
+        draftSession.swapHeroIds = [];
+        draftSession.heroDetails = {};
         draftSession.chosenDefenceHeroes = [];
         draftSession.chosenAttackHeroes = [];
         draftSession.error = null;

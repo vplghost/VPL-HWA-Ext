@@ -215,7 +215,13 @@ test('LegendsDraftModal template uses unified English labels, diagnostics copy b
 });
 
 test('extractDraftHeroSteps normalizes array and object-shaped candidate pools', async () => {
-  const { extractDraftHeroSteps } = await import('../src/utils/draftHelper.ts');
+  const {
+    extractDraftHeroSteps,
+    extractDraftSwapHeroIds,
+    extractDraftHeroDetails,
+    buildCandidateMatrix,
+  } = await import('../src/utils/draftHelper.ts');
+
   assert.deepEqual(
     extractDraftHeroSteps({ playerTeam: { heroes: [[1, 2, 3], [4, 5, 6]] } }),
     [[1, 2, 3], [4, 5, 6]]
@@ -224,6 +230,44 @@ test('extractDraftHeroSteps normalizes array and object-shaped candidate pools',
     extractDraftHeroSteps({ playerTeam: { heroes: { '0': [{ id: 11 }, { heroId: 12 }], '1': [21, 22] } } }),
     [[11, 12], [21, 22]]
   );
+
+  // Live Unity DraftsXORCipher decrypted payload format: { base: { [id]: HeroObj }, swap: { ... } }
+  const livePayload = {
+    base: {
+      '501': { id: 501, level: 120, color: 16, star: 4, power: 183180 },
+      '12': { id: 12, level: 120, color: 16, star: 3, power: 176262 },
+      '13': { id: 13, level: 120, color: 16, star: 3, power: 173428 },
+      '23': { id: 23, level: 120, color: 16, star: 3, power: 168000 },
+    },
+    swap: {
+      '55': { id: 55, level: 120, color: 16, star: 4, power: 197683 },
+      '60': { id: 60, level: 120, color: 16, star: 3, power: 184057 },
+    },
+  };
+
+  const steps = extractDraftHeroSteps(livePayload);
+  assert.equal(steps.flat().length, 4, 'Must extract all 4 base heroes from { base, swap }');
+  assert.ok(steps.flat().includes(501) && steps.flat().includes(12) && steps.flat().includes(13) && steps.flat().includes(23));
+
+  const swaps = extractDraftSwapHeroIds(livePayload);
+  assert.deepEqual(swaps.sort((a, b) => a - b), [55, 60]);
+
+  const details = extractDraftHeroDetails(livePayload);
+  assert.equal(details[501].power, 183180);
+  assert.equal(details[501].star, 4);
+  assert.equal(details[55].pool, 'swap');
+
+  const matrix = buildCandidateMatrix(steps, [], details);
+  const corvus = matrix.flat().find((h) => h.id === 501);
+  assert.ok(corvus, 'Corvus (501) must be present in candidate matrix');
+  assert.equal(corvus.name, 'Corvus');
+  assert.equal(corvus.avatarFile, 'assets/heroes/501.png');
+  assert.equal(corvus.power, 183180);
+  assert.equal(corvus.star, 4);
+
+  // Stage 7 result payload: { base: null, swap: null }
+  assert.deepEqual(extractDraftHeroSteps({ base: null, swap: null }), []);
+  assert.deepEqual(extractDraftSwapHeroIds({ base: null, swap: null }), []);
 });
 
 test('interceptor decrypts Legends Draft via DraftsXORCipher heap keys without invalid WebAssembly.Table.set', async () => {

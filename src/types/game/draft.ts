@@ -1,3 +1,12 @@
+export interface DraftHeroLiveStats {
+  id: number;
+  level?: number;
+  color?: number;
+  star?: number;
+  power?: number;
+  pool?: 'base' | 'swap';
+}
+
 export interface DraftHeroCandidate {
   id: number;
   name: string;
@@ -7,6 +16,11 @@ export interface DraftHeroCandidate {
   faction?: string;
   mainStat?: string;
   picked?: boolean;
+  level?: number;
+  color?: number;
+  star?: number;
+  power?: number;
+  pool?: 'base' | 'swap';
 }
 
 export interface DraftDto {
@@ -15,6 +29,8 @@ export interface DraftDto {
   playerTeam?: {
     heroes: number[][]; // 5 steps x 3 candidate IDs
   };
+  base?: Record<string, any> | any[] | null;
+  swap?: Record<string, any> | any[] | null;
   chosenDefenceHeroes?: number[];
   chosenAttackHeroes?: number[];
   swappedRows?: any[];
@@ -39,6 +55,8 @@ export interface DraftSessionData {
   enemyRating?: number | null;
   enemyUser: DraftEnemyUser | null;
   heroSteps: number[][]; // 5 columns (rounds 1-5), each with 3 hero IDs
+  swapHeroIds?: number[]; // Optional swap pool hero IDs from decrypted { base, swap } payload
+  heroDetails?: Record<number, DraftHeroLiveStats>; // Per-hero live stats (power, star, level, color)
   chosenDefenceHeroes: number[];
   chosenAttackHeroes: number[];
   rawCiphertext?: string | null;
