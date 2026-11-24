@@ -657,6 +657,7 @@ export function installInterceptor(customWindow?: any): void {
     let cachedPlayKlass = 0;
     let cachedLazyKlass = 0;
     let cachedStringClass = 0;
+    let cachedBattleConfigStorage = 0;
 
     win.__hwaSimulateBattle = async function (rawBattle: any, seed: number) {
       let currentPhase = 'INIT_BRIDGE';
@@ -729,7 +730,9 @@ export function installInterceptor(customWindow?: any): void {
         MultiBattleResult_get_stars: 291577,
         MultiBattleResult_get_progress: 291578,
         MultiBattleResult_get_result: 291576,
-        DataObject_asJson: 274798
+        DataObject_asJson: 274798,
+        BattleConfigStorage_get_titan: 285313,
+        BattleConfigStorage_get_tower: 285311
       };
 
       // Safe caller that pads arguments to match exact WebAssembly function signature length
@@ -894,15 +897,88 @@ export function installInterceptor(customWindow?: any): void {
         };
 
         // Step 2: Create presets for battle
-        // In HWA client, Presets_clanWarReplay: 0 = Titan replay, 1 = Hero replay
+        // Per DungeonStartBattleRoutine_tryInstantBattle (WASM func 159715):
+        // - Dungeon Titan uses BattleConfigStorage_get_titan (285313) + Presets_manualRaid(cfg, 0, 0)
+        // - Dungeon Hero uses BattleConfigStorage_get_tower (285311) + Presets_manualRaid(cfg, 0, 0)
+        // Using Presets_clanWarReplay(0, 0) picks BattleConfigStorage_get_titanClanPvp which desyncs
+        // from Dungeon PvE rules and causes server rejection ("Invalid battle").
         currentPhase = 'CREATE_PRESETS';
-        const isTitan = String(rawBattle?.type || '').toLowerCase().includes('titan');
+        const battleType = String(rawBattle?.type || '').toLowerCase();
+        const isTitan = battleType.includes('titan');
+        const isDungeon = battleType.includes('dungeon');
         let presetPtr = 0;
         const candidateErrors: string[] = [];
 
+        const readCStr = (ptr: number): string => {
+          const curU8 = new Uint8Array(memory.buffer);
+          if (!ptr || ptr < 65536 || ptr >= curU8.byteLength) return '';
+          let out = '';
+          for (let i = 0; i < 64; i++) {
+            const ch = curU8[ptr + i];
+            if (ch === 0) break;
+            out += String.fromCharCode(ch);
+          }
+          return out;
+        };
+
+        const resolveBattleConfigStorage = (): number => {
+          const readU32 = () => new Uint32Array(memory.buffer);
+          let curU32 = readU32();
+          let byteLen = curU32.byteLength;
+          if (cachedBattleConfigStorage > 65536 && cachedBattleConfigStorage < byteLen) {
+            const k = curU32[cachedBattleConfigStorage >>> 2];
+            if (k > 65536 && k < byteLen && readCStr(curU32[(k + 8) >>> 2]) === 'BattleConfigStorage') {
+              return cachedBattleConfigStorage;
+            }
+            cachedBattleConfigStorage = 0;
+          }
+
+          // Trigger IL2CPP ClassInit on the BattleConfigStorage holder class (0x15a3a30)
+          try { callTableFn(sym.Presets_titanArenaRaid, 0); } catch (_) {}
+
+          curU32 = readU32();
+          byteLen = curU32.byteLength;
+          const holderKlass = curU32[0x15a3a30 >>> 2];
+          if (holderKlass > 65536 && holderKlass < byteLen && (holderKlass % 4 === 0)) {
+            const staticFields = curU32[(holderKlass + 92) >>> 2];
+            if (staticFields > 65536 && staticFields + 116 < byteLen && (staticFields % 4 === 0)) {
+              const storagePtr = curU32[(staticFields + 112) >>> 2];
+              if (storagePtr > 65536 && storagePtr < byteLen && (storagePtr % 4 === 0)) {
+                const storageKlass = curU32[storagePtr >>> 2];
+                if (storageKlass > 65536 && storageKlass < byteLen && readCStr(curU32[(storageKlass + 8) >>> 2]) === 'BattleConfigStorage') {
+                  cachedBattleConfigStorage = storagePtr;
+                  return storagePtr;
+                }
+              }
+            }
+          }
+          return 0;
+        };
+
+        const createDungeonPreset = (titanMode: boolean): number => {
+          const storagePtr = resolveBattleConfigStorage();
+          if (!storagePtr) return 0;
+          const cfgIdx = titanMode ? sym.BattleConfigStorage_get_titan : sym.BattleConfigStorage_get_tower;
+          const cfgPtr = callTableFn(cfgIdx, storagePtr, 0);
+          if (!cfgPtr) return 0;
+          return callTableFn(sym.Presets_manualRaid, cfgPtr, 0, 0);
+        };
+
         // Comprehensive candidate list supporting exact WASM arities
+        const dungeonCandidates = isDungeon
+          ? [
+              {
+                name: isTitan
+                  ? 'Presets_manualRaid(BattleConfigStorage.titan)'
+                  : 'Presets_manualRaid(BattleConfigStorage.tower)',
+                fn: () => createDungeonPreset(isTitan),
+              },
+            ]
+          : [];
+
         const candidates = isTitan
           ? [
+              ...dungeonCandidates,
               // 1. ClanWar Replay (Titan variants with arity padding)
               { name: 'Presets_clanWarReplay(0, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 0, 0) },
               { name: 'Presets_clanWarReplay(1, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 1, 0) },
@@ -929,6 +1005,7 @@ export function installInterceptor(customWindow?: any): void {
               { name: 'Presets_manual(0)', fn: () => callTableFn(sym.Presets_manual, 0) },
             ]
           : [
+              ...dungeonCandidates,
               // Hero priority
               { name: 'Presets_clanWarReplay(1, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 1, 0) },
               { name: 'Presets_clanWarReplay(0, 0)', fn: () => callTableFn(sym.Presets_clanWarReplay, 0, 0) },

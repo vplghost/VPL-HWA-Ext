@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.238 — 2026-11-24
+
+### Fixed
+
+- **Titan & Hero Dungeon Simulation `BattleConfig` Desync (`src/content/interceptor.ts`)**:
+  - Replaced `Presets_clanWarReplay` (`BattleConfigStorage.titanClanPvp` / `clanPvp`) priority for Dungeon battles with the exact game client instant-battle preset from `DungeonStartBattleRoutine_tryInstantBattle`: `BattleConfigStorage_get_titan` (`285313`) for Titan Dungeon and `BattleConfigStorage_get_tower` (`285311`) for Hero Dungeon, combined with `BattlePresetsFactory_manualRaid(config, 0, 0)` (`291685`).
+  - Added validated & cached `resolveBattleConfigStorage()` (via `0x15a3a30` + `ClassInit` + `BattleConfigStorage` class-name guard) with full fallback to legacy preset candidates, preventing server `Invalid battle` rejections on `dungeonEndBattle`.
+  - Added regression test in `tests/dungeon-sim-modal.test.mjs`.
+
 ## 0.11.236 — 2026-11-24
 
 ### Fixed

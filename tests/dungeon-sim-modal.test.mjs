@@ -115,3 +115,12 @@ test('backgroundRuntime and bridge forward test-wasm-engine messages with error 
   assert.match(interceptorContent, /__hwaTestWasmCall/, 'interceptor must expose __hwaTestWasmCall');
   assert.match(interceptorContent, /kind === 'test-wasm-call'/, 'interceptor must listen for test-wasm-call message');
 });
+
+test('interceptor uses DungeonStartBattleRoutine BattleConfig (titan/tower + manualRaid) for dungeon battles', async () => {
+  const interceptorContent = await readFile(resolve(root, 'src/content/interceptor.ts'), 'utf8');
+  assert.match(interceptorContent, /BattleConfigStorage_get_titan:\s*285313/, 'Must map BattleConfigStorage_get_titan table index');
+  assert.match(interceptorContent, /BattleConfigStorage_get_tower:\s*285311/, 'Must map BattleConfigStorage_get_tower table index');
+  assert.match(interceptorContent, /resolveBattleConfigStorage/, 'Must dynamically resolve BattleConfigStorage singleton');
+  assert.match(interceptorContent, /createDungeonPreset/, 'Must construct dungeon presets via BattleConfigStorage + Presets_manualRaid');
+  assert.match(interceptorContent, /callTableFn\(sym\.Presets_manualRaid,\s*cfgPtr,\s*0,\s*0\)/, 'Must invoke Presets_manualRaid with resolved BattleConfig');
+});
