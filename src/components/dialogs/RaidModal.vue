@@ -99,6 +99,40 @@ const now = ref(Date.now());
 let timer: number | null = null;
 const raidQueueState = ref<any>(null);
 
+const RALLY_ENERGY_COST = 25;
+const currentWorldEnergy = computed<number | undefined>(() => {
+  const energy = cache.value?.['resource:world-energy']?.data;
+  if (Number.isFinite(energy?.amount)) {
+    if (
+      Number.isFinite(energy.lastRefillAt) &&
+      Number.isFinite(energy.refillEveryMs) &&
+      energy.refillEveryMs > 0 &&
+      Number.isFinite(energy.cap)
+    ) {
+      return Math.min(
+        energy.cap,
+        energy.amount + Math.floor(Math.max(0, now.value - energy.lastRefillAt) / energy.refillEveryMs)
+      );
+    }
+    return energy.amount;
+  }
+  const fallback = cache.value?.worldEnergyStatus?.data?.energy;
+  return Number.isFinite(fallback) ? fallback : undefined;
+});
+const maxRaidRounds = computed<number>(() => {
+  const energy = currentWorldEnergy.value;
+  if (!Number.isFinite(energy)) return 100;
+  return Math.max(1, Math.min(100, Math.floor((energy as number) / RALLY_ENERGY_COST)));
+});
+
+watch(maxRaidRounds, (nextMax) => {
+  if (!Number.isFinite(raidCount.value) || raidCount.value > nextMax) {
+    raidCount.value = nextMax;
+  } else if (raidCount.value < 1) {
+    raidCount.value = 1;
+  }
+});
+
 const activeRallies = computed(() => {
   const marches = normalizeArray(cache.value?.marchStatus?.data?.marches);
   return marches.filter(
@@ -147,7 +181,7 @@ const queueStatusLabel = computed(() => {
 onMounted(async () => {
   await loadSquadData();
   const autoStored: any = await chrome.storage.local.get(['raidEnergyAuto', 'raidEnergyAutoStatus', 'raidPreferences']);
-  raidCount.value = autoStored.raidPreferences?.raidCount || 2;
+  raidCount.value = maxRaidRounds.value;
   if (String(autoStored.raidEnergyAuto?.accountId) === String(cache.value.accountStatus?.data?.id)) {
     autoEnergyRaid.value = autoStored.raidEnergyAuto?.enabled === true;
     energyThreshold.value = autoStored.raidEnergyAuto?.threshold || 200;
@@ -210,6 +244,9 @@ watch(
     if (open) {
       registerModalOpen('raid');
       now.value = Date.now();
+      if (!isRunning.value) {
+        raidCount.value = maxRaidRounds.value;
+      }
       document.addEventListener('keydown', handleKeydown);
       loadSquadData();
     } else {
@@ -370,6 +407,11 @@ async function findBosses() {
 
 async function startRaidQueue(count = raidCount.value) {
   if (!await ensureRpcEnabled()) return;
+  const effectiveCount = Math.min(maxRaidRounds.value, Math.max(1, Math.floor(Number(count) || 1)));
+  if (count === raidCount.value) {
+    raidCount.value = effectiveCount;
+  }
+  count = effectiveCount;
   await savePreferences();
 
   const heroIds = normalizeArray(selectedTeam.value?.heroIds);
@@ -749,15 +791,18 @@ async function stopRaidQueue() {
 
           <!-- Raid Count -->
           <div>
-            <label for="raid-queue-count" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-              Rounds / Attack Count (for queue)
+            <label for="raid-queue-count" class="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+              <span>Rounds / Attack Count (for queue)</span>
+              <span v-if="currentWorldEnergy !== undefined" class="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                Max {{ maxRaidRounds }} ({{ currentWorldEnergy }} ⚡ / {{ RALLY_ENERGY_COST }})
+              </span>
             </label>
             <input
               id="raid-queue-count"
               v-model.number="raidCount"
               type="number"
               min="1"
-              max="100"
+              :max="maxRaidRounds"
               class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden"
             />
           </div>

@@ -465,6 +465,9 @@ export function advance(
     if (now > (state.sentAt || now) + 3600000) {
       return { state: stop(state, 'Active guild raid wait timed out after 1 hour.') };
     }
+    if (record && now < (state.wakeAt || 0)) {
+      return { state };
+    }
     state.wakeAt = now + 5000;
     return {
       state,
@@ -482,6 +485,8 @@ export function advance(
       }
     }
     if (state.roster.heroes && state.roster.units) {
+      const isGuildRaidActive = hasActiveRaidPending(cache, now);
+      const isReturning = hasReturningRallySquad(cache, state.options.heroIds, now);
       if (state.options.teamId === 'weakest') {
         state.options = {
           ...state.options,
@@ -491,14 +496,25 @@ export function advance(
           ),
         };
         if (state.options.heroIds.length !== 5) {
+          if (isGuildRaidActive || isReturning || (state.started || 0) > 0 || (state.completed || 0) > 0) {
+            return {
+              state: { ...state, roster: null, phase: 'waiting_rally', sentAt: now, wakeAt: now + 5000 },
+              calls: [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }],
+              expiresAt: now + 15000,
+            };
+          }
           return { state: stop(state, 'Fewer than five available heroes.') };
         }
       }
-      if (
-        state.roster.units.squads?.some((squad: any) =>
-          squad.heroes?.some((hero: any) => state.options.heroIds.includes(hero.id ?? hero.heroId))
-        )
-      ) {
+      const areDeployed = areHeroesDeployed(state.roster.units, state.options.heroIds);
+      if (isGuildRaidActive || isReturning || (areDeployed && ((state.started || 0) > 0 || (state.completed || 0) > 0))) {
+        return {
+          state: { ...state, roster: null, phase: 'waiting_rally', sentAt: now, wakeAt: now + 5000 },
+          calls: [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }],
+          expiresAt: now + 15000,
+        };
+      }
+      if (areDeployed) {
         return { state: stop(state, 'Selected heroes are already deployed. Queue stopped.') };
       }
       const cap = data.capacityModel(
@@ -654,7 +670,10 @@ export function advance(
             return { state: stop(state, 'Unrecognized battle result. Queue stopped.') };
           }
         }
-        if (event?.type === 'returnFromMobCompleted' && event.body?.squadId === current.squadId) {
+        if (
+          (event?.type === 'returnFromMobCompleted' || event?.type === 'returnToOutpostFromMob') &&
+          event.body?.squadId === current.squadId
+        ) {
           current.returned = true;
         }
         if (event?.type === 'rallyCancelled' && event.body?.rallyId === current.rallyId) {
@@ -675,6 +694,13 @@ export function advance(
       consumeBoss(state);
       if (state.bossQueue.remain_raid_count === 0) {
         return { state: { ...state, phase: 'complete', wakeAt: null } };
+      }
+      if (hasActiveRaidPending(cache, now)) {
+        return {
+          state: { ...state, phase: 'waiting_rally', sentAt: now, wakeAt: now + 5000 },
+          calls: [{ name: 'getMarches', feature: 'march' }, { name: 'getUnitSummary', feature: 'unit' }],
+          expiresAt: now + 15000,
+        };
       }
       return issue(state, 'refreshing', rosterCalls(), now);
     }

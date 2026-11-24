@@ -451,3 +451,102 @@ test('queue waits when raid squad is returning before dispatching next rally', (
   const nextStep = queue.advance(step.state, null, clearedCache, 2000);
   assert.equal(nextStep.state.phase, 'refreshing');
 });
+
+test('mid-queue clan rally interruption enters waiting_rally and auto-resumes when cleared', () => {
+  const started = queue.start({ ...options, firstMobId: 'boss-a', autoCancel: false, count: 3 }, 1, 10, 1000, {
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': { data: inventory },
+    experimentalRallySearch: {
+      updatedAt: new Date(1000).toISOString(),
+      data: { mapId: 'map', mobConfigIds: [64], mobs: [{ mobId: 'boss-a' }, { mobId: 'boss-b' }] }
+    },
+    'resource:world-energy': { data: { amount: 150 } }
+  });
+  assert.equal(started.state.phase, 'creating');
+
+  // Simulate round 1 already completed and now in refreshing while clanmate rally auto-joined our heroes
+  const refreshingState = {
+    ...started.state,
+    started: 1,
+    completed: 1,
+    phase: 'refreshing',
+    sentAt: 5000,
+    wakeAt: 125000,
+    bossQueue: { remain_raid_count: 2, queue: [{ mobId: 'boss-b' }] },
+    roster: {}
+  };
+  const clanBusyCache = {
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': { data: { ...inventory, squads: [{ heroes: [{ id: 1 }, { id: 2 }] }] } },
+    marchStatus: {
+      data: {
+        marches: [{ squadId: 'clan-autojoin', rally: { rallyId: 'clan-r1', returnAt: 999999 }, stage: 'waitingForRallyStart', endsAt: 999999 }]
+      }
+    },
+    'resource:world-energy': { data: { amount: 125 } }
+  };
+  const rosterReply = {
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    method: 'POST',
+    status: 200,
+    timestamp: new Date(6000).toISOString(),
+    requestBody: JSON.stringify({ calls: [{ name: 'heroGetAll', ident: 'h1' }, { name: 'getUnitSummary', feature: 'unit', ident: 'u1' }] }),
+    responseBody: JSON.stringify({
+      results: [
+        { ident: 'h1', result: { response: heroes } },
+        { ident: 'u1', result: { response: { ...inventory, squads: [{ heroes: [{ id: 1 }, { id: 2 }] }] } } }
+      ]
+    })
+  };
+  const waited = queue.advance(refreshingState, rosterReply, clanBusyCache, 6000);
+  assert.equal(waited.state.phase, 'waiting_rally', 'Must enter waiting_rally instead of stopping queue when clan rally deploys heroes');
+
+  // Unrelated packet before wakeAt should not spam polling RPCs
+  const idleWait = queue.advance(waited.state, { timestamp: new Date(7000).toISOString() }, clanBusyCache, 7000);
+  assert.equal(idleWait.state.phase, 'waiting_rally');
+  assert.equal(idleWait.calls, undefined);
+
+  // Once clan rally finishes and heroes are free, queue automatically resumes to refreshing
+  const freeCache = {
+    heroGetAll: { data: heroes },
+    'getUnitSummary:unit': { data: inventory },
+    marchStatus: { data: { marches: [] } },
+    'resource:world-energy': { data: { amount: 125 } }
+  };
+  const resumed = queue.advance(waited.state, null, freeCache, 12000);
+  assert.equal(resumed.state.phase, 'refreshing', 'Must automatically resume to refreshing once clan rally clears');
+});
+
+test('active rally recognizes returnToOutpostFromMob and enters waiting_rally if another clan rally is active', () => {
+  const activeState = {
+    id: '1000:1',
+    tabId: 1,
+    accountId: 10,
+    options: { ...options, autoCancel: false, count: 2 },
+    started: 1,
+    completed: 0,
+    createdRallyIds: ['r1'],
+    completedRallyIds: [],
+    bossQueue: { remain_raid_count: 2, queue: [{ mobId: 'boss-a' }, { mobId: 'boss-b' }] },
+    failedBossIds: [],
+    wonBossIds: [],
+    phase: 'active',
+    sentAt: 1000,
+    wakeAt: 20000,
+    current: { mobId: 'boss-a', mapId: 'map', rallyId: 'r1', squadId: 'sq1', result: 'win', resultAt: 5000, memberChecked: true }
+  };
+  const returnMqtt = {
+    transport: 'websocket',
+    direction: 'received',
+    encoding: 'utf8',
+    payloadTruncated: false,
+    timestamp: new Date(8000).toISOString(),
+    payload: JSON.stringify({ result: { type: 'returnToOutpostFromMob', body: { squadId: 'sq1' } } })
+  };
+  const next = queue.advance(activeState, returnMqtt, {
+    marchStatus: { data: { marches: [] } },
+    'resource:world-energy': { data: { amount: 100 } }
+  }, 8000);
+  assert.equal(next.state.completed, 1);
+  assert.equal(next.state.phase, 'refreshing');
+});

@@ -1426,7 +1426,7 @@ export async function advanceGatherQueue(type: string, record: any, stored: any,
   return save(transition || { state: controller.stop(queue, 'Team or target unavailable after gathering return. Refresh and start again.') }, stored, cr);
 }
 
-export async function updateRaidQueue(record: any, tabId: number, customChrome?: any) {
+export async function updateRaidQueue(record: any, tabId: number, customChrome?: any, liveCache?: Record<string, any>) {
   const cr = getActiveChrome(customChrome);
   const stored =
     (await cr?.storage?.local?.get([
@@ -1438,6 +1438,7 @@ export async function updateRaidQueue(record: any, tabId: number, customChrome?:
       'troopCapacitySettings',
       'smartGatherState'
     ])) || {};
+  if (liveCache) stored.rpcCache = liveCache;
   const state = stored.raidQueue;
   if (state?.phase === 'waiting_gather' && state.tabId === tabId) return advanceGatherQueue('raid', record, stored, tabId, cr);
   if (raidQueueService.terminal(state) || state.tabId !== tabId) return state;
@@ -4251,12 +4252,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       if (cacheResult.cache?.remoteConfigStatus?.data && cr.storage?.local) {
         eventCatalogService.syncRemoteEventCatalog(cacheResult.cache.remoteConfigStatus.data, cr.storage.local).catch(() => {});
       }
-      if (sender.tab?.id) await updateRaidQueue(record, sender.tab.id, cr);
-      if (sender.tab?.id) await updateMonsterQueue(record, sender.tab.id, cr);
-      if (sender.tab?.id) await updateTowerRun(record, sender.tab.id, cr);
-      if (sender.tab?.id) await updateDungeonRun(record, sender.tab.id, cr);
-      if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id, record, cr);
-      if (sender.tab?.id) await advanceResearchQueue(sender.tab.id, record, cr);
+      if (sender.tab?.id) {
+        for (const rec of records) {
+          await updateRaidQueue(rec, sender.tab.id, cr, cacheResult.cache);
+          await updateMonsterQueue(rec, sender.tab.id, cr);
+          await updateTowerRun(rec, sender.tab.id, cr);
+          await updateDungeonRun(rec, sender.tab.id, cr);
+          await advanceBuildingQueue(sender.tab.id, rec, cr);
+          await advanceResearchQueue(sender.tab.id, rec, cr);
+        }
+      }
       if (sender.tab?.id && cacheResult.changed) {
         const troopOrBuildingChanged = [
           'getTrainings:unit',

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.244 — 2026-11-24
+
+### Fixed
+
+- **Raid Queue Auto-Resume, Batch Event Processing & World Energy Round Cap (`backgroundRuntime.ts`, `raidQueue.ts`, `RaidModal.vue`)**:
+  - Processed every record in `api-record-batch` through `updateRaidQueue` (with live hot `rpcCache`), `updateMonsterQueue`, `updateTowerRun`, `updateDungeonRun`, `advanceBuildingQueue`, and `advanceResearchQueue` so closely timed MQTT events (`mobRallyAttackResult` + `rallyCompleted`, `returnFromMobCompleted` + `returnToOutpostFromMob`) are never dropped.
+  - Updated `raidQueue.ts` to transition mid-queue clan rally / auto-join interruptions into `waiting_rally` and automatically resume once cleared instead of stopping the queue, recognized `returnToOutpostFromMob`, and throttled `waiting_rally` polling to `wakeAt`.
+  - Updated `RaidModal.vue` to cap `Rounds` (`#raid-queue-count`) by remaining World Energy (`Math.floor(worldEnergy / 25)`) and default to the maximum possible rounds when opening the dialog.
+
 ## 0.11.242 — 2026-11-24
 
 ### Fixed
