@@ -377,3 +377,77 @@ export function buildAutoTrainCalls(cache: any, settings: TroopTrainSettings, no
 
   return result;
 }
+
+/**
+ * Computes the earliest future timestamp when an active training queue, upgrade queue,
+ * or camp building upgrade will finish so the background scheduler can wake up on time.
+ */
+export function getNextTroopTrainWakeAt(cache: any, now = Date.now()): number | null {
+  if (!cache || typeof cache !== 'object') return null;
+  let earliest: number | null = null;
+  const consider = (ts: number) => {
+    if (Number.isFinite(ts) && ts > now && (earliest === null || ts < earliest)) {
+      earliest = ts;
+    }
+  };
+
+  const trainings = cache?.['getTrainings:unit']?.data ?? cache?.getTrainings?.data;
+  const allQueues = [
+    ...normalizeArray(trainings?.trainingQueues),
+    ...normalizeArray(trainings?.upgradeQueues),
+  ];
+  for (const q of allQueues) {
+    if (Number.isFinite(q?.startDate) && Number.isFinite(q?.duration)) {
+      consider(q.startDate + q.duration);
+    }
+  }
+
+  const campIds = new Set(Object.values(CAMP_BUILDING_IDS));
+  for (const bq of extractBuildingQueues(cache)) {
+    const bId = Number(bq?.buildingId ?? bq?.id);
+    if (!campIds.has(bId)) continue;
+    const start = Number(bq?.startDate ?? bq?.startTime);
+    const dur = Number(bq?.durationMs ?? bq?.duration);
+    if (Number.isFinite(start) && Number.isFinite(dur)) {
+      consider(start + dur);
+    }
+  }
+
+  return earliest;
+}
+
+/**
+ * Determines whether the background Auto Troop Training runner should refresh
+ * building/unit/training snapshots before deciding that nothing can be trained.
+ */
+export function needsTroopTrainingRefresh(cache: any, now = Date.now(), staleMs = 5 * 60 * 1000): boolean {
+  if (!cache || typeof cache !== 'object') return true;
+
+  const unitSummaryEntry = cache['getUnitSummary:unit'] ?? cache.getUnitSummary;
+  const trainingsEntry = cache['getTrainings:unit'] ?? cache.getTrainings;
+  const buildingsRaw = extractBuildingsRaw(cache);
+
+  if (!unitSummaryEntry?.data || !trainingsEntry?.data) return true;
+  if (buildingsRaw == null && !unitSummaryEntry.data?.limits) return true;
+
+  // If a camp building upgrade queue has already elapsed, buildingStatus is likely stale
+  const campIds = new Set(Object.values(CAMP_BUILDING_IDS));
+  for (const bq of extractBuildingQueues(cache)) {
+    const bId = Number(bq?.buildingId ?? bq?.id);
+    if (!campIds.has(bId)) continue;
+    const start = Number(bq?.startDate ?? bq?.startTime);
+    const dur = Number(bq?.durationMs ?? bq?.duration);
+    if (Number.isFinite(start) && Number.isFinite(dur) && start + dur <= now) {
+      return true;
+    }
+  }
+
+  // If trainings cache is stale and no active future training is known, refresh
+  const trainingsUpdatedAt = Date.parse(trainingsEntry.updatedAt || '');
+  if (Number.isFinite(trainingsUpdatedAt) && now - trainingsUpdatedAt > staleMs) {
+    const nextWake = getNextTroopTrainWakeAt(cache, now);
+    if (nextWake === null) return true;
+  }
+
+  return false;
+}

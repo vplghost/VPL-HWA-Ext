@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { engineDiagnostics } from '@/src/composables/engineDiagnostics';
 import { useTheme } from '@/src/composables/useTheme';
 import { useRpcCache } from '@/src/composables/useRpcCache';
@@ -36,29 +36,48 @@ const { autoOpenDraft, saveAutoOpen: saveDraftAutoOpen } = useDraft();
 
 // Auto Troop Training
 const autoTrainEnabled = ref(false);
-const autoTrainLevels = ref<Record<number, number>>({ 0: 7, 1: 7, 2: 7 });
+const autoTrainLevels = ref<Record<number, number>>({});
+const autoTrainState = ref<{
+  status?: string;
+  lastError?: string | null;
+  lastRunAt?: number;
+  nextWakeAt?: number | null;
+} | null>(null);
+const autoTrainTickPending = ref(false);
 
 async function loadTroopTrainSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
     try {
-      const stored = await chrome.storage.local.get('troopTrainSettings');
+      const stored = await chrome.storage.local.get(['troopTrainSettings', 'autoTrainState']);
       if (stored.troopTrainSettings) {
         autoTrainEnabled.value = stored.troopTrainSettings.autoTrainEnabled === true;
         if (stored.troopTrainSettings.trainLevels) {
-          autoTrainLevels.value = { ...autoTrainLevels.value, ...stored.troopTrainSettings.trainLevels };
+          autoTrainLevels.value = { ...stored.troopTrainSettings.trainLevels };
         }
+      }
+      if (stored.autoTrainState) {
+        autoTrainState.value = stored.autoTrainState;
       }
     } catch (_) {}
   }
 }
 
 async function saveAutoTrain() {
-  const payload: TroopTrainSettings = {
-    autoTrainEnabled: autoTrainEnabled.value,
-    trainLevels: { ...autoTrainLevels.value },
-  };
+  const trainLevels: Record<number, number> = {};
+  for (const item of troopSettingsList.value) {
+    const val = Number(autoTrainLevels.value[item.type] ?? item.selectedLevel);
+    if (Number.isInteger(val) && val >= 1 && val <= 10) {
+      trainLevels[item.type] = val;
+    }
+  }
   if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
     try {
+      const existing = await chrome.storage.local.get('troopTrainSettings');
+      const payload: TroopTrainSettings = {
+        ...(existing?.troopTrainSettings || {}),
+        autoTrainEnabled: autoTrainEnabled.value,
+        trainLevels,
+      };
       await chrome.storage.local.set({ troopTrainSettings: payload });
       if (autoTrainEnabled.value && chrome.runtime?.sendMessage) {
         chrome.runtime.sendMessage({ kind: 'auto-train-tick' }).catch(() => {});
@@ -67,18 +86,41 @@ async function saveAutoTrain() {
   }
 }
 
+function onAutoTrainLevelChange(type: number, event: Event) {
+  const target = event.target as HTMLSelectElement;
+  const val = parseInt(target.value, 10);
+  if (!isNaN(val) && val >= 1 && val <= 10) {
+    autoTrainLevels.value = { ...autoTrainLevels.value, [type]: val };
+    saveAutoTrain();
+  }
+}
+
+async function triggerAutoTrainNow() {
+  if (autoTrainTickPending.value || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  autoTrainTickPending.value = true;
+  try {
+    await chrome.runtime.sendMessage({ kind: 'auto-train-tick', force: true });
+    await loadTroopTrainSettings();
+  } catch (_) {
+  } finally {
+    autoTrainTickPending.value = false;
+  }
+}
+
 const troopSettingsList = computed(() => {
   return TROOP_DEFS.map((def) => {
     const cap = getBuildingTrainingCapacity(def.type, cache?.value);
     const savedLvl = autoTrainLevels.value[def.type];
     const unlocked = getUnlockedTroopLevels(def.type, cache?.value, savedLvl);
-    if (!unlocked.includes(autoTrainLevels.value[def.type])) {
-      autoTrainLevels.value[def.type] = unlocked[unlocked.length - 1];
-    }
+    const selectedLevel =
+      typeof savedLvl === 'number' && unlocked.includes(savedLvl)
+        ? savedLvl
+        : unlocked[unlocked.length - 1];
     return {
       ...def,
       trainingCapacity: cap,
       unlockedLevels: unlocked,
+      selectedLevel,
     };
   });
 });
@@ -209,6 +251,28 @@ onMounted(async () => {
       }
       await loadTroopTrainSettings();
     } catch (_) {}
+  }
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
+    chrome.storage.onChanged.addListener(handleAutoTrainStorageChange);
+  }
+});
+
+function handleAutoTrainStorageChange(changes: any, area: string) {
+  if (area !== 'local') return;
+  if (changes?.autoTrainState) {
+    autoTrainState.value = changes.autoTrainState.newValue || null;
+  }
+  if (changes?.troopTrainSettings?.newValue) {
+    autoTrainEnabled.value = changes.troopTrainSettings.newValue.autoTrainEnabled === true;
+    if (changes.troopTrainSettings.newValue.trainLevels) {
+      autoTrainLevels.value = { ...changes.troopTrainSettings.newValue.trainLevels };
+    }
+  }
+}
+
+onUnmounted(() => {
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.removeListener) {
+    chrome.storage.onChanged.removeListener(handleAutoTrainStorageChange);
   }
 });
 
@@ -563,17 +627,40 @@ async function toggleRecording() {
         </span>
       </div>
 
-      <!-- Master Toggle -->
-      <label for="setting-auto-train" class="flex items-center gap-2 cursor-pointer font-medium text-slate-800 dark:text-slate-200">
-        <input
-          id="setting-auto-train"
-          v-model="autoTrainEnabled"
-          type="checkbox"
-          class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-4 cursor-pointer"
-          @change="saveAutoTrain"
-        />
-        <span>Enable Auto Troop Training</span>
-      </label>
+      <!-- Master Toggle & Status -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <label for="setting-auto-train" class="flex items-center gap-2 cursor-pointer font-medium text-slate-800 dark:text-slate-200">
+          <input
+            id="setting-auto-train"
+            v-model="autoTrainEnabled"
+            type="checkbox"
+            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 size-4 cursor-pointer"
+            @change="saveAutoTrain"
+          />
+          <span>Enable Auto Troop Training</span>
+        </label>
+        <button
+          v-if="autoTrainEnabled"
+          type="button"
+          :disabled="autoTrainTickPending"
+          class="cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 transition-colors disabled:opacity-50"
+          @click="triggerAutoTrainNow"
+        >
+          {{ autoTrainTickPending ? 'Checking...' : 'Check Now' }}
+        </button>
+      </div>
+
+      <div
+        v-if="autoTrainEnabled && (autoTrainState?.status || autoTrainState?.lastError)"
+        class="text-xs rounded-lg px-3 py-2 border"
+        :class="
+          autoTrainState?.lastError
+            ? 'bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300'
+            : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-300'
+        "
+      >
+        {{ autoTrainState.lastError ? `Error: ${autoTrainState.lastError}` : autoTrainState.status }}
+      </div>
 
       <!-- Troop Types Level Selection Grid -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -597,9 +684,9 @@ async function toggleRecording() {
             </label>
             <select
               :id="'auto-train-level-' + troop.type"
-              v-model="autoTrainLevels[troop.type]"
+              :value="troop.selectedLevel"
               class="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden"
-              @change="saveAutoTrain"
+              @change="onAutoTrainLevelChange(troop.type, $event)"
             >
               <option v-for="lvl in troop.unlockedLevels" :key="lvl" :value="lvl">
                 Lv.{{ lvl }}

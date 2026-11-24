@@ -7,9 +7,16 @@ import {
   getUnlockedTroopLevels,
   isCampBuildingUpgrading,
   buildAutoTrainCalls,
+  getNextTroopTrainWakeAt,
+  needsTroopTrainingRefresh,
   troopStockProgress,
   getTroopType,
 } from '../src/utils/troops.ts';
+import {
+  advanceTroopTraining,
+  resetTroopTrainRuntimeState,
+  setupBackgroundRuntime,
+} from '../src/background/backgroundRuntime.ts';
 
 test('getBuildingTrainingCapacity resolves correct capacity from camp building level', () => {
   // Level 1: 17, Level 2: 22, Level 3: 26, Level 10: 56, Level 25: 167
@@ -450,4 +457,238 @@ test('upgradeQueues: buildAutoTrainCalls collects finished upgrade queue', () =>
   assert.equal(collectAction.unitId, 28);
   const collectCall = plan.calls.find(c => c.name === 'completeTraining' && c.args?.unitId === 28);
   assert.ok(collectCall, 'Should dispatch completeTraining with targetUnitId 28');
+});
+
+test('getNextTroopTrainWakeAt resolves earliest future completion across trainings, upgrades, and camp buildings', () => {
+  const now = 100000;
+  const cache = {
+    buildingStatus: {
+      data: {
+        queues: [
+          { buildingId: 20, startDate: now - 1000, durationMs: 5000 }, // non-camp building -> ignore
+          { buildingId: 40, startDate: now - 1000, durationMs: 20000 }, // Infantry camp ends at 119000
+        ],
+      },
+    },
+    'getTrainings:unit': {
+      data: {
+        trainingQueues: [
+          { unitId: 17, unitCount: 30, startDate: now - 5000, duration: 15000 }, // ends at 110000 (earliest)
+        ],
+        upgradeQueues: [
+          { sourceUnitId: 27, targetUnitId: 28, unitCount: 100, startDate: now - 1000, duration: 50000 }, // ends at 149000
+        ],
+      },
+    },
+  };
+
+  assert.equal(getNextTroopTrainWakeAt(cache, now), 110000);
+  assert.equal(getNextTroopTrainWakeAt({}, now), null);
+});
+
+test('needsTroopTrainingRefresh detects missing cache, elapsed camp upgrades, and stale idle trainings', () => {
+  const now = 1000000;
+  assert.equal(needsTroopTrainingRefresh({}, now), true, 'Missing cache must trigger refresh');
+
+  // Complete and fresh cache with active queue -> no refresh needed
+  const freshCache = {
+    buildingStatus: {
+      data: { buildings: [{ buildingId: 182, level: 10 }], queues: [] },
+    },
+    'getUnitSummary:unit': {
+      data: { available: [{ unitId: 7, count: 100 }] },
+      updatedAt: new Date(now - 10000).toISOString(),
+    },
+    'getTrainings:unit': {
+      data: { trainingQueues: [] },
+      updatedAt: new Date(now - 10000).toISOString(),
+    },
+  };
+  assert.equal(needsTroopTrainingRefresh(freshCache, now), false);
+
+  // Elapsed camp upgrade queue in buildingStatus -> must refresh
+  const elapsedCampCache = {
+    ...freshCache,
+    buildingStatus: {
+      data: {
+        buildings: [{ buildingId: 182, level: 10 }],
+        queues: [{ buildingId: 41, startDate: now - 60000, durationMs: 30000 }],
+      },
+    },
+  };
+  assert.equal(needsTroopTrainingRefresh(elapsedCampCache, now), true);
+
+  // Stale getTrainings (> 5 min) with no active queue -> must refresh
+  const staleTrainingsCache = {
+    ...freshCache,
+    'getTrainings:unit': {
+      data: { trainingQueues: [] },
+      updatedAt: new Date(now - 6 * 60 * 1000).toISOString(),
+    },
+  };
+  assert.equal(needsTroopTrainingRefresh(staleTrainingsCache, now), true);
+});
+
+test('auto-train-tick from extension tab resolves game tab instead of sending to sender extension tab', async () => {
+  resetTroopTrainRuntimeState();
+  const sentToTabs = [];
+  const alarmsCreated = [];
+  const localData = {
+    popupRpcEnabled: true,
+    socketRefreshMode: 'direct',
+    troopTrainSettings: { autoTrainEnabled: true, trainLevels: { 0: 5 } },
+    rpcCache: {
+      buildingStatus: {
+        data: {
+          buildings: [
+            { buildingId: 182, level: 1 }, // 2770 cap
+            { buildingId: 40, level: 3 },  // 26 capacity
+          ],
+          queues: [],
+        },
+      },
+      'getUnitSummary:unit': {
+        data: { available: [{ unitId: 5, count: 100 }] },
+        updatedAt: new Date().toISOString(),
+      },
+      'getTrainings:unit': {
+        data: { trainingQueues: [], upgradeQueues: [] },
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  };
+
+  let onMessageListener = null;
+  const mockChrome = {
+    runtime: {
+      id: 'ext-test-id',
+      onMessage: { addListener: (fn) => { onMessageListener = fn; } },
+      onStartup: { addListener: () => {} },
+      onInstalled: { addListener: () => {} },
+    },
+    alarms: {
+      get: (_name, cb) => cb && cb(null),
+      create: (name, opts) => alarmsCreated.push({ name, opts }),
+      clear: async () => {},
+      onAlarm: { addListener: () => {} },
+    },
+    storage: {
+      local: {
+        get: async (keys) => {
+          if (Array.isArray(keys)) {
+            const out = {};
+            for (const k of keys) out[k] = localData[k];
+            return out;
+          }
+          if (typeof keys === 'string') return { [keys]: localData[keys] };
+          return { ...localData };
+        },
+        set: async (obj) => { Object.assign(localData, obj); },
+      },
+      onChanged: { addListener: () => {} },
+    },
+    tabs: {
+      query: (_opts, cb) => {
+        const res = [
+          { id: 999, url: 'chrome-extension://ext-test-id/popup.html', active: true },
+          { id: 42, url: 'https://hero-wars-alliance.com/game', active: false },
+        ];
+        if (typeof cb === 'function') cb(res);
+        return Promise.resolve(res);
+      },
+      sendMessage: async (tabId, msg) => {
+        sentToTabs.push({ tabId, msg });
+        return { ok: true, results: [] };
+      },
+    },
+  };
+
+  setupBackgroundRuntime({ chrome: mockChrome });
+  assert.ok(onMessageListener, 'Message listener must be registered');
+
+  const response = await new Promise((resolve) => {
+    onMessageListener(
+      { kind: 'auto-train-tick' },
+      { url: 'chrome-extension://ext-test-id/popup.html', tab: { id: 999 } },
+      resolve
+    );
+  });
+
+  assert.equal(response?.ok, true);
+  assert.equal(sentToTabs.length, 1);
+  assert.equal(sentToTabs[0].tabId, 42, 'Must dispatch to active Hero Wars game tab (42), NOT extension tab (999)');
+  assert.ok(sentToTabs[0].msg.calls.some((c) => c.name === 'startTraining'), 'Must include startTraining call');
+  assert.equal(localData.autoTrainState?.lastError, null);
+});
+
+test('advanceTroopTraining refreshes missing cache and schedules wake alarm when queues are active', async () => {
+  resetTroopTrainRuntimeState();
+  const sent = [];
+  const alarms = [];
+  const now = Date.now();
+  const localData = {
+    popupRpcEnabled: true,
+    socketRefreshMode: 'direct',
+    troopTrainSettings: { autoTrainEnabled: true, trainLevels: {} },
+    rpcCache: {},
+  };
+
+  const mockChrome = {
+    alarms: {
+      create: (name, opts) => alarms.push({ name, opts }),
+      clear: async () => {},
+    },
+    storage: {
+      local: {
+        get: async (keys) => {
+          const out = {};
+          for (const k of (Array.isArray(keys) ? keys : [keys])) out[k] = localData[k];
+          return out;
+        },
+        set: async (obj) => { Object.assign(localData, obj); },
+      },
+    },
+    tabs: {
+      query: (_opts, cb) => {
+        const res = [{ id: 77, url: 'https://hero-wars-alliance.com/game', active: true }];
+        if (typeof cb === 'function') cb(res);
+        return Promise.resolve(res);
+      },
+      sendMessage: async (tabId, msg) => {
+        sent.push({ tabId, msg });
+        return { ok: true, results: [] };
+      },
+    },
+  };
+
+  // 1. Missing cache -> dispatches read-only refresh
+  const refreshRes = await advanceTroopTraining(undefined, mockChrome);
+  assert.equal(refreshRes.ok, true);
+  assert.equal(refreshRes.refreshing, true);
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].msg.calls.some((c) => c.name === 'getTrainings'));
+  assert.ok(sent[0].msg.calls.some((c) => c.name === 'getSummary' && c.feature === 'building'));
+
+  // 2. All queues active -> schedules hwa-troop-train-wake alarm
+  localData.rpcCache = {
+    buildingStatus: { data: { buildings: [{ buildingId: 182, level: 10 }], queues: [] } },
+    'getUnitSummary:unit': { data: { available: [{ unitId: 7, count: 100 }] }, updatedAt: new Date(now).toISOString() },
+    'getTrainings:unit': {
+      data: {
+        trainingQueues: [
+          { unitId: 7, unitCount: 26, startDate: now - 1000, duration: 60000 },
+          { unitId: 17, unitCount: 26, startDate: now - 1000, duration: 90000 },
+          { unitId: 27, unitCount: 26, startDate: now - 1000, duration: 120000 },
+        ],
+      },
+      updatedAt: new Date(now).toISOString(),
+    },
+  };
+
+  const waitRes = await advanceTroopTraining(undefined, mockChrome);
+  assert.equal(waitRes.ok, true);
+  assert.ok(waitRes.nextWakeAt > now);
+  const wakeAlarm = alarms.find((a) => a.name === 'hwa-troop-train-wake');
+  assert.ok(wakeAlarm, 'Must schedule hwa-troop-train-wake alarm');
+  assert.ok(wakeAlarm.opts.when >= waitRes.nextWakeAt);
 });

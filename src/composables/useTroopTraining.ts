@@ -99,15 +99,33 @@ export function useTroopTraining() {
 
     isAutoTraining.value = true;
     try {
-      await dispatchRpc(plan.calls);
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        await chrome.runtime.sendMessage({ kind: 'auto-train-tick' });
+      } else {
+        await dispatchRpc(plan.calls);
+      }
     } catch (_) {
     } finally {
       isAutoTraining.value = false;
     }
   }
 
+  function handleStorageChanged(changes: any, area: string) {
+    if (area === 'local' && changes?.troopTrainSettings?.newValue) {
+      const next = changes.troopTrainSettings.newValue;
+      trainSettings.value = {
+        autoTrainEnabled: next.autoTrainEnabled === true,
+        maxTargets: next.maxTargets || {},
+        trainLevels: next.trainLevels || {},
+      };
+    }
+  }
+
   onMounted(() => {
     loadSettings();
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
+      chrome.storage.onChanged.addListener(handleStorageChanged);
+    }
     timerInterval = setInterval(() => {
       now.value = Date.now();
       if (trainSettings.value?.autoTrainEnabled) {
@@ -118,6 +136,9 @@ export function useTroopTraining() {
 
   onUnmounted(() => {
     if (timerInterval) clearInterval(timerInterval);
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.removeListener) {
+      chrome.storage.onChanged.removeListener(handleStorageChanged);
+    }
   });
 
   const unitSummary = computed(() => cache.value['getUnitSummary:unit']?.data || cache.value.getUnitSummary?.data);

@@ -25,7 +25,7 @@ import { worldReadService } from '../services/worldReadService.ts';
 import { experimentalDataHelper } from '../utils/experimentalData.ts';
 import { isTrackingUrl } from '../utils/trackingFilter.ts';
 import { eventCatalogService } from '../services/eventCatalogService.ts';
-import { buildAutoTrainCalls } from '../utils/troops.ts';
+import { buildAutoTrainCalls, getNextTroopTrainWakeAt, needsTroopTrainingRefresh, TROOP_DEFS } from '../utils/troops.ts';
 import { observedToday } from '../composables/activityState.ts';
 
 export const RECORD_STATE_KEY = 'recordingState';
@@ -562,10 +562,20 @@ export function advanceResearchQueue(tabId?: number, record?: any, customChrome?
   return advanceCityQueue('research', tabId, record, customChrome);
 }
 
-export async function advanceTroopTraining(tabId?: number, customChrome?: any) {
+let troopTrainInFlight = false;
+let lastTroopTrainDispatch: { sig: string; at: number } | null = null;
+let lastTroopTrainRefreshAt = 0;
+
+export function resetTroopTrainRuntimeState() {
+  troopTrainInFlight = false;
+  lastTroopTrainDispatch = null;
+  lastTroopTrainRefreshAt = 0;
+}
+
+export async function advanceTroopTraining(tabId?: number, customChrome?: any, options?: { force?: boolean }) {
   const cr = getActiveChrome(customChrome);
-  if (!tabId) tabId = (await findActiveGameTab(cr))?.id;
-  if (!tabId) return { ok: false, error: 'No active game tab found.' };
+  const now = Date.now();
+  const force = Boolean(options?.force);
 
   const stored =
     (await cr?.storage?.local?.get([
@@ -576,21 +586,138 @@ export async function advanceTroopTraining(tabId?: number, customChrome?: any) {
       'captureSettings',
     ])) || {};
 
-  if (stored.popupRpcEnabled === false) return { ok: false, error: 'Popup RPC is disabled.' };
   const settings = stored.troopTrainSettings;
-  if (!settings || !settings.autoTrainEnabled) return { ok: false, error: 'Auto train is disabled.' };
+  if (!settings || !settings.autoTrainEnabled) {
+    cr?.alarms?.clear?.('hwa-troop-train-wake')?.catch?.(() => {});
+    return { ok: false, error: 'Auto train is disabled.' };
+  }
 
-  const plan = buildAutoTrainCalls(stored.rpcCache, settings);
-  if (!plan.calls.length) return { ok: true, calls: [] };
+  const saveState = async (patch: Record<string, any>) => {
+    try {
+      await cr?.storage?.local?.set({
+        autoTrainState: {
+          updatedAt: now,
+          ...patch,
+        },
+      });
+    } catch (_) {}
+  };
 
-  const dispatch = rpcMessageForSettings(stored, plan.calls);
-  if (!dispatch) return { ok: false, error: 'Could not prepare RPC message for current settings.' };
+  if (stored.popupRpcEnabled !== true) {
+    await saveState({ status: 'Paused: Popup RPC is disabled.', lastError: 'Popup RPC is disabled.' });
+    return { ok: false, error: 'Popup RPC is disabled.' };
+  }
 
+  if (!tabId) tabId = (await findActiveGameTab(cr))?.id;
+  if (!tabId) {
+    await saveState({ status: 'No active game tab found. Waiting for game tab...', lastError: null });
+    return { ok: false, error: 'No active game tab found.' };
+  }
+
+  if (troopTrainInFlight) {
+    return { ok: true, skipped: true, reason: 'in-flight' };
+  }
+
+  troopTrainInFlight = true;
   try {
-    await cr?.tabs?.sendMessage?.(tabId, dispatch);
-    return { ok: true, dispatched: plan.actions };
+    const plan = buildAutoTrainCalls(stored.rpcCache, settings, now);
+
+    if (!plan.calls.length) {
+      if (needsTroopTrainingRefresh(stored.rpcCache, now) && (force || now - lastTroopTrainRefreshAt >= 60_000)) {
+        const refreshCalls = [
+          { name: 'getSummary', feature: 'building', args: {} },
+          { name: 'getUnitSummary', feature: 'unit', args: {} },
+          { name: 'getTrainings', feature: 'unit', args: {} },
+          { name: 'getHealing', feature: 'unit', args: {} },
+        ];
+        const refreshDispatch = rpcMessageForSettings(stored, refreshCalls, false, { group: 'auto-train-refresh' });
+        if (refreshDispatch) {
+          lastTroopTrainRefreshAt = now;
+          try {
+            await cr?.tabs?.sendMessage?.(tabId, refreshDispatch);
+            await saveState({
+              status: `Syncing troop & building data (${new Date(now).toLocaleTimeString()})...`,
+              lastError: null,
+              lastRunAt: now,
+            });
+            return { ok: true, refreshing: true, queued: refreshDispatch.kind === 'queue-rpc' };
+          } catch (err: any) {
+            const errMsg = err?.message || String(err);
+            await saveState({ status: 'Failed to sync troop data.', lastError: errMsg, lastRunAt: now });
+            return { ok: false, error: errMsg };
+          }
+        }
+      }
+
+      const nextWakeAt = getNextTroopTrainWakeAt(stored.rpcCache, now);
+      if (nextWakeAt) {
+        const wakeAt = Math.max(now + 1500, nextWakeAt + 1500);
+        cr?.alarms?.create?.('hwa-troop-train-wake', { when: wakeAt });
+        await saveState({
+          status: `Waiting for queue to finish at ${new Date(nextWakeAt).toLocaleTimeString()}`,
+          nextWakeAt,
+          lastError: null,
+          lastRunAt: now,
+        });
+      } else {
+        await saveState({
+          status: `Idle at ${new Date(now).toLocaleTimeString()} (all camps maxed or upgrading)`,
+          nextWakeAt: null,
+          lastError: null,
+          lastRunAt: now,
+        });
+      }
+      return { ok: true, calls: [], nextWakeAt };
+    }
+
+    const sig = JSON.stringify(plan.actions);
+    if (!force && lastTroopTrainDispatch && lastTroopTrainDispatch.sig === sig && now - lastTroopTrainDispatch.at < 15_000) {
+      return { ok: true, skipped: true, reason: 'cooldown' };
+    }
+
+    const dispatch = rpcMessageForSettings(stored, plan.calls, false, { group: 'auto-train' });
+    if (!dispatch) {
+      const errMsg = 'Could not prepare RPC message for current settings (enable Direct mode or Monitor API for Piggyback).';
+      await saveState({ status: errMsg, lastError: errMsg, lastRunAt: now });
+      return { ok: false, error: errMsg };
+    }
+
+    const resp = await cr?.tabs?.sendMessage?.(tabId, dispatch);
+    if (resp && resp.ok === false) {
+      const errMsg = resp.error || 'RPC dispatch failed.';
+      await saveState({ status: 'RPC dispatch failed.', lastError: errMsg, lastRunAt: now });
+      return { ok: false, error: errMsg };
+    }
+    const rpcErr = Array.isArray(resp?.results)
+      ? resp.results.find((r: any) => r?.error)?.error
+      : null;
+    if (rpcErr) {
+      const errMsg = typeof rpcErr === 'string' ? rpcErr : (rpcErr?.description || rpcErr?.name || JSON.stringify(rpcErr));
+      await saveState({ status: 'Game server rejected training RPC.', lastError: errMsg, lastRunAt: now });
+      return { ok: false, error: errMsg };
+    }
+
+    lastTroopTrainDispatch = { sig, at: now };
+    const summary = plan.actions
+      .map((a) => {
+        const label = TROOP_DEFS.find((d) => d.type === a.type)?.label || `Type ${a.type}`;
+        return a.action === 'collect' ? `Collect ${label}` : `Train ${a.count} ${label}`;
+      })
+      .join(', ');
+    await saveState({
+      status: `${dispatch.kind === 'queue-rpc' ? 'Queued' : 'Dispatched'}: ${summary} (${new Date(now).toLocaleTimeString()})`,
+      lastAction: summary,
+      lastError: null,
+      lastRunAt: now,
+      queued: dispatch.kind === 'queue-rpc',
+    });
+    return { ok: true, dispatched: plan.actions, queued: dispatch.kind === 'queue-rpc' };
   } catch (err: any) {
-    return { ok: false, error: err?.message || String(err) };
+    const errMsg = err?.message || String(err);
+    await saveState({ status: 'Auto train dispatch error.', lastError: errMsg, lastRunAt: now });
+    return { ok: false, error: errMsg };
+  } finally {
+    troopTrainInFlight = false;
   }
 }
 
@@ -2749,6 +2876,12 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       await pending;
     }
     if (alarm.name === 'hwa-mine-defense') await tickAutoGather(false, cr);
+    if (alarm.name === 'hwa-troop-train-wake') {
+      const tab = await findActiveGameTab(cr);
+      if (tab?.id) {
+        await advanceTroopTraining(tab.id, cr);
+      }
+    }
     if (alarm.name === 'hwa-queue-watch') {
       const tab = await findActiveGameTab(cr);
       if (tab?.id) {
@@ -2795,6 +2928,10 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
   cr.storage?.onChanged?.addListener?.((changes: any, area: string) => {
     if (area === 'local' && ['autoFreeSpinEnabled', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
       pending = pending.then(() => runFreeSpin(false, null, null, cr)).catch(() => {});
+    }
+    if (area === 'local' && ['troopTrainSettings', 'popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) {
+      lastTroopTrainDispatch = null;
+      pending = pending.then(() => advanceTroopTraining(undefined, cr)).catch(() => {});
     }
     if (area !== 'local' || !['popupRpcEnabled', 'socketRefreshMode', 'captureSettings'].some((key) => key in changes)) return;
     pending = pending
@@ -2892,7 +3029,8 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       (sender.url?.startsWith('chrome-extension://' + cr.runtime.id + '/') ||
         (isGameUrl(sender.url) && sender.tab?.id))
     ) {
-      pending = pending.then(() => advanceTroopTraining(sender.tab?.id, cr));
+      const targetTabId = isGameUrl(sender.url) ? sender.tab?.id : undefined;
+      pending = pending.then(() => advanceTroopTraining(targetTabId, cr, { force: Boolean(message?.force) }));
       pending.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
       pending = pending.catch(() => {});
       return true;
@@ -3930,6 +4068,27 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       if (sender.tab?.id) await updateDungeonRun(record, sender.tab.id, cr);
       if (sender.tab?.id) await advanceBuildingQueue(sender.tab.id, record, cr);
       if (sender.tab?.id) await advanceResearchQueue(sender.tab.id, record, cr);
+      if (sender.tab?.id && cacheResult.changed) {
+        const troopOrBuildingChanged = [
+          'getTrainings:unit',
+          'getTrainings',
+          'getUnitSummary:unit',
+          'getUnitSummary',
+          'getHealing:unit',
+          'getHealing',
+          'buildingStatus',
+          'getSummary:building',
+        ].some((k) => cacheResult.cache?.[k]?.updatedAt === record.timestamp);
+        if (troopOrBuildingChanged) {
+          if (
+            cacheResult.cache?.['getTrainings:unit']?.updatedAt === record.timestamp ||
+            cacheResult.cache?.getTrainings?.updatedAt === record.timestamp
+          ) {
+            lastTroopTrainDispatch = null;
+          }
+          await advanceTroopTraining(sender.tab.id, cr);
+        }
+      }
       Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue', 'customTeams', 'troopCapacitySettings']));
       let defenseHold = false;
       let evaluatedDefense: any = null;
@@ -4004,6 +4163,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           { name: 'getSummary', feature: 'personalResearch' },
           { name: 'getMarches', feature: 'march' },
           { name: 'getUnitSummary', feature: 'unit' },
+          { name: 'getTrainings', feature: 'unit' },
           { name: 'getIncomingMarches', feature: 'march', args: {} }
         ]);
         calls = await passiveWorldReads(cacheResult.cache, calls, sender.tab.id, Date.now(), {}, cr);
