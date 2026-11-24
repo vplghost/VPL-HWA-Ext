@@ -16,11 +16,19 @@ import {
   type SimResultPayload,
   type SimErrorDetail,
 } from '@/src/utils/dungeonBattleSim';
+import {
+  needsFiveFloorCheckpointClaim,
+  shouldUseBestOfTen,
+  runSingleDoorBestOfTen,
+  SINGLE_DOOR_SIM_ROUNDS,
+  type BestOfTenReport,
+} from '@/src/services/dungeonPlanner';
 
 const props = defineProps<{
   modelValue: boolean;
   door: any;
   doorIdx: number;
+  doorsCount?: number;
   floorNumber: number;
   titanStates: Record<string, any>;
 }>();
@@ -38,6 +46,7 @@ const selectedTitanIds = ref<number[]>([]);
 const isSimulating = ref(false);
 const isSubmitting = ref(false);
 const simResult = ref<SimResultPayload | null>(null);
+const bestOfTenReport = ref<BestOfTenReport | null>(null);
 const errorMessage = ref<string | null>(null);
 const errorDetail = ref<SimErrorDetail | null>(null);
 const showDiagnostics = ref(false);
@@ -383,6 +392,7 @@ async function handleRunSimulation() {
   isSimulating.value = true;
   errorMessage.value = null;
   simResult.value = null;
+  bestOfTenReport.value = null;
 
   try {
     // Call dungeonStartBattle to get authoritative seed and defenders from game server
@@ -403,11 +413,21 @@ async function handleRunSimulation() {
     }
 
     const seed = Number(resPayload.seed) || Math.floor(Math.random() * 1000000000);
+    const alivePool = availableTitans.value.filter((t) => !t.isDead);
+    const useBestOfTen = shouldUseBestOfTen(props.doorsCount ?? 1, alivePool);
 
     // Strictly simulate via Unity WebAssembly Engine; no heuristic fallback
-    const outcome = await simulateBattleWithUnity(resPayload, seed);
-
-    simResult.value = outcome;
+    if (useBestOfTen) {
+      const report = await runSingleDoorBestOfTen(resPayload, simulateBattleWithUnity, {
+        frontlineId: selectedTitanIds.value[0],
+        rounds: SINGLE_DOOR_SIM_ROUNDS,
+      });
+      bestOfTenReport.value = report;
+      simResult.value = report.bestOutcome;
+    } else {
+      const outcome = await simulateBattleWithUnity(resPayload, seed);
+      simResult.value = outcome;
+    }
     errorDetail.value = null;
   } catch (err: any) {
     simResult.value = null;
@@ -467,10 +487,11 @@ async function handleSubmitOfficial() {
     // 2. Persist chosen lineup for this element type
     await persistAcceptedLineup(doorElementKey.value, selectedTitanIds.value);
 
-    // 3. Save progress checkpoint if floor is divisible by 10
+    // 3. Claim 5-floor checkpoint reward whenever required (dungeon: null or floor % 5 === 0)
     const curFloor = props.floorNumber;
     const respawn = Number(cache.value.dungeonStatus?.data?.respawnFloor) || 0;
-    if (curFloor > respawn && curFloor % 10 === 0) {
+    const endResp = firstEnd?.result?.response || firstEnd?.response || {};
+    if (needsFiveFloorCheckpointClaim({ floorNumber: curFloor, endBattleResponse: endResp, respawnFloor: respawn })) {
       await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
     }
 
@@ -797,6 +818,20 @@ async function handleSubmitOfficial() {
                   {{ simResult.stars === 3 ? 'SAFE' : 'RISK' }}
                 </span>
               </div>
+            </div>
+
+            <!-- Best-of-10 Single-Door Summary (alive roster <= 5) -->
+            <div
+              v-if="bestOfTenReport"
+              id="dungeon-sim-best10-summary"
+              class="p-2.5 rounded-lg border border-indigo-200 bg-indigo-50/70 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 text-2xs flex flex-wrap items-center justify-between gap-2"
+            >
+              <span class="font-bold">
+                🎲 Best-of-10 Auto (Single Door &le;5): Picked Run #{{ bestOfTenReport.bestIndex + 1 }}/{{ bestOfTenReport.roundsRun }}
+              </span>
+              <span class="font-mono">
+                Wins: {{ bestOfTenReport.wins }}/{{ bestOfTenReport.roundsRun }} · 0-Loss: {{ bestOfTenReport.zeroCasualtyWins }}/{{ bestOfTenReport.roundsRun }} · Score: {{ bestOfTenReport.bestScore.score }}
+              </span>
             </div>
 
             <!-- Casualties warning -->

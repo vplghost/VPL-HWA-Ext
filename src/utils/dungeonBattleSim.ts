@@ -98,7 +98,7 @@ export async function simulateBattleWithUnity(
   rawBattle: any,
   seed: number
 ): Promise<SimResultPayload> {
-  const effectiveSeed = Number(rawBattle?.seed) || seed || Math.floor(Math.random() * 1000000000);
+  const effectiveSeed = (Number.isFinite(seed) && seed > 0 ? seed : Number(rawBattle?.seed)) || Math.floor(Math.random() * 1000000000);
 
   // 1. Direct in-page Unity simulation (when running inside the game tab)
   if (typeof window !== 'undefined' && typeof (window as any).__hwaSimulateBattle === 'function') {

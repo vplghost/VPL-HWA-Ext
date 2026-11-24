@@ -16,6 +16,7 @@ import { getEffectiveTitanStates } from '@/src/services/queues/dungeonAutomation
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { executeDungeonAutomationStep } from '@/src/services/queues/dungeonAutomationRunner';
 import { DUNGEON_SAVED_LINEUPS_KEY } from '@/src/utils/dungeonBattleSim';
+import type { DungeonAutoSettings } from '@/src/services/dungeonPlanner';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -188,12 +189,13 @@ watch(
   }
 );
 
-onMounted(() => {
-  if (props.modelValue) {
-    registerModalOpen('dungeon');
-    document.addEventListener('keydown', handleKeydown);
-  }
-});
+  onMounted(() => {
+    void loadDungeonAutoSettings();
+    if (props.modelValue) {
+      registerModalOpen('dungeon');
+      document.addEventListener('keydown', handleKeydown);
+    }
+  });
 
 onUnmounted(() => {
   registerModalClose('dungeon');
@@ -224,13 +226,47 @@ const isAutomating = ref(false);
 const autoStopRequested = ref(false);
 const autoStatusMessage = ref<string | null>(null);
 const autoFloorCount = ref(0);
+const autoCheckpointsClaimed = ref(0);
+const autoCheckpointGold = ref(0);
+const DUNGEON_AUTO_CFG_KEY = 'dungeonAutoSettings';
+const autoSettings = ref<DungeonAutoSettings>({
+  targetTitanite: 150,
+  safetyThresholdPct: 20,
+  singleDoorBestOf10: true,
+});
+
+async function loadDungeonAutoSettings() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      const res = await chrome.storage.local.get(DUNGEON_AUTO_CFG_KEY);
+      if (res?.[DUNGEON_AUTO_CFG_KEY]) {
+        autoSettings.value = {
+          targetTitanite: 150,
+          safetyThresholdPct: 20,
+          singleDoorBestOf10: true,
+          ...res[DUNGEON_AUTO_CFG_KEY],
+        };
+      }
+    } catch (_) {}
+  }
+}
+
+async function saveDungeonAutoSettings() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    try {
+      await chrome.storage.local.set({ [DUNGEON_AUTO_CFG_KEY]: { ...autoSettings.value } });
+    } catch (_) {}
+  }
+}
 
 async function startAutomation() {
   if (isAutomating.value) return;
   isAutomating.value = true;
   autoStopRequested.value = false;
-  autoStatusMessage.value = 'Automation started. Simulating doors...';
+  autoStatusMessage.value = 'Automation started. Evaluating floor...';
   autoFloorCount.value = 0;
+  autoCheckpointsClaimed.value = 0;
+  autoCheckpointGold.value = 0;
 
   // Load persistent saved lineups
   let savedLineups: Record<string, number[]> = {};
@@ -250,9 +286,17 @@ async function startAutomation() {
         dispatchRpc,
         savedLineups,
         customTeams: customTeams.value,
-        safetyThresholdPct: 20,
+        safetyThresholdPct: autoSettings.value.safetyThresholdPct,
+        targetTitanite: autoSettings.value.targetTitanite,
+        todayTitanite: todayTitanite.value,
+        singleDoorBestOf10: autoSettings.value.singleDoorBestOf10,
         shouldStop: () => autoStopRequested.value,
       });
+
+      if (step.checkpointClaimed) {
+        autoCheckpointsClaimed.value++;
+        autoCheckpointGold.value += Number(step.checkpointGold) || 0;
+      }
 
       if (step.stopped) {
         autoStatusMessage.value = step.stopReason || 'Automation stopped.';
@@ -264,9 +308,15 @@ async function startAutomation() {
         const chosen = step.chosenEvaluation;
         const tankLoss = chosen?.tankLossPct != null ? chosen.tankLossPct.toFixed(1) : '0';
         const teamLoss = chosen?.teamLossPct != null ? chosen.teamLossPct.toFixed(1) : '0';
-        autoStatusMessage.value = `Floor ${step.floorPassed} cleared via Door ${(step.doorIdx ?? 0) + 1} (${step.doorElement}). Tank loss: ${tankLoss}%, Team loss: ${teamLoss}%.`;
+        const best10Note = step.bestOfTenReport
+          ? ` · Best-of-10 (#${step.bestOfTenReport.bestIndex + 1}/10, ${step.bestOfTenReport.wins}/10 wins)`
+          : '';
+        const cpNote = step.checkpointClaimed
+          ? ` · 5-floor reward claimed${step.checkpointGold ? ` (+${formatNumber(step.checkpointGold)} Gold)` : ''}`
+          : '';
+        autoStatusMessage.value = `Floor ${step.floorPassed} cleared via Door ${(step.doorIdx ?? 0) + 1} (${step.doorElement}). Tank loss: ${tankLoss}%, Team loss: ${teamLoss}%${best10Note}${cpNote}.`;
       } else {
-        autoStatusMessage.value = step.stopReason || `Checkpoint reached and saved at Floor ${step.floorPassed}.`;
+        autoStatusMessage.value = step.stopReason || `Checkpoint reward claimed at Floor ${step.floorPassed}.`;
       }
 
       // Brief delay between floors to avoid rapid-fire RPC and give UI time to reflect state
@@ -394,6 +444,59 @@ function handleImgError(e: Event) {
 
         <!-- Modal Body -->
         <div id="dungeon-modal-body" class="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+          <!-- Compact Auto Attack Config Bar -->
+          <div
+            id="dungeon-auto-config-bar"
+            class="flex flex-wrap items-center justify-between gap-2.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 text-[11px]"
+          >
+            <div class="flex flex-wrap items-center gap-3">
+              <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
+                <span>Target Titanite:</span>
+                <select
+                  id="dungeon-target-titanite-select"
+                  v-model.number="autoSettings.targetTitanite"
+                  :disabled="isAutomating"
+                  class="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold"
+                  @change="saveDungeonAutoSettings"
+                >
+                  <option :value="75">75</option>
+                  <option :value="150">150</option>
+                  <option :value="300">300</option>
+                  <option :value="0">Unlimited</option>
+                </select>
+              </label>
+
+              <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
+                <span>Min HP:</span>
+                <select
+                  id="dungeon-min-hp-select"
+                  v-model.number="autoSettings.safetyThresholdPct"
+                  :disabled="isAutomating"
+                  class="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold"
+                  @change="saveDungeonAutoSettings"
+                >
+                  <option :value="15">15%</option>
+                  <option :value="20">20%</option>
+                  <option :value="25">25%</option>
+                  <option :value="35">35%</option>
+                </select>
+              </label>
+
+              <label class="flex items-center gap-1.5 cursor-pointer text-slate-600 dark:text-slate-300 font-medium">
+                <input
+                  id="dungeon-best10-checkbox"
+                  v-model="autoSettings.singleDoorBestOf10"
+                  type="checkbox"
+                  :disabled="isAutomating"
+                  class="rounded border-slate-300 text-indigo-600"
+                  @change="saveDungeonAutoSettings"
+                />
+                <span>Best-of-10 (Single Door &le;5)</span>
+              </label>
+            </div>
+            <span class="text-[10px] text-slate-400">Auto-claims 5-floor reward</span>
+          </div>
+
           <!-- Automation Status Banner -->
           <div
             v-if="autoStatusMessage"
@@ -411,7 +514,10 @@ function handleImgError(e: Event) {
                 <span v-if="isAutomating" class="inline-flex size-2 rounded-full bg-emerald-500 animate-ping"></span>
                 <span>{{ isAutomating ? '⚡ Automation Running' : '🛑 Automation Info' }}</span>
                 <span v-if="autoFloorCount > 0" class="rounded bg-white/70 dark:bg-slate-800/80 px-1.5 py-0.2 text-[10px] font-mono">
-                  +{{ autoFloorCount }} floors passed
+                  +{{ autoFloorCount }} floors
+                </span>
+                <span v-if="autoCheckpointsClaimed > 0" class="rounded bg-amber-100/80 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-1.5 py-0.2 text-[10px] font-mono">
+                  {{ autoCheckpointsClaimed }} checkpoints{{ autoCheckpointGold > 0 ? ` (+${formatNumber(autoCheckpointGold)} Gold)` : '' }}
                 </span>
               </div>
               <button
@@ -770,6 +876,7 @@ function handleImgError(e: Event) {
       v-model="isSimModalOpen"
       :door="activeSimDoor"
       :door-idx="activeSimDoorIdx"
+      :doors-count="doors.length"
       :floor-number="floorNumber"
       :titan-states="effectiveTitanStates"
       @battle-submitted="handleSimBattleSubmitted"

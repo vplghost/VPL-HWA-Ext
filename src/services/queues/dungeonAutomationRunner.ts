@@ -8,6 +8,13 @@ import {
   type SimResultPayload,
 } from '../../utils/dungeonBattleSim.ts';
 import { getEffectiveTitanStates, DEFAULT_TITAN_POOLS } from './dungeonAutomation.ts';
+import {
+  needsFiveFloorCheckpointClaim,
+  shouldUseBestOfTen,
+  runSingleDoorBestOfTen,
+  SINGLE_DOOR_SIM_ROUNDS,
+  type BestOfTenReport,
+} from '../dungeonPlanner.ts';
 
 export interface DungeonAutomationOptions {
   cache: any;
@@ -15,6 +22,10 @@ export interface DungeonAutomationOptions {
   savedLineups?: Record<string, number[]>;
   customTeams?: Array<{ id: string; name: string; type?: string; heroIds: number[] }>;
   safetyThresholdPct?: number; // default: 20
+  targetTitanite?: number; // 0 = unlimited
+  todayTitanite?: number;
+  singleDoorBestOf10?: boolean; // default: true
+  simulateFn?: (rawBattle: any, seed: number) => Promise<SimResultPayload>;
   shouldStop?: () => boolean;
 }
 
@@ -27,6 +38,9 @@ export interface DungeonAutomationStepResult {
   doorElement?: string;
   chosenEvaluation?: DoorEvaluationResult;
   evaluations?: DoorEvaluationResult[];
+  checkpointClaimed?: boolean;
+  checkpointGold?: number;
+  bestOfTenReport?: BestOfTenReport | null;
 }
 
 /**
@@ -104,7 +118,25 @@ export function resolveSquadForDoor(
 export async function executeDungeonAutomationStep(
   options: DungeonAutomationOptions
 ): Promise<DungeonAutomationStepResult> {
-  const { cache, dispatchRpc, savedLineups = {}, customTeams = [], safetyThresholdPct = 20 } = options;
+  const {
+    cache,
+    dispatchRpc,
+    savedLineups = {},
+    customTeams = [],
+    safetyThresholdPct = 20,
+    targetTitanite = 0,
+    todayTitanite = 0,
+    singleDoorBestOf10 = true,
+    simulateFn = simulateBattleWithUnity,
+  } = options;
+
+  if (targetTitanite > 0 && todayTitanite >= targetTitanite) {
+    return {
+      done: true,
+      stopped: true,
+      stopReason: `Target Titanite reached (${todayTitanite}/${targetTitanite}).`,
+    };
+  }
 
   let dungeonData = cache.value?.dungeonStatus?.data || cache.value?.dungeonGetInfo?.data;
   if (!dungeonData) {
@@ -123,21 +155,27 @@ export async function executeDungeonAutomationStep(
   const rawDoors = dungeonData.currentFloorDoors || dungeonData.floor?.userData || [];
   const doors = Array.isArray(rawDoors) ? rawDoors : Object.values(rawDoors);
 
-  if (doors.length === 0) {
-    // Check if this is a checkpoint/save lever floor with no doors
-    const respawnFloor = Number(dungeonData.respawnFloor) || 0;
-    const saveFloor = Number(dungeonData.saveFloor) || 0;
-    const canSave =
-      (saveFloor > respawnFloor) ||
-      (dungeonData.readyToSave === true) ||
-      (floorNumber > respawnFloor && floorNumber % 10 === 0);
+  // Pre-check: handle 5-floor checkpoint/save reward gate before attempting any battle
+  const needsPreClaim = needsFiveFloorCheckpointClaim({
+    floorNumber,
+    floorType: dungeonData.floorType,
+    doorsCount: doors.length,
+    respawnFloor: Number(dungeonData.respawnFloor) || 0,
+    saveFloor: Number(dungeonData.saveFloor) || 0,
+    readyToSave: dungeonData.readyToSave === true,
+  });
 
-    if (canSave) {
-      await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
+  if (doors.length === 0 || String(dungeonData.floorType || '').toLowerCase() === 'save' || String(dungeonData.floorType || '').toLowerCase() === 'reward') {
+    if (needsPreClaim) {
+      const saveRes = await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
+      const saveResp = saveRes?.results?.[0]?.result?.response || saveRes?.results?.[0]?.response || {};
+      const gold = Number(saveResp?.reward?.gold) || 0;
       await dispatchRpc([{ name: 'dungeonGetInfo', args: {} }]);
       return {
         floorPassed: floorNumber,
-        stopReason: `Checkpoint saved at floor ${floorNumber}.`,
+        checkpointClaimed: true,
+        checkpointGold: gold,
+        stopReason: `Checkpoint reward claimed at Floor ${floorNumber}${gold > 0 ? ` (+${gold.toLocaleString()} Gold)` : ''}.`,
       };
     }
 
@@ -218,10 +256,33 @@ export async function executeDungeonAutomationStep(
 
   const seed = Number(startPayload.seed) || Math.floor(Math.random() * 1000000000);
 
+  // Count total alive eligible titans for this door to detect Single-Door Best-of-10 (<= 5 members)
+  const rawBestElem = bestDoor.door?.attackerType || bestDoor.door?.element || '';
+  let bestDoorElemName = 'Neutral';
+  if (/water/i.test(rawBestElem)) bestDoorElemName = 'Water';
+  else if (/fire/i.test(rawBestElem)) bestDoorElemName = 'Fire';
+  else if (/earth/i.test(rawBestElem)) bestDoorElemName = 'Earth';
+
+  const aliveEligibleIds = Object.keys(titanStates)
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0 && !titanStates[String(id)]?.isDead && isTitanEligibleForDoor(id, bestDoorElemName, getTitanMetadata(id)));
+
+  const useBestOfTen = singleDoorBestOf10 && shouldUseBestOfTen(doors, aliveEligibleIds);
+
   // 2. Simulate outcome strictly using Unity Engine (zero heuristic fallback)
   let outcome: SimResultPayload;
+  let bestOfTenReport: BestOfTenReport | null = null;
   try {
-    outcome = await simulateBattleWithUnity(startPayload, seed);
+    if (useBestOfTen) {
+      bestOfTenReport = await runSingleDoorBestOfTen(startPayload, simulateFn, {
+        frontlineId: bestDoor.teamIds[0],
+        minHpThresholdPct: safetyThresholdPct,
+        rounds: SINGLE_DOOR_SIM_ROUNDS,
+      });
+      outcome = bestOfTenReport.bestOutcome;
+    } else {
+      outcome = await simulateFn(startPayload, seed);
+    }
   } catch (err: any) {
     if (cache?.value?.dungeonStatus?.data) {
       cache.value.dungeonStatus.data.activeBattle = null;
@@ -298,25 +359,30 @@ export async function executeDungeonAutomationStep(
     };
   }
 
-  // 4. Save checkpoint: Check multiple indicators based on IL2CPP PlayerDungeonManager logic:
-  // - saveFloor > respawnFloor
-  // - readyToSave === true
-  // - nextFloor - 1 === respawnFloor
-  // - floorNumber % 10 === 0
-  const endDungeon = endPayload?.result?.response?.dungeon || endPayload?.response?.dungeon || {};
+  // 4. Claim 5-floor checkpoint reward (`dungeonSaveProgress`) whenever required:
+  // Confirmed from live game logs: every 5th floor (e.g. 580, 585), `dungeonEndBattle` returns `dungeon: null`
+  // and blocks further battles until `dungeonSaveProgress({})` is called to claim gold & unlock floor N+1.
+  const endResp = endPayload?.result?.response || endPayload?.response || {};
+  const endDungeon = endResp?.dungeon || {};
   const currentRespawn = Number(endDungeon.respawnFloor ?? dungeonData.respawnFloor) || 0;
   const currentSaveFloor = Number(endDungeon.saveFloor ?? dungeonData.saveFloor) || 0;
-  const nextFloor = Number(endDungeon.floorNumber) || (floorNumber + 1);
 
-  const shouldSaveCheckpoint =
-    (currentSaveFloor > currentRespawn) ||
-    (endDungeon.readyToSave === true) ||
-    (dungeonData.readyToSave === true) ||
-    (currentRespawn > 0 && nextFloor - 1 === currentRespawn) ||
-    (floorNumber > currentRespawn && floorNumber % 10 === 0);
+  const shouldSaveCheckpoint = needsFiveFloorCheckpointClaim({
+    floorNumber,
+    floorType: endDungeon.floorType,
+    endBattleResponse: endResp,
+    respawnFloor: currentRespawn,
+    saveFloor: currentSaveFloor,
+    readyToSave: endDungeon.readyToSave === true || dungeonData.readyToSave === true,
+  });
 
+  let checkpointClaimed = false;
+  let checkpointGold = 0;
   if (shouldSaveCheckpoint) {
-    await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
+    const saveRes = await dispatchRpc([{ name: 'dungeonSaveProgress', args: {} }]);
+    const saveResp = saveRes?.results?.[0]?.result?.response || saveRes?.results?.[0]?.response || {};
+    checkpointClaimed = true;
+    checkpointGold = Number(saveResp?.reward?.gold) || 0;
   }
 
   // 5. Update local titan states immediately to prevent state desync between floors
@@ -358,5 +424,8 @@ export async function executeDungeonAutomationStep(
       minHpPct: metrics.minFinalHpPct,
     },
     evaluations,
+    checkpointClaimed,
+    checkpointGold,
+    bestOfTenReport,
   };
 }

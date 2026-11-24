@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.260 — 2026-11-24
+
+### Added & Fixed
+
+- **Titan Dungeon 5-Floor Checkpoint Auto-Claim, Single-Door Best-of-10 (`<=5` Members) & Unified Auto Attack UI (`dungeonPlanner.ts`, `dungeonAutomationRunner.ts`, `dungeonBattleSim.ts`, `DungeonModal.vue`, `DungeonSimModal.vue`)**:
+  - Fixed Dungeon Auto Attack stalling/erroring at every 5th floor (`580`, `585`, ...) where `dungeonEndBattle` returns `dungeon: null`: replaced outdated `% 10 === 0` checks with `needsFiveFloorCheckpointClaim()` to automatically call `dungeonSaveProgress({})`, claim checkpoint gold, and unlock floor `N+1` in both Auto Attack and manual `DungeonSimModal` submission.
+  - Added `runSingleDoorBestOfTen()` (`src/services/dungeonPlanner.ts`) to automatically execute 10 Unity WASM simulations with distinct derived seeds and accept the best outcome (`win > 0 casualties > tank/team HP & energy preservation`) whenever a single-door floor has `<= 5` alive eligible members.
+  - Fixed `simulateBattleWithUnity()` in `dungeonBattleSim.ts` to respect explicit candidate `seed` overrides over `rawBattle.seed`.
+  - Upgraded the existing **Auto Attack** (`#dungeon-auto-btn`) flow in `DungeonModal.vue` with a compact 1-line `#dungeon-auto-config-bar` (Target Titanite `75/150/300/Unlimited`, Min HP threshold, `Best-of-10 (Single Door ≤5)`) and checkpoint/Best-of-10 session metrics.
+
 ## 0.11.258 — 2026-11-24
 
 ### Added
