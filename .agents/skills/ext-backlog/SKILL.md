@@ -1,11 +1,11 @@
 ---
 name: ext-backlog
-description: Quy trình tự động xử lý backlog tệp (mặc định temp/backlogs), tạo task Knowns, điều tra & sửa lỗi tuần tự, xác thực, ghi nhận kết quả và đổi tên tệp hoàn tất (done.*).
+description: Quy trình tự động xử lý backlog tệp (mặc định temp/backlogs), tạo task Knowns, điều tra & sửa lỗi tuần tự, xác thực, ghi nhận kết quả, đổi tên tệp hoàn tất (done.*) và phát hành/commit đồng bộ qua skill ext-build (đã bao gồm kn-commit).
 ---
 
 # Extension Backlog Processing Workflow (ext-backlog)
 
-Skill này chuẩn hóa quy trình tiếp nhận, theo dõi và giải quyết tuần tự các yêu cầu lỗi hoặc backlog được ghi nhận dưới dạng tệp Markdown trong thư mục backlog (mặc định: `temp/backlogs`).
+Skill này chuẩn hóa quy trình tiếp nhận, theo dõi và giải quyết tuần tự các yêu cầu lỗi hoặc backlog được ghi nhận dưới dạng tệp Markdown trong thư mục backlog (mặc định: `temp/backlogs`), sau đó đóng gói và commit đồng bộ bằng skill **`ext-build`** (skill kép đã bao gồm nâng version, dual-build `dist/` + `.output/chrome-mv3`, `npm test`, cập nhật `CHANGELOG.md` và `kn-commit`).
 
 ```mermaid
 flowchart TD
@@ -16,12 +16,12 @@ flowchart TD
     D --> E["Tạo Task Knowns: knowns task create<br/>Chuyển sang in-progress"]
     E --> F["Điều tra nguyên nhân gốc (Root Cause) & Phân tích stack trace"]
     F --> G["Triển khai bản vá (Fix Implementation)"]
-    G --> H["Kiểm thử đa tầng:<br/>1. Bridge Test (nếu có)<br/>2. npm test<br/>3. npm run build"]
+    G --> H["Kiểm thử xác thực bản vá:<br/>1. Bridge Test (nếu có)<br/>2. npm test"]
     
     H --> I["Ghi nhận '# Kết quả' ngay dưới '# Mô tả'"]
     I --> J["Đổi tên tệp: [filename].md -> done.[filename].md"]
     J --> K["Đánh dấu task Knowns: knowns task edit -s done"]
-    K --> L["Commit thay đổi bằng kn-commit"]
+    K --> L["Thực thi skill ext-build<br/>(Bump version + Dual-build + Test + CHANGELOG + kn-commit)"]
 ```
 
 ---
@@ -136,27 +136,21 @@ Thực hiện kiểm thử theo 3 cấp độ trước khi hoàn tất:
 
 ---
 
-### Bước 6: Commit Thay Đổi Bằng `kn-commit`
+### Bước 6: Đóng Gói, Cập Nhật Changelog & Commit Bằng `ext-build`
 
-Áp dụng quy trình của skill `kn-commit`:
-1. Kiểm tra trạng thái git:
+Thay vì chỉ gọi riêng `kn-commit`, **bắt buộc áp dụng trọn vẹn quy trình của skill `ext-build`** (`.agents/skills/ext-build/SKILL.md` — skill kép đã tích hợp sẵn `kn-commit`) để bảo đảm nhất quán giữa các session:
+1. Đọc và thực thi đầy đủ các bước của skill `ext-build`:
+   - Nâng phiên bản (mặc định `patch`, trừ khi người dùng yêu cầu `minor`/`major`) đồng bộ trên `package.json`, `package-lock.json`, `extension/manifest.json`.
+   - Build kép đồng bộ cả 2 bản: Production (`dist/`, tắt debug bridge) và Debug/Unpacked (`.output/chrome-mv3/`, bật debug bridge) bằng `npm run build`.
+   - Xác thực toàn bộ test suite (`npm test` -> `0` fail) và kiểm tra quyền `nativeMessaging` ở cả 2 bản build.
+   - Cập nhật `CHANGELOG.md` tổng hợp đầy đủ các thay đổi vừa thực hiện.
+2. Stage toàn bộ tệp liên quan (bao gồm mã nguồn, tests, task Knowns và artifact phát hành từ `ext-build`):
    ```powershell
+   git add src/ tests/ .knowns/ debug-bridge/ package.json package-lock.json extension/manifest.json CHANGELOG.md dist/
    git status
    git diff --staged
    ```
-2. Stage các tệp mã nguồn và task tracking:
-   ```powershell
-   git add src/ .knowns/ debug-bridge/ dist/
-   ```
-3. Đề xuất commit message theo chuẩn Conventional Commits:
-   ```
-   fix(<scope>): <tóm tắt ngắn gọn lỗi đã sửa>
-
-   - [Chi tiết nguyên nhân và bản vá]
-   - [Kết quả kiểm thử và xác thực]
-   - Closes task <TASK_ID>
-   ```
-4. Hỏi xác nhận từ người dùng và tiến hành commit.
+3. Đề xuất commit message theo chuẩn Conventional Commits của `kn-commit` (đã tích hợp trong `ext-build`), ghi rõ `Closes task <TASK_ID>`, hỏi xác nhận từ người dùng và tiến hành commit.
 
 ---
 
@@ -169,4 +163,5 @@ Thực hiện kiểm thử theo 3 cấp độ trước khi hoàn tất:
 | **Chuyển task in-progress** | `knowns task edit <TASK_ID> -s in-progress` |
 | **Chuyển task hoàn tất** | `knowns task edit <TASK_ID> -s done` |
 | **Đổi tên tệp xong** | `Move-Item "temp/backlogs/<file>.md" "temp/backlogs/done.<file>.md"` |
-| **Chạy kiểm thử & build** | `npm test; if ($?) { npm run build }` |
+| **Chạy kiểm thử nhanh** | `npm test` |
+| **Bump + Dual-build + Test (`ext-build`)** | `node scripts/bump-version.mjs patch; if ($?) { npm run build }; if ($?) { npm test }` |
