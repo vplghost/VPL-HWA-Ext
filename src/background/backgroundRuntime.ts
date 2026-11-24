@@ -4037,11 +4037,12 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
       sendResponse({ ok: true });
       return true;
     }
-    if (['draft-decrypted', 'draft-decrypt-error', 'draft-rpc-event'].includes(message?.kind)) {
+    if (['draft-decrypted', 'draft-decrypt-error', 'draft-rpc-event', 'draft-mqtt-event'].includes(message?.kind)) {
       try {
         cr.storage?.local?.get(['autoOpenDraftDialog', 'legendsDraftSession'], (stored: any) => {
           const autoOpen = stored?.autoOpenDraftDialog !== false;
           let session = stored?.legendsDraftSession || {};
+          let shouldAutoOpen = false;
 
           if (message.kind === 'draft-decrypted') {
             const dto = message.data?.draft;
@@ -4056,18 +4057,31 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
               errorDetail: null,
               updatedAt: Date.now()
             };
+            shouldAutoOpen = true;
           } else if (message.kind === 'draft-rpc-event') {
+            const action = String(message.data?.action || '');
             const resp = message.data?.response;
-            if (resp) {
+            if (action === 'randomDraft_register') {
+              session = {
+                ...session,
+                stageId: 1,
+                error: null,
+                errorDetail: null,
+                updatedAt: Date.now()
+              };
+              shouldAutoOpen = true;
+            }
+            if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
               if (resp.matchId != null && resp.matchId !== session.matchId) {
                 session.heroSteps = [];
                 session.chosenDefenceHeroes = [];
                 session.chosenAttackHeroes = [];
               }
+              const nextStageId = resp.stageId != null ? Number(resp.stageId) : session.stageId;
               session = {
                 ...session,
                 matchId: resp.matchId != null ? Number(resp.matchId) : session.matchId,
-                stageId: resp.stageId != null ? Number(resp.stageId) : session.stageId,
+                stageId: nextStageId,
                 stageFinishTs: resp.stageFinishTs != null ? Number(resp.stageFinishTs) : session.stageFinishTs,
                 userRating: resp.rating?.userRating != null ? Number(resp.rating.userRating) : session.userRating,
                 enemyRating: resp.rating?.enemyRating != null ? Number(resp.rating.enemyRating) : session.enemyRating,
@@ -4075,6 +4089,19 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
                 rawCiphertext: resp.draft || session.rawCiphertext,
                 updatedAt: Date.now()
               };
+              if (nextStageId != null && [1, 2, 3, 4, 5].includes(nextStageId)) {
+                shouldAutoOpen = true;
+              }
+            }
+          } else if (message.kind === 'draft-mqtt-event') {
+            const eventType = String(message.data?.eventType || '');
+            session = {
+              ...session,
+              lastMqttEventType: eventType || 'randomDraft_statusChanged',
+              updatedAt: Date.now()
+            };
+            if (!eventType || eventType.startsWith('randomDraft_')) {
+              shouldAutoOpen = true;
             }
           } else if (message.kind === 'draft-decrypt-error') {
             session = {
@@ -4083,11 +4110,19 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
               errorDetail: message.data?.detail || null,
               updatedAt: Date.now()
             };
+            shouldAutoOpen = true;
+          }
+
+          if (autoOpen && shouldAutoOpen) {
+            session = {
+              ...session,
+              autoOpenNonce: Date.now()
+            };
           }
 
           cr.storage?.local?.set?.({ legendsDraftSession: session })?.catch?.(() => {});
 
-          if (autoOpen) {
+          if (autoOpen && shouldAutoOpen) {
             cr.runtime?.sendMessage?.({ kind: 'open-draft-dialog', session })?.catch?.(() => {});
           }
         });

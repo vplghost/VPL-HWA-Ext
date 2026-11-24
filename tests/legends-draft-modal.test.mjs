@@ -213,3 +213,106 @@ test('LegendsDraftModal template contains 15 hero candidates grid and close butt
   assert.ok(modalSrc.includes('Lỗi Giải Mã Dữ Liệu Draft'), 'Must contain error reporting section');
   assert.ok(modalSrc.includes('Đóng'), 'Must contain close button');
 });
+
+test('FabDial includes #legend-draft-fab shortcut opening legendsDraft modal', async () => {
+  const fabSrc = await readFile(resolve(root, 'src/components/common/FabDial.vue'), 'utf8');
+  assert.ok(fabSrc.includes('id="legend-draft-fab"'), 'FabDial must include #legend-draft-fab button');
+  assert.ok(fabSrc.includes("openModal('legendsDraft')"), 'FabDial must open legendsDraft modal');
+});
+
+test('interceptor, mqttCapture, bridge, and backgroundRuntime wire randomDraft RPC and MQTT auto-open', async () => {
+  const interceptorSrc = await readFile(resolve(root, 'src/content/interceptor.ts'), 'utf8');
+  assert.ok(
+    interceptorSrc.includes('function inspectDraftRpc(reqText: string | null | undefined, resText: string | null | undefined)'),
+    'inspectDraftRpc must correlate both request and response payloads'
+  );
+  assert.ok(interceptorSrc.includes('draftCallsByIdent'), 'Must correlate UUID idents from randomDraft_* requests');
+
+  const mqttSrc = await readFile(resolve(root, 'src/content/mqttCapture.ts'), 'utf8');
+  assert.ok(mqttSrc.includes("kind: 'draft-mqtt-event'"), 'mqttCapture must emit draft-mqtt-event on randomDraft_* packets');
+
+  const bridgeSrc = await readFile(resolve(root, 'src/content/bridge.ts'), 'utf8');
+  assert.ok(bridgeSrc.includes("'draft-mqtt-event'"), 'bridge must forward draft-mqtt-event to background');
+
+  const bgSrc = await readFile(resolve(root, 'src/background/backgroundRuntime.ts'), 'utf8');
+  assert.ok(bgSrc.includes("'draft-mqtt-event'"), 'backgroundRuntime must handle draft-mqtt-event');
+  assert.ok(bgSrc.includes('autoOpenNonce'), 'backgroundRuntime must stamp autoOpenNonce when auto-opening draft dialog');
+});
+
+test('rpcCache deducts 1 Draft Chip (refillable:60) once per completed Legends Draft match', async () => {
+  const { rpcCacheService } = await import('../src/core/cache/rpcCache.ts');
+  const cacheHelper = rpcCacheService;
+
+  const endpoint = 'https://api.hero-wars-alliance.com/api/rpc';
+  let state = cacheHelper.merge({}, [{
+    endpoint,
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-24T06:00:00.000Z',
+    requestBody: JSON.stringify({ calls: [{ name: 'userGetInfo', args: {}, ident: 'u1' }] }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'u1',
+        result: {
+          response: {
+            id: 123,
+            refillable: [{ id: 60, amount: 5, lastRefill: 1795413600 }]
+          }
+        }
+      }]
+    })
+  }]).cache;
+  assert.equal(state['resource:refillable:60']?.data?.amount, 5, 'Initial Draft Chips should be 5');
+
+  // Battle starts for match 362806945 -> deducts 1 chip
+  state = cacheHelper.merge(state, [{
+    endpoint,
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-24T06:01:00.000Z',
+    requestBody: JSON.stringify({ calls: [{ name: 'randomDraft_startBattle', args: {}, ident: 'b1' }] }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'b1',
+        result: { response: { battleReplay: { typeId: 362806945 } } }
+      }]
+    })
+  }]).cache;
+  assert.equal(state['resource:refillable:60']?.data?.amount, 4, 'Draft Chips should decrement to 4 after startBattle');
+
+  // Match result arrives for the SAME matchId -> must NOT double-deduct
+  state = cacheHelper.merge(state, [{
+    endpoint,
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-24T06:02:00.000Z',
+    requestBody: JSON.stringify({ calls: [{ name: 'randomDraft_result', args: { matchId: 362806945 }, ident: 'r1' }] }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'r1',
+        result: { response: { matchId: 362806945, result: 1, reward: { draftBpExp: 50 } } }
+      }]
+    })
+  }]).cache;
+  assert.equal(state['resource:refillable:60']?.data?.amount, 4, 'Same matchId must not double-deduct Draft Chips');
+
+  // Next match completes via randomDraft_result only -> deducts 1 more chip
+  state = cacheHelper.merge(state, [{
+    endpoint,
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-24T06:05:00.000Z',
+    requestBody: JSON.stringify({ calls: [{ name: 'randomDraft_result', args: { matchId: 362806999 }, ident: 'r2' }] }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'r2',
+        result: { response: { matchId: 362806999, result: 1, reward: { draftBpExp: 50 } } }
+      }]
+    })
+  }]).cache;
+  assert.equal(state['resource:refillable:60']?.data?.amount, 3, 'New matchId should decrement Draft Chips to 3');
+});

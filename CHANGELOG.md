@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.242 — 2026-11-24
+
+### Fixed
+
+- **Legends Draft Auto-Open on RPC/MQTT, FAB Shortcut & Draft Chip Deduction (`interceptor.ts`, `mqttCapture.ts`, `bridge.ts`, `backgroundRuntime.ts`, `useDraft.ts`, `FabDial.vue`, `rpcCache.ts`)**:
+  - Updated `inspectDraftRpc(reqText, resText)` across `fetch`, piggyback `fetch`, and `XHR` to correlate `randomDraft_*` request UUID `ident`s with responses instead of requiring `'randomDraft'` inside response bodies.
+  - Emitted and forwarded `draft-mqtt-event` for `randomDraft_statusChanged` MQTT pushes and stamped `autoOpenNonce` in `backgroundRuntime.ts` + `useDraft.ts` so `LegendsDraftModal` reliably auto-opens on active draft events when enabled in settings.
+  - Restored the `#legend-draft-fab` shortcut button in `FabDial.vue` to open `LegendsDraftModal`.
+  - Deducted `-1` Draft Chip (`resource:refillable:60`) once per `matchId` (`randomDraft_chip:${matchId}`) on `randomDraft_startBattle` / `randomDraft_result` in `rpcCache.ts`.
+
 ## 0.11.240 — 2026-11-24
 
 ### Changed

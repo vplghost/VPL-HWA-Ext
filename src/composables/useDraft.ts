@@ -97,56 +97,68 @@ export function useDraft() {
   }
 
   /**
-   * Bind RPC event (e.g. randomDraft_getInfo response)
+   * Bind RPC event (e.g. randomDraft_getInfo / randomDraft_register response)
    */
-  function bindRpcEvent(resp: any) {
-    if (!resp) return;
+  function bindRpcEvent(resp: any, action?: string) {
+    if (!resp && action !== 'randomDraft_register') return;
 
-    // If new match detected, reset steps as new session
-    if (resp.matchId != null && resp.matchId !== draftSession.matchId) {
-      draftSession.heroSteps = [];
-      draftSession.chosenDefenceHeroes = [];
-      draftSession.chosenAttackHeroes = [];
+    if (action === 'randomDraft_register') {
+      draftSession.stageId = 1;
+      const phaseInfo = formatDraftPhase(1);
+      draftSession.phase = phaseInfo.phase;
+      draftSession.phaseLabel = phaseInfo.label;
       draftSession.error = null;
       draftSession.errorDetail = null;
     }
 
-    if (resp.matchId != null) {
-      draftSession.matchId = Number(resp.matchId);
-    }
-    if (resp.stageId != null) {
-      draftSession.stageId = Number(resp.stageId);
-      const phaseInfo = formatDraftPhase(draftSession.stageId);
-      draftSession.phase = phaseInfo.phase;
-      draftSession.phaseLabel = phaseInfo.label;
-    }
-    if (resp.stageFinishTs != null) {
-      draftSession.stageFinishTs = Number(resp.stageFinishTs);
-    }
-    if (resp.rating?.userRating != null) {
-      draftSession.userRating = Number(resp.rating.userRating);
-    }
-    if (resp.rating?.enemyRating != null) {
-      draftSession.enemyRating = Number(resp.rating.enemyRating);
-    }
-    if (resp.enemyUser && typeof resp.enemyUser === 'object') {
-      draftSession.enemyUser = {
-        id: resp.enemyUser.id,
-        name: resp.enemyUser.name,
-        level: resp.enemyUser.level,
-        clanTitle: resp.enemyUser.clanTitle,
-        avatarId: resp.enemyUser.avatarId
-      };
-    }
-    if (resp.draft) {
-      draftSession.rawCiphertext = resp.draft;
+    if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
+      // If new match detected, reset steps as new session
+      if (resp.matchId != null && resp.matchId !== draftSession.matchId) {
+        draftSession.heroSteps = [];
+        draftSession.chosenDefenceHeroes = [];
+        draftSession.chosenAttackHeroes = [];
+        draftSession.error = null;
+        draftSession.errorDetail = null;
+      }
+
+      if (resp.matchId != null) {
+        draftSession.matchId = Number(resp.matchId);
+      }
+      if (resp.stageId != null) {
+        draftSession.stageId = Number(resp.stageId);
+        const phaseInfo = formatDraftPhase(draftSession.stageId);
+        draftSession.phase = phaseInfo.phase;
+        draftSession.phaseLabel = phaseInfo.label;
+      }
+      if (resp.stageFinishTs != null) {
+        draftSession.stageFinishTs = Number(resp.stageFinishTs);
+      }
+      if (resp.rating?.userRating != null) {
+        draftSession.userRating = Number(resp.rating.userRating);
+      }
+      if (resp.rating?.enemyRating != null) {
+        draftSession.enemyRating = Number(resp.rating.enemyRating);
+      }
+      if (resp.enemyUser && typeof resp.enemyUser === 'object') {
+        draftSession.enemyUser = {
+          id: resp.enemyUser.id,
+          name: resp.enemyUser.name,
+          level: resp.enemyUser.level,
+          clanTitle: resp.enemyUser.clanTitle,
+          avatarId: resp.enemyUser.avatarId
+        };
+      }
+      if (resp.draft) {
+        draftSession.rawCiphertext = resp.draft;
+      }
     }
 
     draftSession.updatedAt = Date.now();
     persistSession();
 
-    // Auto open when starting draft session (Stage 1 matching or Stage 2 defense)
-    if (autoOpenDraft.value && (draftSession.stageId === 1 || draftSession.stageId === 2 || draftSession.stageId === 4)) {
+    // Auto open when starting or actively playing a draft session
+    const isActiveStage = draftSession.stageId != null && [1, 2, 3, 4, 5].includes(draftSession.stageId);
+    if (autoOpenDraft.value && (action === 'randomDraft_register' || isActiveStage)) {
       openModal('legendsDraft');
     }
   }
@@ -182,19 +194,41 @@ export function useDraft() {
         autoOpenDraft.value = changes.autoOpenDraftDialog.newValue === true;
       }
       if (changes.legendsDraftSession?.newValue) {
-        Object.assign(draftSession, changes.legendsDraftSession.newValue);
+        const prevNonce = (changes.legendsDraftSession.oldValue as any)?.autoOpenNonce;
+        const nextVal = changes.legendsDraftSession.newValue as any;
+        Object.assign(draftSession, nextVal);
+        if (nextVal.stageId != null) {
+          const phaseInfo = formatDraftPhase(Number(nextVal.stageId));
+          draftSession.phase = phaseInfo.phase;
+          draftSession.phaseLabel = phaseInfo.label;
+        }
+        if (autoOpenDraft.value && nextVal.autoOpenNonce && nextVal.autoOpenNonce !== prevNonce) {
+          openModal('legendsDraft');
+        }
       }
     });
 
     // Listen to runtime messages
     chrome.runtime?.onMessage?.addListener?.((message: any) => {
       if (message?.kind === 'open-draft-dialog') {
-        if (message.session) Object.assign(draftSession, message.session);
+        if (message.session) {
+          Object.assign(draftSession, message.session);
+          if (message.session.stageId != null) {
+            const phaseInfo = formatDraftPhase(Number(message.session.stageId));
+            draftSession.phase = phaseInfo.phase;
+            draftSession.phaseLabel = phaseInfo.label;
+          }
+        }
         openModal('legendsDraft');
       } else if (message?.kind === 'draft-decrypted') {
         bindDecryptedData(message.data?.draft, message.data?.raw);
       } else if (message?.kind === 'draft-rpc-event') {
-        bindRpcEvent(message.data?.response);
+        bindRpcEvent(message.data?.response, message.data?.action);
+      } else if (message?.kind === 'draft-mqtt-event') {
+        draftSession.updatedAt = Date.now();
+        if (autoOpenDraft.value) {
+          openModal('legendsDraft');
+        }
       } else if (message?.kind === 'draft-decrypt-error') {
         bindError(message.data?.error, message.data?.detail, message.data?.raw);
       }

@@ -1026,6 +1026,33 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 skinId: call.args.skinId, token: `${call.ident}:skinUpgrade` },
               updatedAt: record.timestamp }];
           }
+          if (call.name === 'randomDraft_startBattle' || call.name === 'randomDraft_result') {
+            const resp = result?.response;
+            const matchId =
+              call.name === 'randomDraft_startBattle'
+                ? Number(resp?.battleReplay?.typeId ?? call.args?.matchId)
+                : Number(resp?.matchId ?? call.args?.matchId);
+            const hasCompletionSignal =
+              call.name === 'randomDraft_startBattle'
+                ? Boolean(resp?.battleReplay)
+                : Boolean(resp?.reward && typeof resp.reward === 'object' && Object.keys(resp.reward).length > 0);
+            if (Number.isFinite(matchId) && matchId > 0 && hasCompletionSignal) {
+              return [{
+                key: 'resourceAction',
+                method: call.name,
+                feature: call.feature || null,
+                group: 'internal',
+                data: {
+                  resourceKey: 'resource:refillable:60',
+                  delta: -1,
+                  label: 'Draft Chips',
+                  requireSnapshot: true,
+                  token: `randomDraft_chip:${matchId}`
+                },
+                updatedAt: record.timestamp
+              }];
+            }
+          }
           if (call.name === 'heroUpgradeSkill') {
             const actions = resourceAction(record, call, 'refillable:2', -1);
             const numHeroId = Number(call.args?.heroId);

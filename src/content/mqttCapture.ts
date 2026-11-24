@@ -218,6 +218,7 @@ export function installMqttCapture(customWindow?: any): void {
               bytes: packet.payload.length
             });
           }
+          const payloadInfo = describePayload(packet.payload);
           win.postMessage(
             {
               source: 'hwa-helper-api',
@@ -233,11 +234,30 @@ export function installMqttCapture(customWindow?: any): void {
                 direction,
                 topic: packet.topic,
                 qos: packet.qos,
-                ...describePayload(packet.payload)
+                ...payloadInfo
               }
             },
             loc.origin
           );
+          const isDraftMqtt =
+            (typeof payloadInfo.eventType === 'string' && payloadInfo.eventType.startsWith('randomDraft_')) ||
+            /randomDraft/i.test(packet.topic || '') ||
+            (typeof payloadInfo.payload === 'string' && /randomDraft_/i.test(payloadInfo.payload));
+          if (isDraftMqtt) {
+            win.postMessage(
+              {
+                source: 'hwa-helper-api',
+                kind: 'draft-mqtt-event',
+                topic: packet.topic,
+                direction,
+                eventMethod: payloadInfo.eventMethod || null,
+                eventType: payloadInfo.eventType || null,
+                payload: payloadInfo.payload,
+                timestamp
+              },
+              loc.origin
+            );
+          }
         }
       })
       .catch(() => {});

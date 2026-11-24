@@ -383,7 +383,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       return;
     }
 
-    if (['draft-decrypted', 'draft-decrypt-error', 'draft-rpc-event'].includes(event.data.kind)) {
+    if (['draft-decrypted', 'draft-decrypt-error', 'draft-rpc-event', 'draft-mqtt-event'].includes(event.data.kind)) {
       sendBridgeMessage({ kind: event.data.kind, data: event.data });
       return;
     }

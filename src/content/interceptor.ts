@@ -604,16 +604,48 @@ export function installInterceptor(customWindow?: any): void {
     } catch (_) {}
   }
 
-  function inspectDraftRpc(resText: string | null | undefined) {
-    if (!resText || !resText.includes('randomDraft')) return;
+  function inspectDraftRpc(reqText: string | null | undefined, resText: string | null | undefined) {
+    if (!resText) return;
+    const hasDraftReq = typeof reqText === 'string' && reqText.includes('randomDraft_');
+    const hasDraftRes =
+      resText.includes('"stageId"') ||
+      resText.includes('"draftEnemy"') ||
+      resText.includes('randomDraft');
+    if (!hasDraftReq && !hasDraftRes) return;
+
     try {
+      const draftCallsByIdent = new Map<string, any>();
+      if (hasDraftReq && reqText) {
+        try {
+          const parsedReq = JSON.parse(reqText);
+          const calls = Array.isArray(parsedReq?.calls) ? parsedReq.calls : (parsedReq?.name ? [parsedReq] : []);
+          for (const c of calls) {
+            if (typeof c?.name === 'string' && c.name.startsWith('randomDraft_') && c.ident) {
+              draftCallsByIdent.set(String(c.ident), c);
+            }
+          }
+        } catch (_) {}
+      }
+
       const parsed = JSON.parse(resText);
       for (const r of (parsed?.results || [])) {
+        const ident = r?.ident != null ? String(r.ident) : '';
+        const matchedCall = ident ? draftCallsByIdent.get(ident) : null;
         const resp = r?.result?.response;
-        if (resp && (resp.stageId !== undefined || resp.matchId !== undefined || resp.draft !== undefined)) {
+        const looksLikeDraftResp =
+          resp &&
+          typeof resp === 'object' &&
+          !Array.isArray(resp) &&
+          (resp.draft !== undefined ||
+            resp.draftEnemy !== undefined ||
+            (resp.stageId !== undefined && resp.matchId !== undefined));
+
+        if (matchedCall || looksLikeDraftResp) {
           win.postMessage({
             source: 'hwa-helper-api',
             kind: 'draft-rpc-event',
+            action: matchedCall?.name || 'randomDraft_getInfo',
+            args: matchedCall?.args || null,
             response: resp
           }, loc.origin);
         }
@@ -2466,6 +2498,7 @@ export function installInterceptor(customWindow?: any): void {
                     try { Object.defineProperty(filtered, property, { value: response[property] }); } catch (_) {}
                   }
 
+                  inspectDraftRpc(piggyback.options.body, fullText);
                   record('fetch', method, url, response.status, duration, 'completed', {
                     requestBody: piggyback.options.body,
                     responseBody: fullText
@@ -2500,7 +2533,7 @@ export function installInterceptor(customWindow?: any): void {
                 Promise.all([requestBody, readFetchResponse(response)]).then(([request, received]) => {
                   const reqText = request?.text ?? null;
                   const resText = received?.text ?? null;
-                  inspectDraftRpc(resText);
+                  inspectDraftRpc(reqText, resText);
                   if (resText && resText.includes('"version"')) {
                     try {
                       const parsed = JSON.parse(resText);
@@ -2747,9 +2780,9 @@ export function installInterceptor(customWindow?: any): void {
           if (String(info.method).toUpperCase() === 'POST') {
             const received = readXhrResponse(this);
             const resText = received?.text ?? null;
-            inspectDraftRpc(resText);
             info.requestBody.then((request: any) => {
               const reqText = request?.text ?? null;
+              inspectDraftRpc(reqText, resText);
               record('xhr', info.method, info.url,
                 this.status || null, duration, info.outcome, {
                   requestBody: request?.text ?? null,
