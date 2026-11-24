@@ -10,6 +10,23 @@ export const DEFAULT_PVP_MATCH_ROUNDS = 10;
 export const BASE_ELO = 1500;
 export const ELO_K_FACTOR = 32;
 
+export const DEFAULT_ARENA_BATTLE_FEATURES: readonly string[] = [
+  'battleFeature_202',
+  'battleFeature_204',
+  'battleFeature_207',
+  'battleFeature_208',
+  'battleFeature_209',
+  'battleFeature_212',
+  'battleFeature_213',
+  'battleFeature_214',
+];
+
+export interface BattleEnvelopeTemplate {
+  userId?: string | number;
+  battleFeatures?: string[];
+  battleEffects?: Record<string, number>;
+}
+
 export type PvpSearchMode = 'one-swap' | 'beam-search' | 'top-k-round-robin';
 
 export interface PvpHeroSnapshot {
@@ -36,6 +53,9 @@ export interface PvpMatchOptions {
   symmetric?: boolean;   // default: true (5 atk + 5 def)
   earlyExit?: boolean;   // default: true during screening
   baseSeed?: number;
+  hydratedHeroStats?: Record<string, any>;
+  battleTemplate?: BattleEnvelopeTemplate;
+  userId?: string | number;
 }
 
 export interface PvpMatchResult {
@@ -222,32 +242,151 @@ export function generateOneSwapCandidates(
   return candidates;
 }
 
+function lookupHero(
+  heroMap: Map<number, PvpHeroSnapshot> | Record<string, PvpHeroSnapshot>,
+  id: number
+): PvpHeroSnapshot | undefined {
+  if (heroMap instanceof Map) return heroMap.get(id);
+  if (heroMap && typeof heroMap === 'object') return heroMap[String(id)];
+  return undefined;
+}
+
+/**
+ * Normalizes a hero object into the exact schema expected by Unity's `BattleInstantPlay`
+ * constructor (`CONSTRUCT_BATTLE_PLAY`), preferring server-hydrated combat stats from
+ * `battleHeroStatsCache` and safely filling all required C# fields when falling back to `heroGetAll`.
+ */
+export function normalizeBattleHero(
+  heroId: number,
+  hydratedHero?: any,
+  rawHero?: PvpHeroSnapshot | any
+): Record<string, any> {
+  const id = Number(heroId);
+  const src = hydratedHero && typeof hydratedHero === 'object' && Number.isFinite(Number(hydratedHero.hp))
+    ? hydratedHero
+    : (rawHero || {});
+
+  const level = Math.max(1, Number(src.level ?? rawHero?.level) || 90);
+  const color = Math.max(1, Number(src.color ?? rawHero?.color) || 9);
+  const star = Math.max(1, Number(src.star ?? rawHero?.star) || 5);
+  const power = Math.max(1000, Number(src.power ?? rawHero?.power) || 30000);
+
+  // Normalize artifacts to exact `{ level, star, artifactType }[]` format
+  const rawArts = Array.isArray(src.artifacts) ? src.artifacts : [];
+  const artTypes = ['weapon', 'book', 'ring'];
+  const artifacts = artTypes.map((artifactType, idx) => {
+    const a = rawArts[idx] && typeof rawArts[idx] === 'object' ? rawArts[idx] : {};
+    return {
+      level: Math.max(1, Number(a.level) || 1),
+      star: Math.max(1, Number(a.star) || 1),
+      artifactType: typeof a.artifactType === 'string' ? a.artifactType : artifactType,
+    };
+  });
+
+  const currentSkin = Number(src.currentSkin ?? src.skin ?? id) || id;
+  const skinsObj =
+    src.skins && typeof src.skins === 'object' && !Array.isArray(src.skins)
+      ? src.skins
+      : { [String(id)]: 1 };
+  const slotsObj =
+    src.slots && typeof src.slots === 'object' && !Array.isArray(src.slots)
+      ? src.slots
+      : {};
+  const skillsObj =
+    src.skills && typeof src.skills === 'object' && !Array.isArray(src.skills)
+      ? src.skills
+      : {};
+  const heroRunes = Array.isArray(src.hero_runes)
+    ? src.hero_runes
+    : (Array.isArray(src.runes) && src.runes.length === 5 ? src.runes : [0, 0, 0, 0, 0]);
+
+  // If server-hydrated stats exist, preserve them verbatim; otherwise derive safe non-zero combat stats
+  const hasHydratedCombat = Number.isFinite(Number(src.hp)) && Number(src.hp) > 0;
+  const estStat = Math.max(100, Math.round(power * 0.04));
+
+  return {
+    ...src,
+    id,
+    xp: Number(src.xp) || level * 10000,
+    level,
+    color,
+    star,
+    power,
+    slots: slotsObj,
+    skills: skillsObj,
+    runes: Array.isArray(src.runes) ? src.runes : [0, 0, 0, 0, 0],
+    hero_runes: heroRunes,
+    skins: skinsObj,
+    currentSkin,
+    skin: Number(src.skin) || currentSkin,
+    baseSkinId: Number(src.baseSkinId) || id,
+    skinsInfo: Array.isArray(src.skinsInfo) ? src.skinsInfo : [],
+    currentSkinRank: Number(src.currentSkinRank) || 0,
+    skinRank: Number(src.skinRank) || 0,
+    currentSkinColorId: Number(src.currentSkinColorId) || 0,
+    titanGiftLevel: Number(src.titanGiftLevel) || 0,
+    artifacts,
+    patronLevel: Number(src.patronLevel) || 0,
+    upgradedSkills: Array.isArray(src.upgradedSkills) ? src.upgradedSkills : [],
+    GlobalAttack: Number(src.GlobalAttack) || 100,
+    agility: hasHydratedCombat ? Number(src.agility) || estStat : estStat,
+    strength: hasHydratedCombat ? Number(src.strength) || estStat : estStat,
+    intelligence: hasHydratedCombat ? Number(src.intelligence) || estStat : estStat,
+    hp: hasHydratedCombat ? Number(src.hp) : Math.max(5000, Math.round(power * 1.8)),
+    armor: hasHydratedCombat ? Number(src.armor) || 500 : Math.max(300, Math.round(power * 0.06)),
+    magicResist: hasHydratedCombat ? Number(src.magicResist) || 500 : Math.max(300, Math.round(power * 0.05)),
+    physicalAttack: hasHydratedCombat ? Number(src.physicalAttack) || 1000 : Math.max(500, Math.round(power * 0.12)),
+    magicPower: hasHydratedCombat ? Number(src.magicPower) || 1000 : Math.max(500, Math.round(power * 0.08)),
+  };
+}
+
 /**
  * Builds a synthetic offline Arena `rawBattle` payload for Unity WASM (`Presets_arena(0)`).
+ * Matches the live `customArena_startBattle` envelope (`effects: []`, `reward: []`,
+ * `startTime`, `battleFeatures`, `battleEffects`) so `CONSTRUCT_BATTLE_PLAY` never throws.
  * Zero server RPCs required.
  */
 export function buildSyntheticArenaBattle(
   attackerIds: number[],
   defenderIds: number[],
-  heroMap: Map<number, PvpHeroSnapshot>,
-  seed: number
+  heroMap: Map<number, PvpHeroSnapshot> | Record<string, PvpHeroSnapshot>,
+  seed: number,
+  opts: {
+    hydratedHeroStats?: Record<string, any>;
+    battleTemplate?: BattleEnvelopeTemplate;
+    userId?: string | number;
+  } = {}
 ): Record<string, any> {
+  const hydrated = opts.hydratedHeroStats || {};
   const attackers: Record<string, any> = {};
   for (const id of attackerIds) {
-    const h = heroMap.get(Number(id)) || { id: Number(id), level: 120, color: 16, star: 6, power: 100000 };
-    attackers[String(id)] = { ...h, id: Number(id) };
+    const nId = Number(id);
+    attackers[String(nId)] = normalizeBattleHero(nId, hydrated[String(nId)], lookupHero(heroMap, nId));
   }
   const defenders: Record<string, any> = {};
   for (const id of defenderIds) {
-    const h = heroMap.get(Number(id)) || { id: Number(id), level: 120, color: 16, star: 6, power: 100000 };
-    defenders[String(id)] = { ...h, id: Number(id) };
+    const nId = Number(id);
+    defenders[String(nId)] = normalizeBattleHero(nId, hydrated[String(nId)], lookupHero(heroMap, nId));
   }
+  const tpl = opts.battleTemplate;
   return {
+    userId: String(opts.userId ?? tpl?.userId ?? '1'),
+    typeId: 1,
     type: 'arena',
     seed: (Number(seed) >>> 0) || 1,
+    startTime: Math.floor(Date.now() / 1000),
+    effects: [],
+    reward: [],
+    battleFeatures:
+      Array.isArray(tpl?.battleFeatures) && tpl.battleFeatures.length > 0
+        ? [...tpl.battleFeatures]
+        : [...DEFAULT_ARENA_BATTLE_FEATURES],
+    battleEffects:
+      tpl?.battleEffects && typeof tpl.battleEffects === 'object'
+        ? tpl.battleEffects
+        : {},
     attackers,
     defenders: [defenders],
-    effects: {},
   };
 }
 
@@ -288,9 +427,14 @@ export async function runTenRoundPvpMatch(
   for (let i = 0; i < rounds; i++) {
     const aIsAttacker = i < atkRounds;
     const seed = deriveMatchSeed(baseSeed, i);
+    const battleOpts = {
+      hydratedHeroStats: options.hydratedHeroStats,
+      battleTemplate: options.battleTemplate,
+      userId: options.userId,
+    };
     const battle = aIsAttacker
-      ? buildSyntheticArenaBattle(teamAIds, teamBIds, heroMap, seed)
-      : buildSyntheticArenaBattle(teamBIds, teamAIds, heroMap, seed);
+      ? buildSyntheticArenaBattle(teamAIds, teamBIds, heroMap, seed, battleOpts)
+      : buildSyntheticArenaBattle(teamBIds, teamAIds, heroMap, seed, battleOpts);
 
     const outcome = await simulateFn(battle, seed);
     roundsPlayed++;

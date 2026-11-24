@@ -33,7 +33,19 @@ const accountId = computed(() => cache.value.accountStatus?.data?.id ?? cache.va
 const { customTeams, saveTeams } = useAccountTeams(accountId);
 
 const rawHeroes = computed(() => cache.value.heroGetAll?.data || {});
+const hydratedHeroStats = computed<Record<string, any>>(() => cache.value.battleHeroStatsCache?.data || {});
+const battleTemplate = computed(() => cache.value.battleEnvelopeTemplate?.data || undefined);
 const heroPoolMap = computed(() => buildHeroPoolMap(rawHeroes.value));
+
+const hydrationCoverage = computed(() => {
+  const pool = prunedPool.value;
+  const hydrated = hydratedHeroStats.value;
+  let count = 0;
+  for (const h of pool) {
+    if (hydrated[String(h.id)] && Number.isFinite(Number(hydrated[String(h.id)]?.hp))) count++;
+  }
+  return { hydratedCount: count, total: pool.length };
+});
 
 const pickerHeroes = computed<PickerHeroItem[]>(() =>
   Array.from(heroPoolMap.value.values()).map((h) => ({
@@ -61,6 +73,20 @@ const savedTeamPresets = computed<SavedTeamPreset[]>(() => {
       label: 'Server Arena Team',
       heroIds: serverArena.map(Number).filter((id) => id > 0).slice(0, 5),
     });
+  }
+  const trainingChallenges = cache.value.clanTrainingsCache?.data?.challenges;
+  if (Array.isArray(trainingChallenges) && trainingChallenges.length > 0) {
+    const ch = trainingChallenges[0];
+    const chHeroes = Array.isArray(ch?.data?.defenders?.heroes)
+      ? ch.data.defenders.heroes.map((h: any) => Number(h?.id ?? h)).filter((id: number) => id > 0).slice(0, 5)
+      : [];
+    if (chHeroes.length === 5) {
+      presets.push({
+        id: `training:${ch.id || 'latest'}`,
+        label: ch.data?.description ? `Training: ${ch.data.description}` : 'Guild Training Team',
+        heroIds: chHeroes,
+      });
+    }
   }
   for (const t of customTeams.value) {
     if (t.type === 'titan') continue;
@@ -187,6 +213,9 @@ async function startOptimization() {
         rounds: 10,
         symmetric: symmetricMatch.value,
         earlyExit: earlyExit.value,
+        hydratedHeroStats: hydratedHeroStats.value,
+        battleTemplate: battleTemplate.value,
+        userId: accountId.value,
       },
       maxMatchups: maxMatchups.value,
       shouldStop: () => stopRequested.value,
@@ -207,9 +236,10 @@ async function startOptimization() {
       await chrome.storage.local.set({ [PVP_OPTIMIZER_STORAGE_KEY]: result }).catch(() => {});
     }
   } catch (err: any) {
-    errorMessage.value = err?.message || String(err);
+    const phase = err?.detail?.phase ? ` [${err.detail.phase}]` : '';
+    errorMessage.value = `${err?.message || String(err)}${phase}`;
     statusMessage.value = 'Optimization failed.';
-    addLog(`Error: ${errorMessage.value}`, 'error');
+    addLog(`Error${phase}: ${err?.message || String(err)}`, 'error');
   } finally {
     isRunning.value = false;
   }
@@ -304,9 +334,18 @@ watch(
       <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-3.5 space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h4 class="font-bold text-slate-900 dark:text-slate-100">2. Pool Pruning & Tournament Settings</h4>
-          <span id="pvp-optimizer-estimate" class="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
-            Pruned Pool: {{ prunedPool.length }} heroes · Est. Gen-1: ~{{ estimatedGen1Matchups }} matchups
-          </span>
+          <div class="flex flex-wrap items-center gap-2">
+            <span id="pvp-optimizer-estimate" class="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
+              Pruned Pool: {{ prunedPool.length }} heroes · Est. Gen-1: ~{{ estimatedGen1Matchups }} matchups
+            </span>
+            <span
+              id="pvp-optimizer-hydration-badge"
+              class="px-2 py-0.5 rounded-full text-[10px] font-semibold border"
+              :class="hydrationCoverage.hydratedCount === hydrationCoverage.total && hydrationCoverage.total > 0 ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700'"
+            >
+              Stats: {{ hydrationCoverage.hydratedCount }}/{{ hydrationCoverage.total }} server-hydrated
+            </span>
+          </div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">

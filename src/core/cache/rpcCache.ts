@@ -1046,26 +1046,93 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               updatedAt: record.timestamp
             }];
           }
-          if (call.name === 'customArena_startBattle' && call.args?.type === 'GrandArena' && result?.response) {
-            const paidGrand = Number(result.response?.paid?.refillable?.['21']) || 0;
-            if (paidGrand > 0) {
-              const tokenId = call.ident || record.timestamp;
-              return [{
-                key: 'resourceAction',
-                method: call.name,
-                feature: null,
-                group: 'internal',
-                data: {
-                  resourceKey: 'resource:refillable:21',
-                  delta: -paidGrand,
-                  label: 'Grand Arena Battles',
-                  requireSnapshot: true,
-                  token: `grand_arena_start:${tokenId}`
-                },
-                updatedAt: record.timestamp
-              }];
+          if (call.name === 'customArena_startBattle' && result?.response) {
+            const resp = result.response;
+            const entries: any[] = [];
+            const battles = Array.isArray(resp.battles) ? resp.battles : [];
+            if (battles.length > 0) {
+              const hydratedHeroes: Record<string, any> = {};
+              for (const b of battles) {
+                if (b?.attackers && typeof b.attackers === 'object') {
+                  for (const [hid, heroObj] of Object.entries(b.attackers)) {
+                    if (heroObj && typeof heroObj === 'object' && Number((heroObj as any).id) > 0) {
+                      hydratedHeroes[String((heroObj as any).id || hid)] = heroObj;
+                    }
+                  }
+                }
+              }
+              if (Object.keys(hydratedHeroes).length > 0) {
+                entries.push({
+                  key: 'battleHeroStatsAction',
+                  method: call.name,
+                  feature: null,
+                  group: 'internal',
+                  data: { heroes: hydratedHeroes },
+                  updatedAt: record.timestamp
+                });
+              }
+              const firstBattle = battles[0];
+              if (Array.isArray(firstBattle?.battleFeatures) || (firstBattle?.battleEffects && typeof firstBattle.battleEffects === 'object')) {
+                entries.push({
+                  key: 'battleEnvelopeTemplate',
+                  method: call.name,
+                  feature: null,
+                  group: 'other',
+                  data: {
+                    battleFeatures: Array.isArray(firstBattle.battleFeatures) ? firstBattle.battleFeatures : [],
+                    battleEffects: firstBattle.battleEffects && typeof firstBattle.battleEffects === 'object' ? firstBattle.battleEffects : {},
+                  },
+                  updatedAt: record.timestamp
+                });
+              }
             }
-            return [];
+            if (call.args?.type === 'GrandArena') {
+              const paidGrand = Number(resp?.paid?.refillable?.['21']) || 0;
+              if (paidGrand > 0) {
+                const tokenId = call.ident || record.timestamp;
+                entries.push({
+                  key: 'resourceAction',
+                  method: call.name,
+                  feature: null,
+                  group: 'internal',
+                  data: {
+                    resourceKey: 'resource:refillable:21',
+                    delta: -paidGrand,
+                    label: 'Grand Arena Battles',
+                    requireSnapshot: true,
+                    token: `grand_arena_start:${tokenId}`
+                  },
+                  updatedAt: record.timestamp
+                });
+              }
+            }
+            return entries;
+          }
+          if (call.name === 'clanTrainings_getAll' && result?.response) {
+            return [{
+              key: 'clanTrainingsCache',
+              method: call.name,
+              feature: null,
+              group: 'other',
+              data: {
+                challenges: Array.isArray(result.response.challenges) ? result.response.challenges : [],
+                replays: Array.isArray(result.response.replays) ? result.response.replays : [],
+              },
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'clanTrainings_createChallenge' && result?.response) {
+            return [{
+              key: 'clanTrainingsCache',
+              method: call.name,
+              feature: null,
+              group: 'other',
+              data: {
+                challenges: [result.response],
+                replays: [],
+              },
+              updatedAt: record.timestamp
+            }];
           }
           if (call.name === 'League_getInfo' && call.args?.type === 'ratingArena' && result?.response) {
             return [{
@@ -6255,6 +6322,25 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             changed = true;
           }
           // Available troop counts are reconciled from getUnitSummary, not inferred.
+          continue;
+        }
+
+        if (entry.key === 'battleHeroStatsAction') {
+          const incoming = entry.data?.heroes;
+          if (incoming && typeof incoming === 'object') {
+            const prevMap = next.battleHeroStatsCache?.data && typeof next.battleHeroStatsCache.data === 'object'
+              ? next.battleHeroStatsCache.data
+              : {};
+            next.battleHeroStatsCache = {
+              key: 'battleHeroStatsCache',
+              method: entry.method,
+              feature: null,
+              group: 'other',
+              data: { ...prevMap, ...incoming },
+              updatedAt: entry.updatedAt
+            };
+            changed = true;
+          }
           continue;
         }
 

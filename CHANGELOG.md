@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.272 — 2026-11-24
+
+### Fixed & Improved
+
+- **PvP Team Optimizer `CONSTRUCT_BATTLE_PLAY` Fix & Passive Battle Hydration (`pvpTeamOptimizer.ts`, `rpcCache.ts`, `PvpTeamOptimizerModal.vue`)**:
+  - Fixed `buildSyntheticArenaBattle()` in `src/services/pvpTeamOptimizer.ts` to emit `effects: []` (Array instead of `{}`), `reward: []`, `startTime`, `userId`, `typeId`, `battleFeatures`, `battleEffects`, and complete C#-safe normalized hero fields (`normalizeBattleHero`) — eliminating the `IL2CPP managed exception in phase 'CONSTRUCT_BATTLE_PLAY'` error across both PvP Team Optimizer and Grand Arena Pre-Sim.
+  - Added passive hydration caching in `src/core/cache/rpcCache.ts` (`battleHeroStatsCache`, `battleEnvelopeTemplate`, `clanTrainingsCache`) from live `customArena_startBattle` & `clanTrainings_*` responses with zero extra RPCs and zero Guild Training spam.
+  - Added Hydration Coverage badge (`#pvp-optimizer-hydration-badge`) and 1-click Guild Training Seed Team preset in `PvpTeamOptimizerModal.vue`.
+
 ## 0.11.270 — 2026-11-24
 
 ### Added
