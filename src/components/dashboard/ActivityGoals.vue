@@ -40,7 +40,7 @@ const activities = computed<ActivityRow[]>(() => {
   rows.push({ id: 'arena', title: 'Arena', icon: '⚔️',
     ...arenaActivityState(cache.value, false, now.value), isInteractive: true });
   rows.push({ id: 'grand-arena', title: 'Grand Arena', icon: '🛡️',
-    ...arenaActivityState(cache.value, true, now.value) });
+    ...arenaActivityState(cache.value, true, now.value), isInteractive: true });
 
   rows.push({ id: 'dungeon', title: 'Guild Dungeon', icon: '🏰',
     ...dungeonActivityState(cache.value, now.value), isInteractive: true });
@@ -100,6 +100,7 @@ const activities = computed<ActivityRow[]>(() => {
 function handleActivityClick(act: ActivityRow) {
   if (act.id === 'tower') openModal('tower');
   else if (act.id === 'arena') openModal('arena');
+  else if (act.id === 'grand-arena') openModal('grandArena');
   else if (act.id === 'dungeon') openModal('dungeon');
   else if (act.id === 'expeditions') openModal('expeditions');
   else if (act.id === 'quests') openModal('questDetail');

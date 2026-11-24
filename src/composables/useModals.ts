@@ -25,6 +25,7 @@ export type ModalName =
   | 'marchDetail'
   | 'legendsDraft'
   | 'arena'
+  | 'grandArena'
   | 'pvpOptimizer';
 
 const modalState = reactive<Record<ModalName, boolean>>({
@@ -52,6 +53,7 @@ const modalState = reactive<Record<ModalName, boolean>>({
   marchDetail: false,
   legendsDraft: false,
   arena: false,
+  grandArena: false,
   pvpOptimizer: false,
 });
 

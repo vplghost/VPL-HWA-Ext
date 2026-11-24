@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.270 — 2026-11-24
+
+### Added
+
+- **Grand Arena Dialog & 3-Team Unity WASM Best-of-3 Optimizer with Top-50 Hidden Team Strategies (`grandArenaService.ts`, `GrandArenaModal.vue`, `rpcCache.ts`, `useModals.ts`, `ActivityGoals.vue`, `App.vue`)**:
+  - Added `src/services/grandArenaService.ts` supporting live-verified `grandFindEnemies` & `customArena_startBattle` / `customArena_endBattle` (`type: 'GrandArena'`), exact `hiddenTeamPower` calculation when 1 team is hidden (`totalPower - sum(visibleTeamPowers)`), local 0-cost pre-simulation (`computePairwiseWinMatrix` via `buildSyntheticArenaBattle`), 6-permutation Best-of-3 optimizer (`full-3x3`, `Visible-2 Lock` with strongest-spare tie-breaker, `Hidden-Power Sacrifice`, Top-20 skip), and 24h `grandArenaIntelCache`.
+  - Updated `src/core/cache/rpcCache.ts` to cache `grandFindEnemies`, deduct `resource:refillable:21` on `customArena_startBattle` (`type: 'GrandArena'`), and isolate `grandArenaState` / `grandArenaEnemies` from Normal Arena.
+  - Added `GrandArenaModal.vue` wired into `ActivityGoals.vue` (Grand Arena card), `useModals.ts`, and `App.vue`.
+
 ## 0.11.268 — 2026-11-24
 
 ### Added & Fixed

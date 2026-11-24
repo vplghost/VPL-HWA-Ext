@@ -1036,6 +1036,37 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
               updatedAt: record.timestamp
             }];
           }
+          if (call.name === 'grandFindEnemies' && result?.response) {
+            return [{
+              key: 'grandArenaEnemies',
+              method: call.name,
+              feature: null,
+              group: 'other',
+              data: result.response,
+              updatedAt: record.timestamp
+            }];
+          }
+          if (call.name === 'customArena_startBattle' && call.args?.type === 'GrandArena' && result?.response) {
+            const paidGrand = Number(result.response?.paid?.refillable?.['21']) || 0;
+            if (paidGrand > 0) {
+              const tokenId = call.ident || record.timestamp;
+              return [{
+                key: 'resourceAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  resourceKey: 'resource:refillable:21',
+                  delta: -paidGrand,
+                  label: 'Grand Arena Battles',
+                  requireSnapshot: true,
+                  token: `grand_arena_start:${tokenId}`
+                },
+                updatedAt: record.timestamp
+              }];
+            }
+            return [];
+          }
           if (call.name === 'League_getInfo' && call.args?.type === 'ratingArena' && result?.response) {
             return [{
               key: 'arenaLeague',
@@ -1058,6 +1089,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           }
           if (call.name === 'customArena_endBattle' && result?.response) {
             const resp = result.response;
+            const isGrand = call.args?.type === 'GrandArena' || resp.state?.arenaType === 'GrandArena';
             const entries: any[] = [];
             const nextEnemies = Array.isArray(resp.enemies)
               ? resp.enemies
@@ -1065,10 +1097,10 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             const nextEnemiesType =
               resp.enemies && typeof resp.enemies === 'object' && !Array.isArray(resp.enemies) && resp.enemies.type
                 ? resp.enemies.type
-                : (resp.state?.arenaType || 'NormalArena');
+                : (resp.state?.arenaType || (isGrand ? 'GrandArena' : 'NormalArena'));
             if (resp.state) {
               entries.push({
-                key: 'arenaState',
+                key: isGrand ? 'grandArenaState' : 'arenaState',
                 method: call.name,
                 feature: null,
                 group: 'other',
@@ -1078,7 +1110,7 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             }
             if (resp.enemies !== undefined) {
               entries.push({
-                key: 'arenaEnemies',
+                key: isGrand ? 'grandArenaEnemies' : 'arenaEnemies',
                 method: call.name,
                 feature: null,
                 group: 'other',
@@ -1086,21 +1118,23 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
                 updatedAt: record.timestamp
               });
             }
-            const tokenId = resp.replayId || call.ident || record.timestamp;
-            entries.push({
-              key: 'resourceAction',
-              method: call.name,
-              feature: null,
-              group: 'internal',
-              data: {
-                resourceKey: 'resource:refillable:6',
-                delta: -1,
-                label: 'Arena Battles',
-                requireSnapshot: true,
-                token: `arena_battle:${tokenId}`
-              },
-              updatedAt: record.timestamp
-            });
+            if (!isGrand) {
+              const tokenId = resp.replayId || call.ident || record.timestamp;
+              entries.push({
+                key: 'resourceAction',
+                method: call.name,
+                feature: null,
+                group: 'internal',
+                data: {
+                  resourceKey: 'resource:refillable:6',
+                  delta: -1,
+                  label: 'Arena Battles',
+                  requireSnapshot: true,
+                  token: `arena_battle:${tokenId}`
+                },
+                updatedAt: record.timestamp
+              });
+            }
             return entries;
           }
           if (call.name === 'randomDraft_startBattle' || call.name === 'randomDraft_result') {
