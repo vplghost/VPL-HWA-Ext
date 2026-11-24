@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.291 — 2026-11-25
+
+### Added
+
+- **Unified Game Data Sync Pipeline (`gameDataSync.ts`, `scripts/sync-game-data.mjs`, `nameData.ts`, `heroMetadata.ts`, `tests/game-data-sync.test.mjs`)**:
+  - Added `src/services/gameDataSync.ts` (`extractGameDataConfigSubset`, `compileHeroRemoteMetadata`, `mergeNamesAdditiveSafe`, `mergeHeroMetadataAdditiveSafe`, `detectGameDataDrift`, `applyGameDataOverlay`) covering Hero, Faction, Role, Class, Artifact, Building & Research remote configs with strict additive-safe merge rules.
+  - Added unified CLI `scripts/sync-game-data.mjs` (`npm run sync:game-data`) supporting `--from-bridge`, `--from-log`, `--from-index`, `--only=all|city|heroes|artifacts`, `--dry-run`, and `--force`.
+  - Extended runtime hot-overlay support in `src/data/nameData.ts` (`setGameNameOverlay`) and `src/data/heroMetadata.ts` (`setHeroMetadataOverlay`) so hotfixed Hero/Titan/Artifact IDs resolve immediately without overwriting curated static entries.
+
 ## 0.11.289 — 2026-11-25
 
 ### Added

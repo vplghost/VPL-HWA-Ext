@@ -2786,6 +2786,13 @@ const itemGroups: Record<string, string> = {
 };
 
 let cityNameOverlay: { building?: Record<string, string>; research?: Record<string, string> } | null = null;
+let gameNameOverlay: Record<string, Record<string, string>> | null = null;
+
+export function setGameNameOverlay(
+  overlay: Record<string, Record<string, string>> | null
+): void {
+  gameNameOverlay = overlay;
+}
 
 export function setCityNameOverlay(
   overlay: { building?: Record<string, string>; research?: Record<string, string> } | null
@@ -2801,6 +2808,9 @@ export function lookupName(group: string, id: string | number): string | null {
   const localNames = nameData.names?.[group];
   if (localNames && Object.hasOwn(localNames, strId)) {
     return localNames[strId] ?? null;
+  }
+  if (gameNameOverlay?.[group] && Object.hasOwn(gameNameOverlay[group]!, strId)) {
+    return gameNameOverlay[group]![strId] ?? null;
   }
   const extra = itemResources?.items;
   const rows = extra && Object.hasOwn(extra, group) ? extra[group] : null;
