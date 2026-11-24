@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   CAMP_BUILDING_IDS,
   CAMP_TRAINING_CAPACITY_BY_LEVEL,
+  RESEARCH_TRAINING_CAPACITY_BY_ID,
+  getResearchTrainingCapacityBonus,
   getBuildingTrainingCapacity,
   getUnlockedTroopLevels,
   isCampBuildingUpgrading,
@@ -691,4 +693,65 @@ test('advanceTroopTraining refreshes missing cache and schedules wake alarm when
   const wakeAlarm = alarms.find((a) => a.name === 'hwa-troop-train-wake');
   assert.ok(wakeAlarm, 'Must schedule hwa-troop-train-wake alarm');
   assert.ok(wakeAlarm.opts.when >= waitRes.nextWakeAt);
+});
+
+
+test('getBuildingTrainingCapacity includes permanent Personal Research Camp Expansion bonuses', () => {
+  // Player completed Camp Expansion I-IV max + V Lv.1: 7 + 15 + 23 + 30 + 11 = +86
+  const cache = {
+    buildingStatus: {
+      data: {
+        buildings: [
+          { buildingId: 40, level: 21 }, // Infantry Camp Lv.21 = 134
+          { buildingId: 41, level: 22 }, // Marksmen Camp Lv.22 = 142
+          { buildingId: 42, level: 21 }, // Spearmen Camp Lv.21 = 134
+          { buildingId: 182, level: 20 },
+          { buildingId: 183, level: 14 },
+        ],
+      },
+    },
+    researchStatus: {
+      data: {
+        completedResearches: [
+          { researchId: 3, level: 3 },   // +7
+          { researchId: 59, level: 3 },  // +15
+          { researchId: 90, level: 3 },  // +23
+          { researchId: 125, level: 3 }, // +30
+          { researchId: 158, level: 1 }, // +11
+          { researchId: 6, level: 3 },   // trainingSpeed, not capacity -> +0
+        ],
+      },
+    },
+    'getUnitSummary:unit': {
+      data: { available: [{ unitId: 7, count: 100 }] },
+    },
+    'getTrainings:unit': {
+      data: { trainingQueues: [], upgradeQueues: [] },
+    },
+  };
+
+  assert.equal(getResearchTrainingCapacityBonus(cache), 86);
+  assert.equal(getBuildingTrainingCapacity(0, cache), 134 + 86); // 220
+  assert.equal(getBuildingTrainingCapacity(1, cache), 134 + 86); // 220
+  assert.equal(getBuildingTrainingCapacity(2, cache), 142 + 86); // 228
+
+  // Verify buildAutoTrainCalls uses the combined capacity (220 / 228)
+  const plan = buildAutoTrainCalls(cache, { autoTrainEnabled: true, trainLevels: { 0: 7, 1: 7, 2: 7 } }, 1000000);
+  const inf = plan.actions.find((a) => a.type === 0 && a.action === 'train');
+  const mks = plan.actions.find((a) => a.type === 2 && a.action === 'train');
+  assert.equal(inf?.count, 220);
+  assert.equal(mks?.count, 228);
+
+  // Max Camp Expansion I-VII sum check: 7 + 15 + 23 + 30 + 37 + 46 + 20 = 178
+  const maxCache = {
+    researchStatus: {
+      data: {
+        completedResearches: Object.entries(RESEARCH_TRAINING_CAPACITY_BY_ID).map(([id, tbl]) => ({
+          researchId: Number(id),
+          level: tbl.length - 1,
+        })),
+      },
+    },
+  };
+  assert.equal(getResearchTrainingCapacityBonus(maxCache), 178);
 });

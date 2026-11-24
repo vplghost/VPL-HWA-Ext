@@ -667,6 +667,7 @@ export async function advanceTroopTraining(tabId?: number, customChrome?: any, o
       if (needsTroopTrainingRefresh(stored.rpcCache, now) && (force || now - lastTroopTrainRefreshAt >= 60_000)) {
         const refreshCalls = [
           { name: 'getSummary', feature: 'building', args: {} },
+          { name: 'getSummary', feature: 'personalResearch', args: {} },
           { name: 'getUnitSummary', feature: 'unit', args: {} },
           { name: 'getTrainings', feature: 'unit', args: {} },
           { name: 'getHealing', feature: 'unit', args: {} },

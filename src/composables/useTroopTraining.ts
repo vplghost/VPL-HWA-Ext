@@ -292,6 +292,7 @@ export function useTroopTraining() {
     try {
       await dispatchRpc([
         { name: 'getSummary', feature: 'building' },
+        { name: 'getSummary', feature: 'personalResearch' },
         { name: 'getUnitSummary', feature: 'unit' },
         { name: 'getTrainings', feature: 'unit' },
         { name: 'getHealing', feature: 'unit' },

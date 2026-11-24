@@ -128,13 +128,68 @@ export function calculateHealingDurationMs(units: Array<{ unitId: number | strin
 }
 
 /**
- * Resolve training capacity for corresponding camp building (Camps 41, 42, 40).
+ * Cumulative permanent `trainingCapacity` bonuses granted by Personal Researches
+ * ("Camp Expansion I–VII" / "Расширение лагеря I–VII"), extracted from
+ * `personalResearchLevel` + `bonus` game configs.
+ */
+export const RESEARCH_TRAINING_CAPACITY_BY_ID: Record<number, readonly number[]> = {
+  3: [0, 2, 4, 7],                                   // Camp Expansion I (+2, +2, +3)
+  59: [0, 4, 9, 15],                                 // Camp Expansion II (+4, +5, +6)
+  90: [0, 7, 14, 23],                                // Camp Expansion III (+7, +7, +9)
+  125: [0, 9, 18, 30],                               // Camp Expansion IV (+9, +9, +12)
+  158: [0, 11, 22, 37],                              // Camp Expansion V (+11, +11, +15)
+  189: [0, 14, 28, 46],                              // Camp Expansion VI (+14, +14, +18)
+  492: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20],      // Camp Expansion VII (+2 x 10)
+};
+
+export function extractCompletedResearches(cache: any): any[] {
+  if (!cache || typeof cache !== 'object') return [];
+  const raw =
+    cache?.researchStatus?.data?.completedResearches ??
+    cache?.researchStatus?.data?.researches ??
+    cache?.['getSummary:personalResearch']?.data?.completedResearches ??
+    cache?.personalResearch_getSummary?.data?.completedResearches ??
+    cache?.clan_getSummary?.data?.completedResearches ??
+    null;
+  return normalizeArray(raw);
+}
+
+/**
+ * Sums permanent training batch capacity bonuses from completed Personal Researches.
+ */
+export function getResearchTrainingCapacityBonus(cache: any): number {
+  const completed = extractCompletedResearches(cache);
+  if (!completed.length) return 0;
+
+  let bonus = 0;
+  const maxByResearch = new Map<number, number>();
+  for (const item of completed) {
+    const rId = Number(item?.researchId ?? item?.id);
+    const level = Number(item?.level);
+    if (!Number.isInteger(rId) || !Number.isInteger(level) || level <= 0) continue;
+    const table = RESEARCH_TRAINING_CAPACITY_BY_ID[rId];
+    if (!table) continue;
+    const clamped = Math.min(level, table.length - 1);
+    const val = table[clamped] || 0;
+    const prev = maxByResearch.get(rId) || 0;
+    if (val > prev) maxByResearch.set(rId, val);
+  }
+  for (const val of maxByResearch.values()) {
+    bonus += val;
+  }
+  return bonus;
+}
+
+/**
+ * Resolve total training batch capacity for corresponding camp building (Camps 40, 41, 42)
+ * plus permanent bonuses from completed Personal Researches.
  */
 export function getBuildingTrainingCapacity(type: number, cache: any): number {
-  if (!Number.isInteger(type) || type < 0 || type > 2) return 26;
+  const researchBonus = getResearchTrainingCapacityBonus(cache);
+  if (!Number.isInteger(type) || type < 0 || type > 2) return 26 + researchBonus;
   const targetBuildingId = CAMP_BUILDING_IDS[type];
   const raw = extractBuildingsRaw(cache);
-  if (!raw || typeof raw !== 'object') return 26;
+  if (!raw || typeof raw !== 'object') return 26 + researchBonus;
 
   for (const [key, value] of Object.entries(raw)) {
     const b: any = value;
@@ -142,13 +197,13 @@ export function getBuildingTrainingCapacity(type: number, cache: any): number {
     if (id !== targetBuildingId) continue;
     const rawLevel = typeof b === 'number' ? b : b?.level;
     const level = Number(rawLevel);
-    if (!Number.isInteger(level) || level <= 0) return 17;
+    if (!Number.isInteger(level) || level <= 0) return 17 + researchBonus;
     if (level >= CAMP_TRAINING_CAPACITY_BY_LEVEL.length) {
-      return CAMP_TRAINING_CAPACITY_BY_LEVEL[CAMP_TRAINING_CAPACITY_BY_LEVEL.length - 1];
+      return CAMP_TRAINING_CAPACITY_BY_LEVEL[CAMP_TRAINING_CAPACITY_BY_LEVEL.length - 1] + researchBonus;
     }
-    return CAMP_TRAINING_CAPACITY_BY_LEVEL[level];
+    return CAMP_TRAINING_CAPACITY_BY_LEVEL[level] + researchBonus;
   }
-  return 26;
+  return 26 + researchBonus;
 }
 
 /**
