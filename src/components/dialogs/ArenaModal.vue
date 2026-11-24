@@ -6,6 +6,7 @@ import { getHeroMetadata, getHeroName } from '@/src/utils/metadata';
 import { simulateBattleWithUnity } from '@/src/utils/dungeonBattleSim';
 import {
   extractArenaOverview,
+  extractArenaEnemyList,
   isEnemyWithinPowerRatio,
   buildArenaEndBattleArgs,
   runArenaMonteCarloSim,
@@ -245,9 +246,9 @@ async function simulateAndOptionallyFight(enemy: ArenaEnemy): Promise<'won' | 'l
       throw new Error(String(endResp?.error || endRes?.results?.[0]?.result?.error?.description || 'Arena battle rejected by server'));
     }
 
-    if (endResp?.enemies?.[0]) {
-      liveEnemy.value = normalizeArenaEnemy(endResp.enemies[0]);
-    }
+    const nextRawEnemies = extractArenaEnemyList(endResp?.enemies);
+    const nextEnemy = nextRawEnemies.length > 0 ? normalizeArenaEnemy(nextRawEnemies[0]) : null;
+    liveEnemy.value = nextEnemy && nextEnemy.userId !== enemy.userId ? nextEnemy : null;
 
     if (mc.canonicalOutcome.win) {
       addLog(`Victory vs ${enemy.name}! New Rank: #${endResp?.state?.place ?? overview.value.place ?? '—'}.`, 'ok');
@@ -288,6 +289,7 @@ async function startAutoArena() {
   );
 
   try {
+    let lastFoughtUserId: string | undefined;
     while (!stopRequested.value) {
       const freeLeft = overview.value.freeBattlesLeft;
       if (freeLeft !== null && freeLeft <= 0) {
@@ -296,7 +298,10 @@ async function startAutoArena() {
         break;
       }
 
-      let enemy = activeEnemy.value || (await findNextEnemy());
+      let enemy = activeEnemy.value;
+      if (!enemy || (lastFoughtUserId && enemy.userId === lastFoughtUserId)) {
+        enemy = await findNextEnemy(lastFoughtUserId);
+      }
       if (!enemy) {
         statusMessage.value = 'Stopped: Could not find an Arena opponent.';
         addLog('Stopped: No opponent returned.', 'warn');
@@ -336,6 +341,7 @@ async function startAutoArena() {
         continue;
       }
 
+      lastFoughtUserId = enemy.userId;
       // Refresh free battles counter after victory
       await dispatchRpc([{ name: 'refillableGetAll', args: {}, feature: 'refillable' }]);
     }

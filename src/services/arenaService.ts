@@ -54,6 +54,19 @@ export interface ArenaMonteCarloResult {
   runs: ArenaSimRun[];
 }
 
+/**
+ * Extracts a raw Arena enemy list from either a flat array (`Enemy[]`) or a wrapped
+ * response object (`{ type, useCustomArenaMode, enemies: Enemy[] }`), as returned by
+ * `arenaFindEnemies` and `customArena_endBattle`.
+ */
+export function extractArenaEnemyList(source: any): any[] {
+  if (Array.isArray(source)) return source;
+  if (source && typeof source === 'object' && Array.isArray(source.enemies)) {
+    return source.enemies;
+  }
+  return [];
+}
+
 export function normalizeArenaEnemy(raw: any): ArenaEnemy | null {
   if (!raw || typeof raw !== 'object') return null;
   const userId = String(raw.userId ?? raw.user?.id ?? '').trim();
@@ -90,9 +103,9 @@ export function extractArenaOverview(cache: Record<string, any> | null | undefin
   const arenaReplays = c.arenaReplays?.data || {};
   const freeEntry = c['resource:refillable:6']?.data;
 
-  const rawEnemies = Array.isArray(arenaEnemies.enemies) && arenaEnemies.enemies.length > 0
-    ? arenaEnemies.enemies
-    : (Array.isArray(arenaState.enemies) ? arenaState.enemies : []);
+  const fromArenaEnemies = extractArenaEnemyList(arenaEnemies);
+  const fromArenaState = extractArenaEnemyList(arenaState.enemies);
+  const rawEnemies = fromArenaEnemies.length > 0 ? fromArenaEnemies : fromArenaState;
 
   const enemies = rawEnemies
     .map(normalizeArenaEnemy)

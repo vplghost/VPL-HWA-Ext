@@ -1059,23 +1059,30 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
           if (call.name === 'customArena_endBattle' && result?.response) {
             const resp = result.response;
             const entries: any[] = [];
+            const nextEnemies = Array.isArray(resp.enemies)
+              ? resp.enemies
+              : (Array.isArray(resp.enemies?.enemies) ? resp.enemies.enemies : []);
+            const nextEnemiesType =
+              resp.enemies && typeof resp.enemies === 'object' && !Array.isArray(resp.enemies) && resp.enemies.type
+                ? resp.enemies.type
+                : (resp.state?.arenaType || 'NormalArena');
             if (resp.state) {
               entries.push({
                 key: 'arenaState',
                 method: call.name,
                 feature: null,
                 group: 'other',
-                data: { ...resp.state, enemies: resp.enemies || [] },
+                data: { ...resp.state, enemies: nextEnemies },
                 updatedAt: record.timestamp
               });
             }
-            if (Array.isArray(resp.enemies) && resp.enemies.length > 0) {
+            if (resp.enemies !== undefined) {
               entries.push({
                 key: 'arenaEnemies',
                 method: call.name,
                 feature: null,
                 group: 'other',
-                data: { type: resp.state?.arenaType || 'NormalArena', enemies: resp.enemies },
+                data: { type: nextEnemiesType, enemies: nextEnemies },
                 updatedAt: record.timestamp
               });
             }

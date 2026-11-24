@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   extractArenaOverview,
+  extractArenaEnemyList,
   isEnemyWithinPowerRatio,
   buildArenaEndBattleArgs,
   runArenaMonteCarloSim,
@@ -128,4 +129,79 @@ test('rpcCache extracts arenaFindEnemies, League_getInfo, and deducts free battl
   assert.equal(after.freeBattlesLeft, 4, 'Free Arena battles should decrement after customArena_endBattle');
   assert.equal(after.place, 12046);
   assert.equal(after.numWins, 260);
+  assert.equal(after.enemies.length, 0, 'Empty enemies in customArena_endBattle must clear stale opponent');
+});
+
+test('extractArenaEnemyList & rpcCache unwrap nested customArena_endBattle enemies object', async () => {
+  assert.deepEqual(extractArenaEnemyList(null), []);
+  assert.deepEqual(extractArenaEnemyList([{ userId: '1' }]), [{ userId: '1' }]);
+  assert.deepEqual(
+    extractArenaEnemyList({
+      type: 'RatingArena',
+      useCustomArenaMode: true,
+      enemies: [{ userId: '54079447', power: 155146 }],
+    }),
+    [{ userId: '54079447', power: 155146 }]
+  );
+
+  const endpoint = 'https://api.hero-wars-alliance.com/api/rpc';
+  let state = rpcCacheService.merge({}, [{
+    endpoint,
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-24T12:30:20.000Z',
+    requestBody: JSON.stringify({ calls: [{ name: 'arenaFindEnemies', args: {}, ident: 'e0' }] }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'e0',
+        result: {
+          response: {
+            type: 'RatingArena',
+            enemies: [{ userId: '646392096', power: 139497, rating: 7000, user: { name: 'robjo69', level: 100 }, heroes: [] }],
+          },
+        },
+      }],
+    }),
+  }]).cache;
+
+  assert.equal(extractArenaOverview(state).enemies[0]?.userId, '646392096');
+
+  // Live server returns enemies as { type, useCustomArenaMode, enemies: [...] } inside customArena_endBattle
+  state = rpcCacheService.merge(state, [{
+    endpoint,
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-24T12:30:27.590Z',
+    requestBody: JSON.stringify({ calls: [{ name: 'customArena_endBattle', args: { type: 'NormalArena' }, ident: 'end2' }] }),
+    responseBody: JSON.stringify({
+      results: [{
+        ident: 'end2',
+        result: {
+          response: {
+            replayId: 'rep-2',
+            valid: true,
+            state: { arenaType: 'NormalArena', place: 12046, bestPlace: 12046, numBattles: 271, numWins: 264, power: 172882, defenders: [] },
+            enemies: {
+              type: 'RatingArena',
+              useCustomArenaMode: true,
+              enemies: [
+                { userId: '54079447', power: 155146, rating: 7148, user: { name: 'NextRival', level: 101 }, heroes: [{ id: 16, level: 90, power: 40000 }] },
+              ],
+            },
+          },
+        },
+      }],
+    }),
+  }]).cache;
+
+  const after = extractArenaOverview(state);
+  assert.equal(after.enemies.length, 1);
+  assert.equal(after.enemies[0].userId, '54079447', 'Must replace defeated opponent with nested enemies[0]');
+  assert.equal(after.enemies[0].name, 'NextRival');
+
+  const modalSrc = await readFile(resolve(root, 'src/components/dialogs/ArenaModal.vue'), 'utf8');
+  assert.ok(modalSrc.includes('extractArenaEnemyList(endResp?.enemies)'), 'ArenaModal must unwrap nested endResp.enemies');
+  assert.ok(modalSrc.includes('lastFoughtUserId'), 'Auto Arena loop must guard against re-attacking the previous target');
 });

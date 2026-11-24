@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.266 — 2026-11-24
+
+### Fixed
+
+- **Auto Arena `Invalid target <userId>` after First Victory (`arenaService.ts`, `rpcCache.ts`, `ArenaModal.vue`)**:
+  - Added `extractArenaEnemyList()` in `src/services/arenaService.ts` to unwrap both flat `Enemy[]` arrays and nested `{ type, useCustomArenaMode, enemies: Enemy[] }` objects returned by `customArena_endBattle`.
+  - Updated `src/core/cache/rpcCache.ts` (`customArena_endBattle`) to unwrap nested `resp.enemies.enemies` into `arenaState` and `arenaEnemies` (clearing stale targets when empty).
+  - Updated `ArenaModal.vue` to replace/clear `liveEnemy` with the unwrapped next opponent after `customArena_endBattle` and guard the `startAutoArena()` loop with `lastFoughtUserId` so a defeated target is never attacked twice.
+
 ## 0.11.264 — 2026-11-24
 
 ### Added
