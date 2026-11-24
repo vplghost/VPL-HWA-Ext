@@ -6,6 +6,7 @@ export interface MonsterQueueOptions {
   heroIds: number[];
   teamId?: string;
   firstMobId?: string | number;
+  autoHealAfterQueue?: boolean;
   maxTroops?: number | null;
   capacitySettings?: any;
   [key: string]: any;

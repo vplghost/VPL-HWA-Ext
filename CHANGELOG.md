@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.268 — 2026-11-24
+
+### Added & Fixed
+
+- **Raid & Monster Queue Smart Coordination: Post-Queue Auto-Heal, Squad Lock & Session Summary (`queueCoordination.ts`, `resourceLock.ts`, `autoGather.ts`, `raidQueue.ts`, `monsterQueue.ts`, `backgroundRuntime.ts`, `RaidModal.vue`, `MonsterModal.vue`)**:
+  - Added `src/services/queues/queueCoordination.ts` (`planPostQueueHeal`, `buildQueueSessionSummary`, `appendSessionEvent`) to trigger a single fire-and-forget `startHealing` dispatch after a Raid/Monster queue completes or stops (avoiding mid-queue interruptions and redundant RPC calls), and added dynamic troop re-allocation to `monsterQueue.nextAttack()`.
+  - Fixed `ResourceLockManager.syncFromQueueStates()` to read actual `phase` / `options.heroIds` fields, arm locks when `raidEnergyAuto` approaches threshold, and wired reserved hero/march-slot enforcement directly into `planAutoGather()`.
+  - Added `Auto-heal wounded troops when queue ends` checkbox, active Squad Lock badge, and collapsible `Last Session Summary` card (`lastRaidSessionSummary`, `lastMonsterSessionSummary`) to `RaidModal.vue` and `MonsterModal.vue`.
+
 ## 0.11.266 — 2026-11-24
 
 ### Fixed

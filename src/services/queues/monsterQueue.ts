@@ -5,6 +5,7 @@ import type {
   MonsterCurrentTarget,
 } from '../../types/game/monsterQueue.ts';
 import * as expData from '../../utils/experimentalData.ts';
+import { appendSessionEvent } from './queueCoordination.ts';
 
 function getDataHelper(): any {
   return expData;
@@ -128,9 +129,12 @@ export function search(state: MonsterQueueState, now: number): MonsterQueueStepR
 export function nextAttack(
   state: MonsterQueueState,
   cache: Record<string, any> | null | undefined,
-  now: number
+  now: number,
+  settings?: any
 ): MonsterQueueStepResult {
+  const data = getDataHelper();
   if (state.completed >= state.options.count) {
+    state.sessionEvents = appendSessionEvent(state.sessionEvents, { at: now, type: 'completed', detail: `Completed ${state.completed}/${state.options.count}` });
     return { state: { ...state, phase: 'complete', wakeAt: null, expected: [] } };
   }
   if (!state.targets.length) return search(state, now);
@@ -140,6 +144,28 @@ export function nextAttack(
       state: stop(state, `Not enough World Energy for a monster attack (need ${MONSTER_ATTACK_COST}).`),
     };
   }
+
+  // Dynamically re-allocate troops from the latest unit summary right before dispatching attack
+  const currentSummary = cache?.['getUnitSummary:unit']?.data || cache?.getUnitSummary?.data;
+  const heroesData = cache?.heroGetAll?.data;
+  if (currentSummary && heroesData && state.options?.heroIds?.length) {
+    const cap = data.capacityModel(
+      state.options.heroIds,
+      heroesData,
+      cache?.troopCapacityEvidence?.data,
+      settings || state.options.capacitySettings,
+      state.accountId
+    ).total;
+    const freshUnits = data.allocateTroops(
+      currentSummary,
+      data.teamTroopCapacity(cap, state.options.maxTroops),
+      true
+    );
+    if (freshUnits && freshUnits.length > 0) {
+      state.squad = data.buildSquad(state.options.heroIds, freshUnits);
+    }
+  }
+
   const target = state.targets[0];
   const squad = state.squad;
   if (!squad) return { state: stop(state, 'No available team or troops.') };
@@ -148,6 +174,7 @@ export function nextAttack(
     mobConfigId: target.mobConfigId || null,
     mapId: state.options.mapId,
   };
+  state.sessionEvents = appendSessionEvent(state.sessionEvents, { at: now, type: 'created', mobId: target.mobId });
   return issue(
     state,
     'attacking',
@@ -239,6 +266,8 @@ export function start(
     options,
     started: 0,
     completed: 0,
+    startedAt: now,
+    sessionEvents: [],
     phase: 'refreshing',
     current: null,
     targets: [],
@@ -409,9 +438,11 @@ export function advance(
     if (current.result === 'win' && current.returned) {
       state.completed++;
       state.attackedMobIds.push(current.mobId);
+      state.sessionEvents = appendSessionEvent(state.sessionEvents, { at: now, type: 'won', mobId: current.mobId });
       state.targets = state.targets.filter((target: any) => target.mobId !== current.mobId);
       state.current = null;
       if (state.completed >= state.options.count) {
+        state.sessionEvents = appendSessionEvent(state.sessionEvents, { at: now, type: 'completed', detail: `Completed ${state.completed}/${state.options.count}` });
         return { state: { ...state, phase: 'complete', wakeAt: null, expected: [] } };
       }
       return issue(state, 'refreshing', rosterCalls(), now);

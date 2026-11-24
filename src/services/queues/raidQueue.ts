@@ -5,6 +5,7 @@ import type {
   RaidCurrentTarget,
 } from '../../types/game/raidQueue.ts';
 import * as expData from '../../utils/experimentalData.ts';
+import { appendSessionEvent } from './queueCoordination.ts';
 
 function getDataHelper(): any {
   return expData;
@@ -149,6 +150,7 @@ export function nextBoss(
   const call = data.buildRallyCall(state.options.mapId, mobId, state.squad, state.options.waitSeconds);
   if (!call) return { state: stop(state, 'No available troops. Refresh the form.') };
   state.current = { mobId: mobId!, mapId: state.options.mapId };
+  state.sessionEvents = appendSessionEvent(state.sessionEvents, { at: now, type: 'created', mobId });
   return issue(state, 'creating', [call], now);
 }
 
@@ -265,6 +267,10 @@ export function start(
     options: { ...options, autoCancel: options.autoCancel !== false },
     started: 0,
     completed: 0,
+    startedAt: now,
+    cancelledCount: 0,
+    retriedCount: 0,
+    sessionEvents: [],
     createdRallyIds: [],
     completedRallyIds: [],
     bossQueue: { remain_raid_count: options.count, queue: [] },
@@ -677,6 +683,13 @@ export function advance(
           current.returned = true;
         }
         if (event?.type === 'rallyCancelled' && event.body?.rallyId === current.rallyId) {
+          state.cancelledCount = (Number(state.cancelledCount) || 0) + 1;
+          state.sessionEvents = appendSessionEvent(state.sessionEvents, {
+            at: now,
+            type: 'cancelled',
+            mobId: current.mobId,
+            rallyId: current.rallyId,
+          });
           consumeBoss(state, true);
           return issue(state, 'refreshing', rosterCalls(), now);
         }
@@ -691,8 +704,19 @@ export function advance(
       if (current.rallyId) {
         state.completedRallyIds = [...(state.completedRallyIds || []), current.rallyId];
       }
+      state.sessionEvents = appendSessionEvent(state.sessionEvents, {
+        at: now,
+        type: 'won',
+        mobId: current.mobId,
+        rallyId: current.rallyId,
+      });
       consumeBoss(state);
       if (state.bossQueue.remain_raid_count === 0) {
+        state.sessionEvents = appendSessionEvent(state.sessionEvents, {
+          at: now,
+          type: 'completed',
+          detail: `Completed ${state.completed}/${state.options.count}`,
+        });
         return { state: { ...state, phase: 'complete', wakeAt: null } };
       }
       if (hasActiveRaidPending(cache, now)) {

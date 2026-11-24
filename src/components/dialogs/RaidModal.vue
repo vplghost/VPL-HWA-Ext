@@ -53,12 +53,16 @@ const waitSeconds = ref(300);
 const minMembers = ref(4);
 const raidCount = ref(2);
 const autoCancel = ref(true);
+const autoHealAfterQueue = ref(true);
 const autoEnergyRaid = ref(false);
 const energyThreshold = ref(200);
 const autoEnergyMessage = ref('');
 const autoConfigLoaded = ref(false);
 const isRunning = ref(false);
 const queueStatusText = ref('Idle');
+const lastSessionSummary = ref<any>(null);
+const activeRaidLock = ref<any>(null);
+const showSessionSummary = ref(false);
 
 const selectedMobId = ref<string>('');
 const isSearchingBosses = ref(false);
@@ -195,12 +199,20 @@ onMounted(async () => {
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     try {
-      const stored = await chrome.storage.local.get<{ popupRpcEnabled?: boolean; socketRefreshMode?: string; raidPreferences?: {bossLevel?: number; waitSeconds?: number; minMembers?: number; autoCancel?: boolean; rallyTeam?: string; targetMobId?: string}; raidQueue?: {phase: string; [key: string]: unknown} }>(['raidPreferences', 'raidQueue', 'popupRpcEnabled', 'socketRefreshMode']);
+      const stored = await chrome.storage.local.get<{
+        popupRpcEnabled?: boolean;
+        socketRefreshMode?: string;
+        raidPreferences?: { bossLevel?: number; waitSeconds?: number; minMembers?: number; autoCancel?: boolean; autoHealAfterQueue?: boolean; rallyTeam?: string; targetMobId?: string };
+        raidQueue?: { phase: string; [key: string]: unknown };
+        lastRaidSessionSummary?: any;
+        activeResourceLocks?: any[];
+      }>(['raidPreferences', 'raidQueue', 'popupRpcEnabled', 'socketRefreshMode', 'lastRaidSessionSummary', 'activeResourceLocks']);
       if (stored.raidPreferences) {
         if (stored.raidPreferences.bossLevel) bossLevel.value = stored.raidPreferences.bossLevel;
         if (stored.raidPreferences.waitSeconds) waitSeconds.value = stored.raidPreferences.waitSeconds;
         if (stored.raidPreferences.minMembers) minMembers.value = stored.raidPreferences.minMembers;
         if (stored.raidPreferences.autoCancel !== undefined) autoCancel.value = stored.raidPreferences.autoCancel;
+        if (stored.raidPreferences.autoHealAfterQueue !== undefined) autoHealAfterQueue.value = stored.raidPreferences.autoHealAfterQueue;
         // Team restoration is owned by useSquadTeams and its account-specific storage.
         if (stored.raidPreferences.targetMobId) selectedMobId.value = stored.raidPreferences.targetMobId;
       }
@@ -208,6 +220,12 @@ onMounted(async () => {
         raidQueueState.value = stored.raidQueue;
         isRunning.value = !['stopped', 'complete'].includes(stored.raidQueue.phase);
         queueStatusText.value = stored.raidQueue.phase || 'Idle';
+      }
+      if (stored.lastRaidSessionSummary) {
+        lastSessionSummary.value = stored.lastRaidSessionSummary;
+      }
+      if (Array.isArray(stored.activeResourceLocks)) {
+        activeRaidLock.value = stored.activeResourceLocks.find((l: any) => l?.owner === 'raidQueue') || null;
       }
     } catch (_) {}
 
@@ -218,6 +236,13 @@ onMounted(async () => {
         raidQueueState.value = q;
         isRunning.value = q ? !['stopped', 'complete'].includes(q.phase || 'stopped') : false;
         queueStatusText.value = q?.phase || 'Idle';
+      }
+      if (area === 'local' && changes.lastRaidSessionSummary) {
+        lastSessionSummary.value = changes.lastRaidSessionSummary.newValue || null;
+      }
+      if (area === 'local' && changes.activeResourceLocks) {
+        const list = Array.isArray(changes.activeResourceLocks.newValue) ? changes.activeResourceLocks.newValue : [];
+        activeRaidLock.value = list.find((l: any) => l?.owner === 'raidQueue') || null;
       }
     });
   }
@@ -275,7 +300,8 @@ async function ensureRpcEnabled() {
 function raidOptions(count = raidCount.value) {
   return { mapId: mapContext.value?.mapId, center: mapCenter.value, firstMobId: selectedMobId.value,
     level: bossLevel.value, waitSeconds: waitSeconds.value, minMembers: minMembers.value, count,
-    autoCancel: autoCancel.value, heroIds: normalizeArray(selectedTeam.value?.heroIds),
+    autoCancel: autoCancel.value, autoHealAfterQueue: autoHealAfterQueue.value,
+    heroIds: normalizeArray(selectedTeam.value?.heroIds),
     teamId: selectedTeam.value?.id || '', maxTroops: selectedTeam.value?.maxTroops };
 }
 async function saveAutoRaid() {
@@ -310,6 +336,7 @@ async function savePreferences() {
         waitSeconds: waitSeconds.value,
         minMembers: minMembers.value,
         autoCancel: autoCancel.value,
+        autoHealAfterQueue: autoHealAfterQueue.value,
         rallyTeam: selectedTeamId.value,
         targetMobId: selectedMobId.value,
       },
@@ -454,6 +481,7 @@ async function startRaidQueue(count = raidCount.value) {
         minMembers: minMembers.value,
         count,
         autoCancel: autoCancel.value,
+        autoHealAfterQueue: autoHealAfterQueue.value,
         heroIds,
         teamId,
         maxTroops,
@@ -807,6 +835,27 @@ async function stopRaidQueue() {
             />
           </div>
 
+          <!-- Post-Queue Auto-Heal & Squad Lock Indicator -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <label class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+              <input
+                id="raid-auto-heal-after"
+                v-model="autoHealAfterQueue"
+                type="checkbox"
+                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 shrink-0"
+                @change="savePreferences"
+              />
+              <span>Auto-heal wounded troops when queue ends</span>
+            </label>
+            <span
+              v-if="activeRaidLock"
+              id="raid-squad-lock-badge"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+            >
+              🔒 {{ activeRaidLock.heroIds?.length || 0 }} heroes &amp; {{ activeRaidLock.marchSlots || 1 }} march slot reserved from Auto Gather
+            </span>
+          </div>
+
           <div class="rounded-lg border border-indigo-200 dark:border-indigo-900 p-3 space-y-2">
             <label class="flex items-center gap-2 text-xs font-semibold">
               <input id="raid-auto-energy" v-model="autoEnergyRaid" type="checkbox" @change="saveAutoRaid" />
@@ -837,6 +886,34 @@ async function stopRaidQueue() {
             {{ isLocatingMap ? 'Locating...' : 'Locate on Map' }}
           </button>
         </div>
+
+        <!-- Last Session Summary -->
+        <section
+          v-if="lastSessionSummary"
+          id="raid-last-session-summary"
+          class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 p-3 text-xs space-y-2"
+        >
+          <button
+            type="button"
+            class="cursor-pointer w-full flex items-center justify-between text-left font-semibold text-slate-700 dark:text-slate-200"
+            @click="showSessionSummary = !showSessionSummary"
+          >
+            <span>📊 Last Session Summary ({{ lastSessionSummary.completedRounds }}/{{ lastSessionSummary.targetRounds }} rounds · {{ lastSessionSummary.energySpent }} ⚡)</span>
+            <span class="text-[11px] text-slate-400">{{ showSessionSummary ? '▲ Hide' : '▼ Details' }}</span>
+          </button>
+          <div class="flex flex-wrap gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+            <span class="px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800">Status: {{ lastSessionSummary.status }}</span>
+            <span v-if="lastSessionSummary.cancelledRounds > 0" class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300">Cancelled: {{ lastSessionSummary.cancelledRounds }}</span>
+            <span v-if="lastSessionSummary.postQueueHeal" class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              Post-Queue Heal: {{ lastSessionSummary.postQueueHeal.status === 'triggered' ? `Healed ${lastSessionSummary.postQueueHeal.troopsCount} troops` : lastSessionSummary.postQueueHeal.status }}
+            </span>
+          </div>
+          <div v-if="showSessionSummary && lastSessionSummary.events?.length" class="max-h-28 overflow-y-auto space-y-1 border-t border-slate-200 dark:border-slate-800 pt-2 font-mono text-[10px] text-slate-500 dark:text-slate-400">
+            <div v-for="(ev, i) in lastSessionSummary.events" :key="i">
+              [{{ new Date(ev.at).toLocaleTimeString([], { hour12: false }) }}] {{ ev.type }} {{ ev.rallyId ? `rally #${ev.rallyId}` : (ev.mobId ? `mob ${ev.mobId}` : '') }} {{ ev.detail || '' }}
+            </div>
+          </div>
+        </section>
 
         <!-- Status Message Banner -->
         <StatusAlertBanner

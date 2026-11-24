@@ -6,6 +6,7 @@ export interface RaidQueueOptions {
   count: number;
   minMembers: number;
   autoCancel?: boolean;
+  autoHealAfterQueue?: boolean;
   maxTroops?: number | null;
   heroIds: number[];
   teamId?: string;

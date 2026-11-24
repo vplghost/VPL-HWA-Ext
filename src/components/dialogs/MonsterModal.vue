@@ -50,9 +50,13 @@ const {
 
 const mobLevel = ref(1);
 const mobCount = ref(2);
+const autoHealAfterQueue = ref(true);
 const isRunning = ref(false);
 const queueStatusText = ref('Idle');
 const monsterQueueState = ref<any>(null);
+const lastSessionSummary = ref<any>(null);
+const activeMonsterLock = ref<any>(null);
+const showSessionSummary = ref(false);
 
 const selectedMobId = ref<string>('');
 const isSearchingMonsters = ref(false);
@@ -147,6 +151,16 @@ async function syncMonsterQueueState() {
         isRunning.value = false;
         queueStatusText.value = 'Idle';
       }
+      const extra: any = await chrome.storage.local.get(['monsterPreferences', 'lastMonsterSessionSummary', 'activeResourceLocks']);
+      if (extra?.monsterPreferences?.autoHealAfterQueue !== undefined) {
+        autoHealAfterQueue.value = extra.monsterPreferences.autoHealAfterQueue;
+      }
+      if (extra?.lastMonsterSessionSummary) {
+        lastSessionSummary.value = extra.lastMonsterSessionSummary;
+      }
+      if (Array.isArray(extra?.activeResourceLocks)) {
+        activeMonsterLock.value = extra.activeResourceLocks.find((l: any) => l?.owner === 'monsterQueue') || null;
+      }
     } catch (_) {}
   }
 }
@@ -171,6 +185,13 @@ onMounted(async () => {
         if (!active && statusMessage.value?.includes('already running')) {
           statusMessage.value = '';
         }
+      }
+      if (area === 'local' && changes.lastMonsterSessionSummary) {
+        lastSessionSummary.value = changes.lastMonsterSessionSummary.newValue || null;
+      }
+      if (area === 'local' && changes.activeResourceLocks) {
+        const list = Array.isArray(changes.activeResourceLocks.newValue) ? changes.activeResourceLocks.newValue : [];
+        activeMonsterLock.value = list.find((l: any) => l?.owner === 'monsterQueue') || null;
       }
     });
   }
@@ -234,6 +255,7 @@ async function savePreferences() {
         accountId: cache.value.accountStatus?.data?.id,
         teamId: selectedTeamId.value,
         targetMobId: selectedMobId.value,
+        autoHealAfterQueue: autoHealAfterQueue.value,
       },
     });
   }
@@ -375,6 +397,7 @@ async function startMonsterQueue(count = mobCount.value) {
         firstMobId,
         level: mobLevel.value,
         count,
+        autoHealAfterQueue: autoHealAfterQueue.value,
         heroIds,
         teamId,
         maxTroops,
@@ -728,6 +751,27 @@ async function stopMonsterQueue() {
             <p class="text-2xs">Base power uses the selected heroes and allocated troops. Preset power is a guide; combat bonuses and matchups can change the outcome.</p>
           </div>
 
+          <!-- Post-Queue Auto-Heal & Squad Lock Indicator -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <label class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+              <input
+                id="monster-auto-heal-after"
+                v-model="autoHealAfterQueue"
+                type="checkbox"
+                class="rounded border-slate-300 text-amber-600 focus:ring-amber-500 h-4 w-4 shrink-0"
+                @change="savePreferences"
+              />
+              <span>Auto-heal wounded troops when queue ends</span>
+            </label>
+            <span
+              v-if="activeMonsterLock"
+              id="monster-squad-lock-badge"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+            >
+              🔒 {{ activeMonsterLock.heroIds?.length || 0 }} heroes &amp; {{ activeMonsterLock.marchSlots || 1 }} march slot reserved from Auto Gather
+            </span>
+          </div>
+
           <p class="text-2xs text-slate-400 dark:text-slate-500 italic">
             Dispatches individual squad attacks against wild monsters sequentially, automatically halting on a loss.
           </p>
@@ -751,6 +795,33 @@ async function stopMonsterQueue() {
             {{ isLocatingMap ? 'Locating...' : 'Locate on Map' }}
           </button>
         </div>
+
+        <!-- Last Session Summary -->
+        <section
+          v-if="lastSessionSummary"
+          id="monster-last-session-summary"
+          class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 p-3 text-xs space-y-2"
+        >
+          <button
+            type="button"
+            class="cursor-pointer w-full flex items-center justify-between text-left font-semibold text-slate-700 dark:text-slate-200"
+            @click="showSessionSummary = !showSessionSummary"
+          >
+            <span>📊 Last Session Summary ({{ lastSessionSummary.completedRounds }}/{{ lastSessionSummary.targetRounds }} attacks · {{ lastSessionSummary.energySpent }} ⚡)</span>
+            <span class="text-[11px] text-slate-400">{{ showSessionSummary ? '▲ Hide' : '▼ Details' }}</span>
+          </button>
+          <div class="flex flex-wrap gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+            <span class="px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800">Status: {{ lastSessionSummary.status }}</span>
+            <span v-if="lastSessionSummary.postQueueHeal" class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              Post-Queue Heal: {{ lastSessionSummary.postQueueHeal.status === 'triggered' ? `Healed ${lastSessionSummary.postQueueHeal.troopsCount} troops` : lastSessionSummary.postQueueHeal.status }}
+            </span>
+          </div>
+          <div v-if="showSessionSummary && lastSessionSummary.events?.length" class="max-h-28 overflow-y-auto space-y-1 border-t border-slate-200 dark:border-slate-800 pt-2 font-mono text-[10px] text-slate-500 dark:text-slate-400">
+            <div v-for="(ev, i) in lastSessionSummary.events" :key="i">
+              [{{ new Date(ev.at).toLocaleTimeString([], { hour12: false }) }}] {{ ev.type }} {{ ev.mobId ? `mob ${ev.mobId}` : '' }} {{ ev.detail || '' }}
+            </div>
+          </div>
+        </section>
 
         <!-- Status Message Banner -->
         <StatusAlertBanner

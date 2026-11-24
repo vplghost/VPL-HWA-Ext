@@ -63,35 +63,85 @@ export class ResourceLockManager {
   }
 
   /**
-   * Synchronize reservations directly from persisted queue states (`raidQueue`, `monsterQueue`, etc.)
+   * Synchronize reservations directly from persisted queue states (`raidQueue`, `monsterQueue`, `raidEnergyAuto`)
    */
   syncFromQueueStates(
     states: {
       raidQueue?: any;
       monsterQueue?: any;
+      raidEnergyAuto?: any;
+      currentEnergy?: number | null;
     },
     nowMs: number = Date.now()
   ): void {
+    const activeRaidPhases = new Set([
+      'refreshing',
+      'waiting_rally',
+      'waiting_gather',
+      'searching',
+      'creating',
+      'active',
+      'cancelling',
+      'running',
+      'waiting_march',
+      'queued',
+    ]);
+    const activeMonsterPhases = new Set([
+      'refreshing',
+      'waiting_gather',
+      'searching',
+      'attacking',
+      'active',
+      'running',
+      'waiting_march',
+      'queued',
+    ]);
+
     const rq = states.raidQueue;
-    if (rq && ['running', 'waiting_rally', 'waiting_march', 'queued'].includes(String(rq.status || ''))) {
-      const heroIds = Array.isArray(rq.heroIds)
-        ? rq.heroIds
-        : (Array.isArray(rq.team?.heroes) ? rq.team.heroes : []);
+    const rqPhase = String(rq?.phase || rq?.status || '');
+    const rqActive = Boolean(rq && activeRaidPhases.has(rqPhase));
+    const rea = states.raidEnergyAuto;
+    const reaArmed = Boolean(
+      !rqActive &&
+      rea?.enabled === true &&
+      Number.isFinite(rea.threshold) &&
+      Number.isFinite(states.currentEnergy) &&
+      (states.currentEnergy as number) >= rea.threshold - 15 &&
+      Array.isArray(rea.options?.heroIds) &&
+      rea.options.heroIds.length > 0
+    );
+
+    if (rqActive) {
+      const heroIds = Array.isArray(rq.options?.heroIds)
+        ? rq.options.heroIds
+        : Array.isArray(rq.heroIds)
+          ? rq.heroIds
+          : (Array.isArray(rq.team?.heroes) ? rq.team.heroes : []);
       this.reserve('raidQueue', {
         heroIds,
         marchSlots: 1,
-        reason: rq.status === 'waiting_rally' ? 'Raid queue waiting for clan rally' : 'Raid queue active',
+        reason: rqPhase === 'waiting_rally' ? 'Raid queue waiting for clan rally' : 'Raid queue active',
         nowMs,
       });
-    } else if ('raidQueue' in states) {
+    } else if (reaArmed) {
+      this.reserve('raidQueue', {
+        heroIds: rea.options.heroIds,
+        marchSlots: 1,
+        reason: `Raid Energy Auto armed (${states.currentEnergy}/${rea.threshold})`,
+        nowMs,
+      });
+    } else if ('raidQueue' in states || 'raidEnergyAuto' in states) {
       this.release('raidQueue');
     }
 
     const mq = states.monsterQueue;
-    if (mq && ['running', 'waiting_march', 'queued'].includes(String(mq.status || ''))) {
-      const heroIds = Array.isArray(mq.heroIds)
-        ? mq.heroIds
-        : (Array.isArray(mq.team?.heroes) ? mq.team.heroes : []);
+    const mqPhase = String(mq?.phase || mq?.status || '');
+    if (mq && activeMonsterPhases.has(mqPhase)) {
+      const heroIds = Array.isArray(mq.options?.heroIds)
+        ? mq.options.heroIds
+        : Array.isArray(mq.heroIds)
+          ? mq.heroIds
+          : (Array.isArray(mq.team?.heroes) ? mq.team.heroes : []);
       this.reserve('monsterQueue', {
         heroIds,
         marchSlots: 1,

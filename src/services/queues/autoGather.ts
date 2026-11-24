@@ -7,6 +7,46 @@ import * as expData from '../../utils/experimentalData.ts';
 import { calculateAccountMaxMarches } from '../../utils/dashboardState.ts';
 import smartGatherService from './smartGather.ts';
 import { unsafeMineIds as getUnsafeMineIds } from '../mineDefense.ts';
+import { ResourceLockManager, type ResourceReservation } from '../../background/resourceLock.ts';
+
+function resolveGatherLocks(
+  cache: any,
+  stored: any,
+  now: number
+): { reservedHeroIds: Set<number>; reservedMarchSlots: number } {
+  const reservedHeroIds = new Set<number>();
+  let reservedMarchSlots = 0;
+  let locks: ResourceReservation[] = [];
+  if (Array.isArray(stored?.activeResourceLocks)) {
+    locks = stored.activeResourceLocks;
+  } else if (stored?.raidQueue || stored?.monsterQueue || stored?.raidEnergyAuto?.enabled) {
+    const tmp = new ResourceLockManager();
+    const energy = cache?.['resource:world-energy']?.data;
+    const currentEnergy = Number.isFinite(energy?.amount) ? Number(energy.amount) : null;
+    tmp.syncFromQueueStates(
+      {
+        raidQueue: stored.raidQueue,
+        monsterQueue: stored.monsterQueue,
+        raidEnergyAuto: stored.raidEnergyAuto,
+        currentEnergy,
+      },
+      now
+    );
+    locks = tmp.getSnapshot(now);
+  }
+  for (const lock of locks) {
+    if (!lock || lock.owner === 'autoGather') continue;
+    if (Number.isFinite(lock.expiresAt) && lock.expiresAt <= now) continue;
+    if (Array.isArray(lock.heroIds)) {
+      for (const id of lock.heroIds) {
+        const n = Number(id);
+        if (Number.isInteger(n) && n > 0) reservedHeroIds.add(n);
+      }
+    }
+    reservedMarchSlots += Math.max(0, Math.floor(Number(lock.marchSlots) || 0));
+  }
+  return { reservedHeroIds, reservedMarchSlots };
+}
 
 export const BASIC_MINE_TYPES: readonly BasicResourceType[] = ['food', 'wood', 'stone', 'iron'];
 
@@ -260,17 +300,22 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
     }
   }
 
+  const { reservedHeroIds, reservedMarchSlots } = resolveGatherLocks(cache, stored, now);
+  const effectiveMaxMarches = Math.max(0, settings.maxMarches - reservedMarchSlots);
   const marches = safeList(cache?.marchStatus?.data?.marches);
   const activeCount = smart ? marches.length : countActiveMarches(marches, now);
-  if (activeCount >= settings.maxMarches) {
+  if (activeCount >= effectiveMaxMarches) {
     if (snapshotRefresh && marches.some((m: any) => !Number.isFinite(m.endsAt) || now >= m.endsAt)) {
       return snapshotRefresh;
     }
     return {
       action: 'wait',
-      reason: `Current marches limit reached (${activeCount}/${settings.maxMarches})`,
+      reason:
+        reservedMarchSlots > 0
+          ? `Waiting: ${reservedMarchSlots} march slot(s) reserved by active queue (${activeCount}/${effectiveMaxMarches})`
+          : `Current marches limit reached (${activeCount}/${settings.maxMarches})`,
       activeCount,
-      maxMarches: settings.maxMarches,
+      maxMarches: effectiveMaxMarches,
     };
   }
   if (snapshotRefresh) return snapshotRefresh;
@@ -293,16 +338,28 @@ export function planAutoGather(cache: any, stored: any, now: number = Date.now()
   const summary = cache?.['getUnitSummary:unit']?.data;
   if (!summary) return { action: 'wait', reason: 'Unit summary unavailable' };
 
-  const availableHeroIds = data.availableHeroIds(heroes, summary, marches);
+  const rawAvailableHeroIds = data.availableHeroIds(heroes, summary, marches);
+  const availableHeroIds = reservedHeroIds.size > 0
+    ? rawAvailableHeroIds.filter((id: number) => !reservedHeroIds.has(Number(id)))
+    : rawAvailableHeroIds;
   const isOptimized = settings.selectedTeam === 'optimized' || settings.optimizeTeam === true;
 
   if (isOptimized) {
     if (availableHeroIds.length < 1) {
-      return { action: 'wait', reason: 'No heroes available' };
+      return {
+        action: 'wait',
+        reason: reservedHeroIds.size > 0 ? 'No unreserved heroes available (reserved by active queue)' : 'No heroes available',
+      };
     }
   } else {
     if (availableHeroIds.length < 5) {
-      return { action: 'wait', reason: `Fewer than 5 heroes available (${availableHeroIds.length})` };
+      return {
+        action: 'wait',
+        reason:
+          reservedHeroIds.size > 0
+            ? `Fewer than 5 unreserved heroes available (${availableHeroIds.length}; ${reservedHeroIds.size} reserved by active queue)`
+            : `Fewer than 5 heroes available (${availableHeroIds.length})`,
+      };
     }
   }
 

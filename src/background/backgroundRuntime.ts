@@ -33,6 +33,7 @@ import { pruneRpcCache } from '../core/cache/cachePruner.ts';
 import { runtimeTelemetry, collectStorageTelemetry } from './telemetry.ts';
 import { createRuntimeEventBus } from './eventBus.ts';
 import { resourceLockManager } from './resourceLock.ts';
+import { planPostQueueHeal, buildQueueSessionSummary } from '../services/queues/queueCoordination.ts';
 import { handleDraftMessage, DRAFT_MESSAGE_KINDS } from './handlers/draftHandler.ts';
 import { registerQueueListeners } from './handlers/queueDispatcher.ts';
 
@@ -1240,6 +1241,42 @@ export function setupQueueAlarms(customChrome?: any) {
   } catch (_) {}
 }
 
+async function finalizeQueueCoordination(
+  kind: 'raid' | 'monster',
+  state: any,
+  stored: any,
+  cr: any
+) {
+  const now = Date.now();
+  let postQueueHeal: any = undefined;
+  const shouldHeal =
+    state?.options?.autoHealAfterQueue === true &&
+    ((Number(state?.completed) || 0) > 0 || (Number(state?.started) || 0) > 0);
+  if (shouldHeal) {
+    const healingData = stored?.rpcCache?.['getHealing:unit']?.data || stored?.rpcCache?.getHealing?.data;
+    const plan = planPostQueueHeal(healingData, now);
+    postQueueHeal = plan.summary;
+    if (plan.calls.length > 0 && state?.tabId) {
+      const dispatch = rpcMessageForSettings(stored, plan.calls);
+      if (dispatch) {
+        await cr?.tabs?.sendMessage?.(state.tabId, {
+          ...dispatch,
+          group: `${kind}-post-heal`,
+          expiresAt: now + 30000,
+        })?.catch?.(() => {});
+      }
+    }
+  } else if (state?.options?.autoHealAfterQueue === false) {
+    postQueueHeal = { status: 'skipped', troopsCount: 0 };
+  }
+
+  const summary = buildQueueSessionSummary(kind, state, now, postQueueHeal);
+  const storageKey = kind === 'raid' ? 'lastRaidSessionSummary' : 'lastMonsterSessionSummary';
+  await cr?.storage?.local?.set({ [storageKey]: summary }).catch?.(() => {});
+  resourceLockManager.release(kind === 'raid' ? 'raidQueue' : 'monsterQueue');
+  await resourceLockManager.persistSnapshot(cr, now);
+}
+
 export async function saveRaidTransition(transition: any, stored: any, customChrome?: any) {
   const cr = getActiveChrome(customChrome);
   let state = transition.state;
@@ -1249,7 +1286,10 @@ export async function saveRaidTransition(transition: any, stored: any, customChr
   await cr?.storage?.local?.set({ raidQueue: state });
   if (raidQueueService.terminal(state)) {
     await cr?.tabs?.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: state.id }).catch(() => {});
+    await finalizeQueueCoordination('raid', state, stored, cr);
   } else if (transition.calls?.length) {
+    resourceLockManager.syncFromQueueStates({ raidQueue: state });
+    void resourceLockManager.persistSnapshot(cr);
     const dispatch = rpcMessageForSettings(stored, transition.calls);
     try {
       await cr?.tabs?.sendMessage(state.tabId, {
@@ -1260,6 +1300,7 @@ export async function saveRaidTransition(transition: any, stored: any, customChr
     } catch {
       state = raidQueueService.stop(state, 'Game tab disconnected. Queue stopped.');
       await cr?.storage?.local?.set({ raidQueue: state });
+      await finalizeQueueCoordination('raid', state, stored, cr);
     }
   }
   return state;
@@ -1481,7 +1522,10 @@ export async function saveMonsterTransition(transition: any, stored: any, custom
   await cr?.storage?.local?.set({ monsterQueue: state });
   if (monsterQueueService.terminal(state)) {
     await cr?.tabs?.sendMessage(state.tabId, { kind: 'drop-rpc-group', group: state.id }).catch(() => {});
+    await finalizeQueueCoordination('monster', state, stored, cr);
   } else if (transition.calls?.length) {
+    resourceLockManager.syncFromQueueStates({ monsterQueue: state });
+    void resourceLockManager.persistSnapshot(cr);
     try {
       await cr?.tabs?.sendMessage(state.tabId, {
         ...rpcMessageForSettings(stored, transition.calls),
@@ -1491,6 +1535,7 @@ export async function saveMonsterTransition(transition: any, stored: any, custom
     } catch {
       state = monsterQueueService.stop(state, 'Game tab disconnected. Queue stopped.');
       await cr?.storage?.local?.set({ monsterQueue: state });
+      await finalizeQueueCoordination('monster', state, stored, cr);
     }
   }
   return state;
@@ -4276,11 +4321,16 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           await advanceTroopTraining(sender.tab.id, cr);
         }
       }
-      Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue', 'customTeams', 'troopCapacitySettings']));
-      resourceLockManager.syncFromQueueStates({ raidQueue: stored.raidQueue, monsterQueue: stored.monsterQueue });
-      if (resourceLockManager.getSnapshot().length > 0) {
-        void resourceLockManager.persistSnapshot(cr);
-      }
+      Object.assign(stored, await cr.storage?.local?.get(['smartGatherState', 'raidQueue', 'monsterQueue', 'raidEnergyAuto', 'customTeams', 'troopCapacitySettings']));
+      const currentEnergy = raidEnergyAutoService.amountAt(cacheResult.cache?.['resource:world-energy']?.data, Date.now());
+      resourceLockManager.syncFromQueueStates({
+        raidQueue: stored.raidQueue,
+        monsterQueue: stored.monsterQueue,
+        raidEnergyAuto: stored.raidEnergyAuto,
+        currentEnergy,
+      });
+      stored.activeResourceLocks = resourceLockManager.getSnapshot();
+      void resourceLockManager.persistSnapshot(cr);
       let defenseHold = false;
       let evaluatedDefense: any = null;
       if (sender.tab?.id && stored.autoGatherSettings?.enabled && stored.autoGatherSettings?.smartEnabled) {
