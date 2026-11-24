@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.289 — 2026-11-25
+
+### Added
+
+- **Hydra Dialog & Overkill Guard Planner (`hydraService.ts`, `HydraModal.vue`, `useModals.ts`, `ActivityGoals.vue`, `App.vue`, `tests/hydra-modal.test.mjs`)**:
+  - Added `src/services/hydraService.ts` (`parseHydraState`, `planHydraHornTargets`, `simulateHydraHeadDamage`, `formatHydraDamage`) parsing live `clanBoss_getAll` (5 Hydra tiers × 6 elemental heads `8010`–`8015`, `attackerId`, `enableRaid`, `tries`/`superTries`, `endDay`) and auto-hydrating 3 server-saved teams from `teamGetAll.clan_boss`.
+  - Enforced **Guildmate Lock Guard** (`attackerId != null`), **Overkill Guard** (`wasteRatio > overkillGuardPct`), **Instant Raid Preference**, and **Super Horn Safety** (`allowSuperTries: false` by default).
+  - Added `HydraModal.vue` (`#hydra-status-bar`, `#hydra-heads-grid`, `#hydra-teams-panel`, `#hydra-auto-controls`, 100% English) wired into the Dashboard Hydra card (`ActivityGoals.vue`), `useModals.ts`, and `App.vue`.
+
 ## 0.11.287 — 2026-11-25
 
 ### Fixed & Added

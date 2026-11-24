@@ -42,6 +42,7 @@ import LegendsDraftModal from '@/src/components/dialogs/LegendsDraftModal.vue';
 import ArenaModal from '@/src/components/dialogs/ArenaModal.vue';
 import GrandArenaModal from '@/src/components/dialogs/GrandArenaModal.vue';
 import PvpTeamOptimizerModal from '@/src/components/dialogs/PvpTeamOptimizerModal.vue';
+import HydraModal from '@/src/components/dialogs/HydraModal.vue';
 
 const activeTab = ref('dashboard');
 const { modalState, modalContext } = useModals();
@@ -116,6 +117,7 @@ const { modalState, modalContext } = useModals();
       <ArenaModal v-model="modalState.arena" />
       <GrandArenaModal v-model="modalState.grandArena" />
       <PvpTeamOptimizerModal v-model="modalState.pvpOptimizer" />
+      <HydraModal v-model="modalState.hydra" />
     </div>
   </div>
 </template>

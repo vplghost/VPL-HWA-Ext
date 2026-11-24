@@ -57,6 +57,7 @@ const activities = computed<ActivityRow[]>(() => {
     icon: '🐉',
     state: tries === null ? 'unknown' : tries > 0 ? 'pending' : 'done',
     detail: !knownTries ? unknown : `${hydra.tries ?? 0} regular · ${hydra.superTries ?? 0} super tries left`,
+    isInteractive: true,
   });
 
   // Guild Versus
@@ -101,6 +102,7 @@ function handleActivityClick(act: ActivityRow) {
   if (act.id === 'tower') openModal('tower');
   else if (act.id === 'arena') openModal('arena');
   else if (act.id === 'grand-arena') openModal('grandArena');
+  else if (act.id === 'hydra') openModal('hydra');
   else if (act.id === 'dungeon') openModal('dungeon');
   else if (act.id === 'expeditions') openModal('expeditions');
   else if (act.id === 'quests') openModal('questDetail');
