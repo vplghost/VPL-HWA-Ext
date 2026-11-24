@@ -153,3 +153,79 @@ test('shared RPC policy does not create an unissued pending Smart gathering acti
   assert.equal(local.smartGatherState.pending, undefined);
   assert.match(local.smartGatherState.status, /paused by shared RPC settings/);
 });
+
+test('P1-06: sync prunes occupied/invalid interrupted mines and resumePlan never deadlocks free march slots', async () => {
+  const { default: smartGather } = await import('../src/services/queues/smartGather.ts');
+  const { planAutoGather } = await import('../src/services/queues/autoGather.ts');
+
+  const now = at;
+  const cache = {
+    accountStatus: { data: { id: 1 } },
+    experimentalMapContext: { data: { mapId: 'map', center: { x: 500, y: 500 } } },
+    marchStatus: {
+      updatedAt: new Date(now).toISOString(),
+      data: {
+        marches: [
+          {
+            squadId: 'sq-1',
+            stage: 'interactionWithTarget',
+            kind: 'gather',
+            mineId: '698d12ec-c071-49f8-b76a-dae4e9f651ae',
+            targetId: '698d12ec-c071-49f8-b76a-dae4e9f651ae',
+            endsAt: now + 34_804_131,
+          },
+        ],
+      },
+    },
+    gatheringStatus: {
+      updatedAt: new Date(now).toISOString(),
+      data: {
+        gatherings: [{ mineId: 'db0c1ddf-2049-4c81-a4da-bf9b2acd05fc', squadId: 'sq-2' }],
+      },
+    },
+    'getUnitSummary:unit': {
+      updatedAt: new Date(now).toISOString(),
+      data: { available: [{ unitId: 7, count: 50000 }], squads: [] },
+    },
+    heroGetAll: {
+      data: {
+        '1': { id: 1, power: 1000 },
+        '2': { id: 2, power: 1000 },
+        '3': { id: 3, power: 1000 },
+        '4': { id: 4, power: 1000 },
+        '5': { id: 5, power: 1000 },
+      },
+    },
+  };
+
+  const staleState = {
+    accountId: 1,
+    interrupted: [
+      { mineId: '698d12ec-c071-49f8-b76a-dae4e9f651ae', mapId: 'map', configId: 76 },
+      { mineId: 'db0c1ddf-2049-4c81-a4da-bf9b2acd05fc', mapId: 'map', configId: 86 },
+      { mineId: 'bad-config-mine', mapId: 'map', configId: 999999 },
+    ],
+    resumeCandidate: { mineId: '698d12ec-c071-49f8-b76a-dae4e9f651ae', checkedAt: now },
+  };
+
+  // Even before sync(), resumePlan() must skip occupied & invalid mines instead of returning wait
+  const preSyncResume = smartGather.resumePlan(cache, staleState, now);
+  assert.equal(preSyncResume, null, 'resumePlan must skip occupied & invalid interrupted mines');
+
+  // sync() must automatically prune occupied & invalid interrupted mines and clear stale resumeCandidate
+  const synced = smartGather.sync(staleState, null, cache, now);
+  assert.deepEqual(synced.interrupted, []);
+  assert.equal(synced.resumeCandidate, null);
+
+  // planAutoGather() must proceed to search for free march slots instead of deadlocking
+  const plan = planAutoGather(
+    cache,
+    {
+      popupRpcEnabled: true,
+      autoGatherSettings: { enabled: true, smartEnabled: true, maxMarches: 3, mineLevel: 5, mineType: 'food' },
+      smartGatherState: synced,
+    },
+    now
+  );
+  assert.equal(plan.action, 'search', 'planAutoGather must dispatch search for remaining free march slots');
+});

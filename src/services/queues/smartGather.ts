@@ -229,6 +229,19 @@ export function nearestPlan(cache: any, state: any, type: string, now: number): 
   };
 }
 
+export function activeGatheringMineIds(cache: any): Set<string> {
+  const ids = new Set<string>();
+  for (const m of list(cache?.marchStatus?.data?.marches)) {
+    if (m?.stage === 'returnToOutpost' || m?.kind === 'return') continue;
+    const id = m?.mineId || m?.target?.objectId || m?.targetId;
+    if (typeof id === 'string' && id) ids.add(id);
+  }
+  for (const g of list(cache?.gatheringStatus?.data?.gatherings)) {
+    if (typeof g?.mineId === 'string' && g.mineId) ids.add(g.mineId);
+  }
+  return ids;
+}
+
 export function resumePlan(cache: any, state: any, now: number = Date.now()): any {
   const mapId = context(cache).mapId;
   const smartData = getSmartGatherData();
@@ -237,17 +250,17 @@ export function resumePlan(cache: any, state: any, now: number = Date.now()): an
     ...(defense.unsafeMineIds ? defense.unsafeMineIds(cache, state, now) : []),
     ...blockedMineIds(state, now),
   ]);
-  const mine = list(state?.interrupted).find((row: any) => row.mapId === mapId && !unsafe.has(row.mineId));
+  const occupied = activeGatheringMineIds(cache);
+  const mine = list(state?.interrupted).find(
+    (row: any) =>
+      row?.mineId &&
+      row.mapId === mapId &&
+      !unsafe.has(row.mineId) &&
+      !occupied.has(row.mineId) &&
+      Boolean(smartData?.mines?.[row.configId])
+  );
   if (!mine) return null;
-  if (
-    list(cache?.marchStatus?.data?.marches).some(
-      (m: any) => m.mineId === (mine as any).mineId && m.stage !== 'returnToOutpost' && m.kind !== 'return'
-    )
-  ) {
-    return { action: 'wait', reason: 'Interrupted mine already has a gathering squad' };
-  }
-  const info = smartData?.mines?.[(mine as any).configId];
-  if (!info) return { action: 'wait', reason: 'Interrupted mine configuration unavailable' };
+  const info = smartData.mines[(mine as any).configId];
   if (state.resumeCandidate?.mineId === (mine as any).mineId && state.resumeCandidate.checkedAt > now - 30000) {
     const remaining = state.resumeCandidate.resourceAmount ?? (mine as any).resourceAmount ?? (mine as any).resourcesAmount;
     return {
@@ -464,6 +477,24 @@ export function sync(raw: any, record: any, cache: any, now: number): SmartGathe
 
   if (state.marchLimitBackoffUntil && now >= state.marchLimitBackoffUntil) {
     delete state.marchLimitBackoffUntil;
+  }
+
+  // Prune interrupted mines that already have an active (non-returning) gathering squad or invalid config
+  const occupiedMines = activeGatheringMineIds(cache);
+  const beforeInterrupted = list(state.interrupted);
+  if (beforeInterrupted.length > 0) {
+    const pruned = beforeInterrupted.filter((row: any) => {
+      if (!row?.mineId) return false;
+      if (occupiedMines.has(row.mineId)) return false;
+      if (smartData?.mines && row.configId != null && !smartData.mines[row.configId]) return false;
+      return true;
+    });
+    if (pruned.length !== beforeInterrupted.length) {
+      state.interrupted = pruned;
+      if (state.resumeCandidate?.mineId && !pruned.some((r: any) => r.mineId === state.resumeCandidate?.mineId)) {
+        state.resumeCandidate = null;
+      }
+    }
   }
 
   const pending = state.pending;

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.283 — 2026-11-24
+
+### Fixed
+
+- **Smart / Auto Gather Deadlock Loop (`smartGather.ts`, `tests/smart-gather-background.test.mjs`)**:
+  - Fixed an infinite deadlock where `resumePlan()` returned `{ action: 'wait', reason: 'Interrupted mine already has a gathering squad' }` (blocking all remaining free march slots and repeatedly triggering `snapshotRefresh`) whenever a mine in `state.interrupted` already had an active gathering squad.
+  - Added `activeGatheringMineIds(cache)` so `smartGatherService.sync()` automatically prunes occupied or invalid-config mines from `state.interrupted` (and `resumeCandidate`), and `resumePlan()` skips them so `planAutoGather()` immediately proceeds to dispatch free march slots.
+
 ## 0.11.281 — 2026-11-24
 
 ### Fixed
