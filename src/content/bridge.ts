@@ -861,28 +861,36 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       updateRecordingTooltip();
     };
 
+    let isTogglingRecord = false;
+
+    function applyRecordingStatus(res: any) {
+      if (!res || typeof res !== 'object') return;
+      isRecording = Boolean(res.active);
+      if (recordingActive !== isRecording) {
+        recordingActive = isRecording;
+        sendControl();
+      }
+      liveApiCount = Number(res.count ?? res.nextIndex ?? liveApiCount ?? 0);
+      liveInteractionCount = Number(res.interactionCount ?? res.nextInteractionIndex ?? liveInteractionCount ?? 0);
+      recordBtn.innerHTML = isRecording
+        ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="hwa-rec-dot"></span>'
+        : '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><circle cx="12" cy="12" r="9"/></svg>';
+      updateRecordingTooltip();
+    }
+
     async function syncRecordingState() {
+      if (isTogglingRecord) return;
       try {
         const res = await sendBridgeMessage({ kind: 'record-status' });
-        if (!res) return;
-        isRecording = Boolean(res.active);
-        if (recordingActive !== isRecording) {
-          recordingActive = isRecording;
-          sendControl();
-        }
-        liveApiCount = Number(res.count || 0);
-        liveInteractionCount = Number(res.interactionCount || 0);
-        recordBtn.innerHTML = isRecording
-          ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="hwa-rec-dot"></span>'
-          : '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><circle cx="12" cy="12" r="9"/></svg>';
-        updateRecordingTooltip();
+        applyRecordingStatus(res);
       } catch (_) {}
     }
 
     updateButtonsRecordingState = syncRecordingState;
 
     recordBtn.addEventListener('click', () => {
-      if (recordBtn.disabled) return;
+      if (recordBtn.disabled || isTogglingRecord) return;
+      isTogglingRecord = true;
       const willStop = isRecording;
       const nextKind = willStop ? 'record-stop' : 'record-start';
 
@@ -905,8 +913,16 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       }
 
       sendBridgeMessage({ kind: nextKind })
-        .then(syncRecordingState)
+        .then((res) => {
+          isTogglingRecord = false;
+          if (res && typeof res === 'object' && 'active' in res) {
+            applyRecordingStatus(res);
+          } else {
+            syncRecordingState();
+          }
+        })
         .catch((err) => {
+          isTogglingRecord = false;
           handleContextInvalidated(err);
         });
     });
@@ -987,7 +1003,11 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
             const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
             a.download = `hwa-game-record-${ts}.json`;
             a.click();
-            UrlConstructor.revokeObjectURL(url);
+            if (typeof win.setTimeout === 'function') {
+              win.setTimeout(() => UrlConstructor.revokeObjectURL(url), 1000);
+            } else {
+              UrlConstructor.revokeObjectURL(url);
+            }
             resetExportBtn();
           }).catch((err: any) => {
             handleContextInvalidated(err);

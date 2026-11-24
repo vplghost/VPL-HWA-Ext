@@ -1396,3 +1396,63 @@ test('campaign-raid, craft-fragment, and craft-recipe messages forward RPC calls
   assert.equal(recipeMsg.msg.calls[0].args.libId, 102);
   assert.equal(recipeMsg.msg.calls[0].args.amount, 1);
 });
+
+
+test('recording survives MV3 service worker restart and record-export never scans full local storage when idle', async () => {
+  const { send, chrome } = setup();
+  let fullLocalScanCount = 0;
+  const origLocalGet = chrome.storage.local.get;
+  chrome.storage.local.get = async (keys) => {
+    if (keys === null || keys === undefined) fullLocalScanCount++;
+    return origLocalGet(keys);
+  };
+
+  const makeRec = (n) => ({
+    transport: 'fetch',
+    method: 'POST',
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    status: 200,
+    durationMs: 12,
+    outcome: 'completed',
+    timestamp: `2026-11-24T03:00:0${n}.000Z`,
+    requestBody: JSON.stringify({ calls: [{ name: `call_${n}`, ident: `id_${n}` }] }),
+    responseBody: JSON.stringify({ results: [{ ident: `id_${n}`, result: { response: {} } }] }),
+  });
+
+  await send('record-start');
+  assert.equal((await send('api-record', makeRec(1))).saved, true);
+  assert.equal((await send('api-record', makeRec(2))).saved, true);
+
+  // Simulate MV3 Service Worker termination and fresh restart with same session/local storage
+  let restartedListener = null;
+  chrome.runtime.onMessage.addListener = (fn) => { restartedListener = fn; };
+  setupBackgroundRuntime({ chrome });
+  assert.ok(restartedListener);
+  const sendAfterRestart = (kind, record) =>
+    new Promise((resolve) =>
+      restartedListener(
+        record ? { kind, record } : { kind },
+        kind === 'api-record' ? gameSender : popupSender,
+        resolve
+      )
+    );
+
+  // 1. record-status must hydrate active=true and count=2 from session storage
+  const status = await sendAfterRestart('record-status');
+  assert.equal(status.active, true);
+  assert.equal(status.count, 2);
+
+  // 2. Subsequent api-record must append at record:2 (not overwrite record:0)
+  assert.equal((await sendAfterRestart('api-record', makeRec(3))).saved, true);
+
+  // 3. record-stop must return authoritative stopped state with count=3
+  const stopped = await sendAfterRestart('record-stop');
+  assert.equal(stopped.active, false);
+  assert.equal(stopped.count, 3);
+
+  // 4. record-export must return all 3 records and MUST NOT perform chrome.storage.local.get(null)
+  const exported = await sendAfterRestart('record-export');
+  assert.equal(exported.records.length, 3);
+  assert.equal(exported.interactions.length, 0);
+  assert.equal(fullLocalScanCount, 0, 'record-export must never scan all of chrome.storage.local');
+});

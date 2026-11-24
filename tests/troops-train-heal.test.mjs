@@ -557,3 +557,26 @@ test('renderDashboardTroops accurately treats injuredUnits as total wounded in h
   assert.equal(trainBtn2.disabled, true);
   assert.ok(trainBtn2.textContent.includes('Maxed'));
 });
+
+test('calculateHealingDurationMs computes exact per-tier healing duration matching unitHealing config', async () => {
+  const { calculateHealingDurationMs, UNIT_HEALING_DURATION_MS_BY_LEVEL } = await import('../src/utils/troops.ts');
+
+  // Exact real-game payload from healling-error.md:
+  // 3x Lv.8 Infantry (8) + 24x Lv.7 Spearmen (17) + 4x Lv.8 Marksmen (28)
+  // = 3*11000 + 24*8000 + 4*11000 = 33000 + 192000 + 44000 = 269000ms
+  const realCase = calculateHealingDurationMs([
+    { unitId: 8, count: 3 },
+    { unitId: 17, count: 24 },
+    { unitId: 28, count: 4 },
+  ]);
+  assert.equal(realCase, 269000, 'Must match real game startHealing duration (269000ms) exactly');
+
+  // Verify every tier Lv.1..Lv.10 across all troop types
+  const expectedSec = [0, 1, 2, 2, 3, 4, 6, 8, 11, 13, 15];
+  for (let lvl = 1; lvl <= 10; lvl++) {
+    assert.equal(UNIT_HEALING_DURATION_MS_BY_LEVEL[lvl], expectedSec[lvl] * 1000);
+    assert.equal(calculateHealingDurationMs([{ unitId: lvl, count: 2 }]), expectedSec[lvl] * 2000);
+    assert.equal(calculateHealingDurationMs([{ unitId: 10 + lvl, count: 1 }]), expectedSec[lvl] * 1000);
+    assert.equal(calculateHealingDurationMs([{ unitId: 20 + lvl, count: 3 }]), expectedSec[lvl] * 3000);
+  }
+});

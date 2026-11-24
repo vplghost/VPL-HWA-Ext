@@ -103,6 +103,31 @@ export const CAMP_TRAINING_CAPACITY_BY_LEVEL = [
 ] as const;
 
 /**
+ * Base healing duration per single unit (in milliseconds) for troop levels 1–10.
+ * Extracted from game remote config `unitHealing` (7bb1bceb5515df43ecf378d584c94e21.json):
+ * Lv.1=1s, Lv.2=2s, Lv.3=2s, Lv.4=3s, Lv.5=4s, Lv.6=6s, Lv.7=8s, Lv.8=11s, Lv.9=13s, Lv.10=15s.
+ */
+export const UNIT_HEALING_DURATION_MS_BY_LEVEL = [
+  0, 1000, 2000, 2000, 3000, 4000, 6000, 8000, 11000, 13000, 15000
+] as const;
+
+/**
+ * Calculates total healing duration (ms) for a list of injured units based on each unit's tier/level.
+ */
+export function calculateHealingDurationMs(units: Array<{ unitId: number | string; count: number }>): number {
+  let totalMs = 0;
+  for (const u of units || []) {
+    const count = Number(u?.count) || 0;
+    if (count <= 0) continue;
+    const info = getTroopType(u?.unitId);
+    const level = info?.level ?? 7;
+    const perUnitMs = UNIT_HEALING_DURATION_MS_BY_LEVEL[level] ?? 8000;
+    totalMs += count * perUnitMs;
+  }
+  return totalMs;
+}
+
+/**
  * Resolve training capacity for corresponding camp building (Camps 41, 42, 40).
  */
 export function getBuildingTrainingCapacity(type: number, cache: any): number {

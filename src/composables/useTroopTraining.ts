@@ -11,6 +11,7 @@ import {
   getUnlockedTroopLevels,
   isCampBuildingUpgrading,
   buildAutoTrainCalls,
+  calculateHealingDurationMs,
 } from '../utils/troops.ts';
 import type { TroopTrainSettings, TroopUnitState } from '@/src/types';
 
@@ -355,13 +356,19 @@ export function useTroopTraining() {
     isHealLoading.value = true;
     healStatus.value = '';
     try {
-      const countSum = unitsToHeal.reduce((s: number, u: any) => s + u.count, 0);
+      const duration = calculateHealingDurationMs(unitsToHeal);
       const result = await dispatchRpc([
         { name: 'startHealing', feature: 'unit',
-          args: { startDate: Date.now(), duration: countSum * 8000, units: unitsToHeal } },
+          args: { startDate: Date.now(), duration, units: unitsToHeal } },
         { name: 'getHealing', feature: 'unit' },
       ]);
+      const rpcError = Array.isArray(result?.results)
+        ? result.results
+            .map((r: any) => r?.error || r?.result?.response?.errorCode || r?.result?.response?.error)
+            .find(Boolean)
+        : null;
       healStatus.value = !result?.ok ? result?.error || 'Could not start healing.'
+        : rpcError ? `Healing failed: ${typeof rpcError === 'string' ? rpcError : JSON.stringify(rpcError)}`
         : result.queued ? 'Queued. Waiting for the game to start healing.'
         : 'Healing requested. Waiting for game data.';
     } catch (error) {
