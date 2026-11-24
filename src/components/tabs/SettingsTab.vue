@@ -120,8 +120,14 @@ async function syncCityTrees() {
     const compiledResearch = fetched.personalResearchLevel
       ? compileResearchData(fetched.personalResearch, fetched.personalResearchLevel, fetched.personalResearchType)
       : undefined;
-    const { buildingNames, researchNames } = fetched.strategicLocalization
-      ? extractStrategicNames(fetched.building, fetched.personalResearch, fetched.strategicLocalization)
+    const mergedLoc = (fetched.legacyLocalization || fetched.strategicLocalization)
+      ? {
+          ...(fetched.strategicLocalization && typeof fetched.strategicLocalization === 'object' ? fetched.strategicLocalization : {}),
+          ...(fetched.legacyLocalization && typeof fetched.legacyLocalization === 'object' ? fetched.legacyLocalization : {}),
+        }
+      : null;
+    const { buildingNames, researchNames } = mergedLoc
+      ? extractStrategicNames(fetched.building, fetched.personalResearch, mergedLoc)
       : { buildingNames: {}, researchNames: {} };
 
     const overlay: CityTreeOverlay = {

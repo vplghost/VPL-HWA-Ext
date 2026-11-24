@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.279 — 2026-11-24
+
+### Added & Updated
+
+- **Live Building & Research Tree Data Sync (`buildingData.ts`, `researchData.ts`, `nameData.ts`, `cityTreeManifest.json`, `cityTreeSync.ts`, `scripts/sync-city-trees.mjs`, `SettingsTab.vue`, `debugBridge.ts`)**:
+  - Synced live Building & Research remote configs via `npm run sync:city-trees -- --from-bridge`: added 6 new Sentinel buildings (`187`–`192`: *Sentinel of Honor*, *Sentinel of Chaos*, *Sentinel of Nature*, *Sentinel of Progress*, *Sentinel of Mystery*, *Sentinel of Eternity*), updated 45 buildings (`159` total), added 99 new researches and updated `328` total researches with exact `researchTypeId` branches, and updated `nameData.ts` (`+22` building names, `+71` research names) from `legacyLocalization`.
+  - Fixed `scripts/sync-city-trees.mjs --from-bridge` to use `evalInGame` from `debug-bridge/bridge-cli.js` with fire-and-poll `remoteConfigInit({ lang: 'en' })` RPC dispatch, added `legacyLocalization` & `STRATEGIC_BASE_INTERFACE_BUILDING_ID_<id>_NAME` / `STRATEGIC_BASE_INTERFACE_RESEARCH_<id>` key resolution in `src/services/cityTreeSync.ts`, and ignored benign Chrome `message port closed` warnings in `src/background/debugBridge.ts`.
+
 ## 0.11.277 — 2026-11-24
 
 ### Added

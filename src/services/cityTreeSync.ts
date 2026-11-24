@@ -19,6 +19,7 @@ export const CITY_TREE_CONFIG_KEYS = [
   'personalResearchLevel',
   'personalResearchType',
   'strategicLocalization',
+  'legacyLocalization',
 ] as const;
 
 export type CityTreeConfigKey = (typeof CITY_TREE_CONFIG_KEYS)[number];
@@ -209,6 +210,7 @@ export function compileResearchData(
     const id = Number(r?.id ?? r?.researchId);
     if (!Number.isInteger(id) || id <= 0) continue;
     const rawBranch =
+      r.researchTypeId ??
       r.type ??
       r.branch ??
       r.category ??
@@ -323,6 +325,7 @@ export function extractStrategicNames(
     const id = Number(b?.id ?? b?.buildingId);
     if (!Number.isInteger(id) || id <= 0) continue;
     const name = resolveLoc(b, [
+      `STRATEGIC_BASE_INTERFACE_BUILDING_ID_${id}_NAME`,
       `BUILDING_${id}_NAME`,
       `BUILDING_NAME_${id}`,
       `building_${id}_name`,
@@ -340,6 +343,7 @@ export function extractStrategicNames(
     const id = Number(r?.id ?? r?.researchId);
     if (!Number.isInteger(id) || id <= 0) continue;
     const name = resolveLoc(r, [
+      `STRATEGIC_BASE_INTERFACE_RESEARCH_${id}`,
       `PERSONAL_RESEARCH_${id}_NAME`,
       `RESEARCH_${id}_NAME`,
       `personal_research_${id}_name`,

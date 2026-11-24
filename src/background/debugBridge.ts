@@ -223,7 +223,7 @@ async function handleHostMessage(msg: any) {
           payload: msg.payload
         },
         (_response) => {
-          if (cr.runtime.lastError) {
+          if (cr.runtime.lastError && !/message port closed/i.test(cr.runtime.lastError.message || '')) {
             sendToHost({
               type: 'eval_result',
               id: msg.id,

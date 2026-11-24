@@ -96,13 +96,59 @@ async function main() {
     const logObj = JSON.parse(await readFile(resolve(ROOT, opts.fromLog), 'utf8'));
     rawConfigs = extractIndexFromLog(logObj);
   } else if (opts.fromBridge) {
-    const { sendEval } = await import('../debug-bridge/bridge-cli.js');
-    const evalRes = await sendEval(
-      `(() => { const s = window.__hwaLastRemoteConfigInit || null; return s; })()`
+    const bridgeMod = await import('../debug-bridge/bridge-cli.js');
+    const evalInGame = bridgeMod.evalInGame || bridgeMod.default?.evalInGame;
+    if (typeof evalInGame !== 'function') {
+      throw new Error('debug-bridge/bridge-cli.js does not export evalInGame.');
+    }
+    // Step 1: Check cached or kick off live remoteConfigInit RPC (stored on window to avoid Chrome sendMessage port-close on async eval)
+    const kickRes = await evalInGame(
+      `if (window.__hwaLastRemoteConfigInit) return { ready: true, data: window.__hwaLastRemoteConfigInit };
+      const reqId = 'sync_city_trees_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      window.__hwaSyncCityTreesPending = { reqId, ready: false, data: null, error: null };
+      function onMsg(ev) {
+        if (ev.source !== window || ev.data?.source !== 'hwa-helper-api' || ev.data?.kind !== 'refresh-rpc-result') return;
+        if (ev.data.requestId !== reqId) return;
+        window.removeEventListener('message', onMsg);
+        if (!ev.data.ok) {
+          window.__hwaSyncCityTreesPending = { reqId, ready: true, data: null, error: ev.data.error || ('RPC HTTP ' + ev.data.status) };
+          return;
+        }
+        const first = Array.isArray(ev.data.results) ? ev.data.results[0] : null;
+        const resp = first?.result?.response || ev.data.data?.results?.[0]?.result?.response || null;
+        if (resp) window.__hwaLastRemoteConfigInit = resp;
+        window.__hwaSyncCityTreesPending = { reqId, ready: true, data: resp, error: resp ? null : 'Empty remoteConfigInit response' };
+      }
+      window.addEventListener('message', onMsg);
+      window.postMessage({
+        source: 'hwa-helper-control',
+        kind: 'refresh-rpc',
+        direct: true,
+        requestId: reqId,
+        calls: [{ name: 'remoteConfigInit', args: { lang: 'en' } }]
+      }, location.origin);
+      return { ready: false, reqId };`,
+      8000
     );
-    rawConfigs = evalRes?.result?.index?.configs || evalRes?.result?.configs || null;
+    if (!kickRes?.ok) {
+      throw new Error(kickRes?.error || 'Live bridge eval failed.');
+    }
+    let bridgeData = kickRes.result?.ready ? kickRes.result.data : null;
+    if (!bridgeData) {
+      const deadline = Date.now() + 12000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 350));
+        const pollRes = await evalInGame(`window.__hwaSyncCityTreesPending || null`, 5000);
+        if (pollRes?.ok && pollRes.result?.ready) {
+          if (pollRes.result.error) throw new Error(pollRes.result.error);
+          bridgeData = pollRes.result.data;
+          break;
+        }
+      }
+    }
+    rawConfigs = bridgeData?.index?.configs || bridgeData?.configs || null;
     if (!rawConfigs) {
-      throw new Error('No remoteConfigInit captured in live tab. Use --from-index (exported from SettingsTab) or --from-log.');
+      throw new Error('No remoteConfigInit configs returned from live tab. Use --from-index (exported from SettingsTab) or --from-log.');
     }
   } else {
     console.log('Usage: node scripts/sync-city-trees.mjs (--from-log <file> | --from-index <file> | --from-bridge) [--dry-run] [--force]');
@@ -138,8 +184,16 @@ async function main() {
       ? compileResearchData(fetched.personalResearch, fetched.personalResearchLevel, fetched.personalResearchType)
       : researchData;
 
-  const { buildingNames, researchNames } = fetched.strategicLocalization
-    ? extractStrategicNames(fetched.building, fetched.personalResearch, fetched.strategicLocalization)
+  const mergedLocalization =
+    fetched.legacyLocalization || fetched.strategicLocalization
+      ? {
+          ...(fetched.strategicLocalization && typeof fetched.strategicLocalization === 'object' ? fetched.strategicLocalization : {}),
+          ...(fetched.legacyLocalization && typeof fetched.legacyLocalization === 'object' ? fetched.legacyLocalization : {}),
+        }
+      : null;
+
+  const { buildingNames, researchNames } = mergedLocalization
+    ? extractStrategicNames(fetched.building, fetched.personalResearch, mergedLocalization)
     : { buildingNames: {}, researchNames: {} };
 
   const diff = diffCityTreeData({
@@ -200,7 +254,7 @@ async function main() {
       nSrc = nSrc.replace(/"building":\s*\{([\s\S]*?)\}/, (match) => {
         try {
           const existing = JSON.parse(`{${match.slice(match.indexOf('{') + 1, match.lastIndexOf('}'))}}`);
-          const merged = { ...existing, ...buildingNames };
+          const merged = { ...buildingNames, ...existing };
           return `"building": ${JSON.stringify(merged, null, 2).replace(/\n/g, '\n    ')}`;
         } catch {
           return match;
@@ -211,7 +265,7 @@ async function main() {
       nSrc = nSrc.replace(/"research":\s*\{([\s\S]*?)\}/, (match) => {
         try {
           const existing = JSON.parse(`{${match.slice(match.indexOf('{') + 1, match.lastIndexOf('}'))}}`);
-          const merged = { ...existing, ...researchNames };
+          const merged = { ...researchNames, ...existing };
           return `"research": ${JSON.stringify(merged, null, 2).replace(/\n/g, '\n    ')}`;
         } catch {
           return match;

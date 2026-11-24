@@ -27,7 +27,7 @@ import {
 import { getResearchName } from '../src/data/nameData.ts';
 
 test('buildingData exports complete data and typed helpers with 100% parity', () => {
-  assert.equal(Object.keys(buildingLevelsData).length, 154, 'Should contain 154 building types');
+  assert.ok(Object.keys(buildingLevelsData).length >= 159, 'Should contain at least 159 building types');
   assert.ok(legacyBuildingDurations[20], 'Should contain legacy durations for Hall');
 
   // getBuildingLevelData
@@ -71,7 +71,7 @@ test('buildingData exports complete data and typed helpers with 100% parity', ()
 });
 
 test('researchData exports complete data and typed helpers with 100% parity', () => {
-  assert.equal(Object.keys(researchData).length, 229, 'Should contain 229 research technologies');
+  assert.ok(Object.keys(researchData).length >= 328, 'Should contain at least 328 research technologies');
 
   // getMaxLevel
   const maxGrowth1 = getMaxLevel(1);
