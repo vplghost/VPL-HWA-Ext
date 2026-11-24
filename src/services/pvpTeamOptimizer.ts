@@ -9,6 +9,7 @@ import {
   DEFAULT_ARENA_BATTLE_FEATURES,
   DEFAULT_ARENA_BATTLE_EFFECTS,
 } from '../data/arenaBattleEffects.ts';
+import { isWasmMemoryTrapError } from './wasmGcScheduler.ts';
 
 export { DEFAULT_ARENA_BATTLE_FEATURES, DEFAULT_ARENA_BATTLE_EFFECTS };
 
@@ -58,6 +59,9 @@ export interface PvpMatchOptions {
   hydratedHeroStats?: Record<string, any>;
   battleTemplate?: BattleEnvelopeTemplate;
   userId?: string | number;
+  maxMemoryTrapRetries?: number;
+  onMemoryPressureGc?: (info: { round: number; error: string }) => Promise<void> | void;
+  onRoundTelemetry?: (telemetry: { wasmMemoryMb?: number; gcRuns?: number; gcTriggered?: boolean; highMemoryPressure?: boolean }) => void;
 }
 
 export interface PvpMatchResult {
@@ -461,7 +465,27 @@ export async function runTenRoundPvpMatch(
       ? buildSyntheticArenaBattle(teamAIds, teamBIds, heroMap, seed, battleOpts)
       : buildSyntheticArenaBattle(teamBIds, teamAIds, heroMap, seed, battleOpts);
 
-    const outcome = await simulateFn(battle, seed);
+    const maxRetries = Math.max(0, Math.floor(Number(options.maxMemoryTrapRetries ?? 1)));
+    let outcome: any = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        outcome = await simulateFn(battle, seed);
+        break;
+      } catch (err: any) {
+        if (attempt < maxRetries && isWasmMemoryTrapError(err)) {
+          if (typeof options.onMemoryPressureGc === 'function') {
+            await options.onMemoryPressureGc({ round: i + 1, error: String(err?.message || err) });
+          } else {
+            await new Promise((r) => setTimeout(r, 300));
+          }
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (outcome?.telemetry && typeof options.onRoundTelemetry === 'function') {
+      options.onRoundTelemetry(outcome.telemetry);
+    }
     roundsPlayed++;
     totalDuration += Number(outcome?.duration) || 0;
 

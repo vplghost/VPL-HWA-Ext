@@ -241,7 +241,7 @@ function loadPresetAsCustomSeed(heroIds: number[]) {
 function promoteLeaderboardTeamToCustomSeed(heroIds: number[]) {
   if (isRunning.value || heroIds.length !== 5) return;
   loadPresetAsCustomSeed(heroIds);
-  addLog('info', `Promoted team [${heroIds.map((id) => getHeroName(id)).join(', ')}] to Seed (#1-#5) in Custom Pool.`);
+  addLog(`Promoted team [${heroIds.map((id) => getHeroName(id)).join(', ')}] to Seed (#1-#5) in Custom Pool.`, 'info');
 }
 
 function clearCustomPool() {
@@ -260,6 +260,34 @@ const expandedTeamKey = ref<string | null>(null);
 const statusMessage = ref('');
 const errorMessage = ref('');
 const logs = ref<AutomationLogEntry[]>([]);
+const wasmMemoryMb = ref<number | null>(null);
+const wasmGcRuns = ref<number>(0);
+const isRunningGc = ref(false);
+
+async function triggerWasmGc(force = true): Promise<void> {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    try {
+      const res: any = await chrome.runtime.sendMessage({ kind: 'run-wasm-gc', force });
+      if (res?.ok) {
+        if (Number.isFinite(res.wasmMemoryMb) && res.wasmMemoryMb > 0) wasmMemoryMb.value = res.wasmMemoryMb;
+        if (Number.isFinite(res.gcRuns)) wasmGcRuns.value = res.gcRuns;
+        return;
+      }
+    } catch (_) {}
+  }
+  await new Promise((r) => setTimeout(r, 300));
+}
+
+async function handleManualGc() {
+  if (isRunning.value || isRunningGc.value) return;
+  isRunningGc.value = true;
+  try {
+    await triggerWasmGc(true);
+    addLog(`WASM GC complete (Heap: ${wasmMemoryMb.value ?? '?'} MB, GC runs: ${wasmGcRuns.value}).`, 'info');
+  } finally {
+    isRunningGc.value = false;
+  }
+}
 
 function addLog(text: string, level: 'info' | 'warn' | 'error' = 'info') {
   const ts = new Date().toTimeString().slice(0, 8);
@@ -368,6 +396,15 @@ async function startOptimization() {
         hydratedHeroStats: hydratedHeroStats.value,
         battleTemplate: battleTemplate.value,
         userId: accountId.value,
+        maxMemoryTrapRetries: 1,
+        onMemoryPressureGc: async ({ round }) => {
+          addLog(`WASM memory trap on round ${round}; running emergency GC and retrying once...`, 'warn');
+          await triggerWasmGc(true);
+        },
+        onRoundTelemetry: (t) => {
+          if (Number.isFinite(t?.wasmMemoryMb) && (t.wasmMemoryMb || 0) > 0) wasmMemoryMb.value = t.wasmMemoryMb!;
+          if (Number.isFinite(t?.gcRuns)) wasmGcRuns.value = t.gcRuns!;
+        },
       },
       maxMatchups: maxMatchups.value,
       shouldStop: () => stopRequested.value,
@@ -704,6 +741,30 @@ watch(
           </div>
 
           <div class="flex items-center gap-2">
+            <span
+              v-if="wasmMemoryMb != null"
+              id="pvp-wasm-heap-badge"
+              class="px-2 py-1 rounded-lg text-[11px] font-mono border"
+              :class="
+                wasmMemoryMb >= 1750
+                  ? 'bg-rose-500/15 border-rose-500/40 text-rose-500'
+                  : wasmMemoryMb >= 1450
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-500'
+                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+              "
+            >
+              Heap: {{ wasmMemoryMb }} MB · GC: {{ wasmGcRuns }}
+            </span>
+            <button
+              id="btn-pvp-run-gc"
+              type="button"
+              :disabled="isRunning || isRunningGc"
+              class="cursor-pointer rounded-lg px-2.5 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold disabled:opacity-40"
+              title="Run Unity WASM garbage collection and yield frame loop"
+              @click="handleManualGc"
+            >
+              {{ isRunningGc ? 'GC...' : '🧹 Run GC' }}
+            </button>
             <button
               v-if="!isRunning"
               id="btn-start-pvp-optimizer"

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.287 — 2026-11-25
+
+### Fixed & Added
+
+- **WASM Battle Simulator Managed Allocation, Adaptive GC Scheduler & Memory-Trap Recovery (`wasmGcScheduler.ts`, `interceptor.ts`, `bridge.ts`, `backgroundRuntime.ts`, `pvpTeamOptimizer.ts`, `PvpTeamOptimizerModal.vue`)**:
+  - Updated `win.__hwaSimulateBattle` in `src/content/interceptor.ts` to allocate `BattleInstantPlay` and `LazyDataObject` on the IL2CPP managed heap via `GetUninitializedObject` (falling back to `malloc` only when unavailable, and freeing only `malloc`-allocated pointers in `finally`) — eliminating Boehm GC Use-After-Free traps in `START_BATTLE_PLAY`.
+  - Added `src/services/wasmGcScheduler.ts` (`shouldTriggerWasmGc`, `isWasmMemoryTrapError`) and `runWasmGcCycle` in `interceptor.ts` to automatically trigger GC + frame-loop yield every 20 battles, on +64 MB heap growth, or at 1450 MB / 1750 MB watermarks, plus on-demand `run-wasm-gc` bridge support.
+  - Added emergency GC + single-retry recovery in `runTenRoundPvpMatch()` for transient `START_BATTLE_PLAY: memory access out of bounds` traps, along with live `Heap (MB) · GC` telemetry (`#pvp-wasm-heap-badge`) and manual **🧹 Run GC** (`#btn-pvp-run-gc`) in `PvpTeamOptimizerModal.vue`.
+
 ## 0.11.285 — 2026-11-24
 
 ### Fixed & Improved

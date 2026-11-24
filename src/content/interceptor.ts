@@ -13,6 +13,7 @@ import {
   type WasmSymbolOverrides,
   type WasmProfileVerification,
 } from '../data/wasmSymbols.ts';
+import { shouldTriggerWasmGc } from '../services/wasmGcScheduler.ts';
 
 export interface InterceptRecord {
   endpoint: string;
@@ -1009,6 +1010,66 @@ export function installInterceptor(customWindow?: any): void {
     let cachedLazyKlass = 0;
     let cachedStringClass = 0;
     let cachedBattleConfigStorage = 0;
+    let cachedPlayTypePtr = 0;
+    let cachedLazyTypePtr = 0;
+    let simCountSinceGc = 0;
+    let lastGcMemoryMb = 0;
+    let totalGcRuns = 0;
+
+    async function runWasmGcCycle(
+      table: WebAssembly.Table | undefined,
+      memory: WebAssembly.Memory | undefined,
+      sym: Record<string, number>,
+      opts: { force?: boolean; passes?: number; yieldMs?: number } = {}
+    ): Promise<{ wasmMemoryMb: number; gcRuns: number; gcMethod: string }> {
+      const passes = Math.max(1, Math.min(3, Math.floor(Number(opts.passes ?? 1))));
+      const yieldMs = Math.max(10, Math.min(500, Math.floor(Number(opts.yieldMs ?? 40))));
+      let gcMethod = 'frame-yield';
+
+      if (table && sym.GC_Collect) {
+        try {
+          const gcFn = table.get(sym.GC_Collect);
+          if (typeof gcFn === 'function') {
+            for (let p = 0; p < passes; p++) {
+              const args = new Array(gcFn.length).fill(0);
+              gcFn(...args);
+            }
+            gcMethod = 'System.GC.Collect+yield';
+          }
+        } catch (_) {
+          gcMethod = 'frame-yield';
+        }
+      }
+
+      // Yield to browser animation frame + event loop so Unity/Boehm GC can sweep dead battle graphs
+      if (typeof win.requestAnimationFrame === 'function') {
+        await new Promise<void>((resolve) => win.requestAnimationFrame(() => resolve()));
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, yieldMs));
+
+      const wasmMemoryMb = memory?.buffer ? Math.round(memory.buffer.byteLength / 1048576) : 0;
+      simCountSinceGc = 0;
+      lastGcMemoryMb = wasmMemoryMb;
+      totalGcRuns++;
+      return { wasmMemoryMb, gcRuns: totalGcRuns, gcMethod };
+    }
+
+    (win as any).__hwaRunWasmGc = async function (force = true) {
+      const activeInst = activeUnityInstance || findActiveUnityInstance(win, doc);
+      const mod = activeInst?.Module || win.unityFramework?.Module || (win as any).__hwaUnityModule || activeInst;
+      const asm = mod?.asm || mod;
+      const values = asm ? Object.values(asm) : [];
+      const table = (values.find((v: any) => v instanceof WebAssembly.Table) || (mod as any)?.wasmTable) as WebAssembly.Table | undefined;
+      const memory = (values.find((v: any) => v instanceof WebAssembly.Memory) || (mod as any)?.wasmMemory) as WebAssembly.Memory | undefined;
+      const sym = buildSymMap(getActiveWasmProfile());
+      const decision = shouldTriggerWasmGc({
+        simCountSinceGc,
+        wasmMemoryMb: memory?.buffer ? Math.round(memory.buffer.byteLength / 1048576) : 0,
+        lastGcMemoryMb,
+        force,
+      });
+      return runWasmGcCycle(table, memory, sym, { force, passes: decision.passes || 2, yieldMs: decision.yieldMs || 200 });
+    };
 
     win.__hwaSimulateBattle = async function (rawBattle: any, seed: number) {
       let currentPhase = 'INIT_BRIDGE';
@@ -1103,6 +1164,10 @@ export function installInterceptor(customWindow?: any): void {
       let hPresets = 0;
       let playPtr = 0;
       let lazyDataPtr = 0;
+      let playAllocatedByMalloc = false;
+      let lazyAllocatedByMalloc = false;
+      let presetAllocatedByMalloc = false;
+      let presetPtr = 0;
 
       // Dynamic Il2CppClass lookup by matching class name in metadata
       const findClassByName = (className: string): number => {
@@ -1235,7 +1300,7 @@ export function installInterceptor(customWindow?: any): void {
         const battleType = String(rawBattle?.type || '').toLowerCase();
         const isTitan = battleType.includes('titan');
         const isDungeon = battleType.includes('dungeon');
-        let presetPtr = 0;
+        presetPtr = 0;
         const candidateErrors: string[] = [];
 
         const readCStr = (ptr: number): string => {
@@ -1418,6 +1483,7 @@ export function installInterceptor(customWindow?: any): void {
             if (fallbackPtr > 0) {
               callTableFn(sym.BattlePresets_ctorDefault, fallbackPtr, 0);
               presetPtr = fallbackPtr;
+              presetAllocatedByMalloc = true;
             }
           } catch (e: any) {
             candidateErrors.push(`Raw BattlePresets ctor failed: ${e?.message || String(e)}`);
@@ -1442,42 +1508,79 @@ export function installInterceptor(customWindow?: any): void {
         if (!jsonNodePtr) throw new Error('JSON_Parse returned null for rawBattle payload');
 
         currentPhase = 'CONVERT_LAZY_DATA_OBJECT';
-        let lazyKlass = cachedLazyKlass;
-        if (!lazyKlass) {
-          const cand = heap.u32[0x15aacd4 >>> 2];
-          if (cand > 65536 && cand < memory.buffer.byteLength && (cand % 4 === 0)) {
-            lazyKlass = cand;
-          } else {
-            lazyKlass = findClassByName('LazyDataObject');
+        // Prefer IL2CPP managed heap allocation (GetUninitializedObject) so Boehm GC scans internal roots safely
+        if (!cachedLazyTypePtr && sym.Type_GetType && sym.GetUninitializedObject) {
+          const lazyTypeNamePtr = forgeString('LazyDataObject');
+          try {
+            const tPtr = invokePtr('Type_GetType', lazyTypeNamePtr);
+            if (tPtr > 0) cachedLazyTypePtr = tPtr;
+          } catch (_) {} finally {
+            free(lazyTypeNamePtr);
           }
-          if (lazyKlass) cachedLazyKlass = lazyKlass;
         }
-        if (!lazyKlass) throw new Error('LazyDataObject Il2CppClass descriptor not found');
+        if (cachedLazyTypePtr && sym.GetUninitializedObject) {
+          try {
+            const managedLazy = invokePtr('GetUninitializedObject', cachedLazyTypePtr);
+            if (managedLazy > 0) lazyDataPtr = managedLazy;
+          } catch (_) {}
+        }
+        if (!lazyDataPtr) {
+          let lazyKlass = cachedLazyKlass;
+          if (!lazyKlass) {
+            const cand = heap.u32[0x15aacd4 >>> 2];
+            if (cand > 65536 && cand < memory.buffer.byteLength && (cand % 4 === 0)) {
+              lazyKlass = cand;
+            } else {
+              lazyKlass = findClassByName('LazyDataObject');
+            }
+            if (lazyKlass) cachedLazyKlass = lazyKlass;
+          }
+          if (!lazyKlass) throw new Error('LazyDataObject Il2CppClass descriptor not found');
 
-        lazyDataPtr = malloc(128) >>> 0;
-        heap.u8.fill(0, lazyDataPtr, lazyDataPtr + 128);
-        heap.u32[lazyDataPtr >>> 2] = lazyKlass;
+          lazyDataPtr = malloc(128) >>> 0;
+          lazyAllocatedByMalloc = true;
+          heap.u8.fill(0, lazyDataPtr, lazyDataPtr + 128);
+          heap.u32[lazyDataPtr >>> 2] = lazyKlass;
+        }
         invoke('LazyDataObject_ctor', lazyDataPtr, jsonNodePtr, 0);
 
-        // Step 4: Allocate BattleInstantPlay
+        // Step 4: Allocate BattleInstantPlay on managed heap (prevents mid-battle Boehm GC UAF in START_BATTLE_PLAY)
         currentPhase = 'ALLOC_PLAY_OBJECT';
-        let playKlass = cachedPlayKlass;
-        if (!playKlass) {
-          playKlass = findClassByName('BattleInstantPlay');
-          if (playKlass) cachedPlayKlass = playKlass;
-        }
-        if (!playKlass) {
-          const cand = heap.u32[0x159ffd0 >>> 2];
-          if (cand > 65536 && cand < memory.buffer.byteLength && (cand % 4 === 0)) {
-            playKlass = cand;
-            cachedPlayKlass = playKlass;
+        if (!cachedPlayTypePtr && sym.Type_GetType && sym.GetUninitializedObject) {
+          const playTypeNamePtr = forgeString('BattleInstantPlay');
+          try {
+            const tPtr = invokePtr('Type_GetType', playTypeNamePtr);
+            if (tPtr > 0) cachedPlayTypePtr = tPtr;
+          } catch (_) {} finally {
+            free(playTypeNamePtr);
           }
         }
-        if (!playKlass) throw new Error('BattleInstantPlay Il2CppClass descriptor not found');
+        if (cachedPlayTypePtr && sym.GetUninitializedObject) {
+          try {
+            const managedPlay = invokePtr('GetUninitializedObject', cachedPlayTypePtr);
+            if (managedPlay > 0) playPtr = managedPlay;
+          } catch (_) {}
+        }
+        if (!playPtr) {
+          let playKlass = cachedPlayKlass;
+          if (!playKlass) {
+            playKlass = findClassByName('BattleInstantPlay');
+            if (playKlass) cachedPlayKlass = playKlass;
+          }
+          if (!playKlass) {
+            const cand = heap.u32[0x159ffd0 >>> 2];
+            if (cand > 65536 && cand < memory.buffer.byteLength && (cand % 4 === 0)) {
+              playKlass = cand;
+              cachedPlayKlass = playKlass;
+            }
+          }
+          if (!playKlass) throw new Error('BattleInstantPlay Il2CppClass descriptor not found');
 
-        playPtr = malloc(1024) >>> 0;
-        heap.u8.fill(0, playPtr, playPtr + 1024);
-        heap.u32[playPtr >>> 2] = playKlass;
+          playPtr = malloc(1024) >>> 0;
+          playAllocatedByMalloc = true;
+          heap.u8.fill(0, playPtr, playPtr + 1024);
+          heap.u32[playPtr >>> 2] = playKlass;
+        }
 
         // Step 5: Construct BattleInstantPlay(lazyDataObj, presets, 0, 0, 0, 0)
         currentPhase = 'CONSTRUCT_BATTLE_PLAY';
@@ -1547,6 +1650,17 @@ export function installInterceptor(customWindow?: any): void {
 
         const duration = Number(parsedProgress?.duration) || 0;
 
+        simCountSinceGc++;
+        let wasmMemoryMb = memory?.buffer ? Math.round(memory.buffer.byteLength / 1048576) : 0;
+        const gcDecision = shouldTriggerWasmGc({ simCountSinceGc, wasmMemoryMb, lastGcMemoryMb });
+        if (gcDecision.trigger) {
+          const gcRes = await runWasmGcCycle(table, memory, sym, {
+            passes: gcDecision.passes,
+            yieldMs: gcDecision.yieldMs,
+          });
+          wasmMemoryMb = gcRes.wasmMemoryMb;
+        }
+
         return {
           win,
           stars,
@@ -1559,6 +1673,14 @@ export function installInterceptor(customWindow?: any): void {
           endArgs: {
             result: { win, stars },
             progress: [parsedProgress]
+          },
+          telemetry: {
+            wasmMemoryMb,
+            gcRuns: totalGcRuns,
+            gcTriggered: gcDecision.trigger,
+            gcReason: gcDecision.reason,
+            highMemoryPressure: gcDecision.highMemoryPressure,
+            managedAlloc: !playAllocatedByMalloc,
           }
         };
       } catch (err: any) {
@@ -1574,8 +1696,9 @@ export function installInterceptor(customWindow?: any): void {
         throw enrichedError;
       } finally {
         try { if (playPtr) invoke('Play_dispose', playPtr, 0); } catch (_) {}
-        try { if (playPtr) free(playPtr); } catch (_) {}
-        try { if (lazyDataPtr) free(lazyDataPtr); } catch (_) {}
+        try { if (playPtr && playAllocatedByMalloc) free(playPtr); } catch (_) {}
+        try { if (lazyDataPtr && lazyAllocatedByMalloc) free(lazyDataPtr); } catch (_) {}
+        try { if (presetPtr && presetAllocatedByMalloc) free(presetPtr); } catch (_) {}
       }
     };
   }
@@ -2417,6 +2540,36 @@ export function installInterceptor(customWindow?: any): void {
           enemyCiphertext: typeof event.data.enemyCiphertext === 'string' ? event.data.enemyCiphertext : null
         }, 0);
       }
+      return;
+    }
+
+    if (event.data?.source === 'hwa-helper-control' && event.data.kind === 'run-wasm-gc') {
+      const gcId = event.data.gcId;
+      (async () => {
+        try {
+          const gcFn = (win as any).__hwaRunWasmGc;
+          const res = typeof gcFn === 'function'
+            ? await gcFn(event.data.force !== false)
+            : { wasmMemoryMb: 0, gcRuns: 0, gcMethod: 'unavailable' };
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'run-wasm-gc-result',
+            gcId,
+            ok: true,
+            wasmMemoryMb: res.wasmMemoryMb,
+            gcRuns: res.gcRuns,
+            gcMethod: res.gcMethod
+          }, loc.origin);
+        } catch (err: any) {
+          win.postMessage({
+            source: 'hwa-helper-api',
+            kind: 'run-wasm-gc-result',
+            gcId,
+            ok: false,
+            error: err?.message || String(err)
+          }, loc.origin);
+        }
+      })();
       return;
     }
   });

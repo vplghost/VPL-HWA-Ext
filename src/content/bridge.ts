@@ -104,6 +104,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   const pendingSimRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
   const pendingWasmTestRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
   const pendingWasmCallRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
+  const pendingWasmGcRequests = new Map<string, { resolve: (resp: any) => void; timeout: any }>();
   const getNow = () => (typeof win.Date?.now === 'function' ? win.Date.now() : Date.now());
 
   function handleContextInvalidated(err: any, notifyUser = true) {
@@ -382,6 +383,23 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       return;
     }
 
+    if (event.data.kind === 'run-wasm-gc-result') {
+      const gcId = event.data.gcId;
+      if (gcId && pendingWasmGcRequests.has(gcId)) {
+        const pending = pendingWasmGcRequests.get(gcId);
+        pendingWasmGcRequests.delete(gcId);
+        if (pending?.timeout) clearTimeout(pending.timeout);
+        pending?.resolve?.({
+          ok: event.data.ok === true,
+          wasmMemoryMb: event.data.wasmMemoryMb ?? 0,
+          gcRuns: event.data.gcRuns ?? 0,
+          gcMethod: event.data.gcMethod || 'frame-yield',
+          error: event.data.error || null
+        });
+      }
+      return;
+    }
+
     if (event.data.kind === 'interaction-record') {
       if (recordingActive && event.data.entry) saveInteraction(event.data.entry);
       return;
@@ -556,6 +574,23 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
         }, win.location.origin);
         sendResponse?.({ ok: true });
         return false;
+      }
+      if (message?.kind === 'run-wasm-gc') {
+        const gcId = 'gc_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const timeout = setTimeout(() => {
+          if (pendingWasmGcRequests.has(gcId)) {
+            pendingWasmGcRequests.delete(gcId);
+            sendResponse?.({ ok: false, error: 'WASM GC request timed out in game page bridge.' });
+          }
+        }, 8000);
+        pendingWasmGcRequests.set(gcId, { resolve: sendResponse, timeout });
+        win.postMessage({
+          source: 'hwa-helper-control',
+          kind: 'run-wasm-gc',
+          gcId,
+          force: message.force !== false
+        }, win.location.origin);
+        return true;
       }
     });
   } catch (_) {}

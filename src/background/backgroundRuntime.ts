@@ -3880,6 +3880,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
         message?.kind === 'test-wasm-engine' ||
         message?.kind === 'test-wasm-call' ||
         message?.kind === 'retry-draft-decrypt' ||
+        message?.kind === 'run-wasm-gc' ||
         message?.kind === 'campaign-raid' ||
         message?.kind === 'craft-fragment' ||
         message?.kind === 'craft-recipe') &&
@@ -3919,7 +3920,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
               .catch(() => {});
           }
 
-          if (!queued && (forwardedMessage.kind === 'refresh-rpc' || forwardedMessage.kind === 'simulate-battle' || forwardedMessage.kind === 'test-wasm-engine' || forwardedMessage.kind === 'test-wasm-call')) {
+          if (!queued && (forwardedMessage.kind === 'refresh-rpc' || forwardedMessage.kind === 'simulate-battle' || forwardedMessage.kind === 'test-wasm-engine' || forwardedMessage.kind === 'test-wasm-call' || forwardedMessage.kind === 'run-wasm-gc')) {
             try {
               let settled = false;
               const onDone = (resp: any) => {
@@ -3953,7 +3954,7 @@ export function setupBackgroundRuntime(options: SetupBackgroundRuntimeOptions = 
           cr.tabs.sendMessage(targetTab.id, forwardedMessage).catch(() => {});
           sendResponse({ ok: true, queued, error: null });
         });
-      if (message.kind === 'engine-ping' || message.kind === 'simulate-battle' || message.kind === 'test-wasm-engine' || message.kind === 'test-wasm-call' || message.kind === 'retry-draft-decrypt') forward();
+      if (message.kind === 'engine-ping' || message.kind === 'simulate-battle' || message.kind === 'test-wasm-engine' || message.kind === 'test-wasm-call' || message.kind === 'retry-draft-decrypt' || message.kind === 'run-wasm-gc') forward();
       else
         cr.storage?.local
           ?.get(['popupRpcEnabled', 'socketRefreshMode', 'captureSettings', 'claimRpcStatus', 'rpcCache'])

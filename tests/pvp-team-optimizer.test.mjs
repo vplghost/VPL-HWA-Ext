@@ -352,4 +352,69 @@ test('Custom Hero Pool mode uses first 5 picked heroes as Seed and tests 100% of
   assert.doesNotMatch(modalSrc, /:disabled="seedHeroIds\.length !== 5"/, 'Start button must not hardcode Auto Pool seedHeroIds length');
   assert.match(modalSrc, /id="pvp-hero-sort-select"/, 'Modal must expose #pvp-hero-sort-select dropdown');
   assert.match(modalSrc, /data-action="set-leaderboard-seed"/, 'Leaderboard must expose Set as Seed button for Custom Pool mode');
+  assert.match(modalSrc, /id="btn-pvp-run-gc"/, 'Modal must expose #btn-pvp-run-gc button');
+  assert.match(modalSrc, /id="pvp-wasm-heap-badge"/, 'Modal must expose #pvp-wasm-heap-badge telemetry');
+});
+
+test('P1-08: shouldTriggerWasmGc enforces periodic, memory-delta, pressure, and high-watermark rules + emergency retry recovers START_BATTLE_PLAY trap', async () => {
+  const {
+    shouldTriggerWasmGc,
+    isWasmMemoryTrapError,
+    WASM_GC_PERIODIC_INTERVAL,
+    WASM_GC_PRESSURE_MB,
+    WASM_GC_HIGH_WATERMARK_MB,
+  } = await import('../src/services/wasmGcScheduler.ts');
+
+  assert.equal(shouldTriggerWasmGc({ simCountSinceGc: 5, wasmMemoryMb: 900, lastGcMemoryMb: 880 }).trigger, false);
+  const periodic = shouldTriggerWasmGc({ simCountSinceGc: WASM_GC_PERIODIC_INTERVAL, wasmMemoryMb: 900, lastGcMemoryMb: 880 });
+  assert.equal(periodic.trigger, true);
+  assert.equal(periodic.reason, 'periodic');
+
+  const delta = shouldTriggerWasmGc({ simCountSinceGc: 3, wasmMemoryMb: 1000, lastGcMemoryMb: 920 });
+  assert.equal(delta.trigger, true);
+  assert.equal(delta.reason, 'memory-delta');
+
+  const pressure = shouldTriggerWasmGc({ simCountSinceGc: 6, wasmMemoryMb: WASM_GC_PRESSURE_MB, lastGcMemoryMb: WASM_GC_PRESSURE_MB });
+  assert.equal(pressure.trigger, true);
+  assert.equal(pressure.reason, 'memory-pressure');
+
+  const high = shouldTriggerWasmGc({ simCountSinceGc: 1, wasmMemoryMb: WASM_GC_HIGH_WATERMARK_MB, lastGcMemoryMb: WASM_GC_HIGH_WATERMARK_MB });
+  assert.equal(high.trigger, true);
+  assert.equal(high.reason, 'high-watermark');
+  assert.equal(high.highMemoryPressure, true);
+  assert.equal(high.passes, 2);
+
+  assert.equal(
+    isWasmMemoryTrapError(new Error("WebAssembly execution trap in phase 'START_BATTLE_PLAY': memory access out of bounds. [START_BATTLE_PLAY]")),
+    true
+  );
+  assert.equal(isWasmMemoryTrapError(new Error('Invalid team payload')), false);
+
+  // Emergency GC retry inside runTenRoundPvpMatch
+  const rawHeroes = {};
+  for (let id = 1; id <= 10; id++) rawHeroes[String(id)] = { id, power: 100000 - id * 1000, level: 120, star: 6, color: 16 };
+  const heroMap = buildHeroPoolMap(rawHeroes);
+  let calls = 0;
+  let gcCalls = 0;
+  let lastMemSeen = 0;
+  const flakySim = async () => {
+    calls++;
+    if (calls === 2) {
+      throw new Error("WebAssembly execution trap in phase 'START_BATTLE_PLAY': memory access out of bounds. [START_BATTLE_PLAY]");
+    }
+    return { win: true, stars: 3, duration: 25, telemetry: { wasmMemoryMb: 1120, gcRuns: gcCalls + 1 } };
+  };
+
+  const match = await runTenRoundPvpMatch([1, 2, 3, 4, 5], [6, 7, 8, 9, 10], heroMap, flakySim, {
+    rounds: 4,
+    symmetric: false,
+    maxMemoryTrapRetries: 1,
+    onMemoryPressureGc: async () => { gcCalls++; },
+    onRoundTelemetry: (t) => { lastMemSeen = t.wasmMemoryMb || 0; },
+  });
+
+  assert.equal(gcCalls, 1, 'Emergency GC hook must be invoked once on START_BATTLE_PLAY memory trap');
+  assert.equal(match.roundsPlayed, 4, 'Match must recover and complete all 4 rounds');
+  assert.equal(match.winsA, 4);
+  assert.equal(lastMemSeen, 1120);
 });
