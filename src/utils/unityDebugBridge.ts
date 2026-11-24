@@ -4,6 +4,8 @@
  * inspect WASM functions and memory, and execute chained live hot-tweak commands.
  */
 
+import { safeMem } from './safeWasmMemory.ts';
+
 export const UNITY_BRIDGE_NAMESPACE_TO_MAIN = 'wxt-unity-bridge-to-main';
 export const UNITY_BRIDGE_NAMESPACE_FROM_MAIN = 'wxt-unity-bridge-from-main';
 
@@ -56,6 +58,7 @@ export interface UnityDebugBridge {
   writeMem: (ptr: number, type: string, value: any) => any;
   executeChain: (steps: ChainStep[]) => Promise<{ ok: boolean; results: any[]; error?: string }>;
   getLiveDungeonState: () => any;
+  safeMem?: typeof safeMem;
 }
 
 declare global {
@@ -718,6 +721,7 @@ export function initUnityMainBridge(): UnityDebugBridge | null {
     writeMem,
     executeChain,
     getLiveDungeonState,
+    safeMem,
   };
 
   window.addEventListener('message', async (event: MessageEvent) => {

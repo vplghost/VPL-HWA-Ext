@@ -60,6 +60,7 @@ let chromeConnected = false;
 let lastSeenTabId = null;
 const pendingEvals = new Map(); // id -> { resolve, timer }
 const pendingChains = new Map(); // id -> { resolve, timer }
+const pendingReloads = new Map(); // id -> { resolve, timer }
 
 function logStderr(msg) {
   process.stderr.write(`[Host ${new Date().toISOString()}] ${msg}\n`);
@@ -153,6 +154,21 @@ function handleNativeMessage(message) {
     return;
   }
 
+  // Chrome sends: { type: 'reload_result', id, ok, tabId, error }
+  if (message.type === 'reload_result' && message.id) {
+    const pending = pendingReloads.get(message.id);
+    if (pending) {
+      pendingReloads.delete(message.id);
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.resolve({
+        ok: message.ok !== false,
+        tabId: message.tabId || lastSeenTabId,
+        error: message.error || null
+      });
+    }
+    return;
+  }
+
   // Chrome sends heartbeat / tab status
   if (message.type === 'ping' || message.type === 'tab_ready') {
     chromeConnected = true;
@@ -219,6 +235,113 @@ const server = http.createServer(async (req, res) => {
 
   const parsedUrl = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
   const pathname = parsedUrl.pathname;
+
+  // GET /health (fast read-only Unity WASM probe)
+  if (req.method === 'GET' && pathname === '/health') {
+    const startedAt = Date.now();
+    if (!chromeConnected && !process.stdin.isTTY) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: false,
+        chromeConnected: false,
+        tabId: lastSeenTabId,
+        unityReady: false,
+        error: 'No active Chrome extension connected via Native Messaging.',
+        latencyMs: Date.now() - startedAt
+      }, null, 2));
+      return;
+    }
+
+    const evalId = `health_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const timeoutMs = 4000;
+    const healthCode = `(() => {
+      const inst = window.__hwaUnityInstance || window.unityInstance || window.gameInstance;
+      const mod = inst?.Module || window.__hwaUnityModule || window.unityFramework?.Module || inst;
+      const asm = mod?.asm || mod;
+      const vals = asm ? Object.values(asm) : [];
+      const mem = vals.find((v) => v instanceof WebAssembly.Memory) || mod?.wasmMemory;
+      const tbl = vals.find((v) => v instanceof WebAssembly.Table) || mod?.wasmTable;
+      return {
+        unityReady: Boolean(inst && mem?.buffer && tbl),
+        wasmMemoryMb: mem?.buffer ? Math.round(mem.buffer.byteLength / (1024 * 1024)) : 0,
+        wasmTableSize: tbl ? tbl.length : 0,
+        hasSimulateBattle: typeof window.__hwaSimulateBattle === 'function',
+        hasSafeMem: Boolean(window.__unityBridge?.safeMem),
+        gameVersion: window.hwaHelperGameVersion || null
+      };
+    })()`;
+
+    const evalPromise = new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pendingEvals.delete(evalId);
+        resolve({ ok: false, error: `Health probe timed out after ${timeoutMs}ms` });
+      }, timeoutMs);
+      pendingEvals.set(evalId, { resolve, timer });
+    });
+
+    const sent = sendNativeMessage({ type: 'eval', id: evalId, payload: { code: healthCode, timeoutMs } });
+    if (!sent && !process.stdin.isTTY) {
+      const p = pendingEvals.get(evalId);
+      if (p?.timer) clearTimeout(p.timer);
+      pendingEvals.delete(evalId);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, chromeConnected, unityReady: false, error: 'Failed to write to Native Messaging pipe.' }));
+      return;
+    }
+
+    evalPromise.then((probe) => {
+      const data = (probe && probe.ok && probe.result && typeof probe.result === 'object') ? probe.result : {};
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: Boolean(probe?.ok && data.unityReady),
+        chromeConnected,
+        tabId: lastSeenTabId,
+        unityReady: Boolean(data.unityReady),
+        wasmMemoryMb: data.wasmMemoryMb || 0,
+        wasmTableSize: data.wasmTableSize || 0,
+        hasSimulateBattle: Boolean(data.hasSimulateBattle),
+        hasSafeMem: Boolean(data.hasSafeMem),
+        gameVersion: data.gameVersion || null,
+        error: probe?.ok ? null : (probe?.error || 'Unity not ready'),
+        latencyMs: Date.now() - startedAt
+      }, null, 2));
+    });
+    return;
+  }
+
+  // POST /reload-tab (reloads the active Hero Wars game tab)
+  if (req.method === 'POST' && pathname === '/reload-tab') {
+    if (!chromeConnected && !process.stdin.isTTY) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'No active Chrome extension connected via Native Messaging.' }));
+      return;
+    }
+    const reloadId = `reload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const timeoutMs = 8000;
+    const reloadPromise = new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pendingReloads.delete(reloadId);
+        resolve({ ok: false, error: `Timeout waiting for reload_tab acknowledgement after ${timeoutMs}ms.` });
+      }, timeoutMs);
+      pendingReloads.set(reloadId, { resolve, timer });
+    });
+
+    const sent = sendNativeMessage({ type: 'reload_tab', id: reloadId });
+    if (!sent && !process.stdin.isTTY) {
+      const p = pendingReloads.get(reloadId);
+      if (p?.timer) clearTimeout(p.timer);
+      pendingReloads.delete(reloadId);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Failed to write reload_tab to Native Messaging pipe.' }));
+      return;
+    }
+
+    reloadPromise.then((result) => {
+      res.writeHead(result.ok ? 200 : 500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result, null, 2));
+    });
+    return;
+  }
 
   // GET /status
   if (req.method === 'GET' && (pathname === '/status' || pathname === '/')) {

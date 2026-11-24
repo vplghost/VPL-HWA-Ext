@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.264 — 2026-11-24
+
+### Added
+
+- **Live Debug Bridge Resilience: `/health`, `/reload-tab`, Safe WASM Memory Helpers & Battle Log Replay Harness (`safeWasmMemory.ts`, `unityDebugBridge.ts`, `debugBridge.ts`, `debug-bridge/host.js`, `debug-bridge/bridge-cli.js`, `debug-bridge/replay-battle-log.js`)**:
+  - Added pure bounds- and alignment-checked WASM memory readers in `src/utils/safeWasmMemory.ts` (`isAlignedPtr`, `safeReadU32`, `safeReadI32`, `safeReadCStr`, `safeReadIl2CppStr`, `getFreshViews`) exposed on `window.__unityBridge.safeMem`.
+  - Added `GET /health` (read-only Unity WASM probe) and `POST /reload-tab` (`chrome.tabs.reload` + auto-poll recovery) across `debug-bridge/host.js`, `src/background/debugBridge.ts`, and `debug-bridge/bridge-cli.js` with clean HTTP timeouts.
+  - Added `debug-bridge/replay-battle-log.js` (`extractBattlePairsFromLog`, `diffBattleOutcome`) to extract paired `startBattle`/`endBattle` records (Dungeon, Arena, Tower) from extension logs, replay them via live Unity WASM, and report structured diffs.
+
 ## 0.11.262 — 2026-11-24
 
 ### Added

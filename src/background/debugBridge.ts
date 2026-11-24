@@ -161,6 +161,48 @@ async function handleHostMessage(msg: any) {
   const targetTabId = await findGameTabId();
   const cr = getChromeRuntime();
 
+  if (msg.type === 'reload_tab' && msg.id) {
+    if (!targetTabId || !cr?.tabs?.reload) {
+      sendToHost({
+        type: 'reload_result',
+        id: msg.id,
+        ok: false,
+        error: 'No active Hero Wars tab found in Chrome.'
+      });
+      return;
+    }
+
+    try {
+      cr.tabs.reload(targetTabId, { bypassCache: false }, () => {
+        if (cr.runtime?.lastError) {
+          sendToHost({
+            type: 'reload_result',
+            id: msg.id,
+            ok: false,
+            tabId: targetTabId,
+            error: cr.runtime.lastError.message
+          });
+        } else {
+          sendToHost({
+            type: 'reload_result',
+            id: msg.id,
+            ok: true,
+            tabId: targetTabId
+          });
+        }
+      });
+    } catch (err: any) {
+      sendToHost({
+        type: 'reload_result',
+        id: msg.id,
+        ok: false,
+        tabId: targetTabId,
+        error: err?.message || String(err)
+      });
+    }
+    return;
+  }
+
   if (msg.type === 'eval' && msg.id) {
     if (!targetTabId || !cr?.tabs) {
       sendToHost({
