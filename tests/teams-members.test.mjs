@@ -35,6 +35,7 @@ const module = { exports: {} }, hover = { setup: (_, { slots }) => () => slots.d
 const imports = {
   '@/src/composables/useRpcCache': { useRpcCache: () => ({ cache, dispatchRpc: async () => ({ ok: false }) }) },
   '@/src/composables/useAccountTeams': { useAccountTeams: () => ({ customTeams: custom, saveTeams: async () => {}, storageError: Vue.ref('') }) },
+  '@/src/composables/useModals': { useModals: () => ({ openModal: () => {} }) },
   '@/src/utils/teamMembers': { teamMemberIds, serverTeamGroups }, '@/src/utils/troops': { normalizeArray }, '@/src/utils/formatters': { formatNumber },
   '@/src/utils/metadata': { getHeroMetadata: id => ({ name: 'Hero ' + id }), getTitanMetadata: id => Number(id) >= 4000 ? { name: 'Titan ' + id } : undefined, starGlowClass: () => '' },
   '@/src/components/common/HeroHoverCard.vue': hover, '@/src/components/common/TitanHoverCard.vue': hover

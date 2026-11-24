@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.262 — 2026-11-24
+
+### Added
+
+- **PvP Team Optimizer & 10-Round Local Unity WASM Arena Leaderboard (`pvpTeamOptimizer.ts`, `PvpTeamOptimizerModal.vue`, `useModals.ts`, `App.vue`, `TeamsTab.vue`)**:
+  - Added `src/services/pvpTeamOptimizer.ts` with power-based hero pool pruning (`pruneHeroPool`: `topN`, `minPowerPctOfMax`, `minPowerPctOfSeedMin`, `lockedHeroIds`, `excludedHeroIds`), 1-swap & Beam Search candidate generation (`generateOneSwapCandidates`), offline synthetic Arena battle builder (`buildSyntheticArenaBattle`), 10-round Unity WASM matchup runner (`runTenRoundPvpMatch`: 5+5 symmetric or 10 atk + early-exit screening), and Elo/Top-K Round-Robin leaderboard ranking (`runPvpOptimizationSession`).
+  - Added `PvpTeamOptimizerModal.vue` (reusing `<HeroTeamPicker>` and `<AutomationLogPanel>`) accessible from `TeamsTab.vue` (`#btn-open-pvp-optimizer`), displaying estimated matchup counts, live progress with Stop control, ranked Top Teams with Elo / Win Rate vs Seed / `Giant Killer` badges, and 1-click **Save Team** into `customTeams`.
+
 ## 0.11.260 — 2026-11-24
 
 ### Added & Fixed

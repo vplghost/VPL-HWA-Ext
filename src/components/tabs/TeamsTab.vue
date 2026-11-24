@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useAccountTeams } from '@/src/composables/useAccountTeams';
 import { useRpcCache } from '@/src/composables/useRpcCache';
+import { useModals } from '@/src/composables/useModals';
 import HeroHoverCard from '@/src/components/common/HeroHoverCard.vue';
 import TitanHoverCard from '@/src/components/common/TitanHoverCard.vue';
 import { getHeroMetadata, getTitanMetadata, starGlowClass, getHeroName } from '@/src/utils/metadata';
@@ -18,6 +19,7 @@ interface CustomTeam {
 }
 
 const { cache, dispatchRpc } = useRpcCache();
+const { openModal } = typeof useModals === 'function' ? useModals() : { openModal: () => {} };
 
 const accountId = computed(() => cache.value.accountStatus?.data?.id);
 const heroesData = computed(() => cache.value.heroGetAll?.data || {});
@@ -362,6 +364,14 @@ function getTeamPower(memberIds: unknown): number {
             @click="openAddTeam('titan')"
           >
             <span>⚡ + Add Titan Team</span>
+          </button>
+          <button
+            id="btn-open-pvp-optimizer"
+            type="button"
+            class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors"
+            @click="openModal('pvpOptimizer')"
+          >
+            <span>🏆 Optimize PvP Team</span>
           </button>
         </template>
       </div>
