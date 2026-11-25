@@ -12,6 +12,7 @@ import {
   getMissionTries,
 } from '../src/data/campaignData.ts';
 import { extractDropsFromRaidResponse } from '../src/utils/recipeTree.ts';
+import { useModals } from '../src/composables/useModals.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -229,4 +230,38 @@ test('extractDropsFromRaidResponse ignores non-raid dumps like inventoryGet and 
     modalContent.includes('`mraid_'),
     'CampaignRaidModal must generate explicit ident for each missionRaid call'
   );
+});
+
+test('P2-11: Dashboard reopen resets stale campaign target context, hides picker outside Free Mission, and keeps compact header energy', () => {
+  const { openModal, closeModal, modalContext } = useModals();
+
+  // Open from Hero Detail in soul mode
+  openModal('campaign', { selectedCampaignHeroId: '55', campaignFarmMode: 'soul' });
+  assert.equal(modalContext.selectedCampaignHeroId, '55');
+  assert.equal(modalContext.campaignFarmMode, 'soul');
+  closeModal('campaign');
+
+  // Reopen from Dashboard with no context -> must reset stale hero/gear context to Free Mission
+  openModal('campaign');
+  assert.equal(modalContext.selectedCampaignHeroId, null);
+  assert.equal(modalContext.selectedCampaignGearId, null);
+  assert.equal(modalContext.campaignFarmMode, 'mission');
+  closeModal('campaign');
+
+  // Verify CampaignRaidModal template hygiene (AC2 & AC3)
+  const modalPath = path.resolve(__dirname, '../src/components/dialogs/CampaignRaidModal.vue');
+  const content = fs.readFileSync(modalPath, 'utf8');
+
+  // Compact header energy without redundant "Energy:" text
+  assert.ok(content.includes('id="campaign-header-energy"'), 'Header must contain compact #campaign-header-energy badge');
+  assert.ok(!content.includes('⚡ Energy:'), 'Compact header energy must omit redundant "Energy:" label');
+  assert.ok(
+    !content.includes('Raid campaign missions to farm equipment, fragments, and gold'),
+    'Redundant Campaign Mission Raid body banner must be removed'
+  );
+
+  // Free Mission button + conditional CampaignMissionPicker only in mission mode
+  assert.ok(content.includes('id="btn-campaign-free-mission"'), 'Must provide Free Mission target-reset button');
+  assert.ok(content.includes('<template v-if="farmMode === \'mission\'">'), 'CampaignMissionPicker and recentMissions must be gated to Free Mission mode');
+  assert.ok(content.includes('<template v-else-if="farmMode === \'hero\' || farmMode === \'gear\'">'), 'Item drop chips must only render for hero/gear mode (never duplicating soul mission list)');
 });

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.308 — 2026-11-25
+
+### Changed
+
+- **Campaign Raid UI Cleanup & Dashboard Context Reset (`useModals.ts`, `CampaignRaidModal.vue`, `tests/campaign-soul-stone-raid.test.mjs`)**:
+  - Reset stale `selectedCampaignHeroId`, `selectedCampaignGearId`, and `campaignFarmMode` to `'mission'` (Free Mission Raid) whenever `openModal('campaign')` is invoked from Dashboard without target context, and added a **Free Mission** (`#btn-campaign-free-mission`) target-clear button.
+  - Gated `<CampaignMissionPicker>` (Chapter & Mission dropdowns) and `Recently farmed missions` strictly to Free Mission mode (`farmMode === 'mission'`), eliminating the duplicate mission list in Soul Stone mode (`farmMode === 'soul'`) and hiding redundant dropdowns in Hero/Gear farm modes.
+  - Moved the Energy indicator into the dialog Header as a compact icon+number pill (`#campaign-header-energy`, omitting the redundant `"Energy:"` label) and removed the duplicate `Campaign Mission Raid` body banner.
+
 ## 0.11.306 — 2026-11-25
 
 ### Added

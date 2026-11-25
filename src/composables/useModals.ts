@@ -70,7 +70,7 @@ const modalContext = reactive<{
   selectedCampaignHeroId?: number | string | null;
   selectedChestId?: number | string | null;
   selectedChestCategory?: string | null;
-  campaignFarmMode?: 'gear' | 'hero' | 'soul';
+  campaignFarmMode?: 'gear' | 'hero' | 'soul' | 'mission';
   selectedMarchId?: string | number | null;
 }>({});
 
@@ -122,9 +122,22 @@ export function useModals() {
     selectedCampaignSoulHeroId?: number | string | null;
     selectedChestId?: number | string | null;
     selectedChestCategory?: string | null;
-    campaignFarmMode?: 'gear' | 'hero' | 'soul';
+    campaignFarmMode?: 'gear' | 'hero' | 'soul' | 'mission';
     selectedMarchId?: string | number | null;
   }) {
+    if (name === 'campaign') {
+      const hasCampaignTarget = Boolean(
+        context &&
+          (context.selectedCampaignGearId != null ||
+            context.selectedCampaignHeroId != null ||
+            context.selectedCampaignSoulHeroId != null)
+      );
+      if (!hasCampaignTarget) {
+        modalContext.selectedCampaignGearId = null;
+        modalContext.selectedCampaignHeroId = null;
+        modalContext.campaignFarmMode = 'mission';
+      }
+    }
     if (context) {
       if (context.selectedHero !== undefined) modalContext.selectedHero = context.selectedHero;
       if (context.selectedTitan !== undefined) modalContext.selectedTitan = context.selectedTitan;
@@ -132,10 +145,21 @@ export function useModals() {
       if (context.selectedQuestFilter !== undefined) modalContext.selectedQuestFilter = context.selectedQuestFilter;
       if (context.selectedEventId !== undefined) modalContext.selectedEventId = context.selectedEventId;
       if (context.selectedBattlePassId !== undefined) modalContext.selectedBattlePassId = context.selectedBattlePassId;
-      if (context.selectedCampaignGearId !== undefined) modalContext.selectedCampaignGearId = context.selectedCampaignGearId;
-      if (context.selectedCampaignHeroId !== undefined) modalContext.selectedCampaignHeroId = context.selectedCampaignHeroId;
+      if (context.selectedCampaignGearId !== undefined) {
+        modalContext.selectedCampaignGearId = context.selectedCampaignGearId;
+        if (context.selectedCampaignGearId != null && context.selectedCampaignHeroId === undefined && context.selectedCampaignSoulHeroId === undefined) {
+          modalContext.selectedCampaignHeroId = null;
+        }
+      }
+      if (context.selectedCampaignHeroId !== undefined) {
+        modalContext.selectedCampaignHeroId = context.selectedCampaignHeroId;
+        if (context.selectedCampaignHeroId != null && context.selectedCampaignGearId === undefined) {
+          modalContext.selectedCampaignGearId = null;
+        }
+      }
       if (context.selectedCampaignSoulHeroId !== undefined) {
         modalContext.selectedCampaignHeroId = context.selectedCampaignSoulHeroId;
+        modalContext.selectedCampaignGearId = null;
         modalContext.campaignFarmMode = 'soul';
       }
       if (context.selectedChestId !== undefined) modalContext.selectedChestId = context.selectedChestId;
