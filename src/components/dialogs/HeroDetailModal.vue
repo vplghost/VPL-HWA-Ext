@@ -843,8 +843,8 @@ async function handlePromote() {
   }
 }
 
-// P2-13: Compact sub-tabs, Prev/Next switcher, 1-click heroEvolve, artifact_evolve, XP planner, Glyphs/Talisman
-const activeSubTab = ref<'core' | 'artifacts' | 'skins' | 'glyphs'>('core');
+// P2-13/15/16: 2-tab layout (Core + Upgrades), Prev/Next switcher, heroEvolve, artifact_evolve, XP planner, Glyphs/Sparks
+const activeSubTab = ref<'core' | 'upgrades'>('core');
 const isEvolvingHero = ref(false);
 const isLevelingHero = ref(false);
 const evolvingArtifactSlot = ref<number | null>(null);
@@ -860,6 +860,38 @@ const ownedSparksOfPower = computed(() =>
 const heroSparkStatus = computed(() =>
   getHeroSparkStatus(activeHero.value, inventoryConsumables.value, currentGold.value)
 );
+
+const artifactHeaderResources = computed(() => {
+  const seen = new Set<number>();
+  const items: Array<{ id: number; name: string; owned: number; icon: string }> = [];
+  for (const art of detailedArtifacts.value) {
+    const cid = Number(art.plan?.consumableId);
+    if (!cid || seen.has(cid)) continue;
+    seen.add(cid);
+    items.push({
+      id: cid,
+      name: art.plan.resourceName,
+      owned: art.plan.ownedAmount,
+      icon: `assets/items/consumable/${cid}.png`,
+    });
+  }
+  return items;
+});
+
+const artifactHeaderChests = computed(() => {
+  const defs = [
+    { id: 62, name: 'Artifact Essence Chest' },
+    { id: 63, name: 'Artifact Scroll Chest' },
+    { id: 64, name: 'Artifact Metal Chest' },
+  ];
+  return defs
+    .map((d) => ({
+      ...d,
+      owned: Number(inventoryConsumables.value?.[d.id] ?? 0) || 0,
+      icon: `assets/items/consumable/${d.id}.png`,
+    }))
+    .filter((d) => d.owned > 0);
+});
 
 const heroEvolveStatus = computed(() =>
   getHeroEvolveStatus({
@@ -907,6 +939,21 @@ const artifactUpgradeableCount = computed(() =>
 
 const skinUpgradeableCount = computed(() =>
   detailedSkins.value.filter((s: any) => !s.plan?.isMax && (s.plan?.canAffordNextOne || s.plan?.canAffordNextTen)).length
+);
+
+const glyphAndSparkUpgradeableCount = computed(() => {
+  let count = 0;
+  if (ownedRuneStones.value > 0) {
+    count += heroGlyphsAndTalisman.value.glyphs.filter((g) => !g.isMax).length;
+  }
+  if (heroSparkStatus.value.canUpgrade) {
+    count += 1;
+  }
+  return count;
+});
+
+const totalUpgradesReadyCount = computed(
+  () => artifactUpgradeableCount.value + skinUpgradeableCount.value + glyphAndSparkUpgradeableCount.value
 );
 
 function switchHeroByDelta(delta: -1 | 1) {
@@ -1384,7 +1431,7 @@ function handleSoulStoneFarm() {
             </div>
           </div>
 
-          <!-- Compact Sub-Tab Switcher -->
+          <!-- Compact 2-Tab Switcher (Core + Unified Upgrades) -->
           <div id="hero-detail-subtabs" class="flex items-center gap-1.5 p-1 rounded-xl bg-slate-200/70 dark:bg-slate-800/90 text-xs font-semibold flex-wrap">
             <button
               type="button"
@@ -1398,28 +1445,11 @@ function handleSoulStoneFarm() {
             <button
               type="button"
               class="cursor-pointer flex-1 min-w-fit px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5"
-              :class="activeSubTab === 'artifacts' ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
-              @click="activeSubTab = 'artifacts'"
+              :class="activeSubTab === 'upgrades' ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
+              @click="activeSubTab = 'upgrades'"
             >
-              <span>🛡️</span> <span>Artifacts</span>
-              <span v-if="artifactUpgradeableCount > 0" class="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-3xs font-bold">{{ artifactUpgradeableCount }}</span>
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer flex-1 min-w-fit px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5"
-              :class="activeSubTab === 'skins' ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
-              @click="activeSubTab = 'skins'"
-            >
-              <span>👘</span> <span>Skins</span>
-              <span v-if="skinUpgradeableCount > 0" class="px-1.5 py-0.2 rounded-full bg-purple-500 text-white text-3xs font-bold">{{ skinUpgradeableCount }}</span>
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer flex-1 min-w-fit px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5"
-              :class="activeSubTab === 'glyphs' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
-              @click="activeSubTab = 'glyphs'"
-            >
-              <span>✨</span> <span>Glyphs</span>
+              <span>✨</span> <span>Upgrades (Artifacts · Skins · Glyphs)</span>
+              <span v-if="totalUpgradesReadyCount > 0" class="px-1.5 py-0.2 rounded-full bg-purple-500 text-white text-3xs font-bold">{{ totalUpgradesReadyCount }}</span>
             </button>
           </div>
 
@@ -1629,15 +1659,46 @@ function handleSoulStoneFarm() {
           <!-- 3. Artifacts Section -->
           <div
             v-if="detailedArtifacts.length > 0"
-            v-show="activeSubTab === 'artifacts'"
+            v-show="activeSubTab === 'upgrades'"
             class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3"
           >
             <div class="flex items-center justify-between gap-2 flex-wrap">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <span>🛡️</span> Artifacts
-              </h4>
-              <div class="text-3xs text-slate-400 dark:text-slate-500">
-                Milestones: Lv. 25, 50, 70, 85, 100
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <span>🛡️</span> Artifacts
+                </h4>
+                <div class="text-2xs text-slate-400 dark:text-slate-500">
+                  Milestones: Lv. 25, 50, 70, 85, 100
+                </div>
+              </div>
+
+              <!-- Unified Icon+Count Resource Summary Bar (matching Skins card) -->
+              <div
+                id="hero-artifacts-resource-bar"
+                class="flex items-center gap-2.5 text-2xs bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60 flex-wrap"
+              >
+                <div
+                  v-for="res in artifactHeaderResources"
+                  :key="'art-res-' + res.id"
+                  class="flex items-center gap-1"
+                  :title="`${res.name}: ${formatNumber(res.owned)}`"
+                >
+                  <img :src="getAssetUrl(res.icon)" :alt="res.name" class="size-4 object-contain" />
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(res.owned) }}</span>
+                </div>
+
+                <template v-if="artifactHeaderChests.length > 0">
+                  <span class="text-slate-300 dark:text-slate-600">|</span>
+                  <div
+                    v-for="ch in artifactHeaderChests"
+                    :key="'art-chest-' + ch.id"
+                    class="flex items-center gap-1"
+                    :title="`${ch.name}: ${formatNumber(ch.owned)}`"
+                  >
+                    <img :src="getAssetUrl(ch.icon)" :alt="ch.name" class="size-4 object-contain" />
+                    <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ch.owned) }}</span>
+                  </div>
+                </template>
               </div>
             </div>
 
@@ -1700,20 +1761,29 @@ function handleSoulStoneFarm() {
                     ></div>
                   </div>
 
-                  <!-- Resource owned status -->
-                  <div class="text-3xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 bg-slate-100/60 dark:bg-slate-900/50 px-2 py-1 rounded">
-                    <span class="truncate" :title="art.plan.resourceName">
-                      {{ art.plan.shortName }}
+                  <!-- Compact Next-Level Material Cost Pill -->
+                  <div
+                    v-if="!art.plan.isMax"
+                    class="text-3xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 bg-slate-100/60 dark:bg-slate-900/50 px-2 py-1 rounded"
+                    :title="`${art.plan.resourceName}: ${art.plan.ownedAmount.toLocaleString()} owned (next Lv cost: ${art.plan.costForNextOne.toLocaleString()})`"
+                  >
+                    <span class="inline-flex items-center gap-1">
+                      <img
+                        :src="getAssetUrl(`assets/items/consumable/${art.plan.consumableId}.png`)"
+                        :alt="art.plan.shortName"
+                        class="size-3.5 object-contain shrink-0"
+                      />
+                      <span>Next</span>
                     </span>
                     <span
-                      class="font-bold"
+                      class="font-bold font-mono"
                       :class="
                         art.plan.ownedAmount >= art.plan.costForNextOne
-                          ? 'text-slate-800 dark:text-slate-200'
+                          ? 'text-emerald-700 dark:text-emerald-300'
                           : 'text-rose-500 dark:text-rose-400'
                       "
                     >
-                      {{ art.plan.ownedAmount.toLocaleString() }}
+                      {{ art.plan.costForNextOne.toLocaleString() }}
                     </span>
                   </div>
                 </div>
@@ -1803,7 +1873,7 @@ function handleSoulStoneFarm() {
           </div>
 
           <!-- 4. Skins Section -->
-          <div v-show="activeSubTab === 'skins'" class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <div v-show="activeSubTab === 'upgrades'" class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -2142,7 +2212,7 @@ function handleSoulStoneFarm() {
 
           <!-- 6. Glyphs, Spark of Power & Talisman Section -->
           <div
-            v-show="activeSubTab === 'glyphs'"
+            v-show="activeSubTab === 'upgrades'"
             class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3"
           >
             <div class="flex items-center justify-between gap-2 flex-wrap">
@@ -2154,7 +2224,10 @@ function handleSoulStoneFarm() {
                   Upgrade 5 glyphs with Rune Stones (zero Emeralds) and boost Spark of Power
                 </div>
               </div>
-              <div class="flex items-center gap-3 text-2xs bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60">
+              <div
+                id="hero-glyphs-resource-bar"
+                class="flex items-center gap-3 text-2xs bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60"
+              >
                 <div class="flex items-center gap-1.5" :title="`Rune Stones: ${formatNumber(ownedRuneStones)}`">
                   <img :src="getAssetUrl('assets/items/coin/40077.png')" alt="Rune Stones" class="size-4 object-contain" />
                   <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedRuneStones) }}</span>

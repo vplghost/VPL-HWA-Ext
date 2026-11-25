@@ -123,4 +123,10 @@ test('HeroDetailModal wires 1-click heroEvolve, artifact_evolve, XP level-up, Gl
   assert.ok(modalSrc.includes('alternatePrice: false'));
   assert.ok(modalSrc.includes('id="btn-hero-spark-up"'));
   assert.ok(modalSrc.includes("name: 'heroTitanGiftLevelUp'"));
+  // P2-16: 2-tab unified Upgrades layout & icon+count resource bars
+  assert.ok(modalSrc.includes("ref<'core' | 'upgrades'>('core')"));
+  assert.ok(modalSrc.includes('id="hero-artifacts-resource-bar"'));
+  assert.ok(modalSrc.includes('id="hero-glyphs-resource-bar"'));
+  const upgradesTabMatches = modalSrc.match(/v-show="activeSubTab === 'upgrades'"/g) || [];
+  assert.equal(upgradesTabMatches.length, 3, 'Artifacts, Skins, and Glyphs/Sparks must all render inside the unified Upgrades tab');
 });

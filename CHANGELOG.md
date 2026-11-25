@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.324 — 2026-11-26
+
+### Changed
+
+- **Hero Detail Dialog UI: Unified `Upgrades` Tab & Consistent Icon+Count Resource Bars (`HeroDetailModal.vue`, `tests/hero-detail-overhaul.test.mjs`)**:
+  - Consolidated `#hero-detail-subtabs` from 4 sub-tabs into 2: **`⚙️ Core (Skills & Gear)`** and **`✨ Upgrades (Artifacts · Skins · Glyphs)`** with a combined upgrade-ready badge count, stacking Artifacts, Skins, and Glyphs & Spark of Power together to utilize full dialog height.
+  - Standardized card headers across Artifacts, Skins, and Glyphs & Sparks with a subtitle under the title on the left and a unified icon+count resource bar on the right (`#hero-artifacts-resource-bar` showing active-tier Essence/Scroll/Metal + Artifact Chests, and `#hero-glyphs-resource-bar` showing Rune Stones | Sparks of Power | Gold).
+  - Replaced verbose material text inside individual Artifact cards with a compact icon + next-level cost pill.
+
 ## 0.11.322 — 2026-11-26
 
 ### Added
