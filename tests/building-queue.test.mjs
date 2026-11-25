@@ -593,3 +593,21 @@ test('P1-10: advanceBuildingQueue persists observed maxSlots=2 and logs detailed
   assert.equal(verifyLog.maxSlots, 2);
   assert.ok(verifyLog.ageSec >= 179, 'Should include stale ageSec diagnostic');
 });
+
+test('BuildingModal shows Build/Upgrade button whenever a free builder slot is available (e.g. slot 2 idle)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const modalSrc = await readFile(
+    join(import.meta.dirname, '..', 'src', 'components', 'dialogs', 'BuildingModal.vue'),
+    'utf8'
+  );
+  assert.ok(modalSrc.includes('hasFreeBuilderSlot'), 'BuildingModal must compute hasFreeBuilderSlot across builder slots');
+  assert.ok(
+    modalSrc.includes('v-if="hasFreeBuilderSlot && !b.isUpgrading && hasEnoughBuildingResources(b)"'),
+    'Next Building Candidates must show Build/Upgrade button whenever a builder slot is free'
+  );
+  assert.ok(
+    !modalSrc.includes('v-if="activeQueues.length === 0 && !b.isUpgrading'),
+    'Must not restrict Build/Upgrade button to activeQueues.length === 0 only'
+  );
+});

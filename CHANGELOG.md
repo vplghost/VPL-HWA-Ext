@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.301 — 2026-11-25
+
+### Fixed
+
+- **Building Modal Multi-Slot Build/Upgrade Button (`BuildingModal.vue`, `tests/building-queue.test.mjs`)**:
+  - Updated **Next Building Candidates** in `BuildingModal.vue` to compute `maxBuilderSlots`, `freeBuilderSlots`, and `hasFreeBuilderSlot` (defaulting to 2 builder slots, aligned with Dashboard) so the **Build / Upgrade** button is displayed whenever any builder slot is free (e.g., Slot 2 idle while Slot 1 is busy) instead of requiring `activeQueues.length === 0`.
+
 ## 0.11.299 — 2026-11-25
 
 ### Fixed

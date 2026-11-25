@@ -1050,7 +1050,7 @@ test('BuildingModal and ResearchModal support queuing upgrades with projected pr
   // Must NOT filter out isUpgrading buildings from upgrade candidates
   assert.doesNotMatch(bContent, /if\s*\(b\.isUpgrading\)\s*return\s*false;/, 'BuildingModal must not exclude isUpgrading from candidates');
   assert.match(bContent, /if\s*\(b\.id\s*!==\s*20\s*&&\s*b\.nextLevel\s*>\s*hallLevel\)\s*return\s*false;/, 'BuildingModal must check nextLevel > hallLevel');
-  assert.match(bContent, /v-if="activeQueues\.length === 0 && !b\.isUpgrading && hasEnoughBuildingResources\(b\)"/, 'Building direct upgrade button must check !b.isUpgrading');
+  assert.match(bContent, /v-if="hasFreeBuilderSlot && !b\.isUpgrading && hasEnoughBuildingResources\(b\)"/, 'Building direct upgrade button must check hasFreeBuilderSlot and !b.isUpgrading');
 
   const rContent = await readFile(join(root, 'src/components/dialogs/ResearchModal.vue'), 'utf8');
   // Must NOT filter out isResearching tech from upgrade candidates

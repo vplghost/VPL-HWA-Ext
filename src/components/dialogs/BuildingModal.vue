@@ -64,16 +64,22 @@ interface BuildingQueueItem {
 
 interface BuildingQueueState {
   enabled: boolean;
+  maxSlots?: number;
   items: BuildingQueueItem[];
 }
 
 const buildingQueue = ref<BuildingQueueState>({
   enabled: true,
+  maxSlots: 2,
   items: [],
 });
 
 const { commandQueue, queueError, queueBusy, applyQueueSnapshot } = useCityQueueActions('building', queue => {
-  buildingQueue.value = { enabled: queue.enabled !== false, items: Array.isArray(queue.items) ? queue.items : [] };
+  buildingQueue.value = {
+    enabled: queue.enabled !== false,
+    maxSlots: Number(queue.maxSlots) || 2,
+    items: Array.isArray(queue.items) ? queue.items : [],
+  };
 });
 const isLoaded = ref(false);
 const queueLogs = ref<any[]>([]);
@@ -189,6 +195,12 @@ const finishedQueues = computed(() => {
   );
 });
 
+const maxBuilderSlots = computed(() =>
+  Math.max(2, Number(buildingQueue.value?.maxSlots) || 2, activeQueues.value.length)
+);
+const freeBuilderSlots = computed(() => Math.max(0, maxBuilderSlots.value - activeQueues.value.length));
+const hasFreeBuilderSlot = computed(() => freeBuilderSlots.value > 0);
+
 const isFinishing = ref<Record<string, boolean>>({});
 
 async function finishConstruction(f: any) {
@@ -215,7 +227,9 @@ async function finishConstruction(f: any) {
 // Timeline
 const queueTimeline = computed(() => {
   if (bQueueHelper?.calculateQueueTimeline) {
-    return bQueueHelper.calculateQueueTimeline(rawQueues.value, buildingQueue.value.items, now.value);
+    return bQueueHelper.calculateQueueTimeline(rawQueues.value, buildingQueue.value.items, now.value, {
+      maxSlots: maxBuilderSlots.value,
+    });
   }
   let currentEst = now.value;
   if (activeQueues.value.length > 0) {
@@ -964,7 +978,13 @@ async function refreshBuildings() {
           </div>
 
           <p class="text-xs text-slate-500 dark:text-slate-400">
-            {{ activeQueues.length > 0 ? 'Builder queue is currently occupied. Once complete, the following buildings can be upgraded next:' : 'Builder queue is available. The following buildings can be upgraded next:' }}
+            {{
+              hasFreeBuilderSlot
+                ? (activeQueues.length > 0
+                    ? `Builder slot available (${freeBuilderSlots} of ${maxBuilderSlots} free). You can build/upgrade immediately or add to queue:`
+                    : `Builder queue is available (${freeBuilderSlots} of ${maxBuilderSlots} free). The following buildings can be upgraded next:`)
+                : 'All builder slots are currently occupied. Once complete, the following buildings can be upgraded next:'
+            }}
           </p>
 
           <!-- Search & Sort Controls -->
@@ -1052,7 +1072,7 @@ async function refreshBuildings() {
                   </button>
 
                   <button
-                    v-if="activeQueues.length === 0 && !b.isUpgrading && hasEnoughBuildingResources(b)"
+                    v-if="hasFreeBuilderSlot && !b.isUpgrading && hasEnoughBuildingResources(b)"
                     type="button"
                     :disabled="isStarting[`${b.id}-${b.nextLevel}`]"
                     class="size-6.5 rounded-md inline-flex items-center justify-center text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs cursor-pointer transition-colors disabled:opacity-50 shrink-0"
