@@ -16,7 +16,7 @@ import { rpcCacheService } from '../src/core/cache/rpcCache.ts';
 
 const root = resolve(process.cwd());
 
-test('resolveDailyResetAnchor prioritizes override -> questResetStatus -> eventReset -> timezone -> 02:00 UTC (09:00 UTC+7) fallback', () => {
+test('resolveDailyResetAnchor aligns with Event Daily Quest reset (02:00 UTC / 09:00 UTC+7) and ignores 05:00 personal daily reset', () => {
   const now = Date.UTC(2026, 10, 25, 1, 0, 0); // 2026-11-25 01:00 UTC (08:00 UTC+7)
 
   // Default fallback: 02:00 UTC (09:00 UTC+7)
@@ -25,28 +25,59 @@ test('resolveDailyResetAnchor prioritizes override -> questResetStatus -> eventR
   assert.equal(fallback.formattedUtc, '02:00 UTC');
   assert.equal(fallback.nextResetMs, Date.UTC(2026, 10, 25, 2, 0, 0));
 
-  // questResetStatus.nextDayAt takes priority over default
-  const serverNext = Date.UTC(2026, 10, 25, 2, 0, 0);
-  const fromQuest = resolveDailyResetAnchor(
-    { questResetStatus: { data: { nextDayAt: serverNext } } },
+  // Personal daily reset (questResetStatus.nextDayAt at 22:00 UTC / 05:00 UTC+7) & account timezone MUST be ignored
+  const personalReset = Date.UTC(2026, 10, 25, 22, 0, 0);
+  const ignoringPersonal = resolveDailyResetAnchor(
+    {
+      questResetStatus: { data: { nextDayAt: personalReset } },
+      userGetInfo: { data: { timeZone: 7 } },
+    },
     null,
     now
   );
-  assert.equal(fromQuest.source, 'questResetStatus');
-  assert.equal(fromQuest.nextResetMs, serverNext);
+  assert.equal(ignoringPersonal.source, 'default-02utc');
+  assert.equal(ignoringPersonal.formattedUtc, '02:00 UTC');
+  assert.equal(ignoringPersonal.nextResetMs, Date.UTC(2026, 10, 25, 2, 0, 0));
 
-  // Account timezone offset (+7h = 25200s -> 05:00 local = 22:00 UTC)
-  const fromTz = resolveDailyResetAnchor(
-    { settingsGetAll: { data: { timeZone: 25200 } } },
+  // Verified battlePass_getAll[].nextDayTime (1795658400 = 2026-11-26T02:00:00Z) takes priority over events & default
+  const fromBp = resolveDailyResetAnchor(
+    {
+      questResetStatus: { data: { nextDayAt: personalReset } },
+      battlePass_getAll: { data: [{ id: 177, nextDayTime: 1795658400 }] },
+    },
     null,
     now
   );
-  assert.equal(fromTz.source, 'accountTimezone');
-  assert.equal(fromTz.formattedUtc, '22:00 UTC');
+  assert.equal(fromBp.source, 'battlePassNextDay');
+  assert.equal(fromBp.formattedUtc, '02:00 UTC');
+  assert.equal(fromBp.nextResetMs, 1795658400 * 1000);
+
+  // Verified getSpecialQuestState:quest daily event start (1795399200000 = 2026-11-23T02:00:00Z) rolls forward to 2026-11-25T02:00:00Z
+  const fromEvent = resolveDailyResetAnchor(
+    {
+      'getSpecialQuestState:quest': {
+        data: {
+          events: [
+            {
+              id: 100402,
+              start: 1795399200000,
+              end: 1797818400000,
+              groups: [{ id: 1425, repeatType: 'daily', quests: [] }],
+            },
+          ],
+        },
+      },
+    },
+    null,
+    now
+  );
+  assert.equal(fromEvent.source, 'eventReset');
+  assert.equal(fromEvent.formattedUtc, '02:00 UTC');
+  assert.equal(fromEvent.nextResetMs, Date.UTC(2026, 10, 25, 2, 0, 0));
 
   // Manual override takes highest priority
   const fromOverride = resolveDailyResetAnchor(
-    { questResetStatus: { data: { nextDayAt: serverNext } } },
+    { battlePass_getAll: { data: [{ id: 177, nextDayTime: 1795658400 }] } },
     { resetOverrideUtcMinutes: 150 }, // 02:30 UTC
     now
   );

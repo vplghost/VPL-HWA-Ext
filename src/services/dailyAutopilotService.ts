@@ -113,9 +113,10 @@ export interface DailyAutopilotRuntimeState {
 
 export interface DailyResetAnchor {
   nextResetMs: number;
-  source: 'questResetStatus' | 'eventReset' | 'accountTimezone' | 'override' | 'default-02utc';
+  source: 'override' | 'battlePassNextDay' | 'eventReset' | 'default-02utc';
   cycleKey: string;
   formattedUtc: string;
+  formattedLocal: string;
 }
 
 export function getDefaultDailyAutopilotSettings(): DailyAutopilotSettings {
@@ -212,12 +213,13 @@ function computeCycleKey(nextResetMs: number): string {
 }
 
 /**
- * Resolves the authoritative daily server reset anchor without hardcoding a fragile clock:
+ * Resolves the authoritative **Event Daily Quest** reset anchor (02:00 UTC / 09:00 UTC+7),
+ * intentionally NOT the personal daily quest reset (05:00 local / 22:00 UTC), so Autopilot
+ * waits until event daily quests (e.g., open Tower chests, fight in Arena) have refreshed:
  * 1. Explicit Settings override (`resetOverrideUtcMinutes`), if configured by user
- * 2. `cache.questResetStatus.data.nextDayAt` (server-authoritative daily reset)
- * 3. Active daily event reset timestamp (`questGetEvents` / `specialEvent_getAll`)
- * 4. Account timezone offset (`settingsGetAll` / `userGetInfo`) -> 05:00 local game reset
- * 5. Fallback default: 02:00 UTC (09:00 AM Vietnam time, UTC+7)
+ * 2. `cache.battlePass_getAll.data[].nextDayTime` (server-authoritative 02:00 UTC event day rollover)
+ * 3. Active Event Daily Quest boundary (`getSpecialQuestState:quest` events / `questGetEvents` / `specialEvent_getAll`)
+ * 4. Fallback default: 02:00 UTC (09:00 AM UTC+7)
  */
 export function resolveDailyResetAnchor(
   cache: Record<string, any> | null | undefined,
@@ -225,6 +227,17 @@ export function resolveDailyResetAnchor(
   now = Date.now()
 ): DailyResetAnchor {
   const c = cache || {};
+
+  const buildAnchor = (
+    nextResetMs: number,
+    source: DailyResetAnchor['source']
+  ): DailyResetAnchor => ({
+    nextResetMs,
+    source,
+    cycleKey: computeCycleKey(nextResetMs),
+    formattedUtc: formatUtcHhMm(nextResetMs),
+    formattedLocal: formatShortTime(nextResetMs),
+  });
 
   // 1. User manual override
   if (
@@ -241,74 +254,60 @@ export function resolveDailyResetAnchor(
       mins % 60,
       0
     );
-    const nextResetMs = rollForwardToUpcoming(base, now);
-    return {
-      nextResetMs,
-      source: 'override',
-      cycleKey: computeCycleKey(nextResetMs),
-      formattedUtc: formatUtcHhMm(nextResetMs),
-    };
+    return buildAnchor(rollForwardToUpcoming(base, now), 'override');
   }
 
-  // 2. Server-authoritative questResetStatus.nextDayAt
-  const questNextMs = toMsEpoch(c.questResetStatus?.data?.nextDayAt ?? c.userGetInfo?.data?.nextDayAt);
-  if (questNextMs !== null) {
-    const nextResetMs = rollForwardToUpcoming(questNextMs, now);
-    return {
-      nextResetMs,
-      source: 'questResetStatus',
-      cycleKey: computeCycleKey(nextResetMs),
-      formattedUtc: formatUtcHhMm(nextResetMs),
-    };
+  // 2. Server-authoritative Battle Pass event day rollover (`battlePass_getAll[].nextDayTime`, 02:00 UTC)
+  const bpRaw = c.battlePass_getAll?.data;
+  if (bpRaw && typeof bpRaw === 'object') {
+    const bpList = Array.isArray(bpRaw) ? bpRaw : Object.values(bpRaw);
+    for (const bp of bpList) {
+      const nextDayMs = toMsEpoch((bp as any)?.nextDayTime);
+      if (nextDayMs !== null) {
+        return buildAnchor(rollForwardToUpcoming(nextDayMs, now), 'battlePassNextDay');
+      }
+    }
   }
 
-  // 3. Event reset timestamp from questGetEvents / specialEvent_getAll
+  // 3. Active Event Daily Quest reset boundary from `getSpecialQuestState:quest` / `questGetEvents` / `specialEvent_getAll`
+  const specialEvents =
+    c['getSpecialQuestState:quest']?.data?.events ??
+    c.getSpecialQuestState?.data?.events;
+  if (Array.isArray(specialEvents) && specialEvents.length > 0) {
+    // Prefer events with a `daily` repeatType group, falling back to any active event start/end
+    const prioritized = [
+      ...specialEvents.filter((ev: any) =>
+        Array.isArray(ev?.groups) && ev.groups.some((g: any) => g?.repeatType === 'daily')
+      ),
+      ...specialEvents,
+    ];
+    for (const ev of prioritized) {
+      const ts = toMsEpoch(ev?.nextResetAt ?? ev?.dailyResetAt ?? ev?.start ?? ev?.end);
+      if (ts !== null) {
+        return buildAnchor(rollForwardToUpcoming(ts, now), 'eventReset');
+      }
+    }
+  }
+
   const eventSources = [c.questGetEvents?.data, c.specialEvent_getAll?.data];
   for (const src of eventSources) {
     if (!src || typeof src !== 'object') continue;
     const list = Array.isArray(src) ? src : Object.values(src);
     for (const item of list) {
-      const ts = toMsEpoch((item as any)?.nextResetAt ?? (item as any)?.dailyResetAt ?? (item as any)?.resetTime);
+      const ts = toMsEpoch(
+        (item as any)?.nextResetAt ??
+          (item as any)?.dailyResetAt ??
+          (item as any)?.resetTime ??
+          (item as any)?.startTime ??
+          (item as any)?.endTime
+      );
       if (ts !== null) {
-        const nextResetMs = rollForwardToUpcoming(ts, now);
-        return {
-          nextResetMs,
-          source: 'eventReset',
-          cycleKey: computeCycleKey(nextResetMs),
-          formattedUtc: formatUtcHhMm(nextResetMs),
-        };
+        return buildAnchor(rollForwardToUpcoming(ts, now), 'eventReset');
       }
     }
   }
 
-  // 4. Account timezone offset (Hero Wars Alliance daily quest reset is 05:00 local account time)
-  const tzOffsetSec = Number(
-    c.settingsGetAll?.data?.timeZone ??
-      c.settingsGetAll?.data?.timezone ??
-      c.userGetInfo?.data?.timeZone ??
-      c.userGetInfo?.data?.timezone
-  );
-  if (Number.isFinite(tzOffsetSec) && Math.abs(tzOffsetSec) <= 50400) {
-    // 05:00 local = (5 * 3600 - tzOffsetSec) UTC
-    const utcOffsetSec = ((5 * 3600 - tzOffsetSec) % 86400 + 86400) % 86400;
-    const dayStartUtc = Date.UTC(
-      new Date(now).getUTCFullYear(),
-      new Date(now).getUTCMonth(),
-      new Date(now).getUTCDate(),
-      0,
-      0,
-      0
-    );
-    const nextResetMs = rollForwardToUpcoming(dayStartUtc + utcOffsetSec * 1000, now);
-    return {
-      nextResetMs,
-      source: 'accountTimezone',
-      cycleKey: computeCycleKey(nextResetMs),
-      formattedUtc: formatUtcHhMm(nextResetMs),
-    };
-  }
-
-  // 5. Fallback default: 02:00 UTC (09:00 AM Vietnam time, UTC+7)
+  // 4. Fallback default: 02:00 UTC (09:00 AM Vietnam time, UTC+7)
   const defaultAnchor = Date.UTC(
     new Date(now).getUTCFullYear(),
     new Date(now).getUTCMonth(),
@@ -317,13 +316,7 @@ export function resolveDailyResetAnchor(
     0,
     0
   );
-  const nextResetMs = rollForwardToUpcoming(defaultAnchor, now);
-  return {
-    nextResetMs,
-    source: 'default-02utc',
-    cycleKey: computeCycleKey(nextResetMs),
-    formattedUtc: formatUtcHhMm(nextResetMs),
-  };
+  return buildAnchor(rollForwardToUpcoming(defaultAnchor, now), 'default-02utc');
 }
 
 export interface PlannedDailyStep {

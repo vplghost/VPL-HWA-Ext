@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.326 — 2026-11-26
+
+### Fixed
+
+- **Daily Autopilot Start Anchor Aligned to Event Daily Quest Reset (`02:00 UTC` / `09:00 UTC+7`) (`dailyAutopilotService.ts`, `SettingsTab.vue`, `tests/daily-autopilot.test.mjs`)**:
+  - Updated `resolveDailyResetAnchor()` to prioritize server-authoritative Event Daily Quest boundaries (`override` → `battlePass_getAll[].nextDayTime` → `getSpecialQuestState:quest` daily events / `questGetEvents` → `02:00 UTC` fallback) and explicitly ignore the personal daily quest reset (`questResetStatus.nextDayAt` / `05:00` local timezone).
+  - Prevents Daily Autopilot from clearing Tower chests, Arena battles, or other daily tasks 4 hours before Event Daily Quests refresh at `02:00 UTC` (`09:00 UTC+7`).
+  - Displayed both local time and UTC (`Event reset anchor: HH:MM (02:00 UTC · source)`) in `SettingsTab.vue`.
+
 ## 0.11.324 — 2026-11-26
 
 ### Changed

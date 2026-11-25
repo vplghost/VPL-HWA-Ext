@@ -884,7 +884,7 @@ async function toggleRecording() {
           <span>🤖</span> Daily Routine Autopilot
         </h3>
         <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-          Reset anchor: {{ dailyResetAnchor.formattedUtc }} ({{ dailyResetAnchor.source }})
+          Event reset anchor: {{ dailyResetAnchor.formattedLocal }} ({{ dailyResetAnchor.formattedUtc }} · {{ dailyResetAnchor.source }})
         </span>
       </div>
 
@@ -896,7 +896,7 @@ async function toggleRecording() {
             :checked="dailyAutopilotSettings.enabled"
             @change="saveDailyAutopilotSettings({ enabled: ($event.target as HTMLInputElement).checked })"
           />
-          <span>Auto-start daily routine after server reset (default 02:00 UTC / 09:00 UTC+7 with jitter)</span>
+          <span>Auto-start daily routine after event daily quest reset (02:00 UTC / 09:00 UTC+7 with jitter)</span>
         </label>
 
         <label class="flex items-center gap-2 cursor-pointer">
