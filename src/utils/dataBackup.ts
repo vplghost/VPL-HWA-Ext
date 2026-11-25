@@ -23,6 +23,7 @@ export const CONFIG_KEYS = [
   'tabConfig',
   'theme',
   'popupRpcEnabled',
+  'sanitizeTeamEnabled',
   'socketRefreshMode',
   'resourceSelection',
   'customTeams',

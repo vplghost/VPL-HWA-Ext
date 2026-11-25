@@ -14,6 +14,10 @@ import {
   type WasmProfileVerification,
 } from '../data/wasmSymbols.ts';
 import { shouldTriggerWasmGc } from '../services/wasmGcScheduler.ts';
+import {
+  hasTeamGetAllRequest,
+  sanitizeTeamGetAllRpcPayload,
+} from '../services/rpcSanitizer.ts';
 
 export interface InterceptRecord {
   endpoint: string;
@@ -106,6 +110,11 @@ export function installInterceptor(customWindow?: any): void {
   let popupRpcEnabled = false;
   let rpcDispatchMode = 'direct';
   let recordingActive = false;
+  let sanitizeTeamEnabled = true;
+  try {
+    const storedSanitize = win.localStorage?.getItem?.('hwa_sanitize_team_enabled');
+    if (storedSanitize === 'false') sanitizeTeamEnabled = false;
+  } catch (_) {}
   let wasmSymbolOverrides: WasmSymbolOverrides | null = null;
   let lastWasmVerification: WasmProfileVerification | null = null;
   let verifiedTableRef: any = null;
@@ -2229,6 +2238,13 @@ export function installInterceptor(customWindow?: any): void {
       popupRpcEnabled = event.data.popupRpcEnabled === true;
       rpcDispatchMode = event.data.socketRefreshMode === 'direct' ? 'direct' : 'piggyback';
       recordingActive = event.data.recordingActive === true;
+      if ('sanitizeTeamEnabled' in event.data) {
+        sanitizeTeamEnabled = event.data.sanitizeTeamEnabled !== false;
+        try {
+          const s = getStorage();
+          if (s) s.setItem('hwa_sanitize_team_enabled', String(sanitizeTeamEnabled));
+        } catch (_) {}
+      }
       if ('wasmSymbolOverrides' in event.data) {
         wasmSymbolOverrides = event.data.wasmSymbolOverrides || null;
         verifiedTableRef = null;
@@ -2956,7 +2972,6 @@ export function installInterceptor(customWindow?: any): void {
         try {
           return Promise.resolve(nativeFetch.apply(this, args)).then(
             async (response: any) => {
-              if (!captureEnabled && !piggyback) return response;
               const duration = perf.now() - started;
 
               if (piggyback) {
@@ -2964,6 +2979,13 @@ export function installInterceptor(customWindow?: any): void {
                   const fullText = await response.clone().text();
                   const full = JSON.parse(fullText);
                   if (!response.ok || !Array.isArray(full.results)) throw Error('Piggyback RPC failed');
+
+                  if (sanitizeTeamEnabled) {
+                    const sanitizedResult = sanitizeTeamGetAllRpcPayload(piggyback.options?.body ?? null, full);
+                    if (sanitizedResult.mutated) {
+                      console.warn('[HWA Interceptor] Sanitized malformed teamGetAll entry:', sanitizedResult.fixes);
+                    }
+                  }
 
                   const appendedIds = new Set(piggyback.appended.map((call: any) => call.ident));
                   const extraResults = full.results.filter((item: any) => appendedIds.has(item.ident));
@@ -3019,8 +3041,38 @@ export function installInterceptor(customWindow?: any): void {
                 }
               }
 
+              let responseToReturn = response;
+              if (sanitizeTeamEnabled && isPost && url.includes('/api/rpc') && response.ok) {
+                try {
+                  const reqInfo = await requestBody;
+                  const reqText = reqInfo?.text ?? null;
+                  if (hasTeamGetAllRequest(reqText)) {
+                    const rawText = await response.clone().text();
+                    const parsed = JSON.parse(rawText);
+                    const sanitizedResult = sanitizeTeamGetAllRpcPayload(reqText, parsed);
+                    if (sanitizedResult.mutated) {
+                      console.warn('[HWA Interceptor] Sanitized malformed teamGetAll entry:', sanitizedResult.fixes);
+                      const headers = new Headers(response.headers);
+                      headers.delete('content-length');
+                      headers.delete('content-encoding');
+                      const sanitized = new Response(JSON.stringify(parsed), {
+                        status: response.status,
+                        statusText: response.statusText,
+                        headers
+                      });
+                      for (const property of ['url', 'redirected', 'type']) {
+                        try { Object.defineProperty(sanitized, property, { value: response[property] }); } catch (_) {}
+                      }
+                      responseToReturn = sanitized;
+                    }
+                  }
+                } catch (_) {}
+              }
+
+              if (!captureEnabled) return responseToReturn;
+
               if (isPost) {
-                Promise.all([requestBody, readFetchResponse(response)]).then(([request, received]) => {
+                Promise.all([requestBody, readFetchResponse(responseToReturn)]).then(([request, received]) => {
                   const reqText = request?.text ?? null;
                   const resText = received?.text ?? null;
                   inspectDraftRpc(reqText, resText);
@@ -3046,7 +3098,7 @@ export function installInterceptor(customWindow?: any): void {
               } else {
                 record('fetch', method, url, response.status, duration, 'completed');
               }
-              return response;
+              return responseToReturn;
             },
             (error: any) => {
               if (piggyback) restorePiggyback(piggyback.appended);

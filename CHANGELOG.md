@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.303 — 2026-11-25
+
+### Added
+
+- **Sanitize Team Data Guard & Toggle (`rpcSanitizer.ts`, `interceptor.ts`, `bridge.ts`, `SettingsTab.vue`, `dataBackup.ts`, `tests/rpc-sanitizer.test.mjs`)**:
+  - Added pure `sanitizeTeamGetAllRpcPayload()` and `hasTeamGetAllRequest()` helpers in `src/services/rpcSanitizer.ts` to protect Unity WebGL login (`GameModel.OnLoginComplete` -> `PlayerTeamData.createTeam`) from crashing with `System.InvalidOperationException` (`ValueObject<T>.get_Keys()`) when server `teamGetAll` returns malformed entries (such as a flat 1D hero ID array in multi-team slots `grand`, `clan_boss`, or `champClanDefence_heroes`, mixed invalid elements, or bare scalar values).
+  - Strictly error-only interception in `src/content/interceptor.ts`: healthy `teamGetAll` responses return the original `Response` untouched (`mutated: false`, zero mutation/rebuild overhead).
+  - Added **Sanitize Team Data** toggle (`#sanitize-team-enabled`, stored in `sanitizeTeamEnabled` and synced via `bridge.ts` + `localStorage` fallback for `document_start`) in `SettingsTab.vue` and included it in `dataBackup.ts` `CONFIG_KEYS`.
+
 ## 0.11.301 — 2026-11-25
 
 ### Fixed

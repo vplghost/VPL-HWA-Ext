@@ -427,6 +427,7 @@ async function testWasmCall() {
 const dispatchMode = ref<'piggyback' | 'direct'>('direct');
 const popupRpcEnabled = ref(true);
 const interceptEnabled = ref(true);
+const sanitizeTeamEnabled = ref(true);
 const mqttCaptureEnabled = ref(true);
 
 const DEFAULT_TAB_ITEMS = [
@@ -459,6 +460,7 @@ onMounted(async () => {
         'socketRefreshMode',
         'popupRpcEnabled',
         'mqttCaptureEnabled',
+        'sanitizeTeamEnabled',
         'captureSettings',
         'tabConfig',
         'wasmSymbolOverrides',
@@ -479,6 +481,7 @@ onMounted(async () => {
       const rawMode = stored.socketRefreshMode || stored.dispatchMode;
       dispatchMode.value = rawMode === 'piggyback' ? 'piggyback' : 'direct';
       popupRpcEnabled.value = stored.popupRpcEnabled !== false;
+      sanitizeTeamEnabled.value = stored.sanitizeTeamEnabled !== false;
       if (stored.captureSettings?.interceptEnabled !== undefined) {
         interceptEnabled.value = stored.captureSettings.interceptEnabled !== false;
       }
@@ -613,6 +616,13 @@ async function toggleIntercept() {
         interceptEnabled: interceptEnabled.value,
       },
     });
+  }
+}
+
+async function toggleSanitizeTeam() {
+  sanitizeTeamEnabled.value = !sanitizeTeamEnabled.value;
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    await chrome.storage.local.set({ sanitizeTeamEnabled: sanitizeTeamEnabled.value });
   }
 }
 
@@ -795,6 +805,24 @@ async function toggleRecording() {
           @click="toggleIntercept"
         >
           {{ interceptEnabled ? 'Enabled' : 'Disabled' }}
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div>
+          <div class="font-semibold text-slate-700 dark:text-slate-200">Sanitize Team Data</div>
+          <div class="text-[11px] text-slate-400">
+            Auto-repairs malformed teamGetAll entries (e.g. corrupted 1D Grand Arena team) only when data errors are detected.
+          </div>
+        </div>
+        <button
+          id="sanitize-team-enabled"
+          type="button"
+          class="cursor-pointer px-3 py-1 rounded-lg font-semibold transition-colors text-xs"
+          :class="sanitizeTeamEnabled ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'"
+          @click="toggleSanitizeTeam"
+        >
+          {{ sanitizeTeamEnabled ? 'Enabled' : 'Disabled' }}
         </button>
       </div>
 

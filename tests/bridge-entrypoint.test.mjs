@@ -16,7 +16,8 @@ test('createControlPayload constructs valid control messages', () => {
     interceptEnabled: true,
     popupRpcEnabled: true,
     socketRefreshMode: 'piggyback',
-    recordingActive: true
+    recordingActive: true,
+    sanitizeTeamEnabled: true
   });
 
   const disabledPayload = createControlPayload({ interceptEnabled: false }, false, 'disabled', false);

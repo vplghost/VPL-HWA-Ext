@@ -18,6 +18,7 @@ export interface BridgeControlMessage {
   popupRpcEnabled: boolean;
   socketRefreshMode: string;
   recordingActive: boolean;
+  sanitizeTeamEnabled: boolean;
   wasmSymbolOverrides?: any;
 }
 
@@ -26,7 +27,8 @@ export function createControlPayload(
   popupRpcEnabled: boolean,
   socketRefreshMode: string,
   recordingActive: boolean,
-  wasmSymbolOverrides: any = null): BridgeControlMessage | null {
+  wasmSymbolOverrides: any = null,
+  sanitizeTeamEnabled = true): BridgeControlMessage | null {
   if (!settings) return null;
   const payload: BridgeControlMessage = {
     source: 'hwa-helper-config',
@@ -35,6 +37,7 @@ export function createControlPayload(
     popupRpcEnabled,
     socketRefreshMode,
     recordingActive,
+    sanitizeTeamEnabled: sanitizeTeamEnabled !== false,
     ...(wasmSymbolOverrides ? { wasmSymbolOverrides } : {})
   };
   return payload;
@@ -167,6 +170,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
   let socketRefreshMode = 'direct';
   let recordingActive = false;
   let recordingStateObserved = false;
+  let sanitizeTeamEnabled = true;
   let wasmSymbolOverrides: any = null;
   let freeSpinAccountId: string | null = null;
   let updateButtonsRecordingState: (() => void) | null = null;
@@ -215,7 +219,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
 
   function sendControl() {
     if (!currentSettings) return;
-    const payload = createControlPayload(currentSettings, popupRpcEnabled, socketRefreshMode, recordingActive, wasmSymbolOverrides);
+    const payload = createControlPayload(currentSettings, popupRpcEnabled, socketRefreshMode, recordingActive, wasmSymbolOverrides, sanitizeTeamEnabled);
     if (payload) {
       win.postMessage(payload, win.location?.origin || '*');
     }
@@ -777,7 +781,8 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     'buildingQueue',
     'researchQueue',
     'gameEngineStatus',
-    'wasmSymbolOverrides'
+    'wasmSymbolOverrides',
+    'sanitizeTeamEnabled'
   ]).then((stored: any) => {
     const currentExtVersion = win.chrome?.runtime?.getManifest?.()?.version;
     const hasCanvas = typeof doc?.querySelector === 'function' && Boolean(doc.querySelector('canvas#unity-canvas, canvas#canvas, canvas'));
@@ -802,6 +807,7 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
     if (stored?.popupRpcEnabled !== undefined) popupRpcEnabled = Boolean(stored.popupRpcEnabled);
     if (stored?.socketRefreshMode) socketRefreshMode = stored.socketRefreshMode === 'piggyback' ? 'piggyback' : 'direct';
     if (stored?.wasmSymbolOverrides !== undefined) wasmSymbolOverrides = stored.wasmSymbolOverrides || null;
+    if (stored?.sanitizeTeamEnabled !== undefined) sanitizeTeamEnabled = stored.sanitizeTeamEnabled !== false;
     const cachedAccountId = stored?.rpcCache?.accountStatus?.data?.id ?? stored?.rpcCache?.userGetInfo?.data?.id;
     if (cachedAccountId && !freeSpinAccountId) freeSpinAccountId = String(cachedAccountId);
     sendControl();
@@ -864,6 +870,10 @@ export function installBridge(customWindow: any = typeof window !== 'undefined' 
       }
       if ('wasmSymbolOverrides' in changes) {
         wasmSymbolOverrides = changes.wasmSymbolOverrides.newValue || null;
+        configChanged = true;
+      }
+      if ('sanitizeTeamEnabled' in changes) {
+        sanitizeTeamEnabled = changes.sanitizeTeamEnabled.newValue !== false;
         configChanged = true;
       }
       if (configChanged) sendControl();
