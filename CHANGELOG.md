@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.314 — 2026-11-25
+
+### Added
+
+- **Legends Draft Phase 2: Role/Faction Badges, Instant Top-3 Team Recommendations & On-Demand WASM Simulation (`draftRecommendationService.ts`, `LegendsDraftModal.vue`, `tests/draft-recommendation.test.mjs`)**:
+  - Added pure JS `scoreDraftTeam()` and `recommendTop3DraftTeams()` in `src/services/draftRecommendationService.ts` evaluating all 243 (`3^5`) combinations in `< 2ms` with zero automatic WASM calls, returning 3 diverse recommended teams ranked by Role/Position balance, progressive Faction synergy (`2/3/4/5` and `3+2`), and live draft power.
+  - Upgraded `LegendsDraftModal.vue` hero cards with color-coded Class/Role (`Tank · Front`, etc.) and Faction (`Eternity`, `Progress`, `Nature`, `Chaos`, `Mystery`, `Honor`) badges.
+  - Added `#draft-recommendations` panel for both Defense (Stage 2) and Attack (Stage 4) phases with click/hover highlighting of the 5 recommended picks across Rounds 1–5, plus per-team on-demand **▶ Simulate** buttons (`#btn-draft-sim-team-0..2`) strictly in Attack Phase (Stage 4, manual click only) using `buildSyntheticArenaBattle` + `simulateBattleWithUnity`.
+
 ## 0.11.312 — 2026-11-25
 
 ### Added

@@ -3,6 +3,15 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import ModalDialog from '@/src/components/common/ModalDialog.vue';
 import { useDraft } from '@/src/composables/useDraft';
 import { buildCandidateMatrix, buildDraftHeroCandidate, formatDraftPhase, normalizeDraftHeroIdList } from '@/src/utils/draftHelper';
+import {
+  recommendTop3DraftTeams,
+  shortFactionName,
+  getFactionBadgeClass,
+  getClassBadgeClass,
+  type DraftTeamRecommendation,
+} from '@/src/services/draftRecommendationService';
+import { buildSyntheticArenaBattle, type PvpHeroSnapshot } from '@/src/services/pvpTeamOptimizer';
+import { simulateBattleWithUnity } from '@/src/utils/dungeonBattleSim';
 import type { DraftHeroCandidate } from '@/src/types/game/draft';
 
 const props = defineProps<{
@@ -130,6 +139,106 @@ const playerDefensePower = computed(() =>
 const playerAttackPower = computed(() =>
   playerAttackTeam.value.reduce((sum, h) => sum + (h.power || 0), 0)
 );
+
+// Phase 2: Instant Top-3 Team Recommendations (Defense & Attack, 0 WASM calls)
+const recommendationMode = computed<'defense' | 'attack'>(() =>
+  draftSession.stageId === 4 || draftSession.phase === 'attack' ? 'attack' : 'defense'
+);
+
+const recommendedTeams = computed<DraftTeamRecommendation[]>(() => {
+  if (!draftSession.heroSteps || draftSession.heroSteps.length === 0) return [];
+  return recommendTop3DraftTeams(
+    draftSession.heroSteps,
+    draftSession.heroDetails,
+    recommendationMode.value,
+    enemyCandidates.value
+  );
+});
+
+const highlightedTeamKey = ref<string | null>(null);
+const highlightedHeroIdSet = computed<Set<number>>(() => {
+  if (!highlightedTeamKey.value) return new Set();
+  const team = recommendedTeams.value.find((t) => t.key === highlightedTeamKey.value);
+  return new Set(team ? team.heroIds : []);
+});
+
+const canSimulateAttackRecommendations = computed(
+  () => recommendationMode.value === 'attack' && enemyCandidates.value.length === 5
+);
+
+interface DraftSimResult {
+  wins: number;
+  total: number;
+  winRatePct: number;
+  error?: string;
+}
+
+const simResults = ref<Record<string, DraftSimResult>>({});
+const simulatingTeamKey = ref<string | null>(null);
+const simProgressText = ref<string>('');
+const SIM_ROUNDS = 5;
+
+function simCacheKey(team: DraftTeamRecommendation): string {
+  const enemyKey = enemyCandidates.value.map((e) => e.id).join('-');
+  return `${draftSession.matchId ?? 'x'}:${team.key}:vs:${enemyKey}`;
+}
+
+function getSimResult(team: DraftTeamRecommendation): DraftSimResult | null {
+  return simResults.value[simCacheKey(team)] || null;
+}
+
+async function simulateRecommendedTeam(team: DraftTeamRecommendation) {
+  if (!canSimulateAttackRecommendations.value || simulatingTeamKey.value) return;
+  const cacheKey = simCacheKey(team);
+  simulatingTeamKey.value = team.key;
+  simProgressText.value = `0/${SIM_ROUNDS}`;
+
+  try {
+    const heroMap = new Map<number, PvpHeroSnapshot>();
+    for (const h of [...team.heroes, ...enemyCandidates.value]) {
+      heroMap.set(h.id, {
+        id: h.id,
+        level: h.level ?? 120,
+        color: h.color ?? 16,
+        star: h.star ?? 4,
+        power: h.power ?? 180000,
+      });
+    }
+    const enemyIds = enemyCandidates.value.map((e) => e.id);
+    let wins = 0;
+    const baseSeed = Date.now() >>> 0;
+
+    for (let i = 0; i < SIM_ROUNDS; i++) {
+      simProgressText.value = `${i + 1}/${SIM_ROUNDS}`;
+      const seed = (baseSeed + i * 7919) >>> 0;
+      const payload = buildSyntheticArenaBattle(team.heroIds, enemyIds, heroMap, seed);
+      const outcome = await simulateBattleWithUnity(payload, seed);
+      if (outcome?.win) wins++;
+    }
+
+    simResults.value = {
+      ...simResults.value,
+      [cacheKey]: {
+        wins,
+        total: SIM_ROUNDS,
+        winRatePct: Math.round((wins / SIM_ROUNDS) * 100),
+      },
+    };
+  } catch (err: any) {
+    simResults.value = {
+      ...simResults.value,
+      [cacheKey]: {
+        wins: 0,
+        total: 0,
+        winRatePct: 0,
+        error: err?.message || String(err),
+      },
+    };
+  } finally {
+    simulatingTeamKey.value = null;
+    simProgressText.value = '';
+  }
+}
 
 const poolHeadingLabel = computed(() => {
   if (draftSession.stageId === 2) {
@@ -421,7 +530,9 @@ function close() {
                 :class="
                   hero.picked
                     ? 'bg-amber-500/10 border-amber-500/60 dark:border-amber-400/60 shadow-sm ring-1 ring-amber-500/30'
-                    : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    : highlightedHeroIdSet.has(hero.id)
+                      ? 'bg-emerald-500/10 border-emerald-500 dark:border-emerald-400 shadow-sm ring-2 ring-emerald-500/40'
+                      : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                 "
               >
                 <!-- Picked Ribbon Badge -->
@@ -464,12 +575,22 @@ function close() {
                       {{ getMainStatAbbr(hero.mainStat) }}
                     </span>
 
-                    <!-- Role/Class Badge -->
+                    <!-- Class & Position Role Badge -->
                     <span
-                      v-if="hero.role || hero.class"
-                      class="text-[10px] text-slate-400 truncate"
+                      v-if="hero.class || hero.role"
+                      class="px-1 py-0.2 text-[9px] font-semibold rounded border"
+                      :class="getClassBadgeClass(hero.class)"
                     >
-                      {{ hero.role || hero.class }}
+                      {{ hero.class ? (hero.role ? `${hero.class} · ${hero.role}` : hero.class) : hero.role }}
+                    </span>
+
+                    <!-- Faction Badge -->
+                    <span
+                      v-if="hero.faction"
+                      class="px-1 py-0.2 text-[9px] font-semibold rounded border"
+                      :class="getFactionBadgeClass(hero.faction)"
+                    >
+                      {{ shortFactionName(hero.faction) }}
                     </span>
 
                     <!-- Star & Power from decrypted snapshot -->
@@ -504,6 +625,107 @@ function close() {
           <p class="text-xs text-slate-500 max-w-md mt-1">
             Start a Legends Draft match in game to automatically capture RPC/MQTT packets, decrypt the 15-hero candidate pool via DraftsXORCipher, and display all 5 pick rounds here.
           </p>
+        </div>
+
+        <!-- Phase 2: Instant Top-3 Team Recommendations (Defense & Attack; on-demand WASM simulation in Attack only) -->
+        <div
+          v-if="recommendedTeams.length > 0"
+          id="draft-recommendations"
+          class="mt-2 flex flex-col gap-2 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20"
+        >
+          <div class="flex items-center justify-between flex-wrap gap-2 pb-1 border-b border-emerald-500/20">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              ✨ Top 3 Recommended {{ recommendationMode === 'attack' ? 'Attack' : 'Defense' }} Teams (Role + Faction Synergy)
+            </span>
+            <span class="text-[10px] text-slate-400">
+              Click a team to highlight its 5 picks across Rounds 1–5
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+            <div
+              v-for="(team, tIdx) in recommendedTeams"
+              :key="team.key"
+              class="flex flex-col gap-2 p-2.5 rounded-xl border transition-all cursor-pointer"
+              :class="
+                highlightedTeamKey === team.key
+                  ? 'bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/40'
+                  : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-emerald-400'
+              "
+              @mouseenter="highlightedTeamKey = team.key"
+              @click="highlightedTeamKey = highlightedTeamKey === team.key ? null : team.key"
+            >
+              <div class="flex items-center justify-between gap-1.5">
+                <span class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                  #{{ team.rank }} {{ team.archetypeLabel }}
+                </span>
+                <span class="text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
+                  {{ team.score }} pts
+                </span>
+              </div>
+
+              <div class="flex items-center gap-1">
+                <div
+                  v-for="h in team.heroes"
+                  :key="team.key + '-' + h.id"
+                  class="w-9 h-9 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0"
+                  :title="`${h.name} (${h.class || h.role || ''} · ${shortFactionName(h.faction)})`"
+                >
+                  <img
+                    v-if="h.avatarFile"
+                    :src="getAvatarUrl(h.avatarFile)"
+                    :alt="h.name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <span v-else class="text-[9px] font-bold text-slate-400">#{{ h.id }}</span>
+                </div>
+              </div>
+
+              <div class="text-[10px] text-slate-500 dark:text-slate-400 space-y-0.5">
+                <div class="truncate font-medium text-slate-600 dark:text-slate-300">{{ team.roleSummary }}</div>
+                <div class="flex items-center justify-between gap-1">
+                  <span class="truncate">{{ team.factionSummary }}</span>
+                  <span v-if="team.totalPower > 0" class="font-mono shrink-0">⚡ {{ formatHeroPower(team.totalPower) }}</span>
+                </div>
+              </div>
+
+              <!-- On-demand WASM Simulate button (Attack Phase only, manual click required) -->
+              <div
+                v-if="canSimulateAttackRecommendations"
+                class="pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2"
+                @click.stop
+              >
+                <button
+                  :id="`btn-draft-sim-team-${tIdx}`"
+                  type="button"
+                  :disabled="simulatingTeamKey !== null"
+                  class="cursor-pointer px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  @click="simulateRecommendedTeam(team)"
+                >
+                  {{ simulatingTeamKey === team.key ? `⏳ Sim ${simProgressText}` : '▶ Simulate' }}
+                </button>
+
+                <span
+                  v-if="getSimResult(team)"
+                  class="text-[11px] font-bold font-mono"
+                  :class="
+                    getSimResult(team)?.error
+                      ? 'text-rose-500'
+                      : (getSimResult(team)?.winRatePct ?? 0) >= 60
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                  "
+                >
+                  {{
+                    getSimResult(team)?.error
+                      ? 'Sim Error'
+                      : `${getSimResult(team)!.winRatePct}% Win (${getSimResult(team)!.wins}/${getSimResult(team)!.total})`
+                  }}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Swap Pool (when decrypted payload includes { swap: { ... } }) -->
