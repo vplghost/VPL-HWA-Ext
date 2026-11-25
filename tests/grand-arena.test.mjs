@@ -10,6 +10,8 @@ import {
   buildGrandArenaEndBattleArgs,
   extractDefendersFromStartBattles,
   pruneGrandArenaIntelCache,
+  validateGrandArenaUnitsPayload,
+  inspectServerGrandTeamIntegrity,
   GRAND_ARENA_INTEL_TTL_MS,
 } from '../src/services/grandArenaService.ts';
 import { rpcCacheService } from '../src/core/cache/rpcCache.ts';
@@ -259,4 +261,38 @@ test('buildGrandArenaEndBattleArgs, intel cache pruning, and rpcCache Grand Aren
   assert.equal(after.enemies[0]?.userId, '1216266742');
   assert.equal(after.freeBattlesLeft, 4, 'Grand Arena endBattle must NOT double-deduct refillable:21');
   assert.equal(state.arenaState, undefined, 'Grand Arena must not overwrite Normal Arena state');
+});
+
+test('validateGrandArenaUnitsPayload enforces strict 3x5 unique owned heroes and rejects 1D/corrupt shapes', async () => {
+  const owned = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+  const valid3x5 = [
+    [1, 2, 3, 4, 5],
+    [6, 7, 8, 9, 10],
+    [11, 12, 13, 14, 15],
+  ];
+  const ok = validateGrandArenaUnitsPayload(valid3x5, owned);
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.units, valid3x5);
+
+  // Reject flat 1D array (the exact shape that corrupted teamGetAll.grand)
+  assert.equal(validateGrandArenaUnitsPayload([1, 2, 3, 4, 5], owned).ok, false);
+  // Reject wrong team count
+  assert.equal(validateGrandArenaUnitsPayload([[1, 2, 3, 4, 5]], owned).ok, false);
+  // Reject duplicate hero across teams
+  assert.equal(validateGrandArenaUnitsPayload([[1, 2, 3, 4, 5], [5, 7, 8, 9, 10], [11, 12, 13, 14, 15]], owned).ok, false);
+  // Reject unowned hero
+  assert.equal(validateGrandArenaUnitsPayload([[1, 2, 3, 4, 999], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]], owned).ok, false);
+  // Reject incomplete sub-team
+  assert.equal(validateGrandArenaUnitsPayload([[1, 2, 3, 4], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]], owned).ok, false);
+
+  // inspectServerGrandTeamIntegrity detects flat 1D and partial teamGetAll.grand
+  assert.equal(inspectServerGrandTeamIntegrity({ grand: valid3x5 }, owned).valid, true);
+  assert.equal(inspectServerGrandTeamIntegrity({ grand: [1, 2, 3, 4, 5] }, owned).valid, false);
+  assert.equal(inspectServerGrandTeamIntegrity({ grand: [[1, 2, 3, 4, 5]] }, owned).valid, false);
+  assert.equal(inspectServerGrandTeamIntegrity({ grand: 0 }, owned).valid, false);
+
+  // Verify GrandArenaModal wires pre-dispatch validation and integrity warning banner
+  const modalSrc = await readFile(resolve(root, 'src/components/dialogs/GrandArenaModal.vue'), 'utf8');
+  assert.ok(modalSrc.includes('validateGrandArenaUnitsPayload('));
+  assert.ok(modalSrc.includes('id="grand-arena-integrity-warning"'));
 });

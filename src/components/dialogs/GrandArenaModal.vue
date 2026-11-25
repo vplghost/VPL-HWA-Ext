@@ -14,6 +14,8 @@ import {
   buildGrandArenaEndBattleArgs,
   extractDefendersFromStartBattles,
   pruneGrandArenaIntelCache,
+  validateGrandArenaUnitsPayload,
+  inspectServerGrandTeamIntegrity,
   GRAND_ARENA_INTEL_STORAGE_KEY,
   type GrandArenaEnemy,
   type GrandArenaHiddenPolicy,
@@ -54,6 +56,10 @@ const ownedHeroes = computed(() => {
 });
 
 const heroPowerMap = computed(() => new Map(ownedHeroes.value.map((h) => [h.id, h.power])));
+const ownedHeroIdSet = computed(() => new Set(ownedHeroes.value.map((h) => h.id)));
+const serverGrandTeamIntegrity = computed(() =>
+  inspectServerGrandTeamIntegrity(cache.value?.teamGetAll?.data, ownedHeroIdSet.value)
+);
 
 // 3 Attack Teams (15 unique heroes)
 const attackTeams = ref<[number[], number[], number[]]>([[], [], []]);
@@ -144,14 +150,26 @@ function heroMeta(id: number) {
 
 function initDefaultTeams() {
   if (allTeamsComplete.value) return;
+  if (serverGrandTeamIntegrity.value.valid && serverGrandTeamIntegrity.value.teams) {
+    attackTeams.value = [
+      [...serverGrandTeamIntegrity.value.teams[0]],
+      [...serverGrandTeamIntegrity.value.teams[1]],
+      [...serverGrandTeamIntegrity.value.teams[2]],
+    ];
+    return;
+  }
   const defs = overview.value.defenders;
   if (defs.length === 3 && defs.every((t) => t.length === 5)) {
-    attackTeams.value = [
+    const candidate = [
       defs[0].map((h) => h.id),
       defs[1].map((h) => h.id),
       defs[2].map((h) => h.id),
     ];
-    return;
+    const valid = validateGrandArenaUnitsPayload(candidate, ownedHeroIdSet.value);
+    if (valid.ok) {
+      attackTeams.value = valid.units;
+      return;
+    }
   }
   if (ownedHeroes.value.length >= 15) {
     const top15 = ownedHeroes.value.slice(0, 15).map((h) => h.id);
@@ -264,6 +282,12 @@ async function executeGrandArenaBattle(
   enemy: GrandArenaEnemy,
   plan: GrandArenaPermutationResult
 ): Promise<'won' | 'lost'> {
+  const payloadCheck = validateGrandArenaUnitsPayload(plan?.orderedTeams, ownedHeroIdSet.value);
+  if (!payloadCheck.ok) {
+    stopRequested.value = true;
+    throw new Error(`Blocked malformed Grand Arena payload: ${payloadCheck.reason}`);
+  }
+
   simProgressText.value = `Starting Grand Arena battle vs ${enemy.name}...`;
   const startRes = await dispatchRpc([
     {
@@ -271,7 +295,7 @@ async function executeGrandArenaBattle(
       args: {
         type: 'GrandArena',
         userId: enemy.userId,
-        units: plan.orderedTeams.map((t) => [...t]),
+        units: payloadCheck.units,
       },
     },
   ]);
@@ -357,6 +381,13 @@ async function handleManualFight() {
 
 async function startAutoGrandArena() {
   if (isAutoRunning.value || !allTeamsComplete.value) return;
+  const initialCheck = validateGrandArenaUnitsPayload(attackTeams.value, ownedHeroIdSet.value);
+  if (!initialCheck.ok) {
+    errorMessage.value = `Cannot start Auto Grand Arena: ${initialCheck.reason}`;
+    addLog(errorMessage.value, 'err');
+    return;
+  }
+  attackTeams.value = initialCheck.units;
   isAutoRunning.value = true;
   stopRequested.value = false;
   errorMessage.value = '';
@@ -492,6 +523,15 @@ watch(
         >
           {{ isLoading ? 'Refreshing...' : '↻ Refresh Grand Arena' }}
         </button>
+      </div>
+
+      <!-- Server Grand Team Integrity Warning -->
+      <div
+        v-if="!serverGrandTeamIntegrity.valid"
+        id="grand-arena-integrity-warning"
+        class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium"
+      >
+        ⚠️ Server Grand Arena team data looks malformed ({{ serverGrandTeamIntegrity.issue }}). Run a validated 3-team battle or save your formation in-game to repair it.
       </div>
 
       <!-- Error / Progress Banner -->

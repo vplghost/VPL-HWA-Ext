@@ -500,3 +500,122 @@ export function pruneGrandArenaIntelCache(
   }
   return out;
 }
+
+export type GrandArenaUnitsValidationResult =
+  | { ok: true; units: [number[], number[], number[]] }
+  | { ok: false; reason: string };
+
+/**
+ * Strictly validates a Grand Arena `units` payload before dispatching `customArena_startBattle`.
+ * Guarantees a 2D array of exactly 3 teams x 5 unique positive-integer owned hero IDs
+ * so a flat 1D array or duplicate/invalid squad can never corrupt server `teamGetAll.grand`.
+ */
+export function validateGrandArenaUnitsPayload(
+  units: unknown,
+  ownedHeroIds?: Set<number> | null
+): GrandArenaUnitsValidationResult {
+  if (!Array.isArray(units)) {
+    return { ok: false, reason: 'Grand Arena units must be a 2D array of 3 teams.' };
+  }
+  if (units.length !== 3) {
+    return {
+      ok: false,
+      reason: `Grand Arena units must contain exactly 3 teams (received ${units.length}).`,
+    };
+  }
+  const seen = new Set<number>();
+  const normalized: number[][] = [];
+  for (let t = 0; t < 3; t++) {
+    const team = units[t];
+    if (!Array.isArray(team)) {
+      return {
+        ok: false,
+        reason: `Grand Arena team #${t + 1} must be an array of hero IDs (received ${typeof team}).`,
+      };
+    }
+    if (team.length !== 5) {
+      return {
+        ok: false,
+        reason: `Grand Arena team #${t + 1} must have exactly 5 heroes (received ${team.length}).`,
+      };
+    }
+    const cleanTeam: number[] = [];
+    for (const rawId of team) {
+      const id = Number(rawId);
+      if (!Number.isInteger(id) || id <= 0) {
+        return {
+          ok: false,
+          reason: `Grand Arena team #${t + 1} contains invalid hero ID (${String(rawId)}).`,
+        };
+      }
+      if (seen.has(id)) {
+        return {
+          ok: false,
+          reason: `Hero #${id} is duplicated across Grand Arena teams.`,
+        };
+      }
+      if (ownedHeroIds && ownedHeroIds.size > 0 && !ownedHeroIds.has(id)) {
+        return {
+          ok: false,
+          reason: `Hero #${id} in team #${t + 1} is not in your owned hero roster.`,
+        };
+      }
+      seen.add(id);
+      cleanTeam.push(id);
+    }
+    normalized.push(cleanTeam);
+  }
+  return {
+    ok: true,
+    units: [normalized[0]!, normalized[1]!, normalized[2]!],
+  };
+}
+
+export interface GrandTeamIntegrityStatus {
+  valid: boolean;
+  issue?: string;
+  teams?: [number[], number[], number[]];
+}
+
+/**
+ * Inspects cached `teamGetAll.grand` to detect malformed shapes (e.g. flat 1D array
+ * or partial teams) so GrandArenaModal can warn the user and avoid copying broken state.
+ */
+export function inspectServerGrandTeamIntegrity(
+  rawTeamGetAll: any,
+  ownedHeroIds?: Set<number> | null
+): GrandTeamIntegrityStatus {
+  if (!rawTeamGetAll || typeof rawTeamGetAll !== 'object' || !Object.prototype.hasOwnProperty.call(rawTeamGetAll, 'grand')) {
+    return { valid: true };
+  }
+  const grand = rawTeamGetAll.grand;
+  if (grand === null || grand === undefined) {
+    return { valid: true };
+  }
+  if (!Array.isArray(grand)) {
+    return {
+      valid: false,
+      issue: `Server teamGetAll.grand is a ${typeof grand} instead of a 2D array of 3 teams.`,
+    };
+  }
+  if (grand.length === 0) {
+    return { valid: true };
+  }
+  if (grand.some((el: any) => !Array.isArray(el))) {
+    return {
+      valid: false,
+      issue: 'Server teamGetAll.grand is a flat 1D array or contains non-array entries instead of 3 sub-teams.',
+    };
+  }
+  if (grand.length !== 3) {
+    return {
+      valid: false,
+      issue: `Server teamGetAll.grand has ${grand.length} team(s) instead of 3.`,
+    };
+  }
+  const check = validateGrandArenaUnitsPayload(grand, ownedHeroIds);
+  if (!check.ok) {
+    return { valid: false, issue: check.reason };
+  }
+  return { valid: true, teams: check.units };
+}

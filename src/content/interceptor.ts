@@ -17,6 +17,7 @@ import { shouldTriggerWasmGc } from '../services/wasmGcScheduler.ts';
 import {
   hasTeamGetAllRequest,
   sanitizeTeamGetAllRpcPayload,
+  validateOutgoingMultiTeamRpcCalls,
 } from '../services/rpcSanitizer.ts';
 
 export interface InterceptRecord {
@@ -2342,6 +2343,14 @@ export function installInterceptor(customWindow?: any): void {
       if (calls.some((call: any) => (['refillable_alchemyUseVideo', 'refillable_skillpointsUseVideo', 'artifact_expeditionStart', 'expeditionFarm'].includes(typeof call === 'string' ? call : call?.name) || /^speedUp.*WithResources$/.test(call?.name)) && !isHelperAction(call))) {
         if (event.data.requestId) {
           win.postMessage({ source: 'hwa-helper-api', kind: 'refresh-rpc-result', requestId: event.data.requestId, ok: false, error: 'Blocked restricted call in refresh-rpc.' }, loc.origin);
+        }
+        return;
+      }
+      const multiTeamCheck = validateOutgoingMultiTeamRpcCalls(calls);
+      if (!multiTeamCheck.ok) {
+        console.error('[HWA Interceptor]', multiTeamCheck.error);
+        if (event.data.requestId) {
+          win.postMessage({ source: 'hwa-helper-api', kind: 'refresh-rpc-result', requestId: event.data.requestId, ok: false, error: multiTeamCheck.error }, loc.origin);
         }
         return;
       }

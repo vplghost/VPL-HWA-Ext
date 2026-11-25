@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {
   hasTeamGetAllRequest,
   sanitizeTeamGetAllRpcPayload,
+  validateOutgoingMultiTeamRpcCalls,
 } from '../src/services/rpcSanitizer.ts';
 import { createControlPayload } from '../src/content/bridge.ts';
 
@@ -104,4 +105,55 @@ test('bridge createControlPayload propagates sanitizeTeamEnabled and SettingsTab
   const settingsSrc = fs.readFileSync(new URL('../src/components/tabs/SettingsTab.vue', import.meta.url), 'utf8');
   assert.match(settingsSrc, /id="sanitize-team-enabled"/);
   assert.match(settingsSrc, /sanitizeTeamEnabled/);
+});
+
+test('validateOutgoingMultiTeamRpcCalls blocks flat 1D arrays on GrandArena and multi-team battle_teamSet', () => {
+  // Valid GrandArena 3-team startBattle
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      {
+        name: 'customArena_startBattle',
+        args: { type: 'GrandArena', userId: '1', units: [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]] },
+      },
+    ]).ok,
+    true
+  );
+
+  // Blocked flat 1D GrandArena startBattle
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      {
+        name: 'customArena_startBattle',
+        args: { type: 'GrandArena', userId: '1', units: [1, 2, 3, 4, 5] },
+      },
+    ]).ok,
+    false
+  );
+
+  // Blocked duplicate hero in GrandArena startBattle
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      {
+        name: 'customArena_startBattle',
+        args: { type: 'GrandArena', userId: '1', units: [[1, 2, 3, 4, 5], [5, 7, 8, 9, 10], [11, 12, 13, 14, 15]] },
+      },
+    ]).ok,
+    false
+  );
+
+  // Blocked flat 1D battle_teamSet on multi-team key
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      { name: 'battle_teamSet', args: { key: 'grand', units: [16, 54, 79, 72, 60] } },
+    ]).ok,
+    false
+  );
+
+  // Allowed 2D battle_teamSet on multi-team key
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      { name: 'battle_teamSet', args: { key: 'grand', units: [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]] } },
+    ]).ok,
+    true
+  );
 });

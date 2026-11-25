@@ -101,3 +101,69 @@ export function sanitizeTeamGetAllRpcPayload(
 
   return { mutated: fixes.length > 0, fixes };
 }
+
+export interface OutgoingRpcValidationResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Outgoing safety gate for multi-team RPC calls (`customArena_startBattle` with
+ * `type: 'GrandArena'`, and `battle_teamSet` on `MULTI_TEAM_KEYS`) so extension
+ * code can never dispatch a flat 1D array or corrupted team matrix to the server.
+ */
+export function validateOutgoingMultiTeamRpcCalls(calls: any[]): OutgoingRpcValidationResult {
+  if (!Array.isArray(calls)) return { ok: true };
+  for (const call of calls) {
+    if (!call || typeof call !== 'object') continue;
+    const name = call.name;
+    const args = call.args;
+
+    if (name === 'customArena_startBattle' && args?.type === 'GrandArena') {
+      const units = args?.units;
+      if (!Array.isArray(units) || units.length !== 3) {
+        return {
+          ok: false,
+          error: `Blocked outgoing GrandArena customArena_startBattle: units must be a 2D array of 3 teams (got ${Array.isArray(units) ? units.length : typeof units}).`,
+        };
+      }
+      const seen = new Set<number>();
+      for (let i = 0; i < 3; i++) {
+        const sub = units[i];
+        if (!Array.isArray(sub) || sub.length === 0 || sub.length > 5) {
+          return {
+            ok: false,
+            error: `Blocked outgoing GrandArena customArena_startBattle: team #${i + 1} must be an array of 1..5 hero IDs.`,
+          };
+        }
+        for (const rawId of sub) {
+          const id = Number(rawId);
+          if (!Number.isInteger(id) || id <= 0) {
+            return {
+              ok: false,
+              error: `Blocked outgoing GrandArena customArena_startBattle: team #${i + 1} has invalid hero ID (${String(rawId)}).`,
+            };
+          }
+          if (seen.has(id)) {
+            return {
+              ok: false,
+              error: `Blocked outgoing GrandArena customArena_startBattle: hero #${id} is duplicated across teams.`,
+            };
+          }
+          seen.add(id);
+        }
+      }
+    }
+
+    if (name === 'battle_teamSet' && typeof args?.key === 'string' && MULTI_TEAM_KEYS.has(args.key)) {
+      const units = args?.units;
+      if (!Array.isArray(units) || units.length === 0 || units.some((sub: any) => !Array.isArray(sub) || sub.some((id: any) => !Number.isInteger(Number(id)) || Number(id) <= 0))) {
+        return {
+          ok: false,
+          error: `Blocked outgoing battle_teamSet(${args.key}): multi-team key requires a 2D array of positive integer hero IDs.`,
+        };
+      }
+    }
+  }
+  return { ok: true };
+}

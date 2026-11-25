@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.306 — 2026-11-25
+
+### Added
+
+- **Grand Arena Auto Payload Safety & Outgoing Multi-Team RPC Guard (`grandArenaService.ts`, `GrandArenaModal.vue`, `rpcSanitizer.ts`, `interceptor.ts`, `tests/grand-arena.test.mjs`, `tests/rpc-sanitizer.test.mjs`)**:
+  - Added strict `validateGrandArenaUnitsPayload()` and `inspectServerGrandTeamIntegrity()` in `src/services/grandArenaService.ts` to enforce a valid 2D `3×5` unique owned hero matrix before every Grand Arena dispatch and detect malformed `teamGetAll.grand` cache state.
+  - Added fail-closed pre-dispatch validation in `GrandArenaModal.vue` (`executeGrandArenaBattle` and `startAutoGrandArena`), safe `initDefaultTeams()` preferring validated `teamGetAll.grand`, and `#grand-arena-integrity-warning` banner when server `teamGetAll.grand` looks corrupted.
+  - Added `validateOutgoingMultiTeamRpcCalls()` in `src/services/rpcSanitizer.ts` and wired it into `src/content/interceptor.ts` (`refresh-rpc`) to block flat 1D or duplicate-hero payloads on `customArena_startBattle` (`GrandArena`) and `battle_teamSet` on multi-team keys (`grand`, `clan_boss`, `champClanDefence_heroes`).
+
 ## 0.11.303 — 2026-11-25
 
 ### Added
