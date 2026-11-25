@@ -176,4 +176,24 @@ test('validateOutgoingMultiTeamRpcCalls blocks flat 1D arrays on GrandArena and 
     ]).ok,
     false
   );
+
+  // P2-15: Strict Rune Stone only guard for rune_upgradeHeroRune (no Emeralds)
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      { name: 'rune_upgradeHeroRune', args: { heroId: 29, runeTier: 0, alternatePrice: false } },
+    ]).ok,
+    true
+  );
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      { name: 'rune_upgradeHeroRune', args: { heroId: 29, runeTier: 0, alternatePrice: true } },
+    ]).ok,
+    false
+  );
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      { name: 'rune_upgradeHeroRune', args: { heroId: 29, runeTier: 0 } },
+    ]).ok,
+    false
+  );
 });

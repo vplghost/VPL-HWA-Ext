@@ -74,17 +74,31 @@ export function getHeroEvolveStatus(params: {
   };
 }
 
+export const HERO_RESOURCE_IDS = {
+  RUNE_STONE_COIN_ID: '40077',
+  RUNE_SPHERE_COIN_ID: '40078',
+  SPARK_OF_POWER_CONSUMABLE_ID: '24',
+} as const;
+
 export interface XpPotionDef {
   id: string;
+  libId: number;
   name: string;
   xp: number;
 }
 
+/**
+ * Verified EXP Potion consumable IDs & XP values from live `inventory_use` RPCs:
+ * - libId 9:  Tiny EXP Potion  = 50 XP
+ * - libId 10: Small EXP Potion = 300 XP
+ * - libId 11: Big EXP Potion   = 1,500 XP
+ * - libId 12: Huge EXP Potion  = 7,500 XP
+ */
 export const HERO_XP_POTIONS: XpPotionDef[] = [
-  { id: '4', name: 'Huge EXP Potion', xp: 7500 },
-  { id: '3', name: 'Big EXP Potion', xp: 1500 },
-  { id: '2', name: 'Small EXP Potion', xp: 250 },
-  { id: '1', name: 'Tiny EXP Potion', xp: 50 },
+  { id: '12', libId: 12, name: 'Huge EXP Potion', xp: 7500 },
+  { id: '11', libId: 11, name: 'Big EXP Potion', xp: 1500 },
+  { id: '10', libId: 10, name: 'Small EXP Potion', xp: 300 },
+  { id: '9', libId: 9, name: 'Tiny EXP Potion', xp: 50 },
 ];
 
 export interface XpPotionPlan {
@@ -239,19 +253,102 @@ export function getArtifactEvolveStatus(
 }
 
 export interface HeroGlyphItem {
+  tier: number;
   slot: number;
   level: number;
+  maxLevel: number;
+  isMax: boolean;
+}
+
+export interface HeroSparkStatus {
+  level: number;
+  maxLevel: number;
+  isMax: boolean;
+  sparksOwned: number;
+  canUpgrade: boolean;
+}
+
+export function buildXpPotionInventoryUseCalls(
+  heroId: number | string,
+  plan: XpPotionPlan
+): Array<{ name: string; args: { libId: number; amount: number; params: { unitId: number } } }> {
+  const unitId = Number(heroId);
+  if (!Number.isInteger(unitId) || unitId <= 0 || !plan?.potionsToUse?.length) return [];
+  return plan.potionsToUse
+    .filter((p) => p.count > 0 && Number(p.id) > 0)
+    .map((p) => ({
+      name: 'inventory_use',
+      args: {
+        libId: Number(p.id),
+        amount: p.count,
+        params: { unitId },
+      },
+    }));
+}
+
+export function getHeroSparkStatus(
+  hero: any,
+  consumables: Record<string, any> | null | undefined,
+  userGold?: number | null
+): HeroSparkStatus {
+  const maxLevel = 30;
+  const level = Math.max(0, Math.min(maxLevel, Math.floor(Number(hero?.titanGiftLevel ?? 0) || 0)));
+  const isMax = level >= maxLevel;
+  const sparksOwned = Math.max(
+    0,
+    Math.floor(Number(consumables?.[HERO_RESOURCE_IDS.SPARK_OF_POWER_CONSUMABLE_ID] ?? 0) || 0)
+  );
+  const goldOk = userGold === null || userGold === undefined || Number(userGold) > 0;
+  return {
+    level,
+    maxLevel,
+    isMax,
+    sparksOwned,
+    canUpgrade: !isMax && sparksOwned > 0 && goldOk,
+  };
 }
 
 export function extractHeroGlyphsAndTalisman(hero: any, cache: Record<string, any> | null | undefined) {
   const heroId = String(hero?.id ?? '');
-  const rawRunes = Array.isArray(hero?.runes)
-    ? hero.runes
-    : (hero?.runes && typeof hero.runes === 'object' ? Object.values(hero.runes) : []);
-  const glyphs: HeroGlyphItem[] = rawRunes.slice(0, 5).map((lv: any, idx: number) => ({
-    slot: idx + 1,
-    level: Math.max(0, Number(lv) || 0),
-  }));
+
+  // Primary source: verified `rune_getAll.heroesRunes` (tier 0..4)
+  const heroesRunes = cache?.rune_getAll?.data?.heroesRunes;
+  const matchedRuneEntry = Array.isArray(heroesRunes)
+    ? heroesRunes.find((entry: any) => entry && String(entry.heroId ?? '') === heroId)
+    : null;
+
+  const tierLevels = new Map<number, number>();
+  if (matchedRuneEntry && Array.isArray(matchedRuneEntry.runes)) {
+    for (const r of matchedRuneEntry.runes) {
+      const t = Number(r?.tier);
+      if (Number.isInteger(t) && t >= 0 && t < 5) {
+        tierLevels.set(t, Math.max(0, Math.floor(Number(r?.level ?? 0) || 0)));
+      }
+    }
+  } else {
+    // Fallback to hero.runes if rune_getAll has not been captured yet
+    const rawRunes = Array.isArray(hero?.runes)
+      ? hero.runes
+      : (hero?.runes && typeof hero.runes === 'object' ? Object.values(hero.runes) : []);
+    for (let i = 0; i < Math.min(5, rawRunes.length); i++) {
+      tierLevels.set(i, Math.max(0, Math.floor(Number(rawRunes[i] ?? 0) || 0)));
+    }
+  }
+
+  const glyphs: HeroGlyphItem[] = [];
+  if (matchedRuneEntry || tierLevels.size > 0) {
+    for (let tier = 0; tier < 5; tier++) {
+      const level = tierLevels.get(tier) ?? 0;
+      const maxLevel = level > 40 ? 80 : 40;
+      glyphs.push({
+        tier,
+        slot: tier + 1,
+        level,
+        maxLevel,
+        isMax: level >= maxLevel,
+      });
+    }
+  }
 
   const allTalismans = cache?.talisman_getAll?.data;
   const heroTalismans: any[] = [];

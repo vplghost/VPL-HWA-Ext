@@ -178,6 +178,15 @@ export function validateOutgoingMultiTeamRpcCalls(calls: any[]): OutgoingRpcVali
         };
       }
     }
+
+    if (name === 'rune_upgradeHeroRune') {
+      if (args?.alternatePrice !== false) {
+        return {
+          ok: false,
+          error: 'Blocked outgoing rune_upgradeHeroRune: alternatePrice must be explicitly false (Rune Stones only) to prevent accidental Emerald spend.',
+        };
+      }
+    }
   }
   return { ok: true };
 }

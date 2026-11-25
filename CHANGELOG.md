@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.322 — 2026-11-26
+
+### Added
+
+- **Hero Detail Dialog: Verified Glyphs (`rune_getAll` + `rune_upgradeHeroRune`), EXP Potion Level-Up (`inventory_use`), and Spark of Power (`heroTitanGiftLevelUp`) (`heroUpgradeService.ts`, `rpcSanitizer.ts`, `HeroDetailModal.vue`, `tests/hero-detail-overhaul.test.mjs`, `tests/rpc-sanitizer.test.mjs`)**:
+  - Updated `extractHeroGlyphsAndTalisman()` to read live 5-tier Glyph levels (`tier: 0..4`) from `rune_getAll.heroesRunes` (instead of legacy zeroed `hero.runes`), added `+1`/`+5` Glyph upgrade buttons (`#btn-glyph-upgrade-0..4`) dispatching `rune_upgradeHeroRune({ heroId, runeTier, alternatePrice: false })`, and added an outgoing RPC safety guard in `rpcSanitizer.ts` blocking `rune_upgradeHeroRune` if `alternatePrice !== false`.
+  - Corrected `HERO_XP_POTIONS` to empirically verified consumable IDs (`9`: 50 XP, `10`: 300 XP, `11`: 1,500 XP, `12`: 7,500 XP) and wired `#btn-hero-level-1` (`+1 Lv`) and `#btn-hero-level-max` (`Max`) via `inventory_use({ libId, amount, params: { unitId } })`.
+  - Added Spark of Power progression (`titanGiftLevel / 30`) and `#btn-hero-spark-up` (`+1` / `+5`) dispatching `heroTitanGiftLevelUp({ heroId })`, plus fixed Prev/Next hero switcher state binding.
+
 ## 0.11.320 — 2026-11-26
 
 ### Changed

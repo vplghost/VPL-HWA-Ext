@@ -27,9 +27,12 @@ import {
   type ArtifactUpgradePlan,
 } from '@/src/utils/artifactHelper';
 import {
+  HERO_RESOURCE_IDS,
   getHeroEvolveStatus,
   planHeroXpPotions,
+  buildXpPotionInventoryUseCalls,
   getHeroXpPotionInventory,
+  getHeroSparkStatus,
   getArtifactEvolveStatus,
   extractHeroGlyphsAndTalisman,
 } from '@/src/services/heroUpgradeService';
@@ -843,7 +846,20 @@ async function handlePromote() {
 // P2-13: Compact sub-tabs, Prev/Next switcher, 1-click heroEvolve, artifact_evolve, XP planner, Glyphs/Talisman
 const activeSubTab = ref<'core' | 'artifacts' | 'skins' | 'glyphs'>('core');
 const isEvolvingHero = ref(false);
+const isLevelingHero = ref(false);
 const evolvingArtifactSlot = ref<number | null>(null);
+const upgradingGlyphTier = ref<number | null>(null);
+const isUpgradingSpark = ref(false);
+
+const ownedRuneStones = computed(() =>
+  Number(inventoryCoins.value?.[HERO_RESOURCE_IDS.RUNE_STONE_COIN_ID] ?? 0) || 0
+);
+const ownedSparksOfPower = computed(() =>
+  Number(inventoryConsumables.value?.[HERO_RESOURCE_IDS.SPARK_OF_POWER_CONSUMABLE_ID] ?? 0) || 0
+);
+const heroSparkStatus = computed(() =>
+  getHeroSparkStatus(activeHero.value, inventoryConsumables.value, currentGold.value)
+);
 
 const heroEvolveStatus = computed(() =>
   getHeroEvolveStatus({
@@ -900,8 +916,78 @@ function switchHeroByDelta(delta: -1 | 1) {
   const nextIdx = idx < 0 ? 0 : (idx + delta + list.length) % list.length;
   const target = list[nextIdx];
   if (target) {
-    currentHeroId.value = String(target.id);
-    modalContext.selectedHero = target.raw ?? target;
+    internalHeroId.value = String(target.id);
+  }
+}
+
+async function handleLevelUpHero(mode: 'single' | 'max') {
+  if (!activeHero.value || isLevelingHero.value) return;
+  const plan = mode === 'single' ? nextLevelXpPlan.value : maxLevelXpPlan.value;
+  const useCalls = buildXpPotionInventoryUseCalls(activeHero.value.id, plan);
+  if (useCalls.length === 0) return;
+
+  isLevelingHero.value = true;
+  try {
+    await dispatchRpc([
+      ...useCalls,
+      { name: 'heroGetAll' },
+      { name: 'inventoryGet' },
+    ]);
+  } catch (err) {
+    console.error('Failed to level up hero:', err);
+  } finally {
+    isLevelingHero.value = false;
+  }
+}
+
+async function upgradeGlyphTier(tier: number, steps = 1) {
+  if (!activeHero.value || upgradingGlyphTier.value !== null || ownedRuneStones.value <= 0) return;
+  const numId = Number(activeHero.value.id);
+  const glyph = heroGlyphsAndTalisman.value.glyphs.find((g) => g.tier === tier);
+  if (!glyph || glyph.isMax) return;
+
+  const actualSteps = Math.max(1, Math.min(steps, glyph.maxLevel - glyph.level));
+  upgradingGlyphTier.value = tier;
+  try {
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+    for (let i = 0; i < actualSteps; i++) {
+      calls.push({
+        name: 'rune_upgradeHeroRune',
+        args: { heroId: numId, runeTier: tier, alternatePrice: false },
+      });
+    }
+    calls.push({ name: 'rune_getAll' });
+    calls.push({ name: 'heroGetAll' });
+    calls.push({ name: 'inventoryGet' });
+    await dispatchRpc(calls);
+  } catch (err) {
+    console.error('Failed to upgrade glyph:', err);
+  } finally {
+    upgradingGlyphTier.value = null;
+  }
+}
+
+async function upgradeHeroSpark(steps = 1) {
+  if (!activeHero.value || isUpgradingSpark.value || !heroSparkStatus.value.canUpgrade) return;
+  const numId = Number(activeHero.value.id);
+  const actualSteps = Math.max(1, Math.min(steps, heroSparkStatus.value.maxLevel - heroSparkStatus.value.level));
+  isUpgradingSpark.value = true;
+  try {
+    const calls: Array<{ name: string; args?: any; feature?: string }> = [];
+    for (let i = 0; i < actualSteps; i++) {
+      calls.push({
+        name: 'heroTitanGiftLevelUp',
+        args: { heroId: numId },
+      });
+    }
+    calls.push({ name: 'heroGetAll' });
+    calls.push({ name: 'inventoryGet' });
+    calls.push({ name: 'userGetInfo' });
+    await dispatchRpc(calls);
+  } catch (err) {
+    console.error('Failed to upgrade Spark of Power:', err);
+  } finally {
+    isUpgradingSpark.value = false;
   }
 }
 
@@ -1196,6 +1282,29 @@ function handleSoulStoneFarm() {
                   >
                     🧪 {{ formatNumber(xpPotionInventory.totalAvailableXp) }} XP
                   </span>
+                  <button
+                    v-if="(activeHero.level || 1) < teamLevelCap"
+                    id="btn-hero-level-1"
+                    type="button"
+                    :disabled="isLevelingHero || nextLevelXpPlan.potionsToUse.length === 0"
+                    class="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-3xs font-bold shadow-2xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    :title="nextLevelXpPlan.potionsToUse.length > 0 ? `Use ${nextLevelXpPlan.potionsToUse.map((p) => `${p.count}x ${p.name}`).join(', ')} (~${formatNumber(nextLevelXpPlan.xpNeeded)} XP)` : 'No EXP Potions available'"
+                    @click="handleLevelUpHero('single')"
+                  >
+                    <span v-if="isLevelingHero" class="animate-spin inline-block">↻</span>
+                    <span v-else>+1 Lv</span>
+                  </button>
+                  <button
+                    v-if="(activeHero.level || 1) < teamLevelCap"
+                    id="btn-hero-level-max"
+                    type="button"
+                    :disabled="isLevelingHero || maxLevelXpPlan.potionsToUse.length === 0"
+                    class="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white text-3xs font-bold shadow-2xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    :title="maxLevelXpPlan.potionsToUse.length > 0 ? `Level up toward Lv.${maxLevelXpPlan.targetLevel}: ${maxLevelXpPlan.potionsToUse.map((p) => `${p.count}x ${p.name}`).join(', ')}` : 'No EXP Potions available'"
+                    @click="handleLevelUpHero('max')"
+                  >
+                    <span>Max</span>
+                  </button>
                   <span v-if="equipmentRank" class="inline-flex items-center gap-1 font-semibold">
                     <span class="text-slate-400 font-normal">Rank:</span>
                     <span :style="{ color: equipmentRank.color, textShadow: equipmentRank.textShadow }">
@@ -2031,29 +2140,132 @@ function handleSoulStoneFarm() {
             </div>
           </div>
 
-          <!-- 6. Glyphs & Talisman Overview Tab -->
+          <!-- 6. Glyphs, Spark of Power & Talisman Section -->
           <div
             v-show="activeSubTab === 'glyphs'"
             class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3"
           >
-            <div class="flex items-center justify-between gap-2">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <span>✨</span> Glyphs &amp; Talisman
-              </h4>
-              <span class="text-3xs text-slate-400">Read-only snapshot from heroGetAll / talisman_getAll</span>
-            </div>
-
-            <div v-if="heroGlyphsAndTalisman.glyphs.length > 0" class="grid grid-cols-5 gap-2 text-center text-xs">
-              <div
-                v-for="g in heroGlyphsAndTalisman.glyphs"
-                :key="'glyph-' + g.slot"
-                class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40"
-              >
-                <div class="text-3xs text-slate-400">Glyph #{{ g.slot }}</div>
-                <div class="font-bold text-slate-800 dark:text-slate-100">Lv. {{ g.level }}</div>
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <span>✨</span> Glyphs &amp; Spark of Power
+                </h4>
+                <div class="text-2xs text-slate-400 dark:text-slate-500">
+                  Upgrade 5 glyphs with Rune Stones (zero Emeralds) and boost Spark of Power
+                </div>
+              </div>
+              <div class="flex items-center gap-3 text-2xs bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                <div class="flex items-center gap-1.5" :title="`Rune Stones: ${formatNumber(ownedRuneStones)}`">
+                  <img :src="getAssetUrl('assets/items/coin/40077.png')" alt="Rune Stones" class="size-4 object-contain" />
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedRuneStones) }}</span>
+                </div>
+                <span class="text-slate-300 dark:text-slate-600">|</span>
+                <div class="flex items-center gap-1.5" :title="`Sparks of Power: ${formatNumber(ownedSparksOfPower)}`">
+                  <img :src="getAssetUrl('assets/items/consumable/24.png')" alt="Sparks of Power" class="size-4 object-contain" />
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(ownedSparksOfPower) }}</span>
+                </div>
+                <span class="text-slate-300 dark:text-slate-600">|</span>
+                <div class="flex items-center gap-1.5" :title="`Gold: ${formatNumber(currentGold)}`">
+                  <img :src="getAssetUrl('assets/items/gold/0.png')" alt="Gold" class="size-4 object-contain" />
+                  <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatNumber(currentGold) }}</span>
+                </div>
               </div>
             </div>
-            <div v-else class="text-xs text-slate-400 italic">No glyph data captured for this hero yet.</div>
+
+            <!-- 5 Glyphs Grid -->
+            <div v-if="heroGlyphsAndTalisman.glyphs.length > 0" class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+              <div
+                v-for="g in heroGlyphsAndTalisman.glyphs"
+                :key="'glyph-' + g.tier"
+                class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40 flex flex-col justify-between gap-1.5"
+              >
+                <div class="flex items-center justify-between text-3xs text-slate-500 dark:text-slate-400">
+                  <span class="font-semibold">Glyph {{ g.slot }}</span>
+                  <span class="font-bold text-slate-800 dark:text-slate-100">Lv. {{ g.level }}/{{ g.maxLevel }}</span>
+                </div>
+                <div class="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    class="h-full rounded-full transition-all"
+                    :class="g.isMax ? 'bg-amber-500' : 'bg-sky-500'"
+                    :style="{ width: `${Math.min(100, Math.round((g.level / g.maxLevel) * 100))}%` }"
+                  />
+                </div>
+                <div v-if="g.isMax" class="text-center text-3xs font-bold text-amber-500 py-0.5">
+                  ★ MAX
+                </div>
+                <div v-else class="grid grid-cols-2 gap-1">
+                  <button
+                    :id="`btn-glyph-upgrade-${g.tier}`"
+                    type="button"
+                    :disabled="upgradingGlyphTier !== null || ownedRuneStones <= 0"
+                    class="cursor-pointer h-6 rounded text-3xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    :title="`Upgrade Glyph ${g.slot} +1 using Rune Stones`"
+                    @click="upgradeGlyphTier(g.tier, 1)"
+                  >
+                    <span v-if="upgradingGlyphTier === g.tier" class="animate-spin inline-block">↻</span>
+                    <span v-else>+1</span>
+                  </button>
+                  <button
+                    type="button"
+                    :disabled="upgradingGlyphTier !== null || ownedRuneStones <= 0"
+                    class="cursor-pointer h-6 rounded text-3xs font-bold bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    :title="`Upgrade Glyph ${g.slot} +5 using Rune Stones`"
+                    @click="upgradeGlyphTier(g.tier, 5)"
+                  >
+                    +5
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div v-else class="text-xs text-slate-400 italic">No glyph data captured for this hero yet (open Glyphs in-game to capture rune_getAll).</div>
+
+            <!-- Spark of Power Row -->
+            <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <img :src="getAssetUrl('assets/items/consumable/24.png')" alt="Spark of Power" class="size-5 object-contain shrink-0" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center justify-between text-2xs mb-0.5">
+                    <span class="font-bold text-slate-700 dark:text-slate-200">Spark of Power</span>
+                    <span class="font-bold text-indigo-600 dark:text-indigo-400">
+                      Lv. {{ heroSparkStatus.level }} / {{ heroSparkStatus.maxLevel }}
+                    </span>
+                  </div>
+                  <div class="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all"
+                      :class="heroSparkStatus.isMax ? 'bg-amber-500' : 'bg-indigo-500'"
+                      :style="{ width: `${Math.min(100, Math.round((heroSparkStatus.level / heroSparkStatus.maxLevel) * 100))}%` }"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="heroSparkStatus.isMax" class="text-2xs font-bold text-amber-500 px-2 py-1 rounded bg-amber-50 dark:bg-amber-950/30">
+                ★ MAX (30)
+              </div>
+              <div v-else class="flex items-center gap-1.5 shrink-0">
+                <button
+                  id="btn-hero-spark-up"
+                  type="button"
+                  :disabled="isUpgradingSpark || !heroSparkStatus.canUpgrade"
+                  class="cursor-pointer h-7 px-2.5 rounded-md text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Upgrade Spark of Power +1"
+                  @click="upgradeHeroSpark(1)"
+                >
+                  <span v-if="isUpgradingSpark" class="animate-spin inline-block">↻</span>
+                  <span v-else>+1</span>
+                </button>
+                <button
+                  type="button"
+                  :disabled="isUpgradingSpark || !heroSparkStatus.canUpgrade"
+                  class="cursor-pointer h-7 px-2.5 rounded-md text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Upgrade Spark of Power +5"
+                  @click="upgradeHeroSpark(5)"
+                >
+                  +5
+                </button>
+              </div>
+            </div>
 
             <div v-if="heroGlyphsAndTalisman.talismans.length > 0" class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
               <div class="text-2xs font-bold text-slate-600 dark:text-slate-300">Talismans ({{ heroGlyphsAndTalisman.talismans.length }})</div>
