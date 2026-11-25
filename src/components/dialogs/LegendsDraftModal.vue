@@ -18,6 +18,7 @@ const { draftSession, retryDecrypt } = useDraft();
 const now = ref(Math.floor(Date.now() / 1000));
 let countdownTimer: any = null;
 const showDiagnostics = ref(false);
+const showFullRawJson = ref(false);
 const copiedDiagnostics = ref(false);
 const retryingDecrypt = ref(false);
 
@@ -89,6 +90,37 @@ const enemyCandidates = computed<DraftHeroCandidate[]>(() => {
     .map((h) => buildDraftHeroCandidate(h.id, new Set(), detailsMap));
 });
 
+const enemyCandidateColumns = computed<DraftHeroCandidate[][]>(() => {
+  if (enemyCandidates.value.length !== 15) return [];
+  const cols: DraftHeroCandidate[][] = [];
+  for (let i = 0; i < enemyCandidates.value.length; i += 3) {
+    cols.push(enemyCandidates.value.slice(i, i + 3));
+  }
+  return cols;
+});
+
+const playerDefenseTeam = computed<DraftHeroCandidate[]>(() => {
+  const ids = (draftSession.chosenDefenceHeroes || []).filter((id) => Number.isFinite(id) && id > 0);
+  const pickedSet = new Set(ids);
+  return ids.map((id) => buildDraftHeroCandidate(id, pickedSet, draftSession.heroDetails));
+});
+
+const playerAttackTeam = computed<DraftHeroCandidate[]>(() => {
+  const ids = (draftSession.chosenAttackHeroes || []).filter((id) => Number.isFinite(id) && id > 0);
+  const pickedSet = new Set(ids);
+  return ids.map((id) => buildDraftHeroCandidate(id, pickedSet, draftSession.heroDetails));
+});
+
+const poolHeadingLabel = computed(() => {
+  if (draftSession.stageId === 2) {
+    return 'Your Defense Pool — 15 Candidate Heroes (5 Pick Rounds × 3 Cards)';
+  }
+  if (draftSession.stageId === 4) {
+    return 'Your Attack Pool — 15 Candidate Heroes (5 Pick Rounds × 3 Cards)';
+  }
+  return 'Your 15 Candidate Heroes (5 Pick Rounds × 3 Cards)';
+});
+
 const totalCandidateCount = computed(() =>
   candidateColumns.value.reduce((sum, col) => sum + col.length, 0) + swapCandidates.value.length
 );
@@ -106,15 +138,40 @@ const diagnosticReport = computed(() => ({
   phase: draftSession.phase,
   candidateCount: totalCandidateCount.value,
   enemyHeroCount: enemyCandidates.value.length,
+  heroSteps: draftSession.heroSteps || [],
+  swapHeroIds: draftSession.swapHeroIds || [],
+  enemyHeroIds: (draftSession.enemyHeroes || []).map((h) => h.id),
+  chosenDefenceHeroes: draftSession.chosenDefenceHeroes || [],
+  chosenAttackHeroes: draftSession.chosenAttackHeroes || [],
   decryptMethod: draftSession.decryptMethod || null,
   cipherLength: draftSession.rawCiphertext?.length || 0,
   enemyCipherLength: draftSession.rawEnemyCiphertext?.length || 0,
-  cipherSample: draftSession.rawCiphertext ? draftSession.rawCiphertext.slice(0, 120) : null,
+  rawDecryptedLength: draftSession.rawDecrypted?.length || 0,
+  rawEnemyDecryptedLength: draftSession.rawEnemyDecrypted?.length || 0,
   error: draftSession.error || null,
   errorDetail: draftSession.errorDetail || null,
-  rawDecryptedSample: draftSession.rawDecrypted ? draftSession.rawDecrypted.slice(0, 400) : null,
+  rawDecrypted: draftSession.rawDecrypted || null,
+  rawEnemyDecrypted: draftSession.rawEnemyDecrypted || null,
   updatedAt: draftSession.updatedAt ? new Date(draftSession.updatedAt).toISOString() : null,
 }));
+
+const diagnosticDisplayReport = computed(() => {
+  if (showFullRawJson.value) return diagnosticReport.value;
+  const full = diagnosticReport.value;
+  return {
+    ...full,
+    rawDecrypted: full.rawDecrypted
+      ? (full.rawDecrypted.length > 400
+          ? `${full.rawDecrypted.slice(0, 400)}... (${full.rawDecrypted.length} chars — click Copy JSON for full payload)`
+          : full.rawDecrypted)
+      : null,
+    rawEnemyDecrypted: full.rawEnemyDecrypted
+      ? (full.rawEnemyDecrypted.length > 400
+          ? `${full.rawEnemyDecrypted.slice(0, 400)}... (${full.rawEnemyDecrypted.length} chars — click Copy JSON for full payload)`
+          : full.rawEnemyDecrypted)
+      : null,
+  };
+});
 
 async function copyDiagnostics() {
   try {
@@ -269,24 +326,34 @@ function close() {
         id="draft-diagnostics-panel"
         class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 font-mono text-[11px] flex flex-col gap-2"
       >
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-2">
           <span class="font-bold text-slate-300">Legends Draft Diagnostics Snapshot</span>
-          <button
-            type="button"
-            class="cursor-pointer px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px]"
-            @click="copyDiagnostics"
-          >
-            {{ copiedDiagnostics ? '✓ Copied JSON' : 'Copy JSON' }}
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              id="btn-toggle-draft-full-raw"
+              type="button"
+              class="cursor-pointer px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
+              @click="showFullRawJson = !showFullRawJson"
+            >
+              {{ showFullRawJson ? 'Compact Preview' : 'Show Full Raw JSON' }}
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px]"
+              @click="copyDiagnostics"
+            >
+              {{ copiedDiagnostics ? '✓ Copied Full JSON' : 'Copy Full JSON' }}
+            </button>
+          </div>
         </div>
-        <pre class="overflow-auto max-h-56 whitespace-pre-wrap break-all">{{ JSON.stringify(diagnosticReport, null, 2) }}</pre>
+        <pre class="overflow-auto max-h-64 whitespace-pre-wrap break-all">{{ JSON.stringify(diagnosticDisplayReport, null, 2) }}</pre>
       </div>
 
       <!-- Main 15 Candidates Matrix: 5 Pick Columns x 3 Candidate Rows -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span>🃏 15 Candidate Heroes (5 Pick Rounds × 3 Cards)</span>
+            <span>🃏 {{ poolHeadingLabel }}</span>
           </h3>
           <div class="flex items-center gap-2">
             <span class="text-xs text-slate-400 dark:text-slate-500">
@@ -459,7 +526,88 @@ function close() {
             </div>
           </div>
         </div>
-        <!-- Enemy Team (decrypted from draftEnemy in Stage 2 / Stage 4) -->
+        <!-- Your Selected Teams (Defense & Attack picks) -->
+        <div
+          v-if="playerDefenseTeam.length > 0 || playerAttackTeam.length > 0"
+          id="draft-player-teams"
+          class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3"
+        >
+          <div
+            v-if="playerDefenseTeam.length > 0"
+            class="flex flex-col gap-2 p-2.5 rounded-xl bg-blue-500/5 border border-blue-500/20"
+          >
+            <div class="flex items-center justify-between pb-1 border-b border-blue-500/20">
+              <span class="text-xs font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400">
+                🛡️ Your Defense Team ({{ playerDefenseTeam.length }})
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+              <div
+                v-for="hero in playerDefenseTeam"
+                :key="'my-def-' + hero.id"
+                class="flex items-center gap-1.5 p-1.5 rounded-lg border bg-white dark:bg-slate-950 border-blue-500/25"
+              >
+                <div class="w-8 h-8 shrink-0 rounded-md overflow-hidden border border-blue-500/30 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <img
+                    v-if="hero.avatarFile"
+                    :src="getAvatarUrl(hero.avatarFile)"
+                    :alt="hero.name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <span v-else class="text-[10px] font-bold text-slate-400">#{{ hero.id }}</span>
+                </div>
+                <div class="flex flex-col min-w-0 flex-1">
+                  <span class="font-bold text-[11px] truncate text-slate-800 dark:text-slate-100" :title="hero.name">
+                    {{ hero.name }}
+                  </span>
+                  <span v-if="hero.power" class="text-[10px] font-mono text-slate-400">
+                    {{ formatHeroPower(hero.power) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="playerAttackTeam.length > 0"
+            class="flex flex-col gap-2 p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20"
+          >
+            <div class="flex items-center justify-between pb-1 border-b border-emerald-500/20">
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
+                ⚔️ Your Attack Team ({{ playerAttackTeam.length }})
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+              <div
+                v-for="hero in playerAttackTeam"
+                :key="'my-atk-' + hero.id"
+                class="flex items-center gap-1.5 p-1.5 rounded-lg border bg-white dark:bg-slate-950 border-emerald-500/25"
+              >
+                <div class="w-8 h-8 shrink-0 rounded-md overflow-hidden border border-emerald-500/30 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <img
+                    v-if="hero.avatarFile"
+                    :src="getAvatarUrl(hero.avatarFile)"
+                    :alt="hero.name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <span v-else class="text-[10px] font-bold text-slate-400">#{{ hero.id }}</span>
+                </div>
+                <div class="flex flex-col min-w-0 flex-1">
+                  <span class="font-bold text-[11px] truncate text-slate-800 dark:text-slate-100" :title="hero.name">
+                    {{ hero.name }}
+                  </span>
+                  <span v-if="hero.power" class="text-[10px] font-mono text-slate-400">
+                    {{ formatHeroPower(hero.power) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Enemy Team / Pool (decrypted from draftEnemy in Stage 2 / Stage 4) -->
         <div
           v-if="enemyCandidates.length > 0"
           id="draft-enemy-team"
@@ -467,10 +615,62 @@ function close() {
         >
           <div class="flex items-center justify-between pb-1 border-b border-rose-500/20">
             <span class="text-xs font-bold uppercase tracking-wider text-rose-400">
-              🛡️ {{ draftSession.stageId === 4 ? 'Enemy Defense Team' : 'Enemy Heroes' }} ({{ enemyCandidates.length }})
+              {{
+                enemyCandidateColumns.length === 5
+                  ? '⚔️ Enemy Attack Candidate Pool (5 Pick Rounds × 3 Cards)'
+                  : (draftSession.stageId === 4 ? `🛡️ Enemy Defense Team (${enemyCandidates.length})` : `🛡️ Enemy Heroes (${enemyCandidates.length})`)
+              }}
             </span>
           </div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+
+          <!-- Stage 2: Enemy 15-hero Attack Pool in exact 5x3 round columns -->
+          <div
+            v-if="enemyCandidateColumns.length === 5"
+            class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5"
+          >
+            <div
+              v-for="(col, colIdx) in enemyCandidateColumns"
+              :key="'enemy-col-' + colIdx"
+              class="flex flex-col gap-1.5 p-2 rounded-lg bg-rose-500/5 border border-rose-500/15"
+            >
+              <div class="flex items-center justify-between pb-1 border-b border-rose-500/15">
+                <span class="text-[11px] font-bold text-rose-400">Round {{ colIdx + 1 }}</span>
+                <span class="text-[10px] text-rose-300/80">Enemy #{{ colIdx + 1 }}</span>
+              </div>
+              <div
+                v-for="hero in col"
+                :key="'enemy-' + hero.id"
+                class="relative flex items-center gap-2 p-1.5 rounded-lg border bg-white dark:bg-slate-950 border-rose-500/25"
+              >
+                <div class="relative w-8 h-8 shrink-0 rounded-md overflow-hidden border border-rose-500/30 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <img
+                    v-if="hero.avatarFile"
+                    :src="getAvatarUrl(hero.avatarFile)"
+                    :alt="hero.name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <span v-else class="text-[10px] font-bold text-slate-400">#{{ hero.id }}</span>
+                </div>
+                <div class="flex flex-col min-w-0 flex-1">
+                  <span class="font-bold text-xs truncate text-slate-800 dark:text-slate-100" :title="hero.name">
+                    {{ hero.name }}
+                  </span>
+                  <div class="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span v-if="hero.star" class="font-semibold text-amber-500">★{{ hero.star }}</span>
+                    <span v-if="hero.power" class="font-mono">{{ formatHeroPower(hero.power) }}</span>
+                    <span v-else-if="hero.class" class="truncate">{{ hero.class }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage 4: Enemy 5-hero Defense Team -->
+          <div
+            v-else
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2"
+          >
             <div
               v-for="hero in enemyCandidates"
               :key="'enemy-' + hero.id"

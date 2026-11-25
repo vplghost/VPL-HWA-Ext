@@ -63,6 +63,7 @@ export interface DraftSessionData {
   rawCiphertext?: string | null;
   rawEnemyCiphertext?: string | null;
   rawDecrypted?: string | null;
+  rawEnemyDecrypted?: string | null;
   decryptMethod?: string | null;
   error?: string | null;
   errorDetail?: string | null;

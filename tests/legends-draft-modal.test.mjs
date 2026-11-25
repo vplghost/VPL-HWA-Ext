@@ -486,3 +486,127 @@ test('P1-05: handleDraftMessage sequential queue prevents storage race and syncs
   assert.ok(modalSrc.includes('id="draft-enemy-team"'), 'LegendsDraftModal must include #draft-enemy-team');
   assert.ok(modalSrc.includes('id="draft-retry-decrypt-btn"'), 'LegendsDraftModal must include #draft-retry-decrypt-btn');
 });
+
+test('P1-09: extractOrderedHeroIdsFromRawJson preserves exact 5x3 round order before JSON.parse() key sorting and ignores nested skinData.id', async () => {
+  const {
+    extractOrderedHeroIdsFromRawJson,
+    extractDraftHeroSteps,
+    extractDraftSwapHeroIds,
+    extractDraftEnemyHeroes,
+  } = await import('../src/utils/draftHelper.ts');
+
+  // Real Stage 2 order from draft_5.md: R1=[55,38,42], R2=[36,3,31], R3=[34,47,10], R4=[8,51,58], R5=[13,62,502]
+  const orderedBaseIds = [55, 38, 42, 36, 3, 31, 34, 47, 10, 8, 51, 58, 13, 62, 502];
+  const orderedSwapIds = [24, 53, 30, 26, 7, 9];
+  const baseEntriesStr = orderedBaseIds
+    .map((id) => `"${id}":{"id":${id},"level":120,"color":16,"star":3,"power":175000,"skinData":{"id":0,"rank":0,"color":0},"patron":0}`)
+    .join(',');
+  const swapEntriesStr = orderedSwapIds
+    .map((id) => `{"id":${id},"level":120,"color":16,"star":3,"power":170000,"skinData":{"id":0,"rank":0,"color":0}}`)
+    .join(',');
+  const rawDraftJson = `{"base":{${baseEntriesStr}},"swap":[${swapEntriesStr}]}`;
+  const parsedDraft = JSON.parse(rawDraftJson);
+
+  // Confirm JSON.parse() scrambled Object.keys(parsedDraft.base) into ascending numeric order
+  assert.deepEqual(Object.keys(parsedDraft.base).slice(0, 3), ['3', '8', '10']);
+
+  // Confirm raw JSON extractor restores exact 5x3 round order
+  assert.deepEqual(extractOrderedHeroIdsFromRawJson(rawDraftJson, 'base'), orderedBaseIds);
+  assert.deepEqual(extractDraftHeroSteps(parsedDraft, rawDraftJson), [
+    [55, 38, 42],
+    [36, 3, 31],
+    [34, 47, 10],
+    [8, 51, 58],
+    [13, 62, 502],
+  ]);
+  assert.deepEqual(extractDraftSwapHeroIds(parsedDraft, rawDraftJson), orderedSwapIds);
+
+  // Real Stage 4 draftEnemy order from draft_5: [55, 45, 10, 70, 16]
+  const orderedEnemyIds = [55, 45, 10, 70, 16];
+  const rawEnemyJson = `{${orderedEnemyIds
+    .map((id) => `"${id}":{"id":${id},"level":120,"color":16,"star":3,"power":180000,"skinData":{"id":0}}`)
+    .join(',')}}`;
+  const parsedEnemy = JSON.parse(rawEnemyJson);
+  const extractedEnemy = extractDraftEnemyHeroes(parsedEnemy, rawEnemyJson);
+  assert.deepEqual(extractedEnemy.map((h) => h.id), orderedEnemyIds);
+});
+
+test('P1-09: Stage 5/6/7 empty payloads preserve rawDecrypted, rawEnemyDecrypted, and rawCiphertext; UI exposes player teams and full diagnostics', async () => {
+  const { handleDraftMessage, flushDraftMessageQueue } = await import('../src/background/handlers/draftHandler.ts');
+
+  const store = { autoOpenDraftDialog: false, legendsDraftSession: {} };
+  const mockChrome = {
+    storage: {
+      local: {
+        get: (_keys, cb) => cb({ ...store }),
+        set: (patch, cb) => {
+          Object.assign(store, patch);
+          cb?.();
+        },
+      },
+    },
+    runtime: { sendMessage: () => Promise.resolve() },
+  };
+
+  const activeCipher = 'A'.repeat(2200);
+  const activeEnemyCipher = 'B'.repeat(750);
+  const activeRaw = '{"base":{"55":{"id":55},"38":{"id":38},"42":{"id":42}},"swap":null}';
+  const activeRawEnemy = '{"70":{"id":70},"16":{"id":16}}';
+
+  handleDraftMessage({
+    kind: 'draft-rpc-event',
+    data: {
+      action: 'randomDraft_getInfo',
+      response: { matchId: 999001, stageId: 4, draft: activeCipher, draftEnemy: activeEnemyCipher },
+    },
+  }, mockChrome);
+
+  handleDraftMessage({
+    kind: 'draft-decrypted',
+    data: {
+      matchId: 999001,
+      stageId: 4,
+      draft: JSON.parse(activeRaw),
+      enemyDraft: JSON.parse(activeRawEnemy),
+      raw: activeRaw,
+      rawEnemy: activeRawEnemy,
+      method: 'known-plaintext-stage1',
+    },
+  }, mockChrome);
+
+  // Stage 6 empty RPC & decrypted payload arrive -> must NOT overwrite active raw/ciphertext
+  handleDraftMessage({
+    kind: 'draft-rpc-event',
+    data: {
+      action: 'randomDraft_getInfo',
+      response: { matchId: 999001, stageId: 6, draft: 'x'.repeat(36), draftEnemy: 'y'.repeat(8) },
+    },
+  }, mockChrome);
+  handleDraftMessage({
+    kind: 'draft-decrypted',
+    data: {
+      matchId: 999001,
+      stageId: 6,
+      draft: { base: null, swap: null },
+      raw: '{"base":null,"swap":null}',
+      rawEnemy: null,
+    },
+  }, mockChrome);
+
+  await flushDraftMessageQueue();
+
+  assert.deepEqual(store.legendsDraftSession.heroSteps, [[55, 38, 42]]);
+  assert.deepEqual(store.legendsDraftSession.enemyHeroes.map((h) => h.id), [70, 16]);
+  assert.equal(store.legendsDraftSession.rawDecrypted, activeRaw);
+  assert.equal(store.legendsDraftSession.rawEnemyDecrypted, activeRawEnemy);
+  assert.equal(store.legendsDraftSession.rawCiphertext, activeCipher);
+  assert.equal(store.legendsDraftSession.rawEnemyCiphertext, activeEnemyCipher);
+
+  const modalSrc = await readFile(resolve(root, 'src/components/dialogs/LegendsDraftModal.vue'), 'utf8');
+  assert.ok(modalSrc.includes('id="draft-player-teams"'), 'LegendsDraftModal must include #draft-player-teams');
+  assert.ok(modalSrc.includes('Your Defense Team'), 'Must render Your Defense Team');
+  assert.ok(modalSrc.includes('Your Attack Team'), 'Must render Your Attack Team');
+  assert.ok(modalSrc.includes('Enemy Attack Candidate Pool'), 'Must distinguish Stage 2 Enemy Attack Candidate Pool');
+  assert.ok(modalSrc.includes('id="btn-toggle-draft-full-raw"'), 'Must include full raw JSON toggle in diagnostics');
+  assert.ok(modalSrc.includes('rawEnemyDecrypted'), 'Diagnostics must include rawEnemyDecrypted');
+});

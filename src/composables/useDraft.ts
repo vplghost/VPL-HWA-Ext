@@ -29,6 +29,7 @@ const createDefaultSession = (): DraftSessionData => ({
   rawCiphertext: null,
   rawEnemyCiphertext: null,
   rawDecrypted: null,
+  rawEnemyDecrypted: null,
   decryptMethod: null,
   error: null,
   errorDetail: null,
@@ -77,22 +78,23 @@ export function useDraft() {
   function bindDecryptedData(
     dto: DraftDto,
     rawText?: string,
-    extra?: { enemyDraft?: any; method?: string | null; stageId?: number | null; matchId?: number | null }
+    extra?: { enemyDraft?: any; rawEnemy?: string | null; method?: string | null; stageId?: number | null; matchId?: number | null }
   ) {
     if (!dto) return;
 
-    const extractedSteps = extractDraftHeroSteps(dto);
+    const extractedSteps = extractDraftHeroSteps(dto, rawText);
     const hasCandidates = extractedSteps.length > 0;
     if (hasCandidates) {
       draftSession.heroSteps = extractedSteps;
-      draftSession.swapHeroIds = extractDraftSwapHeroIds(dto);
+      draftSession.swapHeroIds = extractDraftSwapHeroIds(dto, rawText);
     }
     const extractedDetails = extractDraftHeroDetails(dto);
     if (Object.keys(extractedDetails).length > 0) {
       draftSession.heroDetails = { ...(draftSession.heroDetails || {}), ...extractedDetails };
     }
-    const extractedEnemy = extractDraftEnemyHeroes(extra?.enemyDraft);
-    if (extractedEnemy.length > 0) {
+    const extractedEnemy = extractDraftEnemyHeroes(extra?.enemyDraft, extra?.rawEnemy);
+    const hasEnemy = extractedEnemy.length > 0;
+    if (hasEnemy) {
       draftSession.enemyHeroes = extractedEnemy;
     }
     if (Array.isArray(dto.chosenDefenceHeroes)) {
@@ -107,8 +109,11 @@ export function useDraft() {
     if (dto.gameTimeTs) {
       draftSession.gameTimeTs = dto.gameTimeTs;
     }
-    if (rawText) {
+    if (rawText && (hasCandidates || !draftSession.rawDecrypted)) {
       draftSession.rawDecrypted = rawText;
+    }
+    if (extra?.rawEnemy && (hasEnemy || !draftSession.rawEnemyDecrypted)) {
+      draftSession.rawEnemyDecrypted = extra.rawEnemy;
     }
     if (extra?.method) {
       draftSession.decryptMethod = extra.method;
@@ -121,7 +126,7 @@ export function useDraft() {
 
     persistSession();
 
-    if (autoOpenDraft.value && (hasCandidates || extractedEnemy.length > 0)) {
+    if (autoOpenDraft.value && (hasCandidates || hasEnemy)) {
       openModal('legendsDraft');
     }
   }
@@ -149,13 +154,18 @@ export function useDraft() {
 
     if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
       // If new match detected, reset steps as new session
-      if (resp.matchId != null && Number(resp.matchId) !== Number(draftSession.matchId)) {
+      const isNewMatch = resp.matchId != null && Number(resp.matchId) !== Number(draftSession.matchId);
+      if (isNewMatch) {
         draftSession.heroSteps = [];
         draftSession.swapHeroIds = [];
         draftSession.heroDetails = {};
         draftSession.enemyHeroes = [];
         draftSession.chosenDefenceHeroes = [];
         draftSession.chosenAttackHeroes = [];
+        draftSession.rawCiphertext = null;
+        draftSession.rawEnemyCiphertext = null;
+        draftSession.rawDecrypted = null;
+        draftSession.rawEnemyDecrypted = null;
         draftSession.error = null;
         draftSession.errorDetail = null;
       }
@@ -187,11 +197,13 @@ export function useDraft() {
           avatarId: resp.enemyUser.avatarId
         };
       }
-      if (resp.draft) {
-        draftSession.rawCiphertext = resp.draft;
+      if (typeof resp.draft === 'string' && resp.draft.length > 0) {
+        const keepExisting = !isNewMatch && typeof draftSession.rawCiphertext === 'string' && draftSession.rawCiphertext.length > 40 && resp.draft.length <= 40;
+        if (!keepExisting) draftSession.rawCiphertext = resp.draft;
       }
-      if (resp.draftEnemy) {
-        draftSession.rawEnemyCiphertext = resp.draftEnemy;
+      if (typeof resp.draftEnemy === 'string' && resp.draftEnemy.length > 0) {
+        const keepExistingEnemy = !isNewMatch && typeof draftSession.rawEnemyCiphertext === 'string' && draftSession.rawEnemyCiphertext.length > 12 && resp.draftEnemy.length <= 12;
+        if (!keepExistingEnemy) draftSession.rawEnemyCiphertext = resp.draftEnemy;
       }
     }
 
@@ -278,6 +290,7 @@ export function useDraft() {
       } else if (message?.kind === 'draft-decrypted') {
         bindDecryptedData(message.data?.draft, message.data?.raw, {
           enemyDraft: message.data?.enemyDraft,
+          rawEnemy: message.data?.rawEnemy,
           method: message.data?.method,
           stageId: message.data?.stageId,
           matchId: message.data?.matchId,

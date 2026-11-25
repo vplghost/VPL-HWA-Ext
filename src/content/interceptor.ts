@@ -798,11 +798,13 @@ export function installInterceptor(customWindow?: any): void {
             if (parsed && typeof parsed === 'object') {
               cachedDraftCipherKeys = { dynamicKey: cand.dynamicKey, constKey: cand.constKey, source: cand.method };
               let enemyDraft: any = null;
+              let rawEnemy: string | null = null;
               if (typeof meta?.enemyCiphertext === 'string' && meta.enemyCiphertext.length > 8) {
                 try {
                   const enemyPt = xorDecryptDraftBase64(meta.enemyCiphertext, cand.dynamicKey, cand.constKey);
                   if (enemyPt && (enemyPt.startsWith('{') || enemyPt.startsWith('['))) {
                     enemyDraft = JSON.parse(enemyPt);
+                    rawEnemy = enemyPt;
                   }
                 } catch (_) {}
               }
@@ -812,6 +814,7 @@ export function installInterceptor(customWindow?: any): void {
                 draft: parsed,
                 enemyDraft,
                 raw: plaintext,
+                rawEnemy,
                 method: cand.method,
                 attempt,
                 stageId,

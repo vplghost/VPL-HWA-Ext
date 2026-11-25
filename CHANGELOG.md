@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.297 — 2026-11-25
+
+### Fixed
+
+- **Legends Draft Raw JSON Round Order, Player Teams & Full Diagnostics (`draftHelper.ts`, `interceptor.ts`, `draftHandler.ts`, `useDraft.ts`, `LegendsDraftModal.vue`, `types/game/draft.ts`, `tests/legends-draft-modal.test.mjs`)**:
+  - Added `extractOrderedHeroIdsFromRawJson()` in `src/utils/draftHelper.ts` and forwarded `rawEnemy` alongside `raw` from `src/content/interceptor.ts` so both `draft.base` (5 rounds × 3 cards) and `draftEnemy` (Stage 2: 5 rounds × 3 cards; Stage 4: 5 defense heroes) preserve their exact original server order instead of being re-sorted ascending by `JSON.parse()` numeric key rules.
+  - Prevented Stage 5/6/7 empty payloads (`{"base":null,"swap":null}`) from overwriting active `rawDecrypted`, `rawEnemyDecrypted`, `rawCiphertext`, and `rawEnemyCiphertext` in `draftHandler.ts` and `useDraft.ts`.
+  - Upgraded `LegendsDraftModal.vue` with `#draft-player-teams` (`Your Defense Team` / `Your Attack Team`), stage-specific pool headings (`Your Defense Pool` / `Your Attack Pool`), 5×3 round column rendering for Stage 2 `Enemy Attack Candidate Pool`, and untruncated `Copy Full JSON` diagnostics (`heroSteps`, `enemyHeroIds`, `rawDecrypted`, `rawEnemyDecrypted`, plus `#btn-toggle-draft-full-raw`).
+
 ## 0.11.295 — 2026-11-25
 
 ### Added

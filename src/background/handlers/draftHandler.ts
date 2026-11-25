@@ -69,11 +69,14 @@ export function handleDraftMessage(message: any, cr: any): boolean {
 
           if (message.kind === 'draft-decrypted') {
             const dto = message.data?.draft;
-            const heroSteps = extractDraftHeroSteps(dto);
-            const swapHeroIds = extractDraftSwapHeroIds(dto);
+            const rawText = typeof message.data?.raw === 'string' ? message.data.raw : null;
+            const rawEnemyText = typeof message.data?.rawEnemy === 'string' ? message.data.rawEnemy : null;
+            const heroSteps = extractDraftHeroSteps(dto, rawText);
+            const swapHeroIds = extractDraftSwapHeroIds(dto, rawText);
             const heroDetails = extractDraftHeroDetails(dto);
-            const enemyHeroes = extractDraftEnemyHeroes(message.data?.enemyDraft);
+            const enemyHeroes = extractDraftEnemyHeroes(message.data?.enemyDraft, rawEnemyText);
             const hasCandidates = heroSteps.length > 0;
+            const hasEnemy = enemyHeroes.length > 0;
             session = {
               ...session,
               ...(message.data?.matchId != null ? { matchId: Number(message.data.matchId) } : {}),
@@ -85,18 +88,19 @@ export function handleDraftMessage(message: any, cr: any): boolean {
               heroDetails: Object.keys(heroDetails).length > 0
                 ? { ...(session.heroDetails || {}), ...heroDetails }
                 : (session.heroDetails || {}),
-              enemyHeroes: enemyHeroes.length > 0 ? enemyHeroes : (session.enemyHeroes || []),
+              enemyHeroes: hasEnemy ? enemyHeroes : (session.enemyHeroes || []),
               chosenDefenceHeroes: Array.isArray(dto?.chosenDefenceHeroes) ? dto.chosenDefenceHeroes : (session.chosenDefenceHeroes || []),
               chosenAttackHeroes: Array.isArray(dto?.chosenAttackHeroes) ? dto.chosenAttackHeroes : (session.chosenAttackHeroes || []),
               stageFinishTs: dto?.stageFinishTs || session.stageFinishTs,
               gameTimeTs: dto?.gameTimeTs || session.gameTimeTs,
-              rawDecrypted: message.data?.raw || session.rawDecrypted || null,
+              rawDecrypted: (hasCandidates || !session.rawDecrypted) ? (rawText || session.rawDecrypted || null) : session.rawDecrypted,
+              rawEnemyDecrypted: (hasEnemy || !session.rawEnemyDecrypted) ? (rawEnemyText || session.rawEnemyDecrypted || null) : session.rawEnemyDecrypted,
               decryptMethod: message.data?.method || session.decryptMethod || null,
               error: null,
               errorDetail: null,
               updatedAt: Date.now(),
             };
-            if (hasCandidates || enemyHeroes.length > 0) {
+            if (hasCandidates || hasEnemy) {
               shouldAutoOpen = true;
             }
           } else if (message.kind === 'draft-rpc-event') {
@@ -124,17 +128,26 @@ export function handleDraftMessage(message: any, cr: any): boolean {
               }
             }
             if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
-              if (resp.matchId != null && Number(resp.matchId) !== Number(session.matchId)) {
+              const isNewMatch = resp.matchId != null && Number(resp.matchId) !== Number(session.matchId);
+              if (isNewMatch) {
                 session.heroSteps = [];
                 session.swapHeroIds = [];
                 session.heroDetails = {};
                 session.enemyHeroes = [];
                 session.chosenDefenceHeroes = [];
                 session.chosenAttackHeroes = [];
+                session.rawCiphertext = null;
+                session.rawEnemyCiphertext = null;
+                session.rawDecrypted = null;
+                session.rawEnemyDecrypted = null;
                 session.error = null;
                 session.errorDetail = null;
               }
               const nextStageId = resp.stageId != null ? Number(resp.stageId) : session.stageId;
+              const incomingCipher = typeof resp.draft === 'string' && resp.draft.length > 0 ? resp.draft : null;
+              const incomingEnemyCipher = typeof resp.draftEnemy === 'string' && resp.draftEnemy.length > 0 ? resp.draftEnemy : null;
+              const keepExistingCipher = !isNewMatch && typeof session.rawCiphertext === 'string' && session.rawCiphertext.length > 40 && incomingCipher != null && incomingCipher.length <= 40;
+              const keepExistingEnemyCipher = !isNewMatch && typeof session.rawEnemyCiphertext === 'string' && session.rawEnemyCiphertext.length > 12 && incomingEnemyCipher != null && incomingEnemyCipher.length <= 12;
               session = {
                 ...session,
                 matchId: resp.matchId != null ? Number(resp.matchId) : session.matchId,
@@ -143,8 +156,8 @@ export function handleDraftMessage(message: any, cr: any): boolean {
                 userRating: resp.rating?.userRating != null ? Number(resp.rating.userRating) : session.userRating,
                 enemyRating: resp.rating?.enemyRating != null ? Number(resp.rating.enemyRating) : session.enemyRating,
                 enemyUser: resp.enemyUser ? { ...resp.enemyUser } : session.enemyUser,
-                rawCiphertext: resp.draft || session.rawCiphertext,
-                rawEnemyCiphertext: resp.draftEnemy || session.rawEnemyCiphertext,
+                rawCiphertext: keepExistingCipher ? session.rawCiphertext : (incomingCipher || session.rawCiphertext),
+                rawEnemyCiphertext: keepExistingEnemyCipher ? session.rawEnemyCiphertext : (incomingEnemyCipher || session.rawEnemyCiphertext),
                 updatedAt: Date.now(),
               };
               if (nextStageId != null && [1, 2, 3, 4, 5].includes(nextStageId)) {

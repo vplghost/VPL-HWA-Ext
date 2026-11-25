@@ -220,13 +220,191 @@ function chunkIds(ids: number[], size = 3): number[][] {
   return chunks;
 }
 
+function extractBalancedJsonSection(rawJson: string, key: 'base' | 'swap'): string | null {
+  const token = `"${key}"`;
+  let idx = rawJson.indexOf(token);
+  while (idx !== -1) {
+    let colon = idx + token.length;
+    while (colon < rawJson.length && /\s/.test(rawJson[colon])) colon++;
+    if (rawJson[colon] === ':') {
+      let start = colon + 1;
+      while (start < rawJson.length && /\s/.test(rawJson[start])) start++;
+      const openCh = rawJson[start];
+      if (openCh !== '{' && openCh !== '[') return null;
+      const closeCh = openCh === '{' ? '}' : ']';
+      let depth = 0;
+      let inStr = false;
+      let escaped = false;
+      for (let i = start; i < rawJson.length; i++) {
+        const ch = rawJson[i];
+        if (inStr) {
+          if (escaped) escaped = false;
+          else if (ch === '\\') escaped = true;
+          else if (ch === '"') inStr = false;
+          continue;
+        }
+        if (ch === '"') {
+          inStr = true;
+          continue;
+        }
+        if (ch === openCh) depth++;
+        else if (ch === closeCh) {
+          depth--;
+          if (depth === 0) return rawJson.slice(start, i + 1);
+        }
+      }
+      return null;
+    }
+    idx = rawJson.indexOf(token, idx + token.length);
+  }
+  return null;
+}
+
 /**
- * Extract enemy team heroes with live stats from decrypted `draftEnemy` payload
+ * Extract hero IDs in exact original raw JSON order BEFORE JSON.parse() sorts
+ * numeric object keys (`OwnPropertyKeys`), ignoring nested fields like `skinData.id`.
  */
-export function extractDraftEnemyHeroes(enemyDto: any): DraftHeroLiveStats[] {
+export function extractOrderedHeroIdsFromRawJson(
+  rawJson: string | null | undefined,
+  section: 'base' | 'swap' | 'root' = 'root'
+): number[] {
+  if (!rawJson || typeof rawJson !== 'string') return [];
+  const trimmed = rawJson.trim();
+  const target = section === 'root' ? trimmed : extractBalancedJsonSection(trimmed, section);
+  if (!target || target.length < 2) return [];
+
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  const pushId = (n: number) => {
+    if (Number.isFinite(n) && n > 0 && !seen.has(n)) {
+      seen.add(n);
+      ids.push(n);
+    }
+  };
+
+  if (target[0] === '{') {
+    // Object map keyed by numeric heroId: {"55":{...},"38":{...},"42":{...}}
+    let depth = 0;
+    let inStr = false;
+    let escaped = false;
+    for (let i = 0; i < target.length; i++) {
+      const ch = target[i];
+      if (inStr) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '{' || ch === '[') {
+        depth++;
+        continue;
+      }
+      if (ch === '}' || ch === ']') {
+        depth--;
+        continue;
+      }
+      if (ch === '"' && depth === 1) {
+        let j = i + 1;
+        while (j < target.length && target[j] !== '"') {
+          if (target[j] === '\\') j++;
+          j++;
+        }
+        const keyStr = target.slice(i + 1, j);
+        let k = j + 1;
+        while (k < target.length && /\s/.test(target[k])) k++;
+        if (target[k] === ':' && /^\d+$/.test(keyStr)) {
+          pushId(Number(keyStr));
+        }
+        i = j;
+      }
+    }
+    return ids;
+  }
+
+  if (target[0] === '[') {
+    // Array of hero objects: [{"id":24,...},{"id":53,...}] -> read top-level "id" at depth 2 only
+    let depth = 0;
+    let inStr = false;
+    let escaped = false;
+    for (let i = 0; i < target.length; i++) {
+      const ch = target[i];
+      if (inStr) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '{' || ch === '[') {
+        depth++;
+        continue;
+      }
+      if (ch === '}' || ch === ']') {
+        depth--;
+        continue;
+      }
+      if (ch === '"' && depth === 2) {
+        let j = i + 1;
+        while (j < target.length && target[j] !== '"') {
+          if (target[j] === '\\') j++;
+          j++;
+        }
+        const keyStr = target.slice(i + 1, j);
+        if (keyStr === 'id' || keyStr === 'heroId') {
+          let k = j + 1;
+          while (k < target.length && /\s/.test(target[k])) k++;
+          if (target[k] === ':') {
+            k++;
+            while (k < target.length && /\s/.test(target[k])) k++;
+            const numMatch = target.slice(k).match(/^(\d+)/);
+            if (numMatch) pushId(Number(numMatch[1]));
+          }
+        }
+        i = j;
+      }
+    }
+    return ids;
+  }
+
+  return ids;
+}
+
+function reorderIdsByRawOrder(fallbackIds: number[], rawOrder: number[]): number[] {
+  if (!rawOrder.length) return fallbackIds;
+  const allowed = new Set(fallbackIds);
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const id of rawOrder) {
+    if (allowed.has(id) && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  for (const id of fallbackIds) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+}
+
+/**
+ * Extract enemy team heroes with live stats from decrypted `draftEnemy` payload.
+ * When `rawEnemyText` is supplied, preserves original raw JSON key order (5x3 in Stage 2, 5 in Stage 4).
+ */
+export function extractDraftEnemyHeroes(enemyDto: any, rawEnemyText?: string | null): DraftHeroLiveStats[] {
   if (!enemyDto || typeof enemyDto !== 'object') return [];
   const source = enemyDto.heroes ?? enemyDto.base ?? enemyDto;
-  return extractPoolHeroEntries(source, 'base');
+  const entries = extractPoolHeroEntries(source, 'base');
+  if (entries.length === 0 || !rawEnemyText) return entries;
+  const rawOrder = extractOrderedHeroIdsFromRawJson(rawEnemyText, 'root');
+  if (rawOrder.length === 0) return entries;
+  const byId = new Map(entries.map((e) => [e.id, e]));
+  const orderedIds = reorderIdsByRawOrder(
+    entries.map((e) => e.id),
+    rawOrder
+  );
+  return orderedIds.map((id) => byId.get(id)!).filter(Boolean);
 }
 
 /**
@@ -247,20 +425,24 @@ export function extractDraftHeroDetails(dto: any): Record<number, DraftHeroLiveS
 /**
  * Extract distinct swap-pool hero IDs from decrypted DraftDto ({ base, swap })
  */
-export function extractDraftSwapHeroIds(dto: any): number[] {
+export function extractDraftSwapHeroIds(dto: any, rawText?: string | null): number[] {
   if (!dto || typeof dto !== 'object') return [];
   const baseSet = new Set(extractPoolHeroEntries(dto.base, 'base').map((e) => e.id));
-  return extractPoolHeroEntries(dto.swap, 'swap')
+  const fallbackIds = extractPoolHeroEntries(dto.swap, 'swap')
     .map((e) => e.id)
     .filter((id) => !baseSet.has(id));
+  if (!rawText || fallbackIds.length === 0) return fallbackIds;
+  const rawOrder = extractOrderedHeroIdsFromRawJson(rawText, 'swap');
+  return reorderIdsByRawOrder(fallbackIds, rawOrder);
 }
 
 /**
  * Extract 5x3 candidate hero IDs matrix from flexible decrypted DraftDto structures
  * Supports both legacy matrix format (playerTeam.heroes / heroes / steps)
  * and live Unity DraftsXORCipher payload format ({ base: { [heroId]: HeroObj }, swap: { ... } }).
+ * When `rawText` is provided, preserves exact raw JSON 5x3 round order before JSON.parse() key sorting.
  */
-export function extractDraftHeroSteps(dto: any): number[][] {
+export function extractDraftHeroSteps(dto: any, rawText?: string | null): number[][] {
   if (!dto || typeof dto !== 'object') return [];
   const rawSteps = dto.playerTeam?.heroes ?? dto.heroes ?? dto.steps ?? null;
   if (rawSteps) {
@@ -283,11 +465,19 @@ export function extractDraftHeroSteps(dto: any): number[][] {
   // Live Unity DraftsXORCipher format: { base: { "501": { id: 501, ... }, ... }, swap: { ... } }
   const baseEntries = extractPoolHeroEntries(dto.base, 'base');
   if (baseEntries.length > 0) {
-    return chunkIds(baseEntries.map((e) => e.id), 3);
+    const fallbackIds = baseEntries.map((e) => e.id);
+    const orderedIds = rawText
+      ? reorderIdsByRawOrder(fallbackIds, extractOrderedHeroIdsFromRawJson(rawText, 'base'))
+      : fallbackIds;
+    return chunkIds(orderedIds, 3);
   }
   const swapEntries = extractPoolHeroEntries(dto.swap, 'swap');
   if (swapEntries.length > 0) {
-    return chunkIds(swapEntries.map((e) => e.id), 3);
+    const fallbackIds = swapEntries.map((e) => e.id);
+    const orderedIds = rawText
+      ? reorderIdsByRawOrder(fallbackIds, extractOrderedHeroIdsFromRawJson(rawText, 'swap'))
+      : fallbackIds;
+    return chunkIds(orderedIds, 3);
   }
   return [];
 }
