@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.318 — 2026-11-25
+
+### Added
+
+- **Hero Detail Dialog Overhaul: 1-Click Evolve, Artifact Evolve, XP Potion Planner & Compact Sub-Tabs (`heroUpgradeService.ts`, `HeroDetailModal.vue`, `tests/hero-detail-overhaul.test.mjs`)**:
+  - Added pure `heroUpgradeService.ts` with `getHeroEvolveStatus()` (1★–5★ Gold & Soul validation), `planHeroXpPotions()` (Team Level cap clamping & minimal-waste Huge→Tiny potion mix), `getArtifactEvolveStatus()`, and `extractHeroGlyphsAndTalisman()`.
+  - Upgraded `HeroDetailModal.vue` with **◀ / ▶** Prev/Next hero switcher buttons (`#btn-hero-prev`, `#btn-hero-next`), 1-click **⭐ Evolve** button (`#btn-hero-evolve` dispatching `heroEvolve`), per-slot **⭐ Evolve** (`artifact_evolve`) on Artifacts, compact XP Potion level bar (`#hero-level-xp-bar`), and a **4-tab switcher** (`#hero-detail-subtabs`: Core, Artifacts, Skins, Glyphs) with live upgrade-ready badge counts.
+
 ## 0.11.316 — 2026-11-25
 
 ### Added

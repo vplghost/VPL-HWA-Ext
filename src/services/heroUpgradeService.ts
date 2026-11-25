@@ -1,0 +1,267 @@
+/**
+ * Hero Detail Upgrade Service (`heroUpgradeService.ts`).
+ *
+ * Pure, testable helpers for:
+ * - 1-click Hero Star Evolution (`heroEvolve` — verified RPC: `{ heroId }`)
+ * - Hero XP Potion inventory & level-up planner (`planHeroXpPotions`, capped to Team Level)
+ * - Artifact Star Evolution (`artifact_evolve` — verified RPC: `{ heroId, slotId }`)
+ * - Glyphs & Talisman summary extraction
+ */
+
+export const HERO_EVOLVE_GOLD_COST: Record<number, number> = {
+  1: 20_000,
+  2: 50_000,
+  3: 150_000,
+  4: 500_000,
+  5: 1_500_000,
+};
+
+export interface HeroEvolveStatus {
+  canEvolve: boolean;
+  isMax: boolean;
+  currentStar: number;
+  targetStar: number;
+  goldCost: number;
+  hasEnoughSouls: boolean;
+  hasEnoughGold: boolean;
+  reason?: string;
+}
+
+export function getHeroEvolveStatus(params: {
+  star: number;
+  soulOwned: number;
+  soulNeeded: number | 'Max' | null | undefined;
+  userGold?: number | null;
+}): HeroEvolveStatus {
+  const currentStar = Math.max(1, Math.min(6, Math.floor(Number(params.star) || 1)));
+  if (currentStar >= 6 || params.soulNeeded === 'Max') {
+    return {
+      canEvolve: false,
+      isMax: true,
+      currentStar: 6,
+      targetStar: 6,
+      goldCost: 0,
+      hasEnoughSouls: true,
+      hasEnoughGold: true,
+      reason: 'Maximum Evolution (6★)',
+    };
+  }
+
+  const targetStar = currentStar + 1;
+  const goldCost = HERO_EVOLVE_GOLD_COST[currentStar] ?? 0;
+  const needed = Number(params.soulNeeded) || 0;
+  const owned = Number(params.soulOwned) || 0;
+  const hasEnoughSouls = needed > 0 && owned >= needed;
+  const goldKnown = params.userGold !== null && params.userGold !== undefined && Number.isFinite(Number(params.userGold));
+  const hasEnoughGold = !goldKnown || Number(params.userGold) >= goldCost;
+
+  let reason: string | undefined;
+  if (!hasEnoughSouls) {
+    reason = `Need ${Math.max(0, needed - owned)} more Soul Stones`;
+  } else if (!hasEnoughGold) {
+    reason = `Need ${goldCost.toLocaleString('en-US')} Gold`;
+  }
+
+  return {
+    canEvolve: hasEnoughSouls && hasEnoughGold,
+    isMax: false,
+    currentStar,
+    targetStar,
+    goldCost,
+    hasEnoughSouls,
+    hasEnoughGold,
+    reason,
+  };
+}
+
+export interface XpPotionDef {
+  id: string;
+  name: string;
+  xp: number;
+}
+
+export const HERO_XP_POTIONS: XpPotionDef[] = [
+  { id: '4', name: 'Huge EXP Potion', xp: 7500 },
+  { id: '3', name: 'Big EXP Potion', xp: 1500 },
+  { id: '2', name: 'Small EXP Potion', xp: 250 },
+  { id: '1', name: 'Tiny EXP Potion', xp: 50 },
+];
+
+export interface XpPotionPlan {
+  currentLevel: number;
+  targetLevel: number;
+  teamLevelCap: number;
+  levelsToGain: number;
+  xpNeeded: number;
+  totalAvailableXp: number;
+  canReachTarget: boolean;
+  potionsToUse: Array<{ id: string; name: string; count: number; xpEach: number }>;
+  totalPotionsCount: number;
+}
+
+/**
+ * Estimates cumulative XP required to advance from `fromLevel` to `toLevel`.
+ * Uses a smooth HWA-aligned quadratic curve (Lv 1->2 ~ 60 XP, Lv 60->61 ~ 12k XP, Lv 119->120 ~ 48k XP).
+ */
+export function estimateXpForLevelRange(fromLevel: number, toLevel: number): number {
+  const start = Math.max(1, Math.floor(fromLevel));
+  const end = Math.min(120, Math.floor(toLevel));
+  if (end <= start) return 0;
+  let total = 0;
+  for (let lv = start; lv < end; lv++) {
+    total += Math.round(50 + lv * lv * 3.4);
+  }
+  return total;
+}
+
+export function getHeroXpPotionInventory(consumables: Record<string, any> | null | undefined) {
+  const map = consumables && typeof consumables === 'object' ? consumables : {};
+  let totalAvailableXp = 0;
+  let totalPotions = 0;
+  const counts: Record<string, number> = {};
+  for (const def of HERO_XP_POTIONS) {
+    const qty = Math.max(0, Math.floor(Number(map[def.id] ?? 0) || 0));
+    counts[def.id] = qty;
+    totalPotions += qty;
+    totalAvailableXp += qty * def.xp;
+  }
+  return { counts, totalPotions, totalAvailableXp };
+}
+
+/**
+ * Plans an optimal XP Potion combination (Huge -> Big -> Small -> Tiny) to reach
+ * `requestedTargetLevel`, strictly clamped to `teamLevelCap` and Lv. 120.
+ */
+export function planHeroXpPotions(
+  currentLevel: number,
+  requestedTargetLevel: number,
+  teamLevelCap: number,
+  consumables: Record<string, any> | null | undefined
+): XpPotionPlan {
+  const cur = Math.max(1, Math.min(120, Math.floor(Number(currentLevel) || 1)));
+  const cap = Math.max(cur, Math.min(120, Math.floor(Number(teamLevelCap) || 120)));
+  const target = Math.max(cur, Math.min(cap, Math.floor(Number(requestedTargetLevel) || cur)));
+  const levelsToGain = Math.max(0, target - cur);
+  const xpNeeded = estimateXpForLevelRange(cur, target);
+  const inv = getHeroXpPotionInventory(consumables);
+
+  if (levelsToGain === 0 || xpNeeded === 0) {
+    return {
+      currentLevel: cur,
+      targetLevel: cur,
+      teamLevelCap: cap,
+      levelsToGain: 0,
+      xpNeeded: 0,
+      totalAvailableXp: inv.totalAvailableXp,
+      canReachTarget: true,
+      potionsToUse: [],
+      totalPotionsCount: 0,
+    };
+  }
+
+  let remainingXp = xpNeeded;
+  const potionsToUse: Array<{ id: string; name: string; count: number; xpEach: number }> = [];
+
+  for (const def of HERO_XP_POTIONS) {
+    const owned = inv.counts[def.id] || 0;
+    if (owned <= 0 || remainingXp <= 0) continue;
+    const take = Math.min(owned, Math.floor(remainingXp / def.xp));
+    if (take > 0) {
+      potionsToUse.push({ id: def.id, name: def.name, count: take, xpEach: def.xp });
+      remainingXp -= take * def.xp;
+    }
+  }
+
+  // Top up remainder with smallest available potion to minimize XP waste
+  if (remainingXp > 0) {
+    for (let i = HERO_XP_POTIONS.length - 1; i >= 0 && remainingXp > 0; i--) {
+      const def = HERO_XP_POTIONS[i]!;
+      const alreadyUsed = potionsToUse.find((p) => p.id === def.id)?.count || 0;
+      const left = (inv.counts[def.id] || 0) - alreadyUsed;
+      if (left <= 0) continue;
+      const take = Math.min(left, Math.ceil(remainingXp / def.xp));
+      if (take > 0) {
+        const existing = potionsToUse.find((p) => p.id === def.id);
+        if (existing) existing.count += take;
+        else potionsToUse.push({ id: def.id, name: def.name, count: take, xpEach: def.xp });
+        remainingXp -= take * def.xp;
+      }
+    }
+  }
+
+  const totalPotionsCount = potionsToUse.reduce((s, p) => s + p.count, 0);
+  return {
+    currentLevel: cur,
+    targetLevel: target,
+    teamLevelCap: cap,
+    levelsToGain,
+    xpNeeded,
+    totalAvailableXp: inv.totalAvailableXp,
+    canReachTarget: remainingXp <= 0,
+    potionsToUse,
+    totalPotionsCount,
+  };
+}
+
+export const ARTIFACT_EVOLVE_FRAGMENTS: Record<number, number> = {
+  1: 5,
+  2: 15,
+  3: 30,
+  4: 50,
+  5: 150,
+};
+
+export interface ArtifactEvolveStatus {
+  canEvolve: boolean;
+  isMax: boolean;
+  targetStar: number;
+  fragmentsOwned: number;
+  fragmentsNeeded: number;
+}
+
+export function getArtifactEvolveStatus(
+  star: number,
+  fragmentsOwned: number
+): ArtifactEvolveStatus {
+  const s = Math.max(1, Math.min(6, Math.floor(Number(star) || 1)));
+  if (s >= 6) {
+    return { canEvolve: false, isMax: true, targetStar: 6, fragmentsOwned: Number(fragmentsOwned) || 0, fragmentsNeeded: 0 };
+  }
+  const needed = ARTIFACT_EVOLVE_FRAGMENTS[s] ?? 150;
+  const owned = Math.max(0, Math.floor(Number(fragmentsOwned) || 0));
+  return {
+    canEvolve: owned >= needed,
+    isMax: false,
+    targetStar: s + 1,
+    fragmentsOwned: owned,
+    fragmentsNeeded: needed,
+  };
+}
+
+export interface HeroGlyphItem {
+  slot: number;
+  level: number;
+}
+
+export function extractHeroGlyphsAndTalisman(hero: any, cache: Record<string, any> | null | undefined) {
+  const heroId = String(hero?.id ?? '');
+  const rawRunes = Array.isArray(hero?.runes)
+    ? hero.runes
+    : (hero?.runes && typeof hero.runes === 'object' ? Object.values(hero.runes) : []);
+  const glyphs: HeroGlyphItem[] = rawRunes.slice(0, 5).map((lv: any, idx: number) => ({
+    slot: idx + 1,
+    level: Math.max(0, Number(lv) || 0),
+  }));
+
+  const allTalismans = cache?.talisman_getAll?.data;
+  const heroTalismans: any[] = [];
+  if (allTalismans && typeof allTalismans === 'object') {
+    const list = Array.isArray(allTalismans) ? allTalismans : Object.values(allTalismans);
+    for (const t of list) {
+      if (t && String(t.heroId ?? '') === heroId) {
+        heroTalismans.push(t);
+      }
+    }
+  }
+  return { glyphs, talismans: heroTalismans };
+}

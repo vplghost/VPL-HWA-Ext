@@ -27,6 +27,13 @@ import {
   type ArtifactUpgradePlan,
 } from '@/src/utils/artifactHelper';
 import {
+  getHeroEvolveStatus,
+  planHeroXpPotions,
+  getHeroXpPotionInventory,
+  getArtifactEvolveStatus,
+  extractHeroGlyphsAndTalisman,
+} from '@/src/services/heroUpgradeService';
+import {
   getHeroSkinsDetailed,
   getHeroMainStat,
   getSkinStoneInfo,
@@ -833,6 +840,113 @@ async function handlePromote() {
   }
 }
 
+// P2-13: Compact sub-tabs, Prev/Next switcher, 1-click heroEvolve, artifact_evolve, XP planner, Glyphs/Talisman
+const activeSubTab = ref<'core' | 'artifacts' | 'skins' | 'glyphs'>('core');
+const isEvolvingHero = ref(false);
+const evolvingArtifactSlot = ref<number | null>(null);
+
+const heroEvolveStatus = computed(() =>
+  getHeroEvolveStatus({
+    star: starCount.value,
+    soulOwned: Number(soulProgress.value?.owned ?? 0),
+    soulNeeded: soulProgress.value?.needed,
+    userGold: getGold(cache.value),
+  })
+);
+
+const teamLevelCap = computed(() => {
+  const lv = Number(cache.value?.userGetInfo?.data?.level ?? cache.value?.accountStatus?.data?.level ?? 120);
+  return Number.isFinite(lv) && lv > 0 ? Math.min(120, Math.floor(lv)) : 120;
+});
+
+const xpPotionInventory = computed(() =>
+  getHeroXpPotionInventory(cache.value?.inventoryGet?.data?.consumable)
+);
+
+const nextLevelXpPlan = computed(() =>
+  planHeroXpPotions(
+    Number(activeHero.value?.level ?? 1),
+    Number(activeHero.value?.level ?? 1) + 1,
+    teamLevelCap.value,
+    cache.value?.inventoryGet?.data?.consumable
+  )
+);
+
+const maxLevelXpPlan = computed(() =>
+  planHeroXpPotions(
+    Number(activeHero.value?.level ?? 1),
+    teamLevelCap.value,
+    teamLevelCap.value,
+    cache.value?.inventoryGet?.data?.consumable
+  )
+);
+
+const heroGlyphsAndTalisman = computed(() =>
+  extractHeroGlyphsAndTalisman(activeHero.value, cache.value)
+);
+
+const artifactUpgradeableCount = computed(() =>
+  detailedArtifacts.value.filter((a: any) => a.plan?.canUpgradeOne).length
+);
+
+const skinUpgradeableCount = computed(() =>
+  detailedSkins.value.filter((s: any) => !s.plan?.isMax && (s.plan?.canAffordNextOne || s.plan?.canAffordNextTen)).length
+);
+
+function switchHeroByDelta(delta: -1 | 1) {
+  const list = availableHeroes.value;
+  if (list.length <= 1) return;
+  const idx = list.findIndex((h) => String(h.id) === String(currentHeroId.value));
+  const nextIdx = idx < 0 ? 0 : (idx + delta + list.length) % list.length;
+  const target = list[nextIdx];
+  if (target) {
+    currentHeroId.value = String(target.id);
+    modalContext.selectedHero = target.raw ?? target;
+  }
+}
+
+async function handleEvolveHero() {
+  if (!activeHero.value || !heroEvolveStatus.value.canEvolve || isEvolvingHero.value) return;
+  const numId = Number(activeHero.value.id);
+  isEvolvingHero.value = true;
+  try {
+    await dispatchRpc([
+      { name: 'heroEvolve', args: { heroId: numId } },
+      { name: 'heroGetAll' },
+      { name: 'inventoryGet' },
+      { name: 'userGetInfo' },
+    ]);
+  } catch (err) {
+    console.error('Failed to evolve hero:', err);
+  } finally {
+    isEvolvingHero.value = false;
+  }
+}
+
+function getArtifactSlotEvolveInfo(art: any) {
+  const fragMap = cache.value?.inventoryGet?.data?.fragmentArtifact || {};
+  const fragId = art?.artifactId ?? art?.id;
+  const owned = fragId != null ? Number(fragMap[String(fragId)] ?? 0) : 0;
+  return getArtifactEvolveStatus(Number(art?.star ?? 1), owned);
+}
+
+async function evolveArtifactSlot(slotId: number) {
+  if (!activeHero.value || evolvingArtifactSlot.value !== null) return;
+  const numId = Number(activeHero.value.id);
+  evolvingArtifactSlot.value = slotId;
+  try {
+    await dispatchRpc([
+      { name: 'artifact_evolve', args: { heroId: numId, slotId: slotId + 1 } },
+      { name: 'heroGetAll' },
+      { name: 'inventoryGet' },
+    ]);
+  } catch (err) {
+    console.error('Failed to evolve artifact:', err);
+  } finally {
+    evolvingArtifactSlot.value = null;
+  }
+}
+
 async function handleEquip(slot: EquipmentSlotStatus) {
   if (!activeHero.value || slot.isEquipped) return;
   const numId = Number(activeHero.value.id);
@@ -929,7 +1043,7 @@ function handleSoulStoneFarm() {
 
   >
     <div
-      class="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl dark:bg-slate-900 dark:border-slate-800 overflow-hidden"
+      class="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-0 shadow-xl dark:bg-slate-900 dark:border-slate-800 overflow-hidden"
     >
       <!-- Dialog Header -->
       <div
@@ -957,18 +1071,39 @@ function handleSoulStoneFarm() {
               ⚔️ {{ formatNumber(activeHero.power) }}
             </span>
 
-            <!-- Hero Switcher -->
-            <select
-              v-if="availableHeroes.length > 1"
-              id="hero-dialog-switcher"
-              :value="currentHeroId"
-              class="h-6 rounded border border-slate-300 bg-white px-1.5 text-2xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-hidden"
-              @change="handleHeroSwitch($event)"
-            >
-              <option v-for="h in availableHeroes" :key="h.id" :value="h.id">
-                {{ h.name }} ({{ formatNumber(h.power) }})
-              </option>
-            </select>
+            <!-- Hero Switcher with Prev/Next -->
+            <div v-if="availableHeroes.length > 1" class="inline-flex items-center gap-1 shrink-0">
+              <button
+                id="btn-hero-prev"
+                type="button"
+                aria-label="Previous Hero"
+                title="Previous Hero"
+                class="cursor-pointer h-6 px-1.5 rounded border border-slate-300 bg-white text-2xs text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                @click="switchHeroByDelta(-1)"
+              >
+                ◀
+              </button>
+              <select
+                id="hero-dialog-switcher"
+                :value="currentHeroId"
+                class="h-6 rounded border border-slate-300 bg-white px-1.5 text-2xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-hidden"
+                @change="handleHeroSwitch($event)"
+              >
+                <option v-for="h in availableHeroes" :key="h.id" :value="h.id">
+                  {{ h.name }} ({{ formatNumber(h.power) }})
+                </option>
+              </select>
+              <button
+                id="btn-hero-next"
+                type="button"
+                aria-label="Next Hero"
+                title="Next Hero"
+                class="cursor-pointer h-6 px-1.5 rounded border border-slate-300 bg-white text-2xs text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                @click="switchHeroByDelta(1)"
+              >
+                ▶
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1048,10 +1183,18 @@ function handleSoulStoneFarm() {
                   </span>
                 </div>
 
-                <!-- Key stats chips -->
-                <div class="flex items-center gap-2 flex-wrap text-xs">
+                <!-- Key stats chips + Level XP Planner Bar -->
+                <div id="hero-level-xp-bar" class="flex items-center gap-2 flex-wrap text-xs">
                   <span class="inline-flex items-center gap-1 font-bold text-slate-800 dark:text-slate-200">
                     <span class="text-slate-400 font-normal">Level:</span> {{ activeHero.level || 1 }}
+                    <span class="text-2xs font-normal text-slate-400">/ {{ teamLevelCap }}</span>
+                  </span>
+                  <span
+                    v-if="(activeHero.level || 1) < teamLevelCap"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-2xs font-medium text-sky-700 dark:text-sky-300"
+                    :title="`XP Potions in bag: ${xpPotionInventory.totalPotions} (${formatNumber(xpPotionInventory.totalAvailableXp)} XP). +1 Lv needs ~${formatNumber(nextLevelXpPlan.xpNeeded)} XP; Max Lv.${maxLevelXpPlan.targetLevel} needs ~${formatNumber(maxLevelXpPlan.xpNeeded)} XP.`"
+                  >
+                    🧪 {{ formatNumber(xpPotionInventory.totalAvailableXp) }} XP
                   </span>
                   <span v-if="equipmentRank" class="inline-flex items-center gap-1 font-semibold">
                     <span class="text-slate-400 font-normal">Rank:</span>
@@ -1064,11 +1207,23 @@ function handleSoulStoneFarm() {
                   </span>
                 </div>
 
-                <!-- Soul Stones Progress -->
+                <!-- Soul Stones Progress + 1-Click Evolve -->
                 <div v-if="soulProgress" class="pt-1">
                   <div class="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
                     <span>Soul Stones:</span>
                     <div class="flex items-center gap-1.5">
+                      <button
+                        v-if="!heroEvolveStatus.isMax && heroEvolveStatus.hasEnoughSouls"
+                        id="btn-hero-evolve"
+                        type="button"
+                        :disabled="isEvolvingHero || !heroEvolveStatus.canEvolve"
+                        class="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-white text-3xs font-bold shadow-2xs transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+                        :title="heroEvolveStatus.canEvolve ? `Evolve to ${heroEvolveStatus.targetStar}★ (Cost: ${formatNumber(heroEvolveStatus.goldCost)} Gold)` : (heroEvolveStatus.reason || 'Cannot evolve')"
+                        @click="handleEvolveHero"
+                      >
+                        <span v-if="isEvolvingHero" class="animate-spin inline-block">↻</span>
+                        <span v-else>⭐ Evolve → {{ heroEvolveStatus.targetStar }}★</span>
+                      </button>
                       <button
                         v-if="canFarmSoulStones"
                         type="button"
@@ -1120,8 +1275,47 @@ function handleSoulStoneFarm() {
             </div>
           </div>
 
+          <!-- Compact Sub-Tab Switcher -->
+          <div id="hero-detail-subtabs" class="flex items-center gap-1.5 p-1 rounded-xl bg-slate-200/70 dark:bg-slate-800/90 text-xs font-semibold flex-wrap">
+            <button
+              type="button"
+              class="cursor-pointer flex-1 min-w-fit px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5"
+              :class="activeSubTab === 'core' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
+              @click="activeSubTab = 'core'"
+            >
+              <span>⚙️</span> <span>Core (Skills &amp; Gear)</span>
+              <span v-if="canPromote" class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-3xs font-bold">↑</span>
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer flex-1 min-w-fit px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5"
+              :class="activeSubTab === 'artifacts' ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
+              @click="activeSubTab = 'artifacts'"
+            >
+              <span>🛡️</span> <span>Artifacts</span>
+              <span v-if="artifactUpgradeableCount > 0" class="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-3xs font-bold">{{ artifactUpgradeableCount }}</span>
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer flex-1 min-w-fit px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5"
+              :class="activeSubTab === 'skins' ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
+              @click="activeSubTab = 'skins'"
+            >
+              <span>👘</span> <span>Skins</span>
+              <span v-if="skinUpgradeableCount > 0" class="px-1.5 py-0.2 rounded-full bg-purple-500 text-white text-3xs font-bold">{{ skinUpgradeableCount }}</span>
+            </button>
+            <button
+              type="button"
+              class="cursor-pointer flex-1 min-w-fit px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5"
+              :class="activeSubTab === 'glyphs' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'"
+              @click="activeSubTab = 'glyphs'"
+            >
+              <span>✨</span> <span>Glyphs</span>
+            </button>
+          </div>
+
           <!-- 2. Hero Skills Section with + Upgrade Button -->
-          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <div v-show="activeSubTab === 'core'" class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -1326,6 +1520,7 @@ function handleSoulStoneFarm() {
           <!-- 3. Artifacts Section -->
           <div
             v-if="detailedArtifacts.length > 0"
+            v-show="activeSubTab === 'artifacts'"
             class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3"
           >
             <div class="flex items-center justify-between gap-2 flex-wrap">
@@ -1482,12 +1677,24 @@ function handleSoulStoneFarm() {
                 <div v-else class="text-center py-1 text-3xs font-bold text-amber-500">
                   ★ MAX LEVEL ★
                 </div>
+
+                <!-- Artifact Star Evolution Button (artifact_evolve) -->
+                <button
+                  v-if="art.star < 6 && getArtifactSlotEvolveInfo(art).canEvolve"
+                  type="button"
+                  :disabled="evolvingArtifactSlot !== null"
+                  class="mt-1 w-full h-6 px-2 rounded-md bg-amber-500 hover:bg-amber-400 text-white text-3xs font-bold cursor-pointer transition-all disabled:opacity-45"
+                  :title="`Evolve ${art.name} to ${art.star + 1}★`"
+                  @click="evolveArtifactSlot(art.slotId)"
+                >
+                  {{ evolvingArtifactSlot === art.slotId ? '↻ Evolving…' : `⭐ Evolve → ${art.star + 1}★` }}
+                </button>
               </div>
             </div>
           </div>
 
           <!-- 4. Skins Section -->
-          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <div v-show="activeSubTab === 'skins'" class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -1651,7 +1858,7 @@ function handleSoulStoneFarm() {
           </div>
 
           <!-- 5. Equipment Slots & Campaign Farm Section -->
-          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
+          <div v-show="activeSubTab === 'core'" class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -1819,6 +2026,44 @@ function handleSoulStoneFarm() {
                     <span v-if="isEquipping[slot.slotNum]" class="animate-spin text-3xs font-bold leading-none inline-block">↻</span>
                     <span>{{ isEquipping[slot.slotNum] ? 'Equipping' : 'Equip' }}</span>
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Glyphs & Talisman Overview Tab -->
+          <div
+            v-show="activeSubTab === 'glyphs'"
+            class="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-800/80 space-y-3"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <span>✨</span> Glyphs &amp; Talisman
+              </h4>
+              <span class="text-3xs text-slate-400">Read-only snapshot from heroGetAll / talisman_getAll</span>
+            </div>
+
+            <div v-if="heroGlyphsAndTalisman.glyphs.length > 0" class="grid grid-cols-5 gap-2 text-center text-xs">
+              <div
+                v-for="g in heroGlyphsAndTalisman.glyphs"
+                :key="'glyph-' + g.slot"
+                class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40"
+              >
+                <div class="text-3xs text-slate-400">Glyph #{{ g.slot }}</div>
+                <div class="font-bold text-slate-800 dark:text-slate-100">Lv. {{ g.level }}</div>
+              </div>
+            </div>
+            <div v-else class="text-xs text-slate-400 italic">No glyph data captured for this hero yet.</div>
+
+            <div v-if="heroGlyphsAndTalisman.talismans.length > 0" class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+              <div class="text-2xs font-bold text-slate-600 dark:text-slate-300">Talismans ({{ heroGlyphsAndTalisman.talismans.length }})</div>
+              <div class="flex flex-wrap gap-2">
+                <div
+                  v-for="(t, idx) in heroGlyphsAndTalisman.talismans"
+                  :key="'talisman-' + idx"
+                  class="px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50/60 dark:bg-sky-950/30 text-2xs font-semibold text-sky-800 dark:text-sky-300"
+                >
+                  Talisman #{{ t.id ?? idx + 1 }} · Lv. {{ t.level ?? 1 }}
                 </div>
               </div>
             </div>
