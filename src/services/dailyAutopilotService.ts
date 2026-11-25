@@ -604,12 +604,18 @@ export function computeFreeGiftStripItems(
         : 'Skill Points Video: waiting for refillable:55'
   );
 
-  // 7. Heroic Chest Video (tracked from heroChest_getInfo.videoCooldown — read-only until open RPC is verified)
-  const heroChest = c.heroChest_getInfo?.data;
+  // 7. Heroic Chest Video (24h renewal via heroChest_getInfo.videoCooldown + 30-minute open window)
+  const heroChestEntry = c.heroChest_getInfo;
+  const heroChest = heroChestEntry?.data;
   const heroChestCdMs = toMsEpoch(heroChest?.videoCooldown);
   const heroChestRemSec = heroChestCdMs !== null ? Math.max(0, Math.ceil((heroChestCdMs - now) / 1000)) : null;
   const heroChestReady = heroChest != null && heroChestRemSec !== null && heroChestRemSec === 0;
   const heroChestState = !heroChest ? 'unknown' : heroChestReady ? 'available' : 'done';
+  const infoSeenMs = heroChestEntry?.updatedAt ? Date.parse(heroChestEntry.updatedAt) : NaN;
+  const windowRemSec =
+    heroChestReady && Number.isFinite(infoSeenMs) && infoSeenMs <= now
+      ? Math.max(0, 1800 - Math.floor((now - infoSeenMs) / 1000))
+      : null;
   const heroicChestVideo = buildItem(
     'heroicChestVideo',
     '🧰',
@@ -617,11 +623,13 @@ export function computeFreeGiftStripItems(
     heroChestReady ? 1 : 0,
     heroChestState,
     heroChestReady
-      ? 'Free Heroic Chest (Video) is ready in-game (capture open RPC to enable auto-claim)'
+      ? windowRemSec != null && windowRemSec > 0
+        ? `Free Heroic Chest (Video) ready · ${formatCooldownTimer(windowRemSec)} left in 30m window`
+        : 'Free Heroic Chest (Video) ready to claim (24h renewal)'
       : heroChestRemSec != null && heroChestRemSec > 0
         ? `Heroic Chest Video ready in ${formatCooldownTimer(heroChestRemSec)}`
         : 'Heroic Chest Video: waiting for heroChest_getInfo',
-    false
+    true
   );
 
   return [
@@ -633,6 +641,21 @@ export function computeFreeGiftStripItems(
     skillPointsVideo,
     heroicChestVideo,
   ];
+}
+
+/**
+ * Computes the next wake timestamp (+5s buffer) when the 24h Heroic Chest Video
+ * cooldown expires so background scheduling uses a single alarm with zero polling.
+ */
+export function computeHeroicChestNextWakeMs(
+  cache: Record<string, any> | null | undefined,
+  now = Date.now()
+): number | null {
+  const cdMs = toMsEpoch(cache?.heroChest_getInfo?.data?.videoCooldown);
+  if (cdMs !== null && cdMs > now) {
+    return cdMs + 5000;
+  }
+  return null;
 }
 
 export function formatShortTime(ms: number | undefined): string {

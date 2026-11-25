@@ -82,6 +82,8 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
     dailyBonusFarm: 'other',
     zeppelinGiftGet: 'other',
     zeppelinGiftFarm: 'other',
+    heroChest_getInfo: 'other',
+    heroChest_openChest: 'other',
     offerFarmReward: 'other',
     subscriptionFarm: 'other',
     subscriptionGetInfo: 'other',
@@ -3361,6 +3363,24 @@ const getTitanLevelFromExp = (): any => typedGetTitanLevelFromExp;
             data: {
               ...(next.zeppelinGiftGet?.data || {}),
               available: false,
+            },
+            updatedAt: entry.updatedAt,
+          };
+          changed = true;
+          continue;
+        }
+        if (entry.key === 'heroChest_openChest' && entry.data && typeof entry.data === 'object') {
+          next.heroChest_getInfo = {
+            key: 'heroChest_getInfo',
+            method: 'heroChest_getInfo',
+            feature: null,
+            group: 'other',
+            data: {
+              ...(next.heroChest_getInfo?.data || {}),
+              ...(entry.data.opensCount != null ? { opensCount: entry.data.opensCount } : {}),
+              ...(entry.data.videoCooldown != null ? { videoCooldown: entry.data.videoCooldown } : {}),
+              ...(entry.data.startRewardLineupCompleted != null ? { startRewardLineupCompleted: entry.data.startRewardLineupCompleted } : {}),
+              lastOpenedAt: entry.updatedAt,
             },
             updatedAt: entry.updatedAt,
           };

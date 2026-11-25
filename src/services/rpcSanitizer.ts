@@ -164,6 +164,20 @@ export function validateOutgoingMultiTeamRpcCalls(calls: any[]): OutgoingRpcVali
         };
       }
     }
+
+    if (name === 'heroChest_openChest') {
+      const isStrictFreeVideo =
+        args?.free === true &&
+        args?.video === true &&
+        Number(args?.count) === 1 &&
+        String(args?.costId ?? '') === '';
+      if (!isStrictFreeVideo) {
+        return {
+          ok: false,
+          error: 'Blocked outgoing heroChest_openChest: only free video opens (count:1, free:true, video:true, costId:"") are permitted to prevent accidental Emerald spend.',
+        };
+      }
+    }
   }
   return { ok: true };
 }

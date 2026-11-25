@@ -156,4 +156,24 @@ test('validateOutgoingMultiTeamRpcCalls blocks flat 1D arrays on GrandArena and 
     ]).ok,
     true
   );
+
+  // P2-12: Strict 0-Emerald guard for heroChest_openChest
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      { name: 'heroChest_openChest', args: { count: 1, free: true, video: true, costId: '' } },
+    ]).ok,
+    true
+  );
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      { name: 'heroChest_openChest', args: { count: 10, free: false, video: false, costId: 'emerald' } },
+    ]).ok,
+    false
+  );
+  assert.equal(
+    validateOutgoingMultiTeamRpcCalls([
+      { name: 'heroChest_openChest', args: { count: 1, free: true, video: false, costId: '' } },
+    ]).ok,
+    false
+  );
 });

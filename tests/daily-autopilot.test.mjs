@@ -6,11 +6,13 @@ import {
   resolveDailyResetAnchor,
   buildDailyExecutionPlan,
   computeExpeditionNextWakeMs,
+  computeHeroicChestNextWakeMs,
   computeFreeGiftStripItems,
   mergeActivityWithAutopilotState,
   DEFAULT_DAILY_STEP_ORDER,
   HIGH_RISK_ACTIVITIES,
 } from '../src/services/dailyAutopilotService.ts';
+import { rpcCacheService } from '../src/core/cache/rpcCache.ts';
 
 const root = resolve(process.cwd());
 
@@ -120,10 +122,36 @@ test('computeFreeGiftStripItems splits all 7 free gift groups with isolated erro
   assert.equal(byId.zeppelinGift.badgeText, '!');
   assert.match(byId.zeppelinGift.tooltip, /RPC timeout/);
 
-  // Heroic Chest Video tracks readiness from heroChest_getInfo.videoCooldown (read-only until open RPC verified)
+  // Heroic Chest Video is clickable when 24h cooldown expired and shows 30m window tooltip
   assert.equal(byId.heroicChestVideo.state, 'available');
-  assert.equal(byId.heroicChestVideo.clickable, false);
-  assert.equal(byId.heroicChestVideo.disabled, true);
+  assert.equal(byId.heroicChestVideo.clickable, true);
+  assert.equal(byId.heroicChestVideo.disabled, false);
+
+  // Cooldown active -> disabled + next wake timestamp scheduled (+5s)
+  const futureCdSec = Math.floor(now / 1000) + 86400;
+  const cdCache = { heroChest_getInfo: { data: { videoCooldown: futureCdSec, opensCount: 114 } } };
+  const cdItems = computeFreeGiftStripItems(cdCache, now, { hasGameTab: true });
+  const cdHeroic = cdItems.find((i) => i.id === 'heroicChestVideo');
+  assert.equal(cdHeroic.state, 'done');
+  assert.equal(cdHeroic.disabled, true);
+  assert.equal(computeHeroicChestNextWakeMs(cdCache, now), futureCdSec * 1000 + 5000);
+
+  // rpcCache syncs heroChest_openChest response into heroChest_getInfo.videoCooldown immediately
+  const merged = rpcCacheService.merge({}, [{
+    endpoint: 'https://api.hero-wars-alliance.com/api/rpc',
+    method: 'POST',
+    status: 200,
+    outcome: 'completed',
+    timestamp: '2026-11-25T15:39:56.519Z',
+    requestBody: JSON.stringify({
+      calls: [{ name: 'heroChest_openChest', args: { count: 1, free: true, video: true, costId: '' }, ident: 'hc1' }],
+    }),
+    responseBody: JSON.stringify({
+      results: [{ ident: 'hc1', result: { response: { cost: [], opensCount: 114, videoCooldown: 1795707596 } } }],
+    }),
+  }]).cache;
+  assert.equal(merged.heroChest_getInfo?.data?.videoCooldown, 1795707596);
+  assert.equal(merged.heroChest_getInfo?.data?.opensCount, 114);
 });
 
 test('mergeActivityWithAutopilotState supports running, waiting, skipped, error, and done statuses', () => {

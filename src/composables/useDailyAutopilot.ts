@@ -8,6 +8,7 @@ import {
   resolveDailyResetAnchor,
   buildDailyExecutionPlan,
   computeExpeditionNextWakeMs,
+  computeHeroicChestNextWakeMs,
   computeFreeGiftStripItems,
   formatShortTime,
   type DailyAutopilotSettings,
@@ -204,8 +205,33 @@ export function useDailyAutopilot(
         const res = await dispatchRpc([{ name: 'refillable_skillpointsUseVideo', args: {} }]);
         const err = extractRpcError(res);
         if (err) throw new Error(err);
+      } else if (giftId === 'heroicChestVideo') {
+        // Verify authoritative videoCooldown from server before opening (strict 24h renewal & 0-Emerald safety)
+        const infoRes = await dispatchRpc([{ name: 'heroChest_getInfo', args: {} }]);
+        const infoErr = extractRpcError(infoRes);
+        if (infoErr) throw new Error(infoErr);
+        const infoData = infoRes?.results?.[0]?.result?.response ?? cacheRef.value?.heroChest_getInfo?.data;
+        const cdSec = Number(infoData?.videoCooldown ?? 0);
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (Number.isFinite(cdSec) && cdSec > nowSec) {
+          // Still on 24h cooldown — schedule single wake alarm and do NOT open
+          const wakeMs = cdSec * 1000 + 5000;
+          if (typeof chrome !== 'undefined' && chrome.alarms?.create) {
+            try { chrome.alarms.create('daily-autopilot-heroic-video-wake', { when: wakeMs }); } catch (_) {}
+          }
+          return true;
+        }
+        const openRes = await dispatchRpc([{
+          name: 'heroChest_openChest',
+          args: { count: 1, free: true, video: true, costId: '' },
+        }]);
+        const openErr = extractRpcError(openRes);
+        if (openErr) throw new Error(openErr);
+        const nextWake = computeHeroicChestNextWakeMs(cacheRef.value, Date.now());
+        if (nextWake && typeof chrome !== 'undefined' && chrome.alarms?.create) {
+          try { chrome.alarms.create('daily-autopilot-heroic-video-wake', { when: nextWake }); } catch (_) {}
+        }
       } else {
-        // heroicChestVideo: read-only until open RPC is empirically captured
         return false;
       }
       return true;

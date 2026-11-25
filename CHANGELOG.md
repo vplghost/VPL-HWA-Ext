@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.316 — 2026-11-25
+
+### Added
+
+- **Free Heroic Chest (Video) Integration & Zero-Emerald Guard (`rpcCache.ts`, `rpcSanitizer.ts`, `dailyAutopilotService.ts`, `useDailyAutopilot.ts`, `tests/daily-autopilot.test.mjs`, `tests/rpc-sanitizer.test.mjs`)**:
+  - Synced `heroChest_getInfo` and `heroChest_openChest` in `src/core/cache/rpcCache.ts` so the returned 24h `videoCooldown` (`+86400s`) and `opensCount` immediately update cache and prevent duplicate opens.
+  - Added strict 0-Emerald outgoing guard for `heroChest_openChest` in `src/services/rpcSanitizer.ts` requiring `{ count: 1, free: true, video: true, costId: "" }`.
+  - Enabled clickable 🧰 `Heroic Video` chip (`#free-gift-chip-heroicChestVideo`) in `FreeGiftsStrip.vue` with 30-minute open-window tooltip tracking, server cooldown verification before dispatch, and single-alarm `computeHeroicChestNextWakeMs()` wake scheduling in `useDailyAutopilot.ts`.
+
 ## 0.11.314 — 2026-11-25
 
 ### Added
