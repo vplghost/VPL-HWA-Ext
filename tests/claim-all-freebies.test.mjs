@@ -354,9 +354,9 @@ test('SettingsTab.vue contains separate checkboxes for every freebie group and p
 });
 
 test('DashboardTab.vue and ClaimAllFreebiesButton.vue provide dashboard claim integration', () => {
-  const dashboardTabPath = path.resolve('src/components/dashboard/DashboardTab.vue');
-  const dashContent = fs.readFileSync(dashboardTabPath, 'utf8');
-  assert.ok(dashContent.includes('ClaimAllFreebiesButton'), 'DashboardTab must mount ClaimAllFreebiesButton');
+  const stripPath = path.resolve('src/components/dashboard/FreeGiftsStrip.vue');
+  const stripContent = fs.readFileSync(stripPath, 'utf8');
+  assert.ok(stripContent.includes('ClaimAllFreebiesButton'), 'FreeGiftsStrip must mount ClaimAllFreebiesButton inside ActivityGoals card');
 
   const buttonPath = path.resolve('src/components/dashboard/ClaimAllFreebiesButton.vue');
   const buttonContent = fs.readFileSync(buttonPath, 'utf8');

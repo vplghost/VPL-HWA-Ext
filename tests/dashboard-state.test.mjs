@@ -177,7 +177,7 @@ async function setupComponent(file, expose, initial = {}) {
   const source = await readFile(new URL('../src/components/dashboard/' + file, import.meta.url), 'utf8');
   const setup = source.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?;\r?$/gm, '');
   const cache = ref(initial), clock = ref(now), opened = [];
-  const context = { computed, ref, useNow: () => clock, useRpcCache: () => ({ cache }),
+  const context = { computed, ref, defineProps: () => ({}), withDefaults: (_p, d) => d, useNow: () => clock, useRpcCache: () => ({ cache }),
     useModals: () => ({ openModal: id => opened.push(id) }), dashboardQueues, dashboardMarches, calculateAccountMaxMarches,
     getBuildingName: id => `Building ${id}`, getResearchName: id => `Research ${id}`,
     expeditionActivity, towerActivityState, arenaActivityState, observedToday, dungeonActivityState: (cache, time) => dungeonActivityState(cache, time, meta), guildVersusActivityState, frontierActivityState, readyQuestCount };

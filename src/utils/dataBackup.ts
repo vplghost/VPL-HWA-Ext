@@ -24,6 +24,7 @@ export const CONFIG_KEYS = [
   'theme',
   'popupRpcEnabled',
   'sanitizeTeamEnabled',
+  'dailyAutopilotSettings',
   'socketRefreshMode',
   'resourceSelection',
   'customTeams',

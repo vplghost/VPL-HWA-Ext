@@ -169,7 +169,8 @@ test('FreeChestButton and DashboardTab template include proper button ID and RPC
   assert.ok(sfcContent.includes("name: 'refillableGetAll'"), 'Must dispatch refillableGetAll for World Energy sync');
   assert.ok(sfcContent.includes("name: 'inventoryGet'"), 'Must dispatch inventoryGet for inventory sync');
 
-  const dashboardTabContent = readFileSync('src/components/dashboard/DashboardTab.vue', 'utf8');
-  assert.ok(dashboardTabContent.includes('FreeChestButton'), 'DashboardTab must import and render FreeChestButton');
-  assert.ok(dashboardTabContent.includes('<FreeChestButton :has-game-tab="hasGameTab" />'), 'Must pass has-game-tab prop to FreeChestButton');
+  const activityGoalsContent = readFileSync('src/components/dashboard/ActivityGoals.vue', 'utf8');
+  assert.ok(activityGoalsContent.includes('FreeGiftsStrip'), 'ActivityGoals must mount unified FreeGiftsStrip');
+  const stripContent = readFileSync('src/components/dashboard/FreeGiftsStrip.vue', 'utf8');
+  assert.ok(stripContent.includes('free-gift-chip-'), 'FreeGiftsStrip must render per-group free gift icon chips');
 });

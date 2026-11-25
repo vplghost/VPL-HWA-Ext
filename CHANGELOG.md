@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.312 — 2026-11-25
+
+### Added
+
+- **One-Click Daily Routine Autopilot & Unified Free Gifts Strip (`dailyAutopilotService.ts`, `useDailyAutopilot.ts`, `FreeGiftsStrip.vue`, `ActivityGoals.vue`, `DashboardTab.vue`, `SettingsTab.vue`, `dataBackup.ts`, `tests/daily-autopilot.test.mjs`)**:
+  - Added `resolveDailyResetAnchor()` in `src/services/dailyAutopilotService.ts` to dynamically resolve daily server reset time (`override` → `questResetStatus.nextDayAt` → event reset → account timezone → `02:00 UTC` / `09:00 UTC+7` fallback).
+  - Added safe-first execution planning (`buildDailyExecutionPlan()`) placing high-risk activities (`Hydra`, `Arena`, `Grand Arena`, `Guild Dungeon`) at the bottom and skipped by default, plus zero-spam Expedition wake scheduling (`computeExpeditionNextWakeMs()`).
+  - Enhanced `ActivityGoals.vue` with compact **▶ Autopilot / ⏹ Stop** controls, short status summary, extended per-activity states (`running`, `waiting`, `skipped`, `error`, `done`), and a unified footer strip (`FreeGiftsStrip.vue`) separating all 7 Free Gift / Video / Spin channels (including read-only `heroChest_getInfo.videoCooldown` tracking) with isolated error and disabled indicators.
+  - Added centralized **Daily Routine Autopilot** configuration in `SettingsTab.vue` and persisted `dailyAutopilotSettings` in `dataBackup.ts` `CONFIG_KEYS`.
+
 ## 0.11.310 — 2026-11-25
 
 ### Fixed

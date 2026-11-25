@@ -8,6 +8,8 @@ import '@/src/utils/metadata';
 import { usePopupAutomation } from '@/src/composables/usePopupAutomation';
 import { useFreeSpinAutomation } from '@/src/composables/useFreeSpinAutomation';
 import { useFrontierAutomation } from '@/src/composables/useFrontierAutomation';
+import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
+import { DAILY_STEP_LABELS, HIGH_RISK_ACTIVITIES } from '@/src/services/dailyAutopilotService';
 import { useDraft } from '@/src/composables/useDraft';
 import { TROOP_DEFS, getBuildingTrainingCapacity, getUnlockedTroopLevels } from '@/src/utils/troops';
 import { DEFAULT_WASM_PROFILE_VERSION } from '@/src/data/wasmSymbols';
@@ -32,6 +34,19 @@ const { theme, applyTheme } = useTheme();
 const { recordingState, cache, updateRecordingState, dispatchRpc } = useRpcCache();
 const isTogglingRecording = ref(false);
 const { autoClaimSettings, priorityAutoJoin, teams: autoJoinTeams, pending: pendingClaims, selectedCount, busy: claimBusy, message: claimMessage, saveAutoClaim, savePriorityJoin, claimRewards } = usePopupAutomation(cache);
+const {
+  settings: dailyAutopilotSettings,
+  resetAnchor: dailyResetAnchor,
+  saveSettings: saveDailyAutopilotSettings,
+} = useDailyAutopilot(cache, dispatchRpc);
+
+function toggleDailyAutopilotStepSkip(stepId: string) {
+  const nextSkipped = {
+    ...(dailyAutopilotSettings.value.skippedSteps || {}),
+    [stepId]: !dailyAutopilotSettings.value.skippedSteps?.[stepId],
+  };
+  saveDailyAutopilotSettings({ skippedSteps: nextSkipped });
+}
 const { hasGameTab, isHealthy, alertMessage, isRefreshing, reloadGameTab, gameEngineStatus, checkStatus } = useGameConnection();
 const engine = computed(() => engineDiagnostics(gameEngineStatus.value));
 const enginePingMessage = ref('');
@@ -862,6 +877,84 @@ async function toggleRecording() {
         </button>
       </div>
     </div>
+
+    <section id="settings-daily-autopilot" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <h3 class="text-sm font-bold flex items-center gap-1.5">
+          <span>🤖</span> Daily Routine Autopilot
+        </h3>
+        <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+          Reset anchor: {{ dailyResetAnchor.formattedUtc }} ({{ dailyResetAnchor.source }})
+        </span>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            id="setting-daily-autopilot-enabled"
+            type="checkbox"
+            :checked="dailyAutopilotSettings.enabled"
+            @change="saveDailyAutopilotSettings({ enabled: ($event.target as HTMLInputElement).checked })"
+          />
+          <span>Auto-start daily routine after server reset (default 02:00 UTC / 09:00 UTC+7 with jitter)</span>
+        </label>
+
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            id="setting-daily-autopilot-skip-high-risk"
+            type="checkbox"
+            :checked="dailyAutopilotSettings.skipHighRiskByDefault"
+            @change="saveDailyAutopilotSettings({ skipHighRiskByDefault: ($event.target as HTMLInputElement).checked })"
+          />
+          <span>Skip high-risk activities by default (Hydra, Arena, Grand Arena, Guild Dungeon)</span>
+        </label>
+
+        <div class="flex items-center justify-between gap-2 pt-1">
+          <span class="text-slate-600 dark:text-slate-300 font-medium">On step error:</span>
+          <select
+            id="setting-daily-autopilot-error-policy"
+            :value="dailyAutopilotSettings.errorPolicy"
+            class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200"
+            @change="saveDailyAutopilotSettings({ errorPolicy: ($event.target as HTMLSelectElement).value as any })"
+          >
+            <option value="skip-and-continue">Skip failed step &amp; continue</option>
+            <option value="stop-all">Stop autopilot immediately</option>
+          </select>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+          <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            Execution Order &amp; Per-Activity Skip (Safe first, high-risk at bottom)
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            <label
+              v-for="(stepId, idx) in dailyAutopilotSettings.stepOrder"
+              :key="stepId"
+              class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 cursor-pointer"
+            >
+              <span class="flex items-center gap-1.5 min-w-0 truncate">
+                <span class="text-[10px] font-mono text-slate-400">{{ idx + 1 }}.</span>
+                <span class="font-medium text-slate-700 dark:text-slate-200 truncate">{{ DAILY_STEP_LABELS[stepId] }}</span>
+                <span
+                  v-if="HIGH_RISK_ACTIVITIES.has(stepId)"
+                  class="px-1 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                >
+                  Risk
+                </span>
+              </span>
+              <span class="flex items-center gap-1 shrink-0 text-[10px] text-slate-500">
+                <input
+                  type="checkbox"
+                  :checked="Boolean(dailyAutopilotSettings.skippedSteps?.[stepId])"
+                  @change="toggleDailyAutopilotStepSkip(stepId)"
+                />
+                <span>Skip</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <section class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
       <h3 class="text-sm font-bold">Auto Free Spin</h3>

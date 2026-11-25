@@ -7,16 +7,26 @@ import { towerActivityState, arenaActivityState, dungeonActivityState, guildVers
 import { useRpcCache } from '@/src/composables/useRpcCache';
 import { useModals } from '@/src/composables/useModals';
 import { dailyQuests } from '@/src/data/questData';
+import { useDailyAutopilot } from '@/src/composables/useDailyAutopilot';
+import { mergeActivityWithAutopilotState, type ExtendedActivityState } from '@/src/services/dailyAutopilotService';
+import FreeGiftsStrip from './FreeGiftsStrip.vue';
 
-const { cache } = useRpcCache();
+const props = withDefaults(defineProps<{ hasGameTab?: boolean }>(), {
+  hasGameTab: true,
+});
+
+const { cache, dispatchRpc } = useRpcCache();
 const now = useNow();
 const { openModal } = useModals();
+const autopilot = typeof useDailyAutopilot === 'function'
+  ? useDailyAutopilot(cache, dispatchRpc, now)
+  : null;
 
 interface ActivityRow {
   id: string;
   title: string;
   icon: string;
-  state: 'pending' | 'done' | 'info' | 'unknown';
+  state: ExtendedActivityState;
   detail: string;
   isInteractive?: boolean;
   progress?: number;
@@ -95,8 +105,22 @@ const activities = computed<ActivityRow[]>(() => {
     isInteractive: true,
   });
 
+  if (autopilot && typeof mergeActivityWithAutopilotState === 'function') {
+    const steps = autopilot.runtimeState.steps || {};
+    return rows.map((row) => mergeActivityWithAutopilotState(row, (steps as any)[row.id]));
+  }
+
   return rows;
 });
+
+function toggleAutopilot() {
+  if (!autopilot) return;
+  if (autopilot.runtimeState.running) {
+    autopilot.stopAutopilot();
+  } else {
+    void autopilot.startAutopilot();
+  }
+}
 
 function handleActivityClick(act: ActivityRow) {
   if (act.id === 'tower') openModal('tower');
@@ -113,11 +137,39 @@ function handleActivityClick(act: ActivityRow) {
 
 <template>
   <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-3 space-y-2.5 shadow-2xs">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-2">
       <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
         <span>🎯</span> Daily Activities & Progress
       </h4>
-      <span class="text-[10px] text-slate-400">Tracked from game packets</span>
+
+      <div class="flex items-center gap-2">
+        <span
+          v-if="autopilot"
+          id="daily-autopilot-status"
+          class="text-[10px] font-medium"
+          :class="autopilot.runtimeState.running ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-400'"
+        >
+          {{ autopilot.statusSummary.value }}
+        </span>
+        <span v-else class="text-[10px] text-slate-400">Tracked from game packets</span>
+
+        <button
+          v-if="autopilot"
+          id="btn-daily-autopilot-toggle"
+          type="button"
+          :disabled="!props.hasGameTab && !autopilot.runtimeState.running"
+          class="cursor-pointer px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+          :class="
+            autopilot.runtimeState.running
+              ? 'bg-rose-600 hover:bg-rose-500 text-white'
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+          "
+          :title="autopilot.runtimeState.running ? 'Stop Daily Autopilot' : 'Start Daily Routine Autopilot'"
+          @click="toggleAutopilot"
+        >
+          {{ autopilot.runtimeState.running ? '⏹ Stop' : '▶ Autopilot' }}
+        </button>
+      </div>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -150,6 +202,10 @@ function handleActivityClick(act: ActivityRow) {
           :class="{
             'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300': act.state === 'done',
             'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 animate-pulse': act.state === 'pending',
+            'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 animate-pulse': act.state === 'running',
+            'bg-cyan-100 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-300': act.state === 'waiting',
+            'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300': act.state === 'error',
+            'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400': act.state === 'skipped',
             'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400': act.state === 'info',
             'bg-slate-50 dark:bg-slate-900 text-slate-400': act.state === 'unknown',
           }"
@@ -158,5 +214,8 @@ function handleActivityClick(act: ActivityRow) {
         </span>
       </div>
     </div>
+
+    <!-- Unified Per-Group Free Gifts / Video / Spin Strip -->
+    <FreeGiftsStrip :has-game-tab="props.hasGameTab" />
   </div>
 </template>

@@ -1,0 +1,388 @@
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import {
+  DAILY_AUTOPILOT_SETTINGS_KEY,
+  DAILY_AUTOPILOT_STATE_KEY,
+  getDefaultDailyAutopilotSettings,
+  normalizeDailyAutopilotSettings,
+  createDefaultDailyRuntimeState,
+  resolveDailyResetAnchor,
+  buildDailyExecutionPlan,
+  computeExpeditionNextWakeMs,
+  computeFreeGiftStripItems,
+  formatShortTime,
+  type DailyAutopilotSettings,
+  type DailyAutopilotRuntimeState,
+  type DailyActivityId,
+  type FreeGiftId,
+} from '../services/dailyAutopilotService.ts';
+import { getAttentionBonusAvailability } from '../utils/freeChestHelper.ts';
+import { freeAlchemyAvailability } from '../utils/freeAlchemySpin.ts';
+
+const settings = ref<DailyAutopilotSettings>(getDefaultDailyAutopilotSettings());
+const runtimeState = reactive<DailyAutopilotRuntimeState>(createDefaultDailyRuntimeState());
+const runningFreeGiftIds = ref<Set<string>>(new Set());
+const freeGiftErrors = ref<Record<string, string | null>>({});
+
+let abortRequested = false;
+let initialized = false;
+
+function persistSettings(next: DailyAutopilotSettings) {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    try {
+      const plain = JSON.parse(JSON.stringify(next));
+      chrome.storage.local.set({ [DAILY_AUTOPILOT_SETTINGS_KEY]: plain }).catch?.(() => {});
+    } catch (_) {}
+  }
+}
+
+function persistRuntime() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+    try {
+      const plain = JSON.parse(JSON.stringify(runtimeState));
+      chrome.storage.local.set({ [DAILY_AUTOPILOT_STATE_KEY]: plain }).catch?.(() => {});
+    } catch (_) {}
+  }
+}
+
+function setGiftRunning(id: FreeGiftId, active: boolean) {
+  const next = new Set(runningFreeGiftIds.value);
+  if (active) next.add(id);
+  else next.delete(id);
+  runningFreeGiftIds.value = next;
+}
+
+function setGiftError(id: FreeGiftId, err: string | null) {
+  freeGiftErrors.value = { ...freeGiftErrors.value, [id]: err };
+}
+
+function extractRpcError(res: any): string | null {
+  if (!res) return 'Empty RPC response';
+  if (res.ok === false) return String(res.error || 'RPC dispatch failed');
+  const first = res.results?.[0];
+  const err = first?.result?.error || first?.result?.response?.error || first?.error;
+  if (err) {
+    return typeof err === 'object' ? String(err.description || err.name || err.message || JSON.stringify(err)) : String(err);
+  }
+  return null;
+}
+
+export function useDailyAutopilot(
+  cacheRef: { value: Record<string, any> },
+  dispatchRpc?: (calls: any[]) => Promise<any>,
+  nowRef?: { value: number }
+) {
+  async function loadFromStorage() {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+      try {
+        const stored: any = await chrome.storage.local.get([
+          DAILY_AUTOPILOT_SETTINGS_KEY,
+          DAILY_AUTOPILOT_STATE_KEY,
+        ]);
+        if (stored?.[DAILY_AUTOPILOT_SETTINGS_KEY]) {
+          settings.value = normalizeDailyAutopilotSettings(stored[DAILY_AUTOPILOT_SETTINGS_KEY]);
+        }
+        if (stored?.[DAILY_AUTOPILOT_STATE_KEY] && typeof stored[DAILY_AUTOPILOT_STATE_KEY] === 'object') {
+          Object.assign(runtimeState, createDefaultDailyRuntimeState(), stored[DAILY_AUTOPILOT_STATE_KEY]);
+          // Never leave stale running=true across popup reloads
+          runtimeState.running = false;
+          runtimeState.activeStepId = null;
+        }
+      } catch (_) {}
+    }
+  }
+
+  function onStorageChanged(changes: any, area: string) {
+    if (area !== 'local') return;
+    if (changes[DAILY_AUTOPILOT_SETTINGS_KEY]?.newValue) {
+      settings.value = normalizeDailyAutopilotSettings(changes[DAILY_AUTOPILOT_SETTINGS_KEY].newValue);
+    }
+    if (changes[DAILY_AUTOPILOT_STATE_KEY]?.newValue && !runtimeState.running) {
+      Object.assign(runtimeState, createDefaultDailyRuntimeState(), changes[DAILY_AUTOPILOT_STATE_KEY].newValue);
+    }
+  }
+
+  onMounted(() => {
+    if (!initialized) {
+      initialized = true;
+      void loadFromStorage();
+      chrome?.storage?.onChanged?.addListener?.(onStorageChanged);
+    }
+  });
+
+  onUnmounted(() => {
+    // Keep shared reactive state alive across tab switches
+  });
+
+  function saveSettings(partial: Partial<DailyAutopilotSettings>) {
+    const next = normalizeDailyAutopilotSettings({ ...settings.value, ...partial });
+    settings.value = next;
+    persistSettings(next);
+  }
+
+  const resetAnchor = computed(() =>
+    resolveDailyResetAnchor(cacheRef.value, settings.value, nowRef?.value ?? Date.now())
+  );
+
+  const freeGiftItems = computed(() =>
+    computeFreeGiftStripItems(cacheRef.value, nowRef?.value ?? Date.now(), {
+      hasGameTab: true,
+      runningIds: runningFreeGiftIds.value,
+      errorMap: freeGiftErrors.value,
+    })
+  );
+
+  const statusSummary = computed(() => {
+    if (runtimeState.running && runtimeState.activeStepId) {
+      return runtimeState.summary || `Running: ${runtimeState.activeStepId}`;
+    }
+    if (runtimeState.summary) return runtimeState.summary;
+    const nextTime = formatShortTime(resetAnchor.value.nextResetMs);
+    return nextTime ? `Next reset ${nextTime}` : 'Idle';
+  });
+
+  /**
+   * Executes a single isolated Free Gift / Video / Spin channel so one error
+   * never cascades into sibling gifts.
+   */
+  async function runSingleFreeGift(giftId: FreeGiftId): Promise<boolean> {
+    if (!dispatchRpc || runningFreeGiftIds.value.has(giftId)) return false;
+    setGiftRunning(giftId, true);
+    setGiftError(giftId, null);
+
+    try {
+      const c = cacheRef.value || {};
+      if (giftId === 'videoBoxes') {
+        await dispatchRpc([{ name: 'cinemaGetCounters', args: {} }]);
+        const counters = cacheRef.value?.cinemaGetCounters?.data || c.cinemaGetCounters?.data;
+        const claimed = new Set((counters?.placementRewards || []).map((r: any) => Number(r?.boxNum)));
+        const remaining = [0, 1, 2, 3, 4].filter((n) => !claimed.has(n));
+        for (const boxNum of remaining) {
+          const res = await dispatchRpc([{ name: 'cinemaGiveReward', args: { type: 'firstPlacement', boxNum } }]);
+          const err = extractRpcError(res);
+          if (err && !err.toLowerCase().includes('already')) throw new Error(err);
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        await dispatchRpc([{ name: 'cinemaGetCounters', args: {} }]);
+      } else if (giftId === 'videoTickets') {
+        await dispatchRpc([{ name: 'cinemaGetCounters', args: {} }]);
+        const counters = cacheRef.value?.cinemaGetCounters?.data || c.cinemaGetCounters?.data;
+        const viewed = Number(counters?.viewed ?? 0);
+        const rem = Math.max(0, 8 - viewed);
+        for (let i = 0; i < rem; i++) {
+          const res = await dispatchRpc([{ name: 'cinemaGiveReward', args: { type: 'cinema' } }]);
+          const err = extractRpcError(res);
+          if (err && !err.toLowerCase().includes('already')) throw new Error(err);
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        await dispatchRpc([{ name: 'cinemaGetCounters', args: {} }]);
+      } else if (giftId === 'alchemySpin') {
+        if (!freeAlchemyAvailability(c, Date.now()).ready) return true;
+        const res = await dispatchRpc([{ name: 'refillable_alchemyUseVideo', args: { type: 'alchemy' } }]);
+        const err = extractRpcError(res);
+        if (err) throw new Error(err);
+      } else if (giftId === 'attentionBonuses') {
+        let bonuses = c.attentionBonusStatus?.data?.bonuses;
+        if (!bonuses || Object.keys(bonuses).length === 0) {
+          await dispatchRpc([{ name: 'liveOps_refresh', args: {} }]);
+          bonuses = cacheRef.value?.attentionBonusStatus?.data?.bonuses;
+        }
+        const avail = getAttentionBonusAvailability(bonuses, Date.now());
+        for (const id of avail.readyBonusIds) {
+          const res = await dispatchRpc([{ name: 'attentionBonus_collectReward', args: { id } }]);
+          const err = extractRpcError(res);
+          if (err) throw new Error(err);
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        if (avail.readyBonusIds.length > 0) {
+          await dispatchRpc([{ name: 'userGetInfo' }, { name: 'inventoryGet' }]);
+        }
+      } else if (giftId === 'zeppelinGift') {
+        const res = await dispatchRpc([{ name: 'zeppelinGiftFarm', args: {} }]);
+        const err = extractRpcError(res);
+        if (err) throw new Error(err);
+      } else if (giftId === 'skillPointsVideo') {
+        const res = await dispatchRpc([{ name: 'refillable_skillpointsUseVideo', args: {} }]);
+        const err = extractRpcError(res);
+        if (err) throw new Error(err);
+      } else {
+        // heroicChestVideo: read-only until open RPC is empirically captured
+        return false;
+      }
+      return true;
+    } catch (e: any) {
+      setGiftError(giftId, e?.message || String(e));
+      return false;
+    } finally {
+      setGiftRunning(giftId, false);
+    }
+  }
+
+  async function executeStep(stepId: DailyActivityId): Promise<void> {
+    if (!dispatchRpc) throw new Error('Game RPC dispatcher unavailable');
+
+    if (stepId === 'freebies') {
+      const items = computeFreeGiftStripItems(cacheRef.value, Date.now(), { hasGameTab: true });
+      const actionable = items.filter((i) => i.clickable && i.state === 'available');
+      let claimed = 0;
+      let failed = 0;
+      for (const item of actionable) {
+        if (abortRequested) break;
+        const ok = await runSingleFreeGift(item.id);
+        if (ok) claimed++;
+        else failed++;
+      }
+      runtimeState.steps.freebies = {
+        status: failed > 0 && claimed === 0 ? 'error' : 'done',
+        detail: `${claimed} freebie group(s) claimed${failed > 0 ? ` · ${failed} failed` : ''}`,
+        ...(failed > 0 && claimed === 0 ? { error: 'One or more freebie groups failed' } : {}),
+        completedAt: Date.now(),
+      };
+      return;
+    }
+
+    if (stepId === 'expeditions') {
+      // Zero-spam single pass: refresh once, schedule next wake timer if active
+      await dispatchRpc([{ name: 'expeditionGet', args: {} }]);
+      const nextWake = computeExpeditionNextWakeMs(cacheRef.value, Date.now());
+      if (nextWake) {
+        if (typeof chrome !== 'undefined' && chrome.alarms?.create) {
+          try {
+            chrome.alarms.create('daily-autopilot-expedition-wake', { when: nextWake });
+          } catch (_) {}
+        }
+        runtimeState.steps.expeditions = {
+          status: 'waiting',
+          waitingUntil: nextWake,
+          detail: `Waiting · next return ${formatShortTime(nextWake)}`,
+        };
+      } else {
+        runtimeState.steps.expeditions = {
+          status: 'done',
+          detail: 'Expeditions checked',
+          completedAt: Date.now(),
+        };
+      }
+      return;
+    }
+
+    if (stepId === 'frontier') {
+      const res = await dispatchRpc([{ name: 'eternalStory_collectChest', args: {} }]);
+      const err = extractRpcError(res);
+      if (err && !err.toLowerCase().includes('empty') && !err.toLowerCase().includes('nothing')) {
+        throw new Error(err);
+      }
+      runtimeState.steps.frontier = {
+        status: 'done',
+        detail: 'AFK chest checked',
+        completedAt: Date.now(),
+      };
+      return;
+    }
+
+    if (stepId === 'quests') {
+      await dispatchRpc([{ name: 'questGetAll', args: {} }, { name: 'mailGetAll', args: {} }]);
+      runtimeState.steps.quests = {
+        status: 'done',
+        detail: 'Quests & mail synced',
+        completedAt: Date.now(),
+      };
+      return;
+    }
+
+    // Tower & High-Risk combat modes delegate safely to their dedicated dialogs/orchestrators
+    runtimeState.steps[stepId] = {
+      status: 'skipped',
+      detail: 'Open dedicated dialog to run combat safely',
+    };
+  }
+
+  async function startAutopilot() {
+    if (runtimeState.running || !dispatchRpc) return;
+    abortRequested = false;
+    const now = Date.now();
+    const anchor = resolveDailyResetAnchor(cacheRef.value, settings.value, now);
+    const plan = buildDailyExecutionPlan(settings.value, cacheRef.value, now);
+
+    runtimeState.running = true;
+    runtimeState.cycleKey = anchor.cycleKey;
+    runtimeState.startedAt = now;
+    runtimeState.finishedAt = null;
+    runtimeState.steps = {};
+    persistRuntime();
+
+    let errorCount = 0;
+    let doneCount = 0;
+
+    try {
+      for (let i = 0; i < plan.length; i++) {
+        if (abortRequested) break;
+        const step = plan[i]!;
+        if (!step.shouldRun) {
+          runtimeState.steps[step.id] = {
+            status: 'skipped',
+            detail: step.skipReason || 'Skipped',
+          };
+          persistRuntime();
+          continue;
+        }
+
+        runtimeState.activeStepId = step.id;
+        runtimeState.summary = `Running: ${step.label} (${i + 1}/${plan.length})`;
+        runtimeState.steps[step.id] = { status: 'running', detail: `Running ${step.label}…` };
+        persistRuntime();
+
+        try {
+          await executeStep(step.id);
+          if (runtimeState.steps[step.id]?.status === 'error') {
+            errorCount++;
+            if (settings.value.errorPolicy === 'stop-all') break;
+          } else {
+            doneCount++;
+          }
+        } catch (err: any) {
+          errorCount++;
+          runtimeState.steps[step.id] = {
+            status: 'error',
+            error: err?.message || String(err),
+          };
+          persistRuntime();
+          if (settings.value.errorPolicy === 'stop-all') break;
+        }
+
+        if (!abortRequested && i < plan.length - 1) {
+          await new Promise((r) => setTimeout(r, 900 + Math.floor(Math.random() * 700)));
+        }
+      }
+    } finally {
+      runtimeState.running = false;
+      runtimeState.activeStepId = null;
+      runtimeState.finishedAt = Date.now();
+      const finishedTime = formatShortTime(runtimeState.finishedAt);
+      runtimeState.summary = abortRequested
+        ? `Stopped at ${finishedTime}`
+        : errorCount > 0
+          ? `Done ${finishedTime} (${errorCount} error${errorCount > 1 ? 's' : ''})`
+          : `Done · ${finishedTime} (${doneCount} steps)`;
+      persistRuntime();
+    }
+  }
+
+  function stopAutopilot() {
+    abortRequested = true;
+    runtimeState.summary = 'Stopping…';
+  }
+
+  return {
+    settings,
+    runtimeState,
+    resetAnchor,
+    freeGiftItems,
+    runningFreeGiftIds,
+    freeGiftErrors,
+    statusSummary,
+    saveSettings,
+    startAutopilot,
+    stopAutopilot,
+    runSingleFreeGift,
+  };
+}

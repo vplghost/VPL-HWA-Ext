@@ -165,10 +165,6 @@ async function refreshAllDashboard() {
       </div>
 
       <div id="dashboard-actions" class="flex flex-wrap items-center gap-2">
-        <ClaimAllFreebiesButton :has-game-tab="hasGameTab" />
-        <FreeAlchemySpinButton :has-game-tab="hasGameTab" />
-        <FreeBoxButton :has-game-tab="hasGameTab" />
-        <FreeChestButton :has-game-tab="hasGameTab" />
         <!-- Guild Raid -->
         <button
           id="open-raid-dialog"
@@ -265,7 +261,7 @@ async function refreshAllDashboard() {
     <!-- Active Queues & Marches -->
     <QueuesOverview />
 
-    <!-- Daily Activities & Progress -->
-    <ActivityGoals />
+    <!-- Daily Activities & Progress (includes unified Free Gifts strip) -->
+    <ActivityGoals :has-game-tab="hasGameTab" />
   </div>
 </template>
